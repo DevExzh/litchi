@@ -6,6 +6,7 @@ use std::collections::HashSet;
 use litchi_sheet::{Cell as Address, Rect};
 
 use super::super::formula::Range as FormulaRange;
+use super::super::strings::RichTextState;
 use super::x14ac;
 use crate::cell::SharedFormulaStorage;
 use crate::column::{self, Assignments};
@@ -50,6 +51,60 @@ pub(crate) fn merge_successor(local: &[u8]) -> bool {
             | b"tableParts"
             | b"extLst"
     )
+}
+
+/// Where a worksheet reader stands relative to `<sheetData>`, which decides
+/// whether a `<mergeCells>` sits in its schema slot: directly after
+/// `<sheetData>`, before any of the children [`merge_successor`] names.
+///
+/// ```text
+/// Before      --<sheetData>--------------> MergeWindow
+/// MergeWindow --<a mergeCells successor>-> Closed
+/// ```
+///
+/// A `<sheetData>` in `MergeWindow` or `Closed` is a duplicate, and a
+/// successor in `Before` or `Closed` changes nothing. The other worksheet
+/// children are independent "seen" flags of each reader.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum SheetDataStage {
+    /// No `<sheetData>` yet.
+    Before,
+    /// After `<sheetData>`, where the schema allows `<mergeCells>`.
+    MergeWindow,
+    /// After `<sheetData>` and a child that follows `<mergeCells>`.
+    Closed,
+}
+
+impl SheetDataStage {
+    /// A `<sheetData>` starts; `false` when it is a duplicate.
+    #[inline]
+    pub(super) fn enter(&mut self) -> bool {
+        match self {
+            Self::Before => {
+                *self = Self::MergeWindow;
+                true
+            },
+            Self::MergeWindow | Self::Closed => false,
+        }
+    }
+
+    /// A child that follows `<mergeCells>` in the schema starts.
+    #[inline]
+    pub(super) fn successor(&mut self) {
+        match self {
+            Self::MergeWindow => *self = Self::Closed,
+            Self::Before | Self::Closed => {},
+        }
+    }
+
+    /// Whether `<sheetData>` has started.
+    #[inline]
+    pub(super) fn seen(self) -> bool {
+        match self {
+            Self::Before => false,
+            Self::MergeWindow | Self::Closed => true,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -103,9 +158,8 @@ pub(super) struct PendingCell<'c> {
     pub(super) inline: String,
     pub(super) inline_bytes: usize,
     pub(super) saw_inline: bool,
-    pub(super) saw_inline_simple: bool,
-    pub(super) saw_inline_run: bool,
-    pub(super) run_has_text: bool,
+    /// Content model of the cell's `<is>` item.
+    pub(super) inline_state: RichTextState,
 }
 
 /// One cell the `<sheetData>` lane admitted, kept compact until the parse
@@ -227,11 +281,10 @@ pub(super) struct Parser<'c> {
     pub(super) seen_defaults: bool,
     pub(super) seen_columns: bool,
     pub(super) column_records: usize,
-    pub(super) seen_sheet_data: bool,
+    pub(super) sheet_data: SheetDataStage,
     pub(super) merges: Vec<Rect>,
     pub(super) merge_count: Option<usize>,
     pub(super) seen_merges: bool,
-    pub(super) merge_window_closed: bool,
     /// Whether cataloged defects are repaired (read facades) or refused
     /// (write-path admission); see `crate::leniency`.
     pub(super) repairs: super::Repairs,

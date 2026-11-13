@@ -38,12 +38,41 @@ enum RawKind {
     Extension(RawOwner),
 }
 
+/// The last child group a `p188:cm` accepted, in schema order:
+///
+/// ```text
+/// Anchors --pos--> Position --replyLst--> Replies --txBody--> TextBody --extLst--> Extensions
+/// ```
+///
+/// Every later group may also be entered directly (all children are
+/// optional). An anchor is only accepted in `Anchors`; any other child is
+/// refused once the stage has reached or passed its own group.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum CommentStage {
+    Anchors,
+    Position,
+    Replies,
+    TextBody,
+    Extensions,
+}
+
+/// The last child a `p188:reply` accepted, in schema order:
+/// `Start --txBody--> TextBody --extLst--> Extensions`, or
+/// `Start --extLst--> Extensions`. A child is refused once the stage has
+/// reached or passed it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum ReplyStage {
+    Start,
+    TextBody,
+    Extensions,
+}
+
 #[derive(Debug)]
 enum FrameKind {
     Root,
     Comment {
         index: usize,
-        stage: u8,
+        stage: CommentStage,
         anchor_family: Option<AnchorFamily>,
     },
     Position,
@@ -53,7 +82,7 @@ enum FrameKind {
     Reply {
         comment: usize,
         reply: usize,
-        stage: u8,
+        stage: ReplyStage,
     },
     Raw {
         start: usize,
@@ -300,7 +329,7 @@ fn child_frame(
             comments.push(parse_comment_attributes(attributes, declarations)?);
             Ok(FrameKind::Comment {
                 index: comments.len() - 1,
-                stage: 0,
+                stage: CommentStage::Anchors,
                 anchor_family: None,
             })
         },
@@ -311,7 +340,7 @@ fn child_frame(
         } => {
             let owner = RawOwner::Comment(*index);
             if let Some((family, kind)) = anchor_kind(namespace, local) {
-                if *stage != 0 {
+                if *stage != CommentStage::Anchors {
                     return Err(invalid("modern comment anchor is out of order"));
                 }
                 match (*anchor_family, family) {
@@ -338,10 +367,10 @@ fn child_frame(
                     kind: RawKind::Anchor(*index, kind),
                 })
             } else if namespace == P188 && local == "pos" {
-                if *stage > 1 {
+                if *stage >= CommentStage::Position {
                     return Err(invalid("modern comment pos is duplicated or out of order"));
                 }
-                *stage = 2;
+                *stage = CommentStage::Position;
                 let attributes = known_attributes(element, decoder, &["x", "y"])?;
                 let x = required(&attributes, "x")?
                     .parse::<i64>()
@@ -352,36 +381,36 @@ fn child_frame(
                 comments[*index].position = Some(Position { x, y });
                 Ok(FrameKind::Position)
             } else if namespace == P188 && local == "replyLst" {
-                if *stage > 2 || comments[*index].reply_list_present {
+                if *stage > CommentStage::Position || comments[*index].reply_list_present {
                     return Err(invalid(
                         "modern comment replyLst is duplicated or out of order",
                     ));
                 }
-                *stage = 3;
+                *stage = CommentStage::Replies;
                 no_non_namespace_attributes(element)?;
                 comments[*index].reply_list_namespace_declarations =
                     namespace_declarations_from(element, decoder, None)?;
                 comments[*index].reply_list_present = true;
                 Ok(FrameKind::ReplyList { comment: *index })
             } else if namespace == P188 && local == "txBody" {
-                if *stage > 3 || comments[*index].text_body_xml.is_some() {
+                if *stage > CommentStage::Replies || comments[*index].text_body_xml.is_some() {
                     return Err(invalid(
                         "modern comment txBody is duplicated or out of order",
                     ));
                 }
-                *stage = 4;
+                *stage = CommentStage::TextBody;
                 validate_any_attributes(element, decoder)?;
                 Ok(FrameKind::Raw {
                     start,
                     kind: RawKind::TextBody(owner),
                 })
             } else if namespace == P188 && local == "extLst" {
-                if *stage > 4 || comments[*index].extension_xml.is_some() {
+                if *stage > CommentStage::TextBody || comments[*index].extension_xml.is_some() {
                     return Err(invalid(
                         "modern comment extLst is duplicated or out of order",
                     ));
                 }
-                *stage = 5;
+                *stage = CommentStage::Extensions;
                 validate_any_attributes(element, decoder)?;
                 Ok(FrameKind::Raw {
                     start,
@@ -418,7 +447,7 @@ fn child_frame(
             Ok(FrameKind::Reply {
                 comment: *comment,
                 reply: comments[*comment].replies.len() - 1,
-                stage: 0,
+                stage: ReplyStage::Start,
             })
         },
         FrameKind::Reply {
@@ -428,24 +457,28 @@ fn child_frame(
         } => {
             let owner = RawOwner::Reply(*comment, *reply);
             if namespace == P188 && local == "txBody" {
-                if *stage > 0 || comments[*comment].replies[*reply].text_body_xml.is_some() {
+                if *stage > ReplyStage::Start
+                    || comments[*comment].replies[*reply].text_body_xml.is_some()
+                {
                     return Err(invalid(
                         "modern comment reply txBody is duplicated or out of order",
                     ));
                 }
-                *stage = 1;
+                *stage = ReplyStage::TextBody;
                 validate_any_attributes(element, decoder)?;
                 Ok(FrameKind::Raw {
                     start,
                     kind: RawKind::TextBody(owner),
                 })
             } else if namespace == P188 && local == "extLst" {
-                if *stage > 1 || comments[*comment].replies[*reply].extension_xml.is_some() {
+                if *stage > ReplyStage::TextBody
+                    || comments[*comment].replies[*reply].extension_xml.is_some()
+                {
                     return Err(invalid(
                         "modern comment reply extLst is duplicated or out of order",
                     ));
                 }
-                *stage = 2;
+                *stage = ReplyStage::Extensions;
                 validate_any_attributes(element, decoder)?;
                 Ok(FrameKind::Raw {
                     start,

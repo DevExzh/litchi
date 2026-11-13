@@ -16,6 +16,8 @@ mod x14ac;
 #[cfg(test)]
 mod lane_parse_tests;
 #[cfg(test)]
+mod state_tests;
+#[cfg(test)]
 mod tests;
 
 pub(crate) use edit::{EventSpan, FactsBuilder, SourceFacts};

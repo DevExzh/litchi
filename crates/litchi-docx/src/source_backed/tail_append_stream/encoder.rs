@@ -717,6 +717,24 @@ where
 /// window. Text borrows are consumed before the next cursor call, and each
 /// borrowed chunk is emitted incrementally through that window without
 /// buffering or splitting an owned paragraph.
+///
+/// Lifecycle, held in `cursor`, `encoder`, `eof`, `completed` and `poisoned`:
+///
+/// ```text
+/// Streaming (cursor and encoder present)
+///   --event encoded-------------------------> Streaming
+///   --cursor end, pass proves `proof`-------> Completed (`eof`, `completed`)
+///   --any error in `pump_event`-------------> Poisoned (`poisoned`)
+/// ```
+///
+/// `pump_event` does not poison the reader itself: on an error it may leave
+/// the cursor and encoder taken while `eof` is still false. Its only caller,
+/// `read`, sets `poisoned` on every such error, and must keep doing so.
+///
+/// The fields are not folded into one state enum because
+/// `DeterministicReplayHandle::open_reader` charges
+/// `size_of::<EncodingReader<S>>()` to the caller's memory budget, so the
+/// layout of this struct is part of what a budget observes.
 pub(crate) struct EncodingReader<'source, S>
 where
     S: ReplayableParagraphSource,

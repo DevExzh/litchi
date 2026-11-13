@@ -10,6 +10,7 @@ use quick_xml::reader::NsReader;
 
 use crate::error::{Error, Result, allocation};
 use crate::raw::namespace::is_spreadsheetml_name;
+use crate::raw::strings::{RichTextDefect, RichTextState};
 use litchi_core::xml::escape_xml;
 use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
 
@@ -60,8 +61,7 @@ enum TextTarget {
 struct PendingString {
     text: String,
     runs: Vec<Run>,
-    saw_simple_text: bool,
-    saw_rich_run: bool,
+    state: RichTextState,
 }
 
 impl PendingString {
@@ -69,15 +69,13 @@ impl PendingString {
         Self {
             text: String::new(),
             runs: Vec::new(),
-            saw_simple_text: false,
-            saw_rich_run: false,
+            state: RichTextState::Empty,
         }
     }
 }
 
 struct PendingRun {
     value: Run,
-    saw_text: bool,
     saw_properties: bool,
     seen_properties: u8,
 }
@@ -94,7 +92,6 @@ impl PendingRun {
                 underline: false,
                 color: None,
             },
-            saw_text: false,
             saw_properties: false,
             seen_properties: 0,
         }
@@ -325,12 +322,7 @@ impl SharedStringParser {
             .pending_string
             .as_mut()
             .ok_or_else(|| invalid("rich-text run outside a shared-string item"))?;
-        if string.saw_simple_text {
-            return Err(invalid(
-                "shared-string item mixes simple text and rich-text runs",
-            ));
-        }
-        string.saw_rich_run = true;
+        string.state.run().map_err(item_defect)?;
         if self.pending_run.is_some() {
             return Err(invalid("nested shared-string rich-text run"));
         }
@@ -357,25 +349,14 @@ impl SharedStringParser {
                     .pending_string
                     .as_mut()
                     .ok_or_else(|| invalid("text outside a shared-string item"))?;
-                if string.saw_rich_run {
-                    return Err(invalid(
-                        "shared-string item mixes simple text and rich-text runs",
-                    ));
-                }
-                if string.saw_simple_text {
-                    return Err(invalid("duplicate text in shared-string item"));
-                }
-                string.saw_simple_text = true;
+                string.state.text().map_err(item_defect)?;
             },
             TextTarget::RichRun => {
-                let run = self
-                    .pending_run
+                let string = self
+                    .pending_string
                     .as_mut()
                     .ok_or_else(|| invalid("text outside a shared-string rich-text run"))?;
-                if run.saw_text {
-                    return Err(invalid("duplicate text in shared-string rich-text run"));
-                }
-                run.saw_text = true;
+                string.state.run_text().map_err(item_defect)?;
             },
         }
         Ok(())
@@ -472,14 +453,14 @@ impl SharedStringParser {
             .pending_run
             .take()
             .ok_or_else(|| invalid("missing shared-string rich-text run"))?;
-        if !run.saw_text {
-            return Err(invalid("shared-string rich-text run is missing its text"));
-        }
-        run.value.text = decode_spreadsheet_text(&run.value.text)?;
         let string = self
             .pending_string
             .as_mut()
             .ok_or_else(|| invalid("rich-text run outside a shared-string item"))?;
+        if !string.state.run_has_text() {
+            return Err(invalid("shared-string rich-text run is missing its text"));
+        }
+        run.value.text = decode_spreadsheet_text(&run.value.text)?;
         string.text.push_str(&run.value.text);
         string.runs.push(run.value);
         Ok(())
@@ -493,7 +474,7 @@ impl SharedStringParser {
             .pending_string
             .take()
             .ok_or_else(|| invalid("missing shared-string item"))?;
-        if !string.saw_rich_run {
+        if !string.state.is_rich() {
             string.text = decode_spreadsheet_text(&string.text)?;
         }
         let index = self.strings.len();
@@ -855,6 +836,17 @@ fn mark_property(seen: &mut u8, bit: u8, description: &str) -> Result<()> {
     Ok(())
 }
 
+/// The refusal for a string item that breaks its content model.
+fn item_defect(defect: RichTextDefect) -> Error {
+    invalid(match defect {
+        RichTextDefect::DuplicateText => "duplicate text in shared-string item",
+        RichTextDefect::TextAfterRun | RichTextDefect::RunAfterText => {
+            "shared-string item mixes simple text and rich-text runs"
+        },
+        RichTextDefect::DuplicateRunText => "duplicate text in shared-string rich-text run",
+    })
+}
+
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
@@ -862,6 +854,7 @@ fn invalid(message: impl Into<String>) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::pinned_rows::assert_rows;
 
     const S: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
     const STRICT_S: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -987,5 +980,102 @@ mod tests {
         );
         assert_eq!(parsed.get(2), Some("literal _x0041_"));
         assert!(xml.contains("xml:space=\"preserve\""));
+    }
+
+    #[test]
+    fn item_machine_outcomes_are_pinned() {
+        // Every transition of the simple/rich item machine: valid orders,
+        // each mixed pair, duplicates, runs without text, phonetic runs.
+        const EXPECTED: &[(&str, &str)] = &[
+            (r#""#, "ok \"\" runs=None"),
+            (r#"<t>a</t>"#, "ok \"a\" runs=None"),
+            (r#"<t/>"#, "ok \"\" runs=None"),
+            (r#"<r><t>a</t></r>"#, "ok \"a\" runs=Some([\"a\"])"),
+            (
+                r#"<r><t>a</t></r><r><t>b</t></r>"#,
+                "ok \"ab\" runs=Some([\"a\", \"b\"])",
+            ),
+            (
+                r#"<t>a</t><t>b</t>"#,
+                "invalid XLSX structure: duplicate text in shared-string item",
+            ),
+            (
+                r#"<t>a</t><r><t>b</t></r>"#,
+                "invalid XLSX structure: shared-string item mixes simple text and rich-text runs",
+            ),
+            (
+                r#"<r><t>a</t></r><t>b</t>"#,
+                "invalid XLSX structure: shared-string item mixes simple text and rich-text runs",
+            ),
+            (
+                r#"<r><t>a</t><t>b</t></r>"#,
+                "invalid XLSX structure: duplicate text in shared-string rich-text run",
+            ),
+            (
+                r#"<r><t>a</t></r><r><t>b</t><t>c</t></r>"#,
+                "invalid XLSX structure: duplicate text in shared-string rich-text run",
+            ),
+            (
+                r#"<t>a</t><r><t>b</t></r><r><t>c</t></r>"#,
+                "invalid XLSX structure: shared-string item mixes simple text and rich-text runs",
+            ),
+            (
+                r#"<r><t>a</t></r><t>b</t><r><t>c</t></r>"#,
+                "invalid XLSX structure: shared-string item mixes simple text and rich-text runs",
+            ),
+            (
+                r#"<r><t>a</t></r><t>b</t><t>c</t>"#,
+                "invalid XLSX structure: shared-string item mixes simple text and rich-text runs",
+            ),
+            (
+                r#"<t>a</t><r><t>b</t><t>c</t></r>"#,
+                "invalid XLSX structure: shared-string item mixes simple text and rich-text runs",
+            ),
+            (
+                r#"<t>a</t><t>b</t><r><t>c</t></r>"#,
+                "invalid XLSX structure: duplicate text in shared-string item",
+            ),
+            (
+                r#"<r/>"#,
+                "invalid XLSX structure: shared-string rich-text run is missing its text",
+            ),
+            (
+                r#"<r></r>"#,
+                "invalid XLSX structure: shared-string rich-text run is missing its text",
+            ),
+            (
+                r#"<r><rPr/></r>"#,
+                "invalid XLSX structure: shared-string rich-text run is missing its text",
+            ),
+            (
+                r#"<t>a</t><r/>"#,
+                "invalid XLSX structure: shared-string rich-text run is missing its text",
+            ),
+            (
+                r#"<r><t>a</t></r><rPh sb="0" eb="1"><t>p</t></rPh>"#,
+                "ok \"a\" runs=Some([\"a\"])",
+            ),
+            (
+                r#"<t>a</t><rPh sb="0" eb="1"><t>p</t></rPh><t>b</t>"#,
+                "invalid XLSX structure: duplicate text in shared-string item",
+            ),
+            (
+                r#"<rPh sb="0" eb="1"><t>p</t></rPh><r><t>a</t></r>"#,
+                "ok \"a\" runs=Some([\"a\"])",
+            ),
+        ];
+        assert_rows(EXPECTED, |body| {
+            let xml = format!(r#"<sst xmlns="{S}"><si>{body}</si></sst>"#);
+            match Table::parse(&xml, &litchi_opc::SourceLimits::default()) {
+                Ok(table) => format!(
+                    "ok {:?} runs={:?}",
+                    table.strings()[0],
+                    table
+                        .rich_text_runs(0)
+                        .map(|runs| runs.iter().map(|run| run.text.as_str()).collect::<Vec<_>>())
+                ),
+                Err(error) => error.to_string(),
+            }
+        });
     }
 }

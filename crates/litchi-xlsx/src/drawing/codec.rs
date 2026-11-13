@@ -180,6 +180,53 @@ enum AnchorChild {
     ClientData,
 }
 
+/// The next child an anchor accepts. Every anchor kind has exactly four
+/// children, in this order (`CT_TwoCellAnchor`, `CT_OneCellAnchor`,
+/// `CT_AbsoluteAnchor`):
+///
+/// ```text
+/// Origin --from | pos--> Size --to | ext--> Object --one object--> ClientData --clientData--> Complete
+/// ```
+///
+/// Any other child is out of order; any child in `Complete` is a duplicate
+/// or trailing child; an anchor that ends before `Complete` is missing
+/// required children.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum AnchorPhase {
+    /// `from` (two-cell, one-cell) or `pos` (absolute).
+    Origin,
+    /// `to` (two-cell) or `ext` (one-cell, absolute).
+    Size,
+    Object,
+    ClientData,
+    Complete,
+}
+
+impl AnchorPhase {
+    /// The child this phase accepts for `kind`, and the phase after it.
+    fn expected(self, kind: AnchorKind) -> Option<(AnchorChild, Self)> {
+        match self {
+            Self::Origin => Some((
+                match kind {
+                    AnchorKind::TwoCell | AnchorKind::OneCell => AnchorChild::From,
+                    AnchorKind::Absolute => AnchorChild::Position,
+                },
+                Self::Size,
+            )),
+            Self::Size => Some((
+                match kind {
+                    AnchorKind::TwoCell => AnchorChild::To,
+                    AnchorKind::OneCell | AnchorKind::Absolute => AnchorChild::Extent,
+                },
+                Self::Object,
+            )),
+            Self::Object => Some((AnchorChild::Object, Self::ClientData)),
+            Self::ClientData => Some((AnchorChild::ClientData, Self::Complete)),
+            Self::Complete => None,
+        }
+    }
+}
+
 struct PendingAnchor {
     kind: AnchorKind,
     edit_as: EditAs,
@@ -192,8 +239,7 @@ struct PendingAnchor {
     chart_relationship_id: Option<String>,
     content_part_relationship_id: Option<String>,
     description: Option<String>,
-    phase: u8,
-    client_data_seen: bool,
+    phase: AnchorPhase,
 }
 
 impl PendingAnchor {
@@ -210,34 +256,18 @@ impl PendingAnchor {
             chart_relationship_id: None,
             content_part_relationship_id: None,
             description: None,
-            phase: 0,
-            client_data_seen: false,
+            phase: AnchorPhase::Origin,
         }
     }
 
     fn take_child(&mut self, child: AnchorChild) -> Result<()> {
-        let expected = match (self.kind, self.phase) {
-            (AnchorKind::TwoCell, 0) => AnchorChild::From,
-            (AnchorKind::TwoCell, 1) => AnchorChild::To,
-            (AnchorKind::TwoCell, 2) => AnchorChild::Object,
-            (AnchorKind::TwoCell, 3) => AnchorChild::ClientData,
-            (AnchorKind::OneCell, 0) => AnchorChild::From,
-            (AnchorKind::OneCell, 1) => AnchorChild::Extent,
-            (AnchorKind::OneCell, 2) => AnchorChild::Object,
-            (AnchorKind::OneCell, 3) => AnchorChild::ClientData,
-            (AnchorKind::Absolute, 0) => AnchorChild::Position,
-            (AnchorKind::Absolute, 1) => AnchorChild::Extent,
-            (AnchorKind::Absolute, 2) => AnchorChild::Object,
-            (AnchorKind::Absolute, 3) => AnchorChild::ClientData,
-            _ => return Err(invalid("drawing anchor has duplicate or trailing children")),
+        let Some((expected, next)) = self.phase.expected(self.kind) else {
+            return Err(invalid("drawing anchor has duplicate or trailing children"));
         };
         if expected != child {
             return Err(invalid("drawing anchor children are out of order"));
         }
-        self.phase = self
-            .phase
-            .checked_add(1)
-            .ok_or_else(|| limit("drawing anchor children"))?;
+        self.phase = next;
         Ok(())
     }
 }
@@ -612,11 +642,6 @@ impl Parser {
             },
             b"clientData" => {
                 self.take_anchor_child(AnchorChild::ClientData)?;
-                let anchor = self.anchor_mut()?;
-                if anchor.client_data_seen {
-                    return Err(invalid("drawing anchor has duplicate clientData"));
-                }
-                anchor.client_data_seen = true;
                 Ok(Context::Ignored)
             },
             b"pic" => {
@@ -778,7 +803,7 @@ impl Parser {
             .anchor
             .take()
             .ok_or_else(|| invalid("missing pending drawing anchor"))?;
-        if pending.phase != 4 || !pending.client_data_seen {
+        if pending.phase != AnchorPhase::Complete {
             return Err(invalid("drawing anchor is missing required children"));
         }
         let drawing_anchor = match pending.kind {

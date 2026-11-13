@@ -1016,6 +1016,53 @@ enum AnchorChild {
     ClientData,
 }
 
+/// The next child an anchor accepts. Every anchor kind has exactly four
+/// children, in this order (`CT_TwoCellAnchor`, `CT_OneCellAnchor`,
+/// `CT_AbsoluteAnchor`):
+///
+/// ```text
+/// Origin --from | pos--> Size --to | ext--> Object --one object--> ClientData --clientData--> Complete
+/// ```
+///
+/// Any other child is out of order; any child in `Complete` is a duplicate
+/// or trailing child; an anchor that ends before `Complete` is missing
+/// required children.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum AnchorPhase {
+    /// `from` (two-cell, one-cell) or `pos` (absolute).
+    Origin,
+    /// `to` (two-cell) or `ext` (one-cell, absolute).
+    Size,
+    Object,
+    ClientData,
+    Complete,
+}
+
+impl AnchorPhase {
+    /// The child this phase accepts for `kind`, and the phase after it.
+    fn expected(self, kind: AnchorKind) -> Option<(AnchorChild, Self)> {
+        match self {
+            Self::Origin => Some((
+                match kind {
+                    AnchorKind::TwoCell | AnchorKind::OneCell => AnchorChild::From,
+                    AnchorKind::Absolute => AnchorChild::Position,
+                },
+                Self::Size,
+            )),
+            Self::Size => Some((
+                match kind {
+                    AnchorKind::TwoCell => AnchorChild::To,
+                    AnchorKind::OneCell | AnchorKind::Absolute => AnchorChild::Extent,
+                },
+                Self::Object,
+            )),
+            Self::Object => Some((AnchorChild::Object, Self::ClientData)),
+            Self::ClientData => Some((AnchorChild::ClientData, Self::Complete)),
+            Self::Complete => None,
+        }
+    }
+}
+
 struct AnchorCapture {
     kind: AnchorKind,
     range: ByteRange,
@@ -1027,8 +1074,7 @@ struct AnchorCapture {
     object_kind: Option<ObjectKind>,
     picture_index: Option<usize>,
     content_part_index: Option<usize>,
-    phase: u8,
-    client_data_seen: bool,
+    phase: AnchorPhase,
 }
 
 impl AnchorCapture {
@@ -1044,39 +1090,23 @@ impl AnchorCapture {
             object_kind: None,
             picture_index: None,
             content_part_index: None,
-            phase: 0,
-            client_data_seen: false,
+            phase: AnchorPhase::Origin,
         }
     }
 
     fn take_child(&mut self, child: AnchorChild) -> Result<()> {
-        let expected = match (self.kind, self.phase) {
-            (AnchorKind::TwoCell, 0) => AnchorChild::From,
-            (AnchorKind::TwoCell, 1) => AnchorChild::To,
-            (AnchorKind::TwoCell, 2) => AnchorChild::Object,
-            (AnchorKind::TwoCell, 3) => AnchorChild::ClientData,
-            (AnchorKind::OneCell, 0) => AnchorChild::From,
-            (AnchorKind::OneCell, 1) => AnchorChild::Extent,
-            (AnchorKind::OneCell, 2) => AnchorChild::Object,
-            (AnchorKind::OneCell, 3) => AnchorChild::ClientData,
-            (AnchorKind::Absolute, 0) => AnchorChild::Position,
-            (AnchorKind::Absolute, 1) => AnchorChild::Extent,
-            (AnchorKind::Absolute, 2) => AnchorChild::Object,
-            (AnchorKind::Absolute, 3) => AnchorChild::ClientData,
-            _ => return Err(invalid("drawing anchor has duplicate or trailing children")),
+        let Some((expected, next)) = self.phase.expected(self.kind) else {
+            return Err(invalid("drawing anchor has duplicate or trailing children"));
         };
         if expected != child {
             return Err(invalid("drawing anchor children are out of order"));
         }
-        self.phase = self
-            .phase
-            .checked_add(1)
-            .ok_or_else(|| limit("drawing anchor children", MAX_XML_DEPTH))?;
+        self.phase = next;
         Ok(())
     }
 
     fn finish(&self) -> Result<DrawingAnchor> {
-        if self.phase != 4 || !self.client_data_seen {
+        if self.phase != AnchorPhase::Complete {
             return Err(invalid("drawing anchor is missing required children"));
         }
         match self.kind {
@@ -2013,10 +2043,6 @@ impl<'a> Scanner<'a> {
             },
             Kind::ClientData => {
                 self.anchor_mut()?.take_child(AnchorChild::ClientData)?;
-                if self.anchor_mut()?.client_data_seen {
-                    return Err(invalid("drawing anchor has duplicate clientData"));
-                }
-                self.anchor_mut()?.client_data_seen = true;
             },
             Kind::SvgBlip => {
                 let index = self

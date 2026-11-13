@@ -73,6 +73,9 @@
 #[cfg(test)]
 extern crate self as litchi_xlsx;
 
+#[cfg(test)]
+mod pinned_rows;
+
 pub mod active_x;
 pub mod auto_filter;
 pub mod builder;

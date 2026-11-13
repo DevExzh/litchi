@@ -60,7 +60,7 @@ use super::super::namespace::{SPREADSHEETML_NAMESPACE, STRICT_SPREADSHEETML_NAME
 use super::super::strings::decode_spreadsheet_text;
 use super::model::{
     MAX_CELL_CHARACTERS, MAX_CELL_STYLE, MAX_ENCODED_CELL_BYTES, MAX_FORMULA_CHARACTERS,
-    merge_successor,
+    SheetDataStage, merge_successor,
 };
 use super::{parse_a1, parse_one_based_row, x14ac};
 use crate::cell::{Cell, ErrorValue, Number, Text, Value};
@@ -1149,7 +1149,6 @@ struct PendingCell {
     inline: String,
     inline_bytes: usize,
     saw_inline_simple: bool,
-    saw_inline_run: bool,
 }
 
 impl PendingCell {
@@ -1167,7 +1166,6 @@ impl PendingCell {
             inline: String::new(),
             inline_bytes: 0,
             saw_inline_simple: false,
-            saw_inline_run: false,
         }
     }
 
@@ -1254,9 +1252,8 @@ struct Scanner<'a> {
     root_closed: bool,
     seen_dimension: bool,
     seen_sheet_format: bool,
-    seen_sheet_data: bool,
+    sheet_data: SheetDataStage,
     seen_merge_cells: bool,
-    merge_window_closed: bool,
     merge_count: Option<u32>,
     merges: Vec<Rect>,
     pending_cell: Option<PendingCell>,
@@ -1288,9 +1285,8 @@ impl<'a> Scanner<'a> {
             root_closed: false,
             seen_dimension: false,
             seen_sheet_format: false,
-            seen_sheet_data: false,
+            sheet_data: SheetDataStage::Before,
             seen_merge_cells: false,
-            merge_window_closed: false,
             merge_count: None,
             merges: Vec::new(),
             pending_cell: None,
@@ -1311,7 +1307,7 @@ impl<'a> Scanner<'a> {
                 "worksheet XML has an incomplete SpreadsheetML worksheet root",
             ));
         }
-        if !self.seen_sheet_data {
+        if !self.sheet_data.seen() {
             return Err(invalid("worksheet XML is missing required sheetData"));
         }
         if self.selected_count != self.selected.len() {
@@ -1490,11 +1486,10 @@ impl<'a> Scanner<'a> {
             return self.start_dimension(element);
         }
         if is_spreadsheetml_element(element, "sheetData") {
-            if self.seen_sheet_data {
+            if !self.sheet_data.enter() {
                 return Err(invalid("worksheet has duplicate sheetData"));
             }
             self.validate_attributes(element, &[], false)?;
-            self.seen_sheet_data = true;
             return Ok(Some(Frame::SheetData));
         }
         if is_spreadsheetml_element(element, "mergeCells") {
@@ -1511,11 +1506,11 @@ impl<'a> Scanner<'a> {
             ));
         }
         let local = element.expanded_name.local_name.as_str();
-        if self.seen_sheet_data
+        if self.sheet_data == SheetDataStage::MergeWindow
             && is_spreadsheetml_element(element, local)
             && merge_successor(local.as_bytes())
         {
-            self.merge_window_closed = true;
+            self.sheet_data.successor();
         }
         if self.admit_inert {
             if is_spreadsheetml_element(element, "sheetViews")
@@ -1545,7 +1540,7 @@ impl<'a> Scanner<'a> {
     /// observer of this stream exactly as the parser's extension capture
     /// validates it.
     fn start_sheet_format(&mut self, element: &SemanticElement<'_>) -> Option<Frame> {
-        if self.seen_sheet_format || self.seen_sheet_data {
+        if self.seen_sheet_format || self.sheet_data.seen() {
             self.mark(NotEligibleReason::UnsupportedStructure);
             return None;
         }
@@ -1561,7 +1556,7 @@ impl<'a> Scanner<'a> {
     /// recorded by the materialized parser (audit finding 4.10); this scanner
     /// never repairs, so it defers such a worksheet.
     fn start_dimension(&mut self, element: &SemanticElement<'_>) -> Result<Option<Frame>> {
-        if self.seen_sheet_data || self.seen_dimension {
+        if self.sheet_data.seen() || self.seen_dimension {
             self.mark(NotEligibleReason::UnsupportedStructure);
             return Ok(None);
         }
@@ -1677,7 +1672,7 @@ impl<'a> Scanner<'a> {
         if self.seen_merge_cells {
             return Err(invalid("worksheet has duplicate mergeCells elements"));
         }
-        Ok(self.seen_sheet_data && !self.merge_window_closed)
+        Ok(self.sheet_data == SheetDataStage::MergeWindow)
     }
 
     fn start_merge_cells_child(&mut self, element: &SemanticElement<'_>) -> Result<Option<Frame>> {
@@ -1729,7 +1724,9 @@ impl<'a> Scanner<'a> {
                 .pending_cell
                 .as_mut()
                 .ok_or_else(|| invalid("inline text outside a worksheet cell"))?;
-            if cell.saw_inline_simple || cell.saw_inline_run {
+            // A rich `<r>` marks the worksheet not eligible and is not
+            // tracked, so only a repeated simple `<t>` is refused here.
+            if cell.saw_inline_simple {
                 return Err(invalid("inline string mixes or duplicates text"));
             }
             cell.saw_inline_simple = true;

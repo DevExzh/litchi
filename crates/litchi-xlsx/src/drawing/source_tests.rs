@@ -460,3 +460,88 @@ fn non_picture_objects_still_require_the_unique_ordered_anchor_slot() {
         }
     }
 }
+
+/// One anchor child per letter of an anchor-order row.
+fn anchor_child(letter: char) -> String {
+    match letter {
+        'F' => marker("from", 0, 0),
+        'T' => marker("to", 2, 2),
+        'P' => r#"<xdr:pos x="1" y="2"/>"#.to_owned(),
+        'E' => r#"<xdr:ext cx="100" cy="200"/>"#.to_owned(),
+        'O' => picture(1, "", ""),
+        'C' => "<xdr:clientData/>".to_owned(),
+        other => panic!("unknown anchor child letter {other}"),
+    }
+}
+
+/// What the schema's anchor child sequence answers for `order`: the
+/// children must be exactly `required`, in that order.
+fn anchor_order_refusal(required: &str, order: &str) -> Option<&'static str> {
+    for (index, child) in order.chars().enumerate() {
+        match required.chars().nth(index) {
+            None => return Some("drawing anchor has duplicate or trailing children"),
+            Some(expected) if expected != child => {
+                return Some("drawing anchor children are out of order");
+            },
+            Some(_) => {},
+        }
+    }
+    (order.len() < required.len()).then_some("drawing anchor is missing required children")
+}
+
+/// Every order of up to five anchor children, for each anchor kind, is
+/// accepted or refused by the schema sequence in the typed parser and in the
+/// source scan. The source scan does not classify a `to`, `pos` or `ext`
+/// under an anchor kind that has no such child, so it skips those.
+#[test]
+fn anchor_child_order_is_the_schema_sequence_in_both_readers() {
+    const LETTERS: [char; 6] = ['F', 'T', 'P', 'E', 'O', 'C'];
+    let mut orders = vec![String::new()];
+    let mut start = 0;
+    for _ in 0..5 {
+        let end = orders.len();
+        for index in start..end {
+            for letter in LETTERS {
+                let mut next = orders[index].clone();
+                next.push(letter);
+                orders.push(next);
+            }
+        }
+        start = end;
+    }
+    let mut accepted = 0;
+    for (anchor, required, source_skips) in [
+        ("twoCellAnchor", "FTOC", "PE"),
+        ("oneCellAnchor", "FEOC", "TP"),
+        ("absoluteAnchor", "PEOC", "T"),
+    ] {
+        for order in &orders {
+            let children = order.chars().map(anchor_child).collect::<String>();
+            let bytes = transitional_drawing(&format!("<xdr:{anchor}>{children}</xdr:{anchor}>"));
+            let xml = std::str::from_utf8(&bytes).expect("UTF-8 fixture");
+            let typed = super::parse(xml, &litchi_opc::SourceLimits::default())
+                .map(|_| ())
+                .map_err(|error| error.to_string());
+            let source = SourceDrawing::scan(&bytes, 0, ScanLimits::default())
+                .map(|_| ())
+                .map_err(|error| error.to_string());
+            let expected_typed = anchor_order_refusal(required, order).map_or(Ok(()), |refusal| {
+                Err(format!("invalid XLSX structure: {refusal}"))
+            });
+            assert_eq!(typed, expected_typed, "{anchor} {order}");
+            let source_order = order
+                .chars()
+                .filter(|letter| !source_skips.contains(*letter))
+                .collect::<String>();
+            let expected_source =
+                anchor_order_refusal(required, &source_order).map_or(Ok(()), |refusal| {
+                    Err(format!(
+                        "invalid XLSX structure: source-backed XLSX drawing: {refusal}"
+                    ))
+                });
+            assert_eq!(source, expected_source, "{anchor} {order}");
+            accepted += usize::from(typed.is_ok());
+        }
+    }
+    assert_eq!(accepted, 3);
+}

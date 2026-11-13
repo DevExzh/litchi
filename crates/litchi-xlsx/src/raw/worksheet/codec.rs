@@ -14,13 +14,13 @@ use quick_xml::reader::NsReader;
 
 use super::super::formula::Range as FormulaRange;
 use super::super::namespace::is_spreadsheetml_name;
-use super::super::strings::decode_spreadsheet_text;
+use super::super::strings::{RichTextDefect, RichTextState, decode_spreadsheet_text};
 use super::lane;
 use super::model::{CellFields, LaneCell};
 use super::model::{
     Context, MAX_CELL_CHARACTERS, MAX_CELL_STYLE, MAX_COLUMN_STYLE, MAX_ENCODED_CELL_BYTES,
     MAX_FORMULA_CHARACTERS, MAX_METADATA_INDEX, MAX_XML_DEPTH, MAX_XML_EVENTS, Parser, PendingCell,
-    PendingRow, RawCell, RawFormula, RawFormulaKind, TextTarget, merge_successor,
+    PendingRow, RawCell, RawFormula, RawFormulaKind, SheetDataStage, TextTarget, merge_successor,
 };
 use super::semantic::{materialize, resolve_shared_formulas};
 use super::validation::{
@@ -307,11 +307,10 @@ impl<'c> Parser<'c> {
             seen_defaults: false,
             seen_columns: false,
             column_records: 0,
-            seen_sheet_data: false,
+            sheet_data: SheetDataStage::Before,
             merges: Vec::new(),
             merge_count: None,
             seen_merges: false,
-            merge_window_closed: false,
             repairs,
             tolerance: ToleranceReport::default(),
             duplicate_rows: false,
@@ -835,12 +834,12 @@ impl<'c> Parser<'c> {
                 "worksheet leaf property must not have child elements",
             ));
         }
-        if parent == Context::Worksheet && self.seen_sheet_data {
+        if parent == Context::Worksheet && self.sheet_data == SheetDataStage::MergeWindow {
             let local = element.name().local_name();
             if is_spreadsheetml_name(namespace, element.name(), local.as_ref())
                 && merge_successor(local.as_ref())
             {
-                self.merge_window_closed = true;
+                self.sheet_data.successor();
             }
         }
         if parent == Context::Worksheet
@@ -850,7 +849,7 @@ impl<'c> Parser<'c> {
             // garbage; Excel and LibreOffice recompute it (audit finding
             // 4.10). It is accepted in any position, the first one wins, and
             // an unusable `ref` is ignored.
-            if self.seen_columns || self.seen_sheet_data {
+            if self.seen_columns || self.sheet_data.seen() {
                 self.tolerate(
                     WorksheetDefect::MisplacedElement,
                     Location::Worksheet,
@@ -903,10 +902,9 @@ impl<'c> Parser<'c> {
         if parent == Context::Worksheet
             && is_spreadsheetml_name(namespace, element.name(), b"sheetData")
         {
-            if self.seen_sheet_data {
+            if !self.sheet_data.enter() {
                 return Err(invalid("worksheet has duplicate sheetData"));
             }
-            self.seen_sheet_data = true;
             return Ok(Context::SheetData);
         }
         if parent == Context::Worksheet
@@ -917,19 +915,18 @@ impl<'c> Parser<'c> {
             }
             // Merges are collected position-independently (audit finding
             // 4.10).
-            if !self.seen_sheet_data {
-                self.tolerate(
+            match self.sheet_data {
+                SheetDataStage::Before => self.tolerate(
                     WorksheetDefect::MisplacedElement,
                     Location::Worksheet,
                     invalid("worksheet mergeCells appears before sheetData"),
-                )?;
-            }
-            if self.merge_window_closed {
-                self.tolerate(
+                )?,
+                SheetDataStage::MergeWindow => {},
+                SheetDataStage::Closed => self.tolerate(
                     WorksheetDefect::MisplacedElement,
                     Location::Worksheet,
                     invalid("worksheet mergeCells appears after a schema successor"),
-                )?;
+                )?,
             }
             self.seen_merges = true;
             self.merge_count =
@@ -1118,7 +1115,7 @@ impl<'c> Parser<'c> {
         if self.seen_defaults {
             return Err(invalid("worksheet has duplicate sheetFormatPr elements"));
         }
-        if self.seen_columns || self.seen_sheet_data {
+        if self.seen_columns || self.sheet_data.seen() {
             self.tolerate(
                 WorksheetDefect::MisplacedElement,
                 Location::Worksheet,
@@ -1142,7 +1139,7 @@ impl<'c> Parser<'c> {
         if self.seen_columns {
             return Err(invalid("worksheet has duplicate cols elements"));
         }
-        if self.seen_sheet_data {
+        if self.sheet_data.seen() {
             self.tolerate(
                 WorksheetDefect::MisplacedElement,
                 Location::Worksheet,
@@ -1272,9 +1269,7 @@ impl<'c> Parser<'c> {
             inline: String::new(),
             inline_bytes: 0,
             saw_inline: false,
-            saw_inline_simple: false,
-            saw_inline_run: false,
-            run_has_text: false,
+            inline_state: RichTextState::Empty,
         });
         Ok(())
     }
@@ -1394,12 +1389,7 @@ impl<'c> Parser<'c> {
             .cell
             .as_mut()
             .ok_or_else(|| invalid("rich-text run outside an inline string"))?;
-        if cell.saw_inline_simple {
-            return Err(invalid("inline string mixes simple and rich text"));
-        }
-        cell.saw_inline_run = true;
-        cell.run_has_text = false;
-        Ok(())
+        cell.inline_state.run().map_err(inline_defect)
     }
 
     fn start_inline_text(&mut self, in_run: bool) -> Result<()> {
@@ -1408,17 +1398,11 @@ impl<'c> Parser<'c> {
             .as_mut()
             .ok_or_else(|| invalid("inline text outside a worksheet cell"))?;
         if in_run {
-            if cell.run_has_text {
-                return Err(invalid("rich-text run has duplicate text"));
-            }
-            cell.run_has_text = true;
+            cell.inline_state.run_text()
         } else {
-            if cell.saw_inline_simple || cell.saw_inline_run {
-                return Err(invalid("inline string mixes or duplicates text"));
-            }
-            cell.saw_inline_simple = true;
+            cell.inline_state.text()
         }
-        Ok(())
+        .map_err(inline_defect)
     }
 
     fn push_text(&mut self, target: TextTarget, value: &str) -> Result<()> {
@@ -1594,7 +1578,7 @@ impl<'c> Parser<'c> {
             cell_type: cell.cell_type,
             value: cell.saw_value.then_some(cell.value),
             inline: cell.saw_inline.then_some(cell.inline),
-            inline_rich: cell.saw_inline_run,
+            inline_rich: cell.inline_state.is_rich(),
             formula_range: None,
             shared_formula: None,
             formula,
@@ -1713,4 +1697,15 @@ where
     }
 
     super::SourceParseAttempt::Complete(parser.finish_parse(strings))
+}
+
+/// The refusal for an inline string that breaks its content model.
+fn inline_defect(defect: RichTextDefect) -> crate::Error {
+    invalid(match defect {
+        RichTextDefect::DuplicateText | RichTextDefect::TextAfterRun => {
+            "inline string mixes or duplicates text"
+        },
+        RichTextDefect::RunAfterText => "inline string mixes simple and rich text",
+        RichTextDefect::DuplicateRunText => "rich-text run has duplicate text",
+    })
 }

@@ -245,13 +245,30 @@ fn prefix_of(element: &BytesStart<'_>) -> Option<String> {
         .map(|prefix| String::from_utf8_lossy(prefix.as_ref()).into_owned())
 }
 
+/// Which DrawingML ancestor of the current event is open inside a text body.
+///
+/// ```text
+/// Body      --<a:p> at depth 1--------> Paragraph
+/// Paragraph --<a:t> at depth 3--------> Text
+/// Text      --</a:t> at depth 3-------> Paragraph
+/// Paragraph --</a:p> at depth 1-------> Body
+/// ```
+///
+/// Character data is collected only in `Text`, including the character data
+/// of elements nested inside that `a:t`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum BodyContext {
+    Body,
+    Paragraph,
+    Text,
+}
+
 /// Text-body collection state while a `t`/`txBody` element is open.
 struct BodyState {
     body: TextBody,
     depth: usize,
-    in_paragraph: bool,
+    context: BodyContext,
     paragraph: String,
-    in_text: bool,
     first_paragraph_done: bool,
     text_bytes: usize,
 }
@@ -266,12 +283,28 @@ impl BodyState {
                 ..TextBody::default()
             },
             depth: 0,
-            in_paragraph: false,
+            context: BodyContext::Body,
             paragraph: String::new(),
-            in_text: false,
             first_paragraph_done: false,
             text_bytes: 0,
         }
+    }
+
+    fn in_paragraph(&self) -> bool {
+        match self.context {
+            BodyContext::Body => false,
+            BodyContext::Paragraph | BodyContext::Text => true,
+        }
+    }
+
+    /// Whether the open paragraph is the first one, whose properties the
+    /// body records.
+    fn in_first_paragraph(&self) -> bool {
+        self.in_paragraph() && !self.first_paragraph_done
+    }
+
+    fn in_text(&self) -> bool {
+        self.context == BodyContext::Text
     }
 
     /// One event inside the body (at body-relative `depth` after a start
@@ -289,36 +322,32 @@ impl BodyState {
                     self.body.prefix = Some(prefix_of(element).unwrap_or_default());
                 }
                 if !empty {
-                    self.in_paragraph = true;
+                    self.context = BodyContext::Paragraph;
                     self.paragraph.clear();
                 } else {
                     self.body.paragraphs.push(String::new());
                     self.first_paragraph_done = true;
                 }
             },
-            (2, b"pPr") if self.in_paragraph && !self.first_paragraph_done && empty => {
+            (2, b"pPr") if self.in_first_paragraph() && empty => {
                 self.body.paragraph_properties = Some(span);
             },
-            (2, b"br") if self.in_paragraph => self.paragraph.push('\n'),
+            (2, b"br") if self.in_paragraph() => self.paragraph.push('\n'),
             (2, b"endParaRPr")
-                if self.in_paragraph
-                    && !self.first_paragraph_done
-                    && empty
-                    && self.body.run_properties.is_none() =>
+                if self.in_first_paragraph() && empty && self.body.run_properties.is_none() =>
             {
                 self.body.run_properties = Some(span);
                 self.body.run_properties_is_end = true;
             },
             (3, b"rPr")
-                if self.in_paragraph
-                    && !self.first_paragraph_done
+                if self.in_first_paragraph()
                     && empty
                     && (self.body.run_properties.is_none() || self.body.run_properties_is_end) =>
             {
                 self.body.run_properties = Some(span);
                 self.body.run_properties_is_end = false;
             },
-            (3, b"t") if self.in_paragraph && !empty => self.in_text = true,
+            (3, b"t") if self.in_paragraph() && !empty => self.context = BodyContext::Text,
             _ => {},
         }
     }
@@ -328,14 +357,14 @@ impl BodyState {
             return;
         }
         match (self.depth, local) {
-            (1, b"p") if self.in_paragraph => {
-                self.in_paragraph = false;
+            (1, b"p") if self.in_paragraph() => {
+                self.context = BodyContext::Body;
                 self.first_paragraph_done = true;
                 self.body
                     .paragraphs
                     .push(std::mem::take(&mut self.paragraph));
             },
-            (3, b"t") => self.in_text = false,
+            (3, b"t") if self.in_text() => self.context = BodyContext::Paragraph,
             _ => {},
         }
     }
@@ -346,13 +375,21 @@ impl BodyState {
 struct Pending {
     depth: usize,
     start: usize,
-    kind: u8,
+    kind: PendingKind,
 }
 
-const PENDING_PREAMBLE: u8 = 0;
-const PENDING_PPR: u8 = 1;
-const PENDING_RPR: u8 = 2;
-const PENDING_END_RPR: u8 = 3;
+/// Which piece of the text body a [`Pending`] element becomes when it closes.
+#[derive(Clone, Copy)]
+enum PendingKind {
+    /// `bodyPr` or `lstStyle`.
+    Preamble,
+    /// `pPr` of the first paragraph.
+    ParagraphProperties,
+    /// `rPr` of a run in the first paragraph.
+    RunProperties,
+    /// `endParaRPr` of the first paragraph.
+    EndRunProperties,
+}
 
 /// Parse a text body element that starts at `start` (its start tag already
 /// read, ending at `open_end`) through its end tag.
@@ -395,24 +432,22 @@ fn read_body<R: std::io::BufRead>(
                 let local = element.local_name();
                 if pending.is_none() && is_dml(ns) {
                     let kind = match (state.depth, local.as_ref()) {
-                        (1, b"bodyPr" | b"lstStyle") => Some(PENDING_PREAMBLE),
-                        (2, b"pPr") if state.in_paragraph && !state.first_paragraph_done => {
-                            Some(PENDING_PPR)
+                        (1, b"bodyPr" | b"lstStyle") => Some(PendingKind::Preamble),
+                        (2, b"pPr") if state.in_first_paragraph() => {
+                            Some(PendingKind::ParagraphProperties)
                         },
                         (2, b"endParaRPr")
-                            if state.in_paragraph
-                                && !state.first_paragraph_done
+                            if state.in_first_paragraph()
                                 && state.body.run_properties.is_none() =>
                         {
-                            Some(PENDING_END_RPR)
+                            Some(PendingKind::EndRunProperties)
                         },
                         (3, b"rPr")
-                            if state.in_paragraph
-                                && !state.first_paragraph_done
+                            if state.in_first_paragraph()
                                 && (state.body.run_properties.is_none()
                                     || state.body.run_properties_is_end) =>
                         {
-                            Some(PENDING_RPR)
+                            Some(PendingKind::RunProperties)
                         },
                         _ => None,
                     };
@@ -458,13 +493,15 @@ fn read_body<R: std::io::BufRead>(
                 {
                     let span = (open.start, event_end);
                     match open.kind {
-                        PENDING_PREAMBLE => state.body.preamble.push(span),
-                        PENDING_PPR => state.body.paragraph_properties = Some(span),
-                        PENDING_END_RPR => {
+                        PendingKind::Preamble => state.body.preamble.push(span),
+                        PendingKind::ParagraphProperties => {
+                            state.body.paragraph_properties = Some(span);
+                        },
+                        PendingKind::EndRunProperties => {
                             state.body.run_properties = Some(span);
                             state.body.run_properties_is_end = true;
                         },
-                        _ => {
+                        PendingKind::RunProperties => {
                             state.body.run_properties = Some(span);
                             state.body.run_properties_is_end = false;
                         },
@@ -475,7 +512,7 @@ fn read_body<R: std::io::BufRead>(
                 state.end(ns, local.as_ref());
                 state.depth -= 1;
             },
-            Event::Text(text) if state.in_text => {
+            Event::Text(text) if state.in_text() => {
                 let text = text.decode().map_err(xml_error)?;
                 let text = quick_xml::escape::unescape(&text).map_err(xml_error)?;
                 let max_text = limits.node_text_bytes_value().min(1024 * 1024);
@@ -490,7 +527,7 @@ fn read_body<R: std::io::BufRead>(
                 state.text_bytes = observed;
                 state.paragraph.push_str(&text);
             },
-            Event::GeneralRef(reference) if state.in_text => {
+            Event::GeneralRef(reference) if state.in_text() => {
                 let name = reference.decode().map_err(xml_error)?;
                 let entity = format!("&{name};");
                 let text = quick_xml::escape::unescape(&entity).map_err(xml_error)?;
@@ -506,7 +543,7 @@ fn read_body<R: std::io::BufRead>(
                 state.text_bytes = observed;
                 state.paragraph.push_str(&text);
             },
-            Event::CData(data) if state.in_text => {
+            Event::CData(data) if state.in_text() => {
                 let max_text = limits.node_text_bytes_value().min(1024 * 1024);
                 let text = String::from_utf8_lossy(data.as_ref());
                 let observed = state.text_bytes.saturating_add(text.len());
@@ -1877,5 +1914,124 @@ mod tests {
             read_drawing(drawing, &Limits::default()),
             Err(Error::Invalid(_))
         ));
+    }
+
+    /// Render `(input, outcome)` rows as the Rust table the test pins.
+    fn render_rows(rows: &[(&str, String)]) -> String {
+        rows.iter()
+            .map(|(input, outcome)| format!("            (r#\"{input}\"#, {outcome:?}),\n"))
+            .collect()
+    }
+
+    #[track_caller]
+    fn assert_rows(expected: &[(&str, &str)], outcome: impl Fn(&str) -> String) {
+        let actual = expected
+            .iter()
+            .map(|(input, _)| (*input, outcome(input)))
+            .collect::<Vec<_>>();
+        let matches = actual
+            .iter()
+            .zip(expected)
+            .all(|((_, got), (_, want))| got == want);
+        assert!(matches, "outcomes changed:\n{}", render_rows(&actual));
+    }
+
+    /// Text bodies that exercise the body reader's nesting context: the
+    /// preamble, first and later paragraphs, runs, fields, breaks, empty and
+    /// non-empty property elements, foreign namespaces and misplaced
+    /// elements. Each outcome names the recorded pieces by their source text.
+    #[test]
+    fn text_body_outcomes_are_pinned() {
+        const EXPECTED: &[(&str, &str)] = &[
+            (
+                r#""#,
+                "prefix=None paragraphs=[] preamble=[] pPr=None rPr=None end=false",
+            ),
+            (
+                r#"<a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr lang="en"/><a:t>x</a:t></a:r></a:p>"#,
+                "prefix=Some(\"a\") paragraphs=[\"x\"] preamble=[\"<a:bodyPr/>\", \"<a:lstStyle/>\"] pPr=None rPr=Some(\"<a:rPr lang=\\\"en\\\"/>\") end=false",
+            ),
+            (
+                r#"<a:bodyPr><a:normAutofit/></a:bodyPr><a:lstStyle><a:lvl1pPr/></a:lstStyle><a:p><a:pPr><a:buNone/></a:pPr><a:r><a:rPr><a:latin typeface="A"/></a:rPr><a:t>x</a:t></a:r></a:p>"#,
+                "prefix=Some(\"a\") paragraphs=[\"x\"] preamble=[\"<a:bodyPr><a:normAutofit/></a:bodyPr>\", \"<a:lstStyle><a:lvl1pPr/></a:lstStyle>\"] pPr=Some(\"<a:pPr><a:buNone/></a:pPr>\") rPr=Some(\"<a:rPr><a:latin typeface=\\\"A\\\"/></a:rPr>\") end=false",
+            ),
+            (
+                r#"<a:p><a:pPr/><a:r><a:t>a</a:t></a:r><a:br/><a:r><a:rPr b="1"/><a:t>b</a:t></a:r><a:endParaRPr/></a:p>"#,
+                "prefix=Some(\"a\") paragraphs=[\"a\\nb\"] preamble=[] pPr=Some(\"<a:pPr/>\") rPr=Some(\"<a:rPr b=\\\"1\\\"/>\") end=false",
+            ),
+            (
+                r#"<a:p><a:endParaRPr/><a:r><a:rPr b="1"/><a:t>a</a:t></a:r></a:p>"#,
+                "prefix=Some(\"a\") paragraphs=[\"a\"] preamble=[] pPr=None rPr=Some(\"<a:rPr b=\\\"1\\\"/>\") end=false",
+            ),
+            (
+                r#"<a:p><a:endParaRPr><a:latin typeface="A"/></a:endParaRPr><a:r><a:rPr><a:latin typeface="B"/></a:rPr><a:t>a</a:t></a:r></a:p>"#,
+                "prefix=Some(\"a\") paragraphs=[\"a\"] preamble=[] pPr=None rPr=Some(\"<a:rPr><a:latin typeface=\\\"B\\\"/></a:rPr>\") end=false",
+            ),
+            (
+                r#"<a:p><a:r><a:rPr b="1"/><a:t>a</a:t></a:r><a:r><a:rPr i="1"/><a:t>b</a:t></a:r><a:endParaRPr/></a:p>"#,
+                "prefix=Some(\"a\") paragraphs=[\"ab\"] preamble=[] pPr=None rPr=Some(\"<a:rPr b=\\\"1\\\"/>\") end=false",
+            ),
+            (
+                r#"<a:p/><a:p><a:pPr/><a:r><a:rPr b="1"/><a:t>second</a:t></a:r><a:endParaRPr/></a:p>"#,
+                "prefix=Some(\"a\") paragraphs=[\"\", \"second\"] preamble=[] pPr=None rPr=None end=false",
+            ),
+            (
+                r#"<a:p><a:r><a:t>one</a:t></a:r></a:p><a:p><a:pPr><a:buNone/></a:pPr><a:r><a:rPr><a:latin typeface="B"/></a:rPr><a:t>two</a:t></a:r><a:br/></a:p>"#,
+                "prefix=Some(\"a\") paragraphs=[\"one\", \"two\\n\"] preamble=[] pPr=None rPr=None end=false",
+            ),
+            (
+                r#"<a:p><a:t>direct</a:t><a:r><a:t>a<a:x>nested</a:x>b</a:t></a:r><a:r><a:x><a:t>deep</a:t></a:x></a:r></a:p>"#,
+                "prefix=Some(\"a\") paragraphs=[\"anestedb\"] preamble=[] pPr=None rPr=None end=false",
+            ),
+            (
+                r#"<a:p><a:fld><a:t>field</a:t></a:fld><a:r><a:t/></a:r><a:r><a:t><![CDATA[c&d]]>&amp;&#65;</a:t></a:r></a:p>"#,
+                "prefix=Some(\"a\") paragraphs=[\"fieldc&d&A\"] preamble=[] pPr=None rPr=None end=false",
+            ),
+            (
+                r#"<a:p><x:r><x:t>foreign</x:t></x:r><a:r><x:t>foreign text</x:t><x:rPr/></a:r><x:pPr/></a:p><x:p><a:r><a:t>outside</a:t></a:r></x:p>"#,
+                "prefix=Some(\"a\") paragraphs=[\"\"] preamble=[] pPr=None rPr=None end=false",
+            ),
+            (
+                r#"<a:r><a:t>no paragraph</a:t></a:r><a:pPr/><a:br/><a:p><a:r><a:t>p</a:t></a:r></a:p>"#,
+                "prefix=Some(\"a\") paragraphs=[\"p\"] preamble=[] pPr=None rPr=None end=false",
+            ),
+            (
+                r#"<a:p><a:r><a:t>a</a:t></a:r><a:p><a:r><a:t>nested paragraph</a:t></a:r></a:p><a:r><a:t>b</a:t></a:r></a:p>"#,
+                "prefix=Some(\"a\") paragraphs=[\"ab\"] preamble=[] pPr=None rPr=None end=false",
+            ),
+            (
+                r#"<a:bodyPr><a:p><a:r><a:t>in preamble</a:t></a:r></a:p><a:rPr/></a:bodyPr><a:p><a:pPr><a:rPr/><a:endParaRPr/></a:pPr><a:r><a:rPr/><a:t>x</a:t></a:r></a:p>"#,
+                "prefix=Some(\"a\") paragraphs=[\"x\"] preamble=[\"<a:bodyPr><a:p><a:r><a:t>in preamble</a:t></a:r></a:p><a:rPr/></a:bodyPr>\"] pPr=Some(\"<a:pPr><a:rPr/><a:endParaRPr/></a:pPr>\") rPr=Some(\"<a:rPr/>\") end=false",
+            ),
+            (
+                r#"<a:p><a:r><a:rPr><a:t>in rPr</a:t></a:rPr><a:t>x</a:t></a:r><a:r><a:t>y</a:t><a:rPr b="1"/></a:r></a:p>"#,
+                "prefix=Some(\"a\") paragraphs=[\"xy\"] preamble=[] pPr=None rPr=Some(\"<a:rPr><a:t>in rPr</a:t></a:rPr>\") end=false",
+            ),
+        ];
+        assert_rows(EXPECTED, |body| {
+            let xml = format!(
+                r#"<dsp:drawing xmlns:dsp="http://schemas.microsoft.com/office/drawing/2008/diagram" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:x="urn:x"><dsp:spTree><dsp:sp modelId="m"><dsp:txBody>{body}</dsp:txBody></dsp:sp></dsp:spTree></dsp:drawing>"#
+            );
+            let piece = |span: (usize, usize)| &xml[span.0..span.1];
+            match read_drawing(xml.as_bytes(), &Limits::default()) {
+                Ok((shapes, _)) => shapes
+                    .iter()
+                    .map(|shape| {
+                        let body = &shape.body;
+                        format!(
+                            "prefix={:?} paragraphs={:?} preamble={:?} pPr={:?} rPr={:?} end={}",
+                            body.prefix,
+                            body.paragraphs,
+                            body.preamble.iter().copied().map(piece).collect::<Vec<_>>(),
+                            body.paragraph_properties.map(piece),
+                            body.run_properties.map(piece),
+                            body.run_properties_is_end,
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" / "),
+                Err(error) => error.to_string(),
+            }
+        });
     }
 }

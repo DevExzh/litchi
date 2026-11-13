@@ -529,29 +529,78 @@ struct Parser {
     sort_rules: Option<SortRulesBuilder>,
     sort_rule: Option<SortRuleBuilder>,
     capture: Option<Capture>,
-    root_phase: u8,
+    root_phase: RootPhase,
     retained: usize,
     seen_root: bool,
 }
+/// Child position inside `namedSheetViews`: `Views --extLst--> Extensions`.
+/// A `namedSheetView` or a second `extLst` in `Extensions` is refused.
+#[derive(Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
+enum RootPhase {
+    #[default]
+    Views,
+    Extensions,
+}
+/// Child position inside `namedSheetView`: `Filters --extLst--> Extensions`.
+/// An `nsvFilter` or a second `extLst` in `Extensions` is refused.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum ViewPhase {
+    Filters,
+    Extensions,
+}
+/// Child position inside `nsvFilter`:
+/// `ColumnFilters --sortRules--> SortRules --extLst--> Extensions`, and
+/// `ColumnFilters --extLst--> Extensions`. A child is refused once the phase
+/// is past its own position.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum FilterPhase {
+    ColumnFilters,
+    SortRules,
+    Extensions,
+}
+/// Child position inside `columnFilter`:
+/// `Dxf --filter--> Filters --extLst--> Extensions`, and
+/// `Dxf --extLst--> Extensions`. `dxf` is only accepted in `Dxf`, a `filter`
+/// up to `Filters`, and one `extLst` before `Extensions`.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum ColumnPhase {
+    Dxf,
+    Filters,
+    Extensions,
+}
+/// Child position inside `sortRules`: `Rules --extLst--> Extensions`.
+/// A `sortRule` or a second `extLst` in `Extensions` is refused.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum SortRulesPhase {
+    Rules,
+    Extensions,
+}
+/// Child position inside `sortRule`: `Dxf --sort condition--> Condition`.
+/// `dxf` is only accepted in `Dxf`.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum SortRulePhase {
+    Dxf,
+    Condition,
+}
 struct ViewBuilder {
     value: View,
-    phase: u8,
+    phase: ViewPhase,
 }
 struct FilterBuilder {
     value: Filter,
-    phase: u8,
+    phase: FilterPhase,
 }
 struct ColumnBuilder {
     value: ColumnFilter,
-    phase: u8,
+    phase: ColumnPhase,
 }
 struct SortRulesBuilder {
     value: SortRules,
-    phase: u8,
+    phase: SortRulesPhase,
 }
 struct SortRuleBuilder {
     value: SortRule,
-    phase: u8,
+    phase: SortRulePhase,
 }
 
 impl Parser {
@@ -748,7 +797,7 @@ impl Parser {
             return Err(invalid("duplicate namedSheetViews root"));
         }
         self.seen_root = true;
-        self.root_phase = 0;
+        self.root_phase = RootPhase::Views;
         self.root = Some(Views {
             views: Vec::new(),
             extensions: Vec::new(),
@@ -757,7 +806,7 @@ impl Parser {
         Ok(())
     }
     fn begin_view(&mut self, e: &BytesStart<'_>, d: Decoder) -> Result<()> {
-        if self.root_phase > 0 {
+        if self.root_phase > RootPhase::Views {
             return Err(invalid("namedSheetView appears after root extLst"));
         }
         if self
@@ -781,7 +830,7 @@ impl Parser {
                 extensions: Vec::new(),
                 show_data_type_icons_custom_sheet_view: None,
             },
-            phase: 0,
+            phase: ViewPhase::Filters,
         });
         Ok(())
     }
@@ -803,7 +852,7 @@ impl Parser {
             .view
             .as_mut()
             .ok_or_else(|| invalid("nsvFilter outside namedSheetView"))?;
-        if view.phase > 0 {
+        if view.phase > ViewPhase::Filters {
             return Err(invalid("nsvFilter appears after extLst"));
         }
         if view.value.filters.len() >= MAX_FILTERS {
@@ -818,7 +867,7 @@ impl Parser {
                 sort_rules: None,
                 extensions: Vec::new(),
             },
-            phase: 0,
+            phase: FilterPhase::ColumnFilters,
         });
         Ok(())
     }
@@ -841,7 +890,7 @@ impl Parser {
             .filter
             .as_mut()
             .ok_or_else(|| invalid("columnFilter outside nsvFilter"))?;
-        if filter.phase > 0 {
+        if filter.phase > FilterPhase::ColumnFilters {
             return Err(invalid("columnFilter is out of schema order"));
         }
         if filter.value.column_filters.len() >= MAX_COLUMNS {
@@ -855,7 +904,7 @@ impl Parser {
                 filters: Vec::new(),
                 extensions: Vec::new(),
             },
-            phase: 0,
+            phase: ColumnPhase::Dxf,
         });
         Ok(())
     }
@@ -878,10 +927,10 @@ impl Parser {
             .filter
             .as_mut()
             .ok_or_else(|| invalid("sortRules outside nsvFilter"))?;
-        if filter.phase > 1 || filter.value.sort_rules.is_some() {
+        if filter.phase > FilterPhase::SortRules || filter.value.sort_rules.is_some() {
             return Err(invalid("duplicate or misplaced sortRules"));
         }
-        filter.phase = 1;
+        filter.phase = FilterPhase::SortRules;
         let method = attr(e, b"sortMethod", d)?
             .as_deref()
             .unwrap_or("none")
@@ -894,7 +943,7 @@ impl Parser {
                 rules: Vec::new(),
                 extensions: Vec::new(),
             },
-            phase: 0,
+            phase: SortRulesPhase::Rules,
         });
         Ok(())
     }
@@ -916,7 +965,7 @@ impl Parser {
             .sort_rules
             .as_mut()
             .ok_or_else(|| invalid("sortRule outside sortRules"))?;
-        if rules.phase > 0 {
+        if rules.phase > SortRulesPhase::Rules {
             return Err(invalid("sortRule appears after extLst"));
         }
         if rules.value.rules.len() >= 64 {
@@ -929,7 +978,7 @@ impl Parser {
                 differential_format: None,
                 condition: None,
             },
-            phase: 0,
+            phase: SortRulePhase::Dxf,
         });
         Ok(())
     }
@@ -967,10 +1016,10 @@ impl Parser {
             .sort_rule
             .as_mut()
             .ok_or_else(|| invalid("sort condition outside sortRule"))?;
-        if rule.phase > 1 || rule.value.condition.is_some() {
+        if rule.value.condition.is_some() {
             return Err(invalid("sortRule has multiple conditions"));
         }
-        rule.phase = 1;
+        rule.phase = SortRulePhase::Condition;
         rule.value.condition = Some(parse_condition(e, d, kind)?);
         Ok(())
     }
@@ -989,10 +1038,10 @@ impl Parser {
     fn begin_ext(&mut self, owner: ExtOwner) -> Result<()> {
         match owner {
             ExtOwner::Root => {
-                if self.root_phase > 0 {
+                if self.root_phase > RootPhase::Views {
                     return Err(invalid("duplicate root extLst"));
                 }
-                self.root_phase = 1;
+                self.root_phase = RootPhase::Extensions;
             },
             ExtOwner::View => {
                 let v = self.view.as_mut().unwrap_or_else(|| {
@@ -1000,10 +1049,10 @@ impl Parser {
                         "required value was checked before extraction",
                     )
                 });
-                if v.phase > 0 {
+                if v.phase > ViewPhase::Filters {
                     return Err(invalid("duplicate view extLst"));
                 }
-                v.phase = 1;
+                v.phase = ViewPhase::Extensions;
             },
             ExtOwner::Filter => {
                 let v = self.filter.as_mut().unwrap_or_else(|| {
@@ -1011,10 +1060,10 @@ impl Parser {
                         "required value was checked before extraction",
                     )
                 });
-                if v.phase > 1 {
+                if v.phase > FilterPhase::SortRules {
                     return Err(invalid("duplicate filter extLst"));
                 }
-                v.phase = 2;
+                v.phase = FilterPhase::Extensions;
             },
             ExtOwner::Column => {
                 let v = self.column.as_mut().unwrap_or_else(|| {
@@ -1022,10 +1071,10 @@ impl Parser {
                         "required value was checked before extraction",
                     )
                 });
-                if v.phase > 1 {
+                if v.phase > ColumnPhase::Filters {
                     return Err(invalid("duplicate columnFilter extLst"));
                 }
-                v.phase = 2;
+                v.phase = ColumnPhase::Extensions;
             },
             ExtOwner::SortRules => {
                 let v = self.sort_rules.as_mut().unwrap_or_else(|| {
@@ -1033,10 +1082,10 @@ impl Parser {
                         "required value was checked before extraction",
                     )
                 });
-                if v.phase > 0 {
+                if v.phase > SortRulesPhase::Rules {
                     return Err(invalid("duplicate sortRules extLst"));
                 }
-                v.phase = 1;
+                v.phase = SortRulesPhase::Extensions;
             },
         }
         Ok(())
@@ -1049,7 +1098,7 @@ impl Parser {
                         "required value was checked before extraction",
                     )
                 });
-                if v.phase > 0 || v.value.differential_format.is_some() {
+                if v.phase > ColumnPhase::Dxf || v.value.differential_format.is_some() {
                     return Err(invalid("duplicate or misplaced columnFilter dxf"));
                 }
                 v.value.differential_format = Some(Markup(Vec::new()));
@@ -1060,7 +1109,7 @@ impl Parser {
                         "required value was checked before extraction",
                     )
                 });
-                if v.phase > 0 || v.value.differential_format.is_some() {
+                if v.phase > SortRulePhase::Dxf || v.value.differential_format.is_some() {
                     return Err(invalid("duplicate or misplaced sortRule dxf"));
                 }
                 v.value.differential_format = Some(Markup(Vec::new()));
@@ -1194,10 +1243,10 @@ impl Parser {
                     .column
                     .as_mut()
                     .ok_or_else(|| invalid("filter outside columnFilter"))?;
-                if column.phase > 1 {
+                if column.phase > ColumnPhase::Filters {
                     return Err(invalid("filter appears after extLst"));
                 }
-                column.phase = 1;
+                column.phase = ColumnPhase::Filters;
                 if column.value.filters.len() >= MAX_FILTERS {
                     return Err(invalid("too many filter payloads"));
                 }
@@ -1861,6 +1910,7 @@ mod tests {
     };
     use super::*;
     use crate::auto_filter::{Calendar, DateGroup, Grouping, Icon, Item, Payload, Top10, Values};
+    use crate::pinned_rows::assert_rows;
     use litchi_opc::{OpcPackage, PackURI, SourceLimits};
     use quick_xml::name::ResolveResult as Resolved;
 
@@ -2257,5 +2307,360 @@ mod tests {
         for xml in cases {
             assert!(parse_named_sheet_views(xml.as_bytes()).is_err(), "{xml}")
         }
+    }
+
+    /// The XML of one `owner:ORDER` row: `owner` names the element whose
+    /// children are ordered, and each letter of `ORDER` is one child.
+    fn child_order_xml(row: &str) -> String {
+        const EXT: &str = r#"<extLst><x:ext uri="urn:test"><p:payload/></x:ext></extLst>"#;
+        const FILTER_ID: &str = "{11111111-2222-3333-4444-555555555555}";
+        const VIEW_ID: &str = "{01234567-89AB-CDEF-0123-456789ABCDEF}";
+        let (owner, order) = row.split_once(':').expect("owner:ORDER");
+        let children = order
+            .chars()
+            .map(|letter| match (owner, letter) {
+                (_, 'X') => EXT.to_owned(),
+                ("root", 'V') => format!(r#"<namedSheetView name="v" id="{VIEW_ID}"/>"#),
+                ("view", 'N') => format!(r#"<nsvFilter filterId="{FILTER_ID}" ref="A1:B9"/>"#),
+                ("filter", 'C') => r#"<columnFilter colId="0"/>"#.to_owned(),
+                ("filter", 'S') => r#"<sortRules/>"#.to_owned(),
+                ("column" | "rule", 'D') => r#"<dxf><x:font><x:b/></x:font></dxf>"#.to_owned(),
+                ("column", 'F') => {
+                    r#"<filter colId="0"><x:filters><x:filter val="a"/></x:filters></filter>"#
+                        .to_owned()
+                },
+                ("rules", 'R') => {
+                    r#"<sortRule colId="0"><sortCondition ref="A1:A9"/></sortRule>"#.to_owned()
+                },
+                ("rule", 'K') => r#"<sortCondition ref="A1:A9"/>"#.to_owned(),
+                ("rule", 'Q') => {
+                    r#"<richSortCondition ref="A1:A9" richSortKey="City"/>"#.to_owned()
+                },
+                other => panic!("unknown child {other:?}"),
+            })
+            .collect::<String>();
+        let filter = |body: &str| {
+            format!(
+                r#"<namedSheetView name="v" id="{VIEW_ID}"><nsvFilter filterId="{FILTER_ID}" ref="A1:B9">{body}</nsvFilter></namedSheetView>"#
+            )
+        };
+        let body = match owner {
+            "root" => children,
+            "view" => {
+                format!(r#"<namedSheetView name="v" id="{VIEW_ID}">{children}</namedSheetView>"#)
+            },
+            "filter" => filter(&children),
+            "column" => filter(&format!(
+                r#"<columnFilter colId="0">{children}</columnFilter>"#
+            )),
+            "rules" => filter(&format!("<sortRules>{children}</sortRules>")),
+            "rule" => filter(&format!(
+                r#"<sortRules><sortRule colId="0">{children}</sortRule></sortRules>"#
+            )),
+            other => panic!("unknown owner {other}"),
+        };
+        format!(
+            r#"<namedSheetViews xmlns="http://schemas.microsoft.com/office/spreadsheetml/2019/namedsheetviews" xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:p="urn:payload">{body}</namedSheetViews>"#
+        )
+    }
+
+    /// Child orders of every element with a schema sequence: each single
+    /// child, each ordered pair, and a few longer sequences.
+    #[test]
+    fn child_order_outcomes_are_pinned() {
+        const EXPECTED: &[(&str, &str)] = &[
+            (
+                r#"root:"#,
+                "invalid XLSX structure: Named Sheet Views part must contain a namedSheetView",
+            ),
+            (
+                r#"root:V"#,
+                "ok views=1 root_ext=0 filters=Some(0) view_ext=Some(0) columns=None sort_rules=None filter_ext=None dxf=None payloads=None column_ext=None",
+            ),
+            (
+                r#"root:X"#,
+                "invalid XLSX structure: Named Sheet Views part must contain a namedSheetView",
+            ),
+            (
+                r#"root:VV"#,
+                "invalid XLSX structure: duplicate named sheet view name",
+            ),
+            (
+                r#"root:VX"#,
+                "ok views=1 root_ext=1 filters=Some(0) view_ext=Some(0) columns=None sort_rules=None filter_ext=None dxf=None payloads=None column_ext=None",
+            ),
+            (
+                r#"root:XV"#,
+                "invalid XLSX structure: namedSheetView appears after root extLst",
+            ),
+            (
+                r#"root:XX"#,
+                "invalid XLSX structure: duplicate root extLst",
+            ),
+            (
+                r#"view:"#,
+                "ok views=1 root_ext=0 filters=Some(0) view_ext=Some(0) columns=None sort_rules=None filter_ext=None dxf=None payloads=None column_ext=None",
+            ),
+            (
+                r#"view:N"#,
+                "ok views=1 root_ext=0 filters=Some(1) view_ext=Some(0) columns=Some(0) sort_rules=None filter_ext=Some(0) dxf=None payloads=None column_ext=None",
+            ),
+            (
+                r#"view:X"#,
+                "ok views=1 root_ext=0 filters=Some(0) view_ext=Some(1) columns=None sort_rules=None filter_ext=None dxf=None payloads=None column_ext=None",
+            ),
+            (
+                r#"view:NN"#,
+                "ok views=1 root_ext=0 filters=Some(2) view_ext=Some(0) columns=Some(0) sort_rules=None filter_ext=Some(0) dxf=None payloads=None column_ext=None",
+            ),
+            (
+                r#"view:NX"#,
+                "ok views=1 root_ext=0 filters=Some(1) view_ext=Some(1) columns=Some(0) sort_rules=None filter_ext=Some(0) dxf=None payloads=None column_ext=None",
+            ),
+            (
+                r#"view:XN"#,
+                "invalid XLSX structure: nsvFilter appears after extLst",
+            ),
+            (
+                r#"view:XX"#,
+                "invalid XLSX structure: duplicate view extLst",
+            ),
+            (
+                r#"filter:"#,
+                "ok views=1 root_ext=0 filters=Some(1) view_ext=Some(0) columns=Some(0) sort_rules=None filter_ext=Some(0) dxf=None payloads=None column_ext=None",
+            ),
+            (
+                r#"filter:C"#,
+                "ok views=1 root_ext=0 filters=Some(1) view_ext=Some(0) columns=Some(1) sort_rules=None filter_ext=Some(0) dxf=Some(false) payloads=Some(0) column_ext=Some(0)",
+            ),
+            (
+                r#"filter:S"#,
+                "ok views=1 root_ext=0 filters=Some(1) view_ext=Some(0) columns=Some(0) sort_rules=Some((0, 0)) filter_ext=Some(0) dxf=None payloads=None column_ext=None",
+            ),
+            (
+                r#"filter:X"#,
+                "ok views=1 root_ext=0 filters=Some(1) view_ext=Some(0) columns=Some(0) sort_rules=None filter_ext=Some(1) dxf=None payloads=None column_ext=None",
+            ),
+            (
+                r#"filter:CC"#,
+                "ok views=1 root_ext=0 filters=Some(1) view_ext=Some(0) columns=Some(2) sort_rules=None filter_ext=Some(0) dxf=Some(false) payloads=Some(0) column_ext=Some(0)",
+            ),
+            (
+                r#"filter:CS"#,
+                "ok views=1 root_ext=0 filters=Some(1) view_ext=Some(0) columns=Some(1) sort_rules=Some((0, 0)) filter_ext=Some(0) dxf=Some(false) payloads=Some(0) column_ext=Some(0)",
+            ),
+            (
+                r#"filter:CX"#,
+                "ok views=1 root_ext=0 filters=Some(1) view_ext=Some(0) columns=Some(1) sort_rules=None filter_ext=Some(1) dxf=Some(false) payloads=Some(0) column_ext=Some(0)",
+            ),
+            (
+                r#"filter:SC"#,
+                "invalid XLSX structure: columnFilter is out of schema order",
+            ),
+            (
+                r#"filter:SS"#,
+                "invalid XLSX structure: duplicate or misplaced sortRules",
+            ),
+            (
+                r#"filter:SX"#,
+                "ok views=1 root_ext=0 filters=Some(1) view_ext=Some(0) columns=Some(0) sort_rules=Some((0, 0)) filter_ext=Some(1) dxf=None payloads=None column_ext=None",
+            ),
+            (
+                r#"filter:XC"#,
+                "invalid XLSX structure: columnFilter is out of schema order",
+            ),
+            (
+                r#"filter:XS"#,
+                "invalid XLSX structure: duplicate or misplaced sortRules",
+            ),
+            (
+                r#"filter:XX"#,
+                "invalid XLSX structure: duplicate filter extLst",
+            ),
+            (
+                r#"column:"#,
+                "ok views=1 root_ext=0 filters=Some(1) view_ext=Some(0) columns=Some(1) sort_rules=None filter_ext=Some(0) dxf=Some(false) payloads=Some(0) column_ext=Some(0)",
+            ),
+            (
+                r#"column:D"#,
+                "ok views=1 root_ext=0 filters=Some(1) view_ext=Some(0) columns=Some(1) sort_rules=None filter_ext=Some(0) dxf=Some(true) payloads=Some(0) column_ext=Some(0)",
+            ),
+            (
+                r#"column:F"#,
+                "ok views=1 root_ext=0 filters=Some(1) view_ext=Some(0) columns=Some(1) sort_rules=None filter_ext=Some(0) dxf=Some(false) payloads=Some(1) column_ext=Some(0)",
+            ),
+            (
+                r#"column:X"#,
+                "ok views=1 root_ext=0 filters=Some(1) view_ext=Some(0) columns=Some(1) sort_rules=None filter_ext=Some(0) dxf=Some(false) payloads=Some(0) column_ext=Some(1)",
+            ),
+            (
+                r#"column:DD"#,
+                "invalid XLSX structure: duplicate or misplaced columnFilter dxf",
+            ),
+            (
+                r#"column:DF"#,
+                "ok views=1 root_ext=0 filters=Some(1) view_ext=Some(0) columns=Some(1) sort_rules=None filter_ext=Some(0) dxf=Some(true) payloads=Some(1) column_ext=Some(0)",
+            ),
+            (
+                r#"column:DX"#,
+                "ok views=1 root_ext=0 filters=Some(1) view_ext=Some(0) columns=Some(1) sort_rules=None filter_ext=Some(0) dxf=Some(true) payloads=Some(0) column_ext=Some(1)",
+            ),
+            (
+                r#"column:FD"#,
+                "invalid XLSX structure: duplicate or misplaced columnFilter dxf",
+            ),
+            (
+                r#"column:FF"#,
+                "ok views=1 root_ext=0 filters=Some(1) view_ext=Some(0) columns=Some(1) sort_rules=None filter_ext=Some(0) dxf=Some(false) payloads=Some(2) column_ext=Some(0)",
+            ),
+            (
+                r#"column:FX"#,
+                "ok views=1 root_ext=0 filters=Some(1) view_ext=Some(0) columns=Some(1) sort_rules=None filter_ext=Some(0) dxf=Some(false) payloads=Some(1) column_ext=Some(1)",
+            ),
+            (
+                r#"column:XD"#,
+                "invalid XLSX structure: duplicate or misplaced columnFilter dxf",
+            ),
+            (
+                r#"column:XF"#,
+                "invalid XLSX structure: filter appears after extLst",
+            ),
+            (
+                r#"column:XX"#,
+                "invalid XLSX structure: duplicate columnFilter extLst",
+            ),
+            (
+                r#"rules:"#,
+                "ok views=1 root_ext=0 filters=Some(1) view_ext=Some(0) columns=Some(0) sort_rules=Some((0, 0)) filter_ext=Some(0) dxf=None payloads=None column_ext=None",
+            ),
+            (
+                r#"rules:R"#,
+                "ok views=1 root_ext=0 filters=Some(1) view_ext=Some(0) columns=Some(0) sort_rules=Some((1, 0)) filter_ext=Some(0) dxf=None payloads=None column_ext=None",
+            ),
+            (
+                r#"rules:X"#,
+                "ok views=1 root_ext=0 filters=Some(1) view_ext=Some(0) columns=Some(0) sort_rules=Some((0, 1)) filter_ext=Some(0) dxf=None payloads=None column_ext=None",
+            ),
+            (
+                r#"rules:RR"#,
+                "ok views=1 root_ext=0 filters=Some(1) view_ext=Some(0) columns=Some(0) sort_rules=Some((2, 0)) filter_ext=Some(0) dxf=None payloads=None column_ext=None",
+            ),
+            (
+                r#"rules:RX"#,
+                "ok views=1 root_ext=0 filters=Some(1) view_ext=Some(0) columns=Some(0) sort_rules=Some((1, 1)) filter_ext=Some(0) dxf=None payloads=None column_ext=None",
+            ),
+            (
+                r#"rules:XR"#,
+                "invalid XLSX structure: sortRule appears after extLst",
+            ),
+            (
+                r#"rules:XX"#,
+                "invalid XLSX structure: duplicate sortRules extLst",
+            ),
+            (
+                r#"rule:"#,
+                "ok views=1 root_ext=0 filters=Some(1) view_ext=Some(0) columns=Some(0) sort_rules=Some((1, 0)) filter_ext=Some(0) dxf=None payloads=None column_ext=None",
+            ),
+            (
+                r#"rule:D"#,
+                "invalid XLSX structure: sortRule dxf presence does not match sortCondition dxfId",
+            ),
+            (
+                r#"rule:K"#,
+                "ok views=1 root_ext=0 filters=Some(1) view_ext=Some(0) columns=Some(0) sort_rules=Some((1, 0)) filter_ext=Some(0) dxf=None payloads=None column_ext=None",
+            ),
+            (
+                r#"rule:Q"#,
+                "ok views=1 root_ext=0 filters=Some(1) view_ext=Some(0) columns=Some(0) sort_rules=Some((1, 0)) filter_ext=Some(0) dxf=None payloads=None column_ext=None",
+            ),
+            (
+                r#"rule:DD"#,
+                "invalid XLSX structure: duplicate or misplaced sortRule dxf",
+            ),
+            (
+                r#"rule:DK"#,
+                "invalid XLSX structure: sortRule dxf presence does not match sortCondition dxfId",
+            ),
+            (
+                r#"rule:DQ"#,
+                "invalid XLSX structure: sortRule dxf presence does not match sortCondition dxfId",
+            ),
+            (
+                r#"rule:KD"#,
+                "invalid XLSX structure: duplicate or misplaced sortRule dxf",
+            ),
+            (
+                r#"rule:KK"#,
+                "invalid XLSX structure: sortRule has multiple conditions",
+            ),
+            (
+                r#"rule:KQ"#,
+                "invalid XLSX structure: sortRule has multiple conditions",
+            ),
+            (
+                r#"rule:QD"#,
+                "invalid XLSX structure: duplicate or misplaced sortRule dxf",
+            ),
+            (
+                r#"rule:QK"#,
+                "invalid XLSX structure: sortRule has multiple conditions",
+            ),
+            (
+                r#"rule:QQ"#,
+                "invalid XLSX structure: sortRule has multiple conditions",
+            ),
+            (
+                r#"filter:CSX"#,
+                "ok views=1 root_ext=0 filters=Some(1) view_ext=Some(0) columns=Some(1) sort_rules=Some((0, 0)) filter_ext=Some(1) dxf=Some(false) payloads=Some(0) column_ext=Some(0)",
+            ),
+            (
+                r#"filter:CCS"#,
+                "ok views=1 root_ext=0 filters=Some(1) view_ext=Some(0) columns=Some(2) sort_rules=Some((0, 0)) filter_ext=Some(0) dxf=Some(false) payloads=Some(0) column_ext=Some(0)",
+            ),
+            (
+                r#"column:DFX"#,
+                "ok views=1 root_ext=0 filters=Some(1) view_ext=Some(0) columns=Some(1) sort_rules=None filter_ext=Some(0) dxf=Some(true) payloads=Some(1) column_ext=Some(1)",
+            ),
+            (
+                r#"column:DFF"#,
+                "ok views=1 root_ext=0 filters=Some(1) view_ext=Some(0) columns=Some(1) sort_rules=None filter_ext=Some(0) dxf=Some(true) payloads=Some(2) column_ext=Some(0)",
+            ),
+            (
+                r#"rules:RRX"#,
+                "ok views=1 root_ext=0 filters=Some(1) view_ext=Some(0) columns=Some(0) sort_rules=Some((2, 1)) filter_ext=Some(0) dxf=None payloads=None column_ext=None",
+            ),
+            (
+                r#"root:VVX"#,
+                "invalid XLSX structure: duplicate named sheet view name",
+            ),
+            (
+                r#"view:NNX"#,
+                "ok views=1 root_ext=0 filters=Some(2) view_ext=Some(1) columns=Some(0) sort_rules=None filter_ext=Some(0) dxf=None payloads=None column_ext=None",
+            ),
+        ];
+        assert_rows(EXPECTED, |row| {
+            match parse_named_sheet_views(child_order_xml(row).as_bytes()) {
+                Ok(views) => {
+                    let view = views.views().first();
+                    let filter = view.and_then(|view| view.filters().first());
+                    let column = filter.and_then(|filter| filter.column_filters().first());
+                    let rules = filter.and_then(|filter| filter.sort_rules());
+                    format!(
+                        "ok views={} root_ext={} filters={:?} view_ext={:?} columns={:?} sort_rules={:?} filter_ext={:?} dxf={:?} payloads={:?} column_ext={:?}",
+                        views.views().len(),
+                        views.extensions().len(),
+                        view.map(|view| view.filters().len()),
+                        view.map(|view| view.extensions().len()),
+                        filter.map(|filter| filter.column_filters().len()),
+                        rules.map(|rules| (rules.rules().len(), rules.extensions().len())),
+                        filter.map(|filter| filter.extensions().len()),
+                        column.map(|column| column.differential_format().is_some()),
+                        column.map(|column| column.filters().len()),
+                        column.map(|column| column.extensions().len()),
+                    )
+                },
+                Err(error) => error.to_string(),
+            }
+        });
     }
 }

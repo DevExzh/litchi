@@ -558,3 +558,247 @@ mod author_tests {
         );
     }
 }
+
+mod child_order_tests {
+    use super::*;
+    use crate::modern_comments::{P, P188, PC};
+
+    /// Render `(input, outcome)` rows as the Rust table the test pins.
+    fn render_rows(rows: &[(&str, String)]) -> String {
+        rows.iter()
+            .map(|(input, outcome)| format!("            (r#\"{input}\"#, {outcome:?}),\n"))
+            .collect()
+    }
+
+    #[track_caller]
+    fn assert_rows(expected: &[(&str, &str)], outcome: impl Fn(&str) -> String) {
+        let actual = expected
+            .iter()
+            .map(|(input, _)| (*input, outcome(input)))
+            .collect::<Vec<_>>();
+        let matches = actual
+            .iter()
+            .zip(expected)
+            .all(|((_, got), (_, want))| got == want);
+        assert!(matches, "outcomes changed:\n{}", render_rows(&actual));
+    }
+
+    /// The XML of one `owner:ORDER` row: `cm` orders the children of a
+    /// comment, `reply` those of a reply; each letter is one child.
+    fn child_order_xml(row: &str) -> String {
+        const AUTHOR: &str = "{CD37207E-7903-4ED4-8AE8-017538D2DF7E}";
+        const COMMENT: &str = "{62A8A96D-E5A8-4BFC-B993-A6EAE3907CAD}";
+        const REPLY: &str = "{E524A04C-CF22-45D7-A60D-09322EA5A80D}";
+        const TEXT: &str = "<p188:txBody><a:bodyPr/><a:lstStyle/><a:p/></p188:txBody>";
+        const EXT: &str = r#"<p188:extLst><p:ext uri="{A}"><x:data/></p:ext></p188:extLst>"#;
+        let reply = |children: &str| {
+            format!(
+                r#"<p188:replyLst><p188:reply id="{REPLY}" authorId="{AUTHOR}" created="2026-07-19T12:01:00+08:00">{children}</p188:reply></p188:replyLst>"#
+            )
+        };
+        let (owner, order) = row.split_once(':').expect("owner:ORDER");
+        let children = order
+            .chars()
+            .map(|letter| match (owner, letter) {
+                ("cm", 'A') => "<pc:sldMkLst><pc:sldMk/></pc:sldMkLst>".to_owned(),
+                ("cm", 'P') => r#"<p188:pos x="10" y="-20"/>"#.to_owned(),
+                ("cm", 'R') => reply(TEXT),
+                (_, 'T') => TEXT.to_owned(),
+                (_, 'X') => EXT.to_owned(),
+                other => panic!("unknown child {other:?}"),
+            })
+            .collect::<String>();
+        let body = match owner {
+            "cm" => children,
+            "reply" => reply(&children),
+            other => panic!("unknown owner {other}"),
+        };
+        format!(
+            r#"<p188:cmLst xmlns:p188="{P188}" xmlns:pc="{PC}" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="{P}" xmlns:x="urn:payload"><p188:cm id="{COMMENT}" authorId="{AUTHOR}" created="2026-07-19T12:00:00+08:00">{body}</p188:cm></p188:cmLst>"#
+        )
+    }
+
+    /// Child orders of a modern comment and of a reply: each single child,
+    /// each ordered pair, and a few longer sequences.
+    #[test]
+    fn child_order_outcomes_are_pinned() {
+        const EXPECTED: &[(&str, &str)] = &[
+            (r#"cm:"#, "ok "),
+            (r#"cm:A"#, "ok sldMkLst sldMk"),
+            (r#"cm:P"#, "ok pos"),
+            (r#"cm:R"#, "ok replyLst reply txBody"),
+            (r#"cm:T"#, "ok txBody"),
+            (r#"cm:X"#, "ok extLst"),
+            (
+                r#"cm:AA"#,
+                "invalid PresentationML: modern comment mixes anchor choice branches",
+            ),
+            (r#"cm:AP"#, "ok sldMkLst sldMk pos"),
+            (r#"cm:AR"#, "ok sldMkLst sldMk replyLst reply txBody"),
+            (r#"cm:AT"#, "ok sldMkLst sldMk txBody"),
+            (r#"cm:AX"#, "ok sldMkLst sldMk extLst"),
+            (
+                r#"cm:PA"#,
+                "invalid PresentationML: modern comment anchor is out of order",
+            ),
+            (
+                r#"cm:PP"#,
+                "invalid PresentationML: modern comment pos is duplicated or out of order",
+            ),
+            (r#"cm:PR"#, "ok pos replyLst reply txBody"),
+            (r#"cm:PT"#, "ok pos txBody"),
+            (r#"cm:PX"#, "ok pos extLst"),
+            (
+                r#"cm:RA"#,
+                "invalid PresentationML: modern comment anchor is out of order",
+            ),
+            (
+                r#"cm:RP"#,
+                "invalid PresentationML: modern comment pos is duplicated or out of order",
+            ),
+            (
+                r#"cm:RR"#,
+                "invalid PresentationML: modern comment replyLst is duplicated or out of order",
+            ),
+            (r#"cm:RT"#, "ok replyLst reply txBody txBody"),
+            (r#"cm:RX"#, "ok replyLst reply txBody extLst"),
+            (
+                r#"cm:TA"#,
+                "invalid PresentationML: modern comment anchor is out of order",
+            ),
+            (
+                r#"cm:TP"#,
+                "invalid PresentationML: modern comment pos is duplicated or out of order",
+            ),
+            (
+                r#"cm:TR"#,
+                "invalid PresentationML: modern comment replyLst is duplicated or out of order",
+            ),
+            (
+                r#"cm:TT"#,
+                "invalid PresentationML: modern comment txBody is duplicated or out of order",
+            ),
+            (r#"cm:TX"#, "ok txBody extLst"),
+            (
+                r#"cm:XA"#,
+                "invalid PresentationML: modern comment anchor is out of order",
+            ),
+            (
+                r#"cm:XP"#,
+                "invalid PresentationML: modern comment pos is duplicated or out of order",
+            ),
+            (
+                r#"cm:XR"#,
+                "invalid PresentationML: modern comment replyLst is duplicated or out of order",
+            ),
+            (
+                r#"cm:XT"#,
+                "invalid PresentationML: modern comment txBody is duplicated or out of order",
+            ),
+            (
+                r#"cm:XX"#,
+                "invalid PresentationML: modern comment extLst is duplicated or out of order",
+            ),
+            (
+                r#"cm:APRTX"#,
+                "ok sldMkLst sldMk pos replyLst reply txBody txBody extLst",
+            ),
+            (
+                r#"cm:AAPRTX"#,
+                "invalid PresentationML: modern comment mixes anchor choice branches",
+            ),
+            (
+                r#"cm:PRTXA"#,
+                "invalid PresentationML: modern comment anchor is out of order",
+            ),
+            (
+                r#"cm:PRTXP"#,
+                "invalid PresentationML: modern comment pos is duplicated or out of order",
+            ),
+            (
+                r#"cm:RTXR"#,
+                "invalid PresentationML: modern comment replyLst is duplicated or out of order",
+            ),
+            (
+                r#"cm:PTR"#,
+                "invalid PresentationML: modern comment replyLst is duplicated or out of order",
+            ),
+            (
+                r#"cm:PXT"#,
+                "invalid PresentationML: modern comment txBody is duplicated or out of order",
+            ),
+            (
+                r#"cm:RXT"#,
+                "invalid PresentationML: modern comment txBody is duplicated or out of order",
+            ),
+            (r#"reply:"#, "ok replyLst reply"),
+            (r#"reply:T"#, "ok replyLst reply txBody"),
+            (r#"reply:X"#, "ok replyLst reply extLst"),
+            (
+                r#"reply:TT"#,
+                "invalid PresentationML: modern comment reply txBody is duplicated or out of order",
+            ),
+            (r#"reply:TX"#, "ok replyLst reply txBody extLst"),
+            (
+                r#"reply:XT"#,
+                "invalid PresentationML: modern comment reply txBody is duplicated or out of order",
+            ),
+            (
+                r#"reply:XX"#,
+                "invalid PresentationML: modern comment reply extLst is duplicated or out of order",
+            ),
+            (
+                r#"reply:TTT"#,
+                "invalid PresentationML: modern comment reply txBody is duplicated or out of order",
+            ),
+            (
+                r#"reply:TTX"#,
+                "invalid PresentationML: modern comment reply txBody is duplicated or out of order",
+            ),
+            (
+                r#"reply:TXT"#,
+                "invalid PresentationML: modern comment reply txBody is duplicated or out of order",
+            ),
+            (
+                r#"reply:TXX"#,
+                "invalid PresentationML: modern comment reply extLst is duplicated or out of order",
+            ),
+            (
+                r#"reply:XTT"#,
+                "invalid PresentationML: modern comment reply txBody is duplicated or out of order",
+            ),
+            (
+                r#"reply:XTX"#,
+                "invalid PresentationML: modern comment reply txBody is duplicated or out of order",
+            ),
+            (
+                r#"reply:XXT"#,
+                "invalid PresentationML: modern comment reply extLst is duplicated or out of order",
+            ),
+            (
+                r#"reply:XXX"#,
+                "invalid PresentationML: modern comment reply extLst is duplicated or out of order",
+            ),
+        ];
+        assert_rows(EXPECTED, |row| {
+            match List::parse(child_order_xml(row).as_bytes()) {
+                Ok(list) => {
+                    let xml = String::from_utf8(list.to_xml().expect("serializes")).expect("UTF-8");
+                    let start = xml.find("<p188:cm ").expect("comment");
+                    let body = &xml[start..];
+                    let body = &body[body.find('>').expect("comment tag") + 1..];
+                    let names = body
+                        .split('<')
+                        .filter_map(|tag| {
+                            tag.strip_prefix("p188:")
+                                .or_else(|| tag.strip_prefix("pc:"))
+                        })
+                        .map(|tag| tag.split([' ', '>', '/']).next().unwrap_or_default())
+                        .collect::<Vec<_>>();
+                    format!("ok {}", names.join(" "))
+                },
+                Err(error) => error.to_string(),
+            }
+        });
+    }
+}

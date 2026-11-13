@@ -27,6 +27,124 @@ const MAX_RUNS: u32 = 32_767;
 const MAX_OFFICE_COUNT: u64 = 2_147_483_647;
 const MAX_PREALLOCATED_STRINGS: usize = 4_096;
 
+/// Content model of one string item (`CT_Rst`): a shared-string `<si>` or a
+/// cell's inline `<is>`. An item holds either one simple `<t>` or any number
+/// of rich `<r>` runs, each with at most one `<t>`.
+///
+/// ```text
+/// Empty  --<t>--> Simple
+/// Empty  --<r>--> Rich { run_has_text: false }
+/// Rich   --<r>--> Rich { run_has_text: false }
+/// Rich   --<t> in the open run--> Rich { run_has_text: true }
+/// Simple --<t>--> Simple   (DuplicateText)
+/// Simple --<r>--> Mixed    (RunAfterText)
+/// Rich   --<t>--> Mixed    (TextAfterRun)
+/// Mixed  --<t>--> Mixed    (TextAfterRun)
+/// Mixed  --<r>--> Mixed    (RunAfterText)
+/// Rich/Mixed { run_has_text: true } --<t> in the open run--> unchanged (DuplicateRunText)
+/// ```
+///
+/// A transition that breaks the content model still happens and reports its
+/// [`RichTextDefect`]; each reader decides whether that is an error, a
+/// recorded repair or a deferral. `Mixed` is only observed by the readers
+/// that continue after a defect.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(crate) enum RichTextState {
+    /// No `<t>` and no `<r>` yet.
+    #[default]
+    Empty,
+    /// One simple `<t>`.
+    Simple,
+    /// One or more `<r>` runs; `run_has_text` belongs to the latest run.
+    Rich { run_has_text: bool },
+    /// Both a simple `<t>` and an `<r>`; `run_has_text` as in `Rich`.
+    Mixed { run_has_text: bool },
+}
+
+/// How a string-item child broke the content model of [`RichTextState`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RichTextDefect {
+    /// A second simple `<t>`.
+    DuplicateText,
+    /// A simple `<t>` after an `<r>`.
+    TextAfterRun,
+    /// An `<r>` after a simple `<t>`.
+    RunAfterText,
+    /// A second `<t>` inside one `<r>`.
+    DuplicateRunText,
+}
+
+impl RichTextState {
+    /// A `<t>` that is a direct child of the item.
+    #[inline]
+    pub(crate) fn text(&mut self) -> std::result::Result<(), RichTextDefect> {
+        match *self {
+            Self::Empty => {
+                *self = Self::Simple;
+                Ok(())
+            },
+            Self::Simple => Err(RichTextDefect::DuplicateText),
+            Self::Rich { run_has_text } | Self::Mixed { run_has_text } => {
+                *self = Self::Mixed { run_has_text };
+                Err(RichTextDefect::TextAfterRun)
+            },
+        }
+    }
+
+    /// An `<r>` that is a direct child of the item.
+    #[inline]
+    pub(crate) fn run(&mut self) -> std::result::Result<(), RichTextDefect> {
+        match *self {
+            Self::Empty | Self::Rich { .. } => {
+                *self = Self::Rich {
+                    run_has_text: false,
+                };
+                Ok(())
+            },
+            Self::Simple | Self::Mixed { .. } => {
+                *self = Self::Mixed {
+                    run_has_text: false,
+                };
+                Err(RichTextDefect::RunAfterText)
+            },
+        }
+    }
+
+    /// A `<t>` inside the latest `<r>`. Readers only report it under a run
+    /// they reported through [`Self::run`], so the run-less states ignore it.
+    #[inline]
+    pub(crate) fn run_text(&mut self) -> std::result::Result<(), RichTextDefect> {
+        match self {
+            Self::Empty | Self::Simple => Ok(()),
+            Self::Rich { run_has_text } | Self::Mixed { run_has_text } => {
+                if std::mem::replace(run_has_text, true) {
+                    Err(RichTextDefect::DuplicateRunText)
+                } else {
+                    Ok(())
+                }
+            },
+        }
+    }
+
+    /// Whether the item has an `<r>` run.
+    #[inline]
+    pub(crate) fn is_rich(self) -> bool {
+        match self {
+            Self::Empty | Self::Simple => false,
+            Self::Rich { .. } | Self::Mixed { .. } => true,
+        }
+    }
+
+    /// Whether the latest `<r>` run has its `<t>`.
+    #[inline]
+    pub(crate) fn run_has_text(self) -> bool {
+        match self {
+            Self::Empty | Self::Simple => false,
+            Self::Rich { run_has_text } | Self::Mixed { run_has_text } => run_has_text,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Context {
     Table,
@@ -43,15 +161,13 @@ struct Item {
     encoded_bytes: usize,
     runs: u32,
     phonetic_runs: u32,
-    saw_simple: bool,
-    saw_run: bool,
+    state: RichTextState,
 }
 
 #[derive(Debug, Default)]
 struct Parser<'r> {
     strings: Vec<Text>,
     item: Option<Item>,
-    seen_text_in_run: bool,
     /// Where cataloged repairs are recorded; `None` refuses them.
     tolerance: Option<&'r mut ToleranceReport>,
 }
@@ -243,10 +359,9 @@ impl<'a> SelectedParser<'a> {
                 .ok_or_else(|| invalid("shared-string text outside an item"))?;
             // Mixed or repeated text is repaired and recorded by the
             // materializing parse (audit finding 4.12).
-            if item.saw_simple || item.saw_run {
+            if item.state.text().is_err() {
                 self.irregular = true;
             }
-            item.saw_simple = true;
             return Ok(Context::Text);
         }
         if parent == Context::Item && is_spreadsheetml_element(element, b"r") {
@@ -254,7 +369,7 @@ impl<'a> SelectedParser<'a> {
                 .item
                 .as_mut()
                 .ok_or_else(|| invalid("shared-string run outside an item"))?;
-            if item.saw_simple {
+            if item.state.run().is_err() {
                 self.irregular = true;
             }
             item.runs = item
@@ -262,8 +377,6 @@ impl<'a> SelectedParser<'a> {
                 .checked_add(1)
                 .filter(|count| *count <= MAX_RUNS)
                 .ok_or_else(|| invalid("shared string has too many rich-text runs"))?;
-            item.saw_run = true;
-            item.seen_text_in_run = false;
             return Ok(Context::Run);
         }
         if parent == Context::Run && is_spreadsheetml_element(element, b"t") {
@@ -271,10 +384,9 @@ impl<'a> SelectedParser<'a> {
                 .item
                 .as_mut()
                 .ok_or_else(|| invalid("shared-string run text outside an item"))?;
-            if item.seen_text_in_run {
+            if item.state.run_text().is_err() {
                 self.irregular = true;
             }
-            item.seen_text_in_run = true;
             return Ok(Context::Text);
         }
         if parent == Context::Item && is_spreadsheetml_element(element, b"rPh") {
@@ -429,9 +541,7 @@ struct SelectedItem {
     encoded_bytes: usize,
     runs: u32,
     phonetic_runs: u32,
-    saw_simple: bool,
-    saw_run: bool,
-    seen_text_in_run: bool,
+    state: RichTextState,
     unsupported: bool,
 }
 
@@ -444,9 +554,7 @@ impl SelectedItem {
             encoded_bytes: 0,
             runs: 0,
             phonetic_runs: 0,
-            saw_simple: false,
-            saw_run: false,
-            seen_text_in_run: false,
+            state: RichTextState::Empty,
             unsupported: false,
         }
     }
@@ -760,9 +868,7 @@ impl<'r> Parser<'r> {
                 .item
                 .as_mut()
                 .ok_or_else(|| invalid("shared-string text outside an item"))?;
-            let irregular = item.saw_simple || item.saw_run;
-            item.saw_simple = true;
-            if irregular {
+            if item.state.text().is_err() {
                 self.tolerate_run_structure(invalid(
                     "shared-string item mixes or duplicates simple and rich text",
                 ))?;
@@ -774,7 +880,7 @@ impl<'r> Parser<'r> {
                 .item
                 .as_mut()
                 .ok_or_else(|| invalid("shared-string run outside an item"))?;
-            if item.saw_simple {
+            if item.state.run().is_err() {
                 self.tolerate_run_structure(invalid(
                     "shared-string item mixes simple and rich text",
                 ))?;
@@ -788,15 +894,16 @@ impl<'r> Parser<'r> {
                 .checked_add(1)
                 .filter(|count| *count <= MAX_RUNS)
                 .ok_or_else(|| invalid("shared string has too many rich-text runs"))?;
-            item.saw_run = true;
-            self.seen_text_in_run = false;
             return Ok(Context::Run);
         }
         if parent == Context::Run && is_spreadsheetml_name(namespace, element.name(), b"t") {
-            if self.seen_text_in_run {
+            let item = self
+                .item
+                .as_mut()
+                .ok_or_else(|| invalid("shared-string run text outside an item"))?;
+            if item.state.run_text().is_err() {
                 self.tolerate_run_structure(invalid("shared-string run has duplicate text"))?;
             }
-            self.seen_text_in_run = true;
             return Ok(Context::Text);
         }
         if parent == Context::Item && is_spreadsheetml_name(namespace, element.name(), b"rPh") {
@@ -1015,6 +1122,7 @@ mod tests {
     use litchi_ooxml_common::mce::{Capabilities, StreamError, StreamLimits};
 
     use super::*;
+    use crate::pinned_rows::assert_rows;
 
     #[allow(clippy::result_large_err)]
     fn streaming_0364_run(
@@ -1515,5 +1623,278 @@ mod tests {
 
         let low = decode_spreadsheet_text("😀_xDC00_").expect_err("unpaired low surrogate");
         assert!(low.to_string().contains("at byte 4"));
+    }
+
+    fn item_table(body: &str) -> String {
+        format!(
+            r#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si>{body}</si></sst>"#
+        )
+    }
+
+    // The three tables below share their item bodies: every transition of the
+    // simple/rich item machine (valid orders, each mixed pair, duplicates,
+    // runs without text, phonetic runs).
+
+    #[test]
+    fn item_machine_strict_parse_outcomes_are_pinned() {
+        const EXPECTED: &[(&str, &str)] = &[
+            (r#""#, "ok \"\""),
+            (r#"<t>a</t>"#, "ok \"a\""),
+            (r#"<t/>"#, "ok \"\""),
+            (r#"<r><t>a</t></r>"#, "ok \"a\""),
+            (r#"<r><t>a</t></r><r><t>b</t></r>"#, "ok \"ab\""),
+            (
+                r#"<t>a</t><t>b</t>"#,
+                "invalid XLSX structure: shared-string item mixes or duplicates simple and rich text",
+            ),
+            (
+                r#"<t>a</t><r><t>b</t></r>"#,
+                "invalid XLSX structure: shared-string item mixes simple and rich text",
+            ),
+            (
+                r#"<r><t>a</t></r><t>b</t>"#,
+                "invalid XLSX structure: shared-string item mixes or duplicates simple and rich text",
+            ),
+            (
+                r#"<r><t>a</t><t>b</t></r>"#,
+                "invalid XLSX structure: shared-string run has duplicate text",
+            ),
+            (
+                r#"<r><t>a</t></r><r><t>b</t><t>c</t></r>"#,
+                "invalid XLSX structure: shared-string run has duplicate text",
+            ),
+            (
+                r#"<t>a</t><r><t>b</t></r><r><t>c</t></r>"#,
+                "invalid XLSX structure: shared-string item mixes simple and rich text",
+            ),
+            (
+                r#"<r><t>a</t></r><t>b</t><r><t>c</t></r>"#,
+                "invalid XLSX structure: shared-string item mixes or duplicates simple and rich text",
+            ),
+            (
+                r#"<r><t>a</t></r><t>b</t><t>c</t>"#,
+                "invalid XLSX structure: shared-string item mixes or duplicates simple and rich text",
+            ),
+            (
+                r#"<t>a</t><r><t>b</t><t>c</t></r>"#,
+                "invalid XLSX structure: shared-string item mixes simple and rich text",
+            ),
+            (
+                r#"<t>a</t><t>b</t><r><t>c</t></r>"#,
+                "invalid XLSX structure: shared-string item mixes or duplicates simple and rich text",
+            ),
+            (r#"<r/>"#, "ok \"\""),
+            (r#"<r></r>"#, "ok \"\""),
+            (r#"<r><rPr/></r>"#, "ok \"\""),
+            (
+                r#"<t>a</t><r/>"#,
+                "invalid XLSX structure: shared-string item mixes simple and rich text",
+            ),
+            (
+                r#"<r><t>a</t></r><rPh sb="0" eb="1"><t>p</t></rPh>"#,
+                "ok \"a\"",
+            ),
+            (
+                r#"<t>a</t><rPh sb="0" eb="1"><t>p</t></rPh><t>b</t>"#,
+                "invalid XLSX structure: shared-string item mixes or duplicates simple and rich text",
+            ),
+            (
+                r#"<rPh sb="0" eb="1"><t>p</t></rPh><r><t>a</t></r>"#,
+                "ok \"a\"",
+            ),
+        ];
+        assert_rows(EXPECTED, |body| match parse(item_table(body).as_bytes()) {
+            Ok(strings) => format!("ok {:?}", strings[0].as_str()),
+            Err(error) => error.to_string(),
+        });
+    }
+
+    #[test]
+    fn item_machine_repairing_parse_outcomes_are_pinned() {
+        const EXPECTED: &[(&str, &str)] = &[
+            (r#""#, "ok \"\" "),
+            (r#"<t>a</t>"#, "ok \"a\" "),
+            (r#"<t/>"#, "ok \"\" "),
+            (r#"<r><t>a</t></r>"#, "ok \"a\" "),
+            (r#"<r><t>a</t></r><r><t>b</t></r>"#, "ok \"ab\" "),
+            (
+                r#"<t>a</t><t>b</t>"#,
+                "ok \"ab\" SharedStrings(RunStructure)",
+            ),
+            (
+                r#"<t>a</t><r><t>b</t></r>"#,
+                "ok \"ab\" SharedStrings(RunStructure)",
+            ),
+            (
+                r#"<r><t>a</t></r><t>b</t>"#,
+                "ok \"ab\" SharedStrings(RunStructure)",
+            ),
+            (
+                r#"<r><t>a</t><t>b</t></r>"#,
+                "ok \"ab\" SharedStrings(RunStructure)",
+            ),
+            (
+                r#"<r><t>a</t></r><r><t>b</t><t>c</t></r>"#,
+                "ok \"abc\" SharedStrings(RunStructure)",
+            ),
+            (
+                r#"<t>a</t><r><t>b</t></r><r><t>c</t></r>"#,
+                "ok \"abc\" SharedStrings(RunStructure),SharedStrings(RunStructure)",
+            ),
+            (
+                r#"<r><t>a</t></r><t>b</t><r><t>c</t></r>"#,
+                "ok \"abc\" SharedStrings(RunStructure),SharedStrings(RunStructure)",
+            ),
+            (
+                r#"<r><t>a</t></r><t>b</t><t>c</t>"#,
+                "ok \"abc\" SharedStrings(RunStructure),SharedStrings(RunStructure)",
+            ),
+            (
+                r#"<t>a</t><r><t>b</t><t>c</t></r>"#,
+                "ok \"abc\" SharedStrings(RunStructure),SharedStrings(RunStructure)",
+            ),
+            (
+                r#"<t>a</t><t>b</t><r><t>c</t></r>"#,
+                "ok \"abc\" SharedStrings(RunStructure),SharedStrings(RunStructure)",
+            ),
+            (r#"<r/>"#, "ok \"\" "),
+            (r#"<r></r>"#, "ok \"\" "),
+            (r#"<r><rPr/></r>"#, "ok \"\" "),
+            (r#"<t>a</t><r/>"#, "ok \"a\" SharedStrings(RunStructure)"),
+            (
+                r#"<r><t>a</t></r><rPh sb="0" eb="1"><t>p</t></rPh>"#,
+                "ok \"a\" ",
+            ),
+            (
+                r#"<t>a</t><rPh sb="0" eb="1"><t>p</t></rPh><t>b</t>"#,
+                "ok \"ab\" SharedStrings(RunStructure)",
+            ),
+            (
+                r#"<rPh sb="0" eb="1"><t>p</t></rPh><r><t>a</t></r>"#,
+                "ok \"a\" ",
+            ),
+        ];
+        assert_rows(EXPECTED, |body| {
+            let mut report = ToleranceReport::default();
+            match parse_repairing(item_table(body).as_bytes(), &mut report) {
+                Ok(strings) => {
+                    let defects = report
+                        .iter()
+                        .map(|entry| format!("{:?}", entry.defect))
+                        .collect::<Vec<_>>();
+                    format!("ok {:?} {}", strings[0].as_str(), defects.join(","))
+                },
+                Err(error) => error.to_string(),
+            }
+        });
+    }
+
+    #[test]
+    fn item_machine_selected_scan_outcomes_are_pinned() {
+        const EXPECTED: &[(&str, &str)] = &[
+            (
+                r#""#,
+                "irregular=false unsupported_rich=false requested=[(0, \"\")]",
+            ),
+            (
+                r#"<t>a</t>"#,
+                "irregular=false unsupported_rich=false requested=[(0, \"a\")]",
+            ),
+            (
+                r#"<t/>"#,
+                "irregular=false unsupported_rich=false requested=[(0, \"\")]",
+            ),
+            (
+                r#"<r><t>a</t></r>"#,
+                "irregular=false unsupported_rich=true requested=[]",
+            ),
+            (
+                r#"<r><t>a</t></r><r><t>b</t></r>"#,
+                "irregular=false unsupported_rich=true requested=[]",
+            ),
+            (
+                r#"<t>a</t><t>b</t>"#,
+                "irregular=true unsupported_rich=false requested=[(0, \"ab\")]",
+            ),
+            (
+                r#"<t>a</t><r><t>b</t></r>"#,
+                "irregular=true unsupported_rich=true requested=[]",
+            ),
+            (
+                r#"<r><t>a</t></r><t>b</t>"#,
+                "irregular=true unsupported_rich=true requested=[]",
+            ),
+            (
+                r#"<r><t>a</t><t>b</t></r>"#,
+                "irregular=true unsupported_rich=true requested=[]",
+            ),
+            (
+                r#"<r><t>a</t></r><r><t>b</t><t>c</t></r>"#,
+                "irregular=true unsupported_rich=true requested=[]",
+            ),
+            (
+                r#"<t>a</t><r><t>b</t></r><r><t>c</t></r>"#,
+                "irregular=true unsupported_rich=true requested=[]",
+            ),
+            (
+                r#"<r><t>a</t></r><t>b</t><r><t>c</t></r>"#,
+                "irregular=true unsupported_rich=true requested=[]",
+            ),
+            (
+                r#"<r><t>a</t></r><t>b</t><t>c</t>"#,
+                "irregular=true unsupported_rich=true requested=[]",
+            ),
+            (
+                r#"<t>a</t><r><t>b</t><t>c</t></r>"#,
+                "irregular=true unsupported_rich=true requested=[]",
+            ),
+            (
+                r#"<t>a</t><t>b</t><r><t>c</t></r>"#,
+                "irregular=true unsupported_rich=true requested=[]",
+            ),
+            (
+                r#"<r/>"#,
+                "irregular=false unsupported_rich=true requested=[]",
+            ),
+            (
+                r#"<r></r>"#,
+                "irregular=false unsupported_rich=true requested=[]",
+            ),
+            (
+                r#"<r><rPr/></r>"#,
+                "irregular=false unsupported_rich=true requested=[]",
+            ),
+            (
+                r#"<t>a</t><r/>"#,
+                "irregular=true unsupported_rich=true requested=[]",
+            ),
+            (
+                r#"<r><t>a</t></r><rPh sb="0" eb="1"><t>p</t></rPh>"#,
+                "irregular=false unsupported_rich=true requested=[]",
+            ),
+            (
+                r#"<t>a</t><rPh sb="0" eb="1"><t>p</t></rPh><t>b</t>"#,
+                "irregular=true unsupported_rich=true requested=[]",
+            ),
+            (
+                r#"<rPh sb="0" eb="1"><t>p</t></rPh><r><t>a</t></r>"#,
+                "irregular=false unsupported_rich=true requested=[]",
+            ),
+        ];
+        assert_rows(EXPECTED, |body| {
+            match streaming_0364_default(item_table(body).as_bytes(), &[0]) {
+                Ok(selected) => format!(
+                    "irregular={} unsupported_rich={} requested={:?}",
+                    selected.irregular,
+                    selected.unsupported_rich,
+                    selected
+                        .requested
+                        .iter()
+                        .map(|(index, text)| (*index, text.as_str()))
+                        .collect::<Vec<_>>()
+                ),
+                Err(error) => error.to_string(),
+            }
+        });
     }
 }

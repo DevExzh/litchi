@@ -790,16 +790,9 @@ impl SourcePartSpliceReplay for MemoryReplayHandle {
     fn open(&self) -> Result<Box<dyn Read + '_>, SourcePartSpliceReplayError> {
         let reader = <Self as AuthoredReplayHandle>::open(self)
             .map_err(|error| SourcePartSpliceReplayError::Provider(Box::new(error)))?;
-        Ok(Box::new(AuthenticatedReader {
-            inner: Some(reader),
-            identity: None,
-            durable_reference: None,
-            expected: self.proof,
-            bytes: 0,
-            hash: Sha256::new(),
-            finished: false,
-            poisoned: false,
-        }))
+        Ok(Box::new(AuthenticatedReader::new(
+            reader, None, None, self.proof,
+        )))
     }
 }
 
@@ -922,50 +915,92 @@ impl OpcReplayAdapter {
     }
 }
 
+/// Lifecycle of an [`AuthenticatedReader`].
+///
+/// ```text
+/// Reading --read returns bytes within the proof------------> Reading
+/// Reading --inner EOF, its pass proves the expected bytes--> Finished
+/// Reading --any error--------------------------------------> Poisoned
+/// ```
+///
+/// `Finished` and `Poisoned` are terminal: a finished reader reports EOF and
+/// a poisoned one repeats its poison error. The reader poisons itself; its
+/// callers have no duty.
+enum AuthenticatedState<'a> {
+    Reading(Box<dyn AuthoredReplayReader + 'a>),
+    Finished,
+    /// A read that failed keeps the inner reader, and whatever it reserved,
+    /// alive until this reader is dropped; a failed EOF check has already
+    /// consumed it.
+    Poisoned {
+        _retained: Option<Box<dyn AuthoredReplayReader + 'a>>,
+    },
+}
+
 struct AuthenticatedReader<'a> {
-    inner: Option<Box<dyn AuthoredReplayReader + 'a>>,
+    state: AuthenticatedState<'a>,
     identity: Option<Arc<dyn AuthoredReplayHandle>>,
     durable_reference: Option<AuthoredReplayReference>,
     expected: AuthoredStreamProof,
     bytes: u64,
     hash: Sha256,
-    finished: bool,
-    poisoned: bool,
 }
 
-impl AuthenticatedReader<'_> {
+impl<'a> AuthenticatedReader<'a> {
+    fn new(
+        inner: Box<dyn AuthoredReplayReader + 'a>,
+        identity: Option<Arc<dyn AuthoredReplayHandle>>,
+        durable_reference: Option<AuthoredReplayReference>,
+        expected: AuthoredStreamProof,
+    ) -> Self {
+        Self {
+            state: AuthenticatedState::Reading(inner),
+            identity,
+            durable_reference,
+            expected,
+            bytes: 0,
+            hash: Sha256::new(),
+        }
+    }
+
+    fn poisoned_error() -> io::Error {
+        io::Error::other("authored replay reader is poisoned after a terminal error")
+    }
+
+    /// `Reading --> Poisoned`, keeping the inner reader alive.
+    fn poison(&mut self) {
+        let consumed = AuthenticatedState::Poisoned { _retained: None };
+        self.state = match std::mem::replace(&mut self.state, consumed) {
+            AuthenticatedState::Reading(inner) => AuthenticatedState::Poisoned {
+                _retained: Some(inner),
+            },
+            AuthenticatedState::Finished => AuthenticatedState::Poisoned { _retained: None },
+            state @ AuthenticatedState::Poisoned { .. } => state,
+        };
+    }
+
+    /// `Reading --> Finished` at the inner reader's EOF, or `Poisoned` when
+    /// its pass does not prove the expected bytes.
     fn finish_inner(&mut self) -> io::Result<()> {
-        if self.finished {
-            return Ok(());
-        }
-        if self.poisoned {
-            return Err(io::Error::other(
-                "authored replay reader is poisoned after a terminal error",
-            ));
-        }
-        let inner = match self.inner.take() {
-            Some(inner) => inner,
-            None => {
-                self.poisoned = true;
-                return Err(io::Error::other(
-                    "authored replay reader was already finished",
-                ));
+        let consumed = AuthenticatedState::Poisoned { _retained: None };
+        let inner = match std::mem::replace(&mut self.state, consumed) {
+            AuthenticatedState::Reading(inner) => inner,
+            AuthenticatedState::Finished => {
+                self.state = AuthenticatedState::Finished;
+                return Ok(());
+            },
+            state @ AuthenticatedState::Poisoned { .. } => {
+                self.state = state;
+                return Err(Self::poisoned_error());
             },
         };
-        let pass = match inner.finish() {
-            Ok(pass) => pass.proof(),
-            Err(error) => {
-                self.poisoned = true;
-                return Err(map_replay_io(error));
-            },
-        };
-        if let Some(identity) = self.identity.as_ref() {
-            if identity.proof() != self.expected
-                || identity.durable_reference() != self.durable_reference
-            {
-                self.poisoned = true;
-                return Err(map_replay_io(AuthoredReplayError::Changed));
-            }
+        let pass = inner.finish().map_err(map_replay_io)?.proof();
+        if identity_changed(
+            self.identity.as_ref(),
+            self.expected,
+            self.durable_reference.as_ref(),
+        ) {
+            return Err(map_replay_io(AuthoredReplayError::Changed));
         }
         let encoded_sha256: [u8; 32] = self.hash.clone().finalize().into();
         let actual = AuthoredStreamProof {
@@ -974,75 +1009,78 @@ impl AuthenticatedReader<'_> {
             ..pass
         };
         if actual != self.expected || pass.encoded_xml_bytes != self.bytes {
-            self.poisoned = true;
             return Err(map_replay_io(AuthoredReplayError::Changed));
         }
-        self.finished = true;
+        self.state = AuthenticatedState::Finished;
         Ok(())
     }
 }
 
+/// Whether the handle a reader was opened from no longer proves the expected
+/// stream.
+fn identity_changed(
+    identity: Option<&Arc<dyn AuthoredReplayHandle>>,
+    expected: AuthoredStreamProof,
+    durable_reference: Option<&AuthoredReplayReference>,
+) -> bool {
+    identity.is_some_and(|identity| {
+        identity.proof() != expected || identity.durable_reference().as_ref() != durable_reference
+    })
+}
+
 impl Read for AuthenticatedReader<'_> {
     fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
-        if self.poisoned {
-            return Err(io::Error::other(
-                "authored replay reader is poisoned after a terminal error",
-            ));
-        }
-        if output.is_empty() {
-            return Ok(0);
-        }
-        if self.finished {
-            return Ok(0);
-        }
-        if let Some(identity) = self.identity.as_ref() {
-            if identity.proof() != self.expected
-                || identity.durable_reference() != self.durable_reference
-            {
-                self.poisoned = true;
-                return Err(map_replay_io(AuthoredReplayError::Changed));
-            }
-        }
-        let inner = self
-            .inner
-            .as_mut()
-            .ok_or_else(|| io::Error::other("authored replay reader is unavailable"))?;
-        let count = match inner.read(output) {
-            Ok(count) => count,
-            Err(error) => {
-                self.poisoned = true;
-                return Err(error);
+        let read = match &mut self.state {
+            AuthenticatedState::Poisoned { .. } => return Err(Self::poisoned_error()),
+            AuthenticatedState::Finished => return Ok(0),
+            AuthenticatedState::Reading(_) if output.is_empty() => return Ok(0),
+            AuthenticatedState::Reading(inner) => {
+                if identity_changed(
+                    self.identity.as_ref(),
+                    self.expected,
+                    self.durable_reference.as_ref(),
+                ) {
+                    Err(map_replay_io(AuthoredReplayError::Changed))
+                } else {
+                    inner.read(output)
+                }
             },
         };
+        let accepted = read.and_then(|count| self.accept(count, output));
+        if accepted.is_err() {
+            self.poison();
+        }
+        accepted
+    }
+}
+
+impl AuthenticatedReader<'_> {
+    /// Account for one inner read of `count` bytes into `output`; zero bytes
+    /// is the inner reader's EOF.
+    fn accept(&mut self, count: usize, output: &[u8]) -> io::Result<usize> {
         if count > output.len() {
-            self.poisoned = true;
             return Err(map_replay_io(AuthoredReplayError::Invalid(
                 "authored replay reader returned more bytes than requested",
             )));
         }
         if count == 0 {
             self.finish_inner()?;
-        } else {
-            let count_u64 = u64::try_from(count).map_err(|_| {
-                self.poisoned = true;
-                map_replay_io(AuthoredReplayError::Invalid(
-                    "authored replay byte count does not fit in u64",
-                ))
-            })?;
-            let next = match self.bytes.checked_add(count_u64) {
-                Some(bytes) => bytes,
-                None => {
-                    self.poisoned = true;
-                    return Err(io::Error::other("authored replay length overflow"));
-                },
-            };
-            if next > self.expected.encoded_xml_bytes {
-                self.poisoned = true;
-                return Err(map_replay_io(AuthoredReplayError::Changed));
-            }
-            self.bytes = next;
-            self.hash.update(&output[..count]);
+            return Ok(0);
         }
+        let count_u64 = u64::try_from(count).map_err(|_| {
+            map_replay_io(AuthoredReplayError::Invalid(
+                "authored replay byte count does not fit in u64",
+            ))
+        })?;
+        let next = self
+            .bytes
+            .checked_add(count_u64)
+            .ok_or_else(|| io::Error::other("authored replay length overflow"))?;
+        if next > self.expected.encoded_xml_bytes {
+            return Err(map_replay_io(AuthoredReplayError::Changed));
+        }
+        self.bytes = next;
+        self.hash.update(&output[..count]);
         Ok(count)
     }
 }
@@ -1067,16 +1105,12 @@ impl SourcePartSpliceReplay for OpcReplayAdapter {
             .handle
             .open()
             .map_err(|error| SourcePartSpliceReplayError::Provider(Box::new(error)))?;
-        Ok(Box::new(AuthenticatedReader {
-            inner: Some(reader),
-            identity: Some(Arc::clone(&self.handle)),
-            durable_reference: self.durable_reference.clone(),
-            expected: self.proof,
-            bytes: 0,
-            hash: Sha256::new(),
-            finished: false,
-            poisoned: false,
-        }))
+        Ok(Box::new(AuthenticatedReader::new(
+            reader,
+            Some(Arc::clone(&self.handle)),
+            self.durable_reference.clone(),
+            self.proof,
+        )))
     }
 }
 
@@ -1122,7 +1156,7 @@ impl BoundReplayHandle {
 }
 
 struct BoundReplayReader<'a> {
-    inner: Option<Box<dyn AuthoredReplayReader + 'a>>,
+    inner: Box<dyn AuthoredReplayReader + 'a>,
     owner: Arc<dyn AuthoredReplayHandle>,
     expected: AuthoredStreamProof,
     durable_reference: Option<AuthoredReplayReference>,
@@ -1148,11 +1182,7 @@ impl Read for BoundReplayReader<'_> {
             self.poisoned = true;
             map_replay_io(AuthoredReplayError::Provider(Box::new(error)))
         })?;
-        let inner = self
-            .inner
-            .as_mut()
-            .ok_or_else(|| io::Error::other("authored replay reader was already finished"))?;
-        let count = match inner.read(output) {
+        let count = match self.inner.read(output) {
             Ok(count) => count,
             Err(error) => {
                 self.poisoned = true;
@@ -1198,7 +1228,7 @@ impl Read for BoundReplayReader<'_> {
 impl AuthoredReplayReader for BoundReplayReader<'_> {
     fn finish(self: Box<Self>) -> Result<AuthoredPassProof, AuthoredReplayError> {
         let BoundReplayReader {
-            mut inner,
+            inner,
             owner,
             expected,
             durable_reference,
@@ -1211,12 +1241,9 @@ impl AuthoredReplayReader for BoundReplayReader<'_> {
                 "authored replay reader is poisoned after a terminal error",
             )));
         }
-        let reader = inner.take().ok_or(AuthoredReplayError::Invalid(
-            "authored replay reader was already finished",
-        ))?;
         check_store_operation(access_context.as_ref(), access_cancellation.as_ref())
             .map_err(|error| AuthoredReplayError::Provider(Box::new(error)))?;
-        let pass = reader.finish()?;
+        let pass = inner.finish()?;
         check_store_operation(access_context.as_ref(), access_cancellation.as_ref())
             .map_err(|error| AuthoredReplayError::Provider(Box::new(error)))?;
         if pass.proof() != expected
@@ -1287,7 +1314,7 @@ impl AuthoredReplayHandle for BoundReplayHandle {
         )
         .map_err(|error| AuthoredReplayError::Provider(Box::new(error)))?;
         Ok(Box::new(BoundReplayReader {
-            inner: Some(reader),
+            inner: reader,
             owner: Arc::clone(&self.inner),
             expected: self.proof,
             durable_reference: self.durable_reference.clone(),
@@ -2433,16 +2460,7 @@ mod authenticated_reader_tests {
             failure,
             proof: AuthoredPassProof(expected),
         };
-        AuthenticatedReader {
-            inner: Some(Box::new(inner)),
-            identity: None,
-            durable_reference: None,
-            expected,
-            bytes: 0,
-            hash: Sha256::new(),
-            finished: false,
-            poisoned: false,
-        }
+        AuthenticatedReader::new(Box::new(inner), None, None, expected)
     }
 
     fn authored_error(error: &io::Error) -> Option<&AuthoredReplayError> {
@@ -2473,6 +2491,206 @@ mod authenticated_reader_tests {
             Some(AuthoredReplayError::Changed)
         ));
         assert!(reader.read(&mut [0; 1]).is_err());
+    }
+
+    /// An inner reader that plays back scripted reads and a scripted
+    /// `finish`, and records when it is dropped.
+    struct ScriptedReader {
+        reads: std::collections::VecDeque<io::Result<&'static [u8]>>,
+        finish: Option<Result<AuthoredPassProof, AuthoredReplayError>>,
+        dropped: Arc<std::sync::atomic::AtomicBool>,
+    }
+
+    impl Read for ScriptedReader {
+        fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+            match self.reads.pop_front() {
+                None => Ok(0),
+                Some(Err(error)) => Err(error),
+                Some(Ok(bytes)) => {
+                    output[..bytes.len()].copy_from_slice(bytes);
+                    Ok(bytes.len())
+                },
+            }
+        }
+    }
+
+    impl AuthoredReplayReader for ScriptedReader {
+        fn finish(mut self: Box<Self>) -> Result<AuthoredPassProof, AuthoredReplayError> {
+            self.finish.take().expect("finish is scripted once")
+        }
+    }
+
+    impl Drop for ScriptedReader {
+        fn drop(&mut self) {
+            self.dropped
+                .store(true, std::sync::atomic::Ordering::SeqCst);
+        }
+    }
+
+    #[derive(Debug)]
+    struct ChangedHandle(AuthoredStreamProof);
+
+    impl AuthoredReplayHandle for ChangedHandle {
+        fn proof(&self) -> AuthoredStreamProof {
+            self.0
+        }
+
+        fn open(&self) -> Result<Box<dyn AuthoredReplayReader + '_>, AuthoredReplayError> {
+            Err(AuthoredReplayError::Invalid("not opened by this test"))
+        }
+
+        fn durable_reference(&self) -> Option<AuthoredReplayReference> {
+            None
+        }
+    }
+
+    /// Render `(input, outcome)` rows as the Rust table the test pins.
+    fn render_rows(rows: &[(&str, String)]) -> String {
+        rows.iter()
+            .map(|(input, outcome)| format!("            (r#\"{input}\"#, {outcome:?}),\n"))
+            .collect()
+    }
+
+    #[track_caller]
+    fn assert_rows(expected: &[(&str, &str)], outcome: impl Fn(&str) -> String) {
+        let actual = expected
+            .iter()
+            .map(|(input, _)| (*input, outcome(input)))
+            .collect::<Vec<_>>();
+        let matches = actual
+            .iter()
+            .zip(expected)
+            .all(|((_, got), (_, want))| got == want);
+        assert!(matches, "outcomes changed:\n{}", render_rows(&actual));
+    }
+
+    /// Every lifecycle of the authenticated reader: reading, a finished
+    /// pass, and each way to poison it. Each outcome lists, for the reads
+    /// `0, 8, 8, 8, 0` (requested bytes), the result and whether the inner
+    /// reader has been dropped (`+` dropped, `-` alive), then the same flag
+    /// after the authenticated reader is dropped.
+    #[test]
+    fn lifecycle_outcomes_are_pinned() {
+        const EXPECTED: &[(&str, &str)] = &[
+            (r#"complete"#, "0 - | 4 - | 0 + | 0 + | 0 + | +"),
+            (
+                r#"complete-in-two-reads"#,
+                "0 - | 2 - | 2 - | 0 + | 0 + | +",
+            ),
+            (r#"empty-stream"#, "0 - | 0 + | 0 + | 0 + | 0 + | +"),
+            (
+                r#"short"#,
+                "0 - | 2 - | authored paragraph replay proof changed between passes + | authored replay reader is poisoned after a terminal error + | authored replay reader is poisoned after a terminal error + | +",
+            ),
+            (
+                r#"wrong-bytes"#,
+                "0 - | 4 - | authored paragraph replay proof changed between passes + | authored replay reader is poisoned after a terminal error + | authored replay reader is poisoned after a terminal error + | +",
+            ),
+            (
+                r#"too-long"#,
+                "0 - | authored paragraph replay proof changed between passes - | authored replay reader is poisoned after a terminal error - | authored replay reader is poisoned after a terminal error - | authored replay reader is poisoned after a terminal error - | +",
+            ),
+            (
+                r#"pass-length-differs"#,
+                "0 - | 4 - | authored paragraph replay proof changed between passes + | authored replay reader is poisoned after a terminal error + | authored replay reader is poisoned after a terminal error + | +",
+            ),
+            (
+                r#"pass-facts-differ"#,
+                "0 - | 4 - | authored paragraph replay proof changed between passes + | authored replay reader is poisoned after a terminal error + | authored replay reader is poisoned after a terminal error + | +",
+            ),
+            (
+                r#"finish-error"#,
+                "0 - | 4 - | authored paragraph stream is invalid: scripted finish failure + | authored replay reader is poisoned after a terminal error + | authored replay reader is poisoned after a terminal error + | +",
+            ),
+            (
+                r#"read-error"#,
+                "0 - | 2 - | boom - | authored replay reader is poisoned after a terminal error - | authored replay reader is poisoned after a terminal error - | +",
+            ),
+            (
+                r#"read-error-first"#,
+                "0 - | boom - | authored replay reader is poisoned after a terminal error - | authored replay reader is poisoned after a terminal error - | authored replay reader is poisoned after a terminal error - | +",
+            ),
+            (
+                r#"identity-changed"#,
+                "0 - | authored paragraph replay proof changed between passes - | authored replay reader is poisoned after a terminal error - | authored replay reader is poisoned after a terminal error - | authored replay reader is poisoned after a terminal error - | +",
+            ),
+        ];
+        assert_rows(EXPECTED, |scenario| {
+            let content: &'static [u8] = if scenario == "empty-stream" {
+                b""
+            } else {
+                b"abcd"
+            };
+            let expected = AuthoredStreamProof {
+                encoded_xml_bytes: content.len() as u64,
+                encoded_sha256: Sha256::digest(content).into(),
+                ..proof(0)
+            };
+            let boom = || io::Error::other("boom");
+            let (reads, finish): (Vec<io::Result<&'static [u8]>>, _) = match scenario {
+                "complete" => (vec![Ok(b"abcd")], Ok(AuthoredPassProof(expected))),
+                "complete-in-two-reads" => {
+                    (vec![Ok(b"ab"), Ok(b"cd")], Ok(AuthoredPassProof(expected)))
+                },
+                "empty-stream" => (vec![], Ok(AuthoredPassProof(expected))),
+                "short" => (vec![Ok(b"ab")], Ok(AuthoredPassProof(expected))),
+                "wrong-bytes" => (vec![Ok(b"abcx")], Ok(AuthoredPassProof(expected))),
+                "too-long" => (vec![Ok(b"abcde")], Ok(AuthoredPassProof(expected))),
+                "pass-length-differs" => (
+                    vec![Ok(b"abcd")],
+                    Ok(AuthoredPassProof(AuthoredStreamProof {
+                        encoded_xml_bytes: 5,
+                        ..expected
+                    })),
+                ),
+                "pass-facts-differ" => (
+                    vec![Ok(b"abcd")],
+                    Ok(AuthoredPassProof(AuthoredStreamProof {
+                        paragraph_count: 2,
+                        ..expected
+                    })),
+                ),
+                "finish-error" => (
+                    vec![Ok(b"abcd")],
+                    Err(AuthoredReplayError::Invalid("scripted finish failure")),
+                ),
+                "read-error" => (
+                    vec![Ok(b"ab"), Err(boom())],
+                    Ok(AuthoredPassProof(expected)),
+                ),
+                "read-error-first" => (vec![Err(boom())], Ok(AuthoredPassProof(expected))),
+                "identity-changed" => (vec![Ok(b"abcd")], Ok(AuthoredPassProof(expected))),
+                other => panic!("unknown scenario {other}"),
+            };
+            let dropped = Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let inner = ScriptedReader {
+                reads: reads.into(),
+                finish: Some(finish),
+                dropped: Arc::clone(&dropped),
+            };
+            let changed: Arc<dyn AuthoredReplayHandle> = Arc::new(ChangedHandle(proof(99)));
+            let identity = (scenario == "identity-changed").then_some(changed);
+            let mut reader = AuthenticatedReader::new(Box::new(inner), identity, None, expected);
+            let flag = |dropped: &std::sync::atomic::AtomicBool| {
+                if dropped.load(std::sync::atomic::Ordering::SeqCst) {
+                    '+'
+                } else {
+                    '-'
+                }
+            };
+            let mut steps = Vec::new();
+            for request in [0usize, 8, 8, 8, 0] {
+                let mut output = [0u8; 8];
+                let result = match reader.read(&mut output[..request]) {
+                    Ok(count) => format!("{count}"),
+                    Err(error) => error.to_string(),
+                };
+                steps.push(format!("{result} {}", flag(&dropped)));
+            }
+            drop(reader);
+            steps.push(flag(&dropped).to_string());
+            steps.join(" | ")
+        });
     }
 }
 
