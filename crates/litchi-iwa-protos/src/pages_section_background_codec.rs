@@ -4,11 +4,6 @@
 //! private Buffa lazy projection is used only as an independent borrowed
 //! semantic parity oracle after that preflight succeeds.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Wire helpers stay beside the raw-preserving rewrite model."
-)]
-
 use core::fmt;
 
 use buffa::DecodeOptions as BuffaDecodeOptions;

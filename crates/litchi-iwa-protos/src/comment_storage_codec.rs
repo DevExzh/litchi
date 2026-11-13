@@ -7,11 +7,6 @@
 //! Every borrowed value points into the caller-owned payload, which remains
 //! the only preservation representation.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Strict semantic preflight intentionally precedes its wire reader."
-)]
-
 use core::{fmt, mem::size_of, str};
 
 use buffa::{DecodeOptions as BuffaDecodeOptions, ViewEncode as _};
@@ -4042,11 +4037,6 @@ fn check_rewrite_limits(
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "Focused wire fixtures intentionally use explicit test assertions."
-)]
 mod tests {
     use super::*;
     use crate::tsd;

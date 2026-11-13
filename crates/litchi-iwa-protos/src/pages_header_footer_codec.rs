@@ -7,11 +7,6 @@
 //! known fields, cross-checks each reference with the private Buffa lazy view,
 //! and never asks a generated type to own or encode the repeated records.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the strict wire reader is intentionally arranged before its low-level helpers"
-)]
-
 use core::fmt;
 
 #[cfg(test)]
@@ -1242,11 +1237,6 @@ fn require_canonical_int32(value: u64) -> Result<i32, DecodeError> {
             "int32 scalar is not sign extended",
         ));
     }
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_possible_wrap,
-        reason = "the strict range check proves the value is a canonical int32"
-    )]
     Ok(value as i32)
 }
 
@@ -1444,11 +1434,6 @@ fn decode_int32_unmetered(value: u64) -> Result<i32, ()> {
     if value > 0x7fff_ffff && value < MIN_SIGN_EXTENDED_INT32 {
         return Err(());
     }
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_possible_wrap,
-        reason = "the strict range check proves the value is a canonical int32"
-    )]
     Ok(value as i32)
 }
 
@@ -1686,12 +1671,6 @@ struct Budget {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::shadow_unrelated,
-    reason = "focused codec tests use explicit byte fixtures"
-)]
 mod tests {
     use super::*;
 

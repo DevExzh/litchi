@@ -8,11 +8,6 @@
 //! protobuf messages and it performs all size, field, work, and nesting checks
 //! before reserving the single output buffer.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The public selector API is grouped by native family, then by wire helpers."
-)]
-
 use core::fmt;
 
 pub use crate::keynote_slide_background_codec::{

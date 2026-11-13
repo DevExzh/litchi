@@ -8,11 +8,6 @@
 //! bytes. A private Buffa lazy view cross-checks the selected fields after the
 //! strict scanner has established canonical wire and resource limits.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The strict source scanner is intentionally ordered before its private projection."
-)]
-
 use std::{fmt, mem::size_of};
 
 use buffa::DecodeOptions as BuffaDecodeOptions;

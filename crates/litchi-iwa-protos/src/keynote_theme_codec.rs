@@ -6,11 +6,6 @@
 //! as an exact source span. Classic-theme, timing-curve, and
 //! motion-background fields are framed but not decoded here.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The strict source pass intentionally precedes the private Buffa view."
-)]
-
 use std::{fmt, str};
 
 use buffa::DecodeOptions as BuffaDecodeOptions;
@@ -2930,14 +2925,7 @@ fn selected_reference_payload<'source>(
 }
 
 fn decode_int32(value: u64) -> i32 {
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_possible_wrap,
-        reason = "The selected int32 field is checked for canonical protobuf representation."
-    )]
-    {
-        value as i32
-    }
+    value as i32
 }
 
 fn next_field<'source>(
@@ -3196,18 +3184,10 @@ fn encoded_reference_field_len(field_number: u32, reference: ThemeReferenceSnaps
 
 fn append_varint(output: &mut Vec<u8>, mut value: u64) {
     while value >= 0x80 {
-        #[allow(
-            clippy::cast_possible_truncation,
-            reason = "Only low seven value bits are emitted per protobuf varint byte."
-        )]
         let byte = value as u8;
         output.push(byte & 0x7f | 0x80);
         value >>= 7;
     }
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "The final protobuf varint byte contains at most seven bits."
-    )]
     output.push(value as u8);
 }
 

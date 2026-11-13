@@ -11,11 +11,6 @@
 //! edits use the bounded typed reference-list rewrite below, so the host does
 //! not need to own a generated `IWorkThemeArchive` graph.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The strict wire pass intentionally precedes the private Buffa view."
-)]
-
 use std::{fmt, mem::size_of, str};
 
 use buffa::DecodeOptions as BuffaDecodeOptions;

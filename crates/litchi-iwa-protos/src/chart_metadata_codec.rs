@@ -8,11 +8,6 @@
 //! row counts stay borrowed from the original bytes; no generated message or
 //! repeated-field allocation crosses this boundary.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Strict wire preflight intentionally precedes the private view."
-)]
-
 use std::{fmt, num::NonZeroU64, str};
 
 use buffa::DecodeOptions as BuffaDecodeOptions;

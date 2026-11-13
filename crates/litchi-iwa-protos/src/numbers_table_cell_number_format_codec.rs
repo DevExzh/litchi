@@ -5,8 +5,6 @@
 //! This module publishes the scalar Number and Percentage APIs plus shared
 //! finite execution types; generated values never cross the crate boundary.
 
-#![allow(clippy::module_name_repetitions)]
-
 pub use crate::numbers_table_cell_control_codec::{
     DecodeError, DecodeLimit, DecodeOptions, DecodeReport, MAX_NUMBER_DECIMAL_PLACES,
     NATIVE_AUTOMATIC_DECIMAL_PLACES, NATIVE_NUMBER_FORMAT_TYPE, NumberFormatSnapshot,

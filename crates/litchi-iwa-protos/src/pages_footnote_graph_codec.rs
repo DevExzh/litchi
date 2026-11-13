@@ -12,11 +12,6 @@
 //! This module only calls their generated-free APIs for candidate validation;
 //! no generated type is present in its public surface.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The strict wire pass intentionally precedes low-level helpers."
-)]
-
 use core::fmt;
 use std::{mem::size_of, num::NonZeroU64, str};
 
@@ -2948,11 +2943,6 @@ fn verify_graph_payloads(
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    reason = "Focused graph-codec tests use compact generated-wire fixtures."
-)]
 mod tests {
     use super::*;
     use crate::{tsp, tswp};

@@ -7,11 +7,6 @@
 //! module performs bounded strict preflight before forcing a private Buffa
 //! lazy view, and rewrites only the selected source spans.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Strict wire preflight intentionally precedes the private view."
-)]
-
 use std::fmt;
 
 use buffa::DecodeOptions as BuffaDecodeOptions;
@@ -2146,11 +2141,6 @@ fn take_exact<'source>(
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    reason = "Focused codec tests use explicit wire fixtures and assertions."
-)]
 mod tests {
     use super::{
         ChartArrangementWrite, DecodeLimit, DecodeOptions, WireResourceLimit,

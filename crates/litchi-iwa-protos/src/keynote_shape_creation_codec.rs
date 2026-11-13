@@ -6,11 +6,6 @@
 //! performs a complete local preflight before creating nested Buffa views or
 //! output buffers.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The typed shape closure is organized around its wire graph."
-)]
-
 use std::fmt;
 
 use buffa::ViewEncode as _;

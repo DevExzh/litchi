@@ -6,11 +6,6 @@
 //! values never escape this module and caller-owned bytes remain authoritative
 //! for preservation and rewriting.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Strict routing helpers stay beside the generated-free snapshots they build."
-)]
-
 use core::fmt;
 
 use buffa::DecodeOptions as BuffaDecodeOptions;
@@ -699,11 +694,6 @@ impl Budget {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "Focused wire fixtures require exact successful construction and failures."
-)]
 mod tests {
     use super::*;
 

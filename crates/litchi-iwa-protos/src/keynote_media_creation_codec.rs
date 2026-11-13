@@ -6,11 +6,6 @@
 //! then encodes a private Buffa view directly.  The native generated Prost
 //! graph is used only by the test-only differential oracle.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The public value types precede their bounded encoding helpers."
-)]
-
 use std::fmt;
 
 use buffa::ViewEncode as _;

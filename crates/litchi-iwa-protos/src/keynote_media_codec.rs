@@ -6,11 +6,6 @@
 //! private Buffa lazy view.  The caller-owned source slice remains the only
 //! preservation representation; this module never re-encodes it.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The strict pass intentionally precedes the private Buffa cross-check."
-)]
-
 use core::fmt;
 
 use buffa::DecodeOptions as BuffaDecodeOptions;

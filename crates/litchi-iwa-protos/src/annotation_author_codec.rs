@@ -7,11 +7,6 @@
 //! payload remains the preservation representation; storage rewrites copy it
 //! and alter only one selected repeated reference field.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The strict preflight, borrowed projection, and bounded writer are kept together."
-)]
-
 use core::{fmt, str};
 
 use buffa::{DecodeOptions as BuffaDecodeOptions, ViewEncode as _};
@@ -1491,10 +1486,6 @@ pub type ColorWrite = AuthorColorWrite;
 impl AuthorColorWrite {
     /// Construct a color from all native optional scalar presences.
     #[must_use]
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "The fields mirror the native color schema."
-    )]
     pub const fn new(
         model: i32,
         red: Option<f32>,

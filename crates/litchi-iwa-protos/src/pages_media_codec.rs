@@ -7,11 +7,6 @@
 //! canonical scalar validation, and resource accounting before a private
 //! Buffa lazy view is forced. Unknown source fields are never materialized or rewritten here.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Strict semantic preflight intentionally precedes the low-level wire reader."
-)]
-
 use std::fmt;
 
 use buffa::DecodeOptions as BuffaDecodeOptions;
@@ -575,10 +570,6 @@ fn take_exact<'source>(
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    reason = "Focused media-wire tests use explicit fixture expectations."
-)]
 mod tests {
     use prost::Message as _;
 

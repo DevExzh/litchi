@@ -5,11 +5,6 @@
 //! forced only as borrowed parity oracles; generated values never escape and
 //! caller-owned bytes remain authoritative.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Wire helpers stay beside the generated-free snapshots they construct."
-)]
-
 use core::{fmt, mem::size_of, str};
 
 use buffa::DecodeOptions as BuffaDecodeOptions;
@@ -6665,11 +6660,6 @@ fn set_once<T>(slot: &mut Option<T>, value: T) -> Result<(), DecodeError> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "Focused canonical wire fixtures require exact construction and failure checks."
-)]
 mod tests {
     use super::*;
     use prost::Message as _;

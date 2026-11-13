@@ -7,11 +7,6 @@
 //! All other table metadata remains caller-owned bytes and is never
 //! materialized or re-encoded.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The strict preflight intentionally precedes the low-level wire reader it consumes."
-)]
-
 use std::{fmt, num::NonZeroU64};
 
 use buffa::DecodeOptions as BuffaDecodeOptions;
@@ -2303,11 +2298,6 @@ fn take_exact<'source>(
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    clippy::shadow_unrelated,
-    reason = "Focused negative tests use explicit panic messages and reuse local error roles."
-)]
 mod tests {
     use std::num::NonZeroU64;
 

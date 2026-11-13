@@ -15,11 +15,6 @@
 //! supplies those witnesses and publishes a candidate only after its package
 //! transaction has validated them.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The strict pass, lazy cross-check, and raw-preserving writer are kept together."
-)]
-
 use core::{fmt, mem::size_of};
 
 use buffa::DecodeOptions as BuffaDecodeOptions;
@@ -2055,11 +2050,6 @@ fn canonical_int32(value: u64) -> Result<i32, DecodeError> {
     if value > i32::MAX as u64 && value < MIN_SIGN_EXTENDED_INT32 {
         return Err(DecodeError::noncanonical("int32 scalar"));
     }
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_possible_wrap,
-        reason = "The sign-extension range check proves the cast is canonical."
-    )]
     Ok(value as i32)
 }
 

@@ -6,8 +6,6 @@
 //! exposes typed wrappers around the single audited decimal-format core.
 //! Generated Buffa values never cross the crate boundary.
 
-#![allow(clippy::module_name_repetitions)]
-
 use crate::numbers_table_cell_pop_up_menu_codec as core;
 
 pub use core::{

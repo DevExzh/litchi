@@ -4,11 +4,6 @@
 //! canonical wire validation, forces only the selected private Buffa lazy view,
 //! and publishes borrowed semantic fields.  It deliberately has no encoder.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The decoder keeps schema preflight beside its lazy projection."
-)]
-
 use std::{fmt, str};
 
 use buffa::DecodeOptions as BuffaDecodeOptions;

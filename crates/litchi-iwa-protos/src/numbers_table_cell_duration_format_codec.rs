@@ -6,8 +6,6 @@
 //! boundary. The complete source payload remains authoritative; generated
 //! Buffa values never cross this module.
 
-#![allow(clippy::module_name_repetitions)]
-
 use std::fmt;
 
 use crate::numbers_table_cell_pop_up_menu_codec as core;

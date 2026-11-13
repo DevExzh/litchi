@@ -1,10 +1,5 @@
 //! Strict generated-free streaming reader for the table-local scalar formula subset.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Wire helpers stay beside the generated-free formula model."
-)]
-
 use core::{fmt, mem::size_of, str};
 
 use buffa::DecodeOptions as BuffaDecodeOptions;
@@ -241,7 +236,6 @@ impl FormulaWriteCategoryReference {
     /// and group node `group`, whose formula owner is `internal_owner`;
     /// `grouping` and `aggregate` are `(row, column)` cells of that owner.
     #[must_use]
-    #[allow(clippy::too_many_arguments)]
     pub const fn new(
         group_by: FormulaWriteOwnerUid,
         column: FormulaWriteOwnerUid,

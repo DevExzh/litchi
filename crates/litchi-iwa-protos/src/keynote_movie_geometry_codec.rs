@@ -7,11 +7,6 @@
 //! bytes.  A private Buffa lazy view is used as an ingress cross-check;
 //! generated types never cross this module's public boundary.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The strict scanner precedes the private projection."
-)]
-
 use std::{fmt, mem::size_of};
 
 use buffa::DecodeOptions as BuffaDecodeOptions;

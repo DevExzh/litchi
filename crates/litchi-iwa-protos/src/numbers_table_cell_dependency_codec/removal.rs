@@ -1573,11 +1573,6 @@ fn copy_bytes(source: &[u8], work: &mut WorkBudget) -> Result<Vec<u8>, DecodeErr
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "Focused dependency-removal fixtures use exact wire construction."
-)]
 mod tests {
     use super::*;
 

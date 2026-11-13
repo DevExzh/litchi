@@ -6,11 +6,6 @@
 //! wire scan before asking Buffa for borrowed lazy views of the selected
 //! fields, and publishes only non-zero object identifiers.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The strict scanner intentionally precedes the Buffa parity pass."
-)]
-
 use std::{fmt, num::NonZeroU64};
 
 use buffa::DecodeOptions as BuffaDecodeOptions;

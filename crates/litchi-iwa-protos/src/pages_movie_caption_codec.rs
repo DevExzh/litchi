@@ -6,11 +6,6 @@
 //! private Buffa lazy view is forced. Unknown source fields remain opaque and
 //! caller-owned, so this module never materializes or rewrites them.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Strict semantic preflight intentionally precedes the low-level wire reader."
-)]
-
 use std::fmt;
 
 use buffa::DecodeOptions as BuffaDecodeOptions;
@@ -1363,11 +1358,6 @@ fn require_canonical_int32(value: u64) -> Result<u64, DecodeError> {
     Ok(value)
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_possible_wrap,
-    reason = "Strict preflight proved the u64 is a canonical sign-extended int32."
-)]
 const fn decode_int32(value: u64) -> i32 {
     value as i32
 }
@@ -1591,11 +1581,6 @@ fn force_snapshot(strict: StrictCaptionInfo) -> CaptionInfoSnapshot {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    clippy::same_item_push,
-    reason = "Focused wire fixtures intentionally use direct assertions and byte builders."
-)]
 mod tests {
     use super::{
         Budget, CAPTION_INFO_KIND_FIELD, CaptionInfoWrite, DecodeOptions, decode_caption_info,

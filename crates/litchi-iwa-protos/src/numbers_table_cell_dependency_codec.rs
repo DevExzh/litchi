@@ -4,11 +4,6 @@
 //! Buffa views provide borrowed parity only after the canonical handwritten
 //! pass has validated every selected envelope with one aggregate budget.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Dependency wire helpers stay beside the snapshots they construct."
-)]
-
 use core::fmt;
 
 use crate::buffa_numbers_table_cell_dependency_generated::LitchiIwaTableCellDependencyProjection as projection;
@@ -1837,11 +1832,6 @@ fn set_once<T>(slot: &mut Option<T>, value: T) -> Result<(), DecodeError> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "Focused canonical dependency fixtures require exact construction and failures."
-)]
 mod tests {
     use super::*;
 

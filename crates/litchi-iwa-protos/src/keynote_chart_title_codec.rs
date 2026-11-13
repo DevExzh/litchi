@@ -7,11 +7,6 @@
 //! only a borrowed projection and a wire-local rewrite; it never performs a
 //! chart lookup or archive transaction.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The strict preflight intentionally precedes the low-level wire reader it consumes."
-)]
-
 use std::{fmt, str};
 
 use buffa::DecodeOptions as BuffaDecodeOptions;
@@ -1345,11 +1340,6 @@ fn take_exact<'source>(
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    clippy::shadow_unrelated,
-    reason = "Focused negative tests use explicit panic messages and reuse local wire helpers."
-)]
 mod tests {
     use super::{
         ChartTitleSnapshot, ChartTitleWrite, DecodeLimit, DecodeOptions, WireResourceLimit,

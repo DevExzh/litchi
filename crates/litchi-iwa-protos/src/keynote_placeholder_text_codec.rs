@@ -6,11 +6,6 @@
 //! optional owned-storage edge. Unknown fields remain opaque in caller-owned
 //! source bytes and are never retained or re-encoded by this module.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Strict semantic preflight intentionally precedes its low-level wire reader."
-)]
-
 use std::{fmt, num::NonZeroU64};
 
 use buffa::DecodeOptions as BuffaDecodeOptions;
@@ -733,11 +728,6 @@ fn require_canonical_int32(value: u64) -> Result<u64, DecodeError> {
     Ok(value)
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_possible_wrap,
-    reason = "Strict preflight proved the u64 is a canonical sign-extended int32."
-)]
 fn decode_int32(value: u64) -> i32 {
     value as i32
 }
@@ -937,10 +927,6 @@ fn take_exact<'source>(
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    reason = "Focused negative tests use explicit panic messages."
-)]
 mod tests {
     use prost::Message as _;
 

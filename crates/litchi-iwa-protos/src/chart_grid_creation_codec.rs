@@ -13,11 +13,6 @@
 //! entries never enter generated repeated vectors.  The writer's byte order
 //! and field defaults intentionally match the former Prost source builder.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The request, bounded plan, and streaming wire writer are kept together."
-)]
-
 use std::{error::Error, fmt, mem::size_of};
 
 use buffa::ViewEncode as _;

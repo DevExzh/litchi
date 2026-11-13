@@ -8,11 +8,6 @@
 //! scalar through a borrowed Buffa lazy view.  The caller-owned payload stays
 //! authoritative for unknown fields and future rewrites.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The strict scanner intentionally precedes the Buffa parity pass."
-)]
-
 use std::{fmt, num::NonZeroU64};
 
 use buffa::DecodeOptions as BuffaDecodeOptions;

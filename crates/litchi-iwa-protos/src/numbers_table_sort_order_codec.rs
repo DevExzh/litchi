@@ -7,11 +7,6 @@
 //! balanced unknown groups are retained verbatim. `unknown overlong` scalar
 //! encodings are accepted and copied without normalization.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The strict wire pass intentionally precedes its small public projections."
-)]
-
 use core::{fmt, mem::size_of};
 
 use buffa::DecodeOptions as BuffaDecodeOptions;

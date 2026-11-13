@@ -5,11 +5,6 @@
 //! borrowed parity oracles, constructs one fallibly allocated candidate, and
 //! strictly re-decodes that candidate before any bytes escape.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Wire helpers stay beside the generated-free publication model."
-)]
-
 use core::{fmt, mem::size_of, str};
 
 use buffa::DecodeOptions as BuffaDecodeOptions;
@@ -9868,7 +9863,6 @@ fn scan_root_data_metadata_map(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn scan_removal_component(
     source: &[u8],
     current: bool,

@@ -14,11 +14,6 @@
 //! source bytes.  A record selected for mutation is rejected when its unknown
 //! fields make ownership ambiguous.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Wire helpers are kept beside the streaming publication model."
-)]
-
 use core::{fmt, mem::size_of, num::NonZeroU64, str};
 use std::path::{Component, Path};
 
@@ -70,7 +65,6 @@ impl DecodeOptions {
     /// limits.  All limits are operation-local and are checked before any
     /// output allocation.
     #[must_use]
-    #[allow(clippy::too_many_arguments)]
     pub const fn new(
         max_message_bytes: usize,
         max_fields: usize,
@@ -5054,11 +5048,6 @@ fn utf8(source: &[u8], field: WireField) -> Result<&str, DecodeError> {
 mod content_replacement_tests;
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "The small in-module wire fixtures keep codec invariants readable."
-)]
 mod tests {
     use super::*;
 

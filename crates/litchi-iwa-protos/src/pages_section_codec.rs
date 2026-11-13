@@ -655,11 +655,6 @@ fn strict_reference(
                 if value > 0x7fff_ffff && value < MIN_SIGN_EXTENDED_INT32 {
                     return Err(DecodeError::invalid());
                 }
-                #[allow(
-                    clippy::cast_possible_truncation,
-                    clippy::cast_possible_wrap,
-                    reason = "Strict preflight proved the u64 is a canonical sign-extended int32."
-                )]
                 let value = value as i32;
                 deprecated_type = Some(value);
             },

@@ -8,11 +8,6 @@
 //! Unknown fields, the native row/column id map, and all future data fields
 //! stay source-authoritative.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Strict wire preflight intentionally precedes the private view."
-)]
-
 use std::{fmt, str};
 
 use buffa::DecodeOptions as BuffaDecodeOptions;

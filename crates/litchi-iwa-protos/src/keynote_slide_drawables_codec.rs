@@ -7,11 +7,6 @@
 //! snapshot owns only scalar identifiers; source bytes and generated views do
 //! not escape this boundary.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The strict parser and its lazy-view cross-check intentionally stay together."
-)]
-
 use std::{cell::Cell, fmt};
 
 use buffa::DecodeOptions as BuffaDecodeOptions;
@@ -491,11 +486,6 @@ fn canonical_int32(value: u64) -> Result<i32, DecodeError> {
             "int32 scalar is not sign-extended",
         ));
     }
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_possible_wrap,
-        reason = "The strict range check proves canonical int32 sign extension."
-    )]
     let value = value as i32;
     Ok(value)
 }

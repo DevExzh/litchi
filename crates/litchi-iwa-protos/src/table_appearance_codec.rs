@@ -12,11 +12,6 @@
 //! Object/archive lookup, UUIDs, metadata, and package publication stay above
 //! this codec.  No generated schema type crosses this boundary.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The strict wire pass intentionally precedes the small public projections."
-)]
-
 use core::fmt;
 
 const MODEL_STYLE_FIELD: u32 = 3;

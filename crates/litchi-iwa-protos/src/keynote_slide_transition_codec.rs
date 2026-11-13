@@ -7,11 +7,6 @@
 //! generated or semantic wire model. The source bytes remain the only
 //! preservation and rewrite representation.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Strict semantic preflight intentionally precedes its low-level wire iterator."
-)]
-
 use std::{fmt, str};
 
 use buffa::DecodeOptions as BuffaDecodeOptions;
@@ -315,11 +310,6 @@ impl fmt::Display for DecodeError {
 
 impl std::error::Error for DecodeError {}
 
-#[allow(
-    clippy::wildcard_enum_match_arm,
-    clippy::shadow_same,
-    reason = "Buffa may add wire failures; preserve them without narrowing the error API."
-)]
 impl From<buffa::DecodeError> for DecodeError {
     fn from(error: buffa::DecodeError) -> Self {
         match error {
@@ -1435,11 +1425,6 @@ fn require_canonical_int32(value: u64) -> Result<u64, DecodeError> {
     Ok(value)
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_possible_wrap,
-    reason = "Strict preflight proved the u64 is a canonical sign-extended int32."
-)]
 fn decode_int32(value: u64) -> i32 {
     value as i32
 }
@@ -1708,13 +1693,6 @@ fn take_exact<'source>(
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::cast_possible_truncation,
-        clippy::expect_used,
-        clippy::large_types_passed_by_value,
-        clippy::shadow_unrelated,
-        reason = "Focused adversarial tests deliberately use direct assertions and compact field-number tables."
-    )]
 
     use super::{
         Budget, DecodeError, DecodeOptions, WireResourceLimit, decode_slide_node_has_transition,
@@ -1726,10 +1704,6 @@ mod tests {
         DecodeOptions::new(source.len().max(1), 8)
     }
 
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "Each emitted varint byte intentionally contains only its low seven bits."
-    )]
     fn push_varint(mut value: u64, output: &mut Vec<u8>) {
         while value >= 0x80 {
             output.push((value as u8 & 0x7f) | 0x80);

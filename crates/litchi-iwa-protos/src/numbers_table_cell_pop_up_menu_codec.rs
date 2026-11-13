@@ -11,11 +11,6 @@
 //! [`crate::numbers_table_cell_storage_codec`]; this codec owns the selected
 //! `PopUpMenuModel` and `CellSpecArchive` payloads.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Strict wire helpers stay beside the snapshots they construct."
-)]
-
 use core::{fmt, str};
 
 use buffa::DecodeOptions as BuffaDecodeOptions;

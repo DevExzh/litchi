@@ -12,11 +12,6 @@
 //! authoritative for every rewrite.  Unknown fields, field order, and raw
 //! nested payloads therefore survive a geometry or property edit.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The strict scanner is intentionally ordered before the private Buffa checks."
-)]
-
 use std::{fmt, mem::size_of, str};
 
 use buffa::DecodeOptions as BuffaDecodeOptions;

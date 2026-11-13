@@ -8,11 +8,6 @@
 //! particular, gradient/image branches and unknown extension fields are never
 //! converted into generated owned messages.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Strict wire helpers remain beside the raw-preserving rewrite model."
-)]
-
 use core::fmt;
 
 use buffa::DecodeOptions as BuffaDecodeOptions;
@@ -754,10 +749,6 @@ impl<'source> Field<'source> {
                 "int32 scalar is not sign-extended",
             ));
         }
-        #[allow(
-            clippy::cast_possible_wrap,
-            reason = "Canonical int32 bounds were checked above."
-        )]
         Ok(value as i32)
     }
 

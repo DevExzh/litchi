@@ -478,10 +478,6 @@ impl RewriteReport {
         self.changed
     }
 }
-#[allow(
-    clippy::wildcard_enum_match_arm,
-    reason = "Buffa errors are non-exhaustive and unrecognized failures remain opaque wire errors."
-)]
 impl From<buffa::DecodeError> for DecodeError {
     fn from(error: buffa::DecodeError) -> Self {
         match error {

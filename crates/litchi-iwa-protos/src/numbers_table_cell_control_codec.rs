@@ -6,8 +6,6 @@
 //! hidden seam for package owners; no generated Buffa/Prost values or native
 //! archive identifiers cross it.
 
-#![allow(clippy::module_name_repetitions)]
-
 pub use crate::numbers_table_cell_pop_up_menu_codec::{
     CHECKBOX_INTERACTION_TYPE, ControlCellSpecSnapshot, ControlFormatSnapshot, ControlFormatWrite,
     DecodeError, DecodeLimit, DecodeOptions, DecodeReport, RewriteExecutionLimits,

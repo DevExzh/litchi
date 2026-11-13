@@ -6,11 +6,6 @@
 //! only image-adjustments field 14 and its public scalar controls, and keeps
 //! the original bytes authoritative for rewrites.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The strict scanner intentionally precedes the private view."
-)]
-
 use std::{fmt, mem::size_of};
 
 use buffa::DecodeOptions as BuffaDecodeOptions;

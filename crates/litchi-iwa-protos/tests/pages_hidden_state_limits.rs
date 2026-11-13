@@ -304,7 +304,6 @@ fn rewrite_reports_are_stable_at_the_inclusive_boundary() {
     );
 }
 
-#[allow(dead_code)]
 fn _type_surface_smoke(owner: &HiddenStatesOwnerSnapshot) {
     let _ = UuidSnapshot::new(1, 2);
     let state = RowOrColumnStateSnapshot::new(UuidSnapshot::new(3, 4));

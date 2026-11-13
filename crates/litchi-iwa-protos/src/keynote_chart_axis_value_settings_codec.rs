@@ -8,11 +8,6 @@
 //! preflighted source spans as their preservation authority; generated Buffa
 //! values are never re-encoded and never escape this crate.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The strict wire reader intentionally precedes the generated view it cross-checks."
-)]
-
 use std::fmt;
 
 use crate::buffa_keynote_chart_axis_value_settings_generated::LitchiIwaProjection as projection;
@@ -2568,11 +2563,6 @@ fn take_exact<'source>(
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "Focused codec tests use small canonical wire fixtures."
-)]
 mod tests {
     use super::{
         AxisValueBound, AxisValueBounds, AxisValueSettings, AxisValueSettingsWrite, AxisValueSteps,

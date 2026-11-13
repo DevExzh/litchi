@@ -355,10 +355,6 @@ impl fmt::Display for DecodeError {
 
 impl std::error::Error for DecodeError {}
 
-#[allow(
-    clippy::wildcard_enum_match_arm,
-    reason = "All present and future non-resource Buffa failures retain their exact wire error."
-)]
 impl From<buffa::DecodeError> for DecodeError {
     fn from(error: buffa::DecodeError) -> Self {
         Self {
@@ -1551,11 +1547,6 @@ fn require_canonical_int32(value: u64) -> Result<i32, DecodeError> {
     Ok(decode_int32(value))
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_possible_wrap,
-    reason = "Strict preflight proved the u64 is a canonical sign-extended int32."
-)]
 fn decode_int32(value: u64) -> i32 {
     value as i32
 }
@@ -1749,10 +1740,6 @@ mod tests {
         }
     }
 
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "Each emitted varint byte intentionally contains only the low seven bits."
-    )]
     fn push_varint(mut value: u64, output: &mut Vec<u8>) {
         while value >= 0x80 {
             output.push((value as u8 & 0x7f) | 0x80);

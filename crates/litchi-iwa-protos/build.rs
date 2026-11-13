@@ -32,7 +32,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/keynote_chart_legend_codec.rs");
     println!("cargo:rerun-if-changed=src/chart_arrangement_codec.rs");
     println!("cargo:rerun-if-changed=src/chart_metadata_codec.rs");
-    println!("cargo:rerun-if-changed=src/buffa-projections/TSCHChartMetadataArchive.proto");
     println!("cargo:rerun-if-changed=src/chart_data_codec.rs");
     println!("cargo:rerun-if-changed=src/chart_style_codec.rs");
     println!("cargo:rerun-if-changed=src/chart_style_codec/merge.rs");
@@ -40,12 +39,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/shape_style_codec/native.rs");
     println!("cargo:rerun-if-changed=src/chart_data_codec/rewrite.rs");
     println!("cargo:rerun-if-changed=src/chart_grid_creation_codec.rs");
-    println!("cargo:rerun-if-changed=src/buffa-projections/TSCHChartDataArchive.proto");
     println!("cargo:rerun-if-changed=src/keynote_chart_axis_title_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_chart_axis_value_settings_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_show_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_theme_codec.rs");
-    println!("cargo:rerun-if-changed=src/buffa-projections/KNThemeArchiveProjection.proto");
     println!("cargo:rerun-if-changed=src/keynote_placeholder_text_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_speaker_notes_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_slide_drawables_codec.rs");
@@ -56,9 +53,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/keynote_media_creation_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_shape_creation_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_build_creation_codec.rs");
-    println!("cargo:rerun-if-changed=src/buffa-projections/TSDKeynoteMediaCreationArchive.proto");
-    println!("cargo:rerun-if-changed=src/buffa-projections/TSDKeynoteShapeCreationArchive.proto");
-    println!("cargo:rerun-if-changed=src/buffa-projections/KNKeynoteBuildCreationArchive.proto");
     println!("cargo:rerun-if-changed=src/keynote_media_lifecycle_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_media_lifecycle_codec/node_cache.rs");
     println!("cargo:rerun-if-changed=src/keynote_slide_transition_codec.rs");
@@ -122,12 +116,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/pages_media_codec.rs");
     println!("cargo:rerun-if-changed=src/drawable_parent_codec.rs");
     println!("cargo:rerun-if-changed=src/drawable_container_codec.rs");
-    println!("cargo:rerun-if-changed=src/buffa-projections/TSDDrawableContainerArchive.proto");
     println!("cargo:rerun-if-changed=src/pages_movie_caption_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_movie_caption_codec.rs");
     println!("cargo:rerun-if-changed=src/movie_playback_codec.rs");
     println!("cargo:rerun-if-changed=src/image_adjustments_codec.rs");
-    println!("cargo:rerun-if-changed=src/buffa-projections/TSDImageAdjustmentsArchive.proto");
     println!("cargo:rerun-if-changed=src/keynote_movie_geometry_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_media_properties_codec.rs");
     println!("cargo:rerun-if-changed=src/shape_properties_codec.rs");
@@ -139,17 +131,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/pages_page_layout_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_section_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_hidden_state_codec.rs");
-    println!("cargo:rerun-if-changed=src/buffa-projections/TSTPagesHiddenStateProjection.proto");
-    println!("cargo:rerun-if-changed=src/buffa-projections/KNSlideDrawableOrderArchive.proto");
-    println!("cargo:rerun-if-changed=src/protos/TSPMessages.proto");
-    println!("cargo:rerun-if-changed=src/protos/TSTArchives.proto");
-    println!("cargo:rerun-if-changed=src/protos/TSCEArchives.proto");
     println!("cargo:rerun-if-changed=src/production_codec_guard.rs");
     println!("cargo:rerun-if-changed=src/table_info_codec.rs");
     println!("cargo:rerun-if-changed=src/table_appearance_codec.rs");
     println!("cargo:rerun-if-changed=src/text_storage_codec.rs");
     println!("cargo:rerun-if-changed=src/theme_codec.rs");
-    println!("cargo:rerun-if-changed=src/buffa-projections/TSSThemeArchiveProjection.proto");
     println!("cargo:rerun-if-changed=src/lib.rs");
 
     let mut proto_files = fs::read_dir(proto_directory)?

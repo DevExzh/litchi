@@ -5,11 +5,6 @@
 //! payload remains the preservation authority; the private Buffa sidecar is
 //! used only as a bounded lazy ingress cross-check after the strict scanner.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The strict scanner is intentionally ordered before the private projection."
-)]
-
 use std::{fmt, mem::size_of};
 
 use buffa::DecodeOptions as BuffaDecodeOptions;

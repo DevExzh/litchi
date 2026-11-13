@@ -5,11 +5,6 @@
 //! forced borrowed cross-check of each selected `TSP.Reference`. The caller's
 //! source bytes remain authoritative for preservation and raw-record splicing.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Strict routing helpers stay beside the public generated-free snapshots they build."
-)]
-
 use core::fmt;
 
 use buffa::DecodeOptions as BuffaDecodeOptions;
@@ -732,11 +727,6 @@ impl Budget {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "focused unit-test fixtures require successful construction and exact errors"
-)]
 mod tests {
     use super::*;
 

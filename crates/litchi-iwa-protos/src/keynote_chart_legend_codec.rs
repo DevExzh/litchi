@@ -6,11 +6,6 @@
 //! This module performs a bounded borrowed projection and a source-local wire
 //! rewrite; it never performs chart lookup or archive transactions.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Strict wire preflight intentionally precedes the generated view."
-)]
-
 use std::fmt;
 
 use buffa::DecodeOptions as BuffaDecodeOptions;
@@ -1689,11 +1684,6 @@ fn take_exact<'source>(
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    reason = "Focused codec tests use explicit fixtures and assertions."
-)]
 mod tests {
     use super::{
         ChartLegendVisibilityWrite, DecodeLimit, DecodeOptions, WireResourceLimit,

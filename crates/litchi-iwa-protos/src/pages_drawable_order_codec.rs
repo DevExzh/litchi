@@ -7,11 +7,6 @@
 //! optional reference fields, unknown fields/groups, field order, and all
 //! unrelated root bytes are copied verbatim.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The strict wire scanner intentionally precedes its low-level helpers."
-)]
-
 use core::fmt;
 
 #[cfg(test)]
@@ -1193,11 +1188,6 @@ fn require_canonical_int32(value: u64) -> Result<i32, DecodeError> {
             "int32 scalar is not sign extended",
         ));
     }
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_possible_wrap,
-        reason = "The strict range check proves the value is a canonical int32."
-    )]
     Ok(value as i32)
 }
 
@@ -1414,11 +1404,6 @@ fn decode_int32_unmetered(value: u64) -> Result<i32, ()> {
     if value > 0x7fff_ffff && value < MIN_SIGN_EXTENDED_INT32 {
         return Err(());
     }
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_possible_wrap,
-        reason = "The strict range check proves a canonical int32 representation."
-    )]
     Ok(value as i32)
 }
 
@@ -1587,11 +1572,6 @@ struct Budget {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    clippy::shadow_unrelated,
-    reason = "Focused codec tests use explicit fixture expectations."
-)]
 mod tests {
     use super::*;
 

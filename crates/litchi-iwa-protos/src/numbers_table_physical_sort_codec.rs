@@ -11,11 +11,6 @@
 //! readable and source-preserved for no-op plans, but a plan that changes a
 //! mutable row/index rejects those fields before candidate allocation.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Wire helpers are kept adjacent to their source-preserving plans."
-)]
-
 use core::fmt;
 
 use buffa::DecodeOptions as BuffaDecodeOptions;

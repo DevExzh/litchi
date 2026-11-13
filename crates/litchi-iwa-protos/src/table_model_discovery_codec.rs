@@ -13,11 +13,6 @@
 //! to the same finite nesting/field/work limits as known fields.  This is the
 //! policy used by the existing table-name and table-header projections.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The strict wire pass intentionally precedes the Buffa parity check."
-)]
-
 use std::{fmt, str};
 
 use buffa::DecodeOptions as BuffaDecodeOptions;

@@ -436,10 +436,6 @@ mod tests {
         DecodeOptions::new(source.len().max(1), 32)
     }
 
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "Each emitted varint byte intentionally contains only the low seven bits."
-    )]
     fn push_varint(mut value: u64, output: &mut Vec<u8>) {
         while value >= 0x80 {
             output.push((value as u8 & 0x7f) | 0x80);

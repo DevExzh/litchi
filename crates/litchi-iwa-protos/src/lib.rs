@@ -17,10 +17,6 @@ mod production_codec_guard;
 #[doc(hidden)]
 mod generated {
     #![allow(
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         dead_code,
         unreachable_pub,
         reason = "prost-build output is generated from the native IWA schemas."
@@ -49,21 +45,7 @@ mod buffa_archive_header_generated {
         reason = "The Buffa sidecar is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "buffa-build output is generated from the archive-header projection."
     )]
     include!(concat!(
@@ -77,29 +59,11 @@ mod buffa_archive_header_generated {
 #[doc(hidden)]
 mod buffa_data_reference_generated {
     #![allow(
-        elided_lifetimes_in_paths,
-        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
-    )]
-    #![allow(
         unreachable_pub,
         reason = "The Buffa sidecar is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "buffa-build output is generated from the DataReference projection."
     )]
 
@@ -115,29 +79,11 @@ mod buffa_data_reference_generated {
 #[doc(hidden)]
 mod buffa_theme_archive_generated {
     #![allow(
-        elided_lifetimes_in_paths,
-        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
-    )]
-    #![allow(
         unreachable_pub,
         reason = "The theme sidecar is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "Buffa generated theme views are private implementation detail."
     )]
 
@@ -154,29 +100,11 @@ mod buffa_theme_archive_generated {
 #[doc(hidden)]
 mod buffa_text_storage_generated {
     #![allow(
-        elided_lifetimes_in_paths,
-        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
-    )]
-    #![allow(
         unreachable_pub,
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "buffa-build output is generated from the derived wire projection."
     )]
 
@@ -202,21 +130,7 @@ mod buffa_comment_storage_generated {
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "buffa-build output is generated from the derived wire projection."
     )]
 
@@ -241,21 +155,7 @@ mod buffa_annotation_author_generated {
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "Buffa generated annotation-author views are private implementation detail."
     )]
 
@@ -274,29 +174,11 @@ mod buffa_annotation_author_generated {
 #[doc(hidden)]
 mod buffa_group_node_category_generated {
     #![allow(
-        elided_lifetimes_in_paths,
-        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
-    )]
-    #![allow(
         unreachable_pub,
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "buffa-build output is generated from the derived wire projection."
     )]
 
@@ -321,21 +203,7 @@ mod buffa_keynote_document_generated {
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "buffa-build output is generated from the derived wire projection."
     )]
 
@@ -361,21 +229,7 @@ mod buffa_keynote_chart_caption_generated {
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "buffa-build output is generated from the derived wire projection."
     )]
 
@@ -400,21 +254,7 @@ mod buffa_keynote_movie_caption_generated {
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "Buffa 0.9.1 generated views are private implementation detail."
     )]
 
@@ -429,29 +269,11 @@ mod buffa_keynote_movie_caption_generated {
 #[doc(hidden)]
 mod buffa_movie_playback_generated {
     #![allow(
-        elided_lifetimes_in_paths,
-        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
-    )]
-    #![allow(
         unreachable_pub,
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "Buffa 0.9.1 generated views are private implementation detail."
     )]
 
@@ -475,21 +297,7 @@ mod buffa_image_adjustments_generated {
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "Buffa generated views are private implementation detail."
     )]
 
@@ -513,21 +321,7 @@ mod buffa_keynote_movie_geometry_generated {
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "Buffa generated views are private implementation detail."
     )]
 
@@ -551,21 +345,7 @@ mod buffa_keynote_media_properties_generated {
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "Buffa generated views are private implementation detail."
     )]
 
@@ -587,21 +367,8 @@ mod buffa_keynote_media_lifecycle_generated {
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
         clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "Buffa generated views are private implementation detail."
     )]
 
@@ -627,21 +394,7 @@ mod buffa_keynote_media_creation_generated {
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "Buffa generated views are private implementation detail."
     )]
 
@@ -668,21 +421,7 @@ mod buffa_keynote_shape_creation_generated {
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "Buffa generated views are private implementation detail."
     )]
 
@@ -704,21 +443,8 @@ mod buffa_keynote_build_creation_generated {
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
         clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "Buffa generated views are private implementation detail."
     )]
 
@@ -737,29 +463,11 @@ mod buffa_keynote_build_creation_generated {
 #[doc(hidden)]
 mod buffa_keynote_chart_title_generated {
     #![allow(
-        elided_lifetimes_in_paths,
-        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
-    )]
-    #![allow(
         unreachable_pub,
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "buffa-build output is generated from the derived wire projection."
     )]
 
@@ -774,29 +482,11 @@ mod buffa_keynote_chart_title_generated {
 #[doc(hidden)]
 mod buffa_keynote_chart_legend_generated {
     #![allow(
-        elided_lifetimes_in_paths,
-        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
-    )]
-    #![allow(
         unreachable_pub,
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "buffa-build output is generated from the derived wire projection."
     )]
 
@@ -821,21 +511,7 @@ mod buffa_chart_arrangement_generated {
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "buffa-build output is generated from the derived wire projection."
     )]
 
@@ -860,21 +536,7 @@ mod buffa_chart_metadata_generated {
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "The Buffa build output is private implementation detail."
     )]
 
@@ -890,29 +552,11 @@ mod buffa_chart_metadata_generated {
 #[doc(hidden)]
 mod buffa_chart_data_generated {
     #![allow(
-        elided_lifetimes_in_paths,
-        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
-    )]
-    #![allow(
         unreachable_pub,
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "The Buffa build output is private implementation detail."
     )]
 
@@ -927,29 +571,11 @@ mod buffa_chart_data_generated {
 #[doc(hidden)]
 mod buffa_keynote_chart_axis_title_generated {
     #![allow(
-        elided_lifetimes_in_paths,
-        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
-    )]
-    #![allow(
         unreachable_pub,
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "Buffa 0.9.1 generated views are private implementation detail."
     )]
 
@@ -973,21 +599,7 @@ mod buffa_keynote_chart_axis_value_settings_generated {
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "Buffa 0.9.1 generated views are private implementation detail."
     )]
 
@@ -1012,21 +624,7 @@ mod buffa_keynote_placeholder_text_generated {
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "buffa-build output is generated from the derived wire projection."
     )]
 
@@ -1052,21 +650,7 @@ mod buffa_keynote_speaker_notes_generated {
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "buffa-build output is generated from the derived wire projection."
     )]
 
@@ -1092,21 +676,7 @@ mod buffa_keynote_slide_drawables_generated {
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "buffa-build output is generated from the derived wire projection."
     )]
 
@@ -1122,14 +692,6 @@ mod buffa_keynote_slide_number_generated {
     #![allow(
         elided_lifetimes_in_paths,
         unreachable_pub,
-        clippy::all,
-        clippy::allow_attributes_without_reason,
-        clippy::arbitrary_source_item_ordering,
-        clippy::map_err_ignore,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
         non_snake_case,
         reason = "Buffa generated projection is private implementation detail."
     )]
@@ -1145,14 +707,6 @@ mod buffa_number_attachment_generated {
     #![allow(
         elided_lifetimes_in_paths,
         unreachable_pub,
-        clippy::all,
-        clippy::allow_attributes_without_reason,
-        clippy::arbitrary_source_item_ordering,
-        clippy::map_err_ignore,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
         non_snake_case,
         reason = "Buffa generated projection is private implementation detail."
     )]
@@ -1166,16 +720,7 @@ mod buffa_number_attachment_generated {
 #[doc(hidden)]
 mod buffa_keynote_soundtrack_settings_generated {
     #![allow(
-        elided_lifetimes_in_paths,
         unreachable_pub,
-        clippy::all,
-        clippy::allow_attributes_without_reason,
-        clippy::arbitrary_source_item_ordering,
-        clippy::map_err_ignore,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
         non_snake_case,
         reason = "Buffa generated projection is private implementation detail."
     )]
@@ -1188,13 +733,6 @@ mod buffa_keynote_soundtrack_settings_generated {
 #[doc(hidden)]
 mod buffa_numbers_sheet_order_generated {
     #![allow(
-        clippy::all,
-        clippy::pedantic,
-        clippy::arbitrary_source_item_ordering,
-        clippy::allow_attributes_without_reason,
-        clippy::module_name_repetitions,
-        clippy::shadow_same,
-        elided_lifetimes_in_paths,
         unreachable_pub,
         non_snake_case,
         reason = "Private Buffa generated projection."
@@ -1211,13 +749,6 @@ mod buffa_numbers_sheet_order_generated {
 #[doc(hidden)]
 mod buffa_pages_drawable_order_generated {
     #![allow(
-        clippy::all,
-        clippy::pedantic,
-        clippy::arbitrary_source_item_ordering,
-        clippy::allow_attributes_without_reason,
-        clippy::module_name_repetitions,
-        clippy::shadow_same,
-        elided_lifetimes_in_paths,
         unreachable_pub,
         non_snake_case,
         reason = "Private Buffa generated projection."
@@ -1236,13 +767,6 @@ mod buffa_pages_drawable_order_generated {
 #[doc(hidden)]
 mod buffa_numbers_table_title_generated {
     #![allow(
-        clippy::all,
-        clippy::pedantic,
-        clippy::arbitrary_source_item_ordering,
-        clippy::allow_attributes_without_reason,
-        clippy::module_name_repetitions,
-        clippy::shadow_same,
-        elided_lifetimes_in_paths,
         unreachable_pub,
         non_snake_case,
         reason = "Private Buffa generated projection."
@@ -1257,13 +781,6 @@ mod buffa_numbers_table_title_generated {
 #[doc(hidden)]
 mod buffa_numbers_table_cell_storage_generated {
     #![allow(
-        clippy::all,
-        clippy::pedantic,
-        clippy::arbitrary_source_item_ordering,
-        clippy::allow_attributes_without_reason,
-        clippy::module_name_repetitions,
-        clippy::shadow_same,
-        elided_lifetimes_in_paths,
         unreachable_pub,
         non_snake_case,
         reason = "Private Buffa generated projection."
@@ -1280,13 +797,6 @@ mod buffa_numbers_table_cell_storage_generated {
 #[doc(hidden)]
 mod buffa_table_physical_sort_generated {
     #![allow(
-        clippy::all,
-        clippy::pedantic,
-        clippy::arbitrary_source_item_ordering,
-        clippy::allow_attributes_without_reason,
-        clippy::module_name_repetitions,
-        clippy::shadow_same,
-        elided_lifetimes_in_paths,
         unreachable_pub,
         non_snake_case,
         reason = "Private Buffa generated projection."
@@ -1303,13 +813,6 @@ mod buffa_table_physical_sort_generated {
 #[doc(hidden)]
 mod buffa_numbers_table_cell_pop_up_menu_generated {
     #![allow(
-        clippy::all,
-        clippy::pedantic,
-        clippy::arbitrary_source_item_ordering,
-        clippy::allow_attributes_without_reason,
-        clippy::module_name_repetitions,
-        clippy::shadow_same,
-        elided_lifetimes_in_paths,
         unreachable_pub,
         non_snake_case,
         reason = "Private Buffa generated projection."
@@ -1326,13 +829,6 @@ mod buffa_numbers_table_cell_pop_up_menu_generated {
 #[doc(hidden)]
 mod buffa_numbers_table_cell_currency_format_generated {
     #![allow(
-        clippy::all,
-        clippy::pedantic,
-        clippy::arbitrary_source_item_ordering,
-        clippy::allow_attributes_without_reason,
-        clippy::module_name_repetitions,
-        clippy::shadow_same,
-        elided_lifetimes_in_paths,
         unreachable_pub,
         non_snake_case,
         reason = "buffa-build output is generated from the derived wire projection."
@@ -1349,13 +845,6 @@ mod buffa_numbers_table_cell_currency_format_generated {
 #[doc(hidden)]
 mod buffa_numbers_table_cell_fraction_format_generated {
     #![allow(
-        clippy::all,
-        clippy::pedantic,
-        clippy::arbitrary_source_item_ordering,
-        clippy::allow_attributes_without_reason,
-        clippy::module_name_repetitions,
-        clippy::shadow_same,
-        elided_lifetimes_in_paths,
         unreachable_pub,
         non_snake_case,
         reason = "buffa-build output is generated from the derived wire projection."
@@ -1372,13 +861,6 @@ mod buffa_numbers_table_cell_fraction_format_generated {
 #[doc(hidden)]
 mod buffa_numbers_table_cell_text_format_generated {
     #![allow(
-        clippy::all,
-        clippy::pedantic,
-        clippy::arbitrary_source_item_ordering,
-        clippy::allow_attributes_without_reason,
-        clippy::module_name_repetitions,
-        clippy::shadow_same,
-        elided_lifetimes_in_paths,
         unreachable_pub,
         non_snake_case,
         reason = "buffa-build output is generated from the derived wire projection."
@@ -1395,13 +877,6 @@ mod buffa_numbers_table_cell_text_format_generated {
 #[doc(hidden)]
 mod buffa_numbers_table_cell_date_time_format_generated {
     #![allow(
-        clippy::all,
-        clippy::pedantic,
-        clippy::arbitrary_source_item_ordering,
-        clippy::allow_attributes_without_reason,
-        clippy::module_name_repetitions,
-        clippy::shadow_same,
-        elided_lifetimes_in_paths,
         unreachable_pub,
         non_snake_case,
         reason = "buffa-build output is generated from the derived wire projection."
@@ -1419,13 +894,6 @@ mod buffa_numbers_table_cell_date_time_format_generated {
 #[doc(hidden)]
 mod buffa_numbers_table_cell_custom_format_generated {
     #![allow(
-        clippy::all,
-        clippy::pedantic,
-        clippy::arbitrary_source_item_ordering,
-        clippy::allow_attributes_without_reason,
-        clippy::module_name_repetitions,
-        clippy::shadow_same,
-        elided_lifetimes_in_paths,
         unreachable_pub,
         non_snake_case,
         reason = "Private Buffa generated projection."
@@ -1442,13 +910,6 @@ mod buffa_numbers_table_cell_custom_format_generated {
 #[doc(hidden)]
 mod buffa_numbers_table_cell_duration_format_generated {
     #![allow(
-        clippy::all,
-        clippy::pedantic,
-        clippy::arbitrary_source_item_ordering,
-        clippy::allow_attributes_without_reason,
-        clippy::module_name_repetitions,
-        clippy::shadow_same,
-        elided_lifetimes_in_paths,
         unreachable_pub,
         non_snake_case,
         reason = "buffa-build output is generated from the derived wire projection."
@@ -1464,12 +925,6 @@ mod buffa_numbers_table_cell_duration_format_generated {
 mod buffa_numbers_table_cell_dependency_generated {
     #![allow(
         clippy::all,
-        clippy::pedantic,
-        clippy::arbitrary_source_item_ordering,
-        clippy::allow_attributes_without_reason,
-        clippy::module_name_repetitions,
-        clippy::shadow_same,
-        elided_lifetimes_in_paths,
         unreachable_pub,
         non_snake_case,
         reason = "Private Buffa generated projection."
@@ -1484,13 +939,6 @@ mod buffa_numbers_table_cell_dependency_generated {
 #[doc(hidden)]
 mod buffa_package_metadata_generated {
     #![allow(
-        clippy::all,
-        clippy::pedantic,
-        clippy::arbitrary_source_item_ordering,
-        clippy::allow_attributes_without_reason,
-        clippy::module_name_repetitions,
-        clippy::shadow_same,
-        elided_lifetimes_in_paths,
         unreachable_pub,
         non_snake_case,
         reason = "Private Buffa generated projection."
@@ -1510,11 +958,6 @@ mod buffa_package_metadata_generated {
 #[doc(hidden)]
 mod buffa_package_metadata_media_generated {
     #![allow(
-        clippy::all,
-        clippy::pedantic,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::shadow_same,
         elided_lifetimes_in_paths,
         unreachable_pub,
         non_snake_case,
@@ -1530,13 +973,6 @@ mod buffa_package_metadata_media_generated {
 #[doc(hidden)]
 mod buffa_formula_generated {
     #![allow(
-        clippy::all,
-        clippy::pedantic,
-        clippy::arbitrary_source_item_ordering,
-        clippy::allow_attributes_without_reason,
-        clippy::module_name_repetitions,
-        clippy::shadow_same,
-        elided_lifetimes_in_paths,
         unreachable_pub,
         non_snake_case,
         reason = "Private Buffa generated projection."
@@ -1563,21 +999,7 @@ mod buffa_table_info_generated {
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "buffa-build output is generated from the derived wire projection."
     )]
 
@@ -1604,21 +1026,7 @@ mod buffa_keynote_show_generated {
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "buffa-build output is generated from the derived wire projection."
     )]
 
@@ -1642,21 +1050,7 @@ mod buffa_keynote_theme_generated {
         reason = "The Keynote theme sidecar is intentionally private."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "Buffa generated Keynote theme views are private implementation detail."
     )]
 
@@ -1681,21 +1075,7 @@ mod buffa_pages_section_generated {
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "buffa-build output is generated from the derived wire projection."
     )]
 
@@ -1720,21 +1100,7 @@ mod buffa_pages_section_background_generated {
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "buffa-build output is generated from the derived wire projection."
     )]
 
@@ -1760,21 +1126,7 @@ mod buffa_pages_body_generated {
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "buffa-build output is generated from the derived wire projection."
     )]
 
@@ -1790,29 +1142,11 @@ mod buffa_pages_body_generated {
 #[doc(hidden)]
 mod buffa_pages_hidden_state_generated {
     #![allow(
-        elided_lifetimes_in_paths,
-        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
-    )]
-    #![allow(
         unreachable_pub,
         reason = "The hidden-state projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "The generated projection is private implementation detail."
     )]
 
@@ -1828,29 +1162,11 @@ mod buffa_pages_hidden_state_generated {
 #[doc(hidden)]
 mod buffa_pages_media_generated {
     #![allow(
-        elided_lifetimes_in_paths,
-        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
-    )]
-    #![allow(
         unreachable_pub,
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "Buffa generated projection is private implementation detail."
     )]
 
@@ -1874,21 +1190,7 @@ mod buffa_drawable_parent_generated {
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "Buffa generated output is private implementation detail."
     )]
 
@@ -1911,21 +1213,7 @@ mod buffa_drawable_container_generated {
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "Buffa generated output is private implementation detail."
     )]
 
@@ -1949,21 +1237,7 @@ mod buffa_pages_movie_caption_generated {
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "Buffa generated projection is private implementation detail."
     )]
 
@@ -1989,21 +1263,7 @@ mod buffa_pages_footnote_generated {
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "buffa-build output is generated from the derived wire projection."
     )]
 
@@ -2021,29 +1281,11 @@ mod buffa_pages_footnote_generated {
 #[doc(hidden)]
 mod buffa_pages_footnote_marker_generated {
     #![allow(
-        elided_lifetimes_in_paths,
-        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
-    )]
-    #![allow(
         unreachable_pub,
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "buffa-build generated projection is private implementation detail."
     )]
 
@@ -2059,15 +1301,7 @@ mod buffa_numbers_names_generated {
     #![allow(
         elided_lifetimes_in_paths,
         unreachable_pub,
-        clippy::all,
-        clippy::allow_attributes_without_reason,
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
         non_snake_case,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "Buffa generated projection is private to this crate."
     )]
     include!(concat!(
@@ -2080,17 +1314,8 @@ mod buffa_numbers_names_generated {
 #[doc(hidden)]
 mod buffa_numbers_table_header_settings_generated {
     #![allow(
-        elided_lifetimes_in_paths,
         unreachable_pub,
-        clippy::all,
-        clippy::allow_attributes_without_reason,
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
         non_snake_case,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "Buffa generated projection is private to this crate."
     )]
     include!(concat!(
@@ -2105,13 +1330,7 @@ mod buffa_numbers_table_header_settings_generated {
 #[doc(hidden)]
 mod buffa_numbers_table_sort_order_generated {
     #![allow(
-        elided_lifetimes_in_paths,
         unreachable_pub,
-        clippy::all,
-        clippy::allow_attributes_without_reason,
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
         non_snake_case,
         reason = "Buffa generated projection is private to this crate."
     )]
@@ -2137,21 +1356,7 @@ mod buffa_keynote_slide_transition_generated {
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "buffa-build output is generated from the derived wire projection."
     )]
 
@@ -2177,21 +1382,7 @@ mod buffa_keynote_slide_background_generated {
         reason = "The Buffa projection is intentionally private to this crate."
     )]
     #![allow(
-        clippy::allow_attributes_without_reason,
-        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
-    )]
-    #![allow(
-        clippy::map_err_ignore,
-        clippy::shadow_reuse,
-        clippy::shadow_same,
-        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
-    )]
-    #![allow(
         non_snake_case,
-        clippy::all,
-        clippy::arbitrary_source_item_ordering,
-        clippy::module_name_repetitions,
-        clippy::pedantic,
         reason = "buffa-build output is generated from the derived wire projection."
     )]
 

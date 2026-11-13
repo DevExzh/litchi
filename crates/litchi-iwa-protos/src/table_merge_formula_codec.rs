@@ -13,11 +13,6 @@
 //! wire helpers.  A generated lazy-view oracle and an independent canonical
 //! field walk validate every fresh payload before it is returned.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The typed request, bounded writer, and generated oracle are kept together."
-)]
-
 use std::{error::Error, fmt};
 
 use buffa::LazyMessageView as _;

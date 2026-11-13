@@ -9,15 +9,6 @@
 //! scanner has completed its bounded wire preflight; no generated type is
 //! part of the public API or owns a rewrite.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The wire helpers are intentionally kept beside the snapshots and writers they serve."
-)]
-#![allow(
-    clippy::module_name_repetitions,
-    reason = "Public names mirror the native archive family and existing codec conventions."
-)]
-
 use core::{fmt, mem::size_of, str};
 
 use buffa::DecodeOptions as BuffaDecodeOptions;

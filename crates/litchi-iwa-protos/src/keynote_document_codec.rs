@@ -6,11 +6,6 @@
 //! reference. Unknown bytes remain in the caller-owned source and are never
 //! materialized or re-encoded here.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Strict projection types intentionally stay beside the passes that consume them."
-)]
-
 use std::fmt;
 
 use buffa::DecodeOptions as BuffaDecodeOptions;
@@ -193,10 +188,6 @@ impl fmt::Display for DecodeError {
 
 impl std::error::Error for DecodeError {}
 
-#[allow(
-    clippy::wildcard_enum_match_arm,
-    reason = "All present and future non-resource Buffa failures retain their exact wire error."
-)]
 impl From<buffa::DecodeError> for DecodeError {
     fn from(error: buffa::DecodeError) -> Self {
         Self {
@@ -601,11 +592,6 @@ fn require_canonical_int32(value: u64) -> Result<i32, DecodeError> {
             "int32 scalar is not a sign-extended 32-bit value",
         ));
     }
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_possible_wrap,
-        reason = "The strict range check proves canonical int32 sign extension."
-    )]
     let decoded = value as i32;
     Ok(decoded)
 }
@@ -820,10 +806,6 @@ fn take_exact<'source>(
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    reason = "Focused negative tests attach an explicit failure reason to each expected error."
-)]
 mod tests {
     use prost::Message as _;
 

@@ -12,11 +12,6 @@
 //! input-sized `RepeatedView`/owned generated collection can never cross this
 //! boundary.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The strict schema-directed pass intentionally precedes the Buffa check."
-)]
-
 use core::{fmt, mem::size_of};
 use std::{num::NonZeroU64, str};
 
@@ -4025,11 +4020,6 @@ fn optional_bool(
         .transpose()
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_possible_wrap,
-    reason = "Canonical int32 framing is validated before the cast."
-)]
 fn decode_int32_checked(value: u64) -> Result<i32, DecodeError> {
     // Protobuf int32 values are sign-extended to the ten-byte uint64 form.
     // Positive values use the short canonical form; negative values carry

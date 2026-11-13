@@ -5,11 +5,6 @@
 //! cross-checks the borrowed lazy view.  Unknown fields and all source bytes
 //! remain owned by the caller; this codec has no production encoding path.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Strict semantic preflight intentionally precedes the low-level wire reader."
-)]
-
 use std::{fmt, num::NonZeroU64, str};
 
 use buffa::DecodeOptions as BuffaDecodeOptions;
@@ -742,11 +737,6 @@ fn require_canonical_int32(value: u64) -> Result<u64, DecodeError> {
     Ok(value)
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_possible_wrap,
-    reason = "Strict preflight proved the u64 is a canonical sign-extended int32."
-)]
 fn decode_int32(value: u64) -> i32 {
     value as i32
 }
@@ -946,11 +936,6 @@ fn take_exact<'source>(
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    clippy::shadow_unrelated,
-    reason = "Focused codec tests use explicit fixture panic messages."
-)]
 mod tests {
     use prost::Message as _;
 

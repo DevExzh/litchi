@@ -5,11 +5,6 @@
 //! `TSP.Reference.identifier`.  The movie's extension fields, all unrelated
 //! drawable fields, and all unknown source bytes remain caller-owned.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The strict preflight intentionally precedes the low-level wire reader it consumes."
-)]
-
 use std::fmt;
 
 #[cfg(test)]
@@ -1490,11 +1485,6 @@ fn require_canonical_int32(value: u64) -> Result<i32, DecodeError> {
             "int32 scalar is not a sign-extended 32-bit value",
         ));
     }
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_possible_wrap,
-        reason = "The strict range check proves this is a canonical int32 representation."
-    )]
     Ok(value as i32)
 }
 
@@ -2006,10 +1996,6 @@ fn take_exact<'source>(
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    reason = "Focused codec tests use explicit panic messages for malformed wire cases."
-)]
 mod tests {
     use super::{
         DecodeOptions, MovieCaptionSlot, MovieCaptionWrite, WireResourceLimit,

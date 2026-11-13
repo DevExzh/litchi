@@ -8,8 +8,6 @@
 //! cell-format kind, and are never treated as a `FormatStructArchive` field.
 //! Generated Buffa values never cross this module.
 
-#![allow(clippy::module_name_repetitions)]
-
 use crate::numbers_table_cell_pop_up_menu_codec as core;
 
 pub use core::{

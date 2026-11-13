@@ -6,11 +6,6 @@
 //! views; it never constructs the generated native Prost messages and it
 //! never decodes an existing build to manufacture a replacement.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The typed request, bounded writer, and wire oracle are kept together."
-)]
-
 use std::fmt;
 
 use buffa::ViewEncode;
