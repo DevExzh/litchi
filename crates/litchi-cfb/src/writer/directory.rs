@@ -154,6 +154,10 @@ struct DirectoryEntryBuilder {
     node_color: NodeColor,
 }
 
+#[allow(
+    dead_code,
+    reason = "builder API kept complete for symmetry and future use"
+)]
 impl DirectoryEntryBuilder {
     /// Create a new root entry
     fn root(start_sector: u32, size: u64) -> Self {
@@ -952,6 +956,10 @@ impl DirectoryBuilder {
     }
 }
 
+#[allow(
+    clippy::type_complexity,
+    reason = "the paired UTF-16 name and comparison-key SmallVecs are clearer inline than behind a type alias"
+)]
 fn directory_name_data(name: &str) -> Result<(SmallVec<[u16; 32]>, SmallVec<[u16; 32]>), OleError> {
     let DirectoryNameData { utf16, comparison } =
         parse_directory_name(name).map_err(|error| OleError::InvalidData(error.to_string()))?;
@@ -980,6 +988,11 @@ fn clone_path(path: &[String], resource: &'static str) -> Result<Vec<String>, Ol
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
     use super::*;
 
     #[test]

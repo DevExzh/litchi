@@ -676,6 +676,7 @@ impl PreservationPlan {
 }
 
 /// The policy governing the preservation format accepted by the index.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PreservationPolicy {
     /// Preserve ZIP32 framing only. This remains an internal refusal policy;
@@ -784,6 +785,7 @@ where
     /// archive metadata limits. The public constructors use the same policy;
     /// this entry point remains available to crate-internal tests that need to
     /// exercise the narrower ZIP32 policy explicitly.
+    #[allow(dead_code)]
     pub(crate) fn new_with_policy(
         archive: &'source ZipArchive<R>,
         buffer: &mut [u8],
