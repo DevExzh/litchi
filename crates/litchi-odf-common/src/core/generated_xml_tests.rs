@@ -356,3 +356,312 @@ fn generated_fragment_envelope_matrix() {
         },
     );
 }
+
+/// What the scripted producer does on one call.
+#[derive(Clone, Copy)]
+enum Produce {
+    Fragment(&'static [u8]),
+    Fail(&'static str),
+    EmptyButMore,
+}
+
+/// One call made on the reader under test.
+#[derive(Clone, Copy)]
+enum Call {
+    Prefetch,
+    Read(usize),
+    Report,
+}
+
+/// Drives a reader over `<r>` + fragments + `</r>` and records the result
+/// of every call together with the number of producer calls made so far.
+/// The producer reports end of fragments once its script is used up.
+fn reader_transcript(script: &[Produce], calls: &[Call]) -> Vec<String> {
+    let produced = std::cell::Cell::new(0usize);
+    let envelope = GeneratedXmlEnvelope::try_new(b"<r>", b"</r>").unwrap();
+    let mut reader = envelope
+        .prepare(limits(), 64, |output| {
+            let index = produced.get();
+            produced.set(index + 1);
+            match script.get(index) {
+                Some(Produce::Fragment(bytes)) => {
+                    output.write_all(bytes).map_err(Error::Io)?;
+                    Ok(true)
+                },
+                Some(Produce::Fail(message)) => Err(Error::InvalidFormat((*message).to_owned())),
+                Some(Produce::EmptyButMore) => Ok(true),
+                None => Ok(false),
+            }
+        })
+        .unwrap();
+    calls
+        .iter()
+        .map(|call| {
+            let outcome = match call {
+                Call::Prefetch => match reader.prefetch_first() {
+                    Ok(()) => "prefetch => ok".to_owned(),
+                    Err(error) => format!("prefetch => {error:?}"),
+                },
+                Call::Read(size) => {
+                    let mut buffer = vec![0u8; *size];
+                    match reader.read(&mut buffer) {
+                        Ok(count) => format!(
+                            "read({size}) => {:?}",
+                            String::from_utf8_lossy(&buffer[..count])
+                        ),
+                        Err(error) => format!("read({size}) => {:?}: {error}", error.kind()),
+                    }
+                },
+                Call::Report => {
+                    let report = reader.report();
+                    format!(
+                        "report => fragments={} bytes={} events={}",
+                        report.fragments(),
+                        report.bytes(),
+                        report.events()
+                    )
+                },
+            };
+            format!("{outcome} [produced {}]", produced.get())
+        })
+        .collect()
+}
+
+fn assert_transcript(actual: &[String], expected: &[&str]) {
+    let listing: Vec<String> = actual.iter().map(|line| format!("{line:?},")).collect();
+    assert!(
+        actual
+            .iter()
+            .map(String::as_str)
+            .eq(expected.iter().copied()),
+        "observed transcript:\n{}",
+        listing.join("\n")
+    );
+}
+
+#[test]
+fn reader_without_fragments_walks_prefix_suffix_done() {
+    use Call::{Prefetch, Read, Report};
+    let actual = reader_transcript(
+        &[],
+        &[
+            Read(0),
+            Report,
+            Read(2),
+            Read(2),
+            Read(2),
+            Read(2),
+            Read(2),
+            Read(2),
+            Read(0),
+            Prefetch,
+            Read(8),
+            Report,
+        ],
+    );
+    assert_transcript(
+        &actual,
+        &[
+            "read(0) => \"\" [produced 0]",
+            "report => fragments=0 bytes=7 events=3 [produced 0]",
+            "read(2) => \"<r\" [produced 1]",
+            "read(2) => \">\" [produced 1]",
+            "read(2) => \"</\" [produced 1]",
+            "read(2) => \"r>\" [produced 1]",
+            "read(2) => \"\" [produced 1]",
+            "read(2) => \"\" [produced 1]",
+            "read(0) => \"\" [produced 1]",
+            "prefetch => ok [produced 1]",
+            "read(8) => \"\" [produced 1]",
+            "report => fragments=0 bytes=7 events=3 [produced 1]",
+        ],
+    );
+}
+
+#[test]
+fn reader_prefetch_is_single_shot_and_reads_stop_at_section_ends() {
+    use Call::{Prefetch, Read, Report};
+    let script = [Produce::Fragment(b"<a/>"), Produce::Fragment(b"<b>x</b>")];
+    let actual = reader_transcript(
+        &script,
+        &[
+            Prefetch,
+            Report,
+            Prefetch,
+            Read(64),
+            Report,
+            Read(3),
+            Read(64),
+            Report,
+            Read(5),
+            Read(5),
+            Read(64),
+            Read(64),
+            Read(64),
+            Prefetch,
+            Report,
+        ],
+    );
+    assert_transcript(
+        &actual,
+        &[
+            "prefetch => ok [produced 1]",
+            "report => fragments=1 bytes=11 events=4 [produced 1]",
+            "prefetch => ok [produced 1]",
+            "read(64) => \"<r>\" [produced 1]",
+            "report => fragments=1 bytes=11 events=4 [produced 1]",
+            "read(3) => \"<a/\" [produced 1]",
+            "read(64) => \">\" [produced 1]",
+            "report => fragments=1 bytes=11 events=4 [produced 1]",
+            "read(5) => \"<b>x<\" [produced 2]",
+            "read(5) => \"/b>\" [produced 2]",
+            "read(64) => \"</r>\" [produced 3]",
+            "read(64) => \"\" [produced 3]",
+            "read(64) => \"\" [produced 3]",
+            "prefetch => ok [produced 3]",
+            "report => fragments=2 bytes=19 events=7 [produced 3]",
+        ],
+    );
+}
+
+#[test]
+fn reader_single_byte_reads_cross_every_boundary() {
+    use Call::Read;
+    let script = [Produce::Fragment(b"<a/>"), Produce::Fragment(b"<b/>")];
+    let calls = [Read(1); 18];
+    let actual = reader_transcript(&script, &calls);
+    assert_transcript(
+        &actual,
+        &[
+            "read(1) => \"<\" [produced 1]",
+            "read(1) => \"r\" [produced 1]",
+            "read(1) => \">\" [produced 1]",
+            "read(1) => \"<\" [produced 1]",
+            "read(1) => \"a\" [produced 1]",
+            "read(1) => \"/\" [produced 1]",
+            "read(1) => \">\" [produced 1]",
+            "read(1) => \"<\" [produced 2]",
+            "read(1) => \"b\" [produced 2]",
+            "read(1) => \"/\" [produced 2]",
+            "read(1) => \">\" [produced 2]",
+            "read(1) => \"<\" [produced 3]",
+            "read(1) => \"/\" [produced 3]",
+            "read(1) => \"r\" [produced 3]",
+            "read(1) => \">\" [produced 3]",
+            "read(1) => \"\" [produced 3]",
+            "read(1) => \"\" [produced 3]",
+            "read(1) => \"\" [produced 3]",
+        ],
+    );
+}
+
+#[test]
+fn reader_failure_in_prefetch_is_latched() {
+    use Call::{Prefetch, Read, Report};
+    let actual = reader_transcript(
+        &[Produce::Fail("first fragment failed")],
+        &[
+            Prefetch,
+            Prefetch,
+            Read(0),
+            Read(8),
+            Read(8),
+            Report,
+            Prefetch,
+        ],
+    );
+    assert_transcript(
+        &actual,
+        &[
+            "prefetch => InvalidFormat(\"first fragment failed\") [produced 1]",
+            "prefetch => ok [produced 1]",
+            "read(0) => \"\" [produced 1]",
+            "read(8) => Other: generated XML reader is failed [produced 1]",
+            "read(8) => Other: generated XML reader is failed [produced 1]",
+            "report => fragments=0 bytes=7 events=3 [produced 1]",
+            "prefetch => ok [produced 1]",
+        ],
+    );
+}
+
+#[test]
+fn reader_failure_in_first_read_is_latched() {
+    use Call::{Prefetch, Read, Report};
+    let actual = reader_transcript(
+        &[Produce::Fail("first fragment failed")],
+        &[Read(8), Read(8), Read(0), Prefetch, Read(8), Report],
+    );
+    assert_transcript(
+        &actual,
+        &[
+            "read(8) => Other: Invalid format: first fragment failed [produced 1]",
+            "read(8) => Other: generated XML reader is failed [produced 1]",
+            "read(0) => \"\" [produced 1]",
+            "prefetch => ok [produced 1]",
+            "read(8) => Other: generated XML reader is failed [produced 1]",
+            "report => fragments=0 bytes=7 events=3 [produced 1]",
+        ],
+    );
+}
+
+#[test]
+fn reader_failure_in_later_fragment_is_latched_after_published_bytes() {
+    use Call::{Prefetch, Read, Report};
+    let script = [
+        Produce::Fragment(b"<a/>"),
+        Produce::Fail("second fragment failed"),
+        Produce::Fragment(b"<c/>"),
+    ];
+    let actual = reader_transcript(
+        &script,
+        &[
+            Read(64),
+            Read(64),
+            Read(64),
+            Report,
+            Read(64),
+            Read(0),
+            Prefetch,
+            Read(64),
+        ],
+    );
+    assert_transcript(
+        &actual,
+        &[
+            "read(64) => \"<r>\" [produced 1]",
+            "read(64) => \"<a/>\" [produced 1]",
+            "read(64) => Other: Invalid format: second fragment failed [produced 2]",
+            "report => fragments=1 bytes=11 events=4 [produced 2]",
+            "read(64) => Other: generated XML reader is failed [produced 2]",
+            "read(0) => \"\" [produced 2]",
+            "prefetch => ok [produced 2]",
+            "read(64) => Other: generated XML reader is failed [produced 2]",
+        ],
+    );
+
+    let script = [Produce::Fragment(b"<a/>"), Produce::EmptyButMore];
+    let actual = reader_transcript(
+        &script,
+        &[
+            Prefetch,
+            Read(64),
+            Read(2),
+            Read(64),
+            Read(64),
+            Read(64),
+            Report,
+        ],
+    );
+    assert_transcript(
+        &actual,
+        &[
+            "prefetch => ok [produced 1]",
+            "read(64) => \"<r>\" [produced 1]",
+            "read(2) => \"<a\" [produced 1]",
+            "read(64) => \"/>\" [produced 1]",
+            "read(64) => Other: Invalid format: generated XML: producer returned a non-EOF result without a fragment [produced 2]",
+            "read(64) => Other: generated XML reader is failed [produced 2]",
+            "report => fragments=1 bytes=11 events=4 [produced 2]",
+        ],
+    );
+}

@@ -1349,3 +1349,891 @@ impl std::error::Error for VerifyCallbackError {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{COPY_CHUNK_SIZE, SplicedReader};
+    use std::cell::RefCell;
+    use std::io::{self, BufRead, Read};
+
+    /// What the scripted source does on one `read` call. Once the script is
+    /// used up the source fills every request as far as its data allows.
+    #[derive(Clone, Copy)]
+    enum Step {
+        /// Return at most this many bytes; zero reports end of input.
+        Give(usize),
+        Fail(io::ErrorKind),
+    }
+
+    struct ScriptedSource<'log> {
+        data: Vec<u8>,
+        position: usize,
+        script: Vec<Step>,
+        next: usize,
+        /// One entry per `read` call: `request>returned`, or `request!` for
+        /// a scripted failure.
+        log: &'log RefCell<Vec<String>>,
+    }
+
+    impl Read for ScriptedSource<'_> {
+        fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+            let step = self.script.get(self.next).copied();
+            self.next += 1;
+            let limit = match step {
+                Some(Step::Fail(kind)) => {
+                    self.log.borrow_mut().push(format!("{}!", output.len()));
+                    return Err(io::Error::new(kind, "scripted source failure"));
+                },
+                Some(Step::Give(limit)) => limit,
+                None => usize::MAX,
+            };
+            let count = limit.min(output.len()).min(self.data.len() - self.position);
+            output[..count].copy_from_slice(&self.data[self.position..self.position + count]);
+            self.position += count;
+            self.log
+                .borrow_mut()
+                .push(format!("{}>{count}", output.len()));
+            Ok(count)
+        }
+    }
+
+    impl BufRead for ScriptedSource<'_> {
+        fn fill_buf(&mut self) -> io::Result<&[u8]> {
+            Ok(&self.data[self.position..])
+        }
+
+        fn consume(&mut self, amount: usize) {
+            self.position = (self.position + amount).min(self.data.len());
+        }
+    }
+
+    struct Case {
+        data: Vec<u8>,
+        script: Vec<Step>,
+        expected_source_length: u64,
+        offset: u64,
+        remove: u64,
+        fragment: Vec<u8>,
+    }
+
+    impl Case {
+        fn digits(offset: u64, remove: u64, fragment: &str) -> Self {
+            Self {
+                data: b"0123456789".to_vec(),
+                script: Vec::new(),
+                expected_source_length: 10,
+                offset,
+                remove,
+                fragment: fragment.as_bytes().to_vec(),
+            }
+        }
+
+        fn script(mut self, script: &[Step]) -> Self {
+            self.script = script.to_vec();
+            self
+        }
+
+        fn data(mut self, data: &[u8]) -> Self {
+            self.data = data.to_vec();
+            self
+        }
+
+        fn expected(mut self, length: u64) -> Self {
+            self.expected_source_length = length;
+            self
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    enum Op {
+        Read(usize),
+        FillBuf,
+        Consume(usize),
+    }
+
+    fn render(bytes: &[u8]) -> String {
+        if bytes.len() <= 32 {
+            format!("{:?}", String::from_utf8_lossy(bytes))
+        } else {
+            format!(
+                "{} bytes ending {:?}",
+                bytes.len(),
+                String::from_utf8_lossy(&bytes[bytes.len() - 4..])
+            )
+        }
+    }
+
+    fn hex4(hash: [u8; 32]) -> String {
+        hash[..4].iter().map(|byte| format!("{byte:02x}")).collect()
+    }
+
+    /// Runs `ops` and then `finish`; returns one line per operation and a
+    /// last line for `finish`. Each line ends with the source reads the
+    /// operation caused.
+    fn transcript(case: &Case, ops: &[Op]) -> Vec<String> {
+        let log = RefCell::new(Vec::new());
+        let mut source = ScriptedSource {
+            data: case.data.clone(),
+            position: 0,
+            script: case.script.clone(),
+            next: 0,
+            log: &log,
+        };
+        let mut spliced = SplicedReader::new(
+            &mut source,
+            case.expected_source_length,
+            case.offset,
+            case.remove,
+            &case.fragment,
+        );
+        let mut lines = Vec::new();
+        for op in ops {
+            let outcome = match *op {
+                Op::Read(size) => {
+                    let mut buffer = vec![0u8; size];
+                    match spliced.read(&mut buffer) {
+                        Ok(count) => format!("read({size}) => {}", render(&buffer[..count])),
+                        Err(error) => format!("read({size}) => {:?}: {error}", error.kind()),
+                    }
+                },
+                Op::FillBuf => match spliced.fill_buf() {
+                    Ok(bytes) => format!("fill_buf => {}", render(bytes)),
+                    Err(error) => format!("fill_buf => {:?}: {error}", error.kind()),
+                },
+                Op::Consume(amount) => {
+                    spliced.consume(amount);
+                    format!("consume({amount})")
+                },
+            };
+            let reads = log.borrow_mut().drain(..).collect::<Vec<_>>().join(" ");
+            lines.push(format!("{outcome} [{reads}]"));
+        }
+        lines.push(match spliced.finish() {
+            Ok(proof) => format!(
+                "finish => source {} bytes {}, target {} bytes {}",
+                proof.source_content_length,
+                hex4(proof.source_sha256),
+                proof.target_content_length,
+                hex4(proof.target_sha256)
+            ),
+            Err(what) => format!("finish => Err({what:?})"),
+        });
+        lines
+    }
+
+    /// The `finish` outcome after each prefix of `ops`.
+    fn finish_after_each(case: &Case, ops: &[Op]) -> Vec<String> {
+        (0..=ops.len())
+            .map(|count| {
+                let lines = transcript(case, &ops[..count]);
+                format!("after {count}: {}", lines[lines.len() - 1])
+            })
+            .collect()
+    }
+
+    fn assert_lines(actual: &[String], expected: &[&str]) {
+        let listing: Vec<String> = actual.iter().map(|line| format!("{line:?},")).collect();
+        assert!(
+            actual
+                .iter()
+                .map(String::as_str)
+                .eq(expected.iter().copied()),
+            "observed lines:\n{}",
+            listing.join("\n")
+        );
+    }
+
+    #[test]
+    fn splice_walks_prefix_removal_fragment_suffix() {
+        use Op::Read;
+        let case = Case::digits(3, 2, "AB");
+        assert_lines(
+            &transcript(&case, &[Read(0), Read(64), Read(64), Read(0), Read(64)]),
+            &[
+                "read(0) => \"\" []",
+                "read(64) => \"012AB56789\" [3>3 2>2 5>5]",
+                "read(64) => \"\" []",
+                "read(0) => \"\" []",
+                "read(64) => \"\" []",
+                "finish => source 10 bytes 84d89877, target 10 bytes 30c46a20",
+            ],
+        );
+        assert_lines(
+            &transcript(&case, &[Read(4), Read(4), Read(4), Read(4), Read(4)]),
+            &[
+                "read(4) => \"012A\" [3>3 2>2]",
+                "read(4) => \"B567\" [5>5]",
+                "read(4) => \"89\" []",
+                "read(4) => \"\" []",
+                "read(4) => \"\" []",
+                "finish => source 10 bytes 84d89877, target 10 bytes 30c46a20",
+            ],
+        );
+    }
+
+    #[test]
+    fn splice_finish_outcome_after_every_step() {
+        let case = Case::digits(3, 2, "AB").script(&[Step::Give(1); 16]);
+        assert_lines(
+            &finish_after_each(&case, &[Op::Read(1); 13]),
+            &[
+                "after 0: finish => Err(\"source content length\")",
+                "after 1: finish => Err(\"source content length\")",
+                "after 2: finish => Err(\"source content length\")",
+                "after 3: finish => Err(\"source content length\")",
+                "after 4: finish => Err(\"source content length\")",
+                "after 5: finish => Err(\"source content length\")",
+                "after 6: finish => Err(\"source content length\")",
+                "after 7: finish => Err(\"source content length\")",
+                "after 8: finish => Err(\"source content length\")",
+                "after 9: finish => Err(\"source content length\")",
+                "after 10: finish => source 10 bytes 84d89877, target 10 bytes 30c46a20",
+                "after 11: finish => source 10 bytes 84d89877, target 10 bytes 30c46a20",
+                "after 12: finish => source 10 bytes 84d89877, target 10 bytes 30c46a20",
+                "after 13: finish => source 10 bytes 84d89877, target 10 bytes 30c46a20",
+            ],
+        );
+        let ops = [Op::FillBuf, Op::Consume(64)].repeat(12);
+        assert_lines(
+            &finish_after_each(&case, &ops),
+            &[
+                "after 0: finish => Err(\"source content length\")",
+                "after 1: finish => Err(\"source content length\")",
+                "after 2: finish => Err(\"source content length\")",
+                "after 3: finish => Err(\"source content length\")",
+                "after 4: finish => Err(\"source content length\")",
+                "after 5: finish => Err(\"source content length\")",
+                "after 6: finish => Err(\"source content length\")",
+                "after 7: finish => Err(\"source content length\")",
+                "after 8: finish => Err(\"source content length\")",
+                "after 9: finish => Err(\"source content length\")",
+                "after 10: finish => Err(\"source content length\")",
+                "after 11: finish => Err(\"source content length\")",
+                "after 12: finish => Err(\"source content length\")",
+                "after 13: finish => Err(\"source content length\")",
+                "after 14: finish => Err(\"source content length\")",
+                "after 15: finish => Err(\"source content length\")",
+                "after 16: finish => Err(\"source content length\")",
+                "after 17: finish => source 10 bytes 84d89877, target 10 bytes 30c46a20",
+                "after 18: finish => source 10 bytes 84d89877, target 10 bytes 30c46a20",
+                "after 19: finish => source 10 bytes 84d89877, target 10 bytes 30c46a20",
+                "after 20: finish => source 10 bytes 84d89877, target 10 bytes 30c46a20",
+                "after 21: finish => source 10 bytes 84d89877, target 10 bytes 30c46a20",
+                "after 22: finish => source 10 bytes 84d89877, target 10 bytes 30c46a20",
+                "after 23: finish => source 10 bytes 84d89877, target 10 bytes 30c46a20",
+                "after 24: finish => source 10 bytes 84d89877, target 10 bytes 30c46a20",
+            ],
+        );
+    }
+
+    #[test]
+    fn splice_short_source_reads_keep_phase_boundaries() {
+        let case = Case::digits(3, 2, "AB").script(&[Step::Give(1); 16]);
+        assert_lines(
+            &transcript(&case, &[Op::Read(64), Op::Read(64)]),
+            &[
+                "read(64) => \"012AB56789\" [3>1 2>1 1>1 2>1 1>1 5>1 4>1 3>1 2>1 1>1]",
+                "read(64) => \"\" []",
+                "finish => source 10 bytes 84d89877, target 10 bytes 30c46a20",
+            ],
+        );
+        let ops = [Op::FillBuf, Op::Consume(64)].repeat(12);
+        assert_lines(
+            &transcript(&case, &ops),
+            &[
+                "fill_buf => \"0\" [3>1]",
+                "consume(64) []",
+                "fill_buf => \"1\" [2>1]",
+                "consume(64) []",
+                "fill_buf => \"2\" [1>1]",
+                "consume(64) []",
+                "fill_buf => \"AB\" [2>1 1>1]",
+                "consume(64) []",
+                "fill_buf => \"5\" [5>1]",
+                "consume(64) []",
+                "fill_buf => \"6\" [4>1]",
+                "consume(64) []",
+                "fill_buf => \"7\" [3>1]",
+                "consume(64) []",
+                "fill_buf => \"8\" [2>1]",
+                "consume(64) []",
+                "fill_buf => \"9\" [1>1]",
+                "consume(64) []",
+                "fill_buf => \"\" []",
+                "consume(64) []",
+                "fill_buf => \"\" []",
+                "consume(64) []",
+                "fill_buf => \"\" []",
+                "consume(64) []",
+                "finish => source 10 bytes 84d89877, target 10 bytes 30c46a20",
+            ],
+        );
+        let case = Case::digits(3, 2, "AB").script(&[Step::Give(2); 16]);
+        let ops = [Op::FillBuf, Op::Consume(64)].repeat(8);
+        assert_lines(
+            &transcript(&case, &ops),
+            &[
+                "fill_buf => \"01\" [3>2]",
+                "consume(64) []",
+                "fill_buf => \"2\" [1>1]",
+                "consume(64) []",
+                "fill_buf => \"AB\" [2>2]",
+                "consume(64) []",
+                "fill_buf => \"56\" [5>2]",
+                "consume(64) []",
+                "fill_buf => \"78\" [3>2]",
+                "consume(64) []",
+                "fill_buf => \"9\" [1>1]",
+                "consume(64) []",
+                "fill_buf => \"\" []",
+                "consume(64) []",
+                "fill_buf => \"\" []",
+                "consume(64) []",
+                "finish => source 10 bytes 84d89877, target 10 bytes 30c46a20",
+            ],
+        );
+    }
+
+    #[test]
+    fn splice_buffered_view_is_stable_until_consumed() {
+        use Op::{Consume, FillBuf, Read};
+        let case = Case::digits(3, 2, "AB");
+        assert_lines(
+            &transcript(
+                &case,
+                &[
+                    Consume(5),
+                    FillBuf,
+                    FillBuf,
+                    Consume(1),
+                    FillBuf,
+                    Read(1),
+                    FillBuf,
+                    Consume(64),
+                    FillBuf,
+                    Consume(0),
+                    FillBuf,
+                    Consume(1),
+                    Read(3),
+                    FillBuf,
+                    Consume(64),
+                    FillBuf,
+                    FillBuf,
+                    Consume(1),
+                    FillBuf,
+                ],
+            ),
+            &[
+                "consume(5) []",
+                "fill_buf => \"012\" [3>3]",
+                "fill_buf => \"012\" []",
+                "consume(1) []",
+                "fill_buf => \"12\" []",
+                "read(1) => \"1\" []",
+                "fill_buf => \"2\" []",
+                "consume(64) []",
+                "fill_buf => \"AB\" [2>2]",
+                "consume(0) []",
+                "fill_buf => \"AB\" []",
+                "consume(1) []",
+                "read(3) => \"B56\" [5>5]",
+                "fill_buf => \"789\" []",
+                "consume(64) []",
+                "fill_buf => \"\" []",
+                "fill_buf => \"\" []",
+                "consume(1) []",
+                "fill_buf => \"\" []",
+                "finish => source 10 bytes 84d89877, target 10 bytes 30c46a20",
+            ],
+        );
+    }
+
+    #[test]
+    fn splice_source_errors_at_and_inside_each_phase_are_retried_in_place() {
+        use Step::{Fail, Give};
+        let kind = io::ErrorKind::Other;
+        // Offset 4, removal 3: one failure before and one inside the prefix,
+        // the removal and the suffix.
+        let script = [
+            Fail(kind),
+            Give(2),
+            Fail(kind),
+            Give(2),
+            Fail(kind),
+            Give(1),
+            Fail(kind),
+            Give(2),
+            Fail(kind),
+            Give(1),
+            Fail(io::ErrorKind::Interrupted),
+            Give(2),
+        ];
+        let case = Case::digits(4, 3, "AB").script(&script);
+        let ops = [Op::FillBuf, Op::Consume(64)].repeat(12);
+        assert_lines(
+            &transcript(&case, &ops),
+            &[
+                "fill_buf => Other: scripted source failure [4!]",
+                "consume(64) []",
+                "fill_buf => \"01\" [4>2]",
+                "consume(64) []",
+                "fill_buf => Other: scripted source failure [2!]",
+                "consume(64) []",
+                "fill_buf => \"23\" [2>2]",
+                "consume(64) []",
+                "fill_buf => Other: scripted source failure [3!]",
+                "consume(64) []",
+                "fill_buf => Other: scripted source failure [3>1 2!]",
+                "consume(64) []",
+                "fill_buf => \"AB\" [2>2]",
+                "consume(64) []",
+                "fill_buf => Other: scripted source failure [3!]",
+                "consume(64) []",
+                "fill_buf => \"7\" [3>1]",
+                "consume(64) []",
+                "fill_buf => Interrupted: scripted source failure [2!]",
+                "consume(64) []",
+                "fill_buf => \"89\" [2>2]",
+                "consume(64) []",
+                "fill_buf => \"\" []",
+                "consume(64) []",
+                "finish => source 10 bytes 84d89877, target 9 bytes 4c353d10",
+            ],
+        );
+        assert_lines(
+            &finish_after_each(&case, &ops),
+            &[
+                "after 0: finish => Err(\"source content length\")",
+                "after 1: finish => Err(\"source content length\")",
+                "after 2: finish => Err(\"source content length\")",
+                "after 3: finish => Err(\"source content length\")",
+                "after 4: finish => Err(\"source content length\")",
+                "after 5: finish => Err(\"source content length\")",
+                "after 6: finish => Err(\"source content length\")",
+                "after 7: finish => Err(\"source content length\")",
+                "after 8: finish => Err(\"source content length\")",
+                "after 9: finish => Err(\"source content length\")",
+                "after 10: finish => Err(\"source content length\")",
+                "after 11: finish => Err(\"source content length\")",
+                "after 12: finish => Err(\"source content length\")",
+                "after 13: finish => Err(\"source content length\")",
+                "after 14: finish => Err(\"source content length\")",
+                "after 15: finish => Err(\"source content length\")",
+                "after 16: finish => Err(\"source content length\")",
+                "after 17: finish => Err(\"source content length\")",
+                "after 18: finish => Err(\"source content length\")",
+                "after 19: finish => Err(\"source content length\")",
+                "after 20: finish => Err(\"source content length\")",
+                "after 21: finish => source 10 bytes 84d89877, target 9 bytes 4c353d10",
+                "after 22: finish => source 10 bytes 84d89877, target 9 bytes 4c353d10",
+                "after 23: finish => source 10 bytes 84d89877, target 9 bytes 4c353d10",
+                "after 24: finish => source 10 bytes 84d89877, target 9 bytes 4c353d10",
+            ],
+        );
+        // `read` gathers several refills; a failure discards what the same
+        // call had already gathered.
+        assert_lines(
+            &transcript(&case, &[Op::Read(64); 8]),
+            &[
+                "read(64) => Other: scripted source failure [4!]",
+                "read(64) => Other: scripted source failure [4>2 2!]",
+                "read(64) => Other: scripted source failure [2>2 3!]",
+                "read(64) => Other: scripted source failure [3>1 2!]",
+                "read(64) => Other: scripted source failure [2>2 3!]",
+                "read(64) => Interrupted: scripted source failure [3>1 2!]",
+                "read(64) => \"89\" [2>2]",
+                "read(64) => \"\" []",
+                "finish => source 10 bytes 84d89877, target 9 bytes 4c353d10",
+            ],
+        );
+        assert_lines(
+            &transcript(&case, &[Op::Read(1); 16]),
+            &[
+                "read(1) => Other: scripted source failure [4!]",
+                "read(1) => \"0\" [4>2]",
+                "read(1) => \"1\" []",
+                "read(1) => Other: scripted source failure [2!]",
+                "read(1) => \"2\" [2>2]",
+                "read(1) => \"3\" []",
+                "read(1) => Other: scripted source failure [3!]",
+                "read(1) => Other: scripted source failure [3>1 2!]",
+                "read(1) => \"A\" [2>2]",
+                "read(1) => \"B\" []",
+                "read(1) => Other: scripted source failure [3!]",
+                "read(1) => \"7\" [3>1]",
+                "read(1) => Interrupted: scripted source failure [2!]",
+                "read(1) => \"8\" [2>2]",
+                "read(1) => \"9\" []",
+                "read(1) => \"\" []",
+                "finish => source 10 bytes 84d89877, target 9 bytes 4c353d10",
+            ],
+        );
+    }
+
+    #[test]
+    fn splice_zero_length_source_reads_in_each_phase() {
+        use Step::Give;
+        let ops = [Op::FillBuf, Op::Consume(64)].repeat(6);
+        let prefix = Case::digits(3, 2, "AB").script(&[Give(1), Give(0), Give(0)]);
+        assert_lines(
+            &transcript(&prefix, &ops),
+            &[
+                "fill_buf => \"0\" [3>1]",
+                "consume(64) []",
+                "fill_buf => UnexpectedEof: source content ended before insertion offset [2>0]",
+                "consume(64) []",
+                "fill_buf => UnexpectedEof: source content ended before insertion offset [2>0]",
+                "consume(64) []",
+                "fill_buf => \"12\" [2>2]",
+                "consume(64) []",
+                "fill_buf => \"AB\" [2>2]",
+                "consume(64) []",
+                "fill_buf => \"56789\" [5>5]",
+                "consume(64) []",
+                "finish => source 10 bytes 84d89877, target 10 bytes 30c46a20",
+            ],
+        );
+        let removal = Case::digits(3, 2, "AB").script(&[Give(3), Give(1), Give(0), Give(0)]);
+        assert_lines(
+            &transcript(&removal, &ops),
+            &[
+                "fill_buf => \"012\" [3>3]",
+                "consume(64) []",
+                "fill_buf => UnexpectedEof: source content ended inside replacement range [2>1 1>0]",
+                "consume(64) []",
+                "fill_buf => UnexpectedEof: source content ended inside replacement range [1>0]",
+                "consume(64) []",
+                "fill_buf => \"AB\" [1>1]",
+                "consume(64) []",
+                "fill_buf => \"56789\" [5>5]",
+                "consume(64) []",
+                "fill_buf => \"\" []",
+                "consume(64) []",
+                "finish => source 10 bytes 84d89877, target 10 bytes 30c46a20",
+            ],
+        );
+        let suffix = Case::digits(3, 2, "AB").script(&[Give(3), Give(2), Give(1), Give(0)]);
+        assert_lines(
+            &transcript(&suffix, &ops),
+            &[
+                "fill_buf => \"012\" [3>3]",
+                "consume(64) []",
+                "fill_buf => \"AB\" [2>2]",
+                "consume(64) []",
+                "fill_buf => \"5\" [5>1]",
+                "consume(64) []",
+                "fill_buf => \"\" [4>0]",
+                "consume(64) []",
+                "fill_buf => \"\" []",
+                "consume(64) []",
+                "fill_buf => \"\" []",
+                "consume(64) []",
+                "finish => Err(\"source content length\")",
+            ],
+        );
+        assert_lines(
+            &transcript(&suffix, &[Op::Read(64); 3]),
+            &[
+                "read(64) => \"012AB5\" [3>3 2>2 5>1 4>0]",
+                "read(64) => \"\" []",
+                "read(64) => \"\" []",
+                "finish => Err(\"source content length\")",
+            ],
+        );
+    }
+
+    #[test]
+    fn splice_source_shorter_or_longer_than_declared() {
+        let ops = [Op::Read(64); 3];
+        let rows: Vec<String> = [
+            ("ends in prefix", Case::digits(3, 2, "AB").data(b"01")),
+            ("ends at offset", Case::digits(3, 2, "AB").data(b"012")),
+            ("ends in removal", Case::digits(3, 2, "AB").data(b"0123")),
+            (
+                "ends after removal",
+                Case::digits(3, 2, "AB").data(b"01234"),
+            ),
+            ("ends in suffix", Case::digits(3, 2, "AB").data(b"0123456")),
+            ("empty source", Case::digits(3, 2, "AB").data(b"")),
+            (
+                "longer than declared",
+                Case::digits(3, 2, "AB").data(b"0123456789xy"),
+            ),
+            (
+                "offset beyond declared",
+                Case::digits(3, 2, "AB").expected(2),
+            ),
+            (
+                "removal beyond declared",
+                Case::digits(3, 2, "AB").expected(4),
+            ),
+            (
+                "declared ends at removal",
+                Case::digits(3, 2, "AB").expected(5),
+            ),
+        ]
+        .iter()
+        .flat_map(|(label, case)| {
+            transcript(case, &ops)
+                .into_iter()
+                .map(move |line| format!("{label}: {line}"))
+        })
+        .collect();
+        assert_lines(
+            &rows,
+            &[
+                "ends in prefix: read(64) => UnexpectedEof: source content ended before insertion offset [3>2 1>0]",
+                "ends in prefix: read(64) => UnexpectedEof: source content ended before insertion offset [1>0]",
+                "ends in prefix: read(64) => UnexpectedEof: source content ended before insertion offset [1>0]",
+                "ends in prefix: finish => Err(\"source content length\")",
+                "ends at offset: read(64) => UnexpectedEof: source content ended inside replacement range [3>3 2>0]",
+                "ends at offset: read(64) => UnexpectedEof: source content ended inside replacement range [2>0]",
+                "ends at offset: read(64) => UnexpectedEof: source content ended inside replacement range [2>0]",
+                "ends at offset: finish => Err(\"source content length\")",
+                "ends in removal: read(64) => UnexpectedEof: source content ended inside replacement range [3>3 2>1 1>0]",
+                "ends in removal: read(64) => UnexpectedEof: source content ended inside replacement range [1>0]",
+                "ends in removal: read(64) => UnexpectedEof: source content ended inside replacement range [1>0]",
+                "ends in removal: finish => Err(\"source content length\")",
+                "ends after removal: read(64) => \"012AB\" [3>3 2>2 5>0]",
+                "ends after removal: read(64) => \"\" []",
+                "ends after removal: read(64) => \"\" []",
+                "ends after removal: finish => Err(\"source content length\")",
+                "ends in suffix: read(64) => \"012AB56\" [3>3 2>2 5>2 3>0]",
+                "ends in suffix: read(64) => \"\" []",
+                "ends in suffix: read(64) => \"\" []",
+                "ends in suffix: finish => Err(\"source content length\")",
+                "empty source: read(64) => UnexpectedEof: source content ended before insertion offset [3>0]",
+                "empty source: read(64) => UnexpectedEof: source content ended before insertion offset [3>0]",
+                "empty source: read(64) => UnexpectedEof: source content ended before insertion offset [3>0]",
+                "empty source: finish => Err(\"source content length\")",
+                "longer than declared: read(64) => \"012AB56789\" [3>3 2>2 5>5]",
+                "longer than declared: read(64) => \"\" []",
+                "longer than declared: read(64) => \"\" []",
+                "longer than declared: finish => source 10 bytes 84d89877, target 10 bytes 30c46a20",
+                "offset beyond declared: read(64) => InvalidData: verified source content exceeded declared length [3>3]",
+                "offset beyond declared: read(64) => \"AB\" [2>2]",
+                "offset beyond declared: read(64) => \"\" []",
+                "offset beyond declared: finish => source 2 bytes 86e50149, target 2 bytes 38164fbd",
+                "removal beyond declared: read(64) => InvalidData: verified source content exceeded declared length [3>3 2>2]",
+                "removal beyond declared: read(64) => \"AB5\" [1>1]",
+                "removal beyond declared: read(64) => \"\" []",
+                "removal beyond declared: finish => Err(\"candidate content length\")",
+                "declared ends at removal: read(64) => \"012AB\" [3>3 2>2]",
+                "declared ends at removal: read(64) => \"\" []",
+                "declared ends at removal: read(64) => \"\" []",
+                "declared ends at removal: finish => source 5 bytes c565fe03, target 5 bytes 61bc9aea",
+            ],
+        );
+    }
+
+    #[test]
+    fn splice_empty_phases_are_skipped() {
+        let ops = [Op::FillBuf, Op::Consume(64)].repeat(5);
+        let rows: Vec<String> = [
+            ("no prefix", Case::digits(0, 2, "AB")),
+            ("no removal", Case::digits(3, 0, "AB")),
+            ("no fragment", Case::digits(3, 2, "")),
+            ("no suffix", Case::digits(8, 2, "AB")),
+            ("insert at end", Case::digits(10, 0, "AB")),
+            ("insert at start", Case::digits(0, 0, "AB")),
+            ("replace everything", Case::digits(0, 10, "AB")),
+            ("remove everything", Case::digits(0, 10, "")),
+            ("nothing to do", Case::digits(0, 0, "")),
+            (
+                "empty source and fragment",
+                Case::digits(0, 0, "").data(b"").expected(0),
+            ),
+            (
+                "empty source",
+                Case::digits(0, 0, "AB").data(b"").expected(0),
+            ),
+        ]
+        .iter()
+        .flat_map(|(label, case)| {
+            transcript(case, &ops)
+                .into_iter()
+                .map(move |line| format!("{label}: {line}"))
+        })
+        .collect();
+        assert_lines(
+            &rows,
+            &[
+                "no prefix: fill_buf => \"AB\" [2>2]",
+                "no prefix: consume(64) []",
+                "no prefix: fill_buf => \"23456789\" [8>8]",
+                "no prefix: consume(64) []",
+                "no prefix: fill_buf => \"\" []",
+                "no prefix: consume(64) []",
+                "no prefix: fill_buf => \"\" []",
+                "no prefix: consume(64) []",
+                "no prefix: fill_buf => \"\" []",
+                "no prefix: consume(64) []",
+                "no prefix: finish => source 10 bytes 84d89877, target 10 bytes b38acc48",
+                "no removal: fill_buf => \"012\" [3>3]",
+                "no removal: consume(64) []",
+                "no removal: fill_buf => \"AB\" []",
+                "no removal: consume(64) []",
+                "no removal: fill_buf => \"3456789\" [7>7]",
+                "no removal: consume(64) []",
+                "no removal: fill_buf => \"\" []",
+                "no removal: consume(64) []",
+                "no removal: fill_buf => \"\" []",
+                "no removal: consume(64) []",
+                "no removal: finish => source 10 bytes 84d89877, target 12 bytes 50716a22",
+                "no fragment: fill_buf => \"012\" [3>3]",
+                "no fragment: consume(64) []",
+                "no fragment: fill_buf => \"56789\" [2>2 5>5]",
+                "no fragment: consume(64) []",
+                "no fragment: fill_buf => \"\" []",
+                "no fragment: consume(64) []",
+                "no fragment: fill_buf => \"\" []",
+                "no fragment: consume(64) []",
+                "no fragment: fill_buf => \"\" []",
+                "no fragment: consume(64) []",
+                "no fragment: finish => source 10 bytes 84d89877, target 8 bytes c954a6fe",
+                "no suffix: fill_buf => \"01234567\" [8>8]",
+                "no suffix: consume(64) []",
+                "no suffix: fill_buf => \"AB\" [2>2]",
+                "no suffix: consume(64) []",
+                "no suffix: fill_buf => \"\" []",
+                "no suffix: consume(64) []",
+                "no suffix: fill_buf => \"\" []",
+                "no suffix: consume(64) []",
+                "no suffix: fill_buf => \"\" []",
+                "no suffix: consume(64) []",
+                "no suffix: finish => source 10 bytes 84d89877, target 10 bytes f2bde2b6",
+                "insert at end: fill_buf => \"0123456789\" [10>10]",
+                "insert at end: consume(64) []",
+                "insert at end: fill_buf => \"AB\" []",
+                "insert at end: consume(64) []",
+                "insert at end: fill_buf => \"\" []",
+                "insert at end: consume(64) []",
+                "insert at end: fill_buf => \"\" []",
+                "insert at end: consume(64) []",
+                "insert at end: fill_buf => \"\" []",
+                "insert at end: consume(64) []",
+                "insert at end: finish => source 10 bytes 84d89877, target 12 bytes 4e3f5a1d",
+                "insert at start: fill_buf => \"AB\" []",
+                "insert at start: consume(64) []",
+                "insert at start: fill_buf => \"0123456789\" [10>10]",
+                "insert at start: consume(64) []",
+                "insert at start: fill_buf => \"\" []",
+                "insert at start: consume(64) []",
+                "insert at start: fill_buf => \"\" []",
+                "insert at start: consume(64) []",
+                "insert at start: fill_buf => \"\" []",
+                "insert at start: consume(64) []",
+                "insert at start: finish => source 10 bytes 84d89877, target 12 bytes 2408b90c",
+                "replace everything: fill_buf => \"AB\" [10>10]",
+                "replace everything: consume(64) []",
+                "replace everything: fill_buf => \"\" []",
+                "replace everything: consume(64) []",
+                "replace everything: fill_buf => \"\" []",
+                "replace everything: consume(64) []",
+                "replace everything: fill_buf => \"\" []",
+                "replace everything: consume(64) []",
+                "replace everything: fill_buf => \"\" []",
+                "replace everything: consume(64) []",
+                "replace everything: finish => source 10 bytes 84d89877, target 2 bytes 38164fbd",
+                "remove everything: fill_buf => \"\" [10>10]",
+                "remove everything: consume(64) []",
+                "remove everything: fill_buf => \"\" []",
+                "remove everything: consume(64) []",
+                "remove everything: fill_buf => \"\" []",
+                "remove everything: consume(64) []",
+                "remove everything: fill_buf => \"\" []",
+                "remove everything: consume(64) []",
+                "remove everything: fill_buf => \"\" []",
+                "remove everything: consume(64) []",
+                "remove everything: finish => source 10 bytes 84d89877, target 0 bytes e3b0c442",
+                "nothing to do: fill_buf => \"0123456789\" [10>10]",
+                "nothing to do: consume(64) []",
+                "nothing to do: fill_buf => \"\" []",
+                "nothing to do: consume(64) []",
+                "nothing to do: fill_buf => \"\" []",
+                "nothing to do: consume(64) []",
+                "nothing to do: fill_buf => \"\" []",
+                "nothing to do: consume(64) []",
+                "nothing to do: fill_buf => \"\" []",
+                "nothing to do: consume(64) []",
+                "nothing to do: finish => source 10 bytes 84d89877, target 10 bytes 84d89877",
+                "empty source and fragment: fill_buf => \"\" []",
+                "empty source and fragment: consume(64) []",
+                "empty source and fragment: fill_buf => \"\" []",
+                "empty source and fragment: consume(64) []",
+                "empty source and fragment: fill_buf => \"\" []",
+                "empty source and fragment: consume(64) []",
+                "empty source and fragment: fill_buf => \"\" []",
+                "empty source and fragment: consume(64) []",
+                "empty source and fragment: fill_buf => \"\" []",
+                "empty source and fragment: consume(64) []",
+                "empty source and fragment: finish => source 0 bytes e3b0c442, target 0 bytes e3b0c442",
+                "empty source: fill_buf => \"AB\" []",
+                "empty source: consume(64) []",
+                "empty source: fill_buf => \"\" []",
+                "empty source: consume(64) []",
+                "empty source: fill_buf => \"\" []",
+                "empty source: consume(64) []",
+                "empty source: fill_buf => \"\" []",
+                "empty source: consume(64) []",
+                "empty source: fill_buf => \"\" []",
+                "empty source: consume(64) []",
+                "empty source: finish => source 0 bytes e3b0c442, target 2 bytes 38164fbd",
+            ],
+        );
+    }
+
+    #[test]
+    fn splice_chunks_long_phases() {
+        let letters = |length: usize| -> Vec<u8> {
+            (0..length).map(|index| b'a' + (index % 26) as u8).collect()
+        };
+        let data = letters(4 * COPY_CHUNK_SIZE + 5);
+        let case = Case {
+            expected_source_length: data.len() as u64,
+            data,
+            script: Vec::new(),
+            offset: COPY_CHUNK_SIZE as u64 + 2,
+            remove: COPY_CHUNK_SIZE as u64 + 1,
+            fragment: letters(COPY_CHUNK_SIZE + 3)
+                .iter()
+                .map(u8::to_ascii_uppercase)
+                .collect(),
+        };
+        let ops = [Op::FillBuf, Op::Consume(usize::MAX)].repeat(8);
+        assert_lines(
+            &transcript(&case, &ops),
+            &[
+                "fill_buf => 65536 bytes ending \"mnop\" [65536>65536]",
+                "consume(18446744073709551615) []",
+                "fill_buf => \"qr\" [2>2]",
+                "consume(18446744073709551615) []",
+                "fill_buf => 65536 bytes ending \"MNOP\" [65536>65536 1>1]",
+                "consume(18446744073709551615) []",
+                "fill_buf => \"QRS\" []",
+                "consume(18446744073709551615) []",
+                "fill_buf => 65536 bytes ending \"vwxy\" [65536>65536]",
+                "consume(18446744073709551615) []",
+                "fill_buf => 65536 bytes ending \"lmno\" [65536>65536]",
+                "consume(18446744073709551615) []",
+                "fill_buf => \"pq\" [2>2]",
+                "consume(18446744073709551615) []",
+                "fill_buf => \"\" []",
+                "consume(18446744073709551615) []",
+                "finish => source 262149 bytes 99527826, target 262151 bytes 960bbf5c",
+            ],
+        );
+        assert_lines(
+            &transcript(&case, &[Op::Read(COPY_CHUNK_SIZE + 7); 6]),
+            &[
+                "read(65543) => 65543 bytes ending \"BCDE\" [65536>65536 2>2 65536>65536 1>1]",
+                "read(65543) => 65543 bytes ending \"opqr\" [65536>65536]",
+                "read(65543) => 65543 bytes ending \"lmno\" [65536>65536]",
+                "read(65543) => 65522 bytes ending \"nopq\" [2>2]",
+                "read(65543) => \"\" []",
+                "read(65543) => \"\" []",
+                "finish => source 262149 bytes 99527826, target 262151 bytes 960bbf5c",
+            ],
+        );
+    }
+}
