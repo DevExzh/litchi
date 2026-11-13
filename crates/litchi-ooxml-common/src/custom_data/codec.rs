@@ -999,6 +999,47 @@ pub fn validate_workbook_root(xml: &[u8], limits: &Limits) -> Result<()> {
     }
 }
 
+/// Where the Custom Data reader is relative to its root element
+/// (`datastoreItem`, or `extLst` for an extension fragment). Nesting inside
+/// the root is not part of it: the frame stack holds that.
+///
+/// ```text
+/// Start          --XML declaration (properties part only)--> Prolog
+/// Start | Prolog --comment, PI or whitespace---------------> Prolog
+/// Start | Prolog --root start tag--------------------------> Open
+/// Start | Prolog --root empty-element tag------------------> Closed
+/// Open           --nested content--------------------------> Open
+/// Open           --root end tag----------------------------> Closed
+/// Closed         --comment, PI or whitespace---------------> Closed
+/// ```
+///
+/// Refused: an XML declaration anywhere but `Start`, and everywhere in an
+/// extension fragment, which has no prolog of its own; a second top-level
+/// element; text other than whitespace, CDATA and entity references outside
+/// the root; and the end of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// Nothing has been read.
+    Start,
+    /// A declaration, a comment, a processing instruction or whitespace was
+    /// read; no root yet.
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open,
+    /// The root element is complete.
+    Closed,
+}
+
+impl RootPhase {
+    /// A comment, a processing instruction or top-level whitespace was read.
+    fn miscellaneous(&mut self) {
+        match self {
+            Self::Start => *self = Self::Prolog,
+            Self::Prolog | Self::Open | Self::Closed => {},
+        }
+    }
+}
+
 fn parse_document(
     xml: &[u8],
     expected: ExpectedRoot,
@@ -1027,8 +1068,7 @@ fn parse_document_with_context(
     let mut namespaces = NamespaceState::default();
     namespaces.seed(inherited_namespaces, limits)?;
     let mut stack = Vec::<Frame>::new();
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Start;
     let mut nodes = 0usize;
     let mut events = 0usize;
     let mut extension_count = 0usize;
@@ -1039,8 +1079,6 @@ fn parse_document_with_context(
     let mut extension = None;
     let mut extension_open = None;
     let mut extension_context = None;
-    let mut saw_declaration = false;
-    let mut saw_prolog_content = false;
 
     loop {
         let start = position(&reader, origin)?;
@@ -1085,10 +1123,13 @@ fn parse_document_with_context(
                         &mut id,
                         &mut id_range,
                     )?;
-                    if root_seen || root_closed {
-                        return Err(invalid("multiple XML roots"));
+                    match phase {
+                        RootPhase::Start | RootPhase::Prolog => {},
+                        RootPhase::Open | RootPhase::Closed => {
+                            return Err(invalid("multiple XML roots"));
+                        },
                     }
-                    root_seen = true;
+                    phase = RootPhase::Open;
                     root_open = Some(start..end);
                     if expected == ExpectedRoot::Properties {
                         root_context = Some(namespaces.snapshot(limits)?);
@@ -1098,7 +1139,7 @@ fn parse_document_with_context(
                     } else {
                         FrameKind::ExtensionList
                     }
-                } else if root_closed {
+                } else if phase == RootPhase::Closed {
                     return Err(invalid("element appears after the XML root"));
                 } else if depth == 1 {
                     match expected {
@@ -1214,16 +1255,18 @@ fn parse_document_with_context(
                         &mut id,
                         &mut id_range,
                     )?;
-                    if root_seen || root_closed {
-                        return Err(invalid("multiple XML roots"));
+                    match phase {
+                        RootPhase::Start | RootPhase::Prolog => {},
+                        RootPhase::Open | RootPhase::Closed => {
+                            return Err(invalid("multiple XML roots"));
+                        },
                     }
-                    root_seen = true;
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                     root_open = Some(start..end);
                     if expected == ExpectedRoot::Properties {
                         root_context = Some(namespaces.snapshot(limits)?);
                     }
-                } else if root_closed {
+                } else if phase == RootPhase::Closed {
                     return Err(invalid("element appears after the XML root"));
                 } else if depth == 1 {
                     match expected {
@@ -1331,7 +1374,7 @@ fn parse_document_with_context(
                     || (frame.kind == FrameKind::ExtensionList
                         && expected == ExpectedRoot::ExtensionList)
                 {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
                 namespaces.leave();
             },
@@ -1348,7 +1391,7 @@ fn parse_document_with_context(
                 let decoded = text.decode().map_err(xml_error)?;
                 let decoded = quick_xml::escape::unescape(&decoded).map_err(xml_error)?;
                 if stack.last().is_none() {
-                    saw_prolog_content = true;
+                    phase.miscellaneous();
                     if !is_xml_space_only(&decoded) {
                         return Err(invalid("text outside XML root"));
                     }
@@ -1396,32 +1439,30 @@ fn parse_document_with_context(
                 }
             },
             Event::DocType(_) => return Err(invalid("DTDs are rejected")),
-            Event::Decl(_) => {
-                if expected == ExpectedRoot::ExtensionList
-                    || saw_declaration
-                    || root_seen
-                    || !stack.is_empty()
-                    || saw_prolog_content
-                {
+            Event::Decl(_) => match (phase, expected) {
+                (RootPhase::Start, ExpectedRoot::Properties) => phase = RootPhase::Prolog,
+                (RootPhase::Start, ExpectedRoot::ExtensionList)
+                | (
+                    RootPhase::Prolog | RootPhase::Open | RootPhase::Closed,
+                    ExpectedRoot::Properties | ExpectedRoot::ExtensionList,
+                ) => {
                     return Err(invalid("XML declaration is not at the document prolog"));
-                }
-                saw_declaration = true;
+                },
             },
-            Event::Comment(_) | Event::PI(_) => {
-                if !root_seen {
-                    saw_prolog_content = true;
-                }
-            },
+            Event::Comment(_) | Event::PI(_) => phase.miscellaneous(),
             Event::Eof => break,
         }
     }
     if !stack.is_empty() {
         return Err(invalid("unterminated Custom Data Properties XML"));
     }
-    if !root_seen || !root_closed {
-        return Err(invalid(
-            "missing or unterminated Custom Data Properties XML root",
-        ));
+    match phase {
+        RootPhase::Closed => {},
+        RootPhase::Start | RootPhase::Prolog | RootPhase::Open => {
+            return Err(invalid(
+                "missing or unterminated Custom Data Properties XML root",
+            ));
+        },
     }
     if expected == ExpectedRoot::Properties && id.is_none() {
         return Err(invalid(
@@ -1439,6 +1480,41 @@ fn parse_document_with_context(
     })
 }
 
+/// Where the generic scanner is relative to the document element. Whether
+/// that element is still open is not part of it: the frame stack holds that.
+///
+/// ```text
+/// Start          --XML declaration----------------> Prolog
+/// Start | Prolog --comment, PI or whitespace------> Prolog
+/// Start | Prolog --root start or empty tag--------> Rooted
+/// Rooted         --nested content, root end tag---> Rooted
+/// Rooted         --comment, PI or whitespace------> Rooted
+/// ```
+///
+/// Refused: an XML declaration anywhere but `Start`; a second top-level
+/// element; text other than whitespace, CDATA and entity references outside
+/// the root; and the end of input before `Rooted`.
+enum GenericRootPhase {
+    /// Nothing has been read.
+    Start,
+    /// A declaration, a comment, a processing instruction or whitespace was
+    /// read; no root yet.
+    Prolog,
+    /// The root tag was read: inside the root, or after it. The root has
+    /// this namespace and local name.
+    Rooted((String, String)),
+}
+
+impl GenericRootPhase {
+    /// A comment, a processing instruction or top-level whitespace was read.
+    fn miscellaneous(&mut self) {
+        match self {
+            Self::Start => *self = Self::Prolog,
+            Self::Prolog | Self::Rooted(_) => {},
+        }
+    }
+}
+
 fn scan_generic_document(xml: &[u8], limits: &Limits) -> Result<(String, String)> {
     check_limit(
         limits,
@@ -1450,11 +1526,9 @@ fn scan_generic_document(xml: &[u8], limits: &Limits) -> Result<(String, String)
     let mut reader = NsReader::from_reader(xml);
     let mut namespaces = NamespaceState::default();
     let mut stack = Vec::<(String, String)>::new();
-    let mut root = None;
+    let mut phase = GenericRootPhase::Start;
     let mut nodes = 0usize;
     let mut events = 0usize;
-    let mut declaration = false;
-    let mut prolog_content = false;
     loop {
         let event = reader.read_event().map_err(xml_error)?;
         count_event(&mut events, limits)?;
@@ -1468,10 +1542,11 @@ fn scan_generic_document(xml: &[u8], limits: &Limits) -> Result<(String, String)
                 let _ = element_attributes(&reader, &element, xml, &namespaces, false, limits)?;
                 let name = element_name(&namespaces, element.name(), false, limits)?;
                 if stack.is_empty() {
-                    if root.is_some() {
-                        return Err(invalid("multiple XML roots"));
+                    match phase {
+                        GenericRootPhase::Start | GenericRootPhase::Prolog => {},
+                        GenericRootPhase::Rooted(_) => return Err(invalid("multiple XML roots")),
                     }
-                    root = Some(name.clone());
+                    phase = GenericRootPhase::Rooted(name.clone());
                 }
                 stack
                     .try_reserve(1)
@@ -1486,10 +1561,16 @@ fn scan_generic_document(xml: &[u8], limits: &Limits) -> Result<(String, String)
                 namespaces.enter(&reader, &element, limits)?;
                 let _ = element_attributes(&reader, &element, xml, &namespaces, false, limits)?;
                 if stack.is_empty() {
-                    if root.is_some() {
-                        return Err(invalid("multiple XML roots"));
+                    match phase {
+                        GenericRootPhase::Start | GenericRootPhase::Prolog => {},
+                        GenericRootPhase::Rooted(_) => return Err(invalid("multiple XML roots")),
                     }
-                    root = Some(element_name(&namespaces, element.name(), false, limits)?);
+                    phase = GenericRootPhase::Rooted(element_name(
+                        &namespaces,
+                        element.name(),
+                        false,
+                        limits,
+                    )?);
                 }
                 namespaces.leave();
             },
@@ -1514,7 +1595,7 @@ fn scan_generic_document(xml: &[u8], limits: &Limits) -> Result<(String, String)
                 let value = text.decode().map_err(xml_error)?;
                 let value = quick_xml::escape::unescape(&value).map_err(xml_error)?;
                 if stack.is_empty() {
-                    prolog_content = true;
+                    phase.miscellaneous();
                     if !is_xml_space_only(&value) {
                         return Err(invalid("text outside XML root"));
                     }
@@ -1527,29 +1608,28 @@ fn scan_generic_document(xml: &[u8], limits: &Limits) -> Result<(String, String)
                 let _ = crate::xml::decode_xml_reference(&reference)?;
             },
             Event::DocType(_) => return Err(invalid("DTDs are rejected")),
-            Event::Decl(_) => {
-                if declaration || root.is_some() || !stack.is_empty() || prolog_content {
+            Event::Decl(_) => match phase {
+                GenericRootPhase::Start => phase = GenericRootPhase::Prolog,
+                GenericRootPhase::Prolog | GenericRootPhase::Rooted(_) => {
                     return Err(invalid("XML declaration is not at the document prolog"));
-                }
-                declaration = true;
+                },
             },
             Event::CData(_) => {
                 if stack.is_empty() {
                     return Err(invalid("CDATA outside XML root"));
                 }
             },
-            Event::Comment(_) | Event::PI(_) => {
-                if root.is_none() {
-                    prolog_content = true;
-                }
-            },
+            Event::Comment(_) | Event::PI(_) => phase.miscellaneous(),
             Event::Eof => break,
         }
     }
     if !stack.is_empty() {
         return Err(invalid("unterminated XML root"));
     }
-    root.ok_or_else(|| invalid("missing XML root"))
+    match phase {
+        GenericRootPhase::Rooted(name) => Ok(name),
+        GenericRootPhase::Start | GenericRootPhase::Prolog => Err(invalid("missing XML root")),
+    }
 }
 
 fn admit_root(

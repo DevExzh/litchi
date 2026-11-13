@@ -58,6 +58,34 @@ pub(crate) struct ContentTypesPlan<'source> {
     planning_memory_reservation: Option<Arc<Reservation>>,
 }
 
+/// Where the plan's source scan is relative to the `Types` root element.
+/// Whether a started root has ended is not part of it: the depth counter
+/// holds that.
+///
+/// ```text
+/// Prolog  --declaration, comment, PI or whitespace--> Prolog
+/// Prolog  --root start tag--------------------------> Started
+/// Prolog  --root empty-element tag------------------> Empty
+/// Started --nested content, root end tag------------> Started
+/// Started --declaration, comment, PI or whitespace--> Started
+/// Empty   --declaration, comment, PI or whitespace--> Empty
+/// ```
+///
+/// An XML declaration is accepted anywhere, and so are comments, processing
+/// instructions and whitespace after the root. Refused: a second top-level
+/// element; text other than whitespace, CDATA and a DTD anywhere; and the
+/// end of input in `Prolog`, or in `Started` before the root end tag.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PlanRootPhase {
+    /// No root tag has been read.
+    Prolog,
+    /// The root start tag was read: inside the root, or after its end tag.
+    Started,
+    /// The root was one empty-element tag, which has no end tag to insert
+    /// mappings before.
+    Empty,
+}
+
 impl<'source> ContentTypesPlan<'source> {
     /// Package-level entry point for callers that have already performed
     /// their bounded input preflight. Taking ownership here avoids copying
@@ -285,8 +313,7 @@ impl<'source> ContentTypesPlan<'source> {
         // byte-order mark precedes reader position zero.
         let origin = ReaderOrigin::of(source);
         let mut depth = 0usize;
-        let mut root_seen = false;
-        let mut root_is_empty = false;
+        let mut phase = PlanRootPhase::Prolog;
         let mut root_close_start = None;
         let mut root_prefix = None;
         let mut empty_root_slash = None;
@@ -329,7 +356,7 @@ impl<'source> ContentTypesPlan<'source> {
                 let mut matched_removal = None;
                 match &event {
                     Event::Start(element) if depth == 0 => {
-                        if root_seen
+                        if phase != PlanRootPhase::Prolog
                             || element.local_name().as_ref() != b"Types"
                             || !in_content_types_namespace
                         {
@@ -337,11 +364,11 @@ impl<'source> ContentTypesPlan<'source> {
                                 "content-types root must be Types in the OPC content-types namespace",
                             ));
                         }
-                        root_seen = true;
+                        phase = PlanRootPhase::Started;
                         depth = next_depth(depth, limits)?;
                     },
                     Event::Empty(element) if depth == 0 => {
-                        if root_seen
+                        if phase != PlanRootPhase::Prolog
                             || element.local_name().as_ref() != b"Types"
                             || !in_content_types_namespace
                         {
@@ -349,8 +376,7 @@ impl<'source> ContentTypesPlan<'source> {
                                 "content-types root must be Types in the OPC content-types namespace",
                             ));
                         }
-                        root_seen = true;
-                        root_is_empty = true;
+                        phase = PlanRootPhase::Empty;
                     },
                     Event::Start(element) if depth == 1 => {
                         ensure_direct_mapping(element, in_content_types_namespace)?;
@@ -471,11 +497,20 @@ impl<'source> ContentTypesPlan<'source> {
             }
         }
 
-        if !root_seen || (!root_is_empty && depth != 0) {
-            return Err(OpcError::InvalidContentTypesManifest(
-                "missing or unclosed Types root".into(),
-            ));
-        }
+        let root_is_empty = match phase {
+            PlanRootPhase::Prolog => {
+                return Err(OpcError::InvalidContentTypesManifest(
+                    "missing or unclosed Types root".into(),
+                ));
+            },
+            PlanRootPhase::Started if depth != 0 => {
+                return Err(OpcError::InvalidContentTypesManifest(
+                    "missing or unclosed Types root".into(),
+                ));
+            },
+            PlanRootPhase::Started => false,
+            PlanRootPhase::Empty => true,
+        };
         if let Some(index) = matched_removals.iter().position(|matched| !matched) {
             return Err(OpcError::InvalidContentTypesManifest(format!(
                 "content-type Override for '{}' was not found lexically",

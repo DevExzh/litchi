@@ -16,6 +16,47 @@ use std::collections::HashSet;
 use super::model::{Family, Limits, UI2_NAMESPACE, V2007_NAMESPACE, V2010_NAMESPACE, Version};
 use crate::xml::attributes::BytesStartExt as _;
 
+/// Where the validator is relative to the `customUI` root element. Nesting
+/// inside the root is not part of it: the depth counter holds that.
+///
+/// ```text
+/// Start          --XML declaration----------------> Prolog
+/// Start | Prolog --comment, PI or whitespace------> Prolog
+/// Start | Prolog --root start tag-----------------> Open
+/// Start | Prolog --root empty-element tag---------> Closed
+/// Open           --nested content-----------------> Open
+/// Open           --root end tag-------------------> Closed
+/// Closed         --comment, PI or whitespace------> Closed
+/// ```
+///
+/// Refused: an XML declaration anywhere but `Start`, so it must be the first
+/// event and occur once; a second top-level element; text other than
+/// whitespace, CDATA and entity references outside the root; and the end of
+/// input before `Closed`.
+#[derive(Clone, Copy)]
+enum RootPhase {
+    /// Nothing has been read.
+    Start,
+    /// A declaration, a comment, a processing instruction or whitespace was
+    /// read; no root yet.
+    Prolog,
+    /// The root start tag was read; the root has this version.
+    Open(Version),
+    /// The root element is complete.
+    Closed(Version),
+}
+
+impl RootPhase {
+    /// A comment, a processing instruction or character data was read.
+    fn miscellaneous(self) -> Self {
+        match self {
+            Self::Start | Self::Prolog => Self::Prolog,
+            Self::Open(version) => Self::Open(version),
+            Self::Closed(version) => Self::Closed(version),
+        }
+    }
+}
+
 pub(super) fn validate_xml(xml: &[u8], family: Family, limits: &Limits) -> Result<Version> {
     if xml.len() > limits.xml_bytes {
         return Err(Error::Limit {
@@ -29,27 +70,24 @@ pub(super) fn validate_xml(xml: &[u8], family: Family, limits: &Limits) -> Resul
     reader.config_mut().check_comments = true;
     let mut depth = 0usize;
     let mut nodes = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
-    let mut declaration_seen = false;
-    let mut first_event = true;
-    let mut version = None;
+    let mut phase = RootPhase::Start;
 
     loop {
         let decoder = reader.decoder();
         let (namespace, event) = reader.read_resolved_event()?;
-        let was_first = first_event;
-        first_event = false;
         match event {
             Event::Decl(declaration) => {
                 count_node(&mut nodes, limits)?;
-                if !was_first || declaration_seen || root_seen {
-                    return Err(Error::Invalid(
-                        "Ribbon XML declaration must be the first event and occur once".into(),
-                    ));
+                match phase {
+                    RootPhase::Start => {},
+                    RootPhase::Prolog | RootPhase::Open(_) | RootPhase::Closed(_) => {
+                        return Err(Error::Invalid(
+                            "Ribbon XML declaration must be the first event and occur once".into(),
+                        ));
+                    },
                 }
                 validate_declaration(&declaration)?;
-                declaration_seen = true;
+                phase = RootPhase::Prolog;
             },
             Event::DocType(_) => {
                 return Err(Error::Invalid("DTD is forbidden in Ribbon XML".into()));
@@ -57,15 +95,19 @@ pub(super) fn validate_xml(xml: &[u8], family: Family, limits: &Limits) -> Resul
             Event::PI(instruction) => {
                 count_node(&mut nodes, limits)?;
                 validate_instruction(&reader, &instruction)?;
+                phase = phase.miscellaneous();
             },
             Event::Start(element) => {
                 count_node(&mut nodes, limits)?;
                 validate_qname(element.name().as_ref(), "element")?;
                 let root_version = if depth == 0 {
-                    if root_seen || root_closed {
-                        return Err(Error::Invalid(
-                            "Ribbon XML must contain exactly one root".into(),
-                        ));
+                    match phase {
+                        RootPhase::Start | RootPhase::Prolog => {},
+                        RootPhase::Open(_) | RootPhase::Closed(_) => {
+                            return Err(Error::Invalid(
+                                "Ribbon XML must contain exactly one root".into(),
+                            ));
+                        },
                     }
                     Some(validate_root(&namespace, &element, decoder, family)?)
                 } else {
@@ -74,8 +116,7 @@ pub(super) fn validate_xml(xml: &[u8], family: Family, limits: &Limits) -> Resul
                 };
                 validate_attributes(&reader, &element, decoder, &mut nodes, limits)?;
                 if let Some(root_version) = root_version {
-                    version = Some(root_version);
-                    root_seen = true;
+                    phase = RootPhase::Open(root_version);
                 }
                 depth = depth.checked_add(1).ok_or(Error::Limit {
                     kind: crate::LimitKind::Ribbon(LimitKind::XmlDepth),
@@ -106,10 +147,13 @@ pub(super) fn validate_xml(xml: &[u8], family: Family, limits: &Limits) -> Resul
                     });
                 }
                 let root_version = if depth == 0 {
-                    if root_seen || root_closed {
-                        return Err(Error::Invalid(
-                            "Ribbon XML must contain exactly one root".into(),
-                        ));
+                    match phase {
+                        RootPhase::Start | RootPhase::Prolog => {},
+                        RootPhase::Open(_) | RootPhase::Closed(_) => {
+                            return Err(Error::Invalid(
+                                "Ribbon XML must contain exactly one root".into(),
+                            ));
+                        },
                     }
                     Some(validate_root(&namespace, &element, decoder, family)?)
                 } else {
@@ -118,9 +162,7 @@ pub(super) fn validate_xml(xml: &[u8], family: Family, limits: &Limits) -> Resul
                 };
                 validate_attributes(&reader, &element, decoder, &mut nodes, limits)?;
                 if let Some(root_version) = root_version {
-                    version = Some(root_version);
-                    root_seen = true;
-                    root_closed = true;
+                    phase = RootPhase::Closed(root_version);
                 }
             },
             Event::End(_) => {
@@ -128,8 +170,12 @@ pub(super) fn validate_xml(xml: &[u8], family: Family, limits: &Limits) -> Resul
                 depth = depth.checked_sub(1).ok_or_else(|| {
                     Error::Invalid("Ribbon XML has an unexpected end element".into())
                 })?;
-                if depth == 0 {
-                    root_closed = true;
+                match phase {
+                    RootPhase::Open(version) if depth == 0 => phase = RootPhase::Closed(version),
+                    RootPhase::Start
+                    | RootPhase::Prolog
+                    | RootPhase::Open(_)
+                    | RootPhase::Closed(_) => {},
                 }
             },
             Event::Text(text) => {
@@ -143,6 +189,7 @@ pub(super) fn validate_xml(xml: &[u8], family: Family, limits: &Limits) -> Resul
                         "Ribbon XML contains text outside its root".into(),
                     ));
                 }
+                phase = phase.miscellaneous();
             },
             Event::CData(text) => {
                 count_node(&mut nodes, limits)?;
@@ -171,17 +218,20 @@ pub(super) fn validate_xml(xml: &[u8], family: Family, limits: &Limits) -> Resul
                     .decode()
                     .map_err(|error| Error::Xml(format!("invalid Ribbon comment: {error}")))?;
                 validate_xml_chars(&value)?;
+                phase = phase.miscellaneous();
             },
             Event::Eof => break,
         }
     }
 
-    if !root_seen || !root_closed || depth != 0 {
-        return Err(Error::Invalid(
+    // A top-level element after the root is refused above, so the depth is
+    // zero whenever the root is closed.
+    match phase {
+        RootPhase::Closed(version) => Ok(version),
+        RootPhase::Start | RootPhase::Prolog | RootPhase::Open(_) => Err(Error::Invalid(
             "Ribbon XML must contain one complete customUI root".into(),
-        ));
+        )),
     }
-    version.ok_or_else(|| Error::Invalid("Ribbon XML has no customUI root".into()))
 }
 
 fn validate_attributes(

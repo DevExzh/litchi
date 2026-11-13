@@ -1242,6 +1242,34 @@ fn content_types_xml_working_memory_bound(
         .map_err(|_| overlay_unavailable("content-types raw restoration memory bound exceeds u64"))
 }
 
+/// Where the relationship source reader is relative to the `Relationships`
+/// root element. Nesting inside the root is not part of it: the depth
+/// counter holds that.
+///
+/// ```text
+/// Prolog --XML declaration, as the first event only--> Prolog
+/// Prolog --comment, PI or whitespace-----------------> Prolog
+/// Prolog --root start tag----------------------------> Open
+/// Prolog --root empty-element tag--------------------> Closed
+/// Open   --nested content----------------------------> Open
+/// Open   --root end tag------------------------------> Closed
+/// Closed --comment, PI or whitespace-----------------> Closed
+/// ```
+///
+/// Refused: an XML declaration that is not the first event; any element
+/// after the root ("content appears after the Relationships root"); text
+/// other than whitespace, CDATA, references and a DTD anywhere; and the end
+/// of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RelationshipsRootPhase {
+    /// No root tag has been read.
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open,
+    /// The root element is complete.
+    Closed,
+}
+
 fn parse_noncanonical_relationship_source<F>(
     bytes: &[u8],
     member_name: &str,
@@ -1276,9 +1304,7 @@ where
     // refused by our policy check before that counter can wrap.
     let xml_depth_limit = limits.max_depth().min(QUICK_XML_MAX_SAFE_DEPTH);
     let mut depth = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
-    let mut declaration_seen = false;
+    let mut phase = RelationshipsRootPhase::Prolog;
     let mut relationship_ids = HashSet::new();
     relationship_ids
         .try_reserve(expected.len())
@@ -1354,14 +1380,14 @@ where
         }
         match event {
             Event::Start(element) => {
-                if root_closed {
+                if phase == RelationshipsRootPhase::Closed {
                     return Err(relationship_manifest_append_error(
                         member_name,
                         "content appears after the Relationships root",
                     ));
                 }
                 if depth == 0 {
-                    if root_seen {
+                    if phase == RelationshipsRootPhase::Open {
                         return Err(relationship_manifest_append_error(
                             member_name,
                             "multiple root elements are not supported",
@@ -1407,7 +1433,7 @@ where
                             })?;
                         root_prefix.extend_from_slice(&name[..=colon]);
                     }
-                    root_seen = true;
+                    phase = RelationshipsRootPhase::Open;
                     depth = 1;
                     limits.check(SourceLimitKind::Depth, depth as u64, xml_depth_limit as u64)?;
                 } else if depth == 1 {
@@ -1441,14 +1467,14 @@ where
                 }
             },
             Event::Empty(element) => {
-                if root_closed {
+                if phase == RelationshipsRootPhase::Closed {
                     return Err(relationship_manifest_append_error(
                         member_name,
                         "content appears after the Relationships root",
                     ));
                 }
                 if depth == 0 {
-                    if root_seen {
+                    if phase == RelationshipsRootPhase::Open {
                         return Err(relationship_manifest_append_error(
                             member_name,
                             "multiple root elements are not supported",
@@ -1513,8 +1539,7 @@ where
                     })?;
                     root_close_start = Some(slash);
                     root_empty_end = Some(event_end);
-                    root_seen = true;
-                    root_closed = true;
+                    phase = RelationshipsRootPhase::Closed;
                     continue;
                 }
                 if depth != 1 {
@@ -1604,7 +1629,7 @@ where
                             ));
                         }
                         root_close_start = Some(event_start);
-                        root_closed = true;
+                        phase = RelationshipsRootPhase::Closed;
                         depth = 0;
                     },
                     _ => {
@@ -1648,14 +1673,15 @@ where
                 validate_relationship_pi(&instruction, decoder, member_name)?;
             },
             Event::Decl(declaration) => {
-                if root_seen || declaration_seen || events != 1 {
+                // Only the first event can be the declaration, so it comes
+                // before the root and at most once.
+                if events != 1 {
                     return Err(relationship_manifest_append_error(
                         member_name,
                         "the XML declaration is out of place",
                     ));
                 }
                 crate::xml_splice::validate_source_declaration(&declaration, member_name)?;
-                declaration_seen = true;
             },
             Event::DocType(_) => {
                 return Err(relationship_manifest_append_error(
@@ -1669,14 +1695,16 @@ where
                     "unsupported XML content is not safe to append",
                 ));
             },
-            Event::Eof => {
-                if !root_seen || !root_closed || depth != 0 || open_relationship.is_some() {
+            // Every element after the root is refused above, so once the
+            // root is closed the depth is zero and no Relationship is open.
+            Event::Eof => match phase {
+                RelationshipsRootPhase::Closed => break,
+                RelationshipsRootPhase::Prolog | RelationshipsRootPhase::Open => {
                     return Err(relationship_manifest_append_error(
                         member_name,
                         "missing or unclosed Relationships root",
                     ));
-                }
-                break;
+                },
             },
         }
     }
@@ -15531,6 +15559,34 @@ fn relationships_semantically_equal(left: &Relationships, right: &Relationships)
     })
 }
 
+/// Where the raw content-types reader is relative to the `Types` root
+/// element. Nesting inside the root is not part of it: the depth counter
+/// holds that.
+///
+/// ```text
+/// Prolog --XML declaration, as the first event only--> Prolog
+/// Prolog --comment, PI or whitespace-----------------> Prolog
+/// Prolog --root start tag----------------------------> Open
+/// Prolog --root empty-element tag--------------------> Closed
+/// Open   --nested content----------------------------> Open
+/// Open   --root end tag------------------------------> Closed
+/// Closed --comment, PI or whitespace-----------------> Closed
+/// ```
+///
+/// Refused: an XML declaration that is not the first event; any element
+/// after the root ("content appears after the Types root"); text other than
+/// whitespace, CDATA, references and a DTD anywhere; and the end of input
+/// before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TypesRootPhase {
+    /// No root tag has been read.
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open,
+    /// The root element is complete.
+    Closed,
+}
+
 fn parse_strict_raw_content_types_xml(
     bytes: &[u8],
     limits: SourceLimits,
@@ -15541,9 +15597,7 @@ fn parse_strict_raw_content_types_xml(
     reader.config_mut().check_end_names = true;
     reader.config_mut().check_comments = true;
     let mut depth = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
-    let mut declaration_seen = false;
+    let mut phase = TypesRootPhase::Prolog;
     let mut mappings = HashSet::new();
     mappings
         .try_reserve(map.mapping_count())
@@ -15565,13 +15619,13 @@ fn parse_strict_raw_content_types_xml(
         let (resolved_namespace, event) = reader.read_resolved_event()?;
         match event {
             Event::Start(element) => {
-                if root_closed {
+                if phase == TypesRootPhase::Closed {
                     return Err(OpcError::InvalidContentTypesManifest(
                         "content appears after the Types root".to_owned(),
                     ));
                 }
                 if depth == 0 {
-                    if root_seen
+                    if phase == TypesRootPhase::Open
                         || element.local_name().as_ref() != b"Types"
                         || !matches!(
                             resolved_namespace,
@@ -15585,7 +15639,7 @@ fn parse_strict_raw_content_types_xml(
                         ));
                     }
                     reject_unknown_content_types_root_attributes(&element, decoder)?;
-                    root_seen = true;
+                    phase = TypesRootPhase::Open;
                 } else if depth == 1 {
                     if !matches!(
                         resolved_namespace,
@@ -15618,13 +15672,13 @@ fn parse_strict_raw_content_types_xml(
                 )?;
             },
             Event::Empty(element) => {
-                if root_closed {
+                if phase == TypesRootPhase::Closed {
                     return Err(OpcError::InvalidContentTypesManifest(
                         "content appears after the Types root".to_owned(),
                     ));
                 }
                 if depth == 0 {
-                    if root_seen
+                    if phase == TypesRootPhase::Open
                         || element.local_name().as_ref() != b"Types"
                         || !matches!(
                             resolved_namespace,
@@ -15638,8 +15692,7 @@ fn parse_strict_raw_content_types_xml(
                         ));
                     }
                     reject_unknown_content_types_root_attributes(&element, decoder)?;
-                    root_seen = true;
-                    root_closed = true;
+                    phase = TypesRootPhase::Closed;
                 } else if depth == 1 {
                     if !matches!(
                         resolved_namespace,
@@ -15675,7 +15728,7 @@ fn parse_strict_raw_content_types_xml(
                             "content-types root closing element is not Types".to_owned(),
                         ));
                     }
-                    root_closed = true;
+                    phase = TypesRootPhase::Closed;
                 } else if depth == 1
                     && !matches!(element.local_name().as_ref(), b"Default" | b"Override")
                 {
@@ -15707,7 +15760,9 @@ fn parse_strict_raw_content_types_xml(
                 ));
             },
             Event::Decl(declaration) => {
-                if root_seen || declaration_seen || events != 1 {
+                // Only the first event can be the declaration, so it comes
+                // before the root and at most once.
+                if events != 1 {
                     return Err(OpcError::InvalidContentTypesManifest(
                         "the XML declaration is out of place in content-types metadata".to_owned(),
                     ));
@@ -15716,18 +15771,19 @@ fn parse_strict_raw_content_types_xml(
                     &declaration,
                     "[Content_Types].xml",
                 )?;
-                declaration_seen = true;
             },
             Event::Eof => break,
             Event::Comment(_) | Event::PI(_) => {},
         }
     }
-    if !root_seen || !root_closed || depth != 0 {
-        return Err(OpcError::InvalidContentTypesManifest(
-            "missing or unclosed Types root".to_owned(),
-        ));
+    // Every element after the root is refused above, so the depth is zero
+    // whenever the root is closed.
+    match phase {
+        TypesRootPhase::Closed => Ok(map),
+        TypesRootPhase::Prolog | TypesRootPhase::Open => Err(
+            OpcError::InvalidContentTypesManifest("missing or unclosed Types root".to_owned()),
+        ),
     }
-    Ok(map)
 }
 
 fn validate_raw_content_types_candidate(

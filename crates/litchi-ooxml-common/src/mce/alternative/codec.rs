@@ -15,6 +15,32 @@ use super::model::{Alternatives, Kind, Limits, Span, Stored};
 use crate::xml::attributes::BytesStartExt as _;
 use crate::{xml::decode_xml_reference, xml_name};
 
+/// Where the scanner is relative to the `AlternateContent` root element.
+/// Nesting inside the root is not part of it: the frame stack holds that, and
+/// the root is open exactly while that stack is non-empty.
+///
+/// ```text
+/// Prolog --comment or whitespace-------------------> Prolog
+/// Prolog --root start tag--------------------------> Open
+/// Open   --nested content--------------------------> Open
+/// Open   --root end tag, after at least one branch-> Closed
+/// Closed --comment or whitespace-------------------> Closed
+/// ```
+///
+/// Refused: an XML declaration or a processing instruction anywhere, because
+/// the input is a fragment; an empty-element root; a second top-level element;
+/// text other than whitespace, CDATA and entity references outside a branch;
+/// and the end of input before `Closed`.
+#[derive(Clone, Copy)]
+enum RootPhase {
+    /// No root start tag has been read.
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open,
+    /// The root element is complete.
+    Closed,
+}
+
 /// Read and validate one self-contained `mc:AlternateContent` element.
 ///
 /// The returned snapshot retains the input bytes exactly. Namespace
@@ -35,8 +61,7 @@ pub fn read(xml: &[u8], limits: &Limits) -> Result<Alternatives, Error> {
     reader.config_mut().trim_text(false);
     let mut frames = Vec::new();
     let mut branches = Vec::new();
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut nodes = 0usize;
 
     loop {
@@ -64,12 +89,15 @@ pub fn read(xml: &[u8], limits: &Limits) -> Result<Alternatives, Error> {
                 }
 
                 if frames.is_empty() {
-                    if root_seen || root_closed {
-                        return Err(invalid("AlternateContent must have one root element"));
+                    match phase {
+                        RootPhase::Prolog => {},
+                        RootPhase::Open | RootPhase::Closed => {
+                            return Err(invalid("AlternateContent must have one root element"));
+                        },
                     }
                     require_name(&namespace, element.name(), b"AlternateContent")?;
                     validate_attributes(&reader, &element, AttributePolicy::Root)?;
-                    root_seen = true;
+                    phase = RootPhase::Open;
                     frames.push(Frame::Root);
                 } else if matches!(frames.last(), Some(Frame::Root)) {
                     let (kind, requirements) = parse_branch(&reader, &element, &namespace)?;
@@ -99,8 +127,11 @@ pub fn read(xml: &[u8], limits: &Limits) -> Result<Alternatives, Error> {
                 }
 
                 if frames.is_empty() {
-                    if root_seen || root_closed {
-                        return Err(invalid("AlternateContent must have one root element"));
+                    match phase {
+                        RootPhase::Prolog => {},
+                        RootPhase::Open | RootPhase::Closed => {
+                            return Err(invalid("AlternateContent must have one root element"));
+                        },
                     }
                     require_name(&namespace, element.name(), b"AlternateContent")?;
                     validate_attributes(&reader, &element, AttributePolicy::Root)?;
@@ -129,7 +160,7 @@ pub fn read(xml: &[u8], limits: &Limits) -> Result<Alternatives, Error> {
                         if branches.is_empty() {
                             return Err(invalid("AlternateContent requires a Choice"));
                         }
-                        root_closed = true;
+                        phase = RootPhase::Closed;
                     },
                     Frame::Branch(mut open) => {
                         open.span.content_end = start;
@@ -185,8 +216,13 @@ pub fn read(xml: &[u8], limits: &Limits) -> Result<Alternatives, Error> {
         }
     }
 
-    if !root_seen || !root_closed || !frames.is_empty() {
-        return Err(invalid("unterminated AlternateContent fragment"));
+    // A top-level element after the root is refused above, so no element is
+    // open once the root is closed.
+    match phase {
+        RootPhase::Closed => {},
+        RootPhase::Prolog | RootPhase::Open => {
+            return Err(invalid("unterminated AlternateContent fragment"));
+        },
     }
 
     Ok(Alternatives {

@@ -1614,6 +1614,35 @@ pub fn valid_guid(value: &str) -> bool {
     }) && parts.next().is_none()
 }
 
+/// Where the payload validator is relative to the document element. Nesting
+/// inside that element is not part of it: the depth counter holds that.
+///
+/// ```text
+/// Start          --XML declaration----------------> Prolog
+/// Start | Prolog --comment, PI or whitespace------> Prolog
+/// Start | Prolog --root start tag-----------------> Open
+/// Start | Prolog --root empty-element tag---------> Closed
+/// Open           --nested content-----------------> Open
+/// Open           --root end tag-------------------> Closed
+/// Closed         --comment, PI or whitespace------> Closed
+/// ```
+///
+/// Refused: an XML declaration anywhere but `Start` ("late XML declaration");
+/// a second top-level element ("multiple roots"); text other than whitespace,
+/// CDATA and references outside the root; and the end of input before
+/// `Closed`.
+enum PayloadPhase {
+    /// Nothing has been read.
+    Start,
+    /// A declaration, a comment, a processing instruction or whitespace was
+    /// read; no root yet.
+    Prolog,
+    /// The root start tag was read; the root has this expanded name.
+    Open(Name),
+    /// The root element is complete.
+    Closed(Name),
+}
+
 /// Validate a bounded XML payload and return its expanded document-element name.
 /// # Errors
 ///
@@ -1629,18 +1658,19 @@ pub fn validate_payload(xml: &[u8], source_limits: &SourceLimits) -> Result<Name
     reader.config_mut().check_comments = true;
     let mut buffer = Vec::new();
     let mut depth = 0usize;
-    let mut root = None;
-    let mut closed_root = false;
+    let mut phase = PayloadPhase::Start;
     let mut elements = 0usize;
     let mut version = XmlVersion::Implicit1_0;
-    let mut event_seen = false;
 
     loop {
         let event = reader.read_event_into(&mut buffer)?;
         match event {
             Event::Decl(declaration) => {
-                if event_seen {
-                    return invalid("custom XML payload has a late XML declaration");
+                match phase {
+                    PayloadPhase::Start => {},
+                    PayloadPhase::Prolog | PayloadPhase::Open(_) | PayloadPhase::Closed(_) => {
+                        return invalid("custom XML payload has a late XML declaration");
+                    },
                 }
                 version = validate_declaration(&declaration)?;
             },
@@ -1655,11 +1685,14 @@ pub fn validate_payload(xml: &[u8], source_limits: &SourceLimits) -> Result<Name
                 require_nested_depth(depth, max_depth)?;
                 elements = bump_elements(elements, max_elements)?;
                 let name = inspect_element(&reader, &element, version, depth == 0)?;
-                if depth == 0 {
-                    if closed_root || root.is_some() {
-                        return invalid("custom XML payload has multiple roots");
-                    }
-                    root = name;
+                // The name is captured for a top-level element only.
+                if let Some(name) = name {
+                    phase = match phase {
+                        PayloadPhase::Start | PayloadPhase::Prolog => PayloadPhase::Open(name),
+                        PayloadPhase::Open(_) | PayloadPhase::Closed(_) => {
+                            return invalid("custom XML payload has multiple roots");
+                        },
+                    };
                 }
                 depth = depth
                     .checked_add(1)
@@ -1676,12 +1709,14 @@ pub fn validate_payload(xml: &[u8], source_limits: &SourceLimits) -> Result<Name
                 require_nested_depth(depth, max_depth)?;
                 elements = bump_elements(elements, max_elements)?;
                 let name = inspect_element(&reader, &element, version, depth == 0)?;
-                if depth == 0 {
-                    if closed_root || root.is_some() {
-                        return invalid("custom XML payload has multiple roots");
-                    }
-                    root = name;
-                    closed_root = true;
+                // The name is captured for a top-level element only.
+                if let Some(name) = name {
+                    phase = match phase {
+                        PayloadPhase::Start | PayloadPhase::Prolog => PayloadPhase::Closed(name),
+                        PayloadPhase::Open(_) | PayloadPhase::Closed(_) => {
+                            return invalid("custom XML payload has multiple roots");
+                        },
+                    };
                 }
             },
             Event::End(_) => {
@@ -1689,7 +1724,13 @@ pub fn validate_payload(xml: &[u8], source_limits: &SourceLimits) -> Result<Name
                     Error::Invalid("custom XML payload has an unexpected end tag".into())
                 })?;
                 if depth == 0 {
-                    closed_root = true;
+                    phase = match phase {
+                        PayloadPhase::Open(name) | PayloadPhase::Closed(name) => {
+                            PayloadPhase::Closed(name)
+                        },
+                        PayloadPhase::Start => PayloadPhase::Start,
+                        PayloadPhase::Prolog => PayloadPhase::Prolog,
+                    };
                 }
             },
             Event::DocType(_) => return invalid("DTD is forbidden in custom XML payloads"),
@@ -1727,13 +1768,21 @@ pub fn validate_payload(xml: &[u8], source_limits: &SourceLimits) -> Result<Name
             Event::PI(instruction) => validate_instruction(&reader, &instruction)?,
             Event::Eof => break,
         }
-        event_seen = true;
+        // Whatever was read, a declaration can no longer be the first event.
+        match phase {
+            PayloadPhase::Start => phase = PayloadPhase::Prolog,
+            PayloadPhase::Prolog | PayloadPhase::Open(_) | PayloadPhase::Closed(_) => {},
+        }
         buffer.clear();
     }
-    if depth != 0 || !closed_root {
-        return invalid("custom XML payload has no complete root element");
+    // A top-level element after the root is refused above, so the depth is
+    // zero whenever the root is closed.
+    match phase {
+        PayloadPhase::Closed(name) => Ok(name),
+        PayloadPhase::Start | PayloadPhase::Prolog | PayloadPhase::Open(_) => {
+            invalid("custom XML payload has no complete root element")
+        },
     }
-    root.ok_or_else(|| Error::Invalid("custom XML payload has no root".into()))
 }
 
 fn max_payload_bytes(source_limits: &SourceLimits) -> usize {
@@ -1885,6 +1934,32 @@ fn resolved_namespace<'a>(result: ResolveResult<'a>, kind: &str) -> Result<&'a [
     }
 }
 
+/// Where the properties reader is relative to the `datastoreItem` root.
+/// Admitting the root is not part of it: `props_start` does that, and keeps
+/// the root namespace, so the time before the root and the time inside it
+/// are one state here.
+///
+/// ```text
+/// Start            --any event----------------------------> Unclosed
+/// Start | Unclosed --root empty-element tag---------------> Closed
+/// Unclosed         --comment, whitespace, nested content--> Unclosed
+/// Unclosed         --root end tag-------------------------> Closed
+/// Closed           --comment or whitespace----------------> Closed
+/// ```
+///
+/// Refused: an XML declaration anywhere but `Start` ("late XML
+/// declaration"), and the end of input before `Closed`. A second top-level
+/// element is refused by `props_start`.
+#[derive(Clone, Copy)]
+enum PropsPhase {
+    /// Nothing has been read.
+    Start,
+    /// Something was read and the root element is not complete.
+    Unclosed,
+    /// The root element is complete.
+    Closed,
+}
+
 fn parse_props_xml(xml: &[u8], max_depth: usize, source_limits: &SourceLimits) -> Result<Props> {
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
@@ -1895,9 +1970,8 @@ fn parse_props_xml(xml: &[u8], max_depth: usize, source_limits: &SourceLimits) -
     let mut schemas = Vec::new();
     let mut root_namespace = None;
     let mut seen_schemas = false;
-    let mut closed_root = false;
+    let mut phase = PropsPhase::Start;
     let mut version = XmlVersion::Implicit1_0;
-    let mut event_seen = false;
     let mut events = 0usize;
 
     loop {
@@ -1916,8 +1990,11 @@ fn parse_props_xml(xml: &[u8], max_depth: usize, source_limits: &SourceLimits) -
         }
         match event {
             Event::Decl(declaration) => {
-                if event_seen {
-                    return invalid("custom XML properties have a late XML declaration");
+                match phase {
+                    PropsPhase::Start => {},
+                    PropsPhase::Unclosed | PropsPhase::Closed => {
+                        return invalid("custom XML properties have a late XML declaration");
+                    },
                 }
                 version = validate_declaration(&declaration)?;
             },
@@ -1960,7 +2037,7 @@ fn parse_props_xml(xml: &[u8], max_depth: usize, source_limits: &SourceLimits) -
                     &mut seen_schemas,
                 )?;
                 if contexts.is_empty() {
-                    closed_root = true;
+                    phase = PropsPhase::Closed;
                 }
             },
             Event::End(_) => {
@@ -1968,7 +2045,7 @@ fn parse_props_xml(xml: &[u8], max_depth: usize, source_limits: &SourceLimits) -
                     return invalid("unexpected custom XML properties end tag");
                 }
                 if contexts.is_empty() {
-                    closed_root = true;
+                    phase = PropsPhase::Closed;
                 }
             },
             Event::DocType(_) => return invalid("DTD is forbidden in custom XML properties"),
@@ -2019,11 +2096,20 @@ fn parse_props_xml(xml: &[u8], max_depth: usize, source_limits: &SourceLimits) -
             Event::PI(_) => {},
             Event::Eof => break,
         }
-        event_seen = true;
+        // Whatever was read, a declaration can no longer be the first event.
+        match phase {
+            PropsPhase::Start => phase = PropsPhase::Unclosed,
+            PropsPhase::Unclosed | PropsPhase::Closed => {},
+        }
         buffer.clear();
     }
-    if !closed_root || !contexts.is_empty() {
-        return invalid("custom XML properties root is incomplete");
+    // `props_start` refuses a top-level element after the root, so no element
+    // is open once the root is closed.
+    match phase {
+        PropsPhase::Closed => {},
+        PropsPhase::Start | PropsPhase::Unclosed => {
+            return invalid("custom XML properties root is incomplete");
+        },
     }
     let props = Props {
         id: id.ok_or_else(|| Error::Invalid("datastoreItem requires ds:itemID".into()))?,
