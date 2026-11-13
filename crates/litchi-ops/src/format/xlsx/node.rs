@@ -316,6 +316,7 @@ impl SheetHandle {
         })
     }
 
+    #[cfg(feature = "eval")]
     pub(super) fn name(&self) -> &str {
         match self {
             Self::Eager { sheet, .. } => sheet.name(),
