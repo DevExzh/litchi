@@ -11,6 +11,24 @@
 - **Briefly describe changes in commit messages.** Do not create verification
   documents or append implementation/test narratives to feature matrices.
 
+## No internal record numbers
+
+Code, strings, comments and documents must make sense without any record
+outside the repository.
+
+- **Never write an internal record, change, milestone or wave number** in a
+  comment, a doc comment, a string literal (error messages, suggestions, CLI
+  help, lint and `allow` reasons, panic and assertion messages), a tool
+  message or a Markdown file. This covers forms such as `record 0351`,
+  `change-0416`, `0362ye`, `M1 R4a`, `wave 3` and `owner decision 2`.
+- **Say the reason, not where it was decided.** A comment states the fact or
+  the constraint itself; an error message tells the user what is wrong and
+  what to do.
+- **Do not name new identifiers, files or fixtures after a record number.**
+- Still allowed: file-format record numbers (`BIFF record 0x0809`),
+  specification citations (`[MS-XLS] 2.4.21`, `ECMA-376 §17.3`), ADR numbers
+  under `docs/adr/`, and upstream issue ids.
+
 ## Repository size restrictions
 
 GitHub blocks any file larger than 100 MiB, warns above 50 MiB, and rejects
