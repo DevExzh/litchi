@@ -6,6 +6,32 @@ use quick_xml::events::Event;
 const MAX_CONTENT_BYTES: usize = 256 * 1024 * 1024;
 const MAX_CONTENT_DEPTH: usize = 4096;
 
+/// Where the validator stands relative to the `office:document-content` root.
+///
+/// ```text
+/// Start  --XML declaration--> Prolog
+/// Start  --whitespace text, comment, PI--> Prolog
+/// Prolog --whitespace text, comment, PI--> Prolog
+/// Start | Prolog --`office:document-content` start tag--> Open
+/// Start | Prolog --any other start tag--> refused (wrong root)
+/// Start | Prolog | Closed --empty-element tag--> refused (invalid empty root)
+/// Open   --end tag that returns to depth zero--> Closed
+/// Closed --whitespace text, comment, PI--> Closed (accepted)
+/// Closed --start tag--> refused (content after the root)
+/// Prolog | Open | Closed --XML declaration--> refused (only the first event may be one)
+/// Start | Prolog | Closed --other text, CDATA, entity reference--> refused
+/// Start | Prolog | Open | Closed --DOCTYPE--> refused
+/// Closed --finish--> accepted when the expected body was seen
+/// Start | Prolog | Open --finish--> refused (no complete expected body)
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ContentPhase {
+    Start,
+    Prolog,
+    Open,
+    Closed,
+}
+
 /// Streaming validator for an ODF document root, body, and family element.
 ///
 /// The caller supplies the resolved-office-namespace result for each
@@ -17,12 +43,10 @@ pub struct ContentDocumentValidator {
     family_name: String,
     expected_local: String,
     depth: usize,
-    root_closed: bool,
+    phase: ContentPhase,
     body_seen: bool,
     expected_seen: bool,
     in_body: bool,
-    declaration_seen: bool,
-    first_event: bool,
 }
 
 impl ContentDocumentValidator {
@@ -66,12 +90,10 @@ impl ContentDocumentValidator {
             family_name: family_name.to_owned(),
             expected_local: expected_local.to_owned(),
             depth: 0,
-            root_closed: false,
+            phase: ContentPhase::Start,
             body_seen: false,
             expected_seen: false,
             in_body: false,
-            declaration_seen: false,
-            first_event: true,
         })
     }
 
@@ -94,7 +116,7 @@ impl ContentDocumentValidator {
         let family_name = &self.family_name;
         match event {
             Event::Start(element) => {
-                if self.root_closed {
+                if self.phase == ContentPhase::Closed {
                     return Err(Error::InvalidFormat(format!(
                         "{family_name} content.xml has content after its root"
                     )));
@@ -106,7 +128,10 @@ impl ContentDocumentValidator {
                 }
                 let local = element.local_name();
                 match self.depth {
-                    0 if office && local.as_ref() == b"document-content" => self.depth = 1,
+                    0 if office && local.as_ref() == b"document-content" => {
+                        self.depth = 1;
+                        self.phase = ContentPhase::Open;
+                    },
                     0 => {
                         return Err(Error::InvalidFormat(format!(
                             "{family_name} content.xml has the wrong root"
@@ -159,10 +184,13 @@ impl ContentDocumentValidator {
                 }
             },
             Event::Empty(element) => {
-                if self.root_closed || self.depth == 0 {
-                    return Err(Error::InvalidFormat(format!(
-                        "{family_name} content.xml has an invalid empty root"
-                    )));
+                match self.phase {
+                    ContentPhase::Start | ContentPhase::Prolog | ContentPhase::Closed => {
+                        return Err(Error::InvalidFormat(format!(
+                            "{family_name} content.xml has an invalid empty root"
+                        )));
+                    },
+                    ContentPhase::Open => {},
                 }
                 let local = element.local_name();
                 if self.depth == 1 {
@@ -198,21 +226,19 @@ impl ContentDocumentValidator {
                     Error::InvalidFormat(format!("{family_name} content.xml has an unexpected end"))
                 })?;
                 if self.depth == 0 {
-                    self.root_closed = true;
+                    self.phase = ContentPhase::Closed;
                 } else if self.in_body && self.depth == 1 {
                     self.in_body = false;
                 }
             },
             Event::Text(text) => {
-                if (self.depth == 0 || self.root_closed)
-                    && !text.iter().all(u8::is_ascii_whitespace)
-                {
+                if self.phase != ContentPhase::Open && !text.iter().all(u8::is_ascii_whitespace) {
                     return Err(Error::InvalidFormat(format!(
                         "{family_name} content.xml has unexpected text outside its root"
                     )));
                 }
             },
-            Event::CData(_) | Event::GeneralRef(_) if self.depth == 0 || self.root_closed => {
+            Event::CData(_) | Event::GeneralRef(_) if self.phase != ContentPhase::Open => {
                 return Err(Error::InvalidFormat(format!(
                     "{family_name} content.xml has content outside its root"
                 )));
@@ -227,27 +253,32 @@ impl ContentDocumentValidator {
                     "{family_name} content.xml has an invalid character or entity reference"
                 )));
             },
-            Event::Decl(_)
-                if self.declaration_seen
-                    || !self.first_event
-                    || self.depth != 0
-                    || self.root_closed =>
-            {
-                return Err(Error::InvalidFormat(format!(
-                    "{family_name} content.xml has an XML declaration outside its prologue"
-                )));
+            Event::Decl(_) => match self.phase {
+                // Accepted only as the very first event; the step to `Prolog`
+                // is taken below with every other first event.
+                ContentPhase::Start => {},
+                ContentPhase::Prolog | ContentPhase::Open | ContentPhase::Closed => {
+                    return Err(Error::InvalidFormat(format!(
+                        "{family_name} content.xml has an XML declaration outside its prologue"
+                    )));
+                },
             },
-            Event::Decl(_) => self.declaration_seen = true,
             Event::Eof => {},
             Event::Comment(_) | Event::PI(_) | Event::CData(_) | Event::GeneralRef(_) => {},
         }
-        self.first_event = false;
+        if self.phase == ContentPhase::Start {
+            self.phase = ContentPhase::Prolog;
+        }
         Ok(())
     }
 
     /// Finish validation after the reader has delivered `Event::Eof`.
     pub fn finish(self) -> Result<()> {
-        if !self.root_closed || self.depth != 0 || !self.body_seen || !self.expected_seen {
+        let root_complete = match self.phase {
+            ContentPhase::Start | ContentPhase::Prolog | ContentPhase::Open => false,
+            ContentPhase::Closed => true,
+        };
+        if !root_complete || !self.body_seen || !self.expected_seen {
             return Err(Error::InvalidFormat(format!(
                 "{} content.xml has no complete expected body",
                 self.family_name

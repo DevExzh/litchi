@@ -362,6 +362,28 @@ impl Image {
     }
 }
 
+/// Where the SVG check stands relative to the single `svg` root element.
+///
+/// ```text
+/// Prolog --`svg` start tag in the SVG namespace--> Open { depth: 1 }
+/// Prolog --`svg` empty-element tag in the SVG namespace--> Closed
+/// Prolog --any other start or empty-element tag, or an end tag--> refused
+/// Open   --start tag--> Open, one level deeper (refused past the depth bound)
+/// Open   --empty-element tag, text, CDATA--> unchanged (accepted)
+/// Open   --end tag--> Open, one level up, or Closed when the root ends
+/// Closed --start, empty-element or end tag--> refused
+/// Prolog | Closed --text left after the reader's trimming, or non-empty CDATA--> refused
+/// Prolog | Open | Closed --declaration, DOCTYPE, comment, PI, entity reference--> unchanged
+/// Closed --end of input--> accepted
+/// Prolog | Open --end of input--> refused
+/// ```
+#[derive(Clone, Copy)]
+enum SvgRootPhase {
+    Prolog,
+    Open { depth: usize },
+    Closed,
+}
+
 fn validate_svg(data: &[u8]) -> bool {
     use quick_xml::events::Event;
     use quick_xml::name::{Namespace, ResolveResult};
@@ -370,59 +392,86 @@ fn validate_svg(data: &[u8]) -> bool {
     const SVG_NAMESPACE: Namespace<'_> = Namespace(b"http://www.w3.org/2000/svg");
     let mut reader = NsReader::from_reader(data);
     reader.config_mut().trim_text(true);
-    let mut saw_svg_root = false;
-    let mut root_closed = false;
-    let mut depth = 0usize;
+    let mut phase = SvgRootPhase::Prolog;
     loop {
         let (namespace, event) = match reader.read_resolved_event() {
             Ok(value) => value,
             Err(_) => return false,
         };
         match event {
-            Event::Start(element) if !saw_svg_root => {
-                if element.local_name().as_ref() != b"svg"
-                    || namespace != ResolveResult::Bound(SVG_NAMESPACE)
-                {
-                    return false;
-                }
-                saw_svg_root = true;
-                depth = 1;
+            Event::Start(element) => match phase {
+                SvgRootPhase::Prolog => {
+                    if element.local_name().as_ref() != b"svg"
+                        || namespace != ResolveResult::Bound(SVG_NAMESPACE)
+                    {
+                        return false;
+                    }
+                    phase = SvgRootPhase::Open { depth: 1 };
+                },
+                SvgRootPhase::Open { depth } => {
+                    let Some(next_depth) = depth.checked_add(1) else {
+                        return false;
+                    };
+                    if next_depth > MAX_SVG_XML_DEPTH {
+                        return false;
+                    }
+                    phase = SvgRootPhase::Open { depth: next_depth };
+                },
+                SvgRootPhase::Closed => return false,
             },
-            Event::Empty(element) if !saw_svg_root => {
-                if element.local_name().as_ref() != b"svg"
-                    || namespace != ResolveResult::Bound(SVG_NAMESPACE)
-                {
-                    return false;
-                }
-                saw_svg_root = true;
-                root_closed = true;
+            Event::Empty(element) => match phase {
+                SvgRootPhase::Prolog => {
+                    if element.local_name().as_ref() != b"svg"
+                        || namespace != ResolveResult::Bound(SVG_NAMESPACE)
+                    {
+                        return false;
+                    }
+                    phase = SvgRootPhase::Closed;
+                },
+                SvgRootPhase::Open { .. } => {},
+                SvgRootPhase::Closed => return false,
             },
-            Event::Start(_) if saw_svg_root && !root_closed => {
-                let Some(next_depth) = depth.checked_add(1) else {
-                    return false;
+            Event::End(_) => match phase {
+                SvgRootPhase::Prolog | SvgRootPhase::Closed => return false,
+                SvgRootPhase::Open { depth } => {
+                    let Some(next_depth) = depth.checked_sub(1) else {
+                        return false;
+                    };
+                    phase = if next_depth == 0 {
+                        SvgRootPhase::Closed
+                    } else {
+                        SvgRootPhase::Open { depth: next_depth }
+                    };
+                },
+            },
+            Event::Text(text) => match phase {
+                SvgRootPhase::Prolog | SvgRootPhase::Closed => {
+                    if !text.is_empty() {
+                        return false;
+                    }
+                },
+                SvgRootPhase::Open { .. } => {},
+            },
+            Event::CData(text) => match phase {
+                SvgRootPhase::Prolog | SvgRootPhase::Closed => {
+                    if !text.is_empty() {
+                        return false;
+                    }
+                },
+                SvgRootPhase::Open { .. } => {},
+            },
+            Event::Eof => {
+                return match phase {
+                    SvgRootPhase::Prolog | SvgRootPhase::Open { .. } => false,
+                    SvgRootPhase::Closed => true,
                 };
-                if next_depth > MAX_SVG_XML_DEPTH {
-                    return false;
-                }
-                depth = next_depth;
             },
-            Event::Empty(_) if root_closed => return false,
-            Event::End(_) if !root_closed => {
-                let Some(next_depth) = depth.checked_sub(1) else {
-                    return false;
-                };
-                depth = next_depth;
-                root_closed = depth == 0;
-            },
-            Event::Start(_) | Event::End(_) if root_closed => return false,
-            Event::Text(text) if (!saw_svg_root || root_closed) && !text.is_empty() => {
-                return false;
-            },
-            Event::CData(text) if (!saw_svg_root || root_closed) && !text.is_empty() => {
-                return false;
-            },
-            Event::Eof => return saw_svg_root && root_closed,
-            _ => {},
+            // Accepted before, inside and after the root.
+            Event::Decl(_)
+            | Event::DocType(_)
+            | Event::Comment(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
         }
     }
 }

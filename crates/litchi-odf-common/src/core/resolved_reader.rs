@@ -47,15 +47,38 @@ pub struct ResolvedReader<'a> {
     document: DocumentValidation,
 }
 
+/// Where document validation stands in the XML document.
+///
+/// ```text
+/// Start  --XML declaration--> Prolog
+/// Start  --whitespace text, comment, PI--> Prolog
+/// Prolog --whitespace text, comment, PI--> Prolog
+/// Start | Prolog --root start tag--> Open
+/// Start | Prolog --empty-element root--> Closed
+/// Open   --end tag that returns to depth zero--> Closed
+/// Closed --whitespace text, comment, PI--> Closed (accepted)
+/// Closed --start or empty-element tag--> refused (content after the root)
+/// Prolog | Open | Closed --XML declaration--> refused (only the first event may be one)
+/// Start | Prolog | Closed --other text, CDATA, entity reference--> refused
+/// Start | Prolog | Open | Closed --DOCTYPE--> refused
+/// Closed --end of input--> accepted
+/// Start | Prolog | Open --end of input--> refused (no complete root)
+/// ```
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+enum DocumentPhase {
+    #[default]
+    Start,
+    Prolog,
+    Open,
+    Closed,
+}
+
 #[derive(Debug, Clone, Copy, Default)]
 struct DocumentValidation {
     enabled: bool,
     allow_unknown_namespaces: bool,
     depth: usize,
-    root_seen: bool,
-    root_closed: bool,
-    declaration_seen: bool,
-    saw_any_event: bool,
+    phase: DocumentPhase,
 }
 
 /// Preserve typed reader failures while adding a stable parser context to
@@ -509,7 +532,7 @@ fn validate_document_event(
     validate_event_bytes(event, offset)?;
     match event {
         Event::Start(element) => {
-            if state.root_closed {
+            if state.phase == DocumentPhase::Closed {
                 return Err(invalid_xml(offset, "content appears after the XML root"));
             }
             if state.depth >= limits.max_depth() {
@@ -520,10 +543,10 @@ fn validate_document_event(
                 ));
             }
             if state.depth == 0 {
-                if state.root_seen {
+                if state.phase == DocumentPhase::Open {
                     return Err(invalid_xml(offset, "XML document has more than one root"));
                 }
-                state.root_seen = true;
+                state.phase = DocumentPhase::Open;
             }
             validate_start_event(
                 resolver,
@@ -535,7 +558,7 @@ fn validate_document_event(
             state.depth += 1;
         },
         Event::Empty(element) => {
-            if state.root_closed {
+            if state.phase == DocumentPhase::Closed {
                 return Err(invalid_xml(offset, "content appears after the XML root"));
             }
             if state.depth >= limits.max_depth() {
@@ -546,11 +569,10 @@ fn validate_document_event(
                 ));
             }
             if state.depth == 0 {
-                if state.root_seen {
+                if state.phase == DocumentPhase::Open {
                     return Err(invalid_xml(offset, "XML document has more than one root"));
                 }
-                state.root_seen = true;
-                state.root_closed = true;
+                state.phase = DocumentPhase::Closed;
             }
             validate_start_event(
                 resolver,
@@ -570,18 +592,19 @@ fn validate_document_event(
             }
             state.depth -= 1;
             if state.depth == 0 {
-                state.root_closed = true;
+                state.phase = DocumentPhase::Closed;
             }
         },
         Event::Decl(declaration) => {
-            if state.saw_any_event || state.declaration_seen || state.root_seen || state.depth != 0
-            {
-                return Err(invalid_xml(
-                    offset,
-                    "XML declaration is not the first document event",
-                ));
+            match state.phase {
+                DocumentPhase::Start => state.phase = DocumentPhase::Prolog,
+                DocumentPhase::Prolog | DocumentPhase::Open | DocumentPhase::Closed => {
+                    return Err(invalid_xml(
+                        offset,
+                        "XML declaration is not the first document event",
+                    ));
+                },
             }
-            state.declaration_seen = true;
             validate_declaration(resolver, declaration, attributes, limits, offset)?;
         },
         Event::DocType(_) => {
@@ -591,7 +614,7 @@ fn validate_document_event(
             ));
         },
         Event::GeneralRef(reference) => {
-            if state.depth == 0 || state.root_closed {
+            if state.depth == 0 || state.phase == DocumentPhase::Closed {
                 return Err(invalid_xml(
                     offset,
                     "entity reference appears outside the XML root",
@@ -605,7 +628,7 @@ fn validate_document_event(
             }
         },
         Event::CData(_) => {
-            if state.depth == 0 || state.root_closed {
+            if state.depth == 0 || state.phase == DocumentPhase::Closed {
                 return Err(invalid_xml(offset, "CDATA appears outside the XML root"));
             }
         },
@@ -635,16 +658,17 @@ fn validate_document_event(
             }
         },
         Event::Eof => {
-            if !state.root_seen || !state.root_closed || state.depth != 0 {
-                return Err(invalid_xml(
-                    offset,
-                    "XML document has no single complete root element",
-                ));
-            }
-            return Ok(());
+            return match state.phase {
+                DocumentPhase::Start | DocumentPhase::Prolog | DocumentPhase::Open => Err(
+                    invalid_xml(offset, "XML document has no single complete root element"),
+                ),
+                DocumentPhase::Closed => Ok(()),
+            };
         },
     }
-    state.saw_any_event = true;
+    if state.phase == DocumentPhase::Start {
+        state.phase = DocumentPhase::Prolog;
+    }
     Ok(())
 }
 

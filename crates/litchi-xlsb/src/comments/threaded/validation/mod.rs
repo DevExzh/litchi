@@ -414,13 +414,32 @@ fn validate_xml_chars(value: &str, _description: &str) -> Result<()> {
     Ok(())
 }
 
+/// Where the fragment scan stands relative to the fragment's single root.
+///
+/// ```text
+/// Prolog --start tag--> Open
+/// Prolog --empty-element tag--> Closed
+/// Open   --end tag that returns to depth zero--> Closed
+/// Closed --start or empty-element tag--> refused (multiple root elements)
+/// Closed --end of input--> accepted
+/// Prolog | Open --end of input--> refused (incomplete fragment)
+/// Prolog | Closed --whitespace text or CDATA--> unchanged (accepted)
+/// Prolog | Closed --other text, comment, PI, entity reference--> refused
+/// Prolog | Open | Closed --declaration or DOCTYPE--> refused
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FragmentPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 fn validate_fragment(bytes: &[u8]) -> Result<()> {
     std::str::from_utf8(bytes).map_err(|_error| Error::Encoding("the text cannot be decoded"))?;
     let mut reader = Reader::from_reader(bytes);
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = FragmentPhase::Prolog;
 
     loop {
         let event = reader
@@ -428,10 +447,12 @@ fn validate_fragment(bytes: &[u8]) -> Result<()> {
             .map_err(|_error| Error::Encoding("the text cannot be decoded"))?;
         match event {
             Event::Start(_) => {
-                if root_closed {
-                    return Err(invalid("preserved XML has multiple root elements"));
+                match phase {
+                    FragmentPhase::Closed => {
+                        return Err(invalid("preserved XML has multiple root elements"));
+                    },
+                    FragmentPhase::Prolog | FragmentPhase::Open => phase = FragmentPhase::Open,
                 }
-                root_seen = true;
                 depth = depth
                     .checked_add(1)
                     .ok_or_else(|| invalid("preserved XML nesting overflows"))?;
@@ -439,14 +460,12 @@ fn validate_fragment(bytes: &[u8]) -> Result<()> {
                     return Err(invalid("preserved XML nesting exceeds the resource bound"));
                 }
             },
-            Event::Empty(_) => {
-                if root_closed {
+            Event::Empty(_) => match phase {
+                FragmentPhase::Closed => {
                     return Err(invalid("preserved XML has multiple root elements"));
-                }
-                if !root_seen {
-                    root_seen = true;
-                    root_closed = true;
-                }
+                },
+                FragmentPhase::Prolog => phase = FragmentPhase::Closed,
+                FragmentPhase::Open => {},
             },
             Event::End(_) => {
                 if depth == 0 {
@@ -454,7 +473,7 @@ fn validate_fragment(bytes: &[u8]) -> Result<()> {
                 }
                 depth -= 1;
                 if depth == 0 {
-                    root_closed = true;
+                    phase = FragmentPhase::Closed;
                 }
             },
             Event::Text(text) => {
@@ -484,12 +503,15 @@ fn validate_fragment(bytes: &[u8]) -> Result<()> {
                 ));
             },
             Event::Eof => {
-                if !root_seen || !root_closed || depth != 0 {
-                    return Err(invalid("preserved XML fragment is incomplete"));
-                }
-                return Ok(());
+                return match phase {
+                    FragmentPhase::Prolog | FragmentPhase::Open => {
+                        Err(invalid("preserved XML fragment is incomplete"))
+                    },
+                    FragmentPhase::Closed => Ok(()),
+                };
             },
-            _ => {},
+            // Inside the root these carry no structure to check.
+            Event::Comment(_) | Event::PI(_) | Event::GeneralRef(_) => {},
         }
     }
 }

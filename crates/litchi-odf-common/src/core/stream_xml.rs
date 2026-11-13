@@ -538,6 +538,31 @@ impl XmlStreamReport {
     }
 }
 
+/// Where the scanner stands in the XML document.
+///
+/// ```text
+/// Start  --XML declaration--> Prolog
+/// Start  --whitespace text, comment, PI--> Prolog
+/// Prolog --whitespace text, comment, PI--> Prolog
+/// Start | Prolog --root start tag--> Open
+/// Start | Prolog --empty-element root--> Closed
+/// Open   --end tag that returns to depth zero--> Closed
+/// Closed --whitespace text, comment, PI--> Closed (accepted)
+/// Closed --start or empty-element tag--> refused (content after the root)
+/// Prolog | Open | Closed --XML declaration--> refused (only the first event may be one)
+/// Start | Prolog | Closed --other text, CDATA, entity reference--> refused
+/// Start | Prolog | Open | Closed --DOCTYPE--> refused
+/// Closed --end of input--> accepted
+/// Start | Prolog | Open --end of input--> refused (no complete root)
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum DocumentPhase {
+    Start,
+    Prolog,
+    Open,
+    Closed,
+}
+
 /// Scan one complete XML document under explicit finite limits.
 ///
 /// The callback receives a borrowed event and the namespace tracker while the
@@ -579,10 +604,7 @@ where
     let mut max_depth = 0usize;
     let mut events = 0usize;
     let mut attributes = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
-    let mut declaration_seen = false;
-    let mut saw_any_event = false;
+    let mut phase = DocumentPhase::Start;
     let mut pending_pop = false;
 
     loop {
@@ -638,7 +660,7 @@ where
 
         match stream_event.event() {
             Event::Start(element) => {
-                if root_closed {
+                if phase == DocumentPhase::Closed {
                     return Err(invalid_xml(start, "content appears after the XML root"));
                 }
                 if depth >= limits.max_depth {
@@ -650,10 +672,10 @@ where
                     ));
                 }
                 if depth == 0 {
-                    if root_seen {
+                    if phase == DocumentPhase::Open {
                         return Err(invalid_xml(start, "XML document has more than one root"));
                     }
-                    root_seen = true;
+                    phase = DocumentPhase::Open;
                 }
                 tracker
                     .push(element)
@@ -672,7 +694,7 @@ where
                 visit(&stream_event, &tracker)?;
             },
             Event::Empty(element) => {
-                if root_closed {
+                if phase == DocumentPhase::Closed {
                     return Err(invalid_xml(start, "content appears after the XML root"));
                 }
                 if depth >= limits.max_depth {
@@ -684,11 +706,10 @@ where
                     ));
                 }
                 if depth == 0 {
-                    if root_seen {
+                    if phase == DocumentPhase::Open {
                         return Err(invalid_xml(start, "XML document has more than one root"));
                     }
-                    root_seen = true;
-                    root_closed = true;
+                    phase = DocumentPhase::Closed;
                 }
                 tracker
                     .push(element)
@@ -714,18 +735,20 @@ where
                 visit(&stream_event, &tracker)?;
                 depth -= 1;
                 if depth == 0 {
-                    root_closed = true;
+                    phase = DocumentPhase::Closed;
                 }
                 pending_pop = true;
             },
             Event::Decl(declaration) => {
-                if saw_any_event || declaration_seen || root_seen || depth != 0 {
-                    return Err(invalid_xml(
-                        start,
-                        "XML declaration is not the first document event",
-                    ));
+                match phase {
+                    DocumentPhase::Start => phase = DocumentPhase::Prolog,
+                    DocumentPhase::Prolog | DocumentPhase::Open | DocumentPhase::Closed => {
+                        return Err(invalid_xml(
+                            start,
+                            "XML declaration is not the first document event",
+                        ));
+                    },
                 }
-                declaration_seen = true;
                 declaration.xml_version().map_err(|error| {
                     invalid_xml(start, format!("invalid XML declaration: {error}"))
                 })?;
@@ -770,7 +793,7 @@ where
                 ));
             },
             Event::GeneralRef(reference) => {
-                if depth == 0 || root_closed {
+                if depth == 0 || phase == DocumentPhase::Closed {
                     return Err(invalid_xml(
                         start,
                         "entity reference appears outside the XML root",
@@ -785,7 +808,7 @@ where
                 visit(&stream_event, &tracker)?;
             },
             Event::CData(_) => {
-                if depth == 0 || root_closed {
+                if depth == 0 || phase == DocumentPhase::Closed {
                     return Err(invalid_xml(start, "CDATA appears outside the XML root"));
                 }
                 visit(&stream_event, &tracker)?;
@@ -818,17 +841,22 @@ where
                 visit(&stream_event, &tracker)?;
             },
             Event::Eof => {
-                if !root_seen || !root_closed || depth != 0 {
-                    return Err(invalid_xml(
-                        start,
-                        "XML document has no single complete root element",
-                    ));
+                match phase {
+                    DocumentPhase::Start | DocumentPhase::Prolog | DocumentPhase::Open => {
+                        return Err(invalid_xml(
+                            start,
+                            "XML document has no single complete root element",
+                        ));
+                    },
+                    DocumentPhase::Closed => {},
                 }
                 visit(&stream_event, &tracker)?;
                 break;
             },
         }
-        saw_any_event = true;
+        if phase == DocumentPhase::Start {
+            phase = DocumentPhase::Prolog;
+        }
     }
 
     Ok(XmlStreamReport {

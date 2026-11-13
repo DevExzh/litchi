@@ -2292,6 +2292,29 @@ fn safe_manifest_member_path(path: &str) -> bool {
             .all(|segment| !segment.is_empty() && segment != "." && segment != "..")
 }
 
+/// Where the security scan stands relative to the member's single root element.
+///
+/// ```text
+/// Prolog --declaration as the very first event--> Prolog
+/// Prolog --top-level start tag--> Open
+/// Prolog --top-level empty-element tag--> Closed
+/// Open   --end tag that returns to depth zero--> Closed
+/// Closed --top-level start or empty-element tag--> refused (multiple roots)
+/// Closed --end of input--> accepted
+/// Prolog | Open --end of input--> refused
+/// Prolog | Open | Closed --declaration that is not the first event--> refused
+/// Prolog | Closed --whitespace text--> unchanged (accepted)
+/// Prolog | Closed --other text, CDATA, entity reference--> refused
+/// Prolog | Open | Closed --comment--> unchanged (accepted anywhere)
+/// Prolog | Open | Closed --DOCTYPE or processing instruction--> refused
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 fn scan_xml_security(name: &str, xml: &[u8], limits: OdfRepairLimits) -> Result<(), RepairError> {
     if xml.len() as u64 > limits.max_member_bytes {
         return Err(RepairError::Limit {
@@ -2306,9 +2329,7 @@ fn scan_xml_security(name: &str, xml: &[u8], limits: OdfRepairLimits) -> Result<
     reader.config_mut().check_comments = true;
     let mut events = 0_usize;
     let mut depth = 0_usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
-    let mut declaration_seen = false;
+    let mut phase = RootPhase::Prolog;
     loop {
         if events >= validation_limits.max_xml_events() {
             return Err(RepairError::Limit {
@@ -2325,12 +2346,14 @@ fn scan_xml_security(name: &str, xml: &[u8], limits: OdfRepairLimits) -> Result<
             Event::Start(element) => {
                 validate_element_qname(&reader, &element)?;
                 if depth == 0 {
-                    if root_seen || root_closed {
-                        return Err(RepairError::Unsupported {
-                            reason: "XML member has multiple roots",
-                        });
+                    match phase {
+                        RootPhase::Prolog => phase = RootPhase::Open,
+                        RootPhase::Open | RootPhase::Closed => {
+                            return Err(RepairError::Unsupported {
+                                reason: "XML member has multiple roots",
+                            });
+                        },
                     }
-                    root_seen = true;
                 }
                 depth = depth.saturating_add(1);
                 if depth > validation_limits.max_xml_depth() {
@@ -2345,13 +2368,14 @@ fn scan_xml_security(name: &str, xml: &[u8], limits: OdfRepairLimits) -> Result<
             Event::Empty(element) => {
                 validate_element_qname(&reader, &element)?;
                 if depth == 0 {
-                    if root_seen || root_closed {
-                        return Err(RepairError::Unsupported {
-                            reason: "XML member has multiple roots",
-                        });
+                    match phase {
+                        RootPhase::Prolog => phase = RootPhase::Closed,
+                        RootPhase::Open | RootPhase::Closed => {
+                            return Err(RepairError::Unsupported {
+                                reason: "XML member has multiple roots",
+                            });
+                        },
                     }
-                    root_seen = true;
-                    root_closed = true;
                 }
                 scan_xml_link_attributes(&reader, &element, name)?;
             },
@@ -2361,7 +2385,7 @@ fn scan_xml_security(name: &str, xml: &[u8], limits: OdfRepairLimits) -> Result<
                     reason: "XML member has an unmatched closing element",
                 })?;
                 if depth == 0 {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
             },
             Event::DocType(_) => {
@@ -2376,11 +2400,13 @@ fn scan_xml_security(name: &str, xml: &[u8], limits: OdfRepairLimits) -> Result<
                     reason: "XML member contains an entity reference",
                 });
             },
-            Event::Eof if root_seen && root_closed && depth == 0 => return Ok(()),
             Event::Eof => {
-                return Err(RepairError::Unsupported {
-                    reason: "XML member is malformed during package-wide security scan",
-                });
+                return match phase {
+                    RootPhase::Closed => Ok(()),
+                    RootPhase::Prolog | RootPhase::Open => Err(RepairError::Unsupported {
+                        reason: "XML member is malformed during package-wide security scan",
+                    }),
+                };
             },
             Event::Text(text) => {
                 let decoded = text.decode().map_err(|_| RepairError::Unsupported {
@@ -2419,11 +2445,9 @@ fn scan_xml_security(name: &str, xml: &[u8], limits: OdfRepairLimits) -> Result<
                     reason: "XML member contains an unsupported processing instruction",
                 });
             },
-            Event::Decl(declaration)
-                if events == 1 && !declaration_seen && !root_seen && depth == 0 =>
-            {
+            // The first event cannot follow a root or another declaration.
+            Event::Decl(declaration) if events == 1 => {
                 validate_xml_declaration(&declaration)?;
-                declaration_seen = true;
             },
             Event::Decl(_) => {
                 return Err(RepairError::Unsupported {

@@ -851,14 +851,32 @@ fn reject_xml_space(start: &quick_xml::events::BytesStart<'_>) -> Result<()> {
     Ok(())
 }
 
+/// Where the shape check stands relative to the fragment's single root element.
+///
+/// ```text
+/// Prolog --top-level start tag--> Open
+/// Prolog --top-level empty-element tag--> Closed
+/// Open   --end tag that returns to depth zero--> Closed
+/// Closed --top-level start or empty-element tag--> refused (second root)
+/// Closed --end of input--> accepted
+/// Prolog | Open --end of input--> refused
+/// Prolog | Closed --text, CDATA, entity reference--> refused
+/// Prolog | Open | Closed --declaration, DOCTYPE, comment, PI--> refused
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FragmentPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 fn validate_fragment_shape(bytes: &[u8]) -> Result<()> {
     let text = std::str::from_utf8(bytes)
         .map_err(|error| invalid_generated_xml(format!("fragment is not UTF-8: {error}")))?;
     let mut reader = Reader::from_str(text);
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
-    let mut roots = 0usize;
-    let mut closed_root = false;
+    let mut phase = FragmentPhase::Prolog;
     loop {
         let event = reader
             .read_event()
@@ -866,12 +884,14 @@ fn validate_fragment_shape(bytes: &[u8]) -> Result<()> {
         match event {
             Event::Start(_) => {
                 if depth == 0 {
-                    if closed_root || roots != 0 {
-                        return Err(invalid_generated_xml(
-                            "fragment must contain exactly one element root",
-                        ));
+                    match phase {
+                        FragmentPhase::Prolog => phase = FragmentPhase::Open,
+                        FragmentPhase::Open | FragmentPhase::Closed => {
+                            return Err(invalid_generated_xml(
+                                "fragment must contain exactly one element root",
+                            ));
+                        },
                     }
-                    roots = 1;
                 }
                 depth = depth
                     .checked_add(1)
@@ -879,13 +899,14 @@ fn validate_fragment_shape(bytes: &[u8]) -> Result<()> {
             },
             Event::Empty(_) => {
                 if depth == 0 {
-                    if closed_root || roots != 0 {
-                        return Err(invalid_generated_xml(
-                            "fragment must contain exactly one element root",
-                        ));
+                    match phase {
+                        FragmentPhase::Prolog => phase = FragmentPhase::Closed,
+                        FragmentPhase::Open | FragmentPhase::Closed => {
+                            return Err(invalid_generated_xml(
+                                "fragment must contain exactly one element root",
+                            ));
+                        },
                     }
-                    roots = 1;
-                    closed_root = true;
                 }
             },
             Event::End(_) => {
@@ -894,7 +915,7 @@ fn validate_fragment_shape(bytes: &[u8]) -> Result<()> {
                 }
                 depth -= 1;
                 if depth == 0 {
-                    closed_root = true;
+                    phase = FragmentPhase::Closed;
                 }
             },
             Event::Text(_) | Event::CData(_) => {
@@ -924,12 +945,12 @@ fn validate_fragment_shape(bytes: &[u8]) -> Result<()> {
             Event::Eof => break,
         }
     }
-    if roots != 1 || depth != 0 || !closed_root {
-        return Err(invalid_generated_xml(
+    match phase {
+        FragmentPhase::Prolog | FragmentPhase::Open => Err(invalid_generated_xml(
             "fragment must contain one complete element root",
-        ));
+        )),
+        FragmentPhase::Closed => Ok(()),
     }
-    Ok(())
 }
 
 fn is_predefined_or_numeric_reference(reference: &[u8]) -> bool {

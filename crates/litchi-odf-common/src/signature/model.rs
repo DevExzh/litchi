@@ -114,6 +114,28 @@ struct TextTarget {
     value: String,
 }
 
+/// Where the container reader stands relative to the single
+/// `document-signatures` root element.
+///
+/// ```text
+/// Prolog --`document-signatures` start tag--> Open
+/// Prolog --any other start tag, or any empty-element tag--> refused
+/// Open   --`document-signatures` end tag at depth zero--> Closed
+/// Closed --start or empty-element tag--> refused (content after the root)
+/// Closed --end of input--> accepted
+/// Prolog | Open --end of input--> refused (incomplete)
+/// Prolog | Closed --whitespace text, empty CDATA--> unchanged (accepted)
+/// Prolog | Closed --other text or CDATA--> refused
+/// Prolog | Open | Closed --declaration, comment--> unchanged (accepted anywhere)
+/// Prolog | Open | Closed --DOCTYPE, PI, entity reference--> refused
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 pub(crate) fn parse_signature_container(xml: &[u8]) -> Result<Vec<DigitalSignature>> {
     if xml.len() > MAX_SIGNATURE_XML_BYTES {
         return invalid("ODF signature XML exceeds 16 MiB");
@@ -125,8 +147,7 @@ pub(crate) fn parse_signature_container(xml: &[u8]) -> Result<Vec<DigitalSignatu
     let mut buffer = Vec::new();
     let mut depth = 0usize;
     let mut events = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut signatures = Vec::new();
     let mut signature: Option<SignatureBuilder> = None;
     let mut text_target: Option<TextTarget> = None;
@@ -145,7 +166,7 @@ pub(crate) fn parse_signature_container(xml: &[u8]) -> Result<Vec<DigitalSignatu
             .map_err(|error| format_error(format!("invalid ODF signature XML: {error}")))?;
         match event {
             Event::Start(ref element) => {
-                if root_closed {
+                if phase == RootPhase::Closed {
                     return invalid("ODF signature XML contains content after its root element");
                 }
                 if depth >= MAX_XML_DEPTH {
@@ -154,13 +175,13 @@ pub(crate) fn parse_signature_container(xml: &[u8]) -> Result<Vec<DigitalSignatu
                 let local_name = element.local_name();
                 let local = local_name.as_ref();
                 if depth == 0 {
-                    if root_seen
+                    if phase != RootPhase::Prolog
                         || !namespace_is(&namespace, ODF_SIGNATURE_NAMESPACE)
                         || local != b"document-signatures"
                     {
                         return invalid("invalid ODF digital-signature root element");
                     }
-                    root_seen = true;
+                    phase = RootPhase::Open;
                 } else if depth == 1
                     && namespace_is(&namespace, XML_SIGNATURE_NAMESPACE)
                     && local == b"Signature"
@@ -188,7 +209,7 @@ pub(crate) fn parse_signature_container(xml: &[u8]) -> Result<Vec<DigitalSignatu
                 depth += 1;
             },
             Event::Empty(ref element) => {
-                if depth == 0 || root_closed {
+                if depth == 0 || phase == RootPhase::Closed {
                     return invalid("empty or trailing ODF signature root content");
                 }
                 let local_name = element.local_name();
@@ -255,7 +276,7 @@ pub(crate) fn parse_signature_container(xml: &[u8]) -> Result<Vec<DigitalSignatu
                     if local_name.as_ref() != b"document-signatures" {
                         return invalid("ODF signature XML root end tag is invalid");
                     }
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
             },
             Event::GeneralRef(_) | Event::DocType(_) | Event::PI(_) => {
@@ -267,7 +288,11 @@ pub(crate) fn parse_signature_container(xml: &[u8]) -> Result<Vec<DigitalSignatu
         buffer.clear();
     }
 
-    if !root_seen || !root_closed || depth != 0 || signature.is_some() || text_target.is_some() {
+    let root_complete = match phase {
+        RootPhase::Prolog | RootPhase::Open => false,
+        RootPhase::Closed => true,
+    };
+    if !root_complete || signature.is_some() || text_target.is_some() {
         return invalid("incomplete ODF signature XML");
     }
     if signatures.is_empty() {

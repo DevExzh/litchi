@@ -1292,6 +1292,27 @@ fn manifest_entry_is_content(
     Ok(false)
 }
 
+/// Where the inspection stands relative to the part's single root element.
+///
+/// ```text
+/// Prolog --top-level start tag--> Open
+/// Prolog --top-level empty-element tag--> Closed
+/// Open   --end tag that returns to depth zero--> Closed
+/// Closed --top-level start or empty-element tag--> refused (second root)
+/// Closed --end of input--> accepted
+/// Prolog | Open --end of input--> refused
+/// Prolog | Closed --whitespace text--> unchanged (accepted)
+/// Prolog | Closed --other text, CDATA, entity reference--> refused
+/// Prolog | Open | Closed --declaration, comment, PI--> unchanged (accepted anywhere)
+/// Prolog | Open | Closed --DOCTYPE--> refused
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 fn inspect_xml(
     xml: &[u8],
     limits: OdfValidationLimits,
@@ -1300,8 +1321,7 @@ fn inspect_xml(
     reader.config_mut().check_end_names = true;
     let mut events = 0_usize;
     let mut depth = 0_usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut root_is_manifest = false;
     let mut manifest_entries = 0_u64;
     let mut external_references = 0_u64;
@@ -1323,13 +1343,15 @@ fn inspect_xml(
         match event {
             Event::Start(element) => {
                 if depth == 0 {
-                    if root_seen || root_closed {
-                        return Err(XmlInspectionError::Malformed {
-                            offset,
-                            doctype: false,
-                        });
+                    match phase {
+                        RootPhase::Prolog => phase = RootPhase::Open,
+                        RootPhase::Open | RootPhase::Closed => {
+                            return Err(XmlInspectionError::Malformed {
+                                offset,
+                                doctype: false,
+                            });
+                        },
                     }
-                    root_seen = true;
                     root_is_manifest = matches!(
                         reader.resolver().resolve_element(element.name()).0,
                         ResolveResult::Bound(Namespace(uri)) if uri == MANIFEST_NAMESPACE
@@ -1352,14 +1374,15 @@ fn inspect_xml(
             },
             Event::Empty(element) => {
                 if depth == 0 {
-                    if root_seen || root_closed {
-                        return Err(XmlInspectionError::Malformed {
-                            offset,
-                            doctype: false,
-                        });
+                    match phase {
+                        RootPhase::Prolog => phase = RootPhase::Closed,
+                        RootPhase::Open | RootPhase::Closed => {
+                            return Err(XmlInspectionError::Malformed {
+                                offset,
+                                doctype: false,
+                            });
+                        },
                     }
-                    root_seen = true;
-                    root_closed = true;
                     root_is_manifest = matches!(
                         reader.resolver().resolve_element(element.name()).0,
                         ResolveResult::Bound(Namespace(uri)) if uri == MANIFEST_NAMESPACE
@@ -1385,7 +1408,7 @@ fn inspect_xml(
                     doctype: false,
                 })?;
                 if depth == 0 {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
             },
             Event::DocType(_) => {
@@ -1394,18 +1417,18 @@ fn inspect_xml(
                     doctype: true,
                 });
             },
-            Event::Eof if root_seen && root_closed && depth == 0 => {
-                return Ok(XmlObservations {
-                    external_references,
-                    root_is_manifest,
-                    manifest_entries,
-                });
-            },
             Event::Eof => {
-                return Err(XmlInspectionError::Malformed {
-                    offset,
-                    doctype: false,
-                });
+                return match phase {
+                    RootPhase::Closed => Ok(XmlObservations {
+                        external_references,
+                        root_is_manifest,
+                        manifest_entries,
+                    }),
+                    RootPhase::Prolog | RootPhase::Open => Err(XmlInspectionError::Malformed {
+                        offset,
+                        doctype: false,
+                    }),
+                };
             },
             Event::Text(text) if depth == 0 => {
                 let bytes: &[u8] = text.as_ref();

@@ -28,14 +28,34 @@ use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 const NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/spreadsheetml/2018/threadedcomments";
 const XML_HEADER: &str = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#;
 
+/// Where a part reader stands relative to the part's single root element.
+///
+/// ```text
+/// Prolog --root start tag--> Open
+/// Prolog --empty-element root--> reading stops; later bytes are never read
+/// Open   --root end tag--> Closed
+/// Closed --end of input--> accepted
+/// Prolog | Open --end of input--> refused (missing or unterminated root)
+/// Prolog | Open | Closed --declaration, DOCTYPE, comment--> unchanged
+/// Prolog | Closed --any other event, whitespace text included--> refused
+/// ```
+///
+/// While the root is open its children, text and CDATA are read by the part
+/// reader; a processing instruction or entity reference there is refused.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 /// Parse a bounded `personList` part.
 pub fn parse_persons(xml: impl AsRef<[u8]>, xml_limits: litchi_core::Limits) -> Result<People> {
     let xml = xml.as_ref();
     check_size(xml, xml_limits)?;
     let mut reader = NsReader::from_reader(xml);
     let mut people = People::default();
-    let mut root_open = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
 
     loop {
         let event = next_event(&mut reader)?;
@@ -43,17 +63,17 @@ pub fn parse_persons(xml: impl AsRef<[u8]>, xml_limits: litchi_core::Limits) -> 
         let (namespace, event) = resolver.resolve_event(event);
         match event {
             Event::Decl(_) | Event::DocType(_) | Event::Comment(_) => {},
-            Event::Start(element) if !root_open => {
-                require_root(&namespace, element.name(), b"personList", root_closed)?;
+            Event::Start(element) if phase == RootPhase::Prolog => {
+                require_root(&namespace, element.name(), b"personList")?;
                 people.attributes = raw_attributes(&element, &[], reader.decoder())?;
-                root_open = true;
+                phase = RootPhase::Open;
             },
-            Event::Empty(element) if !root_open => {
-                require_root(&namespace, element.name(), b"personList", root_closed)?;
+            Event::Empty(element) if phase == RootPhase::Prolog => {
+                require_root(&namespace, element.name(), b"personList")?;
                 people.attributes = raw_attributes(&element, &[], reader.decoder())?;
                 break;
             },
-            Event::Start(element) if root_open && !root_closed => {
+            Event::Start(element) if phase == RootPhase::Open => {
                 if is_name(&namespace, element.name(), b"person") {
                     people.persons.push(parse_person(&mut reader, element)?);
                 } else {
@@ -62,7 +82,7 @@ pub fn parse_persons(xml: impl AsRef<[u8]>, xml_limits: litchi_core::Limits) -> 
                         .push(capture_unknown(&mut reader, Event::Start(element))?);
                 }
             },
-            Event::Empty(element) if root_open && !root_closed => {
+            Event::Empty(element) if phase == RootPhase::Open => {
                 if is_name(&namespace, element.name(), b"person") {
                     people
                         .persons
@@ -73,27 +93,27 @@ pub fn parse_persons(xml: impl AsRef<[u8]>, xml_limits: litchi_core::Limits) -> 
                         .push(capture_unknown(&mut reader, Event::Empty(element))?);
                 }
             },
-            Event::End(element) if root_open && !root_closed => {
+            Event::End(element) if phase == RootPhase::Open => {
                 if !is_name(&namespace, element.name(), b"personList") {
                     return Err(invalid("persons part has an invalid root closing element"));
                 }
-                root_closed = true;
+                phase = RootPhase::Closed;
             },
-            Event::Text(text) if root_open && !root_closed => {
+            Event::Text(text) if phase == RootPhase::Open => {
                 if !text.decode().map_err(xml_error)?.trim().is_empty() {
                     return Err(invalid("persons part contains unexpected character data"));
                 }
             },
-            Event::CData(text) if root_open && !root_closed => {
+            Event::CData(text) if phase == RootPhase::Open => {
                 if !text.decode().map_err(xml_error)?.trim().is_empty() {
                     return Err(invalid("persons part contains unexpected character data"));
                 }
             },
-            Event::Eof => {
-                if !root_closed {
+            Event::Eof => match phase {
+                RootPhase::Prolog | RootPhase::Open => {
                     return Err(invalid("persons part has a missing or unterminated root"));
-                }
-                break;
+                },
+                RootPhase::Closed => break,
             },
             _ => return Err(invalid("invalid persons XML structure")),
         }
@@ -111,8 +131,7 @@ pub fn parse_comments(xml: impl AsRef<[u8]>, xml_limits: litchi_core::Limits) ->
     check_size(xml, xml_limits)?;
     let mut reader = NsReader::from_reader(xml);
     let mut comments = Comments::default();
-    let mut root_open = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
 
     loop {
         let event = next_event(&mut reader)?;
@@ -120,17 +139,17 @@ pub fn parse_comments(xml: impl AsRef<[u8]>, xml_limits: litchi_core::Limits) ->
         let (namespace, event) = resolver.resolve_event(event);
         match event {
             Event::Decl(_) | Event::DocType(_) | Event::Comment(_) => {},
-            Event::Start(element) if !root_open => {
-                require_root(&namespace, element.name(), b"ThreadedComments", root_closed)?;
+            Event::Start(element) if phase == RootPhase::Prolog => {
+                require_root(&namespace, element.name(), b"ThreadedComments")?;
                 comments.attributes = raw_attributes(&element, &[], reader.decoder())?;
-                root_open = true;
+                phase = RootPhase::Open;
             },
-            Event::Empty(element) if !root_open => {
-                require_root(&namespace, element.name(), b"ThreadedComments", root_closed)?;
+            Event::Empty(element) if phase == RootPhase::Prolog => {
+                require_root(&namespace, element.name(), b"ThreadedComments")?;
                 comments.attributes = raw_attributes(&element, &[], reader.decoder())?;
                 break;
             },
-            Event::Start(element) if root_open && !root_closed => {
+            Event::Start(element) if phase == RootPhase::Open => {
                 if is_name(&namespace, element.name(), b"threadedComment") {
                     comments.comments.push(parse_comment(&mut reader, element)?);
                 } else {
@@ -139,7 +158,7 @@ pub fn parse_comments(xml: impl AsRef<[u8]>, xml_limits: litchi_core::Limits) ->
                         .push(capture_unknown(&mut reader, Event::Start(element))?);
                 }
             },
-            Event::Empty(element) if root_open && !root_closed => {
+            Event::Empty(element) if phase == RootPhase::Open => {
                 if is_name(&namespace, element.name(), b"threadedComment") {
                     comments
                         .comments
@@ -150,35 +169,35 @@ pub fn parse_comments(xml: impl AsRef<[u8]>, xml_limits: litchi_core::Limits) ->
                         .push(capture_unknown(&mut reader, Event::Empty(element))?);
                 }
             },
-            Event::End(element) if root_open && !root_closed => {
+            Event::End(element) if phase == RootPhase::Open => {
                 if !is_name(&namespace, element.name(), b"ThreadedComments") {
                     return Err(invalid(
                         "threaded-comments part has an invalid root closing element",
                     ));
                 }
-                root_closed = true;
+                phase = RootPhase::Closed;
             },
-            Event::Text(text) if root_open && !root_closed => {
+            Event::Text(text) if phase == RootPhase::Open => {
                 if !text.decode().map_err(xml_error)?.trim().is_empty() {
                     return Err(invalid(
                         "threaded-comments part contains unexpected character data",
                     ));
                 }
             },
-            Event::CData(text) if root_open && !root_closed => {
+            Event::CData(text) if phase == RootPhase::Open => {
                 if !text.decode().map_err(xml_error)?.trim().is_empty() {
                     return Err(invalid(
                         "threaded-comments part contains unexpected character data",
                     ));
                 }
             },
-            Event::Eof => {
-                if !root_closed {
+            Event::Eof => match phase {
+                RootPhase::Prolog | RootPhase::Open => {
                     return Err(invalid(
                         "threaded-comments part has a missing or unterminated root",
                     ));
-                }
-                break;
+                },
+                RootPhase::Closed => break,
             },
             _ => return Err(invalid("invalid threaded-comments XML structure")),
         }
@@ -736,13 +755,8 @@ fn raw_attributes(
     Ok(attributes)
 }
 
-fn require_root(
-    namespace: &ResolveResult<'_>,
-    name: QName<'_>,
-    local: &[u8],
-    closed: bool,
-) -> Result<()> {
-    if closed || !is_name(namespace, name, local) {
+fn require_root(namespace: &ResolveResult<'_>, name: QName<'_>, local: &[u8]) -> Result<()> {
+    if !is_name(namespace, name, local) {
         return Err(invalid(
             "part must have one root in the threaded-comments namespace",
         ));

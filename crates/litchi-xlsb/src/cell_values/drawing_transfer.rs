@@ -908,10 +908,35 @@ fn drawing_layout(xml: &[u8]) -> Result<DrawingLayout> {
     layout.finish()
 }
 
+/// Whether a top-level `xdr:wsDr` start tag has been read.
+///
+/// The layout reader does not close the document after its first root.
+///
+/// ```text
+/// Prolog --top-level `xdr:wsDr` start tag--> Rooted
+/// Rooted --top-level `xdr:wsDr` start tag--> Rooted (accepted: its strictness
+///          and namespace declarations replace the earlier root's, and its
+///          anchors are appended)
+/// Prolog | Rooted --any other top-level start tag--> refused
+/// Prolog | Rooted --top-level empty-element tag--> unchanged (accepted and
+///          ignored, `xdr:wsDr` included, unless it is a markup-compatibility
+///          element)
+/// Prolog | Rooted --text, CDATA, comment, declaration--> unchanged (accepted)
+/// Prolog | Rooted --DOCTYPE or processing instruction--> refused
+/// Rooted --end of input with no element open--> accepted
+/// Prolog --end of input--> refused (incomplete)
+/// ```
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
+enum RootPhase {
+    #[default]
+    Prolog,
+    Rooted,
+}
+
 #[derive(Default)]
 struct LayoutBuilder {
     depth: usize,
-    root_seen: bool,
+    root: RootPhase,
     strict: bool,
     namespaces: BTreeMap<String, String>,
     open_anchor: Option<usize>,
@@ -934,7 +959,13 @@ impl LayoutBuilder {
                     "drawing transfer requires one xdr:wsDr root",
                 ));
             }
-            self.root_seen = true;
+            match self.root {
+                RootPhase::Prolog => self.root = RootPhase::Rooted,
+                // A later top-level `xdr:wsDr` is read like the first one:
+                // the strictness and namespace declarations below replace
+                // the earlier root's.
+                RootPhase::Rooted => {},
+            }
             self.strict =
                 matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == STRICT_XDR);
             self.namespaces = namespace_declarations(element, decoder)?;
@@ -1001,7 +1032,7 @@ impl LayoutBuilder {
     }
 
     fn finish(self) -> Result<DrawingLayout> {
-        if !self.root_seen || self.depth != 0 || self.open_anchor.is_some() {
+        if self.root == RootPhase::Prolog || self.depth != 0 || self.open_anchor.is_some() {
             return Err(Error::InvalidFormat("drawing XML is incomplete"));
         }
         Ok(DrawingLayout {

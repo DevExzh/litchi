@@ -194,6 +194,27 @@ impl Element {
     }
 }
 
+/// Where the chart reader stands relative to the single
+/// `office:document-content` root element.
+///
+/// ```text
+/// Prolog --`office:document-content` start tag--> Open
+/// Prolog --any other start tag, or any empty-element tag--> refused
+/// Open   --end tag that returns to depth zero--> Closed
+/// Closed --start or empty-element tag--> refused
+/// Closed --end of input--> accepted when the chart structure is complete
+/// Prolog | Open --end of input--> refused (incomplete)
+/// Prolog | Closed --whitespace text--> unchanged (accepted)
+/// Prolog | Closed --other text, CDATA, entity reference--> refused
+/// Prolog | Open | Closed --declaration, DOCTYPE, comment, PI--> unchanged (accepted anywhere)
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 /// Read and retain the standard chart subtree from an ODF `content.xml` part
 /// under the caller's raw XML policy.
 ///
@@ -215,8 +236,7 @@ pub fn read(xml: &str, limits: XmlStreamLimits) -> std::result::Result<Element, 
     let mut reader = ResolvedReader::from_xml(xml, limits)?;
     let mut buffer = Vec::new();
     let mut depth = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut body_seen = false;
     let mut office_chart_seen = false;
     let mut body_depth = None;
@@ -233,14 +253,13 @@ pub fn read(xml: &str, limits: XmlStreamLimits) -> std::result::Result<Element, 
                 let namespace_uri = namespace_uri(&namespace)?;
                 let local = decode_name(element.local_name().as_ref(), "element")?;
                 if depth == 0 {
-                    if root_seen
-                        || root_closed
+                    if phase != RootPhase::Prolog
                         || namespace_uri.as_deref() != Some(OFFICENS)
                         || local != "document-content"
                     {
                         return invalid("chart content must have one office:document-content root");
                     }
-                    root_seen = true;
+                    phase = RootPhase::Open;
                 } else if namespace_uri.as_deref() == Some(OFFICENS) && local == "body" {
                     if depth != 1 || body_seen || body_depth.is_some() {
                         return invalid("misplaced or duplicate office:body");
@@ -348,7 +367,7 @@ pub fn read(xml: &str, limits: XmlStreamLimits) -> std::result::Result<Element, 
                     body_depth = None;
                 }
                 if depth == 0 {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
             },
             Event::Text(ref text) if !stack.is_empty() => {
@@ -400,9 +419,11 @@ pub fn read(xml: &str, limits: XmlStreamLimits) -> std::result::Result<Element, 
         buffer.clear();
     }
 
-    if !root_seen
-        || !root_closed
-        || depth != 0
+    let root_complete = match phase {
+        RootPhase::Prolog | RootPhase::Open => false,
+        RootPhase::Closed => true,
+    };
+    if !root_complete
         || !body_seen
         || !office_chart_seen
         || body_depth.is_some()
