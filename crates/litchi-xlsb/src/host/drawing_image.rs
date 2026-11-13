@@ -513,4 +513,98 @@ mod tests {
             })
         ));
     }
+
+    /// Runs `run` over the XML envelope orderings built around one root element
+    /// and compares each `label => outcome` line with the frozen expectation.
+    fn assert_envelope_matrix(
+        open: &str,
+        close: &str,
+        empty: &str,
+        expected: &[&str],
+        run: impl Fn(&str) -> String,
+    ) {
+        const DECL: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+        let doc = format!("{open}{close}");
+        let rows = [
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECL.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", doc.clone()),
+            ("declaration then root", format!("{DECL}{doc}")),
+            ("declaration, whitespace, root", format!("{DECL}\n{doc}")),
+            ("root then whitespace", format!("{doc}\n ")),
+            ("root then comment", format!("{doc}<!--c-->")),
+            ("root then PI", format!("{doc}<?pi x?>")),
+            ("root then text", format!("{doc}text")),
+            ("root then second root", format!("{doc}{doc}")),
+            (
+                "root then foreign start",
+                format!("{doc}<foreign></foreign>"),
+            ),
+            ("root then foreign empty", format!("{doc}<foreign/>")),
+            (
+                "empty-element root then second root",
+                format!("{empty}{doc}"),
+            ),
+            ("empty-element root then text", format!("{empty}text")),
+            ("declaration after root", format!("{doc}{DECL}")),
+            ("two declarations", format!("{DECL}{DECL}{doc}")),
+            ("comment before declaration", format!("<!--c-->{DECL}{doc}")),
+            ("text before root", format!("text{doc}")),
+            ("unterminated root", open.to_owned()),
+            ("stray end tag", format!("{doc}</stray>")),
+            ("DOCTYPE", format!("{DECL}<!DOCTYPE r>{doc}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{doc}")),
+        ];
+        let actual: Vec<String> = rows
+            .iter()
+            .map(|(label, xml)| format!("{label} => {}", run(xml)))
+            .collect();
+        let listing: Vec<String> = actual.iter().map(|line| format!("{line:?},")).collect();
+        assert!(
+            actual
+                .iter()
+                .map(String::as_str)
+                .eq(expected.iter().copied()),
+            "actual envelope matrix:\n{}",
+            listing.join("\n")
+        );
+    }
+
+    #[test]
+    fn svg_root_envelope_matrix() {
+        assert_envelope_matrix(
+            r#"<svg xmlns="http://www.w3.org/2000/svg"><g/>"#,
+            "</svg>",
+            r#"<svg xmlns="http://www.w3.org/2000/svg"/>"#,
+            &[
+                "empty input => false",
+                "whitespace only => false",
+                "declaration only => false",
+                "empty-element root => true",
+                "start and end root => true",
+                "declaration then root => true",
+                "declaration, whitespace, root => true",
+                "root then whitespace => true",
+                "root then comment => true",
+                "root then PI => true",
+                "root then text => false",
+                "root then second root => false",
+                "root then foreign start => false",
+                "root then foreign empty => false",
+                "empty-element root then second root => false",
+                "empty-element root then text => false",
+                "declaration after root => true",
+                "two declarations => true",
+                "comment before declaration => true",
+                "text before root => false",
+                "unterminated root => false",
+                "stray end tag => false",
+                "DOCTYPE => true",
+                "top-level CDATA => false",
+            ],
+            |xml| validate_svg(xml.as_bytes()).to_string(),
+        );
+    }
 }

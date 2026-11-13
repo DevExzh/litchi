@@ -669,4 +669,107 @@ mod tests {
             assert!(parse_signature_container(xml.as_bytes()).is_err(), "accepted {xml}");
         }
     }
+
+    /// Runs `run` over the XML envelope orderings built around one root element
+    /// and compares each `label => outcome` line with the frozen expectation.
+    fn assert_envelope_matrix(
+        open: &str,
+        close: &str,
+        empty: &str,
+        expected: &[&str],
+        run: impl Fn(&str) -> String,
+    ) {
+        const DECL: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+        let doc = format!("{open}{close}");
+        let rows = [
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECL.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", doc.clone()),
+            ("declaration then root", format!("{DECL}{doc}")),
+            ("declaration, whitespace, root", format!("{DECL}\n{doc}")),
+            ("root then whitespace", format!("{doc}\n ")),
+            ("root then comment", format!("{doc}<!--c-->")),
+            ("root then PI", format!("{doc}<?pi x?>")),
+            ("root then text", format!("{doc}text")),
+            ("root then second root", format!("{doc}{doc}")),
+            (
+                "root then foreign start",
+                format!("{doc}<foreign></foreign>"),
+            ),
+            ("root then foreign empty", format!("{doc}<foreign/>")),
+            (
+                "empty-element root then second root",
+                format!("{empty}{doc}"),
+            ),
+            ("empty-element root then text", format!("{empty}text")),
+            ("declaration after root", format!("{doc}{DECL}")),
+            ("two declarations", format!("{DECL}{DECL}{doc}")),
+            ("comment before declaration", format!("<!--c-->{DECL}{doc}")),
+            ("text before root", format!("text{doc}")),
+            ("unterminated root", open.to_owned()),
+            ("stray end tag", format!("{doc}</stray>")),
+            ("DOCTYPE", format!("{DECL}<!DOCTYPE r>{doc}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{doc}")),
+        ];
+        let actual: Vec<String> = rows
+            .iter()
+            .map(|(label, xml)| format!("{label} => {}", run(xml)))
+            .collect();
+        let listing: Vec<String> = actual.iter().map(|line| format!("{line:?},")).collect();
+        assert!(
+            actual
+                .iter()
+                .map(String::as_str)
+                .eq(expected.iter().copied()),
+            "actual envelope matrix:\n{}",
+            listing.join("\n")
+        );
+    }
+
+    #[test]
+    fn signature_container_envelope_matrix() {
+        assert_envelope_matrix(
+            concat!(
+                r#"<document-signatures xmlns="urn:oasis:names:tc:opendocument:xmlns:digitalsignature:1.0">"#,
+                r#"<Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo>"#,
+                r#"<CanonicalizationMethod Algorithm="c"/><SignatureMethod Algorithm="s"/>"#,
+                r#"<Reference URI="content.xml"><DigestMethod Algorithm="d"/><DigestValue>AAAA</DigestValue></Reference>"#,
+                r#"</SignedInfo><SignatureValue>AAAA</SignatureValue></Signature>"#,
+            ),
+            "</document-signatures>",
+            r#"<document-signatures xmlns="urn:oasis:names:tc:opendocument:xmlns:digitalsignature:1.0"/>"#,
+            &[
+                "empty input => InvalidFormat(\"incomplete ODF signature XML\")",
+                "whitespace only => InvalidFormat(\"incomplete ODF signature XML\")",
+                "declaration only => InvalidFormat(\"incomplete ODF signature XML\")",
+                "empty-element root => InvalidFormat(\"empty or trailing ODF signature root content\")",
+                "start and end root => Ok(signatures=1)",
+                "declaration then root => Ok(signatures=1)",
+                "declaration, whitespace, root => Ok(signatures=1)",
+                "root then whitespace => Ok(signatures=1)",
+                "root then comment => Ok(signatures=1)",
+                "root then PI => InvalidFormat(\"entities, DTDs, and processing instructions are prohibited\")",
+                "root then text => InvalidFormat(\"text is not allowed outside an ODF signature\")",
+                "root then second root => InvalidFormat(\"ODF signature XML contains content after its root element\")",
+                "root then foreign start => InvalidFormat(\"ODF signature XML contains content after its root element\")",
+                "root then foreign empty => InvalidFormat(\"empty or trailing ODF signature root content\")",
+                "empty-element root then second root => InvalidFormat(\"empty or trailing ODF signature root content\")",
+                "empty-element root then text => InvalidFormat(\"empty or trailing ODF signature root content\")",
+                "declaration after root => Ok(signatures=1)",
+                "two declarations => Ok(signatures=1)",
+                "comment before declaration => Ok(signatures=1)",
+                "text before root => InvalidFormat(\"text is not allowed outside an ODF signature\")",
+                "unterminated root => InvalidFormat(\"incomplete ODF signature XML\")",
+                "stray end tag => InvalidFormat(\"invalid ODF signature XML: ill-formed document: close tag `</stray>` does not match any open tag\")",
+                "DOCTYPE => InvalidFormat(\"entities, DTDs, and processing instructions are prohibited\")",
+                "top-level CDATA => InvalidFormat(\"unexpected CDATA in ODF signature XML\")",
+            ],
+            |xml| match parse_signature_container(xml.as_bytes()) {
+                Ok(signatures) => format!("Ok(signatures={})", signatures.len()),
+                Err(error) => format!("{error:?}"),
+            },
+        );
+    }
 }

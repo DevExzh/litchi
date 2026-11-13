@@ -3645,4 +3645,102 @@ mod tests {
             })
         ));
     }
+
+    /// Runs `run` over the XML envelope orderings built around one root element
+    /// and compares each `label => outcome` line with the frozen expectation.
+    fn assert_envelope_matrix(
+        open: &str,
+        close: &str,
+        empty: &str,
+        expected: &[&str],
+        run: impl Fn(&str) -> String,
+    ) {
+        const DECL: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+        let doc = format!("{open}{close}");
+        let rows = [
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECL.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", doc.clone()),
+            ("declaration then root", format!("{DECL}{doc}")),
+            ("declaration, whitespace, root", format!("{DECL}\n{doc}")),
+            ("root then whitespace", format!("{doc}\n ")),
+            ("root then comment", format!("{doc}<!--c-->")),
+            ("root then PI", format!("{doc}<?pi x?>")),
+            ("root then text", format!("{doc}text")),
+            ("root then second root", format!("{doc}{doc}")),
+            (
+                "root then foreign start",
+                format!("{doc}<foreign></foreign>"),
+            ),
+            ("root then foreign empty", format!("{doc}<foreign/>")),
+            (
+                "empty-element root then second root",
+                format!("{empty}{doc}"),
+            ),
+            ("empty-element root then text", format!("{empty}text")),
+            ("declaration after root", format!("{doc}{DECL}")),
+            ("two declarations", format!("{DECL}{DECL}{doc}")),
+            ("comment before declaration", format!("<!--c-->{DECL}{doc}")),
+            ("text before root", format!("text{doc}")),
+            ("unterminated root", open.to_owned()),
+            ("stray end tag", format!("{doc}</stray>")),
+            ("DOCTYPE", format!("{DECL}<!DOCTYPE r>{doc}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{doc}")),
+        ];
+        let actual: Vec<String> = rows
+            .iter()
+            .map(|(label, xml)| format!("{label} => {}", run(xml)))
+            .collect();
+        let listing: Vec<String> = actual.iter().map(|line| format!("{line:?},")).collect();
+        assert!(
+            actual
+                .iter()
+                .map(String::as_str)
+                .eq(expected.iter().copied()),
+            "actual envelope matrix:\n{}",
+            listing.join("\n")
+        );
+    }
+
+    #[test]
+    fn security_scan_envelope_matrix() {
+        assert_envelope_matrix(
+            "<r><c/>",
+            "</r>",
+            "<r/>",
+            &[
+                "empty input => Unsupported { reason: \"XML member is malformed during package-wide security scan\" }",
+                "whitespace only => Unsupported { reason: \"XML member is malformed during package-wide security scan\" }",
+                "declaration only => Unsupported { reason: \"XML member is malformed during package-wide security scan\" }",
+                "empty-element root => Ok",
+                "start and end root => Ok",
+                "declaration then root => Ok",
+                "declaration, whitespace, root => Ok",
+                "root then whitespace => Ok",
+                "root then comment => Ok",
+                "root then PI => Unsupported { reason: \"XML member contains an unsupported processing instruction\" }",
+                "root then text => Unsupported { reason: \"XML member has non-whitespace text outside its root\" }",
+                "root then second root => Unsupported { reason: \"XML member has multiple roots\" }",
+                "root then foreign start => Unsupported { reason: \"XML member has multiple roots\" }",
+                "root then foreign empty => Unsupported { reason: \"XML member has multiple roots\" }",
+                "empty-element root then second root => Unsupported { reason: \"XML member has multiple roots\" }",
+                "empty-element root then text => Unsupported { reason: \"XML member has non-whitespace text outside its root\" }",
+                "declaration after root => Unsupported { reason: \"XML member has a misplaced or repeated declaration\" }",
+                "two declarations => Unsupported { reason: \"XML member has a misplaced or repeated declaration\" }",
+                "comment before declaration => Unsupported { reason: \"XML member has a misplaced or repeated declaration\" }",
+                "text before root => Unsupported { reason: \"XML member has non-whitespace text outside its root\" }",
+                "unterminated root => Unsupported { reason: \"XML member is malformed during package-wide security scan\" }",
+                "stray end tag => Unsupported { reason: \"XML member is malformed during package-wide security scan\" }",
+                "DOCTYPE => Unsupported { reason: \"XML member contains a DTD or entity declaration\" }",
+                "top-level CDATA => Unsupported { reason: \"XML member has CDATA outside its root\" }",
+            ],
+            |xml| match scan_xml_security("content.xml", xml.as_bytes(), OdfRepairLimits::default())
+            {
+                Ok(()) => "Ok".to_owned(),
+                Err(error) => format!("{error:?}"),
+            },
+        );
+    }
 }

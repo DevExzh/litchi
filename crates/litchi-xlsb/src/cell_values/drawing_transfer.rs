@@ -2210,4 +2210,175 @@ mod tests {
             }) if relationship_id == "rId2" && relationship_type == rt::CHART
         ));
     }
+
+    /// Runs `run` over the XML envelope orderings built around one root element
+    /// and compares each `label => outcome` line with the frozen expectation.
+    fn assert_envelope_matrix(
+        open: &str,
+        close: &str,
+        empty: &str,
+        expected: &[&str],
+        run: impl Fn(&str) -> String,
+    ) {
+        const DECL: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+        let doc = format!("{open}{close}");
+        let rows = [
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECL.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", doc.clone()),
+            ("declaration then root", format!("{DECL}{doc}")),
+            ("declaration, whitespace, root", format!("{DECL}\n{doc}")),
+            ("root then whitespace", format!("{doc}\n ")),
+            ("root then comment", format!("{doc}<!--c-->")),
+            ("root then PI", format!("{doc}<?pi x?>")),
+            ("root then text", format!("{doc}text")),
+            ("root then second root", format!("{doc}{doc}")),
+            (
+                "root then foreign start",
+                format!("{doc}<foreign></foreign>"),
+            ),
+            ("root then foreign empty", format!("{doc}<foreign/>")),
+            (
+                "empty-element root then second root",
+                format!("{empty}{doc}"),
+            ),
+            ("empty-element root then text", format!("{empty}text")),
+            ("declaration after root", format!("{doc}{DECL}")),
+            ("two declarations", format!("{DECL}{DECL}{doc}")),
+            ("comment before declaration", format!("<!--c-->{DECL}{doc}")),
+            ("text before root", format!("text{doc}")),
+            ("unterminated root", open.to_owned()),
+            ("stray end tag", format!("{doc}</stray>")),
+            ("DOCTYPE", format!("{DECL}<!DOCTYPE r>{doc}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{doc}")),
+        ];
+        let actual: Vec<String> = rows
+            .iter()
+            .map(|(label, xml)| format!("{label} => {}", run(xml)))
+            .collect();
+        let listing: Vec<String> = actual.iter().map(|line| format!("{line:?},")).collect();
+        assert!(
+            actual
+                .iter()
+                .map(String::as_str)
+                .eq(expected.iter().copied()),
+            "actual envelope matrix:\n{}",
+            listing.join("\n")
+        );
+    }
+
+    fn layout_outcome(xml: &str) -> String {
+        match drawing_layout(xml.as_bytes()) {
+            Ok(layout) => format!(
+                "Ok(strict={}, namespaces={}, anchors={})",
+                layout.strict,
+                layout.namespaces.len(),
+                layout.anchors.len()
+            ),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    #[test]
+    fn drawing_layout_root_envelope_matrix() {
+        let xdr = std::str::from_utf8(XDR).expect("namespace is UTF-8");
+        assert_envelope_matrix(
+            &format!(r#"<xdr:wsDr xmlns:xdr="{xdr}">"#),
+            "</xdr:wsDr>",
+            &format!(r#"<xdr:wsDr xmlns:xdr="{xdr}"/>"#),
+            &[
+                "empty input => InvalidFormat(\"drawing XML is incomplete\")",
+                "whitespace only => InvalidFormat(\"drawing XML is incomplete\")",
+                "declaration only => InvalidFormat(\"drawing XML is incomplete\")",
+                "empty-element root => InvalidFormat(\"drawing XML is incomplete\")",
+                "start and end root => Ok(strict=false, namespaces=1, anchors=0)",
+                "declaration then root => Ok(strict=false, namespaces=1, anchors=0)",
+                "declaration, whitespace, root => Ok(strict=false, namespaces=1, anchors=0)",
+                "root then whitespace => Ok(strict=false, namespaces=1, anchors=0)",
+                "root then comment => Ok(strict=false, namespaces=1, anchors=0)",
+                "root then PI => InvalidFormat(\"drawing transfer rejects DTD and processing instructions\")",
+                "root then text => Ok(strict=false, namespaces=1, anchors=0)",
+                "root then second root => Ok(strict=false, namespaces=1, anchors=0)",
+                "root then foreign start => InvalidFormat(\"drawing transfer requires one xdr:wsDr root\")",
+                "root then foreign empty => Ok(strict=false, namespaces=1, anchors=0)",
+                "empty-element root then second root => Ok(strict=false, namespaces=1, anchors=0)",
+                "empty-element root then text => InvalidFormat(\"drawing XML is incomplete\")",
+                "declaration after root => Ok(strict=false, namespaces=1, anchors=0)",
+                "two declarations => Ok(strict=false, namespaces=1, anchors=0)",
+                "comment before declaration => Ok(strict=false, namespaces=1, anchors=0)",
+                "text before root => Ok(strict=false, namespaces=1, anchors=0)",
+                "unterminated root => InvalidFormat(\"drawing XML is incomplete\")",
+                "stray end tag => Encoding(\"invalid drawing XML\")",
+                "DOCTYPE => InvalidFormat(\"drawing transfer rejects DTD and processing instructions\")",
+                "top-level CDATA => Ok(strict=false, namespaces=1, anchors=0)",
+            ],
+            layout_outcome,
+        );
+    }
+
+    #[test]
+    fn drawing_layout_later_top_level_roots() {
+        let xdr = std::str::from_utf8(XDR).expect("namespace is UTF-8");
+        let strict = std::str::from_utf8(STRICT_XDR).expect("namespace is UTF-8");
+        let transitional_root = format!(
+            r#"<xdr:wsDr xmlns:xdr="{xdr}"><xdr:absoluteAnchor></xdr:absoluteAnchor></xdr:wsDr>"#
+        );
+        let strict_root = format!(
+            r#"<s:wsDr xmlns:s="{strict}" xmlns:a="urn:a"><s:oneCellAnchor></s:oneCellAnchor></s:wsDr>"#
+        );
+        let empty_strict_root = format!(r#"<s:wsDr xmlns:s="{strict}" xmlns:a="urn:a"/>"#);
+        let actual = [
+            format!("transitional => {}", layout_outcome(&transitional_root)),
+            format!("strict => {}", layout_outcome(&strict_root)),
+            format!(
+                "transitional then strict => {}",
+                layout_outcome(&format!("{transitional_root}{strict_root}"))
+            ),
+            format!(
+                "strict then transitional => {}",
+                layout_outcome(&format!("{strict_root}{transitional_root}"))
+            ),
+            format!(
+                "transitional then empty strict => {}",
+                layout_outcome(&format!("{transitional_root}{empty_strict_root}"))
+            ),
+            format!(
+                "empty strict then transitional => {}",
+                layout_outcome(&format!("{empty_strict_root}{transitional_root}"))
+            ),
+            format!(
+                "transitional then other drawing element => {}",
+                layout_outcome(&format!(
+                    "{transitional_root}<xdr:other xmlns:xdr=\"{xdr}\"></xdr:other>"
+                ))
+            ),
+            format!(
+                "transitional then empty other drawing element => {}",
+                layout_outcome(&format!(
+                    "{transitional_root}<xdr:other xmlns:xdr=\"{xdr}\"/>"
+                ))
+            ),
+        ];
+        let expected: &[&str] = &[
+            "transitional => Ok(strict=false, namespaces=1, anchors=1)",
+            "strict => Ok(strict=true, namespaces=2, anchors=1)",
+            "transitional then strict => Ok(strict=true, namespaces=2, anchors=2)",
+            "strict then transitional => Ok(strict=false, namespaces=1, anchors=2)",
+            "transitional then empty strict => Ok(strict=false, namespaces=1, anchors=1)",
+            "empty strict then transitional => Ok(strict=false, namespaces=1, anchors=1)",
+            "transitional then other drawing element => InvalidFormat(\"drawing transfer requires one xdr:wsDr root\")",
+            "transitional then empty other drawing element => Ok(strict=false, namespaces=1, anchors=1)",
+        ];
+        let listing: Vec<String> = actual.iter().map(|line| format!("{line:?},")).collect();
+        assert!(
+            actual
+                .iter()
+                .map(String::as_str)
+                .eq(expected.iter().copied()),
+            "actual envelope matrix:\n{}",
+            listing.join("\n")
+        );
+    }
 }

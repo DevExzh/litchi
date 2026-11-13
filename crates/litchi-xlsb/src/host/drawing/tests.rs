@@ -295,3 +295,103 @@ fn xml_limits_bound_drawing_input_bytes() {
     assert!(parse_drawing_part(&bytes, input(bytes.len() as u64)).is_ok());
     assert!(parse_drawing_part(&bytes, input(bytes.len() as u64 - 1)).is_err());
 }
+
+/// Runs `run` over the XML envelope orderings built around one root element
+/// and compares each `label => outcome` line with the frozen expectation.
+fn assert_envelope_matrix(
+    open: &str,
+    close: &str,
+    empty: &str,
+    expected: &[&str],
+    run: impl Fn(&str) -> String,
+) {
+    const DECL: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+    let doc = format!("{open}{close}");
+    let rows = [
+        ("empty input", String::new()),
+        ("whitespace only", " \n".to_owned()),
+        ("declaration only", DECL.to_owned()),
+        ("empty-element root", empty.to_owned()),
+        ("start and end root", doc.clone()),
+        ("declaration then root", format!("{DECL}{doc}")),
+        ("declaration, whitespace, root", format!("{DECL}\n{doc}")),
+        ("root then whitespace", format!("{doc}\n ")),
+        ("root then comment", format!("{doc}<!--c-->")),
+        ("root then PI", format!("{doc}<?pi x?>")),
+        ("root then text", format!("{doc}text")),
+        ("root then second root", format!("{doc}{doc}")),
+        (
+            "root then foreign start",
+            format!("{doc}<foreign></foreign>"),
+        ),
+        ("root then foreign empty", format!("{doc}<foreign/>")),
+        (
+            "empty-element root then second root",
+            format!("{empty}{doc}"),
+        ),
+        ("empty-element root then text", format!("{empty}text")),
+        ("declaration after root", format!("{doc}{DECL}")),
+        ("two declarations", format!("{DECL}{DECL}{doc}")),
+        ("comment before declaration", format!("<!--c-->{DECL}{doc}")),
+        ("text before root", format!("text{doc}")),
+        ("unterminated root", open.to_owned()),
+        ("stray end tag", format!("{doc}</stray>")),
+        ("DOCTYPE", format!("{DECL}<!DOCTYPE r>{doc}")),
+        ("top-level CDATA", format!("<![CDATA[x]]>{doc}")),
+    ];
+    let actual: Vec<String> = rows
+        .iter()
+        .map(|(label, xml)| format!("{label} => {}", run(xml)))
+        .collect();
+    let listing: Vec<String> = actual.iter().map(|line| format!("{line:?},")).collect();
+    assert!(
+        actual
+            .iter()
+            .map(String::as_str)
+            .eq(expected.iter().copied()),
+        "actual envelope matrix:\n{}",
+        listing.join("\n")
+    );
+}
+
+#[test]
+fn drawing_root_envelope_matrix() {
+    assert_envelope_matrix(
+        &format!(r#"<xdr:wsDr xmlns:xdr="{XDR_NS}">"#),
+        "</xdr:wsDr>",
+        &format!(r#"<xdr:wsDr xmlns:xdr="{XDR_NS}"/>"#),
+        &[
+            "empty input => InvalidFormat(\"drawing part is missing xdr:wsDr\")",
+            "whitespace only => InvalidFormat(\"drawing part is missing xdr:wsDr\")",
+            "declaration only => InvalidFormat(\"drawing part is missing xdr:wsDr\")",
+            "empty-element root => Ok(anchors=0)",
+            "start and end root => Ok(anchors=0)",
+            "declaration then root => Ok(anchors=0)",
+            "declaration, whitespace, root => Ok(anchors=0)",
+            "root then whitespace => Ok(anchors=0)",
+            "root then comment => Ok(anchors=0)",
+            "root then PI => Ok(anchors=0)",
+            "root then text => Ok(anchors=0)",
+            "root then second root => InvalidFormat(\"drawing XML contains multiple root elements\")",
+            "root then foreign start => InvalidFormat(\"drawing XML contains multiple root elements\")",
+            "root then foreign empty => InvalidFormat(\"drawing part root is not xdr:wsDr\")",
+            "empty-element root then second root => Ok(anchors=0)",
+            "empty-element root then text => Ok(anchors=0)",
+            "declaration after root => Ok(anchors=0)",
+            "two declarations => Ok(anchors=0)",
+            "comment before declaration => Ok(anchors=0)",
+            "text before root => Ok(anchors=0)",
+            "unterminated root => InvalidFormat(\"drawing XML ends inside the root element\")",
+            "stray end tag => Xml(IllFormed(UnmatchedEndTag(\"stray\")))",
+            "DOCTYPE => Ok(anchors=0)",
+            "top-level CDATA => Ok(anchors=0)",
+        ],
+        |xml| match parse_drawing_part(
+            xml.as_bytes(),
+            litchi_core::Limits::for_profile(litchi_core::Profile::Server),
+        ) {
+            Ok(drawing) => format!("Ok(anchors={})", drawing.anchors.len()),
+            Err(error) => format!("{error:?}"),
+        },
+    );
+}

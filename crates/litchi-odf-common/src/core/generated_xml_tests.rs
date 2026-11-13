@@ -240,3 +240,119 @@ fn envelope_shape_requires_direct_boundary_and_rejects_inherited_space() {
     assert!(GeneratedXmlEnvelope::try_new(b"<root xml:space=\"preserve\">", b"</root>").is_err());
     assert!(GeneratedXmlEnvelope::try_new(b"<root>text", b"</root>").is_err());
 }
+
+/// Runs `run` over the XML envelope orderings built around one root element
+/// and compares each `label => outcome` line with the frozen expectation.
+fn assert_envelope_matrix(
+    open: &str,
+    close: &str,
+    empty: &str,
+    expected: &[&str],
+    run: impl Fn(&str) -> String,
+) {
+    const DECL: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+    let doc = format!("{open}{close}");
+    let rows = [
+        ("empty input", String::new()),
+        ("whitespace only", " \n".to_owned()),
+        ("declaration only", DECL.to_owned()),
+        ("empty-element root", empty.to_owned()),
+        ("start and end root", doc.clone()),
+        ("declaration then root", format!("{DECL}{doc}")),
+        ("declaration, whitespace, root", format!("{DECL}\n{doc}")),
+        ("root then whitespace", format!("{doc}\n ")),
+        ("root then comment", format!("{doc}<!--c-->")),
+        ("root then PI", format!("{doc}<?pi x?>")),
+        ("root then text", format!("{doc}text")),
+        ("root then second root", format!("{doc}{doc}")),
+        (
+            "root then foreign start",
+            format!("{doc}<foreign></foreign>"),
+        ),
+        ("root then foreign empty", format!("{doc}<foreign/>")),
+        (
+            "empty-element root then second root",
+            format!("{empty}{doc}"),
+        ),
+        ("empty-element root then text", format!("{empty}text")),
+        ("declaration after root", format!("{doc}{DECL}")),
+        ("two declarations", format!("{DECL}{DECL}{doc}")),
+        ("comment before declaration", format!("<!--c-->{DECL}{doc}")),
+        ("text before root", format!("text{doc}")),
+        ("unterminated root", open.to_owned()),
+        ("stray end tag", format!("{doc}</stray>")),
+        ("DOCTYPE", format!("{DECL}<!DOCTYPE r>{doc}")),
+        ("top-level CDATA", format!("<![CDATA[x]]>{doc}")),
+    ];
+    let actual: Vec<String> = rows
+        .iter()
+        .map(|(label, xml)| format!("{label} => {}", run(xml)))
+        .collect();
+    let listing: Vec<String> = actual.iter().map(|line| format!("{line:?},")).collect();
+    assert!(
+        actual
+            .iter()
+            .map(String::as_str)
+            .eq(expected.iter().copied()),
+        "actual envelope matrix:\n{}",
+        listing.join("\n")
+    );
+}
+
+#[test]
+fn generated_fragment_envelope_matrix() {
+    assert_envelope_matrix(
+        "<r><c/>",
+        "</r>",
+        "<r/>",
+        &[
+            "empty input => InvalidFormat(\"generated XML: producer returned a non-EOF result without a fragment\")",
+            "whitespace only => InvalidFormat(\"generated XML: XML audit failed: noncompact XML FormattingWhitespace at byte 0\")",
+            "declaration only => InvalidFormat(\"generated XML: XML audit failed: malformed XML at byte 38: XML must contain exactly one document element\")",
+            "empty-element root => Ok(bytes=17, fragments=1)",
+            "start and end root => Ok(bytes=24, fragments=1)",
+            "declaration then root => InvalidFormat(\"generated XML: fragment contains a declaration, doctype, comment, or processing instruction\")",
+            "declaration, whitespace, root => InvalidFormat(\"generated XML: XML audit failed: noncompact XML FormattingWhitespace at byte 38\")",
+            "root then whitespace => InvalidFormat(\"generated XML: XML audit failed: noncompact XML FormattingWhitespace at byte 11\")",
+            "root then comment => InvalidFormat(\"generated XML: fragment contains a declaration, doctype, comment, or processing instruction\")",
+            "root then PI => InvalidFormat(\"generated XML: fragment contains a declaration, doctype, comment, or processing instruction\")",
+            "root then text => InvalidFormat(\"generated XML: XML audit failed: malformed XML at byte 11: character data outside the document element\")",
+            "root then second root => InvalidFormat(\"generated XML: XML audit failed: malformed XML at byte 11: multiple document elements\")",
+            "root then foreign start => InvalidFormat(\"generated XML: XML audit failed: malformed XML at byte 11: multiple document elements\")",
+            "root then foreign empty => InvalidFormat(\"generated XML: XML audit failed: malformed XML at byte 11: multiple document elements\")",
+            "empty-element root then second root => InvalidFormat(\"generated XML: XML audit failed: malformed XML at byte 4: multiple document elements\")",
+            "empty-element root then text => InvalidFormat(\"generated XML: XML audit failed: malformed XML at byte 4: character data outside the document element\")",
+            "declaration after root => InvalidFormat(\"generated XML: fragment contains a declaration, doctype, comment, or processing instruction\")",
+            "two declarations => InvalidFormat(\"generated XML: fragment contains a declaration, doctype, comment, or processing instruction\")",
+            "comment before declaration => InvalidFormat(\"generated XML: fragment contains a declaration, doctype, comment, or processing instruction\")",
+            "text before root => InvalidFormat(\"generated XML: XML audit failed: malformed XML at byte 0: character data outside the document element\")",
+            "unterminated root => InvalidFormat(\"generated XML: XML audit failed: malformed XML at byte 7: unclosed document element\")",
+            "stray end tag => InvalidFormat(\"generated XML: XML audit failed: malformed XML at byte 19: ill-formed document: close tag `</stray>` does not match any open tag\")",
+            "DOCTYPE => InvalidFormat(\"generated XML: XML audit failed: DTD and DOCTYPE are not allowed at byte 38\")",
+            "top-level CDATA => InvalidFormat(\"generated XML: XML audit failed: malformed XML at byte 0: CDATA outside the document element\")",
+        ],
+        |xml| {
+            let envelope = match GeneratedXmlEnvelope::try_new(b"<root>", b"</root>") {
+                Ok(envelope) => envelope,
+                Err(error) => return format!("{error:?}"),
+            };
+            let mut pending = Some(xml.as_bytes());
+            match read_all(envelope, 4096, |output| match pending.take() {
+                Some(fragment) => {
+                    output.write_all(fragment).map_err(Error::Io)?;
+                    Ok(true)
+                },
+                None => Ok(false),
+            }) {
+                Ok((bytes, report)) => {
+                    format!(
+                        "Ok(bytes={}, fragments={})",
+                        bytes.len(),
+                        report.fragments()
+                    )
+                },
+                Err(error) => format!("{error:?}"),
+            }
+        },
+    );
+}

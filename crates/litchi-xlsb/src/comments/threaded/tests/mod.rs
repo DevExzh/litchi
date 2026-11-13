@@ -583,3 +583,198 @@ fn threaded_graph_removal_uses_the_resolved_root_workbook() {
             .all(|relationship| relationship.reltype() != PERSONS_RELATIONSHIP_TYPE)
     );
 }
+
+/// Runs `run` over the XML envelope orderings built around one root element
+/// and compares each `label => outcome` line with the frozen expectation.
+fn assert_envelope_matrix(
+    open: &str,
+    close: &str,
+    empty: &str,
+    expected: &[&str],
+    run: impl Fn(&str) -> String,
+) {
+    const DECL: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+    let doc = format!("{open}{close}");
+    let rows = [
+        ("empty input", String::new()),
+        ("whitespace only", " \n".to_owned()),
+        ("declaration only", DECL.to_owned()),
+        ("empty-element root", empty.to_owned()),
+        ("start and end root", doc.clone()),
+        ("declaration then root", format!("{DECL}{doc}")),
+        ("declaration, whitespace, root", format!("{DECL}\n{doc}")),
+        ("root then whitespace", format!("{doc}\n ")),
+        ("root then comment", format!("{doc}<!--c-->")),
+        ("root then PI", format!("{doc}<?pi x?>")),
+        ("root then text", format!("{doc}text")),
+        ("root then second root", format!("{doc}{doc}")),
+        (
+            "root then foreign start",
+            format!("{doc}<foreign></foreign>"),
+        ),
+        ("root then foreign empty", format!("{doc}<foreign/>")),
+        (
+            "empty-element root then second root",
+            format!("{empty}{doc}"),
+        ),
+        ("empty-element root then text", format!("{empty}text")),
+        ("declaration after root", format!("{doc}{DECL}")),
+        ("two declarations", format!("{DECL}{DECL}{doc}")),
+        ("comment before declaration", format!("<!--c-->{DECL}{doc}")),
+        ("text before root", format!("text{doc}")),
+        ("unterminated root", open.to_owned()),
+        ("stray end tag", format!("{doc}</stray>")),
+        ("DOCTYPE", format!("{DECL}<!DOCTYPE r>{doc}")),
+        ("top-level CDATA", format!("<![CDATA[x]]>{doc}")),
+    ];
+    let actual: Vec<String> = rows
+        .iter()
+        .map(|(label, xml)| format!("{label} => {}", run(xml)))
+        .collect();
+    let listing: Vec<String> = actual.iter().map(|line| format!("{line:?},")).collect();
+    assert!(
+        actual
+            .iter()
+            .map(String::as_str)
+            .eq(expected.iter().copied()),
+        "actual envelope matrix:\n{}",
+        listing.join("\n")
+    );
+}
+
+#[test]
+fn persons_root_envelope_matrix() {
+    assert_envelope_matrix(
+        &format!(r#"<personList xmlns="{NS}"><x:e xmlns:x="urn:x"/>"#),
+        "</personList>",
+        &format!(r#"<personList xmlns="{NS}"/>"#),
+        &[
+            "empty input => Invalid(\"persons part has a missing or unterminated root\")",
+            "whitespace only => Invalid(\"invalid persons XML structure\")",
+            "declaration only => Invalid(\"persons part has a missing or unterminated root\")",
+            "empty-element root => Ok(persons=0, extensions=0)",
+            "start and end root => Ok(persons=0, extensions=1)",
+            "declaration then root => Ok(persons=0, extensions=1)",
+            "declaration, whitespace, root => Invalid(\"invalid persons XML structure\")",
+            "root then whitespace => Invalid(\"invalid persons XML structure\")",
+            "root then comment => Ok(persons=0, extensions=1)",
+            "root then PI => Invalid(\"invalid persons XML structure\")",
+            "root then text => Invalid(\"invalid persons XML structure\")",
+            "root then second root => Invalid(\"invalid persons XML structure\")",
+            "root then foreign start => Invalid(\"invalid persons XML structure\")",
+            "root then foreign empty => Invalid(\"invalid persons XML structure\")",
+            "empty-element root then second root => Ok(persons=0, extensions=0)",
+            "empty-element root then text => Ok(persons=0, extensions=0)",
+            "declaration after root => Ok(persons=0, extensions=1)",
+            "two declarations => Ok(persons=0, extensions=1)",
+            "comment before declaration => Ok(persons=0, extensions=1)",
+            "text before root => Invalid(\"invalid persons XML structure\")",
+            "unterminated root => Invalid(\"persons part has a missing or unterminated root\")",
+            "stray end tag => Encoding(\"the text cannot be decoded\")",
+            "DOCTYPE => Ok(persons=0, extensions=1)",
+            "top-level CDATA => Invalid(\"invalid persons XML structure\")",
+        ],
+        |xml| match parse_persons(
+            xml,
+            litchi_core::Limits::for_profile(litchi_core::Profile::Server),
+        ) {
+            Ok(people) => format!(
+                "Ok(persons={}, extensions={})",
+                people.persons.len(),
+                people.extensions.len()
+            ),
+            Err(error) => format!("{error:?}"),
+        },
+    );
+}
+
+#[test]
+fn comments_root_envelope_matrix() {
+    assert_envelope_matrix(
+        &format!(r#"<ThreadedComments xmlns="{NS}"><x:e xmlns:x="urn:x"/>"#),
+        "</ThreadedComments>",
+        &format!(r#"<ThreadedComments xmlns="{NS}"/>"#),
+        &[
+            "empty input => Invalid(\"threaded-comments part has a missing or unterminated root\")",
+            "whitespace only => Invalid(\"invalid threaded-comments XML structure\")",
+            "declaration only => Invalid(\"threaded-comments part has a missing or unterminated root\")",
+            "empty-element root => Ok(comments=0, extensions=0)",
+            "start and end root => Ok(comments=0, extensions=1)",
+            "declaration then root => Ok(comments=0, extensions=1)",
+            "declaration, whitespace, root => Invalid(\"invalid threaded-comments XML structure\")",
+            "root then whitespace => Invalid(\"invalid threaded-comments XML structure\")",
+            "root then comment => Ok(comments=0, extensions=1)",
+            "root then PI => Invalid(\"invalid threaded-comments XML structure\")",
+            "root then text => Invalid(\"invalid threaded-comments XML structure\")",
+            "root then second root => Invalid(\"invalid threaded-comments XML structure\")",
+            "root then foreign start => Invalid(\"invalid threaded-comments XML structure\")",
+            "root then foreign empty => Invalid(\"invalid threaded-comments XML structure\")",
+            "empty-element root then second root => Ok(comments=0, extensions=0)",
+            "empty-element root then text => Ok(comments=0, extensions=0)",
+            "declaration after root => Ok(comments=0, extensions=1)",
+            "two declarations => Ok(comments=0, extensions=1)",
+            "comment before declaration => Ok(comments=0, extensions=1)",
+            "text before root => Invalid(\"invalid threaded-comments XML structure\")",
+            "unterminated root => Invalid(\"threaded-comments part has a missing or unterminated root\")",
+            "stray end tag => Encoding(\"the text cannot be decoded\")",
+            "DOCTYPE => Ok(comments=0, extensions=1)",
+            "top-level CDATA => Invalid(\"invalid threaded-comments XML structure\")",
+        ],
+        |xml| match parse_comments(
+            xml,
+            litchi_core::Limits::for_profile(litchi_core::Profile::Server),
+        ) {
+            Ok(comments) => format!(
+                "Ok(comments={}, extensions={})",
+                comments.comments.len(),
+                comments.extensions.len()
+            ),
+            Err(error) => format!("{error:?}"),
+        },
+    );
+}
+
+#[test]
+fn preserved_fragment_envelope_matrix() {
+    assert_envelope_matrix(
+        r#"<x:e xmlns:x="urn:x"><x:child/>"#,
+        "</x:e>",
+        r#"<x:e xmlns:x="urn:x"/>"#,
+        &[
+            "empty input => Invalid(\"preserved XML extension is empty\")",
+            "whitespace only => Invalid(\"preserved XML fragment is incomplete\")",
+            "declaration only => Invalid(\"preserved XML fragments cannot contain declarations\")",
+            "empty-element root => Ok",
+            "start and end root => Ok",
+            "declaration then root => Invalid(\"preserved XML fragments cannot contain declarations\")",
+            "declaration, whitespace, root => Invalid(\"preserved XML fragments cannot contain declarations\")",
+            "root then whitespace => Ok",
+            "root then comment => Invalid(\"preserved XML has a non-element outside its root\")",
+            "root then PI => Invalid(\"preserved XML has a non-element outside its root\")",
+            "root then text => Invalid(\"preserved XML has character data outside its root\")",
+            "root then second root => Invalid(\"preserved XML has multiple root elements\")",
+            "root then foreign start => Invalid(\"preserved XML has multiple root elements\")",
+            "root then foreign empty => Invalid(\"preserved XML has multiple root elements\")",
+            "empty-element root then second root => Invalid(\"preserved XML has multiple root elements\")",
+            "empty-element root then text => Invalid(\"preserved XML has character data outside its root\")",
+            "declaration after root => Invalid(\"preserved XML fragments cannot contain declarations\")",
+            "two declarations => Invalid(\"preserved XML fragments cannot contain declarations\")",
+            "comment before declaration => Invalid(\"preserved XML has a non-element outside its root\")",
+            "text before root => Invalid(\"preserved XML has character data outside its root\")",
+            "unterminated root => Invalid(\"preserved XML fragment is incomplete\")",
+            "stray end tag => Encoding(\"the text cannot be decoded\")",
+            "DOCTYPE => Invalid(\"preserved XML fragments cannot contain declarations\")",
+            "top-level CDATA => Invalid(\"preserved XML has character data outside its root\")",
+        ],
+        |xml| {
+            let people = People {
+                extensions: vec![RawXml::new(xml.as_bytes().to_vec())],
+                ..People::new()
+            };
+            match super::validation::validate_people(&people) {
+                Ok(()) => "Ok".to_owned(),
+                Err(error) => format!("{error:?}"),
+            }
+        },
+    );
+}

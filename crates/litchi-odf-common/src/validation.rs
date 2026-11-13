@@ -2292,3 +2292,116 @@ fn check(
 ) -> Result<ValidationCheck, OdfValidationError> {
     Ok(ValidationCheck::new(id(value, limits)?, status))
 }
+
+#[cfg(test)]
+mod envelope_tests {
+    use super::{OdfValidationLimits, XmlInspectionError, inspect_xml};
+
+    /// Runs `run` over the XML envelope orderings built around one root element
+    /// and compares each `label => outcome` line with the frozen expectation.
+    fn assert_envelope_matrix(
+        open: &str,
+        close: &str,
+        empty: &str,
+        expected: &[&str],
+        run: impl Fn(&str) -> String,
+    ) {
+        const DECL: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+        let doc = format!("{open}{close}");
+        let rows = [
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECL.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", doc.clone()),
+            ("declaration then root", format!("{DECL}{doc}")),
+            ("declaration, whitespace, root", format!("{DECL}\n{doc}")),
+            ("root then whitespace", format!("{doc}\n ")),
+            ("root then comment", format!("{doc}<!--c-->")),
+            ("root then PI", format!("{doc}<?pi x?>")),
+            ("root then text", format!("{doc}text")),
+            ("root then second root", format!("{doc}{doc}")),
+            (
+                "root then foreign start",
+                format!("{doc}<foreign></foreign>"),
+            ),
+            ("root then foreign empty", format!("{doc}<foreign/>")),
+            (
+                "empty-element root then second root",
+                format!("{empty}{doc}"),
+            ),
+            ("empty-element root then text", format!("{empty}text")),
+            ("declaration after root", format!("{doc}{DECL}")),
+            ("two declarations", format!("{DECL}{DECL}{doc}")),
+            ("comment before declaration", format!("<!--c-->{DECL}{doc}")),
+            ("text before root", format!("text{doc}")),
+            ("unterminated root", open.to_owned()),
+            ("stray end tag", format!("{doc}</stray>")),
+            ("DOCTYPE", format!("{DECL}<!DOCTYPE r>{doc}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{doc}")),
+        ];
+        let actual: Vec<String> = rows
+            .iter()
+            .map(|(label, xml)| format!("{label} => {}", run(xml)))
+            .collect();
+        let listing: Vec<String> = actual.iter().map(|line| format!("{line:?},")).collect();
+        assert!(
+            actual
+                .iter()
+                .map(String::as_str)
+                .eq(expected.iter().copied()),
+            "actual envelope matrix:\n{}",
+            listing.join("\n")
+        );
+    }
+
+    #[test]
+    fn inspection_envelope_matrix() {
+        assert_envelope_matrix(
+            "<r><c/>",
+            "</r>",
+            "<r/>",
+            &[
+                "empty input => Malformed { offset: 0, doctype: false }",
+                "whitespace only => Malformed { offset: 2, doctype: false }",
+                "declaration only => Malformed { offset: 38, doctype: false }",
+                "empty-element root => Ok(manifest=false, entries=0, external=0)",
+                "start and end root => Ok(manifest=false, entries=0, external=0)",
+                "declaration then root => Ok(manifest=false, entries=0, external=0)",
+                "declaration, whitespace, root => Ok(manifest=false, entries=0, external=0)",
+                "root then whitespace => Ok(manifest=false, entries=0, external=0)",
+                "root then comment => Ok(manifest=false, entries=0, external=0)",
+                "root then PI => Ok(manifest=false, entries=0, external=0)",
+                "root then text => Malformed { offset: 11, doctype: false }",
+                "root then second root => Malformed { offset: 11, doctype: false }",
+                "root then foreign start => Malformed { offset: 11, doctype: false }",
+                "root then foreign empty => Malformed { offset: 11, doctype: false }",
+                "empty-element root then second root => Malformed { offset: 4, doctype: false }",
+                "empty-element root then text => Malformed { offset: 4, doctype: false }",
+                "declaration after root => Ok(manifest=false, entries=0, external=0)",
+                "two declarations => Ok(manifest=false, entries=0, external=0)",
+                "comment before declaration => Ok(manifest=false, entries=0, external=0)",
+                "text before root => Malformed { offset: 0, doctype: false }",
+                "unterminated root => Malformed { offset: 7, doctype: false }",
+                "stray end tag => Malformed { offset: 11, doctype: false }",
+                "DOCTYPE => Malformed { offset: 38, doctype: true }",
+                "top-level CDATA => Malformed { offset: 0, doctype: false }",
+            ],
+            |xml| match inspect_xml(xml.as_bytes(), OdfValidationLimits::default()) {
+                Ok(observations) => format!(
+                    "Ok(manifest={}, entries={}, external={})",
+                    observations.root_is_manifest,
+                    observations.manifest_entries,
+                    observations.external_references
+                ),
+                Err(XmlInspectionError::Limit(message)) => format!("Limit({message:?})"),
+                Err(XmlInspectionError::Malformed { offset, doctype }) => {
+                    format!("Malformed {{ offset: {offset}, doctype: {doctype} }}")
+                },
+                Err(XmlInspectionError::ManifestStructure { offset }) => {
+                    format!("ManifestStructure {{ offset: {offset} }}")
+                },
+            },
+        );
+    }
+}
