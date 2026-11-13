@@ -217,6 +217,29 @@ pub(crate) fn inspect_tracked_changes_source(xml: &str, limits: &Limits) -> Resu
     Ok(source)
 }
 
+/// Where source inspection stands relative to the document element.
+///
+/// ```text
+/// Prolog   --declaration--> Declared
+/// Declared | Open | Closed --declaration--> error (misplaced or duplicate)
+/// Prolog | Declared --root start tag--> Open
+/// Prolog | Declared --empty-element root--> Closed
+/// Open     --root end tag--> Closed
+/// Closed   --start tag or empty element--> error (more than one root element)
+/// ```
+///
+/// A comment or processing instruction is accepted in every phase and may
+/// precede the declaration. Character data, CDATA and entity references
+/// outside the root are judged by the element stack, and a DOCTYPE is
+/// refused everywhere. The end of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Declared,
+    Open,
+    Closed,
+}
+
 fn inspect_source(xml: &str, limits: &Limits) -> Result<SourceMap> {
     if xml.len() > limits.max_input_bytes() {
         return invalid("spreadsheet tracked-change XML exceeds the configured input limit");
@@ -234,9 +257,7 @@ fn inspect_source(xml: &str, limits: &Limits) -> Result<SourceMap> {
     let mut spreadsheet = None;
     let mut owner = None;
     let mut active_record = None::<PendingRecord>;
-    let mut root_seen = false;
-    let mut root_closed = false;
-    let mut declaration_seen = false;
+    let mut phase = RootPhase::Prolog;
     let mut spreadsheet_child_seen = false;
     let mut events = 0usize;
     let mut nodes = 0usize;
@@ -268,10 +289,12 @@ fn inspect_source(xml: &str, limits: &Limits) -> Result<SourceMap> {
                     return invalid("spreadsheet tracked-change XML exceeds the depth limit");
                 }
                 if stack.is_empty() {
-                    if root_seen || root_closed {
-                        return invalid("ODS content.xml has more than one root element");
+                    match phase {
+                        RootPhase::Prolog | RootPhase::Declared => phase = RootPhase::Open,
+                        RootPhase::Open | RootPhase::Closed => {
+                            return invalid("ODS content.xml has more than one root element");
+                        },
                     }
-                    root_seen = true;
                 }
                 let local = decode_name(element.local_name().as_ref(), "element")?;
                 let parent = stack.last().map(|open| open.kind);
@@ -418,7 +441,7 @@ fn inspect_source(xml: &str, limits: &Limits) -> Result<SourceMap> {
                         semantic_bytes,
                     )?;
                     if stack.is_empty() {
-                        root_closed = true;
+                        phase = RootPhase::Closed;
                     }
                 } else {
                     stack.push(opened);
@@ -444,7 +467,7 @@ fn inspect_source(xml: &str, limits: &Limits) -> Result<SourceMap> {
                     semantic_bytes,
                 )?;
                 if stack.is_empty() {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
             },
             Event::Text(text) => {
@@ -502,11 +525,11 @@ fn inspect_source(xml: &str, limits: &Limits) -> Result<SourceMap> {
                 }
                 let _ = reference;
             },
-            Event::Decl(_) => {
-                if declaration_seen || root_seen || root_closed {
+            Event::Decl(_) => match phase {
+                RootPhase::Prolog => phase = RootPhase::Declared,
+                RootPhase::Declared | RootPhase::Open | RootPhase::Closed => {
                     return invalid("misplaced or duplicate XML declaration");
-                }
-                declaration_seen = true;
+                },
             },
             Event::PI(_) => {
                 if stack.iter().any(|open| open.kind == HostKind::Owner) {
@@ -535,7 +558,11 @@ fn inspect_source(xml: &str, limits: &Limits) -> Result<SourceMap> {
         }
         buffer.clear();
     }
-    if !root_seen || !root_closed || !stack.is_empty() {
+    let complete = match phase {
+        RootPhase::Prolog | RootPhase::Declared | RootPhase::Open => false,
+        RootPhase::Closed => stack.is_empty(),
+    };
+    if !complete {
         return invalid("incomplete ODS content.xml document");
     }
     if body.is_none() {

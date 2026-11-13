@@ -233,6 +233,30 @@ pub(crate) fn scan(source: &[u8], owner: Owner) -> Result<Catalog<'_>> {
     scan_with_limits(source, owner, Limits::default())
 }
 
+/// Where the owner scan stands relative to the document element.
+///
+/// ```text
+/// Start  --declaration--> Prolog
+/// Start  --text, comment or processing instruction--> Prolog
+/// Prolog | Open | Closed --declaration--> error (out of order)
+/// Start | Prolog --root start tag--> Open
+/// Start | Prolog --empty-element root--> Closed
+/// Open   --end tag of the root--> Closed
+/// Closed --start tag or empty element--> error (multiple document roots)
+/// ```
+///
+/// The declaration is accepted only as the very first event. Outside `Open`,
+/// text must be whitespace, and CDATA and references are refused; a comment
+/// or processing instruction is accepted in every phase and a DOCTYPE in
+/// none. The end of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Start,
+    Prolog,
+    Open,
+    Closed,
+}
+
 /// Scan one XML owner with caller limits intersected with hard ceilings.
 pub(crate) fn scan_with_limits(source: &[u8], owner: Owner, limits: Limits) -> Result<Catalog<'_>> {
     let limits = limits.bounded();
@@ -270,8 +294,7 @@ pub(crate) fn scan_with_limits(source: &[u8], owner: Owner, limits: Limits) -> R
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Start;
     let mut root_class = ElementKind::Unknown;
     let expected_container = match owner {
         Owner::ContentAutomatic => ElementKind::AutomaticStyles,
@@ -288,8 +311,6 @@ pub(crate) fn scan_with_limits(source: &[u8], owner: Owner, limits: Limits) -> R
     let mut active = None::<StyleCapture>;
     let mut entries = Vec::new();
     let mut element_count = 0usize;
-    let mut declaration_seen = false;
-    let mut prolog_misc_seen = false;
 
     loop {
         let event_start = checked_position(&reader)?;
@@ -340,15 +361,15 @@ pub(crate) fn scan_with_limits(source: &[u8], owner: Owner, limits: Limits) -> R
                         "ODS data-style owner exceeds its depth limit",
                     );
                 }
-                if !root_seen {
-                    root_seen = true;
+                if matches!(phase, RootPhase::Start | RootPhase::Prolog) {
+                    phase = RootPhase::Open;
                     root_class = class;
                     if class != expected_document_root {
                         return invalid(format!(
                             "ODS data-style owner has an invalid document root for {owner:?}"
                         ));
                     }
-                } else if root_closed {
+                } else if phase == RootPhase::Closed {
                     return invalid("ODS data-style owner has multiple document roots");
                 }
                 let direct_root_child = stack.len() == 1;
@@ -454,16 +475,15 @@ pub(crate) fn scan_with_limits(source: &[u8], owner: Owner, limits: Limits) -> R
                         "ODS data-style owner exceeds its depth limit",
                     );
                 }
-                if !root_seen {
-                    root_seen = true;
+                if matches!(phase, RootPhase::Start | RootPhase::Prolog) {
                     root_class = class;
                     if class != expected_document_root {
                         return invalid(format!(
                             "ODS data-style owner has an invalid document root for {owner:?}"
                         ));
                     }
-                    root_closed = true;
-                } else if root_closed {
+                    phase = RootPhase::Closed;
+                } else if phase == RootPhase::Closed {
                     return invalid("ODS data-style owner has multiple document roots");
                 }
                 let direct_root_child = stack.len() == 1;
@@ -545,7 +565,7 @@ pub(crate) fn scan_with_limits(source: &[u8], owner: Owner, limits: Limits) -> R
                     }
                 }
                 if frame_class == root_class && stack.len() == 1 {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
                 if let Some(depth) = owner_depth {
                     if stack.len() == depth {
@@ -568,8 +588,8 @@ pub(crate) fn scan_with_limits(source: &[u8], owner: Owner, limits: Limits) -> R
                     invalid_error(format!("invalid ODS data-style text: {error}"))
                 })?;
                 validate_xml_characters(decoded.as_ref(), "ODS data-style text")?;
-                if !root_seen {
-                    prolog_misc_seen = true;
+                if phase == RootPhase::Start {
+                    phase = RootPhase::Prolog;
                 }
                 if let Some(capture) = active.as_mut() {
                     capture.text(&decoded, &limits)?;
@@ -577,7 +597,7 @@ pub(crate) fn scan_with_limits(source: &[u8], owner: Owner, limits: Limits) -> R
                     && !is_xml_whitespace_only(decoded.as_ref())
                 {
                     return invalid("ODS data-style owner container contains non-whitespace text");
-                } else if root_closed || !root_seen {
+                } else if phase != RootPhase::Open {
                     if !is_xml_whitespace_only(decoded.as_ref()) {
                         return invalid(
                             "ODS data-style owner has non-whitespace text outside its root",
@@ -601,7 +621,7 @@ pub(crate) fn scan_with_limits(source: &[u8], owner: Owner, limits: Limits) -> R
                     && !is_xml_whitespace_only(decoded.as_ref())
                 {
                     return invalid("ODS data-style owner container contains non-whitespace CDATA");
-                } else if root_closed || !root_seen {
+                } else if phase != RootPhase::Open {
                     return invalid("ODS data-style owner has CDATA outside its root");
                 }
             },
@@ -625,15 +645,15 @@ pub(crate) fn scan_with_limits(source: &[u8], owner: Owner, limits: Limits) -> R
                             "ODS data-style owner container contains a character reference",
                         );
                     }
-                } else if root_closed || !root_seen {
+                } else if phase != RootPhase::Open {
                     return invalid("ODS data-style owner has a reference outside its root");
                 }
             },
             Event::Comment(comment) => {
                 let event_end = checked_position(&reader)?;
                 validate_comment(comment.as_ref())?;
-                if !root_seen {
-                    prolog_misc_seen = true;
+                if phase == RootPhase::Start {
+                    phase = RootPhase::Prolog;
                 }
                 if let Some(capture) = active.as_mut() {
                     capture.event_bytes(event_start, event_end, &limits)?;
@@ -643,8 +663,8 @@ pub(crate) fn scan_with_limits(source: &[u8], owner: Owner, limits: Limits) -> R
             Event::PI(processing_instruction) => {
                 let event_end = checked_position(&reader)?;
                 validate_processing_instruction(&processing_instruction)?;
-                if !root_seen {
-                    prolog_misc_seen = true;
+                if phase == RootPhase::Start {
+                    phase = RootPhase::Prolog;
                 }
                 if let Some(capture) = active.as_mut() {
                     capture.event_bytes(event_start, event_end, &limits)?;
@@ -652,11 +672,11 @@ pub(crate) fn scan_with_limits(source: &[u8], owner: Owner, limits: Limits) -> R
                 }
             },
             Event::Decl(declaration) => {
-                if root_seen || declaration_seen || prolog_misc_seen {
+                if phase != RootPhase::Start {
                     return invalid("ODS data-style XML declaration is out of order");
                 }
                 validate_xml_declaration(&declaration)?;
-                declaration_seen = true;
+                phase = RootPhase::Prolog;
             },
             Event::DocType(_) => {
                 return invalid("ODS data-style document type declarations are unsupported");
@@ -665,7 +685,11 @@ pub(crate) fn scan_with_limits(source: &[u8], owner: Owner, limits: Limits) -> R
         }
         buffer.clear();
     }
-    if !root_seen || !root_closed || !stack.is_empty() {
+    let complete = match phase {
+        RootPhase::Start | RootPhase::Prolog | RootPhase::Open => false,
+        RootPhase::Closed => stack.is_empty(),
+    };
+    if !complete {
         return invalid("ODS data-style owner XML root is incomplete");
     }
     if let Some(range) = owner_range.as_mut()

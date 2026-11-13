@@ -47,6 +47,25 @@ enum Kind {
     Other,
 }
 
+/// Where the scan stands relative to the document element.
+///
+/// ```text
+/// Prolog --root start tag--> Open
+/// Prolog --empty-element root--> Closed
+/// Open   --root end tag--> Closed
+/// Closed --start tag or empty element--> error (more than one root element)
+/// ```
+///
+/// A declaration, a DOCTYPE, text, CDATA, a comment, a processing
+/// instruction and an entity reference are accepted in every phase and leave
+/// it unchanged. The end of input is accepted only in `Closed`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum NamespaceKind {
     Office,
@@ -79,8 +98,7 @@ pub(crate) fn locate(xml: &str, limits: &XmlStreamLimits) -> Result<Location> {
     let mut spreadsheet = None;
     let mut container = None;
     let mut insertion = None;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut events = 0usize;
     let mut attributes = 0usize;
     let mut opaque = false;
@@ -117,10 +135,10 @@ pub(crate) fn locate(xml: &str, limits: &XmlStreamLimits) -> Result<Location> {
         match event {
             Event::Start(element) => {
                 if stack.is_empty() {
-                    if root_seen || root_closed {
+                    if phase != RootPhase::Prolog {
                         return Err(invalid("ODS content.xml has more than one root element"));
                     }
-                    root_seen = true;
+                    phase = RootPhase::Open;
                 }
                 if stack.len() >= MAX_DEPTH.min(limits.max_depth()) {
                     return Err(invalid("ODS DataPilot source exceeds the nesting limit"));
@@ -152,11 +170,10 @@ pub(crate) fn locate(xml: &str, limits: &XmlStreamLimits) -> Result<Location> {
             },
             Event::Empty(element) => {
                 if stack.is_empty() {
-                    if root_seen || root_closed {
+                    if phase != RootPhase::Prolog {
                         return Err(invalid("ODS content.xml has more than one root element"));
                     }
-                    root_seen = true;
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
                 if stack.len() >= MAX_DEPTH.min(limits.max_depth()) {
                     return Err(invalid("ODS DataPilot source exceeds the nesting limit"));
@@ -205,7 +222,7 @@ pub(crate) fn locate(xml: &str, limits: &XmlStreamLimits) -> Result<Location> {
                 };
                 record(open.kind, span, &mut spreadsheet, &mut container)?;
                 if stack.is_empty() {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
             },
             Event::Text(text) if stack.iter().any(|open| open.kind == Kind::Container) => {
@@ -233,7 +250,11 @@ pub(crate) fn locate(xml: &str, limits: &XmlStreamLimits) -> Result<Location> {
         buffer.clear();
     }
 
-    if !root_seen || !root_closed || !stack.is_empty() {
+    let complete = match phase {
+        RootPhase::Prolog | RootPhase::Open => false,
+        RootPhase::Closed => stack.is_empty(),
+    };
+    if !complete {
         return Err(invalid("incomplete ODS content.xml document"));
     }
     let spreadsheet =

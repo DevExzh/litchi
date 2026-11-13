@@ -19,10 +19,26 @@ enum NamespaceKind {
     Other,
 }
 
+/// Where styles validation stands relative to `office:document-styles`.
+///
+/// ```text
+/// Prolog --office:document-styles start tag--> Open
+/// Prolog --empty office:document-styles--> Closed
+/// Open   --root end tag--> Closed
+/// Closed --start tag or empty element--> error (one office:document-styles root)
+/// ```
+///
+/// The end of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 struct State {
     depth: usize,
-    root_seen: bool,
-    root_closed: bool,
+    root: RootPhase,
     style_scope: Option<u8>,
     office_containers: BTreeSet<u8>,
     style_names: BTreeSet<(u8, String, String)>,
@@ -32,8 +48,7 @@ impl State {
     fn new() -> Self {
         Self {
             depth: 0,
-            root_seen: false,
-            root_closed: false,
+            root: RootPhase::Prolog,
             style_scope: None,
             office_containers: BTreeSet::new(),
             style_names: BTreeSet::new(),
@@ -50,7 +65,7 @@ impl State {
         self.depth = checked_depth(self.depth, limits.max_depth())?;
         if self.depth == 1 {
             self.validate_root(namespace, element)?;
-            self.root_seen = true;
+            self.root = RootPhase::Open;
         }
         reject_scripts(namespace, element)?;
         if self.depth == 2 && namespace == NamespaceKind::Office {
@@ -78,8 +93,7 @@ impl State {
     ) -> Result<()> {
         if self.depth == 0 {
             self.validate_root(namespace, element)?;
-            self.root_seen = true;
-            self.root_closed = true;
+            self.root = RootPhase::Closed;
         }
         reject_scripts(namespace, element)?;
         let empty_scope = if self.depth == 1 && namespace == NamespaceKind::Office {
@@ -105,7 +119,7 @@ impl State {
             return Err(invalid("ODC styles XML depth underflow"));
         }
         if self.depth == 1 {
-            self.root_closed = true;
+            self.root = RootPhase::Closed;
         }
         if self.depth == 2 {
             self.style_scope = None;
@@ -115,7 +129,7 @@ impl State {
     }
 
     fn validate_root(&self, namespace: NamespaceKind, element: &BytesStart<'_>) -> Result<()> {
-        if self.root_seen
+        if self.root != RootPhase::Prolog
             || namespace != NamespaceKind::Office
             || element.local_name().as_ref() != b"document-styles"
         {
@@ -134,7 +148,11 @@ impl State {
     }
 
     fn finish(self) -> Result<()> {
-        if self.depth != 0 || !self.root_seen || !self.root_closed {
+        let root_complete = match self.root {
+            RootPhase::Prolog | RootPhase::Open => false,
+            RootPhase::Closed => true,
+        };
+        if self.depth != 0 || !root_complete {
             return Err(invalid("ODC styles structure is incomplete"));
         }
         Ok(())

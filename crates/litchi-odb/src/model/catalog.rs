@@ -486,6 +486,25 @@ enum NamespaceKind {
     Other,
 }
 
+/// Where the scan stands relative to `office:document-content`.
+///
+/// ```text
+/// Prolog --office:document-content start tag--> Open
+/// Open   --end tag that empties the element stack--> Closed
+/// Closed --start tag--> error (no office:document-content root)
+/// ```
+///
+/// An empty element at the top level and a DOCTYPE are refused in every
+/// phase. A declaration, text, CDATA, a comment, a processing instruction
+/// and an entity reference outside the root are accepted in every phase and
+/// leave it unchanged. The end of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 fn parse(source: &str, limits: Limits) -> Result<OwnedCatalog> {
     if source.len() > limits.max_xml_bytes {
         return Err(invalid(
@@ -499,8 +518,7 @@ fn parse(source: &str, limits: Limits) -> Result<OwnedCatalog> {
     let mut stack = Vec::<Frame>::new();
     let mut catalog = OwnedCatalog::default();
     let mut events = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut database_seen = false;
     let mut data_sources = 0usize;
     let mut columns = 0usize;
@@ -553,12 +571,12 @@ fn parse(source: &str, limits: Limits) -> Result<OwnedCatalog> {
                     limits,
                 )?;
                 if stack.is_empty() {
-                    if root_seen || root_closed || frame.element != Element::Document {
+                    if phase != RootPhase::Prolog || frame.element != Element::Document {
                         return Err(invalid(
                             "ODB semantic catalog has no office:document-content root",
                         ));
                     }
-                    root_seen = true;
+                    phase = RootPhase::Open;
                     strict_targets = event_strict_targets;
                 }
                 if stack.len() >= limits.max_depth {
@@ -600,7 +618,7 @@ fn parse(source: &str, limits: Limits) -> Result<OwnedCatalog> {
                     return Err(invalid("ODB semantic catalog has an unmatched closing tag"));
                 }
                 if stack.is_empty() {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
             },
             Event::DocType(_) => {
@@ -631,7 +649,11 @@ fn parse(source: &str, limits: Limits) -> Result<OwnedCatalog> {
         buffer.clear();
     }
 
-    if !root_seen || !root_closed || !stack.is_empty() {
+    let complete = match phase {
+        RootPhase::Prolog | RootPhase::Open => false,
+        RootPhase::Closed => stack.is_empty(),
+    };
+    if !complete {
         return Err(invalid("ODB semantic catalog XML is incomplete"));
     }
     if !database_seen || data_sources != 1 {

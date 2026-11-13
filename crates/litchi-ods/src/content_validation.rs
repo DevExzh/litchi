@@ -1581,6 +1581,27 @@ enum Element {
     Other,
 }
 
+/// Where the parser stands relative to `office:document-content`.
+///
+/// ```text
+/// Prolog --office:document-content start tag--> Open
+/// Prolog --empty office:document-content--> Closed
+/// Open   --root end tag--> Closed
+/// Open | Closed --office:document-content--> error (multiple or nested roots)
+/// Closed --any other element except office:body and office:spreadsheet--> error
+/// ```
+///
+/// `office:body` and `office:spreadsheet` are placed by their parent element
+/// alone, and text outside the root is judged by the element stack. A
+/// declaration is accepted in every phase. The end of input is accepted only
+/// in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 struct Parser<'xml> {
     source_xml: &'xml str,
     limits: Limits,
@@ -1591,10 +1612,9 @@ struct Parser<'xml> {
     attributes: usize,
     text_bytes: usize,
     binding_count: usize,
-    seen_root: bool,
+    root: RootPhase,
     seen_body: bool,
     seen_spreadsheet: bool,
-    closed_root: bool,
     catalog: CatalogStage,
     active_definition: Option<ActiveDefinition>,
     catalog_opaque_content: bool,
@@ -1661,10 +1681,9 @@ impl<'xml> Parser<'xml> {
             attributes: 0,
             text_bytes: 0,
             binding_count: 0,
-            seen_root: false,
+            root: RootPhase::Prolog,
             seen_body: false,
             seen_spreadsheet: false,
-            closed_root: false,
             catalog: CatalogStage::Pending,
             active_definition: None,
             catalog_opaque_content: false,
@@ -1728,12 +1747,11 @@ impl<'xml> Parser<'xml> {
                 Event::Eof => break,
             }
         }
-        if !self.seen_root
-            || !self.seen_body
-            || !self.seen_spreadsheet
-            || !self.closed_root
-            || !self.stack.is_empty()
-        {
+        let root_complete = match self.root {
+            RootPhase::Prolog | RootPhase::Open => false,
+            RootPhase::Closed => true,
+        };
+        if !root_complete || !self.seen_body || !self.seen_spreadsheet || !self.stack.is_empty() {
             return Err(Error::InvalidStructure(
                 "ODS content-validation XML lacks a complete document-content envelope".to_string(),
             ));
@@ -1782,10 +1800,10 @@ impl<'xml> Parser<'xml> {
         reader: &NsReader<&[u8]>,
     ) -> Result<Element> {
         if namespace == NamespaceKind::Office && local == b"document-content" {
-            if self.seen_root || self.closed_root || !self.stack.is_empty() {
+            if self.root != RootPhase::Prolog || !self.stack.is_empty() {
                 return invalid("multiple or nested office:document-content roots");
             }
-            self.seen_root = true;
+            self.root = RootPhase::Open;
             return Ok(Element::Root);
         }
         if namespace == NamespaceKind::Office && local == b"body" {
@@ -1812,7 +1830,7 @@ impl<'xml> Parser<'xml> {
                 "office:spreadsheet must be the direct child of office:body",
             );
         }
-        if self.stack.is_empty() || self.closed_root {
+        if self.stack.is_empty() || self.root == RootPhase::Closed {
             return invalid("content occurs outside the canonical document root");
         }
         if namespace == NamespaceKind::Table && local == b"content-validations" {
@@ -2032,7 +2050,7 @@ impl<'xml> Parser<'xml> {
 
     fn finish_element(&mut self, element: Element) -> Result<()> {
         match element {
-            Element::Root => self.closed_root = true,
+            Element::Root => self.root = RootPhase::Closed,
             Element::Catalog(start) => {
                 self.catalog = CatalogStage::Past;
                 if self.definitions.len() == start {

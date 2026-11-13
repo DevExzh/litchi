@@ -146,8 +146,7 @@ impl Snapshot {
         let mut stack = Vec::<Element>::new();
         let mut sheets = Vec::new();
         let mut events = 0usize;
-        let mut seen_root = false;
-        let mut closed_root = false;
+        let mut phase = RootPhase::Prolog;
 
         loop {
             let (namespace, event) =
@@ -182,8 +181,7 @@ impl Snapshot {
                         &stack,
                         &mut sheets,
                         limits,
-                        &mut seen_root,
-                        closed_root,
+                        &mut phase,
                     )?);
                 },
                 Event::Empty(start) => {
@@ -200,8 +198,7 @@ impl Snapshot {
                         &stack,
                         &mut sheets,
                         limits,
-                        &mut seen_root,
-                        closed_root,
+                        &mut phase,
                     )? {
                         Element::Hyperlink { sheet, text } => {
                             push_hyperlink(&mut sheets, sheet, text, limits)?;
@@ -266,7 +263,7 @@ impl Snapshot {
                     Some(Element::Hyperlink { sheet, text }) => {
                         push_hyperlink(&mut sheets, sheet, text, limits)?;
                     },
-                    Some(Element::Root) => closed_root = true,
+                    Some(Element::Root) => phase = RootPhase::Closed,
                     Some(_) => {},
                     None => {
                         return Err(CoreError::InvalidFormat(
@@ -289,7 +286,11 @@ impl Snapshot {
             }
             buffer.clear();
         }
-        if !seen_root || !closed_root || !stack.is_empty() {
+        let complete = match phase {
+            RootPhase::Prolog | RootPhase::Open => false,
+            RootPhase::Closed => stack.is_empty(),
+        };
+        if !complete {
             return Err(CoreError::InvalidFormat(
                 "ODS feature XML is missing a complete canonical document-content envelope"
                     .to_string(),
@@ -417,6 +418,26 @@ enum Element {
     Other,
 }
 
+/// Where feature inspection stands relative to `office:document-content`.
+///
+/// ```text
+/// Prolog --office:document-content start tag--> Open
+/// Open   --root end tag--> Closed
+/// Open | Closed --office:document-content--> error (multiple document roots)
+/// Closed --any other element except office:body and office:spreadsheet--> error
+/// ```
+///
+/// `office:body` and `office:spreadsheet` are placed by their parent element
+/// alone, and text outside the root is judged by the element stack. A
+/// declaration, a comment and a processing instruction are accepted in every
+/// phase. The end of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 #[allow(
     clippy::too_many_arguments,
     reason = "parser state is intentionally explicit"
@@ -428,18 +449,17 @@ fn classify_start(
     stack: &[Element],
     sheets: &mut Vec<Sheet>,
     limits: Limits,
-    seen_root: &mut bool,
-    closed_root: bool,
+    phase: &mut RootPhase,
 ) -> CoreResult<Element> {
     let local = start.local_name();
     let local = local.as_ref();
     if namespace == NamespaceKind::Office && local == b"document-content" {
-        if *seen_root || closed_root || !stack.is_empty() {
+        if *phase != RootPhase::Prolog || !stack.is_empty() {
             return Err(CoreError::InvalidFormat(
                 "ODS feature XML has multiple document roots".to_string(),
             ));
         }
-        *seen_root = true;
+        *phase = RootPhase::Open;
         return Ok(Element::Root);
     }
     if namespace == NamespaceKind::Office && local == b"body" {
@@ -460,7 +480,7 @@ fn classify_start(
                 )
             });
     }
-    if stack.is_empty() || closed_root {
+    if stack.is_empty() || *phase == RootPhase::Closed {
         return Err(CoreError::InvalidFormat(
             "ODS feature XML has content outside its canonical document root".to_string(),
         ));

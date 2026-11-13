@@ -51,6 +51,26 @@ pub(crate) enum NamespaceKind {
     Other,
 }
 
+/// Where the scan stands relative to the document element.
+///
+/// ```text
+/// Prolog --root start tag--> Open
+/// Prolog --empty-element root--> Closed
+/// Open   --root end tag--> Closed
+/// Closed --start tag or empty element--> error (more than one root element)
+/// ```
+///
+/// A declaration, a DOCTYPE, text, CDATA, a comment, a processing
+/// instruction and an entity reference are accepted in every phase and leave
+/// it unchanged. The end of input is accepted only in `Closed`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum RootPhase {
+    #[default]
+    Prolog,
+    Open,
+    Closed,
+}
+
 #[derive(Debug)]
 struct OpenElement {
     kind: Kind,
@@ -87,8 +107,7 @@ pub(crate) fn locate(xml: &str) -> Result<Location> {
     let mut stack = Vec::<OpenElement>::new();
     let mut spreadsheet = None;
     let mut calculation = None;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut events = 0usize;
     let mut opaque = false;
 
@@ -112,12 +131,12 @@ pub(crate) fn locate(xml: &str) -> Result<Location> {
         match event {
             Event::Start(element) => {
                 if stack.is_empty() {
-                    if root_seen || root_closed {
+                    if phase != RootPhase::Prolog {
                         return Err(Error::InvalidFormat(
                             "ODS content.xml has more than one root element".to_string(),
                         ));
                     }
-                    root_seen = true;
+                    phase = RootPhase::Open;
                 }
                 if stack.len() >= MAX_DEPTH {
                     return Err(Error::InvalidFormat(
@@ -147,13 +166,12 @@ pub(crate) fn locate(xml: &str) -> Result<Location> {
             },
             Event::Empty(element) => {
                 if stack.is_empty() {
-                    if root_seen || root_closed {
+                    if phase != RootPhase::Prolog {
                         return Err(Error::InvalidFormat(
                             "ODS content.xml has more than one root element".to_string(),
                         ));
                     }
-                    root_seen = true;
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
                 if stack.len() >= MAX_DEPTH {
                     return Err(Error::InvalidFormat(
@@ -196,7 +214,7 @@ pub(crate) fn locate(xml: &str) -> Result<Location> {
                 };
                 record(open.kind, span, &mut spreadsheet, &mut calculation)?;
                 if stack.is_empty() {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
             },
             Event::Comment(_) | Event::PI(_)
@@ -216,7 +234,11 @@ pub(crate) fn locate(xml: &str) -> Result<Location> {
         buffer.clear();
     }
 
-    if !root_seen || !root_closed || !stack.is_empty() {
+    let complete = match phase {
+        RootPhase::Prolog | RootPhase::Open => false,
+        RootPhase::Closed => stack.is_empty(),
+    };
+    if !complete {
         return Err(Error::InvalidFormat(
             "incomplete ODS content.xml document".to_string(),
         ));
@@ -242,8 +264,7 @@ pub(crate) struct LocateHandler {
     stack: Vec<OpenElement>,
     spreadsheet: Option<Span>,
     calculation: Option<Span>,
-    root_seen: bool,
-    root_closed: bool,
+    phase: RootPhase,
     events: usize,
     opaque: bool,
 }
@@ -281,12 +302,12 @@ impl LocateHandler {
         match event {
             Event::Start(element) => {
                 if self.stack.is_empty() {
-                    if self.root_seen || self.root_closed {
+                    if self.phase != RootPhase::Prolog {
                         return Err(Error::InvalidFormat(
                             "ODS content.xml has more than one root element".to_string(),
                         ));
                     }
-                    self.root_seen = true;
+                    self.phase = RootPhase::Open;
                 }
                 if self.stack.len() >= MAX_DEPTH {
                     return Err(Error::InvalidFormat(
@@ -316,13 +337,12 @@ impl LocateHandler {
             },
             Event::Empty(element) => {
                 if self.stack.is_empty() {
-                    if self.root_seen || self.root_closed {
+                    if self.phase != RootPhase::Prolog {
                         return Err(Error::InvalidFormat(
                             "ODS content.xml has more than one root element".to_string(),
                         ));
                     }
-                    self.root_seen = true;
-                    self.root_closed = true;
+                    self.phase = RootPhase::Closed;
                 }
                 if self.stack.len() >= MAX_DEPTH {
                     return Err(Error::InvalidFormat(
@@ -370,7 +390,7 @@ impl LocateHandler {
                     &mut self.calculation,
                 )?;
                 if self.stack.is_empty() {
-                    self.root_closed = true;
+                    self.phase = RootPhase::Closed;
                 }
             },
             Event::Comment(_) | Event::PI(_)
@@ -392,7 +412,11 @@ impl LocateHandler {
 
     /// Validate the end-of-document state and build the located spans.
     pub(crate) fn finish(self) -> Result<Location> {
-        if !self.root_seen || !self.root_closed || !self.stack.is_empty() {
+        let complete = match self.phase {
+            RootPhase::Prolog | RootPhase::Open => false,
+            RootPhase::Closed => self.stack.is_empty(),
+        };
+        if !complete {
             return Err(Error::InvalidFormat(
                 "incomplete ODS content.xml document".to_string(),
             ));

@@ -659,6 +659,29 @@ enum FlatNamespace {
     Other,
 }
 
+/// Where flat-document validation stands relative to `office:document`.
+///
+/// ```text
+/// Prolog --office:document start tag--> Open
+/// Prolog --any other start tag--> error
+/// Open   --root end tag--> Closed
+/// Closed --start tag--> error (the root must be one office:document)
+/// Prolog --declaration--> Prolog; Open | Closed --declaration--> error
+/// Prolog | Closed --whitespace text--> unchanged; other text --> error
+/// Prolog | Closed --CDATA or entity reference--> error
+/// any    --comment or processing instruction--> unchanged
+/// any    --DOCTYPE--> error
+/// ```
+///
+/// An empty element at depth zero is refused in every phase. The end of
+/// input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 fn validate_flat_xml(xml: &str) -> Result<()> {
     if xml.is_empty() || xml.as_bytes().starts_with(b"PK\x03\x04") {
         return Err(invalid("flat ODS input is not XML"));
@@ -669,8 +692,7 @@ fn validate_flat_xml(xml: &str) -> Result<()> {
     let mut buffer = Vec::new();
     let mut depth = 0usize;
     let mut elements = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut body_depth = None;
     let mut body_seen = false;
     let mut spreadsheet_seen = false;
@@ -692,10 +714,10 @@ fn validate_flat_xml(xml: &str) -> Result<()> {
                 }
                 validate_attributes(&reader, &element)?;
                 if depth == 0 {
-                    if root_seen || root_closed || !office(namespace, &element, b"document") {
+                    if phase != RootPhase::Prolog || !office(namespace, &element, b"document") {
                         return Err(invalid("flat ODS root must be one office:document"));
                     }
-                    root_seen = true;
+                    phase = RootPhase::Open;
                     if office_attribute(&reader, &element, b"mimetype")?.as_deref()
                         != Some(MIMETYPE)
                     {
@@ -764,7 +786,7 @@ fn validate_flat_xml(xml: &str) -> Result<()> {
                     conditional_depth = None;
                 }
                 if depth == 0 {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
             },
             Event::DocType(_) => {
@@ -772,8 +794,7 @@ fn validate_flat_xml(xml: &str) -> Result<()> {
             },
             Event::GeneralRef(reference) => {
                 let reference: &[u8] = reference.as_ref();
-                if !root_seen
-                    || root_closed
+                if phase != RootPhase::Open
                     || !matches!(reference, b"amp" | b"lt" | b"gt" | b"apos" | b"quot")
                 {
                     return Err(invalid("flat ODS XML contains an unsupported entity"));
@@ -784,20 +805,23 @@ fn validate_flat_xml(xml: &str) -> Result<()> {
                 // producer ends a flat document with a newline.
                 let text: &[u8] = text.as_ref();
                 let blank = text.iter().all(|byte| byte.is_ascii_whitespace());
-                if root_closed && !blank {
-                    return Err(invalid("flat ODS XML has trailing text after its root"));
-                }
-                if !root_seen && !blank {
-                    return Err(invalid("flat ODS XML has text before its root"));
+                match phase {
+                    RootPhase::Closed if !blank => {
+                        return Err(invalid("flat ODS XML has trailing text after its root"));
+                    },
+                    RootPhase::Prolog if !blank => {
+                        return Err(invalid("flat ODS XML has text before its root"));
+                    },
+                    RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {},
                 }
             },
             Event::CData(_) => {
-                if !root_seen || root_closed {
+                if phase != RootPhase::Open {
                     return Err(invalid("flat ODS XML has CDATA outside its root"));
                 }
             },
             Event::Eof => break,
-            Event::Decl(_) if !root_seen && !root_closed => {},
+            Event::Decl(_) if phase == RootPhase::Prolog => {},
             // Comments and processing instructions are XML `Misc`, admitted
             // before and after the root as inside it; both stay inert.
             Event::PI(_) | Event::Comment(_) => {},
@@ -808,7 +832,11 @@ fn validate_flat_xml(xml: &str) -> Result<()> {
         buffer.clear();
     }
 
-    if depth != 0 || !root_seen || !root_closed || !body_seen || !spreadsheet_seen {
+    let root_complete = match phase {
+        RootPhase::Prolog | RootPhase::Open => false,
+        RootPhase::Closed => true,
+    };
+    if depth != 0 || !root_complete || !body_seen || !spreadsheet_seen {
         return Err(invalid("flat ODS XML is structurally incomplete"));
     }
     Ok(())

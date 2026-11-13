@@ -1635,6 +1635,28 @@ pub fn parse_detective_with_namespace<'source>(
     typed.with_guards(Some(Arc::new(input_reservation)), memory)
 }
 
+/// Where the standalone owner parse stands relative to `table:detective`.
+///
+/// ```text
+/// Prolog --table:detective start tag--> Open
+/// Prolog --empty table:detective--> Closed
+/// Open   --table:detective end tag--> Closed
+/// Closed --start tag or empty element--> error (unsupported child)
+/// Prolog --text, CDATA, DOCTYPE or entity reference--> Prolog (ignored)
+/// Open   --DOCTYPE or entity reference--> error
+/// Closed --DOCTYPE or entity reference--> error
+/// Closed --non-whitespace text or CDATA--> error (trailing content)
+/// ```
+///
+/// A declaration, a comment and a processing instruction are accepted in
+/// every phase. The end of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum OwnerPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 fn parse_detective_inner<'source>(
     source: &'source str,
     source_offset: usize,
@@ -1663,7 +1685,7 @@ fn parse_detective_inner<'source>(
     buffer
         .try_reserve_exact(buffer_capacity)
         .map_err(|source| allocation("ODS detective owner reader buffer", source))?;
-    let mut root_seen = false;
+    let mut phase = OwnerPhase::Prolog;
     let mut owner_start = 0usize;
     let mut owner_end = 0usize;
     let mut owner_prefix = String::new();
@@ -1672,7 +1694,6 @@ fn parse_detective_inner<'source>(
     let mut operation_capacity = 0usize;
     let mut ordered = Vec::new();
     let mut lexical_fidelity = LexicalFidelity::Canonical;
-    let mut saw_root_end = false;
     let mut in_operations = false;
 
     loop {
@@ -1698,23 +1719,22 @@ fn parse_detective_inner<'source>(
                     return Err(unsupported("ODS detective codec accepts XML 1.0 only"));
                 },
             },
-            Event::Start(element) if !root_seen => {
+            Event::Start(element) if phase == OwnerPhase::Prolog => {
                 ensure_detective_name(element_namespace.as_deref(), &element)?;
-                root_seen = true;
+                phase = OwnerPhase::Open;
                 owner_start = event_start;
                 owner_prefix = prefix_string(element.name().prefix(), ledger)?;
                 validate_owner_attributes(&reader, &element, limits, ledger)?;
             },
-            Event::Empty(element) if !root_seen => {
+            Event::Empty(element) if phase == OwnerPhase::Prolog => {
                 ensure_detective_name(element_namespace.as_deref(), &element)?;
-                root_seen = true;
                 owner_start = event_start;
                 owner_end = position(&reader)?;
                 owner_prefix = prefix_string(element.name().prefix(), ledger)?;
                 validate_owner_attributes(&reader, &element, limits, ledger)?;
-                saw_root_end = true;
+                phase = OwnerPhase::Closed;
             },
-            Event::Start(element) if root_seen && !saw_root_end => {
+            Event::Start(element) if phase == OwnerPhase::Open => {
                 let child_start = event_start;
                 let (child_kind, value) = parse_child_start(
                     &mut reader,
@@ -1777,7 +1797,7 @@ fn parse_detective_inner<'source>(
                 }
                 lexical_fidelity = LexicalFidelity::PreservationRequired;
             },
-            Event::Empty(element) if root_seen && !saw_root_end => {
+            Event::Empty(element) if phase == OwnerPhase::Open => {
                 let child_start = event_start;
                 let (child_kind, value) = parse_child_empty(
                     &reader,
@@ -1839,60 +1859,67 @@ fn parse_detective_inner<'source>(
                     },
                 }
             },
-            Event::End(element) if root_seen && !saw_root_end => {
+            Event::End(element) if phase == OwnerPhase::Open => {
                 if !is_detective_end(element_namespace.as_deref(), &element) {
                     return Err(invalid(
                         "ODS detective closing element does not match its owner",
                     ));
                 }
                 owner_end = position(&reader)?;
-                saw_root_end = true;
+                phase = OwnerPhase::Closed;
             },
-            Event::Text(text) if root_seen && !saw_root_end => {
+            Event::Text(text) if phase == OwnerPhase::Open => {
                 ensure_text_event_limit(text.len(), limits)?;
                 ensure_whitespace_text(&text, XmlVersion::Explicit1_0, "detective")?;
                 lexical_fidelity = LexicalFidelity::PreservationRequired;
             },
-            Event::CData(text) if root_seen && !saw_root_end => {
+            Event::CData(text) if phase == OwnerPhase::Open => {
                 ensure_text_event_limit(text.len(), limits)?;
                 ensure_whitespace_cdata(&text, XmlVersion::Explicit1_0, "detective CDATA")?;
                 lexical_fidelity = LexicalFidelity::PreservationRequired;
             },
-            Event::Comment(_) | Event::PI(_) if root_seen && !saw_root_end => {
+            Event::Comment(_) | Event::PI(_) if phase == OwnerPhase::Open => {
                 lexical_fidelity = LexicalFidelity::PreservationRequired;
             },
-            Event::Eof if !root_seen => {
-                return Err(invalid("ODS detective source has no table:detective root"));
+            Event::Eof => match phase {
+                OwnerPhase::Prolog => {
+                    return Err(invalid("ODS detective source has no table:detective root"));
+                },
+                OwnerPhase::Open => {
+                    return Err(invalid("unterminated ODS table:detective owner"));
+                },
+                OwnerPhase::Closed => break,
             },
-            Event::Eof if !saw_root_end => {
-                return Err(invalid("unterminated ODS table:detective owner"));
-            },
-            Event::Eof => break,
             Event::Text(text) => {
                 ensure_text_event_limit(text.len(), limits)?;
-                if saw_root_end && !is_whitespace_event(source, event_start, position(&reader)?) {
+                if phase == OwnerPhase::Closed
+                    && !is_whitespace_event(source, event_start, position(&reader)?)
+                {
                     return Err(invalid("ODS detective source has trailing content"));
                 }
             },
             Event::CData(text) => {
                 ensure_text_event_limit(text.len(), limits)?;
-                if saw_root_end && !is_whitespace_event(source, event_start, position(&reader)?) {
+                if phase == OwnerPhase::Closed
+                    && !is_whitespace_event(source, event_start, position(&reader)?)
+                {
                     return Err(invalid("ODS detective source has trailing content"));
                 }
             },
             Event::Comment(_) | Event::PI(_) => {},
-            Event::DocType(_) | Event::GeneralRef(_) => {
-                if root_seen {
+            Event::DocType(_) | Event::GeneralRef(_) => match phase {
+                OwnerPhase::Prolog => {},
+                OwnerPhase::Open | OwnerPhase::Closed => {
                     return Err(invalid(
                         "ODS detective owner contains unsupported XML content",
                     ));
-                }
+                },
             },
             Event::Start(_) | Event::Empty(_) | Event::End(_) => {
                 return Err(invalid("ODS detective owner contains an unsupported child"));
             },
         }
-        if root_seen && saw_root_end {
+        if phase == OwnerPhase::Closed {
             // The next event must be whitespace, a declaration that appeared
             // before the root was already handled, or EOF.  Non-whitespace
             // trailing text is rejected above.
@@ -1900,8 +1927,11 @@ fn parse_detective_inner<'source>(
         buffer.clear();
     }
 
-    if !root_seen || !saw_root_end {
-        return Err(invalid("ODS detective owner is incomplete"));
+    match phase {
+        OwnerPhase::Prolog | OwnerPhase::Open => {
+            return Err(invalid("ODS detective owner is incomplete"));
+        },
+        OwnerPhase::Closed => {},
     }
     if owner_end == 0 {
         owner_end = position(&reader)?;
@@ -2351,6 +2381,25 @@ fn validate_owner_attributes(
     })
 }
 
+/// Where the source scan stands relative to the document element.
+///
+/// ```text
+/// Prolog --start tag--> Open
+/// Prolog --empty element--> Closed
+/// Open   --end tag that empties the element stack--> Closed
+/// Closed --start tag or empty element--> error (multiple XML roots)
+/// ```
+///
+/// A declaration, a DOCTYPE, text, CDATA, a comment, a processing
+/// instruction and an entity reference are accepted in every phase and leave
+/// it unchanged. The end of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SourceRootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 fn scan_source<'source>(source: &'source str, ledger: &mut Ledger<'_>) -> Result<Scanned<'source>> {
     let limits = ledger.limits;
     let mut reader = NsReader::from_str(source);
@@ -2370,8 +2419,7 @@ fn scan_source<'source>(source: &'source str, ledger: &mut Ledger<'_>) -> Result
         .map_err(|source| allocation("ODS detective reader buffer", source))?;
     let mut spans = Vec::<Span>::new();
     let mut open = Vec::<OpenFrame>::new();
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = SourceRootPhase::Prolog;
     let mut elements = 0usize;
 
     loop {
@@ -2410,7 +2458,7 @@ fn scan_source<'source>(source: &'source str, ledger: &mut Ledger<'_>) -> Result
                         limits.max_events,
                     ));
                 }
-                if root_closed {
+                if phase == SourceRootPhase::Closed {
                     return Err(invalid("ODS detective source has multiple XML roots"));
                 }
                 let next_depth = open
@@ -2425,8 +2473,8 @@ fn scan_source<'source>(source: &'source str, ledger: &mut Ledger<'_>) -> Result
                         limits.max_depth,
                     ));
                 }
-                if !root_seen {
-                    root_seen = true;
+                if phase == SourceRootPhase::Prolog {
+                    phase = SourceRootPhase::Open;
                 }
                 let span = make_span(
                     &reader,
@@ -2470,12 +2518,11 @@ fn scan_source<'source>(source: &'source str, ledger: &mut Ledger<'_>) -> Result
                         limits.max_events,
                     ));
                 }
-                if root_closed {
+                if phase == SourceRootPhase::Closed {
                     return Err(invalid("ODS detective source has multiple XML roots"));
                 }
-                if !root_seen {
-                    root_seen = true;
-                    root_closed = true;
+                if phase == SourceRootPhase::Prolog {
+                    phase = SourceRootPhase::Closed;
                 }
                 let span = make_span(
                     &reader,
@@ -2512,7 +2559,7 @@ fn scan_source<'source>(source: &'source str, ledger: &mut Ledger<'_>) -> Result
                 span.end = event_end;
                 drop(frame.depth_reservation);
                 if open.is_empty() {
-                    root_closed = true;
+                    phase = SourceRootPhase::Closed;
                 }
             },
             Event::Eof => break,
@@ -2537,8 +2584,11 @@ fn scan_source<'source>(source: &'source str, ledger: &mut Ledger<'_>) -> Result
             "ODS detective source contains unclosed XML elements",
         ));
     }
-    if !root_seen || !root_closed {
-        return Err(invalid("ODS detective source has no complete XML root"));
+    match phase {
+        SourceRootPhase::Prolog | SourceRootPhase::Open => {
+            return Err(invalid("ODS detective source has no complete XML root"));
+        },
+        SourceRootPhase::Closed => {},
     }
     Ok(Scanned::from_spans(spans))
 }

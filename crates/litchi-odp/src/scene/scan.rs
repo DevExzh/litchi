@@ -267,6 +267,22 @@ struct CellBuilder {
     row_span: u32,
 }
 
+/// Whether the scan has met the first element of the part.
+///
+/// ```text
+/// Prolog --first start tag or empty element--> Rooted (its prefixes are read)
+/// Rooted --top-level start tag or empty element--> Rooted (accepted: scanned
+///          as ordinary content, its namespace declarations are not read)
+/// ```
+///
+/// Nothing closes the root here, so an element that follows the first
+/// top-level element is not refused.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Rooted,
+}
+
 struct Scanner<'x> {
     /// Bytes skipped before the scanned text (a byte-order mark).
     base: usize,
@@ -281,7 +297,7 @@ struct Scanner<'x> {
     cells: Vec<CellBuilder>,
     alt: Option<String>,
     prefixes: Prefixes,
-    root_seen: bool,
+    root: RootPhase,
     body_end: Option<usize>,
     /// The content of `office:automatic-styles`, indexed on demand.
     styles_range: Option<Range<usize>>,
@@ -311,7 +327,7 @@ pub(super) fn scan(xml: &str) -> Result<Scene> {
         cells: Vec::new(),
         alt: None,
         prefixes: Prefixes::default(),
-        root_seen: false,
+        root: RootPhase::Prolog,
         body_end: None,
         styles_range: None,
         styles_insertion: StylesInsertion::None,
@@ -467,9 +483,14 @@ impl Scanner<'_> {
     ) -> Result<Frame> {
         let local = element.local_name();
         let local = local.as_ref();
-        if !self.root_seen {
-            self.root_seen = true;
-            self.read_prefixes(element)?;
+        match self.root {
+            RootPhase::Prolog => {
+                self.root = RootPhase::Rooted;
+                self.read_prefixes(element)?;
+            },
+            // Every later element lands here, a second top-level element
+            // included: it is scanned as content and declares no prefixes.
+            RootPhase::Rooted => {},
         }
         let parent = self.parent();
         // Inside a paragraph: runs, controls and opaque inline content.

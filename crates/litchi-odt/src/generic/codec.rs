@@ -78,6 +78,25 @@ impl EventBudget<'_> {
     }
 }
 
+/// Where flat-document validation stands relative to `office:document`.
+///
+/// ```text
+/// Prolog --office:document start tag--> Open
+/// Open   --root end tag--> Closed
+/// Closed --start tag--> error (one office:document root)
+/// Prolog | Closed --non-whitespace text, CDATA or entity reference--> error
+/// ```
+///
+/// An empty element at depth zero is refused in every phase; every other
+/// event is accepted in every phase. The end of input is accepted only in
+/// `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 fn validate_flat_document_inner(
     xml: &str,
     family: Family,
@@ -108,8 +127,7 @@ fn validate_flat_document_inner(
     )?;
     let mut reader = ResolvedReader::from_xml(xml, xml_limits)?;
     let mut depth = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut body_seen = false;
     let mut family_body_seen = false;
     let mut maximum_depth = 0usize;
@@ -138,12 +156,15 @@ fn validate_flat_document_inner(
                     "flat OpenDocument",
                 )?;
                 if depth == 0 {
-                    if root_seen || !is_office || element.local_name().as_ref() != b"document" {
+                    if phase != RootPhase::Prolog
+                        || !is_office
+                        || element.local_name().as_ref() != b"document"
+                    {
                         return Err(Error::InvalidFormat(
                             "flat OpenDocument must contain one office:document root".to_string(),
                         ));
                     }
-                    root_seen = true;
+                    phase = RootPhase::Open;
                 } else if depth == 1 && is_office && element.local_name().as_ref() == b"body" {
                     body_seen = true;
                 } else if depth == 2 && is_office && element.local_name().as_ref() == expected_body
@@ -179,7 +200,7 @@ fn validate_flat_document_inner(
                     Error::InvalidFormat("unexpected flat OpenDocument closing tag".to_string())
                 })?;
                 if depth == 0 {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
             },
             Event::Text(text) if depth == 0 && !text.iter().all(u8::is_ascii_whitespace) => {
@@ -196,7 +217,11 @@ fn validate_flat_document_inner(
             _ => {},
         }
     }
-    if !root_seen || !root_closed || depth != 0 || !body_seen || !family_body_seen {
+    let root_complete = match phase {
+        RootPhase::Prolog | RootPhase::Open => false,
+        RootPhase::Closed => true,
+    };
+    if !root_complete || depth != 0 || !body_seen || !family_body_seen {
         return Err(Error::InvalidFormat(
             "flat OpenDocument is missing its complete family-specific body".to_string(),
         ));

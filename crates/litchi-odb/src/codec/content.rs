@@ -22,6 +22,25 @@ enum Element {
     Other,
 }
 
+/// Where the scan stands relative to `office:document-content`.
+///
+/// ```text
+/// Prolog --office:document-content start tag--> Open
+/// Open   --end tag that empties the element stack--> Closed
+/// Closed --start tag--> error (no office:document-content root)
+/// ```
+///
+/// An empty element at the top level and a DOCTYPE are refused in every
+/// phase. A declaration, text, CDATA, a comment, a processing instruction
+/// and an entity reference outside the root are accepted in every phase and
+/// leave it unchanged. The end of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 /// Validate a UTF-8 content part before authoring it into a package.
 pub(crate) fn validate(xml: &str) -> Result<()> {
     if xml.len() > MAX_CONTENT_BYTES {
@@ -33,8 +52,7 @@ pub(crate) fn validate(xml: &str) -> Result<()> {
     let mut buffer = Vec::new();
     let mut stack = Vec::<Element>::new();
     let mut events = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut database_seen = false;
     let mut data_source_count = 0usize;
 
@@ -57,12 +75,12 @@ pub(crate) fn validate(xml: &str) -> Result<()> {
                     Some(element.local_name().as_ref()),
                 );
                 if stack.is_empty() {
-                    if root_seen || root_closed || classified != Element::Document {
+                    if phase != RootPhase::Prolog || classified != Element::Document {
                         return Err(invalid(
                             "ODB content.xml has no office:document-content root",
                         ));
                     }
-                    root_seen = true;
+                    phase = RootPhase::Open;
                 }
                 if stack.len() >= MAX_DEPTH {
                     return Err(invalid("ODB content.xml exceeds the nesting limit"));
@@ -89,7 +107,7 @@ pub(crate) fn validate(xml: &str) -> Result<()> {
                     return Err(invalid("ODB content.xml has an unmatched closing tag"));
                 }
                 if stack.is_empty() {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
             },
             Event::DocType(_) => {
@@ -106,7 +124,11 @@ pub(crate) fn validate(xml: &str) -> Result<()> {
         buffer.clear();
     }
 
-    if !root_seen || !root_closed || !stack.is_empty() {
+    let complete = match phase {
+        RootPhase::Prolog | RootPhase::Open => false,
+        RootPhase::Closed => stack.is_empty(),
+    };
+    if !complete {
         return Err(invalid("ODB content.xml is incomplete"));
     }
     if !database_seen {

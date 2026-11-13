@@ -1250,6 +1250,25 @@ fn push_plot_component_tag(
     Ok(())
 }
 
+/// Where the chart parse stands relative to the office document root.
+///
+/// ```text
+/// Prolog --expected office root start tag--> Open
+/// Open   --root end tag--> Closed
+/// Closed --start tag--> error (one expected office document root)
+/// ```
+///
+/// An empty element at the top level and a DOCTYPE are refused in every
+/// phase. Text, CDATA and entity references outside the root are judged by
+/// depth; a declaration, a comment and a processing instruction are accepted
+/// in every phase. The end of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<State> {
     if bytes.len() > limits.max_content_bytes() {
         return Err(invalid_error(
@@ -1270,8 +1289,7 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<S
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut body_depth = None;
     let mut body_seen = false;
     let mut office_chart_depth = None;
@@ -1311,13 +1329,15 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<S
                         RootKind::Flat => b"document".as_slice(),
                         RootKind::Content => b"document-content".as_slice(),
                     };
-                    if root_seen || namespace != NamespaceKind::Office || local.as_ref() != expected
+                    if phase != RootPhase::Prolog
+                        || namespace != NamespaceKind::Office
+                        || local.as_ref() != expected
                     {
                         return Err(invalid_error(
                             "ODC requires one expected office document root",
                         ));
                     }
-                    root_seen = true;
+                    phase = RootPhase::Open;
                     root_start_name = Some(event_name_span(
                         &bytes,
                         event_start..event_end,
@@ -1589,7 +1609,7 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<S
                         event_start..event_end,
                         element.name().as_ref(),
                     )?);
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
                 if plot_depth == Some(depth)
                     && namespace == NamespaceKind::Chart
@@ -1641,9 +1661,12 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<S
             | Event::GeneralRef(_) => {},
         }
     }
+    let root_complete = match phase {
+        RootPhase::Prolog | RootPhase::Open => false,
+        RootPhase::Closed => true,
+    };
     if depth != 0
-        || !root_seen
-        || !root_closed
+        || !root_complete
         || !body_seen
         || !office_chart_seen
         || !chart_seen

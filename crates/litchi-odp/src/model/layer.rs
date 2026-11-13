@@ -320,6 +320,31 @@ struct Frame {
     qualified_name: Vec<u8>,
 }
 
+/// Where the layer scan stands relative to the document element.
+///
+/// ```text
+/// Start  --declaration--> Prolog
+/// Start  --whitespace text, comment or processing instruction--> Prolog
+/// Prolog | Open | Closed --declaration--> error (outside the prologue)
+/// Start | Prolog --root start tag--> Open
+/// Start | Prolog --empty-element root--> Closed
+/// Open   --end tag that empties the element stack--> Closed
+/// Closed --start tag or empty element--> error (more than one root element)
+/// ```
+///
+/// The declaration is accepted only as the very first event. Outside `Open`,
+/// text must be whitespace, and CDATA and entity references are refused; a
+/// comment or processing instruction is accepted in every phase and a
+/// DOCTYPE in none. The end of input is refused in `Start` and `Prolog`; an
+/// unterminated root is reported from the element stack.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Start,
+    Prolog,
+    Open,
+    Closed,
+}
+
 /// Parse all layer declarations in one ODP XML part and return source spans.
 ///
 /// This is an internal source scanner.  It retains only small ranges and typed
@@ -339,10 +364,7 @@ pub(crate) fn scan(xml: &str, path: &str) -> Result<ParsedLayers> {
     let mut page_count = 0usize;
     let mut event_count = 0usize;
     let mut layer_count = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
-    let mut declaration_seen = false;
-    let mut prologue_content_seen = false;
+    let mut phase = RootPhase::Start;
 
     loop {
         let event_start = usize::try_from(reader.buffer_position())
@@ -365,10 +387,10 @@ pub(crate) fn scan(xml: &str, path: &str) -> Result<ParsedLayers> {
                     return invalid("ODP layer XML nesting exceeds 512 levels");
                 }
                 let (namespace, local) = resolved_name(&resolved, element.local_name().as_ref())?;
-                if frames.is_empty() && root_closed {
+                if frames.is_empty() && phase == RootPhase::Closed {
                     return invalid("ODP layer XML has more than one root element");
                 }
-                root_seen = true;
+                phase = RootPhase::Open;
                 if let Some(parent) = frames.last_mut() {
                     note_layer_order_child(parent, &namespace, &local)?;
                 }
@@ -548,10 +570,10 @@ pub(crate) fn scan(xml: &str, path: &str) -> Result<ParsedLayers> {
                 }
                 let (namespace, local) = resolved_name(&resolved, element.local_name().as_ref())?;
                 let root_empty = frames.is_empty();
-                if root_empty && root_closed {
+                if root_empty && phase == RootPhase::Closed {
                     return invalid("ODP layer XML has more than one root element");
                 }
-                root_seen = true;
+                phase = RootPhase::Open;
                 if let Some(parent) = frames.last_mut() {
                     note_layer_order_child(parent, &namespace, &local)?;
                 }
@@ -700,7 +722,7 @@ pub(crate) fn scan(xml: &str, path: &str) -> Result<ParsedLayers> {
                     }
                 }
                 if root_empty {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
             },
             Event::End(element) => {
@@ -747,14 +769,14 @@ pub(crate) fn scan(xml: &str, path: &str) -> Result<ParsedLayers> {
                     parent.end = event_end;
                 }
                 if frames.is_empty() {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
             },
             Event::Eof => break,
             Event::DocType(_) => return invalid("ODP layer XML doctype is prohibited"),
             Event::Comment(_) | Event::PI(_) => {
-                if !root_seen {
-                    prologue_content_seen = true;
+                if phase == RootPhase::Start {
+                    phase = RootPhase::Prolog;
                 }
             },
             Event::CData(_) | Event::GeneralRef(_) if frames.is_empty() => {
@@ -765,22 +787,25 @@ pub(crate) fn scan(xml: &str, path: &str) -> Result<ParsedLayers> {
                 if !text.as_ref().iter().all(u8::is_ascii_whitespace) {
                     return invalid("ODP layer XML has non-whitespace content outside its root");
                 }
-                if !root_seen {
-                    prologue_content_seen = true;
+                if phase == RootPhase::Start {
+                    phase = RootPhase::Prolog;
                 }
             },
             Event::Text(_) => {},
             Event::Decl(_) => {
-                if declaration_seen || root_seen || prologue_content_seen {
+                if phase != RootPhase::Start {
                     return invalid("ODP XML declaration is outside the document prologue");
                 }
-                declaration_seen = true;
+                phase = RootPhase::Prolog;
             },
         }
         buffer.clear();
     }
-    if !root_seen {
-        return invalid("ODP layer XML has no root element");
+    match phase {
+        RootPhase::Start | RootPhase::Prolog => {
+            return invalid("ODP layer XML has no root element");
+        },
+        RootPhase::Open | RootPhase::Closed => {},
     }
     if !frames.is_empty() {
         return invalid("ODP layer XML has unterminated elements");

@@ -92,6 +92,28 @@ impl Frame {
     }
 }
 
+/// Where the settings parse stands relative to the document element.
+///
+/// ```text
+/// Prolog --expected office root start tag--> Open
+/// Prolog --expected office root as an empty element--> Closed
+/// Open   --root end tag--> Closed
+/// Closed --start tag or empty element--> error (more than one document element)
+/// Prolog --declaration--> Prolog; Open | Closed --declaration--> error
+/// Prolog | Closed --whitespace text, CDATA or reference--> unchanged
+/// Prolog | Closed --other text, CDATA or reference--> error
+/// ```
+///
+/// A comment is accepted in every phase; a DOCTYPE and a processing
+/// instruction are refused in every phase. The end of input is accepted only
+/// in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 pub(super) fn parse(xml: &str, kind: DocumentKind) -> Result<Settings> {
     if xml.len() > MAX_XML_BYTES {
         return invalid("settings XML exceeds the configured size limit");
@@ -102,8 +124,7 @@ pub(super) fn parse(xml: &str, kind: DocumentKind) -> Result<Settings> {
     let decoder = reader.decoder();
     let mut buffer = Vec::new();
     let mut xml_depth = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut settings_seen = false;
     let mut in_settings = false;
     let mut settings_depth = 0usize;
@@ -118,7 +139,7 @@ pub(super) fn parse(xml: &str, kind: DocumentKind) -> Result<Settings> {
             .map_err(|error| Error::InvalidFormat(format!("invalid settings XML: {error}")))?;
         match event {
             Event::Start(start) => {
-                if root_closed {
+                if phase == RootPhase::Closed {
                     return invalid("settings XML has more than one document element");
                 }
                 if xml_depth >= MAX_DEPTH {
@@ -133,7 +154,7 @@ pub(super) fn parse(xml: &str, kind: DocumentKind) -> Result<Settings> {
                     false,
                     xml_depth,
                     kind,
-                    &mut root_seen,
+                    &mut phase,
                     &mut settings_seen,
                     &mut in_settings,
                     &mut settings_depth,
@@ -144,7 +165,7 @@ pub(super) fn parse(xml: &str, kind: DocumentKind) -> Result<Settings> {
                 xml_depth += 1;
             },
             Event::Empty(start) => {
-                if root_closed {
+                if phase == RootPhase::Closed {
                     return invalid("settings XML has more than one document element");
                 }
                 if xml_depth >= MAX_DEPTH {
@@ -159,7 +180,7 @@ pub(super) fn parse(xml: &str, kind: DocumentKind) -> Result<Settings> {
                     true,
                     xml_depth,
                     kind,
-                    &mut root_seen,
+                    &mut phase,
                     &mut settings_seen,
                     &mut in_settings,
                     &mut settings_depth,
@@ -169,7 +190,7 @@ pub(super) fn parse(xml: &str, kind: DocumentKind) -> Result<Settings> {
                 )?;
                 namespace_scopes.pop();
                 if xml_depth == 0 {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
             },
             Event::End(end) => {
@@ -198,7 +219,7 @@ pub(super) fn parse(xml: &str, kind: DocumentKind) -> Result<Settings> {
                     attach(frame.finish()?, &mut stack, &mut result)?;
                 }
                 if xml_depth == 0 {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
                 namespace_scopes.pop().ok_or_else(|| {
                     Error::InvalidFormat("unbalanced namespace scope".to_string())
@@ -211,23 +232,23 @@ pub(super) fn parse(xml: &str, kind: DocumentKind) -> Result<Settings> {
                 let value = quick_xml::escape::unescape(&decoded).map_err(|error| {
                     Error::InvalidFormat(format!("invalid settings text escape: {error}"))
                 })?;
-                append_text(&value, root_seen, root_closed, in_settings, &mut stack)?;
+                append_text(&value, phase, in_settings, &mut stack)?;
             },
             Event::CData(text) => {
                 let value = text.decode().map_err(|error| {
                     Error::InvalidFormat(format!("invalid settings CDATA encoding: {error}"))
                 })?;
-                append_text(&value, root_seen, root_closed, in_settings, &mut stack)?;
+                append_text(&value, phase, in_settings, &mut stack)?;
             },
             Event::GeneralRef(reference) => {
                 let name = std::str::from_utf8(reference.as_ref()).map_err(|_error| {
                     Error::InvalidFormat("invalid XML character reference".to_string())
                 })?;
                 let value = resolve_reference(name)?;
-                append_text(&value, root_seen, root_closed, in_settings, &mut stack)?;
+                append_text(&value, phase, in_settings, &mut stack)?;
             },
             Event::Decl(decl) => {
-                if root_seen {
+                if phase != RootPhase::Prolog {
                     return invalid("XML declaration must precede the document element");
                 }
                 if decl
@@ -252,7 +273,11 @@ pub(super) fn parse(xml: &str, kind: DocumentKind) -> Result<Settings> {
         buffer.clear();
     }
 
-    if !root_seen || !root_closed || xml_depth != 0 {
+    let root_complete = match phase {
+        RootPhase::Prolog | RootPhase::Open => false,
+        RootPhase::Closed => true,
+    };
+    if !root_complete || xml_depth != 0 {
         return invalid("incomplete settings XML document");
     }
     if !namespace_scopes.is_empty() {
@@ -273,7 +298,7 @@ fn process_start(
     empty: bool,
     depth: usize,
     kind: DocumentKind,
-    root_seen: &mut bool,
+    phase: &mut RootPhase,
     settings_seen: &mut bool,
     in_settings: &mut bool,
     settings_depth: &mut usize,
@@ -283,7 +308,7 @@ fn process_start(
 ) -> Result<()> {
     let local = start.local_name();
     if depth == 0 {
-        if *root_seen || !is_namespace(namespace, OFFICE) {
+        if *phase != RootPhase::Prolog || !is_namespace(namespace, OFFICE) {
             return invalid("invalid settings document element");
         }
         let expected = match kind {
@@ -294,7 +319,7 @@ fn process_start(
             return invalid("unexpected settings document element");
         }
         validate_no_semantic_attributes(decoder, start)?;
-        *root_seen = true;
+        *phase = RootPhase::Open;
         return Ok(());
     }
 
@@ -417,13 +442,12 @@ fn attach(finished: Finished, stack: &mut [Frame], result: &mut Settings) -> Res
 
 fn append_text(
     value: &str,
-    root_seen: bool,
-    root_closed: bool,
+    phase: RootPhase,
     in_settings: bool,
     stack: &mut [Frame],
 ) -> Result<()> {
     if !in_settings {
-        if root_seen && !root_closed {
+        if phase == RootPhase::Open {
             return Ok(());
         }
         if value.trim().is_empty() {

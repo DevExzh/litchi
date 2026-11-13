@@ -2944,6 +2944,26 @@ fn account_batch_child(
     Ok(())
 }
 
+/// Where fragment validation stands relative to the replacement `draw:frame`.
+///
+/// ```text
+/// Prolog --named draw:frame start tag--> Open
+/// Open   --root end tag--> Closed
+/// Closed --start tag--> error (one named draw:frame)
+/// Prolog | Closed --non-whitespace text or CDATA--> error
+/// ```
+///
+/// An empty element at depth zero and a DOCTYPE are refused in every phase;
+/// a declaration, a comment, a processing instruction and an entity
+/// reference are accepted in every phase. The end of input is accepted only
+/// in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FragmentRootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 fn validate_canonical_text_box_fragment(xml: &str, expected_name: &str) -> Result<bool> {
     if xml.len() > MAX_TEXT_BYTES {
         return invalid("ODP source-backed text-box XML exceeds 16 MiB");
@@ -2952,8 +2972,7 @@ fn validate_canonical_text_box_fragment(xml: &str, expected_name: &str) -> Resul
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut depth = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = FragmentRootPhase::Prolog;
     let mut direct_children = 0usize;
     let mut direct_text_boxes = 0usize;
     let mut text_boxes = 0usize;
@@ -2969,8 +2988,7 @@ fn validate_canonical_text_box_fragment(xml: &str, expected_name: &str) -> Resul
         match event {
             Event::Start(element) => {
                 if depth == 0 {
-                    if root_seen
-                        || root_closed
+                    if phase != FragmentRootPhase::Prolog
                         || namespace.as_deref() != Some(DRAW_NS)
                         || element.local_name().as_ref() != b"frame"
                         || read_attribute(&reader, &element, DRAW_NS, b"name")?.as_deref()
@@ -2978,7 +2996,7 @@ fn validate_canonical_text_box_fragment(xml: &str, expected_name: &str) -> Resul
                     {
                         return invalid("ODP text-box replacement must be one named draw:frame");
                     }
-                    root_seen = true;
+                    phase = FragmentRootPhase::Open;
                 } else {
                     if depth == 1 {
                         direct_children = direct_children.checked_add(1).ok_or_else(|| {
@@ -3028,7 +3046,7 @@ fn validate_canonical_text_box_fragment(xml: &str, expected_name: &str) -> Resul
                     Error::InvalidFormat("ODP replacement XML depth underflow".into())
                 })?;
                 if depth == 0 {
-                    root_closed = true;
+                    phase = FragmentRootPhase::Closed;
                 }
             },
             Event::Text(value) if depth == 0 && !value.iter().all(u8::is_ascii_whitespace) => {
@@ -3048,8 +3066,11 @@ fn validate_canonical_text_box_fragment(xml: &str, expected_name: &str) -> Resul
         }
         buffer.clear();
     }
-    if !root_seen
-        || !root_closed
+    let root_complete = match phase {
+        FragmentRootPhase::Prolog | FragmentRootPhase::Open => false,
+        FragmentRootPhase::Closed => true,
+    };
+    if !root_complete
         || depth != 0
         || direct_children != 1
         || direct_text_boxes != 1
