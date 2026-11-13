@@ -4883,6 +4883,110 @@ enum PictureNode {
     Other,
 }
 
+/// The last direct child a `p:pic` accepted:
+///
+/// ```text
+/// Start --nvPicPr--> NonVisualProperties --blipFill--> BlipFill
+///       --spPr--> ShapeProperties --unknown child--> Trailing
+/// Trailing --unknown child--> Trailing
+/// ```
+///
+/// The three known children are required, in this order, once each; any
+/// other child at those stages is refused where it stands. A child this
+/// parser does not know is accepted after `spPr`, any number of times, but a
+/// picture is complete only in `ShapeProperties`: one that ends in any other
+/// stage, `Trailing` included, is refused after its last element.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PictureStage {
+    Start,
+    NonVisualProperties,
+    BlipFill,
+    ShapeProperties,
+    Trailing,
+}
+
+impl PictureStage {
+    /// The stage after `child`, or `None` when the child is refused here.
+    fn accept(self, child: PictureNode) -> Option<Self> {
+        match self {
+            Self::Start => {
+                (child == PictureNode::NonVisualProperties).then_some(Self::NonVisualProperties)
+            },
+            Self::NonVisualProperties => (child == PictureNode::BlipFill).then_some(Self::BlipFill),
+            Self::BlipFill => {
+                (child == PictureNode::ShapeProperties).then_some(Self::ShapeProperties)
+            },
+            Self::ShapeProperties | Self::Trailing => {
+                (child == PictureNode::Other).then_some(Self::Trailing)
+            },
+        }
+    }
+}
+
+/// The last direct `p:blipFill` child a picture accepted:
+///
+/// ```text
+/// Start --blip--> Blip
+/// Start | Blip --srcRect--> SourceRectangle
+/// Start | Blip | SourceRectangle --stretch--> Stretch
+/// Start | Blip | SourceRectangle --tile--> Tile
+/// ```
+///
+/// Every child is optional here and accepted at most once; `stretch` and
+/// `tile` exclude each other and nothing is accepted after either. `blip` is
+/// accepted in `Start` only, so a fill that begins with another child never
+/// gets one: the later stages record whether a blip came first, and a
+/// picture without one is refused after its last element.
+///
+/// A picture has one stage, not one per element: a `p:blipFill` nested in
+/// another picture child continues where the previous one stopped.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum BlipFillStage {
+    Start,
+    Blip,
+    SourceRectangle { has_blip: bool },
+    Stretch { has_blip: bool },
+    Tile { has_blip: bool },
+}
+
+impl BlipFillStage {
+    /// Whether an `a:blip` was accepted.
+    fn has_blip(self) -> bool {
+        match self {
+            Self::Start => false,
+            Self::Blip => true,
+            Self::SourceRectangle { has_blip }
+            | Self::Stretch { has_blip }
+            | Self::Tile { has_blip } => has_blip,
+        }
+    }
+
+    /// The stage after `child`, or `None` when the child is refused here.
+    fn accept(self, child: PictureNode) -> Option<Self> {
+        let has_blip = self.has_blip();
+        match (self, child) {
+            (Self::Start, PictureNode::Blip) => Some(Self::Blip),
+            (Self::Start | Self::Blip, PictureNode::SourceRectangle) => {
+                Some(Self::SourceRectangle { has_blip })
+            },
+            (Self::Start | Self::Blip | Self::SourceRectangle { .. }, PictureNode::Stretch) => {
+                Some(Self::Stretch { has_blip })
+            },
+            (Self::Start | Self::Blip | Self::SourceRectangle { .. }, PictureNode::Tile) => {
+                Some(Self::Tile { has_blip })
+            },
+            (
+                Self::Start
+                | Self::Blip
+                | Self::SourceRectangle { .. }
+                | Self::Stretch { .. }
+                | Self::Tile { .. },
+                _,
+            ) => None,
+        }
+    }
+}
+
 const MCE_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
 const DRAWINGML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
 const STRICT_DRAWINGML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/main";
@@ -4912,11 +5016,8 @@ fn parse_picture_relationship_inner(
     let origin = ReaderOrigin::of(xml);
     let mut stack: Vec<(PictureNode, Vec<u8>)> = Vec::new();
     let mut root_seen = false;
-    let mut picture_stage = 0_u8;
-    let mut blip_fill_stage = 0_u8;
-    let mut saw_blip = false;
-    let mut saw_stretch = false;
-    let mut saw_tile = false;
+    let mut picture_stage = PictureStage::Start;
+    let mut blip_fill_stage = BlipFillStage::Start;
     let mut saw_fill_rectangle = false;
     let mut saw_blip_extension_list = false;
     let mut saw_svg_blip = false;
@@ -4992,23 +5093,21 @@ fn parse_picture_relationship_inner(
                 match parent {
                     None => {},
                     Some(PictureNode::Picture) => {
-                        let expected = match picture_stage {
-                            0 => PictureNode::NonVisualProperties,
-                            1 => PictureNode::BlipFill,
-                            2 => PictureNode::ShapeProperties,
-                            _ => PictureNode::Other,
-                        };
-                        if node != expected {
+                        let Some(next) = picture_stage.accept(node) else {
                             return Err(Error::Invalid(
                                 "picture descriptor direct children must be nvPicPr, blipFill, and spPr in schema order".into(),
                             ));
-                        }
-                        picture_stage = picture_stage.saturating_add(1);
+                        };
+                        picture_stage = next;
                     },
-                    Some(PictureNode::BlipFill) => match node {
-                        PictureNode::Blip if !saw_blip && blip_fill_stage == 0 => {
-                            saw_blip = true;
-                            blip_fill_stage = 1;
+                    Some(PictureNode::BlipFill) => {
+                        let Some(next) = blip_fill_stage.accept(node) else {
+                            return Err(Error::Invalid(
+                                "picture blipFill direct children are an ordered blip, srcRect, and stretch/tile set".into(),
+                            ));
+                        };
+                        blip_fill_stage = next;
+                        if node == PictureNode::Blip {
                             validate_blip_attributes(
                                 &element,
                                 reader.decoder(),
@@ -5051,30 +5150,7 @@ fn parse_picture_relationship_inner(
                                     svg: None,
                                 });
                             }
-                        },
-                        PictureNode::SourceRectangle if blip_fill_stage <= 1 => {
-                            blip_fill_stage = 2;
-                        },
-                        PictureNode::Stretch
-                            if blip_fill_stage <= 2 && !saw_stretch && !saw_tile =>
-                        {
-                            blip_fill_stage = 3;
-                            saw_stretch = true;
-                            if !is_start {
-                                return Err(Error::Invalid(
-                                    "picture blipFill stretch must contain one fillRect".into(),
-                                ));
-                            }
-                        },
-                        PictureNode::Tile if blip_fill_stage <= 2 && !saw_stretch && !saw_tile => {
-                            blip_fill_stage = 3;
-                            saw_tile = true;
-                        },
-                        _ => {
-                            return Err(Error::Invalid(
-                                "picture blipFill direct children are an ordered blip, srcRect, and stretch/tile set".into(),
-                            ));
-                        },
+                        }
                     },
                     Some(PictureNode::Stretch) => {
                         if node != PictureNode::FillRectangle || saw_fill_rectangle {
@@ -5271,17 +5347,17 @@ fn parse_picture_relationship_inner(
             "picture descriptor XML lacks a p:pic root".into(),
         ));
     }
-    if picture_stage != 3 {
+    if picture_stage != PictureStage::ShapeProperties {
         return Err(Error::Invalid(
             "picture descriptor requires exactly nvPicPr, blipFill, and spPr children".into(),
         ));
     }
-    if !saw_blip {
+    if !blip_fill_stage.has_blip() {
         return Err(Error::Relationship(
             "picture descriptor is missing its a:blip relationship".into(),
         ));
     }
-    if saw_stretch && !saw_fill_rectangle {
+    if matches!(blip_fill_stage, BlipFillStage::Stretch { .. }) && !saw_fill_rectangle {
         return Err(Error::Invalid(
             "picture stretch requires exactly one direct fillRect".into(),
         ));

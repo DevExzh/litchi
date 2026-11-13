@@ -387,6 +387,48 @@ pub(super) fn store(package: &mut OpcPackage, value: &Part, limits: Limits) -> R
     Ok(())
 }
 
+/// The last child group a `pc:docChgLst` accepted:
+///
+/// ```text
+/// Start --chgData--> Changes
+/// Start | Changes --docChg--> Changes
+/// Start | Changes --extLst--> Extensions
+/// ```
+///
+/// Every child is optional. `chgData` is accepted in `Start` only, so it is
+/// refused after a `docChg` as well as after another `chgData`; `docChg`
+/// repeats; `extLst` is accepted once and nothing is accepted after it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ListStage {
+    Start,
+    Changes,
+    Extensions,
+}
+
+/// The last child a `pc:docChg` accepted, in schema order:
+///
+/// ```text
+/// Data --chgData--> Data --docMkLst--> MonikerList --sldChg--> SlideChange
+///      --sldMasterChg--> MasterChange --cmAuthorChg--> AuthorChange
+///      --extLst--> Extensions
+/// ```
+///
+/// `Data` is also the phase of a descriptor without children yet. A child
+/// may enter its own phase from any earlier one and is refused once a later
+/// phase has been reached. Every child except `docMkLst` may repeat while its
+/// phase lasts; a second `docMkLst` is refused as a duplicate. `docMkLst` is
+/// required, but a descriptor that skipped it is refused only when it
+/// closes, so `Frame::Document` records separately whether one was seen.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum DocumentPhase {
+    Data,
+    MonikerList,
+    SlideChange,
+    MasterChange,
+    AuthorChange,
+    Extensions,
+}
+
 #[derive(Debug)]
 enum Frame {
     Root,
@@ -395,7 +437,7 @@ enum Frame {
     MetadataExtension,
     Document {
         kinds: Vec<Kind>,
-        order: u8,
+        phase: DocumentPhase,
         has_moniker: bool,
     },
     MonikerList {
@@ -452,7 +494,7 @@ fn parse_changes_information(xml: &[u8], limits: Limits) -> Result<Info> {
     let mut namespaces = Vec::new();
     let mut lists = Vec::new();
     let mut current_list: Option<List> = None;
-    let mut list_order = 0u8;
+    let mut list_stage = ListStage::Start;
     let mut metadata_extension_start = None;
     let mut document_start = None;
     let mut list_extension_start = None;
@@ -557,16 +599,12 @@ fn parse_changes_information(xml: &[u8], limits: Limits) -> Result<Info> {
                                 ));
                             }
                             current_list = Some(List::default());
-                            list_order = 0;
+                            list_stage = ListStage::Start;
                             Frame::List
                         },
                         Frame::List => {
                             if is(&namespace, PC, local.as_ref(), b"chgData") {
-                                if list_order != 0
-                                    || current_list
-                                        .as_ref()
-                                        .is_some_and(|list| list.author.is_some())
-                                {
+                                if list_stage != ListStage::Start {
                                     return Err(invalid(
                                         "docChgLst chgData is duplicated or out of order",
                                     ));
@@ -578,10 +616,10 @@ fn parse_changes_information(xml: &[u8], limits: Limits) -> Result<Info> {
                                         invalid("document change list state is missing")
                                     })?
                                     .author = Some(data);
-                                list_order = 1;
+                                list_stage = ListStage::Changes;
                                 Frame::Metadata
                             } else if is(&namespace, PC, local.as_ref(), b"docChg") {
-                                if list_order > 1 {
+                                if list_stage == ListStage::Extensions {
                                     return Err(invalid("docChg is out of order"));
                                 }
                                 total_changes = total_changes.checked_add(1).ok_or_else(|| {
@@ -603,24 +641,20 @@ fn parse_changes_information(xml: &[u8], limits: Limits) -> Result<Info> {
                                 }
                                 let kinds = parse_change_kinds(&element, reader.decoder(), limits)?;
                                 document_start = Some(start);
-                                list_order = 1;
+                                list_stage = ListStage::Changes;
                                 Frame::Document {
                                     kinds,
-                                    order: 0,
+                                    phase: DocumentPhase::Data,
                                     has_moniker: false,
                                 }
                             } else if is(&namespace, P, local.as_ref(), b"extLst") {
-                                if list_order > 1
-                                    || current_list
-                                        .as_ref()
-                                        .is_some_and(|list| list.extension_xml.is_some())
-                                {
+                                if list_stage == ListStage::Extensions {
                                     return Err(invalid(
                                         "docChgLst extLst is duplicated or out of order",
                                     ));
                                 }
                                 no_attributes(&element, reader.decoder(), limits)?;
-                                list_order = 2;
+                                list_stage = ListStage::Extensions;
                                 list_extension_start = Some(start);
                                 Frame::ListExtension { extensions: 0 }
                             } else {
@@ -634,35 +668,35 @@ fn parse_changes_information(xml: &[u8], limits: Limits) -> Result<Info> {
                             Frame::MetadataExtension
                         },
                         Frame::Document {
-                            order, has_moniker, ..
+                            phase, has_moniker, ..
                         } => {
                             let next = if is(&namespace, PC, local.as_ref(), b"chgData") {
-                                0
+                                DocumentPhase::Data
                             } else if is(&namespace, PC, local.as_ref(), b"docMkLst") {
-                                1
+                                DocumentPhase::MonikerList
                             } else if is(&namespace, PC, local.as_ref(), b"sldChg") {
-                                2
+                                DocumentPhase::SlideChange
                             } else if is(&namespace, PC, local.as_ref(), b"sldMasterChg") {
-                                3
+                                DocumentPhase::MasterChange
                             } else if is(&namespace, PC, local.as_ref(), b"cmAuthorChg") {
-                                4
+                                DocumentPhase::AuthorChange
                             } else if is(&namespace, P, local.as_ref(), b"extLst") {
-                                5
+                                DocumentPhase::Extensions
                             } else {
                                 return Err(invalid("unexpected docChg child"));
                             };
-                            if next < *order || (next == 0 && *order == 0 && *has_moniker) {
+                            if next < *phase {
                                 return Err(invalid(
                                     "docChg children are duplicated or out of order",
                                 ));
                             }
-                            *order = next;
+                            *phase = next;
                             match next {
-                                0 => {
+                                DocumentPhase::Data => {
                                     parse_changes_data(&element, reader.decoder(), limits)?;
                                     Frame::DescriptorOpaque
                                 },
-                                1 => {
+                                DocumentPhase::MonikerList => {
                                     if *has_moniker {
                                         return Err(invalid("docChg has duplicate docMkLst"));
                                     }
@@ -670,11 +704,13 @@ fn parse_changes_information(xml: &[u8], limits: Limits) -> Result<Info> {
                                     no_attributes(&element, reader.decoder(), limits)?;
                                     Frame::MonikerList { count: 0 }
                                 },
-                                2..=4 => {
+                                DocumentPhase::SlideChange
+                                | DocumentPhase::MasterChange
+                                | DocumentPhase::AuthorChange => {
                                     required_change_attribute(&element, reader.decoder(), limits)?;
                                     Frame::DescriptorOpaque
                                 },
-                                _ => {
+                                DocumentPhase::Extensions => {
                                     no_attributes(&element, reader.decoder(), limits)?;
                                     Frame::DescriptorOpaque
                                 },
