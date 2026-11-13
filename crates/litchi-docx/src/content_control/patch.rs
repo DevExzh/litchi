@@ -1,22 +1,10 @@
-#![expect(
-    clippy::let_underscore_must_use,
-    reason = "the builder return is intentionally ignored after mutation"
-)]
 //! Retry-safe exact-source and package patch gates.
 
-use std::sync::{
-    Arc,
-    atomic::{AtomicU8, Ordering},
-};
-
+use crate::publication_gate::{ClaimRefusal, PublicationClaim, PublicationGate};
 use crate::{Error, Result};
 
 use super::snapshot::Source;
 use super::{Limits, Snapshot};
-
-const READY: u8 = 0;
-const IN_FLIGHT: u8 = 1;
-const APPLIED: u8 = 2;
 
 /// Reversible, exact-source content-control XML replacement.
 #[derive(Debug, Clone)]
@@ -86,53 +74,23 @@ impl DraftPatch {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Gate(Arc<AtomicU8>);
+pub(crate) struct Gate(PublicationGate);
 
 impl Gate {
     pub(crate) fn new() -> Self {
-        Self(Arc::new(AtomicU8::new(READY)))
+        Self(PublicationGate::new())
     }
 
     pub(crate) fn is_applied(&self) -> bool {
-        self.0.load(Ordering::Acquire) == APPLIED
+        self.0.is_applied()
     }
 
-    pub(crate) fn claim(&self, subject: &str) -> Result<Claim> {
-        match self
-            .0
-            .compare_exchange(READY, IN_FLIGHT, Ordering::AcqRel, Ordering::Acquire)
-        {
-            Ok(_) => Ok(Claim {
-                gate: self.clone(),
-                finalized: false,
-            }),
-            Err(IN_FLIGHT) => Err(Error::Invalid(format!(
-                "{subject} publication is already in flight"
-            ))),
-            Err(_) => Err(Error::Invalid(format!("{subject} was already applied"))),
-        }
-    }
-}
-
-pub(crate) struct Claim {
-    gate: Gate,
-    finalized: bool,
-}
-
-impl Claim {
-    pub(crate) fn finalize(mut self) {
-        self.gate.0.store(APPLIED, Ordering::Release);
-        self.finalized = true;
-    }
-}
-
-impl Drop for Claim {
-    fn drop(&mut self) {
-        if !self.finalized {
-            let _ =
-                self.gate
-                    .0
-                    .compare_exchange(IN_FLIGHT, READY, Ordering::AcqRel, Ordering::Acquire);
-        }
+    pub(crate) fn claim(&self, subject: &str) -> Result<PublicationClaim> {
+        self.0.claim().map_err(|refusal| match refusal {
+            ClaimRefusal::InFlight => {
+                Error::Invalid(format!("{subject} publication is already in flight"))
+            },
+            ClaimRefusal::Applied => Error::Invalid(format!("{subject} was already applied")),
+        })
     }
 }

@@ -49,6 +49,7 @@ mod part_scan;
 pub mod parts;
 mod picture_spans;
 pub mod properties;
+mod publication_gate;
 pub mod redact;
 pub mod revision;
 pub mod ribbon;

@@ -145,6 +145,97 @@ struct Simple {
     parent: usize,
 }
 
+/// Which `w:fldChar` a marker run carries.
+#[derive(Clone, Copy)]
+enum MarkerKind {
+    Begin,
+    Separate,
+    End,
+}
+
+/// How far the marker runs of a complex field got.
+///
+/// | From          | Marker run closed | To                                       |
+/// |---------------|-------------------|------------------------------------------|
+/// | `Instruction` | `separate`        | `Result`                                 |
+/// | `Instruction` | `end`             | `Closed { separate: None }`              |
+/// | `Result`      | `separate`        | `Result`, the later separator replaces the earlier |
+/// | `Result`      | `end`             | `Closed { separate: Some }`              |
+/// | `Closed`      | `separate`        | `Closed { separate: Some }`, replacing any earlier one |
+/// | `Closed`      | `end`             | `Closed`, replacing the end marker       |
+///
+/// A marker is placed when its run closes, so a separator in an enclosing
+/// run can arrive after the end marker of a run nested in it. A field that
+/// the document never ends stays `Instruction` or `Result` and refuses
+/// result edits.
+#[derive(Clone)]
+enum FieldStage {
+    /// Only the begin marker was read.
+    Instruction,
+    /// A separator was read; the result is still open.
+    Result { separate: Marker },
+    /// The end marker was read.
+    Closed {
+        separate: Option<Marker>,
+        end: Marker,
+    },
+}
+
+impl FieldStage {
+    const fn separate(&self) -> Option<&Marker> {
+        match self {
+            Self::Instruction | Self::Closed { separate: None, .. } => None,
+            Self::Result { separate }
+            | Self::Closed {
+                separate: Some(separate),
+                ..
+            } => Some(separate),
+        }
+    }
+
+    const fn end(&self) -> Option<&Marker> {
+        match self {
+            Self::Instruction | Self::Result { .. } => None,
+            Self::Closed { end, .. } => Some(end),
+        }
+    }
+
+    /// Places the separator run.
+    fn separated(self, separate: Marker) -> Self {
+        match self {
+            Self::Instruction | Self::Result { .. } => Self::Result { separate },
+            Self::Closed { end, .. } => Self::Closed {
+                separate: Some(separate),
+                end,
+            },
+        }
+    }
+
+    /// Places the end run.
+    fn ended(self, end: Marker) -> Self {
+        match self {
+            Self::Instruction => Self::Closed {
+                separate: None,
+                end,
+            },
+            Self::Result { separate } => Self::Closed {
+                separate: Some(separate),
+                end,
+            },
+            Self::Closed { separate, .. } => Self::Closed { separate, end },
+        }
+    }
+}
+
+/// The markup a field is written with.
+#[derive(Clone)]
+enum Markup {
+    /// One `w:fldSimple` element.
+    Simple(Simple),
+    /// `w:fldChar` marker runs.
+    Complex { begin: Marker, stage: FieldStage },
+}
+
 /// One field of the main story.
 #[derive(Clone)]
 pub struct Field {
@@ -154,15 +245,10 @@ pub struct Field {
     begin_paragraph: usize,
     end_paragraph: usize,
     result: String,
-    separated: bool,
-    closed: bool,
     locked: bool,
     dirty: bool,
     nested_paragraph: bool,
-    begin: Marker,
-    separate: Option<Marker>,
-    end: Option<Marker>,
-    simple: Option<Simple>,
+    markup: Markup,
 }
 
 impl Field {
@@ -201,7 +287,10 @@ impl Field {
     /// Whether the field has a result separator (simple fields always do).
     #[must_use]
     pub const fn has_result(&self) -> bool {
-        self.separated
+        match &self.markup {
+            Markup::Simple(_) => true,
+            Markup::Complex { stage, .. } => stage.separate().is_some(),
+        }
     }
 
     /// Whether the field is locked against updates (`w:fldLock`).
@@ -352,36 +441,45 @@ impl Fields {
         if field.begin_paragraph != field.end_paragraph || field.nested_paragraph {
             return Err(Refusal::FieldInterior);
         }
-        if let Some(simple) = &field.simple {
-            let Some(close_start) = simple.close_start else {
-                return Ok(TextRegion::Expand(simple.clone()));
-            };
-            let region = simple.start_tag_end..close_start;
-            self.check_plain(&region)?;
-            return Ok(TextRegion::Replace {
-                region,
-                properties: None,
-            });
-        }
-        let end = field.end.as_ref().ok_or(Refusal::FieldInterior)?;
-        if !field.closed || end.parent != field.begin.parent {
+        let (begin, separate, end) = match &field.markup {
+            Markup::Simple(simple) => {
+                let Some(close_start) = simple.close_start else {
+                    return Ok(TextRegion::Expand(simple.clone()));
+                };
+                let region = simple.start_tag_end..close_start;
+                self.check_plain(&region)?;
+                return Ok(TextRegion::Replace {
+                    region,
+                    properties: None,
+                });
+            },
+            Markup::Complex {
+                stage: FieldStage::Instruction | FieldStage::Result { .. },
+                ..
+            } => return Err(Refusal::FieldInterior),
+            Markup::Complex {
+                begin,
+                stage: FieldStage::Closed { separate, end },
+            } => (begin, separate, end),
+        };
+        if end.parent != begin.parent {
             return Err(Refusal::FieldInterior);
         }
-        match &field.separate {
+        match separate {
             Some(separate) => {
-                if separate.parent != field.begin.parent {
+                if separate.parent != begin.parent {
                     return Err(Refusal::FieldInterior);
                 }
                 let region = separate.run.end..end.run.start;
                 self.check_plain(&region)?;
                 Ok(TextRegion::Replace {
                     region,
-                    properties: field.begin.properties.clone(),
+                    properties: begin.properties.clone(),
                 })
             },
             None => Ok(TextRegion::Insert {
                 at: end.run.start,
-                properties: field.begin.properties.clone(),
+                properties: begin.properties.clone(),
             }),
         }
     }
@@ -397,7 +495,7 @@ impl Fields {
     /// The paragraphs and cut points a paragraph update rewrites.
     fn toc_shape(&self, index: usize) -> std::result::Result<TocShape, Refusal> {
         let field = self.fields.get(index).ok_or(Refusal::FieldNotFound)?;
-        if field.nested_paragraph || !field.closed {
+        if field.nested_paragraph {
             return Err(Refusal::FieldInterior);
         }
         let first = self
@@ -411,21 +509,30 @@ impl Fields {
         if first.parent != last.parent || first.nested {
             return Err(Refusal::FieldInterior);
         }
-        if let Some(simple) = &field.simple {
-            if simple.parent != first.range.start {
-                return Err(Refusal::FieldInterior);
-            }
-            return Ok(TocShape {
-                cut: simple.element.start,
-                resume: simple.element.end,
-                simple: true,
-            });
-        }
-        let end = field.end.as_ref().ok_or(Refusal::FieldInterior)?;
-        if field.begin.parent != first.range.start || end.parent != last.range.start {
+        let (begin, separate, end) = match &field.markup {
+            Markup::Simple(simple) => {
+                if simple.parent != first.range.start {
+                    return Err(Refusal::FieldInterior);
+                }
+                return Ok(TocShape {
+                    cut: simple.element.start,
+                    resume: simple.element.end,
+                    simple: true,
+                });
+            },
+            Markup::Complex {
+                stage: FieldStage::Instruction | FieldStage::Result { .. },
+                ..
+            } => return Err(Refusal::FieldInterior),
+            Markup::Complex {
+                begin,
+                stage: FieldStage::Closed { separate, end },
+            } => (begin, separate, end),
+        };
+        if begin.parent != first.range.start || end.parent != last.range.start {
             return Err(Refusal::FieldInterior);
         }
-        let cut = match &field.separate {
+        let cut = match separate {
             Some(separate) if separate.parent == first.range.start => separate.run.end,
             Some(_) => return Err(Refusal::FieldInterior),
             None if field.begin_paragraph == field.end_paragraph => end.run.start,
@@ -659,8 +766,18 @@ fn refused(position: usize, reason: Refusal) -> Error {
     Error::Refused { position, reason }
 }
 
+/// Where the scanner is inside one open complex field.
+///
+/// | From          | `w:fldChar`  | To                          |
+/// |---------------|--------------|-----------------------------|
+/// | (not open)    | `begin`      | `Instruction`, field pushed |
+/// | `Instruction` | `separate`   | `Result`                    |
+/// | `Result`      | `separate`   | `Result`                    |
+/// | either        | `end`        | field popped                |
+///
+/// `separate` and `end` with no open field are ignored.
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum State {
+enum ScanState {
     Instruction,
     Result,
 }
@@ -676,8 +793,8 @@ struct OpenRun {
     parent: usize,
     properties: Option<Range<usize>>,
     properties_start: Option<usize>,
-    /// `(field, marker kind, fldChar element)`: 0 begin, 1 separate, 2 end.
-    markers: Vec<(usize, u8, Option<Range<usize>>)>,
+    /// `(field, marker kind, fldChar element)`.
+    markers: Vec<(usize, MarkerKind, Option<Range<usize>>)>,
 }
 
 struct Scanner<'x> {
@@ -690,7 +807,7 @@ struct Scanner<'x> {
     runs: Vec<OpenRun>,
     text: Option<usize>,
     instruction: Option<usize>,
-    complex: Vec<(usize, State)>,
+    complex: Vec<(usize, ScanState)>,
     simple: Vec<(usize, usize)>,
     skip: Option<usize>,
     text_boxes: usize,
@@ -866,7 +983,7 @@ impl Scanner<'_> {
         if self
             .complex
             .iter()
-            .any(|(_, state)| *state == State::Instruction)
+            .any(|(_, state)| *state == ScanState::Instruction)
         {
             return;
         }
@@ -874,7 +991,7 @@ impl Scanner<'_> {
             self.out.paragraphs[index].text.push_str(value);
         }
         for (field, state) in &self.complex {
-            if *state == State::Result {
+            if *state == ScanState::Result {
                 self.out.fields[*field].result.push_str(value);
             }
         }
@@ -1076,15 +1193,10 @@ impl Scanner<'_> {
                     begin_paragraph: paragraph,
                     end_paragraph: paragraph,
                     result: String::new(),
-                    separated: true,
-                    closed: false,
                     locked: on(attribute(reader, element, b"fldLock")?.as_deref()),
                     dirty: on(attribute(reader, element, b"dirty")?.as_deref()),
                     nested_paragraph: self.out.paragraphs[paragraph].nested,
-                    begin: Marker::default(),
-                    separate: None,
-                    end: None,
-                    simple: Some(Simple {
+                    markup: Markup::Simple(Simple {
                         element: start..end,
                         start_tag_end: end,
                         close_start: (!empty).then_some(start),
@@ -1092,9 +1204,7 @@ impl Scanner<'_> {
                     }),
                 };
                 let index = self.new_field(field)?;
-                if empty {
-                    self.out.fields[index].closed = true;
-                } else {
+                if !empty {
                     self.simple.push((index, depth));
                 }
             },
@@ -1143,39 +1253,34 @@ impl Scanner<'_> {
                     begin_paragraph: paragraph,
                     end_paragraph: paragraph,
                     result: String::new(),
-                    separated: false,
-                    closed: false,
                     locked: on(attribute(reader, element, b"fldLock")?.as_deref()),
                     dirty: on(attribute(reader, element, b"dirty")?.as_deref()),
                     nested_paragraph: self.out.paragraphs[paragraph].nested,
-                    begin: Marker::default(),
-                    separate: None,
-                    end: None,
-                    simple: None,
+                    markup: Markup::Complex {
+                        begin: Marker::default(),
+                        stage: FieldStage::Instruction,
+                    },
                 };
                 let index = self.new_field(field)?;
-                self.complex.push((index, State::Instruction));
+                self.complex.push((index, ScanState::Instruction));
                 if let Some(run) = self.runs.last_mut() {
-                    run.markers.push((index, 0, character));
+                    run.markers.push((index, MarkerKind::Begin, character));
                 }
             },
             Some("separate") => {
                 if let Some((index, state)) = self.complex.last_mut() {
-                    *state = State::Result;
+                    *state = ScanState::Result;
                     let index = *index;
-                    self.out.fields[index].separated = true;
                     if let Some(run) = self.runs.last_mut() {
-                        run.markers.push((index, 1, character));
+                        run.markers.push((index, MarkerKind::Separate, character));
                     }
                 }
             },
             Some("end") => {
                 if let Some((index, _)) = self.complex.pop() {
-                    let field = &mut self.out.fields[index];
-                    field.end_paragraph = paragraph;
-                    field.closed = true;
+                    self.out.fields[index].end_paragraph = paragraph;
                     if let Some(run) = self.runs.last_mut() {
-                        run.markers.push((index, 2, character));
+                        run.markers.push((index, MarkerKind::End, character));
                     }
                 }
             },
@@ -1224,7 +1329,7 @@ impl Scanner<'_> {
                         .ok_or_else(|| xml_error("instruction offset is out of range"))?,
                 )
                 .map_err(|_| xml_error("invalid field instruction"))?;
-                if let Some((index, State::Instruction)) = self.complex.last() {
+                if let Some((index, ScanState::Instruction)) = self.complex.last() {
                     self.out.fields[*index].instruction.push_str(&value);
                 }
             },
@@ -1246,22 +1351,28 @@ impl Scanner<'_> {
                         properties: run.properties.clone(),
                         character,
                     };
-                    let field = &mut self.out.fields[field];
-                    match kind {
-                        0 => field.begin = marker,
-                        1 => field.separate = Some(marker),
-                        _ => field.end = Some(marker),
+                    // Marker runs are only recorded for complex fields.
+                    if let Markup::Complex { begin, stage } = &mut self.out.fields[field].markup {
+                        match kind {
+                            MarkerKind::Begin => *begin = marker,
+                            MarkerKind::Separate => {
+                                *stage = std::mem::replace(stage, FieldStage::Instruction)
+                                    .separated(marker);
+                            },
+                            MarkerKind::End => {
+                                *stage =
+                                    std::mem::replace(stage, FieldStage::Instruction).ended(marker);
+                            },
+                        }
                     }
                 }
             },
             b"fldSimple" if self.simple.last().is_some_and(|(_, d)| *d == depth) => {
-                if let Some((index, _)) = self.simple.pop() {
-                    let field = &mut self.out.fields[index];
-                    field.closed = true;
-                    if let Some(simple) = &mut field.simple {
-                        simple.element.end = end;
-                        simple.close_start = Some(start);
-                    }
+                if let Some((index, _)) = self.simple.pop()
+                    && let Markup::Simple(simple) = &mut self.out.fields[index].markup
+                {
+                    simple.element.end = end;
+                    simple.close_start = Some(start);
                 }
             },
             b"pPr" => {
@@ -1285,7 +1396,7 @@ impl Scanner<'_> {
                 paragraph.range.end = end;
                 paragraph.close_start = start;
                 for (field, state) in &self.complex {
-                    if *state == State::Result {
+                    if *state == ScanState::Result {
                         self.out.fields[*field].result.push('\n');
                     }
                 }
@@ -1733,30 +1844,37 @@ impl Edit {
                     let prefix = first.prefix.as_str();
                     // The first paragraph, through the separator.
                     let mut head = Vec::new();
-                    if shape.simple {
-                        head.extend_from_slice(&xml[first.range.start..shape.cut]);
-                        head.extend_from_slice(marker_run(prefix, "begin", *dirty).as_bytes());
-                        head.extend_from_slice(
-                            instruction_run(prefix, &field.instruction).as_bytes(),
-                        );
-                        head.extend_from_slice(marker_run(prefix, "separate", false).as_bytes());
-                    } else {
-                        match (&field.begin.character, dirty) {
-                            (Some(character), true) => {
-                                head.extend_from_slice(&xml[first.range.start..character.start]);
-                                head.extend_from_slice(&dirty_marker(
-                                    &xml[character.clone()],
-                                    prefix,
-                                ));
-                                head.extend_from_slice(&xml[character.end..shape.cut]);
-                            },
-                            _ => head.extend_from_slice(&xml[first.range.start..shape.cut]),
-                        }
-                        if field.separate.is_none() {
+                    match &field.markup {
+                        Markup::Simple(_) => {
+                            head.extend_from_slice(&xml[first.range.start..shape.cut]);
+                            head.extend_from_slice(marker_run(prefix, "begin", *dirty).as_bytes());
+                            head.extend_from_slice(
+                                instruction_run(prefix, &field.instruction).as_bytes(),
+                            );
                             head.extend_from_slice(
                                 marker_run(prefix, "separate", false).as_bytes(),
                             );
-                        }
+                        },
+                        Markup::Complex { begin, stage } => {
+                            match (&begin.character, dirty) {
+                                (Some(character), true) => {
+                                    head.extend_from_slice(
+                                        &xml[first.range.start..character.start],
+                                    );
+                                    head.extend_from_slice(&dirty_marker(
+                                        &xml[character.clone()],
+                                        prefix,
+                                    ));
+                                    head.extend_from_slice(&xml[character.end..shape.cut]);
+                                },
+                                _ => head.extend_from_slice(&xml[first.range.start..shape.cut]),
+                            }
+                            if stage.separate().is_none() {
+                                head.extend_from_slice(
+                                    marker_run(prefix, "separate", false).as_bytes(),
+                                );
+                            }
+                        },
                     }
                     head.extend_from_slice(format!("</{prefix}p>").as_bytes());
                     // The last paragraph, from the end marker.
@@ -1850,49 +1968,49 @@ impl Edit {
                         .paragraphs
                         .get(field.begin_paragraph)
                         .map_or("", |paragraph| paragraph.prefix.as_str());
-                    if let Some(simple) = &field.simple {
-                        let tag = &xml[simple.element.start..simple.start_tag_end];
-                        let rewritten = with_attribute(tag, b"instr", instruction)
-                            .and_then(|tag| with_attribute(&tag, b"dirty", "true"))
-                            .ok_or_else(|| refused(*index, Refusal::FieldInterior))?;
-                        splices.push((simple.element.start, simple.start_tag_end, rewritten));
-                    } else {
-                        let next = field
-                            .separate
-                            .as_ref()
-                            .or(field.end.as_ref())
-                            .ok_or_else(|| refused(*index, Refusal::FieldInterior))?;
-                        // The markers must be separate runs of one parent.
-                        if next.parent != field.begin.parent || field.begin.run.end > next.run.start
-                        {
-                            return Err(refused(*index, Refusal::FieldInterior));
-                        }
-                        let region = field.begin.run.end..next.run.start;
-                        // A field nested in the instruction is not rewritten.
-                        if xml[region.clone()]
-                            .windows(b"fldChar".len())
-                            .any(|window| window == b"fldChar")
-                        {
-                            return Err(refused(*index, Refusal::FieldInterior));
-                        }
-                        let properties = field
-                            .begin
-                            .properties
-                            .as_ref()
-                            .map_or(&[][..], |range| &xml[range.clone()]);
-                        let mut run = format!("<{prefix}r>");
-                        run.push_str(&String::from_utf8_lossy(properties));
-                        run.push_str(&format!("<{prefix}instrText xml:space=\"preserve\">"));
-                        escape(&mut run, instruction);
-                        run.push_str(&format!("</{prefix}instrText></{prefix}r>"));
-                        splices.push((region.start, region.end, run.into_bytes()));
-                        if let Some(character) = &field.begin.character {
-                            splices.push((
-                                character.start,
-                                character.end,
-                                dirty_marker(&xml[character.clone()], prefix),
-                            ));
-                        }
+                    match &field.markup {
+                        Markup::Simple(simple) => {
+                            let tag = &xml[simple.element.start..simple.start_tag_end];
+                            let rewritten = with_attribute(tag, b"instr", instruction)
+                                .and_then(|tag| with_attribute(&tag, b"dirty", "true"))
+                                .ok_or_else(|| refused(*index, Refusal::FieldInterior))?;
+                            splices.push((simple.element.start, simple.start_tag_end, rewritten));
+                        },
+                        Markup::Complex { begin, stage } => {
+                            let next = stage
+                                .separate()
+                                .or(stage.end())
+                                .ok_or_else(|| refused(*index, Refusal::FieldInterior))?;
+                            // The markers must be separate runs of one parent.
+                            if next.parent != begin.parent || begin.run.end > next.run.start {
+                                return Err(refused(*index, Refusal::FieldInterior));
+                            }
+                            let region = begin.run.end..next.run.start;
+                            // A field nested in the instruction is not rewritten.
+                            if xml[region.clone()]
+                                .windows(b"fldChar".len())
+                                .any(|window| window == b"fldChar")
+                            {
+                                return Err(refused(*index, Refusal::FieldInterior));
+                            }
+                            let properties = begin
+                                .properties
+                                .as_ref()
+                                .map_or(&[][..], |range| &xml[range.clone()]);
+                            let mut run = format!("<{prefix}r>");
+                            run.push_str(&String::from_utf8_lossy(properties));
+                            run.push_str(&format!("<{prefix}instrText xml:space=\"preserve\">"));
+                            escape(&mut run, instruction);
+                            run.push_str(&format!("</{prefix}instrText></{prefix}r>"));
+                            splices.push((region.start, region.end, run.into_bytes()));
+                            if let Some(character) = &begin.character {
+                                splices.push((
+                                    character.start,
+                                    character.end,
+                                    dirty_marker(&xml[character.clone()], prefix),
+                                ));
+                            }
+                        },
                     }
                     outcome.fields += 1;
                 },

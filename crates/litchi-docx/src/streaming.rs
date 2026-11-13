@@ -8,6 +8,7 @@
 
 use std::fmt;
 use std::io::{self, Write};
+use std::mem;
 use std::sync::{
     Arc, Mutex,
     atomic::{AtomicU64, Ordering},
@@ -407,6 +408,17 @@ impl PoisonReason {
     }
 }
 
+/// Position inside the document body while the writer is open.
+///
+/// | From                            | Event              | To                              |
+/// |---------------------------------|--------------------|---------------------------------|
+/// | `Ready`                         | `start_paragraph`  | `Paragraph { run_open: false }` |
+/// | `Paragraph { run_open: false }` | `start_run`        | `Paragraph { run_open: true }`  |
+/// | `Paragraph { run_open: true }`  | `write_text`       | unchanged, counters advance     |
+/// | `Paragraph { run_open: true }`  | `finish_run`       | `Paragraph { run_open: false }` |
+/// | `Paragraph { run_open: false }` | `finish_paragraph` | `Ready`                         |
+///
+/// Any other call is a state error that leaves the phase unchanged.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Phase {
     Ready,
@@ -415,6 +427,35 @@ enum Phase {
         run_count: u64,
         run_text_bytes: u64,
         paragraph_xml_bytes: u64,
+    },
+}
+
+/// Lifecycle of a [`StreamingDocumentWriter`].
+///
+/// | From       | Event                                     | To                       |
+/// |------------|-------------------------------------------|--------------------------|
+/// | `Open`     | a body call succeeds or is a state error  | `Open`                   |
+/// | `Open`     | a limit, input, execution or sink failure | `Poisoned`               |
+/// | `Open`     | `finish` hands the part to finalization   | `Closing`                |
+/// | `Closing`  | finalization fails                        | `Poisoned`               |
+/// | `Closing`  | finalization succeeds                     | the writer is consumed   |
+/// | `Poisoned` | any call                                  | `Poisoned`, reason replayed |
+///
+/// `Closing` also appears for an instant inside the sink-failure path, between
+/// abandoning the part and recording the reason; no call starts in it.
+enum WriterState<W: Write> {
+    /// The document part accepts body XML.
+    Open {
+        part: PartWriter<BudgetedOutput<W>>,
+        phase: Phase,
+    },
+    /// The document part was taken for finalization or abandonment.
+    Closing,
+    /// A failure ended the document. The part is kept until the writer drops
+    /// unless the failing sink already abandoned it.
+    Poisoned {
+        reason: PoisonReason,
+        part: Option<PartWriter<BudgetedOutput<W>>>,
     },
 }
 
@@ -481,16 +522,14 @@ impl DocumentLeases {
 /// emits or reports a failure. The owned sink is declared first, so it is
 /// still the first thing the writer drops.
 struct DocumentState<W: Write> {
-    part: Option<PartWriter<BudgetedOutput<W>>>,
+    lifecycle: WriterState<W>,
     limits: StreamingDocumentLimits,
-    phase: Phase,
     paragraphs: u64,
     runs: u64,
     input_bytes: u64,
     document_xml_bytes: u64,
     output_counter: Arc<AtomicU64>,
     execution_state: Arc<ExecutionFailureState>,
-    poison: Option<PoisonReason>,
 }
 
 impl<W: Write> StreamingDocumentWriter<W> {
@@ -582,16 +621,17 @@ impl<W: Write> StreamingDocumentWriter<W> {
         }
         Ok(Self {
             state: DocumentState {
-                part: Some(part),
+                lifecycle: WriterState::Open {
+                    part,
+                    phase: Phase::Ready,
+                },
                 limits,
-                phase: Phase::Ready,
                 paragraphs: 0,
                 runs: 0,
                 input_bytes: 0,
                 document_xml_bytes: document_prefix_bytes,
                 output_counter,
                 execution_state,
-                poison: None,
             },
             leases: DocumentLeases::new(&context),
             context,
@@ -633,7 +673,7 @@ impl<W: Write> StreamingDocumentWriter<W> {
     /// this writer.
     #[must_use]
     pub const fn is_poisoned(&self) -> bool {
-        self.state.poison.is_some()
+        self.state.is_poisoned()
     }
 
     /// Returns the leases to the budget once the writer is poisoned, so a
@@ -642,7 +682,7 @@ impl<W: Write> StreamingDocumentWriter<W> {
         &mut self,
         result: Result<T, StreamingDocumentError>,
     ) -> Result<T, StreamingDocumentError> {
-        if self.state.poison.is_some() {
+        if self.state.is_poisoned() {
             self.leases.release();
         }
         result
@@ -655,8 +695,7 @@ impl<W: Write> StreamingDocumentWriter<W> {
     }
 
     fn start_paragraph_inner(&mut self) -> Result<(), StreamingDocumentError> {
-        self.state.ensure_usable()?;
-        if !matches!(self.state.phase, Phase::Ready) {
+        if !matches!(self.state.phase()?, Phase::Ready) {
             return Err(self.state.state_error("a paragraph is already open"));
         }
         self.context
@@ -683,12 +722,12 @@ impl<W: Write> StreamingDocumentWriter<W> {
         self.state
             .emit_document(PARAGRAPH_PREFIX, paragraph_bytes, Some(paragraph_bytes))?;
         self.state.paragraphs = observed;
-        self.state.phase = Phase::Paragraph {
+        self.state.set_phase(Phase::Paragraph {
             run_open: false,
             run_count: 0,
             run_text_bytes: 0,
             paragraph_xml_bytes: paragraph_bytes,
-        };
+        });
         Ok(())
     }
 
@@ -699,13 +738,12 @@ impl<W: Write> StreamingDocumentWriter<W> {
     }
 
     fn start_run_inner(&mut self) -> Result<(), StreamingDocumentError> {
-        self.state.ensure_usable()?;
         let Phase::Paragraph {
             run_open,
             run_count,
             paragraph_xml_bytes,
             ..
-        } = self.state.phase
+        } = self.state.phase()?
         else {
             return Err(self
                 .state
@@ -748,12 +786,12 @@ impl<W: Write> StreamingDocumentWriter<W> {
         self.state
             .emit_document(RUN_PREFIX, run_bytes, Some(run_bytes))?;
         self.state.runs = observed_runs;
-        self.state.phase = Phase::Paragraph {
+        self.state.set_phase(Phase::Paragraph {
             run_open: true,
             run_count: observed_paragraph_runs,
             run_text_bytes: 0,
             paragraph_xml_bytes: next_paragraph_bytes,
-        };
+        });
         Ok(())
     }
 
@@ -768,13 +806,12 @@ impl<W: Write> StreamingDocumentWriter<W> {
     }
 
     fn write_text_inner(&mut self, text: &str) -> Result<(), StreamingDocumentError> {
-        self.state.ensure_usable()?;
         let Phase::Paragraph {
             run_open: true,
             run_text_bytes,
             paragraph_xml_bytes,
             ..
-        } = self.state.phase
+        } = self.state.phase()?
         else {
             return Err(self
                 .state
@@ -826,23 +863,16 @@ impl<W: Write> StreamingDocumentWriter<W> {
             return Err(error);
         }
         self.state.input_bytes = next_input;
-        self.state.phase = match self.state.phase {
-            Phase::Paragraph {
-                run_open,
-                run_count,
-                paragraph_xml_bytes,
-                ..
-            } => Phase::Paragraph {
-                run_open,
-                run_count,
-                run_text_bytes: next_run_bytes,
-                // `emit_document` owns document/paragraph XML progress.  The
-                // escaped chunks may cross several scratch boundaries, so do
-                // not add `encoded_bytes` a second time here.
-                paragraph_xml_bytes,
-            },
-            Phase::Ready => Phase::Ready,
-        };
+        // `emit_document` owns document/paragraph XML progress.  The escaped
+        // chunks may cross several scratch boundaries, so only the run text
+        // counter is advanced here.
+        if let WriterState::Open {
+            phase: Phase::Paragraph { run_text_bytes, .. },
+            ..
+        } = &mut self.state.lifecycle
+        {
+            *run_text_bytes = next_run_bytes;
+        }
         Ok(())
     }
 
@@ -853,13 +883,12 @@ impl<W: Write> StreamingDocumentWriter<W> {
     }
 
     fn finish_run_inner(&mut self) -> Result<(), StreamingDocumentError> {
-        self.state.ensure_usable()?;
         let Phase::Paragraph {
             run_open: true,
             run_count,
             run_text_bytes,
             paragraph_xml_bytes,
-        } = self.state.phase
+        } = self.state.phase()?
         else {
             return Err(self.state.state_error("no run is open"));
         };
@@ -879,12 +908,12 @@ impl<W: Write> StreamingDocumentWriter<W> {
             .map_err(|error| self.state.fail_execution(error))?;
         self.state
             .emit_document(RUN_SUFFIX, suffix_bytes, Some(suffix_bytes))?;
-        self.state.phase = Phase::Paragraph {
+        self.state.set_phase(Phase::Paragraph {
             run_open: false,
             run_count,
             run_text_bytes,
             paragraph_xml_bytes: next_paragraph_bytes,
-        };
+        });
         Ok(())
     }
 
@@ -895,12 +924,11 @@ impl<W: Write> StreamingDocumentWriter<W> {
     }
 
     fn finish_paragraph_inner(&mut self) -> Result<(), StreamingDocumentError> {
-        self.state.ensure_usable()?;
         let Phase::Paragraph {
             run_open: false,
             paragraph_xml_bytes,
             ..
-        } = self.state.phase
+        } = self.state.phase()?
         else {
             return Err(self
                 .state
@@ -922,7 +950,7 @@ impl<W: Write> StreamingDocumentWriter<W> {
             .map_err(|error| self.state.fail_execution(error))?;
         self.state
             .emit_document(PARAGRAPH_SUFFIX, suffix_bytes, Some(suffix_bytes))?;
-        self.state.phase = Phase::Ready;
+        self.state.set_phase(Phase::Ready);
         Ok(())
     }
 
@@ -937,8 +965,7 @@ impl<W: Write> StreamingDocumentWriter<W> {
     }
 
     fn finish_inner(&mut self) -> Result<W, StreamingDocumentError> {
-        self.state.ensure_usable()?;
-        if !matches!(self.state.phase, Phase::Ready) {
+        if !matches!(self.state.phase()?, Phase::Ready) {
             return Err(self.state.state_error("finish the current paragraph first"));
         }
         self.context
@@ -958,7 +985,7 @@ impl<W: Write> StreamingDocumentWriter<W> {
         }
         self.state
             .emit_document(DOCUMENT_SUFFIX, suffix_bytes, None)?;
-        let Some(part) = self.state.part.take() else {
+        let Some(part) = self.state.take_part() else {
             return Err(self
                 .state
                 .fail_invalid("streaming DOCX document part is unavailable"));
@@ -971,7 +998,7 @@ impl<W: Write> StreamingDocumentWriter<W> {
                     self.state.output_bytes(),
                     &self.state.execution_state,
                 );
-                self.state.poison = Some(poison_from_error(&mapped));
+                self.state.poison(poison_from_error(&mapped));
                 return Err(mapped);
             },
         };
@@ -983,7 +1010,7 @@ impl<W: Write> StreamingDocumentWriter<W> {
                     self.state.output_bytes(),
                     &self.state.execution_state,
                 );
-                self.state.poison = Some(poison_from_error(&mapped));
+                self.state.poison(poison_from_error(&mapped));
                 return Err(mapped);
             },
         };
@@ -995,7 +1022,7 @@ impl<W: Write> StreamingDocumentWriter<W> {
                 self.state.output_bytes(),
                 &self.state.execution_state,
             );
-            self.state.poison = Some(poison_from_error(&mapped));
+            self.state.poison(poison_from_error(&mapped));
             return Err(mapped);
         }
         output.into_inner().map_err(|error| {
@@ -1005,7 +1032,7 @@ impl<W: Write> StreamingDocumentWriter<W> {
                 self.state.output_bytes(),
                 &self.state.execution_state,
             );
-            self.state.poison = Some(poison_from_error(&mapped));
+            self.state.poison(poison_from_error(&mapped));
             mapped
         })
     }
@@ -1016,10 +1043,57 @@ impl<W: Write> DocumentState<W> {
         self.output_counter.load(Ordering::Acquire)
     }
 
-    fn ensure_usable(&self) -> Result<(), StreamingDocumentError> {
-        self.poison
-            .as_ref()
-            .map_or(Ok(()), |reason| Err(reason.error(self.output_bytes())))
+    const fn is_poisoned(&self) -> bool {
+        matches!(self.lifecycle, WriterState::Poisoned { .. })
+    }
+
+    /// The body position of an open writer, or the replayed poison reason.
+    fn phase(&self) -> Result<Phase, StreamingDocumentError> {
+        match &self.lifecycle {
+            WriterState::Open { phase, .. } => Ok(*phase),
+            WriterState::Poisoned { reason, .. } => Err(reason.error(self.output_bytes())),
+            WriterState::Closing => {
+                Err(self.state_error("streaming DOCX document part is unavailable"))
+            },
+        }
+    }
+
+    /// Records the body position after a call has emitted its XML.
+    fn set_phase(&mut self, next: Phase) {
+        match &mut self.lifecycle {
+            WriterState::Open { phase, .. } => *phase = next,
+            WriterState::Closing | WriterState::Poisoned { .. } => {},
+        }
+    }
+
+    /// `Open` to `Closing`: hands the document part to the caller. A poisoned
+    /// writer gives up the part it still holds and stays poisoned.
+    fn take_part(&mut self) -> Option<PartWriter<BudgetedOutput<W>>> {
+        match mem::replace(&mut self.lifecycle, WriterState::Closing) {
+            WriterState::Open { part, .. } => Some(part),
+            WriterState::Closing => None,
+            WriterState::Poisoned { reason, part } => {
+                self.lifecycle = WriterState::Poisoned { reason, part: None };
+                part
+            },
+        }
+    }
+
+    /// Any state to `Poisoned`, keeping whichever part is still held.
+    fn poison(&mut self, reason: PoisonReason) {
+        let part = match mem::replace(&mut self.lifecycle, WriterState::Closing) {
+            WriterState::Open { part, .. } => Some(part),
+            WriterState::Closing => None,
+            WriterState::Poisoned { part, .. } => part,
+        };
+        self.lifecycle = WriterState::Poisoned { reason, part };
+    }
+
+    /// Poisons the writer and returns the error that every later call replays.
+    fn fail(&mut self, reason: PoisonReason) -> StreamingDocumentError {
+        let error = reason.error(self.output_bytes());
+        self.poison(reason);
+        error
     }
 
     fn state_error(&self, message: &str) -> StreamingDocumentError {
@@ -1030,11 +1104,7 @@ impl<W: Write> DocumentState<W> {
     }
 
     fn fail_invalid(&mut self, message: impl Into<String>) -> StreamingDocumentError {
-        self.poison = Some(PoisonReason::InvalidInput(message.into()));
-        self.poison.as_ref().map_or_else(
-            || self.state_error("streaming DOCX input failed"),
-            |reason| reason.error(self.output_bytes()),
-        )
+        self.fail(PoisonReason::InvalidInput(message.into()))
     }
 
     fn fail_limit(
@@ -1043,32 +1113,19 @@ impl<W: Write> DocumentState<W> {
         observed: u64,
         limit: u64,
     ) -> StreamingDocumentError {
-        self.poison = Some(PoisonReason::Limit {
+        self.fail(PoisonReason::Limit {
             resource,
             observed,
             limit,
-        });
-        self.poison.as_ref().map_or_else(
-            || self.state_error("streaming DOCX limit failed"),
-            |reason| reason.error(self.output_bytes()),
-        )
+        })
     }
 
     fn fail_overflow(&mut self, resource: &'static str) -> StreamingDocumentError {
-        self.poison = Some(PoisonReason::CounterOverflow(resource));
-        self.poison.as_ref().map_or_else(
-            || self.state_error("streaming DOCX progress counter overflowed"),
-            |reason| reason.error(self.output_bytes()),
-        )
+        self.fail(PoisonReason::CounterOverflow(resource))
     }
 
     fn fail_execution(&mut self, error: ExecutionError) -> StreamingDocumentError {
-        let reason = poison_from_execution(error);
-        self.poison = Some(reason);
-        self.poison.as_ref().map_or_else(
-            || self.state_error("streaming DOCX execution failed"),
-            |reason| reason.error(self.output_bytes()),
-        )
+        self.fail(poison_from_execution(error))
     }
 
     fn preflight_document_and_paragraph(
@@ -1109,15 +1166,18 @@ impl<W: Write> DocumentState<W> {
         if bytes.is_empty() {
             return Ok(());
         }
-        let (result, accepted) = match self.part.as_mut() {
-            Some(part) => {
+        let (result, accepted) = match &mut self.lifecycle {
+            WriterState::Open { part, .. }
+            | WriterState::Poisoned {
+                part: Some(part), ..
+            } => {
                 let before = part.uncompressed_bytes();
                 let result = part.write_all(bytes);
                 let after = part.uncompressed_bytes();
                 let accepted = after.checked_sub(before).unwrap_or(0);
                 (result, accepted)
             },
-            None => {
+            WriterState::Closing | WriterState::Poisoned { part: None, .. } => {
                 return Err(self.fail_invalid("streaming DOCX document part is unavailable"));
             },
         };
@@ -1141,29 +1201,19 @@ impl<W: Write> DocumentState<W> {
             None => return Err(self.fail_overflow("document XML bytes")),
         };
         if let Some(paragraph_bytes) = paragraph_bytes
-            && let Phase::Paragraph {
-                paragraph_xml_bytes,
+            && let WriterState::Open {
+                phase:
+                    Phase::Paragraph {
+                        paragraph_xml_bytes,
+                        ..
+                    },
                 ..
-            } = self.phase
+            } = &mut self.lifecycle
         {
-            let next_paragraph_bytes = match paragraph_xml_bytes.checked_add(paragraph_bytes) {
-                Some(value) => value,
+            match paragraph_xml_bytes.checked_add(paragraph_bytes) {
+                Some(value) => *paragraph_xml_bytes = value,
                 None => return Err(self.fail_overflow("paragraph XML bytes")),
-            };
-            self.phase = match self.phase {
-                Phase::Paragraph {
-                    run_open,
-                    run_count,
-                    run_text_bytes,
-                    ..
-                } => Phase::Paragraph {
-                    run_open,
-                    run_count,
-                    run_text_bytes,
-                    paragraph_xml_bytes: next_paragraph_bytes,
-                },
-                Phase::Ready => Phase::Ready,
-            };
+            }
         }
         Ok(())
     }
@@ -1214,31 +1264,31 @@ impl<W: Write> DocumentState<W> {
     fn fail_io(&mut self, error: io::Error) -> StreamingDocumentError {
         let output = self.output_bytes();
         if let Some(execution) = execution_from_io_error(&error) {
-            self.part.take();
+            drop(self.take_part());
             return self.fail_execution(execution);
         }
         if let Some(limit) = output_limit_from_io_error(&error) {
-            self.part.take();
+            drop(self.take_part());
             return self.fail_limit(limit.resource, limit.observed, limit.limit);
         }
         if let Some(resource) = counter_overflow_from_io_error(&error) {
-            self.part.take();
+            drop(self.take_part());
             return self.fail_overflow(resource);
         }
         if let Some(execution) = self.execution_state.get() {
-            self.part.take();
+            drop(self.take_part());
             return self.fail_execution(execution);
         }
         if let Some(limit) = self.execution_state.output_limit() {
-            self.part.take();
+            drop(self.take_part());
             return self.fail_limit("output bytes", limit.observed, limit.limit);
         }
         if let Some(resource) = self.execution_state.counter_overflow() {
-            self.part.take();
+            drop(self.take_part());
             return self.fail_overflow(resource);
         }
         let kind = error.kind();
-        let finish_error = self.part.take().and_then(|part| part.finish().err());
+        let finish_error = self.take_part().and_then(|part| part.finish().err());
         let message = finish_error.as_ref().map_or_else(
             || error.to_string(),
             |finish_error| format!("{error}; package finalization: {finish_error}"),
@@ -1248,7 +1298,6 @@ impl<W: Write> DocumentState<W> {
                 .as_ref()
                 .is_some_and(|error| matches!(error, OpcError::IncompleteOutput { .. }));
         let source = Some(chained_error_source(error, finish_error));
-        let fallback_message = message.clone();
         let reason = if incomplete {
             PoisonReason::IncompleteOutput { message, source }
         } else {
@@ -1258,11 +1307,9 @@ impl<W: Write> DocumentState<W> {
                 source,
             }
         };
-        self.poison = Some(reason);
-        self.poison.as_ref().map_or_else(
-            || invalid_with_written(fallback_message, output),
-            |reason| reason.error(output),
-        )
+        let error = reason.error(output);
+        self.poison(reason);
+        error
     }
 }
 

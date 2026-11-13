@@ -7,6 +7,7 @@
 //! macros, encryption, and signing are outside this writer's contract.
 
 use std::io::{self, Write};
+use std::mem;
 use std::sync::{
     Arc, Mutex,
     atomic::{AtomicU64, Ordering},
@@ -208,7 +209,7 @@ impl<'a> StreamingCell<'a> {
 /// Dropping the writer before [`Self::finish`] abandons the package and can
 /// leave the owned sink with an intentionally incomplete archive.
 pub struct StreamingWorkbookWriter<W: Write> {
-    part: Option<PartWriter<BudgetedOutput<W>>>,
+    state: WriterState<W>,
     leases: WorkbookLeases,
     context: ExecutionContext,
     execution_state: Arc<ExecutionFailureState>,
@@ -219,8 +220,61 @@ pub struct StreamingWorkbookWriter<W: Write> {
     last_row: Option<u32>,
     cells: u64,
     output_counter: Arc<AtomicU64>,
-    poisoned: bool,
-    poison_message: Option<String>,
+}
+
+/// Lifecycle of a [`StreamingWorkbookWriter`].
+///
+/// | From       | Event                                         | To                           |
+/// |------------|-----------------------------------------------|------------------------------|
+/// | `Open`     | `write_row` succeeds or refuses its arguments | `Open`                       |
+/// | `Open`     | an execution or sink failure                  | `Poisoned`                   |
+/// | `Open`     | `finish` hands the part to finalization       | `Closing`                    |
+/// | `Closing`  | finalization fails                            | `Poisoned`                   |
+/// | `Closing`  | finalization succeeds                         | the writer is consumed       |
+/// | `Poisoned` | any call                                      | `Poisoned`, message replayed |
+///
+/// `Closing` also appears for an instant inside the sink-failure path, between
+/// abandoning the part and recording the message; no call starts in it.
+enum WriterState<W: Write> {
+    /// The worksheet part accepts rows.
+    Open(PartWriter<BudgetedOutput<W>>),
+    /// The worksheet part was taken for finalization or abandonment.
+    Closing,
+    /// A failure ended the workbook. `message` is replayed, as an invalid
+    /// input error, by every later call. The part is kept until the writer
+    /// drops unless the failing sink already abandoned it.
+    Poisoned {
+        message: String,
+        part: Option<PartWriter<BudgetedOutput<W>>>,
+    },
+}
+
+impl<W: Write> WriterState<W> {
+    /// `Open` to `Closing`: hands the worksheet part to the caller. A
+    /// poisoned writer gives up the part it still holds and stays poisoned.
+    fn take_part(&mut self) -> Option<PartWriter<BudgetedOutput<W>>> {
+        match mem::replace(self, Self::Closing) {
+            Self::Open(part) => Some(part),
+            Self::Closing => None,
+            Self::Poisoned { message, part } => {
+                *self = Self::Poisoned {
+                    message,
+                    part: None,
+                };
+                part
+            },
+        }
+    }
+
+    /// Any state to `Poisoned`, keeping whichever part is still held.
+    fn poison(&mut self, message: String) {
+        let part = match mem::replace(self, Self::Closing) {
+            Self::Open(part) => Some(part),
+            Self::Closing => None,
+            Self::Poisoned { part, .. } => part,
+        };
+        *self = Self::Poisoned { message, part };
+    }
 }
 
 /// The writer's budget leases.
@@ -250,9 +304,7 @@ impl WorkbookLeases {
 macro_rules! poison_target {
     ($writer:expr) => {
         PoisonTarget {
-            part: &mut $writer.part,
-            poisoned: &mut $writer.poisoned,
-            poison_message: &mut $writer.poison_message,
+            state: &mut $writer.state,
             output_counter: &$writer.output_counter,
             execution_state: &$writer.execution_state,
         }
@@ -349,7 +401,7 @@ impl<W: Write> StreamingWorkbookWriter<W> {
         }
 
         Ok(Self {
-            part: Some(part),
+            state: WriterState::Open(part),
             leases: WorkbookLeases::new(&context),
             context,
             execution_state,
@@ -360,8 +412,6 @@ impl<W: Write> StreamingWorkbookWriter<W> {
             last_row: None,
             cells: 0,
             output_counter,
-            poisoned: false,
-            poison_message: None,
         })
     }
 
@@ -394,7 +444,7 @@ impl<W: Write> StreamingWorkbookWriter<W> {
     /// invalidated this writer.
     #[must_use]
     pub const fn is_poisoned(&self) -> bool {
-        self.poisoned
+        matches!(self.state, WriterState::Poisoned { .. })
     }
 
     /// Write one sparse worksheet row.
@@ -407,7 +457,7 @@ impl<W: Write> StreamingWorkbookWriter<W> {
         I: IntoIterator<Item = StreamingCell<'a>>,
     {
         let result = self.write_row_inner(row, cells);
-        if self.poisoned {
+        if self.is_poisoned() {
             // A failed writer leaves the budget showing exactly what it used.
             self.leases.release();
         }
@@ -502,10 +552,17 @@ impl<W: Write> StreamingWorkbookWriter<W> {
                 invalid("streaming XLSX worksheet XML limit exceeded"),
             ));
         }
-        let Some(part) = self.part.as_mut() else {
-            return Err(
-                self.refund_row_objects(row_objects, invalid("streaming XLSX part is unavailable"))
-            );
+        let part = match &mut self.state {
+            WriterState::Open(part)
+            | WriterState::Poisoned {
+                part: Some(part), ..
+            } => part,
+            WriterState::Closing | WriterState::Poisoned { part: None, .. } => {
+                return Err(self.refund_row_objects(
+                    row_objects,
+                    invalid("streaming XLSX part is unavailable"),
+                ));
+            },
         };
         if let Err(error) = part.write_all(&self.row_scratch) {
             let error = poison_target!(self).io(error);
@@ -538,17 +595,14 @@ impl<W: Write> StreamingWorkbookWriter<W> {
     }
 
     fn finish_inner(&mut self) -> Result<W> {
-        if self.poisoned {
-            return Err(self.poison_error());
-        }
+        self.ensure_usable()?;
         if let Err(error) = self.context.check() {
             return Err(self.poison_execution(error));
         }
-        let Some(mut part) = self.part.take() else {
+        let Some(mut part) = self.state.take_part() else {
             return Err(invalid("streaming XLSX part is unavailable"));
         };
         if let Err(error) = part.write_all(SHEET_SUFFIX) {
-            self.poisoned = true;
             let output = self.output_bytes();
             let mapped = if let Some(execution) = execution_from_io_error(&error) {
                 execution_failure(execution, output)
@@ -562,40 +616,37 @@ impl<W: Write> StreamingWorkbookWriter<W> {
                     Ok(_) => incomplete_io_error_or_execution(error, output, &self.execution_state),
                 }
             };
-            self.poison_message = Some(mapped.to_string());
+            self.state.poison(mapped.to_string());
             return Err(mapped);
         }
         let physical = match part.finish() {
             Ok(physical) => physical,
             Err(error) => {
-                self.poisoned = true;
                 let mapped = package_error_with_progress_or_execution(
                     error,
                     self.output_bytes(),
                     &self.execution_state,
                 );
-                self.poison_message = Some(mapped.to_string());
+                self.state.poison(mapped.to_string());
                 return Err(mapped);
             },
         };
         // Through the lease: a direct charge would count this writer's own
         // unspent claim against it.
         if let Err(error) = self.leases.objects.consume(1) {
-            self.poisoned = true;
             let mapped = execution_failure(error, self.output_bytes());
-            self.poison_message = Some(mapped.to_string());
+            self.state.poison(mapped.to_string());
             return Err(mapped);
         }
         let output = match physical.finish_into_inner() {
             Ok(output) => output,
             Err(error) => {
-                self.poisoned = true;
                 let mapped = package_error_with_progress_or_execution(
                     error,
                     self.output_bytes(),
                     &self.execution_state,
                 );
-                self.poison_message = Some(mapped.to_string());
+                self.state.poison(mapped.to_string());
                 return Err(mapped);
             },
         };
@@ -604,53 +655,42 @@ impl<W: Write> StreamingWorkbookWriter<W> {
         })
     }
 
+    /// Replays the poison message as an invalid-input error.
     fn ensure_usable(&self) -> Result<()> {
-        if self.poisoned {
-            return Err(self.poison_error());
+        match &self.state {
+            WriterState::Open(_) | WriterState::Closing => Ok(()),
+            WriterState::Poisoned { message, .. } => Err(invalid(message.as_str())),
         }
-        Ok(())
     }
 
     fn poison_execution(&mut self, error: litchi_core::ExecutionError) -> Error {
         poison_target!(self).execution(error)
-    }
-
-    fn poison_error(&self) -> Error {
-        invalid(
-            self.poison_message
-                .as_deref()
-                .unwrap_or("streaming XLSX writer is poisoned"),
-        )
     }
 }
 
 /// The writer fields a failure poisons, borrowed apart from the execution
 /// context and the budget leases.
 struct PoisonTarget<'writer, W: Write> {
-    part: &'writer mut Option<PartWriter<BudgetedOutput<W>>>,
-    poisoned: &'writer mut bool,
-    poison_message: &'writer mut Option<String>,
+    state: &'writer mut WriterState<W>,
     output_counter: &'writer AtomicU64,
     execution_state: &'writer ExecutionFailureState,
 }
 
 impl<W: Write> PoisonTarget<'_, W> {
     fn execution(self, error: litchi_core::ExecutionError) -> Error {
-        *self.poisoned = true;
-        *self.poison_message = Some(error.to_string());
+        self.state.poison(error.to_string());
         execution_failure(error, self.output_counter.load(Ordering::Acquire))
     }
 
     fn io(self, error: io::Error) -> Error {
-        *self.poisoned = true;
         let output = self.output_counter.load(Ordering::Acquire);
         if let Some(execution) = execution_from_io_error(&error) {
-            self.part.take();
+            drop(self.state.take_part());
             let mapped = execution_failure(execution, output);
-            *self.poison_message = Some(mapped.to_string());
+            self.state.poison(mapped.to_string());
             return mapped;
         }
-        let mapped = if let Some(part) = self.part.take() {
+        let mapped = if let Some(part) = self.state.take_part() {
             match part.finish() {
                 Err(error) => {
                     package_error_with_progress_or_execution(error, output, self.execution_state)
@@ -660,7 +700,8 @@ impl<W: Write> PoisonTarget<'_, W> {
         } else {
             incomplete_io_error_or_execution(error, output, self.execution_state)
         };
-        *self.poison_message = Some(format!("{mapped}; accepted output bytes: {output}"));
+        self.state
+            .poison(format!("{mapped}; accepted output bytes: {output}"));
         mapped
     }
 }

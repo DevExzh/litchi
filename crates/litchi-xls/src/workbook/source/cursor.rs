@@ -70,10 +70,26 @@ pub struct CellCursor {
     /// Whether a formula of the worksheet renders no text without the
     /// workbook's name and external-sheet tables.
     needs_formula_context: bool,
-    /// Where the next batch starts; `None` before the first batch.
-    resume: Option<ScanResume>,
+    stage: Stage,
     batch: VecDeque<SourceBackedCell>,
-    done: bool,
+}
+
+/// Where the next batch of a [`CellCursor`] starts.
+///
+/// | From                  | Event                            | To         |
+/// |-----------------------|----------------------------------|------------|
+/// | `Start` or `Scanning` | a batch stops before the stream ends | `Scanning` |
+/// | `Start` or `Scanning` | a batch reaches the stream end   | `Done`     |
+/// | `Start` or `Scanning` | a batch fails (the error is yielded once) | `Done` |
+///
+/// `Done` is terminal: the cursor yields what the last batch holds, then ends.
+#[derive(Clone, Copy)]
+enum Stage {
+    /// No batch was scanned yet.
+    Start,
+    /// The record stream position the next batch resumes at.
+    Scanning(ScanResume),
+    Done,
 }
 
 impl SourceBackedWorksheet {
@@ -131,9 +147,8 @@ impl SourceBackedWorksheet {
             source_owner: Arc::clone(&self.owner),
             sheet_index: self.sheet_index,
             needs_formula_context: check.needs_formula_context,
-            resume: None,
+            stage: Stage::Start,
             batch: VecDeque::new(),
-            done: false,
         }))
     }
 }
@@ -148,8 +163,9 @@ impl CellCursor {
         self.needs_formula_context
     }
 
-    /// Scan the next batch.
-    fn refill(&mut self) -> Result<()> {
+    /// Scan the next batch from `resume` (the stream start when `None`), and
+    /// return where the batch after it resumes, or `None` at the stream end.
+    fn refill(&mut self, resume: Option<ScanResume>) -> Result<Option<ScanResume>> {
         if self.source_owner.needs_source_fence() {
             self.source_owner.ensure_current()?;
         }
@@ -165,16 +181,11 @@ impl CellCursor {
             },
             count: &count,
         };
-        let scan = scan_worksheet_from(&self.owner, self.sheet_index, None, &mut sink, self.resume);
+        let scan = scan_worksheet_from(&self.owner, self.sheet_index, None, &mut sink, resume);
         if self.source_owner.needs_source_fence() {
             self.source_owner.ensure_current()?;
         }
-        let resume = scan?;
-        match resume {
-            Some(resume) => self.resume = Some(resume),
-            None => self.done = true,
-        }
-        Ok(())
+        scan
     }
 }
 
@@ -186,13 +197,19 @@ impl Iterator for CellCursor {
             if let Some(cell) = self.batch.pop_front() {
                 return Some(Ok(cell));
             }
-            if self.done {
-                return None;
-            }
-            if let Err(error) = self.refill() {
-                self.done = true;
-                self.batch.clear();
-                return Some(Err(error));
+            let resume = match self.stage {
+                Stage::Start => None,
+                Stage::Scanning(resume) => Some(resume),
+                Stage::Done => return None,
+            };
+            match self.refill(resume) {
+                Ok(Some(resume)) => self.stage = Stage::Scanning(resume),
+                Ok(None) => self.stage = Stage::Done,
+                Err(error) => {
+                    self.stage = Stage::Done;
+                    self.batch.clear();
+                    return Some(Err(error));
+                },
             }
         }
     }
@@ -206,7 +223,7 @@ impl std::fmt::Debug for CellCursor {
             .debug_struct("CellCursor")
             .field("sheet_index", &self.sheet_index)
             .field("buffered", &self.batch.len())
-            .field("done", &self.done)
+            .field("done", &matches!(self.stage, Stage::Done))
             .finish_non_exhaustive()
     }
 }

@@ -23,10 +23,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    sync::{
-        Arc,
-        atomic::{AtomicU8, Ordering},
-    },
+    sync::Arc,
 };
 
 use litchi_core::xml::ReaderOrigin;
@@ -38,6 +35,7 @@ use quick_xml::{
 };
 
 use crate::package::story::{StoryLimits, capture};
+use crate::publication_gate::{ClaimRefusal, PublicationClaim, PublicationGate};
 use crate::{Package, Result};
 
 #[path = "authoring/edit.rs"]
@@ -61,10 +59,6 @@ const MAX_METADATA_BYTES: usize = 64 * 1024 * 1024;
 const MAX_ATTRIBUTE_BYTES: usize = 1024 * 1024;
 const MAX_ATTRIBUTES: usize = 4_096;
 const MAX_OUTPUT_BYTES: usize = 256 * 1024 * 1024;
-
-const GATE_READY: u8 = 0;
-const GATE_IN_FLIGHT: u8 = 1;
-const GATE_APPLIED: u8 = 2;
 
 /// The semantic disposition of one tracked change.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -702,7 +696,7 @@ pub(crate) struct DraftPatch {
     source_limits: Limits,
     target_limits: Limits,
     binding: Option<Binding>,
-    gate: Arc<AtomicU8>,
+    gate: PublicationGate,
 }
 
 #[allow(
@@ -725,7 +719,7 @@ impl DraftPatch {
             source_limits,
             target_limits,
             binding,
-            gate: Arc::new(AtomicU8::new(GATE_READY)),
+            gate: PublicationGate::new(),
         }
     }
 
@@ -768,7 +762,7 @@ impl DraftPatch {
     /// Whether this patch or one of its clones has been successfully applied.
     #[must_use]
     pub(crate) fn is_applied(&self) -> bool {
-        self.gate.load(Ordering::Acquire) == GATE_APPLIED
+        self.gate.is_applied()
     }
 
     /// Apply this patch to an exact detached or package-bound snapshot.
@@ -809,39 +803,10 @@ impl DraftPatch {
     }
 
     fn claim_publication(&self) -> Result<PublicationClaim> {
-        match self.gate.compare_exchange(
-            GATE_READY,
-            GATE_IN_FLIGHT,
-            Ordering::AcqRel,
-            Ordering::Acquire,
-        ) {
-            Ok(_) => Ok(PublicationClaim {
-                gate: Arc::clone(&self.gate),
-                finalized: false,
-            }),
-            Err(GATE_IN_FLIGHT) => Err(invalid("tracked revision patch publication is in flight")),
-            Err(_) => Err(invalid("tracked revision patch has already been applied")),
-        }
-    }
-}
-
-struct PublicationClaim {
-    gate: Arc<AtomicU8>,
-    finalized: bool,
-}
-
-impl PublicationClaim {
-    fn finalize(mut self) {
-        self.gate.store(GATE_APPLIED, Ordering::Release);
-        self.finalized = true;
-    }
-}
-
-impl Drop for PublicationClaim {
-    fn drop(&mut self) {
-        if !self.finalized {
-            self.gate.store(GATE_READY, Ordering::Release);
-        }
+        self.gate.claim().map_err(|refusal| match refusal {
+            ClaimRefusal::InFlight => invalid("tracked revision patch publication is in flight"),
+            ClaimRefusal::Applied => invalid("tracked revision patch has already been applied"),
+        })
     }
 }
 

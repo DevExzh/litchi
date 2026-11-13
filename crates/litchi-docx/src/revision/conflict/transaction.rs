@@ -1,8 +1,4 @@
 #![expect(
-    clippy::let_underscore_must_use,
-    reason = "the builder return is intentionally ignored after mutation"
-)]
-#![expect(
     clippy::ptr_arg,
     reason = "the internal vector API preserves capacity-aware mutation"
 )]
@@ -20,22 +16,13 @@
 //! retained byte-for-byte; this module never accepts, rejects, merges, resolves,
 //! evaluates, fetches, or activates conflict content.
 
-use std::{
-    collections::HashMap,
-    sync::{
-        Arc,
-        atomic::{AtomicU8, Ordering},
-    },
-};
+use std::{collections::HashMap, sync::Arc};
 
+use crate::publication_gate::{ClaimRefusal, PublicationClaim, PublicationGate};
 use crate::{Error, Result};
 
 use super::model::{Binding, Source};
 use super::{AttributeSpan, Limits, Metadata, Scope, Snapshot, Span};
-
-const GATE_READY: u8 = 0;
-const GATE_IN_FLIGHT: u8 = 1;
-const GATE_APPLIED: u8 = 2;
 
 /// One source-coordinate conflict-markup operation staged by
 /// [`super::Edit::apply`].
@@ -397,7 +384,7 @@ pub(crate) struct DraftPatch {
     source_limits: Limits,
     target_limits: Limits,
     binding: Option<Binding>,
-    gate: Arc<AtomicU8>,
+    gate: PublicationGate,
 }
 
 impl DraftPatch {
@@ -416,7 +403,7 @@ impl DraftPatch {
             source_limits,
             target_limits,
             binding,
-            gate: Arc::new(AtomicU8::new(GATE_READY)),
+            gate: PublicationGate::new(),
         }
     }
 
@@ -479,7 +466,7 @@ impl DraftPatch {
     /// Whether this patch, or any clone of it, has applied successfully.
     #[must_use]
     pub fn is_applied(&self) -> bool {
-        self.gate.load(Ordering::Acquire) == GATE_APPLIED
+        self.gate.is_applied()
     }
 
     /// Apply this patch once to its exact source snapshot.
@@ -529,54 +516,18 @@ impl DraftPatch {
     /// Dropping the claim releases it for retry; finalizing marks every clone
     /// permanently applied, including exact no-op patches.
     pub(crate) fn claim_publication(&self) -> Result<PublicationClaim> {
-        match self.gate.compare_exchange(
-            GATE_READY,
-            GATE_IN_FLIGHT,
-            Ordering::AcqRel,
-            Ordering::Acquire,
-        ) {
-            Ok(_) => Ok(PublicationClaim {
-                gate: self.gate.clone(),
-                finalized: false,
-            }),
-            Err(GATE_IN_FLIGHT) => Err(Error::Invalid(
-                "conflict patch publication is already in flight".into(),
-            )),
-            Err(_) => Err(Error::Invalid(
-                "conflict patch has already been applied".into(),
-            )),
-        }
+        self.gate.claim().map_err(|refusal| match refusal {
+            ClaimRefusal::InFlight => {
+                Error::Invalid("conflict patch publication is already in flight".into())
+            },
+            ClaimRefusal::Applied => {
+                Error::Invalid("conflict patch has already been applied".into())
+            },
+        })
     }
 
     pub(crate) const fn story_binding(&self) -> Option<&Binding> {
         self.binding.as_ref()
-    }
-}
-
-/// Retry-safe ownership of one patch publication attempt.
-pub(crate) struct PublicationClaim {
-    gate: Arc<AtomicU8>,
-    finalized: bool,
-}
-
-impl PublicationClaim {
-    /// Permanently consume the patch after publication has succeeded.
-    pub(crate) fn finalize(mut self) {
-        self.gate.store(GATE_APPLIED, Ordering::Release);
-        self.finalized = true;
-    }
-}
-
-impl Drop for PublicationClaim {
-    fn drop(&mut self) {
-        if !self.finalized {
-            let _ = self.gate.compare_exchange(
-                GATE_IN_FLIGHT,
-                GATE_READY,
-                Ordering::AcqRel,
-                Ordering::Acquire,
-            );
-        }
     }
 }
 

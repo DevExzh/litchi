@@ -361,3 +361,37 @@ fn instructions_bookmark_names_and_removals_are_spliced() {
     assert!(!text.contains("bookmarkStart") && !text.contains("bookmarkEnd"));
     assert!(text.contains("<w:t>Body</w:t>"));
 }
+
+/// Pins what a second `separate` marker in one complex field does: it is
+/// accepted, the cached result reads from the first separator, and a text
+/// update rewrites only what follows the last one.
+#[test]
+fn a_repeated_separator_is_accepted_and_the_last_one_bounds_text_updates() {
+    let xml = document(
+        r#"<w:p><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText> SEQ A </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>first</w:t></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>second</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>"#,
+    );
+    let source = Snapshot::from_xml(xml).unwrap();
+    let fields = source.edit().fields().unwrap();
+    assert_eq!(fields.fields().len(), 1);
+    assert!(fields.fields()[0].has_result());
+    assert_eq!(fields.fields()[0].instruction(), " SEQ A ");
+    assert_eq!(fields.fields()[0].result(), "firstsecond");
+    assert!(fields.accepts_text(0) && fields.accepts_paragraphs(0));
+
+    let target = commit(&source, |_| {
+        vec![Update::Text {
+            field: 0,
+            text: "X".into(),
+        }]
+    });
+    let out = text(&target);
+    assert!(
+        out.contains(
+            r#"<w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>first</w:t></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>X</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r>"#
+        ),
+        "{out}"
+    );
+    assert!(!out.contains("second"), "{out}");
+    let fields = target.edit().fields().unwrap();
+    assert_eq!(fields.fields()[0].result(), "firstX");
+}

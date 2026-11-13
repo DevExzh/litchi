@@ -241,10 +241,45 @@ impl PoisonReason {
     }
 }
 
+/// Position inside the document body.
+///
+/// | From                            | Event              | To                              |
+/// |---------------------------------|--------------------|---------------------------------|
+/// | `Ready`                         | `start_paragraph`  | `Paragraph { run_open: false }` |
+/// | `Paragraph { run_open: false }` | `start_run`        | `Paragraph { run_open: true }`  |
+/// | `Paragraph { run_open: true }`  | `finish_run`       | `Paragraph { run_open: false }` |
+/// | `Paragraph { run_open: false }` | `finish_paragraph` | `Ready`                         |
+///
+/// Any other call is a state error that leaves the phase unchanged.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Phase {
     Ready,
     Paragraph { run_open: bool },
+}
+
+/// Lifecycle of a [`Writer`].
+///
+/// | From       | Event                                     | To                          |
+/// |------------|-------------------------------------------|-----------------------------|
+/// | `Open`     | a body call succeeds or is a state error  | `Open`                      |
+/// | `Open`     | a limit, input, execution or sink failure | `Poisoned`                  |
+/// | `Open`     | `finish` succeeds                         | the writer is consumed      |
+/// | `Poisoned` | any call                                  | `Poisoned`, reason replayed |
+///
+/// `Poisoned` keeps the phase the failure interrupted: a byte write outside an
+/// open run reports its state error before the poison reason is replayed.
+#[derive(Debug)]
+enum WriterState {
+    Open(Phase),
+    Poisoned { reason: PoisonReason, phase: Phase },
+}
+
+impl WriterState {
+    const fn phase(&self) -> Phase {
+        match self {
+            Self::Open(phase) | Self::Poisoned { phase, .. } => *phase,
+        }
+    }
 }
 
 /// Sequential authoring state for a fresh plain-text RTF document.
@@ -253,7 +288,7 @@ pub struct Writer<W: Write> {
     context: ExecutionContext,
     limits: Limits,
     options: Options,
-    phase: Phase,
+    state: WriterState,
     paragraphs: u64,
     runs: u64,
     input_bytes: u64,
@@ -262,7 +297,6 @@ pub struct Writer<W: Write> {
     pending_len: usize,
     pending_cr: bool,
     _scratch: Reservation,
-    poison: Option<PoisonReason>,
 }
 
 impl<W: Write> Writer<W> {
@@ -292,7 +326,7 @@ impl<W: Write> Writer<W> {
             context,
             limits,
             options,
-            phase: Phase::Ready,
+            state: WriterState::Open(Phase::Ready),
             paragraphs: 0,
             runs: 0,
             input_bytes: 0,
@@ -301,7 +335,6 @@ impl<W: Write> Writer<W> {
             pending_len: 0,
             pending_cr: false,
             _scratch: scratch,
-            poison: None,
         };
         emit_header(&mut result)?;
         Ok(result)
@@ -335,13 +368,12 @@ impl<W: Write> Writer<W> {
     /// invalidated this writer.
     #[must_use]
     pub const fn is_poisoned(&self) -> bool {
-        self.poison.is_some()
+        matches!(self.state, WriterState::Poisoned { .. })
     }
 
     /// Start the next logical paragraph.
     pub fn start_paragraph(&mut self) -> Result<(), Error> {
-        self.ensure_usable()?;
-        if !matches!(self.phase, Phase::Ready) {
+        if !matches!(self.usable_phase()?, Phase::Ready) {
             return Err(self.state_error("a paragraph is already open"));
         }
         self.context
@@ -357,14 +389,13 @@ impl<W: Write> Writer<W> {
             .map_err(|error| self.fail_execution(error))?;
         self.emit(b"\\pard ")?;
         self.paragraphs = observed;
-        self.phase = Phase::Paragraph { run_open: false };
+        self.state = WriterState::Open(Phase::Paragraph { run_open: false });
         Ok(())
     }
 
     /// Start a plain run in the currently open paragraph.
     pub fn start_run(&mut self) -> Result<(), Error> {
-        self.ensure_usable()?;
-        if !matches!(self.phase, Phase::Paragraph { run_open: false }) {
+        if !matches!(self.usable_phase()?, Phase::Paragraph { run_open: false }) {
             return Err(self.state_error("a paragraph must be open without another run"));
         }
         self.context
@@ -380,14 +411,13 @@ impl<W: Write> Writer<W> {
             .map_err(|error| self.fail_execution(error))?;
         self.emit(b"{\\plain ")?;
         self.runs = observed;
-        self.phase = Phase::Paragraph { run_open: true };
+        self.state = WriterState::Open(Phase::Paragraph { run_open: true });
         Ok(())
     }
 
     /// Finish the current run.
     pub fn finish_run(&mut self) -> Result<(), Error> {
-        self.ensure_usable()?;
-        if !matches!(self.phase, Phase::Paragraph { run_open: true }) {
+        if !matches!(self.usable_phase()?, Phase::Paragraph { run_open: true }) {
             return Err(self.state_error("no run is open"));
         }
         if self.pending_len != 0 {
@@ -395,14 +425,13 @@ impl<W: Write> Writer<W> {
         }
         self.flush_pending_cr()?;
         self.emit(b"}")?;
-        self.phase = Phase::Paragraph { run_open: false };
+        self.state = WriterState::Open(Phase::Paragraph { run_open: false });
         Ok(())
     }
 
     /// Finish the current paragraph.
     pub fn finish_paragraph(&mut self) -> Result<(), Error> {
-        self.ensure_usable()?;
-        if !matches!(self.phase, Phase::Paragraph { run_open: false }) {
+        if !matches!(self.usable_phase()?, Phase::Paragraph { run_open: false }) {
             return Err(self.state_error("finish the open run before the paragraph"));
         }
         if self.pending_len != 0 {
@@ -410,14 +439,13 @@ impl<W: Write> Writer<W> {
         }
         self.flush_pending_cr()?;
         self.emit(b"\\par ")?;
-        self.phase = Phase::Ready;
+        self.state = WriterState::Open(Phase::Ready);
         Ok(())
     }
 
     /// Finish the document and return the owned non-seek sink.
     pub fn finish(mut self) -> Result<W, Error> {
-        self.ensure_usable()?;
-        if !matches!(self.phase, Phase::Ready) {
+        if !matches!(self.usable_phase()?, Phase::Ready) {
             return Err(self.state_error("finish the current paragraph first"));
         }
         if self.pending_len != 0 {
@@ -428,10 +456,26 @@ impl<W: Write> Writer<W> {
         Ok(self.writer)
     }
 
+    /// The body position of an open writer, or the replayed poison reason.
+    fn usable_phase(&self) -> Result<Phase, Error> {
+        match &self.state {
+            WriterState::Open(phase) => Ok(*phase),
+            WriterState::Poisoned { reason, .. } => Err(reason.error(self.output_bytes)),
+        }
+    }
+
     fn ensure_usable(&self) -> Result<(), Error> {
-        self.poison
-            .as_ref()
-            .map_or(Ok(()), |reason| Err(reason.error(self.output_bytes)))
+        self.usable_phase().map(drop)
+    }
+
+    /// Any state to `Poisoned`; returns the error every later call replays.
+    fn fail(&mut self, reason: PoisonReason) -> Error {
+        let error = reason.error(self.output_bytes);
+        self.state = WriterState::Poisoned {
+            reason,
+            phase: self.state.phase(),
+        };
+        error
     }
 
     fn state_error(&self, message: &str) -> Error {
@@ -442,43 +486,26 @@ impl<W: Write> Writer<W> {
     }
 
     fn fail_invalid(&mut self, message: &str) -> Error {
-        self.poison = Some(PoisonReason::InvalidInput(message.to_string()));
-        self.poison.as_ref().map_or_else(
-            || self.state_error(message),
-            |reason| reason.error(self.output_bytes),
-        )
+        self.fail(PoisonReason::InvalidInput(message.to_string()))
     }
 
     fn fail_limit(&mut self, resource: &'static str, observed: u64, limit: u64) -> Error {
-        self.poison = Some(PoisonReason::Limit {
+        self.fail(PoisonReason::Limit {
             resource,
             observed,
             limit,
-        });
-        self.poison.as_ref().map_or_else(
-            || self.state_error("streaming RTF limit exceeded"),
-            |reason| reason.error(self.output_bytes),
-        )
+        })
     }
 
     fn fail_execution(&mut self, error: ExecutionError) -> Error {
-        let reason = poison_from_execution(error);
-        self.poison = Some(reason);
-        self.poison.as_ref().map_or_else(
-            || self.state_error("streaming RTF execution failure"),
-            |reason| reason.error(self.output_bytes),
-        )
+        self.fail(poison_from_execution(error))
     }
 
     fn fail_io(&mut self, error: io::Error) -> Error {
-        self.poison = Some(PoisonReason::Io {
+        self.fail(PoisonReason::Io {
             kind: error.kind(),
             message: error.to_string(),
-        });
-        self.poison.as_ref().map_or_else(
-            || self.state_error("streaming RTF sink failure"),
-            |reason| reason.error(self.output_bytes),
-        )
+        })
     }
 
     fn commit_output(&mut self, reservation: Reservation, written: usize) {
@@ -750,7 +777,7 @@ impl<W: Write> Writer<W> {
         if bytes.is_empty() {
             return Ok(0);
         }
-        if !matches!(self.phase, Phase::Paragraph { run_open: true }) {
+        if !matches!(self.state.phase(), Phase::Paragraph { run_open: true }) {
             return Err(self.state_error("write bytes only while a run is open"));
         }
         self.ensure_usable()?;
@@ -1480,6 +1507,41 @@ mod tests {
         value.start_run().expect("exact run");
         value.finish_run().expect("run");
         assert!(value.start_run().is_err());
+    }
+
+    /// Pins the replay order of a poisoned writer: a byte write outside an
+    /// open run reports its state error, every other call the poison reason.
+    #[test]
+    fn a_poisoned_writer_reports_the_byte_write_state_error_before_its_reason() {
+        let run_limits = Limits {
+            max_runs: 1,
+            ..Limits::default()
+        };
+        let mut value = Writer::new(Vec::new(), context(4096), run_limits).expect("writer");
+        value.start_paragraph().expect("paragraph");
+        value.start_run().expect("exact run");
+        value.finish_run().expect("run");
+        assert!(matches!(
+            value.start_run(),
+            Err(Error::LimitExceeded {
+                resource: "runs",
+                ..
+            })
+        ));
+        assert!(value.is_poisoned());
+        assert!(matches!(
+            value.write_utf8(b"x"),
+            Err(Error::InvalidInput { message, .. })
+                if message == "write bytes only while a run is open"
+        ));
+        assert!(matches!(
+            value.finish_paragraph(),
+            Err(Error::LimitExceeded {
+                resource: "runs",
+                ..
+            })
+        ));
+        assert!(value.is_poisoned());
     }
 
     #[test]
