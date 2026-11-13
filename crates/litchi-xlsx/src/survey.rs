@@ -1124,6 +1124,52 @@ struct Parser {
     question_limit: usize,
 }
 
+/// The last child the `survey` root accepted, in schema order:
+///
+/// ```text
+/// Start --surveyPr--> SurveyProperties
+/// Start | SurveyProperties --titlePr--> TitleProperties
+/// Start | SurveyProperties | TitleProperties
+///     --descriptionPr--> DescriptionProperties
+/// Start | SurveyProperties | TitleProperties | DescriptionProperties
+///     --questions--> Questions
+/// Questions --extLst--> ExtensionList
+/// ```
+///
+/// The three properties children and `extLst` are optional, `questions` is
+/// required, and no child repeats: a child is accepted only when it comes
+/// later in this order than the last accepted one. `extLst` is refused with
+/// its own message until `questions` has been accepted. The stage also names
+/// the gap a comment between two children belongs to; see
+/// [`SurveyStage::comment_slot`].
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
+enum SurveyStage {
+    #[default]
+    Start,
+    SurveyProperties,
+    TitleProperties,
+    DescriptionProperties,
+    Questions,
+    ExtensionList,
+}
+
+impl SurveyStage {
+    /// The comment slot that follows this stage's child: slot 0 precedes
+    /// every child, slots 1 to 3 follow the three properties children, slot
+    /// 4 follows `questions` and slot 5 follows `extLst`. The writer emits
+    /// each slot at the same position.
+    const fn comment_slot(self) -> usize {
+        match self {
+            Self::Start => 0,
+            Self::SurveyProperties => 1,
+            Self::TitleProperties => 2,
+            Self::DescriptionProperties => 3,
+            Self::Questions => 4,
+            Self::ExtensionList => 5,
+        }
+    }
+}
+
 #[derive(Default)]
 struct SurveyBuilder {
     id: Option<Id>,
@@ -1141,8 +1187,7 @@ struct SurveyBuilder {
     questions_prefix: Option<Box<str>>,
     questions_namespaces: Box<[RawAttribute]>,
     questions_attributes: Box<[RawAttribute]>,
-    questions_seen: bool,
-    child_stage: u8,
+    child_stage: SurveyStage,
     extension_xml: Option<Box<[u8]>>,
     unknown_attributes: Box<[RawAttribute]>,
     namespace_declarations: Box<[RawAttribute]>,
@@ -1153,7 +1198,7 @@ struct SurveyBuilder {
 }
 
 impl Parser {
-    fn advance_survey(&mut self, stage: u8) -> Result<()> {
+    fn advance_survey(&mut self, stage: SurveyStage) -> Result<()> {
         let survey = self.survey_mut()?;
         if stage <= survey.child_stage {
             return Err(invalid("out-of-order Survey child"));
@@ -1182,10 +1227,10 @@ impl Parser {
         }
         let target = match self.scopes.last().copied() {
             Some(Scope::Survey) => {
-                if !self.survey_mut()?.questions_seen {
+                if self.survey_mut()?.child_stage < SurveyStage::Questions {
                     return Err(invalid("Survey extLst must follow questions"));
                 }
-                self.advance_survey(5)?;
+                self.advance_survey(SurveyStage::ExtensionList)?;
                 ExtensionTarget::Survey
             },
             Some(Scope::Question) => ExtensionTarget::Question,
@@ -1337,7 +1382,7 @@ impl Parser {
         match scope {
             Scope::Survey => {
                 let survey = self.survey_mut()?;
-                let slot = survey.child_stage as usize;
+                let slot = survey.child_stage.comment_slot();
                 survey.comments.push(raw.clone());
                 survey.comment_slots.push(CommentSlot { slot, value: raw });
             },
@@ -1435,7 +1480,7 @@ impl Parser {
             .ok_or_else(|| invalid("survey child has no parent element"))?;
         match (parent, name) {
             (Scope::Survey, b"surveyPr") => {
-                self.advance_survey(1)?;
+                self.advance_survey(SurveyStage::SurveyProperties)?;
                 set_once(
                     &mut self.survey_mut()?.properties,
                     parse_properties(element)?,
@@ -1444,7 +1489,7 @@ impl Parser {
                 Ok(Scope::Properties(b"surveyPr"))
             },
             (Scope::Survey, b"titlePr") => {
-                self.advance_survey(2)?;
+                self.advance_survey(SurveyStage::TitleProperties)?;
                 set_once(
                     &mut self.survey_mut()?.title_properties,
                     parse_properties(element)?,
@@ -1453,7 +1498,7 @@ impl Parser {
                 Ok(Scope::Properties(b"titlePr"))
             },
             (Scope::Survey, b"descriptionPr") => {
-                self.advance_survey(3)?;
+                self.advance_survey(SurveyStage::DescriptionProperties)?;
                 set_once(
                     &mut self.survey_mut()?.description_properties,
                     parse_properties(element)?,
@@ -1462,12 +1507,8 @@ impl Parser {
                 Ok(Scope::Properties(b"descriptionPr"))
             },
             (Scope::Survey, b"questions") => {
-                self.advance_survey(4)?;
+                self.advance_survey(SurveyStage::Questions)?;
                 let survey = self.survey_mut()?;
-                if survey.questions_seen {
-                    return Err(invalid("survey has multiple questions elements"));
-                }
-                survey.questions_seen = true;
                 survey.questions_namespaces = namespace_declarations(element)?;
                 survey.questions_attributes = unknown_attributes(element, &[])?;
                 survey.questions_default_namespace =
@@ -1530,7 +1571,7 @@ impl Parser {
         let guid = value
             .guid
             .ok_or_else(|| invalid("survey guid is required"))?;
-        if !value.questions_seen || value.questions.is_empty() {
+        if value.child_stage < SurveyStage::Questions || value.questions.is_empty() {
             return Err(invalid("survey requires at least one question"));
         }
         source::assign_question_origins(&mut value.questions);

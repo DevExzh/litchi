@@ -1340,6 +1340,63 @@ fn owned_source(xml: &[u8], limits: Limits) -> Result<SourcePayload> {
     Ok(SourcePayload::Owned(Arc::new(source_bytes)))
 }
 
+/// The last child the `formControlPr` root accepted, in schema order:
+///
+/// ```text
+/// Start --itemLst--> ItemList
+/// Start | ItemList --extLst--> ExtensionList
+/// ```
+///
+/// Both children are optional and neither repeats; nothing is accepted after
+/// `extLst`. A self-closing child takes the same transition as an open one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RootChildStage {
+    Start,
+    ItemList,
+    ExtensionList,
+}
+
+impl RootChildStage {
+    const fn accepts_item_list(self) -> bool {
+        match self {
+            Self::Start => true,
+            Self::ItemList | Self::ExtensionList => false,
+        }
+    }
+
+    const fn accepts_extension_list(self) -> bool {
+        match self {
+            Self::Start | Self::ItemList => true,
+            Self::ExtensionList => false,
+        }
+    }
+}
+
+/// How far the children of the one `itemLst` have been read:
+///
+/// ```text
+/// Items --item--> Items                    (repeatable)
+/// Items --extLst--> ExtensionList          (optional)
+/// ```
+///
+/// An `item` and a second `extLst` are refused in `ExtensionList`, each with
+/// its own message. A self-closing child takes the same transition as an open
+/// one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ItemListStage {
+    Items,
+    ExtensionList,
+}
+
+impl ItemListStage {
+    const fn accepts_child(self) -> bool {
+        match self {
+            Self::Items => true,
+            Self::ExtensionList => false,
+        }
+    }
+}
+
 fn inspect_with_limits_owned(
     xml: &[u8],
     limits: Limits,
@@ -1411,8 +1468,8 @@ fn inspect_with_limits_owned(
     let mut open_item = None::<OpenItem>;
     let mut open_item_list = false;
     let mut open_opaque = None::<OpenOpaque>;
-    let mut child_rank = 0u8;
-    let mut item_child_rank = 0u8;
+    let mut root_stage = RootChildStage::Start;
+    let mut item_list_stage = ItemListStage::Items;
     retained.charge(PROPERTIES_STORAGE_BYTES, "form-control properties backing")?;
     retained.charge(
         2usize
@@ -1604,13 +1661,12 @@ fn inspect_with_limits_owned(
                     }
                     match local {
                         ITEM_LIST => {
-                            if child_rank > 1 || item_list.is_some() {
+                            if !root_stage.accepts_item_list() {
                                 return Err(invalid(
                                     "duplicate or out-of-order form-control itemLst",
                                 ));
                             }
-                            child_rank = 1;
-                            item_child_rank = 0;
+                            root_stage = RootChildStage::ItemList;
                             item_list_unknown_attributes.clear();
                             parse_item_list_attributes(
                                 &element,
@@ -1647,15 +1703,12 @@ fn inspect_with_limits_owned(
                             check_depth(depth, limits)?;
                         },
                         EXT_LIST => {
-                            if child_rank > 2
-                                || root_extension.is_some()
-                                || root_extension_span.is_some()
-                            {
+                            if !root_stage.accepts_extension_list() {
                                 return Err(invalid(
                                     "duplicate or out-of-order form-control extLst",
                                 ));
                             }
-                            child_rank = 2;
+                            root_stage = RootChildStage::ExtensionList;
                             let diagnostic = extension_list_container_diagnostic(&element, limits)?;
                             open_opaque = Some(OpenOpaque {
                                 owner: OpaqueOwner::Root,
@@ -1678,7 +1731,7 @@ fn inspect_with_limits_owned(
                     }
                     match local {
                         ITEM => {
-                            if item_child_rank == 3 || open_item.is_some() {
+                            if !item_list_stage.accepts_child() {
                                 return Err(invalid("itemLst contains an item after extLst"));
                             }
                             if item_values.len() >= limits.max_items() {
@@ -1739,10 +1792,10 @@ fn inspect_with_limits_owned(
                             check_depth(depth, limits)?;
                         },
                         EXT_LIST => {
-                            if item_child_rank == 3 {
+                            if !item_list_stage.accepts_child() {
                                 return Err(invalid("duplicate itemLst extLst"));
                             }
-                            item_child_rank = 3;
+                            item_list_stage = ItemListStage::ExtensionList;
                             if let Some(layout) = item_list.as_mut() {
                                 if layout.first_content.is_none() {
                                     layout.first_content = Some(start);
@@ -1816,13 +1869,12 @@ fn inspect_with_limits_owned(
                     }
                     match local {
                         ITEM_LIST => {
-                            if child_rank > 1 || item_list.is_some() {
+                            if !root_stage.accepts_item_list() {
                                 return Err(invalid(
                                     "duplicate or out-of-order form-control itemLst",
                                 ));
                             }
-                            child_rank = 1;
-                            item_child_rank = 0;
+                            root_stage = RootChildStage::ItemList;
                             item_list_unknown_attributes.clear();
                             parse_item_list_attributes(
                                 &element,
@@ -1857,15 +1909,12 @@ fn inspect_with_limits_owned(
                             check_depth(2, limits)?;
                         },
                         EXT_LIST => {
-                            if child_rank > 2
-                                || root_extension.is_some()
-                                || root_extension_span.is_some()
-                            {
+                            if !root_stage.accepts_extension_list() {
                                 return Err(invalid(
                                     "duplicate or out-of-order form-control extLst",
                                 ));
                             }
-                            child_rank = 2;
+                            root_stage = RootChildStage::ExtensionList;
                             check_depth(2, limits)?;
                             let diagnostic = extension_list_container_diagnostic(&element, limits)?;
                             let span = start..end;
@@ -1909,7 +1958,7 @@ fn inspect_with_limits_owned(
                     }
                     match local {
                         ITEM => {
-                            if item_child_rank == 3 {
+                            if !item_list_stage.accepts_child() {
                                 return Err(invalid("itemLst contains an item after extLst"));
                             }
                             if item_values.len() >= limits.max_items() {
@@ -1979,10 +2028,10 @@ fn inspect_with_limits_owned(
                             }
                         },
                         EXT_LIST => {
-                            if item_child_rank == 3 {
+                            if !item_list_stage.accepts_child() {
                                 return Err(invalid("duplicate itemLst extLst"));
                             }
-                            item_child_rank = 3;
+                            item_list_stage = ItemListStage::ExtensionList;
                             check_depth(3, limits)?;
                             let diagnostic = extension_list_container_diagnostic(&element, limits)?;
                             if let Some(layout) = item_list.as_mut() {
