@@ -30,6 +30,165 @@ use super::wire::{
 use crate::{Error, Limits, Result};
 use litchi_biff::RecordRef;
 
+/// Progress through the Graph datasheet that may precede the chart.
+///
+/// ```text
+/// Absent          --BOFDatasheet--> Announced
+/// Announced       --Begin---------> Open(Begin)
+/// Open(stage)     --next member---> Open(next stage)   see `DatasheetStage`
+/// Open(Selection) --End-----------> Closed
+/// Closed          --Units---------> UnitsSeen
+/// ```
+///
+/// The datasheet is optional and occurs at most once. `Chart` is accepted
+/// in `Absent` and `UnitsSeen` only, and the stream may end in those two
+/// states only.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum DatasheetPhase {
+    Absent,
+    Announced,
+    Open(DatasheetStage),
+    Closed,
+    UnitsSeen,
+}
+
+/// Last member read inside the open datasheet collection.
+///
+/// Every member is mandatory, occurs once, and follows its predecessor in
+/// declaration order: `Begin --Country--> Country --FontX--> FontX` and so
+/// on through `Selection`. Cached cells may repeat while the stage is
+/// `Orient`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum DatasheetStage {
+    Begin,
+    Country,
+    FontX,
+    ExcludeRows,
+    ExcludeColumns,
+    Orient,
+    WinDoc,
+    MainWindow,
+    Window1,
+    Window2,
+    MaxStatus,
+    Selection,
+}
+
+/// Progress through a Graph chart-level attached label, the collection a
+/// chart title is read from.
+///
+/// ```text
+/// Absent    --Text at depth one--> Announced
+/// Announced --Begin--------------> Open
+/// Open      --End at its depth---> Absent
+/// ```
+///
+/// Inside `Open`, at the label depth: at most one `BRAI`, then at most one
+/// `SeriesText`; `ObjectLink` may occur anywhere and the last one wins. The
+/// closing End takes the text as the chart title when the label has a
+/// `BRAI`, a text, and an `ObjectLink` that names the whole chart.
+enum AttachedLabelPhase {
+    Absent,
+    Announced,
+    Open(AttachedLabel),
+}
+
+struct AttachedLabel {
+    /// Depth of the label's own records; nested collections sit deeper.
+    /// `None` only if the depth counter cannot grow, and then no record
+    /// belongs to the label. The same holds for the other scopes below.
+    depth: Option<usize>,
+    brai_seen: bool,
+    text: Option<String>,
+    link_object: Option<u16>,
+}
+
+impl AttachedLabelPhase {
+    /// The open label, when `depth` is the depth of its own records.
+    fn open_at(&mut self, depth: usize) -> Option<&mut AttachedLabel> {
+        match self {
+            Self::Open(label) if label.depth == Some(depth) => Some(label),
+            Self::Absent | Self::Announced | Self::Open(_) => None,
+        }
+    }
+}
+
+/// The Series collection being read, from its `Series` record to the End
+/// at `depth`.
+///
+/// Its own records come in this order: four `BRAI` in role order, each
+/// optionally followed by one `SeriesText`, then exactly one owner branch
+/// (see `SeriesOwnerStage`).
+struct SeriesScope {
+    /// Position of the series in the chart model.
+    index: usize,
+    /// Depth of the collection's own records; nested collections sit deeper.
+    depth: Option<usize>,
+    /// Number of AI bindings read so far.
+    ai_next: usize,
+    /// Role of the binding read by the previous record, the only binding a
+    /// `SeriesText` may attach to.
+    last_ai: Option<Role>,
+    owner: SeriesOwnerStage,
+}
+
+/// Owner branch of the open Series collection.
+///
+/// ```text
+/// Unassigned     --SerToCrt----------------------------------> Assigned
+/// Unassigned     --SerParent---------------------------------> AwaitAuxiliary
+/// AwaitAuxiliary --SerAuxTrend | SerAuxErrBar, as next record--> Assigned
+/// ```
+///
+/// The collection may close in `Assigned` only.
+#[derive(Clone, Copy)]
+enum SeriesOwnerStage {
+    Unassigned,
+    AwaitAuxiliary(crate::record::series::Parent),
+    Assigned,
+}
+
+/// The ChartFormat collection being read, from its `ChartFormat` record to
+/// the End at `depth`.
+struct GroupScope {
+    /// Depth of the collection's own records; nested collections sit deeper.
+    depth: Option<usize>,
+    link: GroupLinkStage,
+}
+
+/// Mandatory head of the open ChartFormat collection.
+///
+/// ```text
+/// AwaitFamily --chart-family record--> AwaitLink
+/// AwaitLink   --CrtLink--------------> Linked
+/// ```
+///
+/// An Excel chart requires the two records first and adjacent, and closes
+/// in `Linked` only. A Graph chart accepts other records in between and may
+/// also close in `AwaitLink`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum GroupLinkStage {
+    AwaitFamily,
+    AwaitLink,
+    Linked,
+}
+
+/// The AxisParent collection being read, from its `AxisParent` record to
+/// the End at `depth`.
+///
+/// Its own records are the axes first, then the chart groups: an `Axis` is
+/// refused once `group_started` is set.
+struct ParentScope {
+    /// Position of the axis parent in the chart model.
+    index: usize,
+    /// Depth of the collection's own records; nested collections sit deeper.
+    depth: Option<usize>,
+    /// Number of ChartFormat collections closed so far.
+    groups: usize,
+    /// Whether a `ChartFormat` record has been read.
+    group_started: bool,
+}
+
 pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<Model> {
     if input.kind() != context.kind() {
         return invalid_model("context", "producer kind does not match the chart BOF");
@@ -62,22 +221,17 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
         graph_authoring_profile: false,
     };
     let mut depth = 0usize;
-    let mut current_series = None;
-    let mut series_depth = None;
-    let mut ai_next = 0usize;
-    let mut last_ai = None;
-    let mut series_owner_seen = false;
-    let mut series_parent = None;
+    let mut series_scope: Option<SeriesScope> = None;
     let mut current_axis = None;
     let mut axis_depth = None;
-    let mut group_depth = None;
-    let mut group_family_seen = false;
-    let mut group_link_seen = false;
-    let mut parent_depth = None;
-    let mut current_parent: Option<usize> = None;
+    let mut group_scope: Option<GroupScope> = None;
+    let mut parent_scope: Option<ParentScope> = None;
+    // Set by the Begin of an AxisParent collection and cleared by its Pos.
+    // It is not part of `ParentScope` because it outlives the collection: a
+    // Graph AxisParent that closes without a Pos leaves it set, and the
+    // chart is then refused at the end of the stream unless a later
+    // AxisParent collection supplies a Pos.
     let mut parent_needs_pos = false;
-    let mut parent_groups = 0usize;
-    let mut parent_group_started = false;
     let mut pending_begin = false;
     let strict_excel = context.kind() == ChartKind::Excel;
     let mut cache_section = None;
@@ -86,27 +240,8 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
     let mut zoom_seen = false;
     let mut growth_seen = false;
     let mut dimensions_seen = false;
-    let mut datasheet_seen = false;
-    let mut datasheet_pending = false;
-    let mut datasheet_active = false;
-    let mut country_seen = false;
-    let mut font_x_seen = false;
-    let mut exclude_rows_seen = false;
-    let mut exclude_columns_seen = false;
-    let mut orient_seen = false;
-    let mut windoc_seen = false;
-    let mut main_window_seen = false;
-    let mut window1_seen = false;
-    let mut window2_seen = false;
-    let mut max_status_seen = false;
-    let mut selection_seen = false;
-    let mut units_seen = false;
-    let mut attached_label_pending = false;
-    let mut attached_label_active = false;
-    let mut attached_label_depth = None;
-    let mut attached_label_brai_seen = false;
-    let mut attached_label_text = None;
-    let mut attached_label_link_object = None;
+    let mut datasheet = DatasheetPhase::Absent;
+    let mut attached_label = AttachedLabelPhase::Absent;
     let mut axes_used = None;
     let mut chart_seen = false;
     let mut props_seen = false;
@@ -148,22 +283,26 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 return invalid(record, "DropBar LineFormat is not followed by AreaFormat");
             }
         }
-        if last_ai.is_some() && record.kind() != SERIES_TEXT {
-            last_ai = None;
-        }
-        if series_parent.is_some() && !matches!(record.kind(), SER_AUX_TREND | SER_AUX_ERR_BAR) {
-            return invalid(
-                record,
-                "SerParent is not followed immediately by SerAuxTrend or SerAuxErrBar",
-            );
-        }
-        if series_depth == Some(depth) && ai_next < Role::ALL.len() {
-            let optional_text = record.kind() == SERIES_TEXT && last_ai.is_some();
-            if record.kind() != BRAI && !optional_text {
+        if let Some(scope) = series_scope.as_mut() {
+            if scope.last_ai.is_some() && record.kind() != SERIES_TEXT {
+                scope.last_ai = None;
+            }
+            if matches!(scope.owner, SeriesOwnerStage::AwaitAuxiliary(_))
+                && !matches!(record.kind(), SER_AUX_TREND | SER_AUX_ERR_BAR)
+            {
                 return invalid(
                     record,
-                    "Series must begin with exactly four ordered AI bindings",
+                    "SerParent is not followed immediately by SerAuxTrend or SerAuxErrBar",
                 );
+            }
+            if scope.depth == Some(depth) && scope.ai_next < Role::ALL.len() {
+                let optional_text = record.kind() == SERIES_TEXT && scope.last_ai.is_some();
+                if record.kind() != BRAI && !optional_text {
+                    return invalid(
+                        record,
+                        "Series must begin with exactly four ordered AI bindings",
+                    );
+                }
             }
         }
         if strict_excel && parent_needs_pos && record.kind() != POS {
@@ -172,31 +311,42 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 "AxisParent Begin is not followed immediately by Pos",
             );
         }
-        if strict_excel && group_depth == Some(depth) {
+        if strict_excel
+            && let Some(scope) = group_scope
+                .as_ref()
+                .filter(|scope| scope.depth == Some(depth))
+        {
             let family = matches!(
                 record.kind(),
                 BAR | LINE | PIE | BOP_POP | AREA | SCATTER | RADAR | RADAR_AREA | SURFACE
             );
-            if !group_family_seen && !family {
-                return invalid(
-                    record,
-                    "ChartFormat Begin is not followed by a chart family",
-                );
-            }
-            if group_family_seen && !group_link_seen && record.kind() != CRT_LINK {
-                return invalid(
-                    record,
-                    "chart family is not followed immediately by CrtLink",
-                );
+            match scope.link {
+                GroupLinkStage::AwaitFamily => {
+                    if !family {
+                        return invalid(
+                            record,
+                            "ChartFormat Begin is not followed by a chart family",
+                        );
+                    }
+                },
+                GroupLinkStage::AwaitLink => {
+                    if record.kind() != CRT_LINK {
+                        return invalid(
+                            record,
+                            "chart family is not followed immediately by CrtLink",
+                        );
+                    }
+                },
+                GroupLinkStage::Linked => {},
             }
         }
         if record.kind() == EOF {
             break;
         }
-        if datasheet_pending && record.kind() != BEGIN {
+        if datasheet == DatasheetPhase::Announced && record.kind() != BEGIN {
             return invalid(record, "BOFDatasheet is not followed immediately by Begin");
         }
-        if attached_label_pending && record.kind() != BEGIN {
+        if matches!(attached_label, AttachedLabelPhase::Announced) && record.kind() != BEGIN {
             return invalid(record, "attached Text is not followed immediately by Begin");
         }
         if pending_begin && record.kind() != BEGIN {
@@ -207,30 +357,39 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
         }
         let data = record.payload();
         let graph_cache_open = context.kind() == ChartKind::Graph
-            && ((datasheet_active && depth == 1 && orient_seen && !windoc_seen)
-                || (!datasheet_active && depth == 0 && dimensions_seen));
+            && match datasheet {
+                DatasheetPhase::Open(stage) => depth == 1 && stage == DatasheetStage::Orient,
+                DatasheetPhase::Absent
+                | DatasheetPhase::Announced
+                | DatasheetPhase::Closed
+                | DatasheetPhase::UnitsSeen => depth == 0 && dimensions_seen,
+            };
         match record.kind() {
             BEGIN => {
                 exact(record, 0)?;
-                if datasheet_pending {
-                    if context.kind() != ChartKind::Graph || depth != 0 || datasheet_active {
-                        return invalid(record, "datasheet Begin is misplaced");
-                    }
-                    datasheet_pending = false;
-                    datasheet_active = true;
-                } else if datasheet_active {
-                    return invalid(record, "datasheet collection cannot contain nested Begin");
+                match datasheet {
+                    DatasheetPhase::Announced => {
+                        if context.kind() != ChartKind::Graph || depth != 0 {
+                            return invalid(record, "datasheet Begin is misplaced");
+                        }
+                        datasheet = DatasheetPhase::Open(DatasheetStage::Begin);
+                    },
+                    DatasheetPhase::Open(_) => {
+                        return invalid(record, "datasheet collection cannot contain nested Begin");
+                    },
+                    DatasheetPhase::Absent | DatasheetPhase::Closed | DatasheetPhase::UnitsSeen => {
+                    },
                 }
-                if attached_label_pending {
-                    if depth != 1 || attached_label_active {
+                if matches!(attached_label, AttachedLabelPhase::Announced) {
+                    if depth != 1 {
                         return invalid(record, "attached-label Begin is misplaced");
                     }
-                    attached_label_pending = false;
-                    attached_label_active = true;
-                    attached_label_depth = depth.checked_add(1);
-                    attached_label_brai_seen = false;
-                    attached_label_text = None;
-                    attached_label_link_object = None;
+                    attached_label = AttachedLabelPhase::Open(AttachedLabel {
+                        depth: depth.checked_add(1),
+                        brai_seen: false,
+                        text: None,
+                        link_object: None,
+                    });
                 }
                 if strict_excel && depth == 0 && !pending_begin {
                     return invalid(record, "Begin record has no chart-level collection owner");
@@ -242,7 +401,10 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 if depth > limits.max_nesting {
                     return limit(crate::LimitKind::Nesting, depth, limits.max_nesting);
                 }
-                if parent_depth == Some(depth) {
+                if parent_scope
+                    .as_ref()
+                    .is_some_and(|scope| scope.depth == Some(depth))
+                {
                     parent_needs_pos = true;
                 }
             },
@@ -251,43 +413,27 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 if depth == 0 {
                     return invalid(record, "End record has no matching Begin");
                 }
-                if datasheet_active && depth == 1 {
-                    if !orient_seen
-                        || !country_seen
-                        || !font_x_seen
-                        || !exclude_rows_seen
-                        || !exclude_columns_seen
-                        || !windoc_seen
-                        || !main_window_seen
-                        || !window1_seen
-                        || !window2_seen
-                        || !max_status_seen
-                        || !selection_seen
-                    {
+                if let DatasheetPhase::Open(stage) = datasheet
+                    && depth == 1
+                {
+                    if stage != DatasheetStage::Selection {
                         return invalid(
                             record,
                             "datasheet is missing Orient or mandatory window/selection records",
                         );
                     }
-                    datasheet_active = false;
+                    datasheet = DatasheetPhase::Closed;
                     depth -= 1;
                     continue;
                 }
-                if attached_label_active && attached_label_depth == Some(depth) {
-                    if attached_label_link_object == Some(1)
-                        && attached_label_brai_seen
-                        && attached_label_text.is_some()
-                    {
+                if let Some(label) = attached_label.open_at(depth) {
+                    if label.link_object == Some(1) && label.brai_seen && label.text.is_some() {
                         if chart.title.is_some() {
                             return invalid(record, "chart contains more than one title label");
                         }
-                        chart.title = attached_label_text.take();
+                        chart.title = label.text.take();
                     }
-                    attached_label_active = false;
-                    attached_label_depth = None;
-                    attached_label_brai_seen = false;
-                    attached_label_text = None;
-                    attached_label_link_object = None;
+                    attached_label = AttachedLabelPhase::Absent;
                 }
                 if pending_drop
                     .as_ref()
@@ -322,49 +468,60 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                         "chart drop bars",
                     )?;
                 }
-                if series_depth == Some(depth) {
-                    if ai_next != Role::ALL.len() || !series_owner_seen || series_parent.is_some() {
+                if let Some(scope) = series_scope
+                    .as_ref()
+                    .filter(|scope| scope.depth == Some(depth))
+                {
+                    if scope.ai_next != Role::ALL.len()
+                        || !matches!(scope.owner, SeriesOwnerStage::Assigned)
+                    {
                         return invalid(
                             record,
                             "Series requires exactly four AI bindings and one SerToCrt",
                         );
                     }
-                    current_series = None;
-                    series_depth = None;
-                    ai_next = 0;
-                    last_ai = None;
-                    series_owner_seen = false;
-                    series_parent = None;
+                    series_scope = None;
                 }
                 if axis_depth == Some(depth) {
                     current_axis = None;
                     axis_depth = None;
                 }
-                if group_depth == Some(depth) {
-                    if !group_family_seen || (strict_excel && !group_link_seen) {
+                if let Some(scope) = group_scope
+                    .as_ref()
+                    .filter(|scope| scope.depth == Some(depth))
+                {
+                    let incomplete = match scope.link {
+                        GroupLinkStage::AwaitFamily => true,
+                        GroupLinkStage::AwaitLink => strict_excel,
+                        GroupLinkStage::Linked => false,
+                    };
+                    if incomplete {
                         return invalid(
                             record,
                             "ChartFormat collection is missing its family or required Excel CrtLink",
                         );
                     }
-                    group_depth = None;
-                    group_family_seen = false;
-                    group_link_seen = false;
-                    parent_groups = parent_groups.checked_add(1).ok_or(Error::SizeOverflow {
-                        resource: "axis-parent chart groups",
-                    })?;
+                    group_scope = None;
+                    // A ChartFormat collection opens only among the records
+                    // of an AxisParent collection and closes before it.
+                    if let Some(parent) = parent_scope.as_mut() {
+                        parent.groups =
+                            parent.groups.checked_add(1).ok_or(Error::SizeOverflow {
+                                resource: "axis-parent chart groups",
+                            })?;
+                    }
                 }
-                if parent_depth == Some(depth) {
-                    if strict_excel && (parent_needs_pos || !(1..=4).contains(&parent_groups)) {
+                if let Some(scope) = parent_scope
+                    .as_ref()
+                    .filter(|scope| scope.depth == Some(depth))
+                {
+                    if strict_excel && (parent_needs_pos || !(1..=4).contains(&scope.groups)) {
                         return invalid(
                             record,
                             "AxisParent requires Pos and one through four ChartFormat collections",
                         );
                     }
-                    parent_depth = None;
-                    current_parent = None;
-                    parent_groups = 0;
-                    parent_group_started = false;
+                    parent_scope = None;
                 }
                 if depth == 1 {
                     let parent_count =
@@ -389,53 +546,31 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 depth -= 1;
             },
             BOF_DATASHEET if context.kind() == ChartKind::Graph => {
-                if datasheet_seen
-                    || datasheet_pending
-                    || datasheet_active
-                    || chart_seen
-                    || depth != 0
-                {
+                if datasheet != DatasheetPhase::Absent || chart_seen || depth != 0 {
                     return invalid(record, "BOFDatasheet is duplicated or misplaced");
                 }
                 exact(record, 4)?;
-                datasheet_seen = true;
-                datasheet_pending = true;
+                datasheet = DatasheetPhase::Announced;
             },
             COUNTRY if context.kind() == ChartKind::Graph => {
-                if !datasheet_active
-                    || depth != 1
-                    || country_seen
-                    || font_x_seen
-                    || exclude_rows_seen
-                    || exclude_columns_seen
-                    || orient_seen
-                {
+                if datasheet != DatasheetPhase::Open(DatasheetStage::Begin) || depth != 1 {
                     return invalid(record, "Country is duplicated or out of Datasheet order");
                 }
                 exact(record, 4)?;
-                country_seen = true;
+                datasheet = DatasheetPhase::Open(DatasheetStage::Country);
             },
-            FONT_X if context.kind() == ChartKind::Graph && datasheet_active => {
-                if depth != 1
-                    || !country_seen
-                    || font_x_seen
-                    || exclude_rows_seen
-                    || exclude_columns_seen
-                    || orient_seen
-                {
+            FONT_X
+                if context.kind() == ChartKind::Graph
+                    && matches!(datasheet, DatasheetPhase::Open(_)) =>
+            {
+                if depth != 1 || datasheet != DatasheetPhase::Open(DatasheetStage::Country) {
                     return invalid(record, "Datasheet FontX is duplicated or out of order");
                 }
                 exact(record, 2)?;
-                font_x_seen = true;
+                datasheet = DatasheetPhase::Open(DatasheetStage::FontX);
             },
             EXCLUDE_ROWS if context.kind() == ChartKind::Graph => {
-                if !datasheet_active
-                    || depth != 1
-                    || !font_x_seen
-                    || exclude_rows_seen
-                    || exclude_columns_seen
-                    || orient_seen
-                {
+                if datasheet != DatasheetPhase::Open(DatasheetStage::FontX) || depth != 1 {
                     return invalid(
                         record,
                         "ExcludeRows is duplicated or out of Datasheet order",
@@ -444,15 +579,10 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 if data.len() % 2 != 0 || data.len() / 2 > 255 {
                     return invalid(record, "ExcludeRows has an invalid transition array");
                 }
-                exclude_rows_seen = true;
+                datasheet = DatasheetPhase::Open(DatasheetStage::ExcludeRows);
             },
             EXCLUDE_COLUMNS if context.kind() == ChartKind::Graph => {
-                if !datasheet_active
-                    || depth != 1
-                    || !exclude_rows_seen
-                    || exclude_columns_seen
-                    || orient_seen
-                {
+                if datasheet != DatasheetPhase::Open(DatasheetStage::ExcludeRows) || depth != 1 {
                     return invalid(
                         record,
                         "ExcludeColumns is duplicated or out of Datasheet order",
@@ -461,17 +591,10 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 if data.len() % 2 != 0 {
                     return invalid(record, "ExcludeColumns has an invalid transition array");
                 }
-                exclude_columns_seen = true;
+                datasheet = DatasheetPhase::Open(DatasheetStage::ExcludeColumns);
             },
             ORIENT if context.kind() == ChartKind::Graph => {
-                if !datasheet_active
-                    || depth != 1
-                    || !country_seen
-                    || !font_x_seen
-                    || !exclude_rows_seen
-                    || !exclude_columns_seen
-                    || orient_seen
-                {
+                if datasheet != DatasheetPhase::Open(DatasheetStage::ExcludeColumns) || depth != 1 {
                     return invalid(record, "Orient is duplicated or outside Datasheet");
                 }
                 exact(record, 6)?;
@@ -484,30 +607,30 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 if row_series > 0x0F9F || col_series > 0x0F9F {
                     return invalid(record, "Orient series coordinate exceeds the Graph grid");
                 }
-                orient_seen = true;
+                datasheet = DatasheetPhase::Open(DatasheetStage::Orient);
             },
             WIN_DOC if context.kind() == ChartKind::Graph => {
-                if !datasheet_active || depth != 1 || !orient_seen || windoc_seen {
+                if datasheet != DatasheetPhase::Open(DatasheetStage::Orient) || depth != 1 {
                     return invalid(record, "WinDoc is duplicated or out of Datasheet order");
                 }
                 exact(record, 1)?;
                 if byte_at(data, 0, record)? > 1 {
                     return invalid(record, "WinDoc Boolean is invalid");
                 }
-                windoc_seen = true;
+                datasheet = DatasheetPhase::Open(DatasheetStage::WinDoc);
             },
             MAIN_WINDOW if context.kind() == ChartKind::Graph => {
-                if !datasheet_active || depth != 1 || !windoc_seen || main_window_seen {
+                if datasheet != DatasheetPhase::Open(DatasheetStage::WinDoc) || depth != 1 {
                     return invalid(record, "MainWindow is duplicated or out of Datasheet order");
                 }
                 exact(record, 4)?;
                 if i16_at(data, 0, record)? < 1 || i16_at(data, 2, record)? < 1 {
                     return invalid(record, "MainWindow scale must be positive");
                 }
-                main_window_seen = true;
+                datasheet = DatasheetPhase::Open(DatasheetStage::MainWindow);
             },
             WINDOW1 if context.kind() == ChartKind::Graph => {
-                if !datasheet_active || depth != 1 || !main_window_seen || window1_seen {
+                if datasheet != DatasheetPhase::Open(DatasheetStage::MainWindow) || depth != 1 {
                     return invalid(record, "Window1_10 is duplicated or out of Datasheet order");
                 }
                 exact(record, 10)?;
@@ -520,10 +643,10 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                         "Window1_10 dimensions or reserved bytes are invalid",
                     );
                 }
-                window1_seen = true;
+                datasheet = DatasheetPhase::Open(DatasheetStage::Window1);
             },
             WINDOW2_GRAPH if context.kind() == ChartKind::Graph => {
-                if !datasheet_active || depth != 1 || !window1_seen || window2_seen {
+                if datasheet != DatasheetPhase::Open(DatasheetStage::Window1) || depth != 1 {
                     return invalid(
                         record,
                         "Window2Graph is duplicated or out of Datasheet order",
@@ -539,17 +662,17 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 {
                     return invalid(record, "Window2Graph fields are invalid");
                 }
-                window2_seen = true;
+                datasheet = DatasheetPhase::Open(DatasheetStage::Window2);
             },
             MAX_STATUS if context.kind() == ChartKind::Graph => {
-                if !datasheet_active || depth != 1 || !window2_seen || max_status_seen {
+                if datasheet != DatasheetPhase::Open(DatasheetStage::Window2) || depth != 1 {
                     return invalid(record, "MaxStatus is duplicated or out of Datasheet order");
                 }
                 exact(record, 2)?;
-                max_status_seen = true;
+                datasheet = DatasheetPhase::Open(DatasheetStage::MaxStatus);
             },
             SELECTION if context.kind() == ChartKind::Graph => {
-                if !datasheet_active || depth != 1 || !max_status_seen || selection_seen {
+                if datasheet != DatasheetPhase::Open(DatasheetStage::MaxStatus) || depth != 1 {
                     return invalid(record, "Selection is duplicated or out of Datasheet order");
                 }
                 exact(record, 17)?;
@@ -579,30 +702,27 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                         "Selection range is reversed or outside the Graph grid",
                     );
                 }
-                selection_seen = true;
+                datasheet = DatasheetPhase::Open(DatasheetStage::Selection);
             },
             UNITS if context.kind() == ChartKind::Graph => {
-                if !datasheet_seen
-                    || datasheet_pending
-                    || datasheet_active
-                    || units_seen
-                    || chart_seen
-                    || depth != 0
-                {
+                if datasheet != DatasheetPhase::Closed || chart_seen || depth != 0 {
                     return invalid(record, "Units is duplicated or misplaced");
                 }
                 exact(record, 2)?;
                 if data.iter().any(|value| *value != 0) {
                     return invalid(record, "Units reserved field is nonzero");
                 }
-                units_seen = true;
+                datasheet = DatasheetPhase::UnitsSeen;
             },
             CHART_REC => {
                 if chart_seen
                     || depth != 0
-                    || datasheet_pending
-                    || datasheet_active
-                    || (datasheet_seen && !units_seen)
+                    || matches!(
+                        datasheet,
+                        DatasheetPhase::Announced
+                            | DatasheetPhase::Open(_)
+                            | DatasheetPhase::Closed
+                    )
                 {
                     return invalid(record, "Chart must occur once at chart-substream level");
                 }
@@ -660,7 +780,7 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 props_seen = true;
             },
             SERIES => {
-                if current_series.is_some()
+                if series_scope.is_some()
                     || (strict_excel && (depth != 1 || !growth_seen || props_seen))
                 {
                     return invalid(
@@ -687,23 +807,28 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 series.category_count = count_at(data, 4, record)?;
                 series.value_count = count_at(data, 6, record)?;
                 series.bubble_count = count_at(data, 10, record)?;
+                let index = chart.series.len();
                 push(&mut chart.series, series, "chart series")?;
-                current_series = chart.series.len().checked_sub(1);
-                series_depth = depth.checked_add(1);
-                ai_next = 0;
-                last_ai = None;
-                series_owner_seen = false;
-                series_parent = None;
+                series_scope = Some(SeriesScope {
+                    index,
+                    depth: depth.checked_add(1),
+                    ai_next: 0,
+                    last_ai: None,
+                    owner: SeriesOwnerStage::Unassigned,
+                });
                 pending_begin = true;
             },
             BRAI => {
-                if series_depth != Some(depth) {
+                let Some(scope) = series_scope
+                    .as_mut()
+                    .filter(|scope| scope.depth == Some(depth))
+                else {
                     // `[MS-XLS]` `TEXTPROPS` may carry a BRAI in a label or
                     // other text collection. It is not one of this semantic
                     // chart model's four series bindings, so preserve it
                     // losslessly instead of rejecting the host chart.
-                    if attached_label_active && attached_label_depth == Some(depth) {
-                        if attached_label_brai_seen {
+                    if let Some(label) = attached_label.open_at(depth) {
+                        if label.brai_seen {
                             return invalid(
                                 record,
                                 "attached label contains more than one AI binding",
@@ -716,48 +841,53 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                                 "chart title attached label does not use a Name AI",
                             );
                         }
-                        attached_label_brai_seen = true;
+                        label.brai_seen = true;
                     }
                     add_raw(&mut chart, record, &mut unknown_bytes, limits)?;
                     continue;
-                }
+                };
                 let link = links::parse_link(record, context, limits)?;
-                let expected = Role::ALL.get(ai_next).copied().ok_or(Error::InvalidChart {
-                    offset: record.offset(),
-                    reason: "Series collection contains more than four AI bindings",
-                })?;
+                let expected =
+                    Role::ALL
+                        .get(scope.ai_next)
+                        .copied()
+                        .ok_or(Error::InvalidChart {
+                            offset: record.offset(),
+                            reason: "Series collection contains more than four AI bindings",
+                        })?;
                 if link.role() != expected {
                     return invalid(
                         record,
                         "Series AI bindings are missing or out of role order",
                     );
                 }
-                let index = current_series.ok_or(Error::InvalidChart {
-                    offset: record.offset(),
-                    reason: "BRAI appears outside a Series collection",
-                })?;
-                let series = chart.series.get_mut(index).ok_or(Error::InvalidChart {
-                    offset: record.offset(),
-                    reason: "BRAI refers to a missing Series",
-                })?;
+                let series = chart
+                    .series
+                    .get_mut(scope.index)
+                    .ok_or(Error::InvalidChart {
+                        offset: record.offset(),
+                        reason: "BRAI refers to a missing Series",
+                    })?;
                 series.ai.replace(Binding::new(link, None));
-                ai_next = ai_next.checked_add(1).ok_or(Error::SizeOverflow {
+                scope.ai_next = scope.ai_next.checked_add(1).ok_or(Error::SizeOverflow {
                     resource: "series AI count",
                 })?;
-                last_ai = Some(expected);
+                scope.last_ai = Some(expected);
             },
             SER_TO_CRT => {
                 exact(record, 2)?;
-                if series_depth != Some(depth) {
+                let Some(scope) = series_scope
+                    .as_mut()
+                    .filter(|scope| scope.depth == Some(depth))
+                else {
                     return invalid(record, "SerToCrt appears outside a Series collection");
+                };
+                match scope.owner {
+                    SeriesOwnerStage::Unassigned => {},
+                    SeriesOwnerStage::AwaitAuxiliary(_) | SeriesOwnerStage::Assigned => {
+                        return invalid(record, "Series contains more than one owner branch");
+                    },
                 }
-                if series_owner_seen || series_parent.is_some() {
-                    return invalid(record, "Series contains more than one owner branch");
-                }
-                let index = current_series.ok_or(Error::InvalidChart {
-                    offset: record.offset(),
-                    reason: "SerToCrt appears outside a Series collection",
-                })?;
                 let raw = u16_at(data, 0, record)?;
                 let raw = u8::try_from(raw).ok().ok_or(Error::InvalidChart {
                     offset: record.offset(),
@@ -769,39 +899,58 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 })?;
                 chart
                     .series
-                    .get_mut(index)
+                    .get_mut(scope.index)
                     .ok_or(Error::InvalidChart {
                         offset: record.offset(),
                         reason: "SerToCrt refers to a missing Series",
                     })?
                     .owner = Owner::Group(group);
-                series_owner_seen = true;
+                scope.owner = SeriesOwnerStage::Assigned;
             },
             SER_PARENT => {
-                if series_depth != Some(depth) || series_owner_seen || series_parent.is_some() {
+                let Some(scope) = series_scope.as_mut().filter(|scope| {
+                    scope.depth == Some(depth)
+                        && matches!(scope.owner, SeriesOwnerStage::Unassigned)
+                }) else {
                     return invalid(
                         record,
                         "SerParent is duplicated or outside a Series owner branch",
                     );
-                }
-                series_parent = Some(crate::record::series::Parent::parse(record).ok().ok_or({
-                    Error::InvalidChart {
-                        offset: record.offset(),
-                        reason: "SerParent series index is outside 1 through 254",
-                    }
-                })?);
+                };
+                scope.owner = SeriesOwnerStage::AwaitAuxiliary(
+                    crate::record::series::Parent::parse(record).ok().ok_or({
+                        Error::InvalidChart {
+                            offset: record.offset(),
+                            reason: "SerParent series index is outside 1 through 254",
+                        }
+                    })?,
+                );
             },
             SER_AUX_TREND | SER_AUX_ERR_BAR => {
-                if series_depth != Some(depth) || series_owner_seen {
+                let Some(scope) = series_scope
+                    .as_mut()
+                    .filter(|scope| scope.depth == Some(depth))
+                else {
                     return invalid(
                         record,
                         "auxiliary-series record is duplicated or outside Series",
                     );
-                }
-                let parent = series_parent.take().ok_or(Error::InvalidChart {
-                    offset: record.offset(),
-                    reason: "auxiliary-series record must immediately follow SerParent",
-                })?;
+                };
+                let parent = match scope.owner {
+                    SeriesOwnerStage::Assigned => {
+                        return invalid(
+                            record,
+                            "auxiliary-series record is duplicated or outside Series",
+                        );
+                    },
+                    SeriesOwnerStage::Unassigned => {
+                        return Err(Error::InvalidChart {
+                            offset: record.offset(),
+                            reason: "auxiliary-series record must immediately follow SerParent",
+                        });
+                    },
+                    SeriesOwnerStage::AwaitAuxiliary(parent) => parent,
+                };
                 let owner = if record.kind() == SER_AUX_TREND {
                     exact(record, 28)?;
                     Owner::Trend {
@@ -821,24 +970,29 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                         })?,
                     }
                 };
-                let series = current_series
-                    .and_then(|index| chart.series.get_mut(index))
+                let series = chart
+                    .series
+                    .get_mut(scope.index)
                     .ok_or(Error::InvalidChart {
                         offset: record.offset(),
                         reason: "auxiliary owner refers to a missing Series",
                     })?;
                 series.owner = owner;
-                series_owner_seen = true;
+                scope.owner = SeriesOwnerStage::Assigned;
             },
             SERIES_TEXT => {
-                if series_depth == Some(depth) {
-                    let role = last_ai.take().ok_or(Error::InvalidChart {
+                if let Some(scope) = series_scope
+                    .as_mut()
+                    .filter(|scope| scope.depth == Some(depth))
+                {
+                    let role = scope.last_ai.take().ok_or(Error::InvalidChart {
                         offset: record.offset(),
                         reason: "SeriesText in Series must immediately follow one BRAI",
                     })?;
                     let text = parse_short_text(record)?;
-                    let series = current_series
-                        .and_then(|index| chart.series.get_mut(index))
+                    let series = chart
+                        .series
+                        .get_mut(scope.index)
                         .ok_or(Error::InvalidChart {
                             offset: record.offset(),
                             reason: "SeriesText refers to a missing Series",
@@ -853,22 +1007,25 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                             reason: "one AI has more than one SeriesText",
                         })?;
                 } else {
-                    if attached_label_active && attached_label_depth == Some(depth) {
-                        if !attached_label_brai_seen || attached_label_text.is_some() {
+                    if let Some(label) = attached_label.open_at(depth) {
+                        if !label.brai_seen || label.text.is_some() {
                             return invalid(record, "attached label SeriesText is out of AI order");
                         }
-                        attached_label_text = Some(parse_short_text(record)?);
+                        label.text = Some(parse_short_text(record)?);
                     }
                     add_raw(&mut chart, record, &mut unknown_bytes, limits)?;
                 }
             },
             CHART_FORMAT => {
-                if group_depth.is_some() || parent_depth != Some(depth) {
+                let Some(owner) = parent_scope
+                    .as_mut()
+                    .filter(|scope| group_scope.is_none() && scope.depth == Some(depth))
+                else {
                     return invalid(
                         record,
                         "ChartFormat must belong to one AxisParent collection",
                     );
-                }
+                };
                 exact(record, 20)?;
                 let reserved = data.get(..16).ok_or(Error::InvalidChart {
                     offset: record.offset(),
@@ -892,8 +1049,9 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                     offset: record.offset(),
                     reason: "chart-group order exceeds nine",
                 })?;
-                let parent = current_parent
-                    .and_then(|index| chart.parents.get(index))
+                let parent = chart
+                    .parents
+                    .get(owner.index)
                     .map(|parent| parent.id())
                     .ok_or(Error::InvalidChart {
                         offset: record.offset(),
@@ -912,18 +1070,25 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                     },
                     "chart groups",
                 )?;
-                group_depth = depth.checked_add(1);
-                group_family_seen = false;
-                group_link_seen = false;
-                parent_group_started = true;
+                group_scope = Some(GroupScope {
+                    depth: depth.checked_add(1),
+                    link: GroupLinkStage::AwaitFamily,
+                });
+                owner.group_started = true;
                 pending_begin = true;
             },
             BAR | LINE | PIE | BOP_POP | AREA | SCATTER | RADAR | RADAR_AREA | SURFACE => {
-                if group_depth != Some(depth) {
+                let Some(scope) = group_scope
+                    .as_mut()
+                    .filter(|scope| scope.depth == Some(depth))
+                else {
                     return invalid(record, "chart-family record appears outside ChartFormat");
-                }
-                if group_family_seen {
-                    return invalid(record, "ChartFormat contains more than one chart family");
+                };
+                match scope.link {
+                    GroupLinkStage::AwaitFamily => {},
+                    GroupLinkStage::AwaitLink | GroupLinkStage::Linked => {
+                        return invalid(record, "ChartFormat contains more than one chart family");
+                    },
                 }
                 let family = parse_family(record)?;
                 chart
@@ -934,15 +1099,17 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                         reason: "chart-family record has no ChartFormat owner",
                     })?
                     .family = family;
-                group_family_seen = true;
+                scope.link = GroupLinkStage::AwaitLink;
             },
             CRT_LINK => {
-                if group_depth != Some(depth) || !group_family_seen || group_link_seen {
+                let Some(scope) = group_scope.as_mut().filter(|scope| {
+                    scope.depth == Some(depth) && scope.link == GroupLinkStage::AwaitLink
+                }) else {
                     return invalid(
                         record,
                         "CrtLink is missing, duplicated, or outside ChartFormat",
                     );
-                }
+                };
                 let link = crate::record::line::Link::from_payload(data).ok().ok_or({
                     Error::InvalidChart {
                         offset: record.offset(),
@@ -957,10 +1124,13 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                         reason: "CrtLink has no ChartFormat owner",
                     })?
                     .link = link;
-                group_link_seen = true;
+                scope.link = GroupLinkStage::Linked;
             },
             CRT_LINE => {
-                if group_depth != Some(depth) {
+                if group_scope
+                    .as_ref()
+                    .is_none_or(|scope| scope.depth != Some(depth))
+                {
                     return invalid(record, "CrtLine appears outside ChartFormat");
                 }
                 let value = crate::record::line::Line::from_payload(data).ok().ok_or({
@@ -983,7 +1153,10 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 });
             },
             DROP_BAR => {
-                if group_depth != Some(depth) {
+                if group_scope
+                    .as_ref()
+                    .is_none_or(|scope| scope.depth != Some(depth))
+                {
                     return invalid(record, "DropBar appears outside ChartFormat");
                 }
                 if pending_drop.is_some() {
@@ -1024,12 +1197,14 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 pending_begin = true;
             },
             AXIS => {
-                if current_axis.is_some() || parent_depth != Some(depth) || parent_group_started {
+                let Some(owner) = parent_scope.as_ref().filter(|scope| {
+                    current_axis.is_none() && scope.depth == Some(depth) && !scope.group_started
+                }) else {
                     return invalid(
                         record,
                         "Axis must own a non-overlapping AxisParent collection",
                     );
-                }
+                };
                 exact(record, 18)?;
                 let reserved = data.get(2..).ok_or(Error::InvalidChart {
                     offset: record.offset(),
@@ -1045,8 +1220,9 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                     _ => return invalid(record, "invalid axis kind"),
                 };
                 check_add(chart.axes.len(), limits.max_axes, crate::LimitKind::Axes)?;
-                let parent = current_parent
-                    .and_then(|index| chart.parents.get(index))
+                let parent = chart
+                    .parents
+                    .get(owner.index)
                     .map(|parent| parent.id())
                     .ok_or(Error::InvalidChart {
                         offset: record.offset(),
@@ -1076,7 +1252,7 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                     },
                     None => 2,
                 };
-                if parent_depth.is_some()
+                if parent_scope.is_some()
                     || chart.parents.len() >= expected
                     || (strict_excel && depth != 1)
                 {
@@ -1099,6 +1275,7 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 if u16_at(data, 0, record)? > 1 {
                     return invalid(record, "AxisParent index must be primary or secondary");
                 }
+                let index = chart.parents.len();
                 push(
                     &mut chart.parents,
                     if secondary {
@@ -1108,13 +1285,24 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                     },
                     "axis parents",
                 )?;
-                current_parent = chart.parents.len().checked_sub(1);
-                parent_depth = depth.checked_add(1);
-                parent_groups = 0;
-                parent_group_started = false;
+                parent_scope = Some(ParentScope {
+                    index,
+                    depth: depth.checked_add(1),
+                    groups: 0,
+                    group_started: false,
+                });
                 pending_begin = true;
             },
-            POS if parent_depth == Some(depth) => {
+            POS => {
+                let Some(owner) = parent_scope
+                    .as_ref()
+                    .filter(|scope| scope.depth == Some(depth))
+                else {
+                    // A Pos that is not an AxisParent's own record is kept
+                    // as an opaque record.
+                    add_raw(&mut chart, record, &mut unknown_bytes, limits)?;
+                    continue;
+                };
                 if !parent_needs_pos {
                     return invalid(record, "AxisParent contains more than one Pos");
                 }
@@ -1142,14 +1330,13 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 if !pos.is_plot() {
                     return invalid(record, "AxisParent Pos must use Parent/Parent modes");
                 }
-                let index = current_parent.ok_or(Error::InvalidChart {
-                    offset: record.offset(),
-                    reason: "Pos has no AxisParent owner",
-                })?;
-                let parent = chart.parents.get_mut(index).ok_or(Error::InvalidChart {
-                    offset: record.offset(),
-                    reason: "Pos AxisParent owner is missing",
-                })?;
+                let parent = chart
+                    .parents
+                    .get_mut(owner.index)
+                    .ok_or(Error::InvalidChart {
+                        offset: record.offset(),
+                        reason: "Pos AxisParent owner is missing",
+                    })?;
                 *parent = if parent.is_secondary() {
                     axis::Parent::secondary(pos)
                 } else {
@@ -1339,10 +1526,10 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
             },
             DATA_LAB_EXT | DATA_LAB_EXT_CONTENTS | TEXT => {
                 if record.kind() == TEXT && context.kind() == ChartKind::Graph && depth == 1 {
-                    if attached_label_pending || attached_label_active {
+                    if !matches!(attached_label, AttachedLabelPhase::Absent) {
                         return invalid(record, "chart attached labels overlap");
                     }
-                    attached_label_pending = true;
+                    attached_label = AttachedLabelPhase::Announced;
                 }
                 let data = copy(
                     data,
@@ -1363,8 +1550,13 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 if dimensions_seen
                     || (strict_excel && (depth != 0 || !chart_closed))
                     || (context.kind() == ChartKind::Graph
-                        && datasheet_seen
-                        && (!units_seen || depth != 0 || !chart_closed))
+                        && match datasheet {
+                            DatasheetPhase::Absent => false,
+                            DatasheetPhase::Announced
+                            | DatasheetPhase::Open(_)
+                            | DatasheetPhase::Closed => true,
+                            DatasheetPhase::UnitsSeen => depth != 0 || !chart_closed,
+                        })
                 {
                     return invalid(record, "Dimensions must occur once before SERIESDATA cells");
                 }
@@ -1624,13 +1816,13 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
             },
             BOF => return invalid(record, "nested BOF in chart substream"),
             OBJECT_LINK => {
-                if attached_label_active && attached_label_depth == Some(depth) {
+                if let Some(label) = attached_label.open_at(depth) {
                     exact(record, 6)?;
-                    attached_label_link_object = Some(u16_at(data, 0, record)?);
+                    label.link_object = Some(u16_at(data, 0, record)?);
                 }
                 add_raw(&mut chart, record, &mut unknown_bytes, limits)?;
             },
-            CONTINUE | SERIES_LIST | CAT_SER_RANGE | DEFAULT_TEXT | FONT_X | FRAME | POS => {
+            CONTINUE | SERIES_LIST | CAT_SER_RANGE | DEFAULT_TEXT | FONT_X | FRAME => {
                 add_raw(&mut chart, record, &mut unknown_bytes, limits)?;
             },
             _ => add_raw(&mut chart, record, &mut unknown_bytes, limits)?,
@@ -1642,29 +1834,23 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
             reason: "chart Begin/End collections are unbalanced",
         });
     }
-    if datasheet_pending || datasheet_active || attached_label_pending || attached_label_active {
+    if matches!(
+        datasheet,
+        DatasheetPhase::Announced | DatasheetPhase::Open(_)
+    ) || !matches!(attached_label, AttachedLabelPhase::Absent)
+    {
         return Err(Error::InvalidChart {
             offset: input.as_bytes().len(),
             reason: "Datasheet or attached-label collection is incomplete",
         });
     }
-    if datasheet_seen
-        && (!units_seen
-            || !orient_seen
-            || !country_seen
-            || !font_x_seen
-            || !exclude_rows_seen
-            || !exclude_columns_seen
-            || !windoc_seen
-            || !main_window_seen
-            || !window1_seen
-            || !window2_seen
-            || !max_status_seen
-            || !selection_seen
-            || !chart_seen
-            || !chart_closed
-            || !dimensions_seen)
-    {
+    // A datasheet that reached `Closed` holds every mandatory member, so
+    // only the records that follow the collection remain to be checked.
+    if match datasheet {
+        DatasheetPhase::Absent => false,
+        DatasheetPhase::Announced | DatasheetPhase::Open(_) | DatasheetPhase::Closed => true,
+        DatasheetPhase::UnitsSeen => !chart_seen || !chart_closed || !dimensions_seen,
+    } {
         return Err(Error::InvalidChart {
             offset: input.as_bytes().len(),
             reason: "Graph chart sheet is missing a mandatory Datasheet or chart record",
@@ -1672,10 +1858,10 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
     }
     if pending_begin
         || pending_drop.is_some()
-        || current_series.is_some()
+        || series_scope.is_some()
         || current_axis.is_some()
-        || group_depth.is_some()
-        || parent_depth.is_some()
+        || group_scope.is_some()
+        || parent_scope.is_some()
         || parent_needs_pos
     {
         return Err(Error::InvalidChart {
