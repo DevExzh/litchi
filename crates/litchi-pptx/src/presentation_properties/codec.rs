@@ -2202,4 +2202,219 @@ mod tests {
         .unwrap();
         assert!(Properties::parse(xml.as_bytes(), limits).is_ok());
     }
+
+    /// Child-order table for `p:showPr`. Key letters: `P` `p:present`, `B`
+    /// `p:browse`, `S` `p:sldAll`, `R` `p:sldRg`, `C` `p:penClr`, `E`
+    /// `p:extLst`, `X` an unknown child.
+    const SHOW_CHILD_ORDER: &[(&str, &str)] = &[
+        ("", "ok mode=None slides=None pen=false extensions=0"),
+        (
+            "P",
+            "ok mode=Some(Present) slides=None pen=false extensions=0",
+        ),
+        ("S", "ok mode=None slides=Some(All) pen=false extensions=0"),
+        ("C", "ok mode=None slides=None pen=true extensions=0"),
+        ("E", "ok mode=None slides=None pen=false extensions=1"),
+        ("PP", "Invalid: invalid show mode order"),
+        (
+            "PS",
+            "ok mode=Some(Present) slides=Some(All) pen=false extensions=0",
+        ),
+        (
+            "PC",
+            "ok mode=Some(Present) slides=None pen=true extensions=0",
+        ),
+        (
+            "PE",
+            "ok mode=Some(Present) slides=None pen=false extensions=1",
+        ),
+        ("SP", "Invalid: invalid show mode order"),
+        ("SS", "Invalid: invalid show selection order"),
+        ("SC", "ok mode=None slides=Some(All) pen=true extensions=0"),
+        ("SE", "ok mode=None slides=Some(All) pen=false extensions=1"),
+        ("CP", "Invalid: invalid show mode order"),
+        ("CS", "Invalid: invalid show selection order"),
+        ("CC", "Invalid: invalid penClr order"),
+        ("CE", "ok mode=None slides=None pen=true extensions=1"),
+        ("EP", "Invalid: invalid show mode order"),
+        ("ES", "Invalid: invalid show selection order"),
+        ("EC", "Invalid: invalid penClr order"),
+        ("EE", "Invalid: duplicate show extLst"),
+        ("PPP", "Invalid: invalid show mode order"),
+        ("PPS", "Invalid: invalid show mode order"),
+        ("PPC", "Invalid: invalid show mode order"),
+        ("PPE", "Invalid: invalid show mode order"),
+        ("PSP", "Invalid: invalid show mode order"),
+        ("PSS", "Invalid: invalid show selection order"),
+        (
+            "PSC",
+            "ok mode=Some(Present) slides=Some(All) pen=true extensions=0",
+        ),
+        (
+            "PSE",
+            "ok mode=Some(Present) slides=Some(All) pen=false extensions=1",
+        ),
+        ("PCP", "Invalid: invalid show mode order"),
+        ("PCS", "Invalid: invalid show selection order"),
+        ("PCC", "Invalid: invalid penClr order"),
+        (
+            "PCE",
+            "ok mode=Some(Present) slides=None pen=true extensions=1",
+        ),
+        ("PEP", "Invalid: invalid show mode order"),
+        ("PES", "Invalid: invalid show selection order"),
+        ("PEC", "Invalid: invalid penClr order"),
+        ("PEE", "Invalid: duplicate show extLst"),
+        ("SPP", "Invalid: invalid show mode order"),
+        ("SPS", "Invalid: invalid show mode order"),
+        ("SPC", "Invalid: invalid show mode order"),
+        ("SPE", "Invalid: invalid show mode order"),
+        ("SSP", "Invalid: invalid show selection order"),
+        ("SSS", "Invalid: invalid show selection order"),
+        ("SSC", "Invalid: invalid show selection order"),
+        ("SSE", "Invalid: invalid show selection order"),
+        ("SCP", "Invalid: invalid show mode order"),
+        ("SCS", "Invalid: invalid show selection order"),
+        ("SCC", "Invalid: invalid penClr order"),
+        ("SCE", "ok mode=None slides=Some(All) pen=true extensions=1"),
+        ("SEP", "Invalid: invalid show mode order"),
+        ("SES", "Invalid: invalid show selection order"),
+        ("SEC", "Invalid: invalid penClr order"),
+        ("SEE", "Invalid: duplicate show extLst"),
+        ("CPP", "Invalid: invalid show mode order"),
+        ("CPS", "Invalid: invalid show mode order"),
+        ("CPC", "Invalid: invalid show mode order"),
+        ("CPE", "Invalid: invalid show mode order"),
+        ("CSP", "Invalid: invalid show selection order"),
+        ("CSS", "Invalid: invalid show selection order"),
+        ("CSC", "Invalid: invalid show selection order"),
+        ("CSE", "Invalid: invalid show selection order"),
+        ("CCP", "Invalid: invalid penClr order"),
+        ("CCS", "Invalid: invalid penClr order"),
+        ("CCC", "Invalid: invalid penClr order"),
+        ("CCE", "Invalid: invalid penClr order"),
+        ("CEP", "Invalid: invalid show mode order"),
+        ("CES", "Invalid: invalid show selection order"),
+        ("CEC", "Invalid: invalid penClr order"),
+        ("CEE", "Invalid: duplicate show extLst"),
+        ("EPP", "Invalid: invalid show mode order"),
+        ("EPS", "Invalid: invalid show mode order"),
+        ("EPC", "Invalid: invalid show mode order"),
+        ("EPE", "Invalid: invalid show mode order"),
+        ("ESP", "Invalid: invalid show selection order"),
+        ("ESS", "Invalid: invalid show selection order"),
+        ("ESC", "Invalid: invalid show selection order"),
+        ("ESE", "Invalid: invalid show selection order"),
+        ("ECP", "Invalid: invalid penClr order"),
+        ("ECS", "Invalid: invalid penClr order"),
+        ("ECC", "Invalid: invalid penClr order"),
+        ("ECE", "Invalid: invalid penClr order"),
+        ("EEP", "Invalid: duplicate show extLst"),
+        ("EES", "Invalid: duplicate show extLst"),
+        ("EEC", "Invalid: duplicate show extLst"),
+        ("EEE", "Invalid: duplicate show extLst"),
+        (
+            "PSCE",
+            "ok mode=Some(Present) slides=Some(All) pen=true extensions=1",
+        ),
+        (
+            "B",
+            "ok mode=Some(Browse { show_scrollbar: None }) slides=None pen=false extensions=0",
+        ),
+        (
+            "R",
+            "ok mode=None slides=Some(Range { start: 1, end: 2 }) pen=false extensions=0",
+        ),
+        ("PB", "Invalid: invalid show mode order"),
+        ("BP", "Invalid: invalid show mode order"),
+        ("BB", "Invalid: invalid show mode order"),
+        ("SR", "Invalid: invalid show selection order"),
+        ("RS", "Invalid: invalid show selection order"),
+        (
+            "BRCE",
+            "ok mode=Some(Browse { show_scrollbar: None }) slides=Some(Range { start: 1, end: 2 }) pen=true extensions=1",
+        ),
+        ("X", "Invalid: unexpected showPr child"),
+        ("PX", "Invalid: unexpected showPr child"),
+        ("XP", "Invalid: unexpected showPr child"),
+        ("EX", "Invalid: unexpected showPr child"),
+    ];
+
+    /// Every child sequence of at most `longest` children drawn from `letters`.
+    fn sequences(letters: &str, longest: usize) -> Vec<String> {
+        let mut all = vec![String::new()];
+        let mut previous = all.clone();
+        for _ in 0..longest {
+            let mut next = Vec::new();
+            for prefix in &previous {
+                for letter in letters.chars() {
+                    next.push(format!("{prefix}{letter}"));
+                }
+            }
+            all.extend(next.iter().cloned());
+            previous = next;
+        }
+        all
+    }
+
+    /// Checks every row and requires the table to hold the empty parent, each
+    /// child alone and every ordered pair (duplicates included) of `letters`.
+    fn assert_matrix(rows: &[(&str, &str)], letters: &str, outcome: impl Fn(&str) -> String) {
+        for sequence in sequences(letters, 2) {
+            assert!(
+                rows.iter().any(|(key, _)| *key == sequence),
+                "missing row {sequence:?}"
+            );
+        }
+        let differing: Vec<String> = rows
+            .iter()
+            .filter_map(|(key, expected)| {
+                let actual = outcome(key);
+                (actual != *expected).then(|| format!("({key:?}, {actual:?}),"))
+            })
+            .collect();
+        assert!(
+            differing.is_empty(),
+            "rows differ from the table:\n{}",
+            differing.join("\n")
+        );
+    }
+
+    fn show_outcome(key: &str) -> String {
+        let mut xml = format!(r#"<p:presentationPr xmlns:p="{P_NS}" xmlns:a="{A_NS}"><p:showPr>"#);
+        for letter in key.chars() {
+            xml.push_str(match letter {
+                'P' => "<p:present/>",
+                'B' => "<p:browse/>",
+                'S' => "<p:sldAll/>",
+                'R' => r#"<p:sldRg st="1" end="2"/>"#,
+                'C' => r#"<p:penClr><a:srgbClr val="FF0000"/></p:penClr>"#,
+                'E' => {
+                    r#"<p:extLst><p:ext uri="urn:example:show"><v:x xmlns:v="urn:example"/></p:ext></p:extLst>"#
+                },
+                'X' => "<p:other/>",
+                other => panic!("unknown key letter {other:?}"),
+            });
+        }
+        xml.push_str("</p:showPr></p:presentationPr>");
+        match Properties::parse(xml.as_bytes(), Limits::default()) {
+            Ok(value) => {
+                let show = value.show.unwrap();
+                format!(
+                    "ok mode={:?} slides={:?} pen={} extensions={}",
+                    show.mode,
+                    show.slides,
+                    show.pen_color.is_some(),
+                    show.extensions.len()
+                )
+            },
+            Err(Error::Invalid(message)) => format!("Invalid: {message}"),
+            Err(other) => format!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn show_children_keep_their_order_and_duplicate_rules() {
+        assert_matrix(SHOW_CHILD_ORDER, "PSCE", show_outcome);
+    }
 }

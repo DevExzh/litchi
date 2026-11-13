@@ -194,3 +194,100 @@ fn package_facade_edits_math_transactionally() {
     assert_eq!(reopened.remove_math_properties().unwrap(), Some(value));
     assert_eq!(reopened.math_properties().unwrap(), None);
 }
+
+/// Child-order table for `a14:m`. Key letters: `[`…`]` is `m:mathPr` with
+/// content, `/` an empty-element `m:mathPr`, `B` `m:brkBin`, `S`
+/// `m:brkBinSub`, `b` and `s` the same two written with a separate closing
+/// tag, `X` an unknown OMML child.
+const MATH_CHILD_ORDER: &[(&str, &str)] = &[
+    ("", "ok brkBin=None brkBinSub=None"),
+    ("/", "ok brkBin=None brkBinSub=None"),
+    ("[]", "ok brkBin=None brkBinSub=None"),
+    ("//", "Invalid: a14:m contains duplicate mathPr"),
+    ("[][]", "Invalid: a14:m contains duplicate mathPr"),
+    ("/[]", "Invalid: a14:m contains duplicate mathPr"),
+    ("[]/", "Invalid: a14:m contains duplicate mathPr"),
+    ("[B]", "ok brkBin=Some(Before) brkBinSub=None"),
+    ("[S]", "ok brkBin=None brkBinSub=Some(MinusMinus)"),
+    ("[BS]", "ok brkBin=Some(Before) brkBinSub=Some(MinusMinus)"),
+    ("[SB]", "Invalid: invalid brkBin order or duplicate"),
+    ("[BB]", "Invalid: invalid brkBin order or duplicate"),
+    ("[SS]", "Invalid: invalid brkBinSub order or duplicate"),
+    ("[b]", "ok brkBin=Some(Before) brkBinSub=None"),
+    ("[s]", "ok brkBin=None brkBinSub=Some(MinusMinus)"),
+    ("[bs]", "ok brkBin=Some(Before) brkBinSub=Some(MinusMinus)"),
+    ("[sb]", "Invalid: invalid brkBin order or duplicate"),
+    ("[bb]", "Invalid: invalid brkBin order or duplicate"),
+    ("[ss]", "Invalid: invalid brkBinSub order or duplicate"),
+    ("[Bs]", "ok brkBin=Some(Before) brkBinSub=Some(MinusMinus)"),
+    ("[sB]", "Invalid: invalid brkBin order or duplicate"),
+    ("[X]", "Invalid: mathPr contains an unsupported child"),
+    ("[BX]", "Invalid: mathPr contains an unsupported child"),
+    ("[XB]", "Invalid: mathPr contains an unsupported child"),
+    ("[SX]", "Invalid: mathPr contains an unsupported child"),
+    ("[BSX]", "Invalid: mathPr contains an unsupported child"),
+    ("[BSB]", "Invalid: invalid brkBin order or duplicate"),
+    ("[BSS]", "Invalid: invalid brkBinSub order or duplicate"),
+    ("[SBS]", "Invalid: invalid brkBin order or duplicate"),
+    ("[B][S]", "Invalid: a14:m contains duplicate mathPr"),
+    ("[B]/", "Invalid: a14:m contains duplicate mathPr"),
+    ("[BS][]", "Invalid: a14:m contains duplicate mathPr"),
+    ("B", "Invalid: a14:m must contain m:mathPr"),
+    ("S", "Invalid: a14:m must contain m:mathPr"),
+    ("X", "Invalid: a14:m must contain m:mathPr"),
+    ("[]B", "Invalid: a14:m must contain m:mathPr"),
+    ("[]X", "Invalid: a14:m must contain m:mathPr"),
+];
+
+fn math_outcome(key: &str) -> String {
+    let mut xml = format!(r#"<a14:m xmlns:a14="{A14_NS}" xmlns:m="{OMML_NS}">"#);
+    for letter in key.chars() {
+        xml.push_str(match letter {
+            '[' => "<m:mathPr>",
+            ']' => "</m:mathPr>",
+            '/' => "<m:mathPr/>",
+            'B' => r#"<m:brkBin m:val="before"/>"#,
+            'b' => r#"<m:brkBin m:val="before"></m:brkBin>"#,
+            'S' => r#"<m:brkBinSub m:val="--"/>"#,
+            's' => r#"<m:brkBinSub m:val="--"></m:brkBinSub>"#,
+            'X' => "<m:other/>",
+            other => panic!("unknown key letter {other:?}"),
+        });
+    }
+    xml.push_str("</a14:m>");
+    match super::codec::parse(
+        xml.as_bytes(),
+        crate::presentation_properties::Limits::default(),
+    ) {
+        Ok(value) => format!(
+            "ok brkBin={:?} brkBinSub={:?}",
+            value.binary_break, value.binary_subtraction_break
+        ),
+        Err(crate::Error::Invalid(message)) => format!("Invalid: {message}"),
+        Err(other) => format!("{other:?}"),
+    }
+}
+
+#[test]
+fn math_children_keep_their_order_and_duplicate_rules() {
+    for key in [
+        "[]", "[B]", "[S]", "[BS]", "[SB]", "[BB]", "[SS]", "[X]", "//",
+    ] {
+        assert!(
+            MATH_CHILD_ORDER.iter().any(|(row, _)| *row == key),
+            "missing row {key:?}"
+        );
+    }
+    let differing: Vec<String> = MATH_CHILD_ORDER
+        .iter()
+        .filter_map(|(key, expected)| {
+            let actual = math_outcome(key);
+            (actual != *expected).then(|| format!("({key:?}, {actual:?}),"))
+        })
+        .collect();
+    assert!(
+        differing.is_empty(),
+        "rows differ from the table:\n{}",
+        differing.join("\n")
+    );
+}

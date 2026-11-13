@@ -334,3 +334,431 @@ fn empty(out: &mut Vec<u8>, local: &str) {
     open(out, "p228", local);
     out.extend_from_slice(b"/>");
 }
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    reason = "test assertions panic on failure by design"
+)]
+mod tests {
+    use super::*;
+
+    /// Every child sequence of at most `longest` children drawn from `letters`.
+    fn sequences(letters: &str, longest: usize) -> Vec<String> {
+        let mut all = vec![String::new()];
+        let mut previous = all.clone();
+        for _ in 0..longest {
+            let mut next = Vec::new();
+            for prefix in &previous {
+                for letter in letters.chars() {
+                    next.push(format!("{prefix}{letter}"));
+                }
+            }
+            all.extend(next.iter().cloned());
+            previous = next;
+        }
+        all
+    }
+
+    /// Checks every row and requires the table to hold the empty parent, each
+    /// child alone and every ordered pair (duplicates included) of `letters`.
+    fn assert_matrix(rows: &[(&str, &str)], letters: &str, outcome: impl Fn(&str) -> String) {
+        for sequence in sequences(letters, 2) {
+            assert!(
+                rows.iter().any(|(key, _)| *key == sequence),
+                "missing row {sequence:?}"
+            );
+        }
+        let differing: Vec<String> = rows
+            .iter()
+            .filter_map(|(key, expected)| {
+                let actual = outcome(key);
+                (actual != *expected).then(|| format!("({key:?}, {actual:?}),"))
+            })
+            .collect();
+        assert!(
+            differing.is_empty(),
+            "rows differ from the table:\n{}",
+            differing.join("\n")
+        );
+    }
+
+    const GUID: &str = "{62A8A96D-E5A8-4BFC-B993-A6EAE3907CAD}";
+
+    /// Child-order table for `p228:event`. Key letters: `A` `p228:atrbtn`, `N`
+    /// `p228:anchr`, `T` the `p228:add` action, `L` the `p228:title` action, `U`
+    /// a `p228` element this crate does not know (kept as an unknown action), `E`
+    /// `p:extLst`, `X` a child from an unknown namespace.
+    const EVENT_CHILD_ORDER: &[(&str, &str)] = &[
+        ("", "Invalid: task event requires atrbtn"),
+        ("A", "ok anchor=false action=none extension=false"),
+        ("N", "Invalid: task event requires atrbtn"),
+        ("T", "Invalid: task event requires atrbtn"),
+        ("E", "Invalid: task event requires atrbtn"),
+        (
+            "AA",
+            "Invalid: task event atrbtn is duplicated or out of order",
+        ),
+        ("AN", "ok anchor=true action=none extension=false"),
+        ("AT", "ok anchor=false action=add extension=false"),
+        ("AE", "ok anchor=false action=none extension=true"),
+        (
+            "NA",
+            "Invalid: task event atrbtn is duplicated or out of order",
+        ),
+        (
+            "NN",
+            "Invalid: task event anchr is duplicated or out of order",
+        ),
+        ("NT", "Invalid: task event requires atrbtn"),
+        ("NE", "Invalid: task event requires atrbtn"),
+        (
+            "TA",
+            "Invalid: task event atrbtn is duplicated or out of order",
+        ),
+        (
+            "TN",
+            "Invalid: task event anchr is duplicated or out of order",
+        ),
+        (
+            "TT",
+            "Invalid: task event action is duplicated or out of order",
+        ),
+        ("TE", "Invalid: task event requires atrbtn"),
+        (
+            "EA",
+            "Invalid: task event atrbtn is duplicated or out of order",
+        ),
+        (
+            "EN",
+            "Invalid: task event anchr is duplicated or out of order",
+        ),
+        (
+            "ET",
+            "Invalid: task event action is duplicated or out of order",
+        ),
+        (
+            "EE",
+            "Invalid: task event extLst is duplicated or out of order",
+        ),
+        (
+            "AAA",
+            "Invalid: task event atrbtn is duplicated or out of order",
+        ),
+        (
+            "AAN",
+            "Invalid: task event atrbtn is duplicated or out of order",
+        ),
+        (
+            "AAT",
+            "Invalid: task event atrbtn is duplicated or out of order",
+        ),
+        (
+            "AAE",
+            "Invalid: task event atrbtn is duplicated or out of order",
+        ),
+        (
+            "ANA",
+            "Invalid: task event atrbtn is duplicated or out of order",
+        ),
+        (
+            "ANN",
+            "Invalid: task event anchr is duplicated or out of order",
+        ),
+        ("ANT", "ok anchor=true action=add extension=false"),
+        ("ANE", "ok anchor=true action=none extension=true"),
+        (
+            "ATA",
+            "Invalid: task event atrbtn is duplicated or out of order",
+        ),
+        (
+            "ATN",
+            "Invalid: task event anchr is duplicated or out of order",
+        ),
+        (
+            "ATT",
+            "Invalid: task event action is duplicated or out of order",
+        ),
+        ("ATE", "ok anchor=false action=add extension=true"),
+        (
+            "AEA",
+            "Invalid: task event atrbtn is duplicated or out of order",
+        ),
+        (
+            "AEN",
+            "Invalid: task event anchr is duplicated or out of order",
+        ),
+        (
+            "AET",
+            "Invalid: task event action is duplicated or out of order",
+        ),
+        (
+            "AEE",
+            "Invalid: task event extLst is duplicated or out of order",
+        ),
+        (
+            "NAA",
+            "Invalid: task event atrbtn is duplicated or out of order",
+        ),
+        (
+            "NAN",
+            "Invalid: task event atrbtn is duplicated or out of order",
+        ),
+        (
+            "NAT",
+            "Invalid: task event atrbtn is duplicated or out of order",
+        ),
+        (
+            "NAE",
+            "Invalid: task event atrbtn is duplicated or out of order",
+        ),
+        (
+            "NNA",
+            "Invalid: task event anchr is duplicated or out of order",
+        ),
+        (
+            "NNN",
+            "Invalid: task event anchr is duplicated or out of order",
+        ),
+        (
+            "NNT",
+            "Invalid: task event anchr is duplicated or out of order",
+        ),
+        (
+            "NNE",
+            "Invalid: task event anchr is duplicated or out of order",
+        ),
+        (
+            "NTA",
+            "Invalid: task event atrbtn is duplicated or out of order",
+        ),
+        (
+            "NTN",
+            "Invalid: task event anchr is duplicated or out of order",
+        ),
+        (
+            "NTT",
+            "Invalid: task event action is duplicated or out of order",
+        ),
+        ("NTE", "Invalid: task event requires atrbtn"),
+        (
+            "NEA",
+            "Invalid: task event atrbtn is duplicated or out of order",
+        ),
+        (
+            "NEN",
+            "Invalid: task event anchr is duplicated or out of order",
+        ),
+        (
+            "NET",
+            "Invalid: task event action is duplicated or out of order",
+        ),
+        (
+            "NEE",
+            "Invalid: task event extLst is duplicated or out of order",
+        ),
+        (
+            "TAA",
+            "Invalid: task event atrbtn is duplicated or out of order",
+        ),
+        (
+            "TAN",
+            "Invalid: task event atrbtn is duplicated or out of order",
+        ),
+        (
+            "TAT",
+            "Invalid: task event atrbtn is duplicated or out of order",
+        ),
+        (
+            "TAE",
+            "Invalid: task event atrbtn is duplicated or out of order",
+        ),
+        (
+            "TNA",
+            "Invalid: task event anchr is duplicated or out of order",
+        ),
+        (
+            "TNN",
+            "Invalid: task event anchr is duplicated or out of order",
+        ),
+        (
+            "TNT",
+            "Invalid: task event anchr is duplicated or out of order",
+        ),
+        (
+            "TNE",
+            "Invalid: task event anchr is duplicated or out of order",
+        ),
+        (
+            "TTA",
+            "Invalid: task event action is duplicated or out of order",
+        ),
+        (
+            "TTN",
+            "Invalid: task event action is duplicated or out of order",
+        ),
+        (
+            "TTT",
+            "Invalid: task event action is duplicated or out of order",
+        ),
+        (
+            "TTE",
+            "Invalid: task event action is duplicated or out of order",
+        ),
+        (
+            "TEA",
+            "Invalid: task event atrbtn is duplicated or out of order",
+        ),
+        (
+            "TEN",
+            "Invalid: task event anchr is duplicated or out of order",
+        ),
+        (
+            "TET",
+            "Invalid: task event action is duplicated or out of order",
+        ),
+        (
+            "TEE",
+            "Invalid: task event extLst is duplicated or out of order",
+        ),
+        (
+            "EAA",
+            "Invalid: task event atrbtn is duplicated or out of order",
+        ),
+        (
+            "EAN",
+            "Invalid: task event atrbtn is duplicated or out of order",
+        ),
+        (
+            "EAT",
+            "Invalid: task event atrbtn is duplicated or out of order",
+        ),
+        (
+            "EAE",
+            "Invalid: task event atrbtn is duplicated or out of order",
+        ),
+        (
+            "ENA",
+            "Invalid: task event anchr is duplicated or out of order",
+        ),
+        (
+            "ENN",
+            "Invalid: task event anchr is duplicated or out of order",
+        ),
+        (
+            "ENT",
+            "Invalid: task event anchr is duplicated or out of order",
+        ),
+        (
+            "ENE",
+            "Invalid: task event anchr is duplicated or out of order",
+        ),
+        (
+            "ETA",
+            "Invalid: task event action is duplicated or out of order",
+        ),
+        (
+            "ETN",
+            "Invalid: task event action is duplicated or out of order",
+        ),
+        (
+            "ETT",
+            "Invalid: task event action is duplicated or out of order",
+        ),
+        (
+            "ETE",
+            "Invalid: task event action is duplicated or out of order",
+        ),
+        (
+            "EEA",
+            "Invalid: task event extLst is duplicated or out of order",
+        ),
+        (
+            "EEN",
+            "Invalid: task event extLst is duplicated or out of order",
+        ),
+        (
+            "EET",
+            "Invalid: task event extLst is duplicated or out of order",
+        ),
+        (
+            "EEE",
+            "Invalid: task event extLst is duplicated or out of order",
+        ),
+        ("ANTE", "ok anchor=true action=add extension=true"),
+        ("L", "Invalid: task event requires atrbtn"),
+        ("U", "Invalid: task event requires atrbtn"),
+        ("AL", "ok anchor=false action=title extension=false"),
+        ("AU", "ok anchor=false action=unknown extension=false"),
+        (
+            "ATL",
+            "Invalid: task event action is duplicated or out of order",
+        ),
+        (
+            "ALT",
+            "Invalid: task event action is duplicated or out of order",
+        ),
+        (
+            "AUT",
+            "Invalid: task event action is duplicated or out of order",
+        ),
+        (
+            "ATU",
+            "Invalid: task event action is duplicated or out of order",
+        ),
+        ("AUE", "ok anchor=false action=unknown extension=true"),
+        (
+            "UA",
+            "Invalid: task event atrbtn is duplicated or out of order",
+        ),
+        ("X", "Invalid: unexpected task history event child"),
+        ("AX", "Invalid: unexpected task history event child"),
+        ("XA", "Invalid: unexpected task history event child"),
+        ("AEX", "Invalid: unexpected task history event child"),
+    ];
+
+    fn event_outcome(key: &str) -> String {
+        let mut children = String::new();
+        for letter in key.chars() {
+            children.push_str(&match letter {
+                'A' => format!(r#"<p228:atrbtn authorId="{GUID}"/>"#),
+                'N' => format!(r#"<p228:anchr><p228:comment id="{GUID}"/></p228:anchr>"#),
+                'T' => "<p228:add/>".to_owned(),
+                'L' => r#"<p228:title val="Review"/>"#.to_owned(),
+                'U' => "<p228:future/>".to_owned(),
+                'E' => "<p:extLst/>".to_owned(),
+                'X' => r#"<q:other xmlns:q="urn:example:other"/>"#.to_owned(),
+                other => panic!("unknown key letter {other:?}"),
+            });
+        }
+        let xml = format!(
+            r#"<p228:taskDetails xmlns:p228="{P228}" xmlns:p="{P}"><p228:history><p228:event time="2024-01-02T03:04:05Z" id="{GUID}">{children}</p228:event></p228:history></p228:taskDetails>"#
+        );
+        match parse_task_details(xml.as_bytes()) {
+            Ok(value) => {
+                let event = value.history.events.first().unwrap();
+                let action = match &event.action {
+                    None => "none",
+                    Some(Action::Add) => "add",
+                    Some(Action::Title(_)) => "title",
+                    Some(Action::Unknown(_)) => "unknown",
+                    Some(_) => "other",
+                };
+                format!(
+                    "ok anchor={} action={action} extension={}",
+                    event.anchor.is_some(),
+                    event.extension_xml.is_some()
+                )
+            },
+            Err(Error::Invalid(message)) => format!("Invalid: {message}"),
+            Err(other) => format!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn event_children_keep_their_order_and_duplicate_rules() {
+        assert_matrix(EVENT_CHILD_ORDER, "ANTE", event_outcome);
+    }
+}

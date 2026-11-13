@@ -398,3 +398,553 @@ fn locate_commands(xml: &[u8]) -> Result<Vec<(usize, usize, Changes)>> {
     }
     Ok(output)
 }
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    reason = "test assertions panic on failure by design"
+)]
+mod tests {
+    use super::*;
+
+    /// Every child sequence of at most `longest` children drawn from `letters`.
+    fn sequences(letters: &str, longest: usize) -> Vec<String> {
+        let mut all = vec![String::new()];
+        let mut previous = all.clone();
+        for _ in 0..longest {
+            let mut next = Vec::new();
+            for prefix in &previous {
+                for letter in letters.chars() {
+                    next.push(format!("{prefix}{letter}"));
+                }
+            }
+            all.extend(next.iter().cloned());
+            previous = next;
+        }
+        all
+    }
+
+    /// Checks every row and requires the table to hold the empty parent, each
+    /// child alone and every ordered pair (duplicates included) of `letters`.
+    fn assert_matrix(rows: &[(&str, &str)], letters: &str, outcome: impl Fn(&str) -> String) {
+        for sequence in sequences(letters, 2) {
+            assert!(
+                rows.iter().any(|(key, _)| *key == sequence),
+                "missing row {sequence:?}"
+            );
+        }
+        let differing: Vec<String> = rows
+            .iter()
+            .filter_map(|(key, expected)| {
+                let actual = outcome(key);
+                (actual != *expected).then(|| format!("({key:?}, {actual:?}),"))
+            })
+            .collect();
+        assert!(
+            differing.is_empty(),
+            "rows differ from the table:\n{}",
+            differing.join("\n")
+        );
+    }
+
+    const GUID: &str = "{62A8A96D-E5A8-4BFC-B993-A6EAE3907CAD}";
+
+    fn outcome_text<T>(result: Result<T>, describe: impl Fn(&T) -> String) -> String {
+        match result {
+            Ok(value) => describe(&value),
+            Err(Error::Invalid(message)) => format!("Invalid: {message}"),
+            Err(other) => format!("{other:?}"),
+        }
+    }
+
+    fn comment_monikers() -> String {
+        format!(r#"<pc2:cmMkLst xmlns:pc2="{PC2}"><pc2:cmMk id="{GUID}"/></pc2:cmMkLst>"#)
+    }
+
+    fn reply_monikers() -> String {
+        format!(
+            r#"<pc2:cmRplyMkLst xmlns:pc2="{PC2}"><pc2:cmMk id="{GUID}"/><pc2:cmRplyMk id="{GUID}"/></pc2:cmRplyMkLst>"#
+        )
+    }
+
+    fn reply_change(children: &str) -> String {
+        format!(r#"<pc226:cmRplyChg xmlns:pc226="{PC226}" chg="mod">{children}</pc226:cmRplyChg>"#)
+    }
+
+    fn comment_change(children: &str) -> Result<Changes> {
+        parse_comment_changes(
+            format!(r#"<pc226:cmChg xmlns:pc226="{PC226}" chg="mod">{children}</pc226:cmChg>"#)
+                .as_bytes(),
+        )
+    }
+
+    /// Child-order table for `pc226:cmChg`. Key letters: `C` `ac:chgData`, `M`
+    /// `pc2:cmMkLst`, `R` `pc226:cmRplyChg`, `E` `p:extLst`, `X` an unknown
+    /// child.
+    const COMMENT_CHANGE_CHILD_ORDER: &[(&str, &str)] = &[
+        ("", "Invalid: comment change requires cmMkLst"),
+        ("C", "Invalid: comment change requires cmMkLst"),
+        ("M", "ok metadata=false replies=0 extension=false"),
+        ("R", "Invalid: comment change requires cmMkLst"),
+        ("E", "Invalid: comment change requires cmMkLst"),
+        (
+            "CC",
+            "Invalid: comment change chgData is duplicated or out of order",
+        ),
+        ("CM", "ok metadata=true replies=0 extension=false"),
+        ("CR", "Invalid: comment change requires cmMkLst"),
+        ("CE", "Invalid: comment change requires cmMkLst"),
+        (
+            "MC",
+            "Invalid: comment change chgData is duplicated or out of order",
+        ),
+        (
+            "MM",
+            "Invalid: comment change cmMkLst is duplicated or out of order",
+        ),
+        ("MR", "ok metadata=false replies=1 extension=false"),
+        ("ME", "ok metadata=false replies=0 extension=true"),
+        (
+            "RC",
+            "Invalid: comment change chgData is duplicated or out of order",
+        ),
+        (
+            "RM",
+            "Invalid: comment change cmMkLst is duplicated or out of order",
+        ),
+        ("RR", "Invalid: comment change requires cmMkLst"),
+        ("RE", "Invalid: comment change requires cmMkLst"),
+        (
+            "EC",
+            "Invalid: comment change chgData is duplicated or out of order",
+        ),
+        (
+            "EM",
+            "Invalid: comment change cmMkLst is duplicated or out of order",
+        ),
+        ("ER", "Invalid: comment reply change is out of order"),
+        (
+            "EE",
+            "Invalid: comment change extLst is duplicated or out of order",
+        ),
+        (
+            "CCC",
+            "Invalid: comment change chgData is duplicated or out of order",
+        ),
+        (
+            "CCM",
+            "Invalid: comment change chgData is duplicated or out of order",
+        ),
+        (
+            "CCR",
+            "Invalid: comment change chgData is duplicated or out of order",
+        ),
+        (
+            "CCE",
+            "Invalid: comment change chgData is duplicated or out of order",
+        ),
+        (
+            "CMC",
+            "Invalid: comment change chgData is duplicated or out of order",
+        ),
+        (
+            "CMM",
+            "Invalid: comment change cmMkLst is duplicated or out of order",
+        ),
+        ("CMR", "ok metadata=true replies=1 extension=false"),
+        ("CME", "ok metadata=true replies=0 extension=true"),
+        (
+            "CRC",
+            "Invalid: comment change chgData is duplicated or out of order",
+        ),
+        (
+            "CRM",
+            "Invalid: comment change cmMkLst is duplicated or out of order",
+        ),
+        ("CRR", "Invalid: comment change requires cmMkLst"),
+        ("CRE", "Invalid: comment change requires cmMkLst"),
+        (
+            "CEC",
+            "Invalid: comment change chgData is duplicated or out of order",
+        ),
+        (
+            "CEM",
+            "Invalid: comment change cmMkLst is duplicated or out of order",
+        ),
+        ("CER", "Invalid: comment reply change is out of order"),
+        (
+            "CEE",
+            "Invalid: comment change extLst is duplicated or out of order",
+        ),
+        (
+            "MCC",
+            "Invalid: comment change chgData is duplicated or out of order",
+        ),
+        (
+            "MCM",
+            "Invalid: comment change chgData is duplicated or out of order",
+        ),
+        (
+            "MCR",
+            "Invalid: comment change chgData is duplicated or out of order",
+        ),
+        (
+            "MCE",
+            "Invalid: comment change chgData is duplicated or out of order",
+        ),
+        (
+            "MMC",
+            "Invalid: comment change cmMkLst is duplicated or out of order",
+        ),
+        (
+            "MMM",
+            "Invalid: comment change cmMkLst is duplicated or out of order",
+        ),
+        (
+            "MMR",
+            "Invalid: comment change cmMkLst is duplicated or out of order",
+        ),
+        (
+            "MME",
+            "Invalid: comment change cmMkLst is duplicated or out of order",
+        ),
+        (
+            "MRC",
+            "Invalid: comment change chgData is duplicated or out of order",
+        ),
+        (
+            "MRM",
+            "Invalid: comment change cmMkLst is duplicated or out of order",
+        ),
+        ("MRR", "ok metadata=false replies=2 extension=false"),
+        ("MRE", "ok metadata=false replies=1 extension=true"),
+        (
+            "MEC",
+            "Invalid: comment change chgData is duplicated or out of order",
+        ),
+        (
+            "MEM",
+            "Invalid: comment change cmMkLst is duplicated or out of order",
+        ),
+        ("MER", "Invalid: comment reply change is out of order"),
+        (
+            "MEE",
+            "Invalid: comment change extLst is duplicated or out of order",
+        ),
+        (
+            "RCC",
+            "Invalid: comment change chgData is duplicated or out of order",
+        ),
+        (
+            "RCM",
+            "Invalid: comment change chgData is duplicated or out of order",
+        ),
+        (
+            "RCR",
+            "Invalid: comment change chgData is duplicated or out of order",
+        ),
+        (
+            "RCE",
+            "Invalid: comment change chgData is duplicated or out of order",
+        ),
+        (
+            "RMC",
+            "Invalid: comment change cmMkLst is duplicated or out of order",
+        ),
+        (
+            "RMM",
+            "Invalid: comment change cmMkLst is duplicated or out of order",
+        ),
+        (
+            "RMR",
+            "Invalid: comment change cmMkLst is duplicated or out of order",
+        ),
+        (
+            "RME",
+            "Invalid: comment change cmMkLst is duplicated or out of order",
+        ),
+        (
+            "RRC",
+            "Invalid: comment change chgData is duplicated or out of order",
+        ),
+        (
+            "RRM",
+            "Invalid: comment change cmMkLst is duplicated or out of order",
+        ),
+        ("RRR", "Invalid: comment change requires cmMkLst"),
+        ("RRE", "Invalid: comment change requires cmMkLst"),
+        (
+            "REC",
+            "Invalid: comment change chgData is duplicated or out of order",
+        ),
+        (
+            "REM",
+            "Invalid: comment change cmMkLst is duplicated or out of order",
+        ),
+        ("RER", "Invalid: comment reply change is out of order"),
+        (
+            "REE",
+            "Invalid: comment change extLst is duplicated or out of order",
+        ),
+        (
+            "ECC",
+            "Invalid: comment change chgData is duplicated or out of order",
+        ),
+        (
+            "ECM",
+            "Invalid: comment change chgData is duplicated or out of order",
+        ),
+        (
+            "ECR",
+            "Invalid: comment change chgData is duplicated or out of order",
+        ),
+        (
+            "ECE",
+            "Invalid: comment change chgData is duplicated or out of order",
+        ),
+        (
+            "EMC",
+            "Invalid: comment change cmMkLst is duplicated or out of order",
+        ),
+        (
+            "EMM",
+            "Invalid: comment change cmMkLst is duplicated or out of order",
+        ),
+        (
+            "EMR",
+            "Invalid: comment change cmMkLst is duplicated or out of order",
+        ),
+        (
+            "EME",
+            "Invalid: comment change cmMkLst is duplicated or out of order",
+        ),
+        ("ERC", "Invalid: comment reply change is out of order"),
+        ("ERM", "Invalid: comment reply change is out of order"),
+        ("ERR", "Invalid: comment reply change is out of order"),
+        ("ERE", "Invalid: comment reply change is out of order"),
+        (
+            "EEC",
+            "Invalid: comment change extLst is duplicated or out of order",
+        ),
+        (
+            "EEM",
+            "Invalid: comment change extLst is duplicated or out of order",
+        ),
+        (
+            "EER",
+            "Invalid: comment change extLst is duplicated or out of order",
+        ),
+        (
+            "EEE",
+            "Invalid: comment change extLst is duplicated or out of order",
+        ),
+        ("CMRE", "ok metadata=true replies=1 extension=true"),
+        ("CMRRE", "ok metadata=true replies=2 extension=true"),
+        ("MRRRR", "ok metadata=false replies=4 extension=false"),
+        ("X", "Invalid: unexpected comment change child"),
+        ("MX", "Invalid: unexpected comment change child"),
+        ("XM", "Invalid: unexpected comment change child"),
+        ("MEX", "Invalid: unexpected comment change child"),
+    ];
+
+    fn comment_change_outcome(key: &str) -> String {
+        let mut children = String::new();
+        for letter in key.chars() {
+            children.push_str(&match letter {
+                'C' => format!(r#"<ac:chgData xmlns:ac="{AC}" name="Ada"/>"#),
+                'M' => comment_monikers(),
+                'R' => reply_change(&reply_monikers()),
+                'E' => format!(r#"<p:extLst xmlns:p="{P}"/>"#),
+                'X' => r#"<q:other xmlns:q="urn:example:other"/>"#.to_owned(),
+                other => panic!("unknown key letter {other:?}"),
+            });
+        }
+        outcome_text(comment_change(&children), |value| {
+            format!(
+                "ok metadata={} replies={} extension={}",
+                value.metadata.is_some(),
+                value.reply_changes.len(),
+                value.extension_xml.is_some()
+            )
+        })
+    }
+
+    #[test]
+    fn comment_change_children_keep_their_order_and_duplicate_rules() {
+        assert_matrix(COMMENT_CHANGE_CHILD_ORDER, "CMRE", comment_change_outcome);
+    }
+
+    /// Child-order table for `pc226:cmRplyChg`. Key letters: `C` `ac:chgData`,
+    /// `K` `pc2:cmRplyMkLst`, `E` `p:extLst`, `X` an unknown child.
+    const REPLY_CHANGE_CHILD_ORDER: &[(&str, &str)] = &[
+        ("", "Invalid: reply change requires cmRplyMkLst"),
+        ("C", "Invalid: reply change requires cmRplyMkLst"),
+        ("K", "ok metadata=false extension=false"),
+        ("E", "Invalid: reply change requires cmRplyMkLst"),
+        (
+            "CC",
+            "Invalid: reply change chgData is duplicated or out of order",
+        ),
+        ("CK", "ok metadata=true extension=false"),
+        ("CE", "Invalid: reply change requires cmRplyMkLst"),
+        (
+            "KC",
+            "Invalid: reply change chgData is duplicated or out of order",
+        ),
+        (
+            "KK",
+            "Invalid: reply change moniker list is duplicated or out of order",
+        ),
+        ("KE", "ok metadata=false extension=true"),
+        (
+            "EC",
+            "Invalid: reply change chgData is duplicated or out of order",
+        ),
+        (
+            "EK",
+            "Invalid: reply change moniker list is duplicated or out of order",
+        ),
+        (
+            "EE",
+            "Invalid: reply change extLst is duplicated or out of order",
+        ),
+        (
+            "CCC",
+            "Invalid: reply change chgData is duplicated or out of order",
+        ),
+        (
+            "CCK",
+            "Invalid: reply change chgData is duplicated or out of order",
+        ),
+        (
+            "CCE",
+            "Invalid: reply change chgData is duplicated or out of order",
+        ),
+        (
+            "CKC",
+            "Invalid: reply change chgData is duplicated or out of order",
+        ),
+        (
+            "CKK",
+            "Invalid: reply change moniker list is duplicated or out of order",
+        ),
+        ("CKE", "ok metadata=true extension=true"),
+        (
+            "CEC",
+            "Invalid: reply change chgData is duplicated or out of order",
+        ),
+        (
+            "CEK",
+            "Invalid: reply change moniker list is duplicated or out of order",
+        ),
+        (
+            "CEE",
+            "Invalid: reply change extLst is duplicated or out of order",
+        ),
+        (
+            "KCC",
+            "Invalid: reply change chgData is duplicated or out of order",
+        ),
+        (
+            "KCK",
+            "Invalid: reply change chgData is duplicated or out of order",
+        ),
+        (
+            "KCE",
+            "Invalid: reply change chgData is duplicated or out of order",
+        ),
+        (
+            "KKC",
+            "Invalid: reply change moniker list is duplicated or out of order",
+        ),
+        (
+            "KKK",
+            "Invalid: reply change moniker list is duplicated or out of order",
+        ),
+        (
+            "KKE",
+            "Invalid: reply change moniker list is duplicated or out of order",
+        ),
+        (
+            "KEC",
+            "Invalid: reply change chgData is duplicated or out of order",
+        ),
+        (
+            "KEK",
+            "Invalid: reply change moniker list is duplicated or out of order",
+        ),
+        (
+            "KEE",
+            "Invalid: reply change extLst is duplicated or out of order",
+        ),
+        (
+            "ECC",
+            "Invalid: reply change chgData is duplicated or out of order",
+        ),
+        (
+            "ECK",
+            "Invalid: reply change chgData is duplicated or out of order",
+        ),
+        (
+            "ECE",
+            "Invalid: reply change chgData is duplicated or out of order",
+        ),
+        (
+            "EKC",
+            "Invalid: reply change moniker list is duplicated or out of order",
+        ),
+        (
+            "EKK",
+            "Invalid: reply change moniker list is duplicated or out of order",
+        ),
+        (
+            "EKE",
+            "Invalid: reply change moniker list is duplicated or out of order",
+        ),
+        (
+            "EEC",
+            "Invalid: reply change extLst is duplicated or out of order",
+        ),
+        (
+            "EEK",
+            "Invalid: reply change extLst is duplicated or out of order",
+        ),
+        (
+            "EEE",
+            "Invalid: reply change extLst is duplicated or out of order",
+        ),
+        ("X", "Invalid: unexpected comment reply change child"),
+        ("KX", "Invalid: unexpected comment reply change child"),
+        ("XK", "Invalid: unexpected comment reply change child"),
+        ("KEX", "Invalid: unexpected comment reply change child"),
+    ];
+
+    fn reply_change_outcome(key: &str) -> String {
+        let mut children = String::new();
+        for letter in key.chars() {
+            children.push_str(&match letter {
+                'C' => format!(r#"<ac:chgData xmlns:ac="{AC}" name="Ada"/>"#),
+                'K' => reply_monikers(),
+                'E' => format!(r#"<p:extLst xmlns:p="{P}"/>"#),
+                'X' => r#"<q:other xmlns:q="urn:example:other"/>"#.to_owned(),
+                other => panic!("unknown key letter {other:?}"),
+            });
+        }
+        let parent = format!("{}{}", comment_monikers(), reply_change(&children));
+        outcome_text(comment_change(&parent), |value| {
+            let reply = value.reply_changes.first().unwrap();
+            format!(
+                "ok metadata={} extension={}",
+                reply.metadata.is_some(),
+                reply.extension_xml.is_some()
+            )
+        })
+    }
+
+    #[test]
+    fn reply_change_children_keep_their_order_and_duplicate_rules() {
+        assert_matrix(REPLY_CHANGE_CHILD_ORDER, "CKE", reply_change_outcome);
+    }
+}
