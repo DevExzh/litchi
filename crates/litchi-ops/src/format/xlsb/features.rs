@@ -1,7 +1,7 @@
-//! XLSB worksheet features as unified nodes (record 0322): legacy notes
+//! XLSB worksheet features as unified nodes: legacy notes
 //! (`comment`), hyperlinks, drawing pictures and shapes, conditional
 //! formats (`cf`), data validations, the auto-filter and manual page
-//! breaks, with the XLSX property vocabulary of record 0320.
+//! breaks, with the XLSX property vocabulary.
 //!
 //! Every feature is a child of its worksheet, addressed by its position
 //! among the worksheet's features of its kind (`/Sheet1/comment[2]`,
@@ -445,7 +445,7 @@ pub(super) fn lookup<'f>(
         _ => return Ok(Lookup::NotApplicable),
     };
     if kind == Kind::Comment {
-        // One note is labelled, not all of them (record 0326); the stable
+        // One note is labelled, not all of them; the stable
         // sort gives `notes`' row-major order.
         let mut records = if sheet.handle.is_grid() {
             sheet.handle.comments()?
@@ -540,7 +540,7 @@ const fn x14_gap(element: &'static str, key: &'static str) -> GapSpec {
     GapSpec {
         subject: Subject::Property { element, key },
         code: Code::UnsupportedProperty,
-        follow_up: "record 0322 follow-up: XLSB Office 2010 conditional-format extensions",
+        follow_up: "XLSB Office 2010 conditional-format extensions",
         reason: "the XLSB editor authors classic conditional-format records; data-bar negative and axis styling live in BrtBeginCFRule14 future records, which are not authored yet",
     }
 }
@@ -555,7 +555,7 @@ static CRITERIA_GAP: GapSpec = GapSpec {
         key: "criteria0",
     },
     code: Code::UnsupportedProperty,
-    follow_up: "record 0322 follow-up: XLSB auto-filter criteria",
+    follow_up: "XLSB auto-filter criteria",
     reason: "XLSB auto-filter column criteria (`criteriaN.op`, BrtBeginFilterColumn) are not authored yet; the filter range is",
 };
 
@@ -563,7 +563,7 @@ const fn effect_gap(element: &'static str, key: &'static str) -> GapSpec {
     GapSpec {
         subject: Subject::Property { element, key },
         code: Code::UnsupportedProperty,
-        follow_up: "record 0322 follow-up: drawing effects, crops and gradient fills",
+        follow_up: "drawing effects, crops and gradient fills",
         reason: "the drawing writer authors solid fills, outlines, text and transforms; effects, crops, transparency and gradient fills are not authored yet",
     }
 }

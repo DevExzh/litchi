@@ -1,10 +1,10 @@
-//! Allocation evidence for the node view (record 0010 §2, decision D1).
+//! Allocation evidence for the node view.
 //!
 //! Serializing a node view must allocate nothing beyond its sink: no
 //! `DocumentNode`, no per-node map, no path `String`. These tests build a
 //! fake document during setup, pre-size the sink, and count, with a
 //! per-thread counting allocator (the pattern of litchi-core's
-//! `tests/selector_allocations.rs`, record 0005), the allocations that
+//! `tests/selector_allocations.rs`), the allocations that
 //! serializing and reading the view perform.
 //!
 //! The fake format is compiled under the `test-support` feature only, so this

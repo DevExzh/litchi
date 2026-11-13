@@ -1,18 +1,17 @@
-//! The seams between the resolver and the format adapters (record 0010
-//! §4.1): the element kinds a format names, the [`Navigate`] trait each
-//! adapter implements, the classified step it is asked for, and what it
+//! The seams between the resolver and the format adapters: the element
+//! kinds a format names, the [`Navigate`] trait each adapter
+//! implements, the classified step it is asked for, and what it
 //! answers.
 //!
-//! # Boundary with the node view (M1 step R1)
+//! # Boundary with the node view
 //!
-//! The resolver is generic over the adapter's node type and places no bound
-//! on it. R1's per-format `Node<'f>` variant is [`Navigate::Node`]; its
-//! canonical `NodePath` is rendered from the node by R1, so the resolver needs
-//! no address trait: its error messages quote the resolved prefix of the
-//! path it was given. R1's `GapSpec` meets [`GapInfo`] by returning its
-//! follow-up, and R1's `FormatSpec` element names are the canonical names of
-//! the family [`Vocabulary`], which is how a format adapter (M1 step R4)
-//! implements [`ElementKind`].
+//! The resolver is generic over the adapter's node type and places no bound on it. The
+//! node view's per-format `Node<'f>` variant is [`Navigate::Node`]; its canonical
+//! `NodePath` is rendered from the node by the node view, so the resolver needs no
+//! address trait: its error messages quote the resolved prefix of the path it was given.
+//! The node view's `GapSpec` meets [`GapInfo`] by returning its follow-up, and its
+//! `FormatSpec` element names are the canonical names of the family [`Vocabulary`], which
+//! is how a format adapter implements [`ElementKind`].
 
 use std::fmt::{self, Write as _};
 use std::marker::PhantomData;
@@ -45,10 +44,10 @@ pub(crate) trait ElementKind: Copy + Eq + fmt::Debug + 'static {
     fn ordinal(self) -> u8;
 }
 
-/// Why an element the format has cannot be read yet: R1's `GapSpec`, seen
+/// Why an element the format has cannot be read yet: the node view's `GapSpec`, seen
 /// from the resolver.
 pub(crate) trait GapInfo: 'static {
-    /// The leaf request or milestone that closes the gap (`L-PPTX-R7`).
+    /// What closes the gap: the missing capability, or `not supported yet`.
     fn follow_up(&self) -> &'static str;
 }
 
@@ -63,7 +62,7 @@ pub(crate) trait Navigate<'f> {
     type Kind: ElementKind;
     /// The format's typed node.
     type Node;
-    /// The format's capability-gap descriptor (R1's `GapSpec`).
+    /// The format's capability-gap descriptor (the node view's `GapSpec`).
     type Gap: GapInfo;
 
     /// Children borrow the retained document, not this adapter value.
@@ -193,7 +192,7 @@ pub(crate) struct Resolved<'s, K> {
     pub(crate) select: Select<'s>,
 }
 
-/// How a step picks one child of its kind (record 0010 §4.3).
+/// How a step picks one child of its kind.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Select<'s> {
     /// No predicate: the only child of a singleton kind (`/body`, `notes`),
@@ -222,7 +221,7 @@ pub(crate) enum Select<'s> {
     /// A bare type token: `placeholder[ctrTitle]`.
     Token(&'s str),
     /// An A1 cell inside the grid; a coordinate with no record still
-    /// resolves (record 0010 §4.7).
+    /// resolves.
     Cell(CellRef),
     /// An A1 range.
     Range(CellRange),

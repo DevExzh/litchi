@@ -1,7 +1,7 @@
-//! Add, set and remove of XLS worksheet features (record 0327).
+//! Add, set and remove of XLS worksheet features.
 //!
 //! Every verb admits its properties through the kind's registry table in
-//! `features` (the XLSX vocabulary of record 0320), builds the leaf value
+//! `features` (the XLSX vocabulary), builds the leaf value
 //! and publishes one `litchi_xls::sheet_features::edit` commit: notes,
 //! hyperlinks, pictures, shapes, conditional formats, validations, the
 //! auto-filter and page breaks are record-level edits of the worksheet

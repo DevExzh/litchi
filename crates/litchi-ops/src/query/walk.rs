@@ -1,5 +1,4 @@
-//! Query execution (record 0010 §5.3): one iterative depth-first walk in
-//! document order.
+//! Query execution: one iterative depth-first walk in document order.
 //!
 //! The walk keeps an explicit stack of frames, one per container it has
 //! entered: the container's node, its kind, its position among the parent's
@@ -55,7 +54,7 @@ pub(crate) enum PlanRef<'q> {
     Owned(Box<Plan<'q>>),
     /// Prepared once by the caller and reused.
     Borrowed(&'q Plan<'q>),
-    /// Shared with this thread's plan cache (record 0291).
+    /// Shared with this thread's plan cache.
     Shared(Arc<Plan<'static>>),
 }
 
@@ -128,8 +127,8 @@ where
     /// `(interest, kinds worth asking the adapter for)`, the two most recent.
     relevant: [(u128, u128); 2],
     /// The latest match, from the step that found it until the iterator or
-    /// the hit takes it (record 0287: the node moves once into this slot and
-    /// once out, instead of through every layer of the step's result).
+    /// the hit takes it (the node moves once into this slot and once out,
+    /// instead of through every layer of the step's result).
     out: Option<N::Node>,
     /// The latest match of a `[last()]` subject, with its ancestors.
     pending: Option<(N::Node, N::Kind, u32)>,
@@ -144,15 +143,15 @@ where
     visited: u64,
     /// The walk is likely to stop early: it has a `limit`, or every
     /// alternative selects its `[N]`th match. Its containers are then read
-    /// through [`Inspect::early_children`] (record 0267).
+    /// through [`Inspect::early_children`].
     early: bool,
     /// The kinds of the query's one alternative when it tests the kind
     /// only and selects no position (`cell`, `p`, `shape`): a visited node
     /// then matches exactly when it is of one of them, and the visit skips
-    /// the per-alternative bookkeeping (record 0291).
+    /// the per-alternative bookkeeping.
     kind_only: Option<u128>,
     /// Tests only: walk on the general step even when the plan has a
-    /// [`FastPlan`] (record 0315).
+    /// [`FastPlan`].
     #[cfg(test)]
     general: bool,
 }
@@ -392,7 +391,7 @@ where
     }
 
     /// The same walk on the general step, without its [`FastPlan`] path: the
-    /// reference the fast path is tested against (record 0315).
+    /// reference the fast path is tested against.
     #[cfg(test)]
     pub(crate) fn general(mut self) -> Self {
         self.state.general = true;
@@ -447,7 +446,7 @@ where
         // nested reads skip their own checks while the scope is active, and a
         // source that changed before or during the step fails this check, so
         // its error wins over whatever the step read, as it would if checked
-        // before as well (record 0262).
+        // before as well.
         let result = {
             let _scope = Scope::enter(self.nav.fence_key());
             self.advance_checked()
@@ -535,7 +534,7 @@ where
     N::Node: Clone,
 {
     /// The next match, wrapped by `wrap` as it leaves the walk's slot, so
-    /// the node moves once into the caller's item (record 0287).
+    /// the node moves once into the caller's item.
     #[inline]
     pub(crate) fn next_map<T>(&mut self, wrap: impl FnOnce(N::Node) -> T) -> Option<Result<T>> {
         match self.advance() {
@@ -552,9 +551,9 @@ where
     N::Node: Clone,
 {
     /// [`Self::next_map`] on the [`FastPlan`] path: [`Self::advance`] with the
-    /// match handed straight to `wrap` instead of through the walk's slot
-    /// (record 0315). The bracket, the limit, the fusing and the error
-    /// handling are [`Self::advance`]'s.
+    /// match handed straight to `wrap` instead of through the walk's slot. The
+    /// bracket, the limit, the fusing and the error handling are
+    /// [`Self::advance`]'s.
     ///
     /// The caller takes this route only for a walk whose
     /// [`Self::is_fast`] holds, decided once when the walk starts
@@ -884,8 +883,8 @@ where
     /// [`Self::next_found`] for a plan with a [`FastPlan`], on the route
     /// [`Walk::next_fast_map`] takes (`Matches`; a [`Hit`] walk keeps the
     /// general step): the same visits, reads and matches without the
-    /// per-alternative bookkeeping, whose outcome the plan fixes (record
-    /// 0315). The match is returned rather than left in the walk's slot.
+    /// per-alternative bookkeeping, whose outcome the plan fixes. The
+    /// match is returned rather than left in the walk's slot.
     #[inline(always)]
     fn next_fast(&mut self, fast: FastPlan) -> Result<Option<Matched<'f, N>>> {
         loop {
@@ -977,8 +976,8 @@ where
         self.next_child_inline()
     }
 
-    /// [`Self::next_child`], inlined into the fast step (record 0315): the
-    /// general step keeps its out-of-line call.
+    /// [`Self::next_child`], inlined into the fast step: the general step
+    /// keeps its out-of-line call.
     #[inline(always)]
     fn next_child_inline(&mut self) -> Option<Result<N::Node>> {
         let nav = self.nav;

@@ -1,17 +1,16 @@
 //! Presentation slide wrappers: [`Slide`], [`SlideData`] and
 //! [`LegacySlideData`].
 //!
-//! Moved from the facade's `presentation::{slide, types}` (record 0003 §2.4).
-//! The [`PresentationView`](crate::PresentationView) family view returns
-//! them.
+//! Moved from the facade's `presentation::{slide, types}`. The
+//! [`PresentationView`](crate::PresentationView) family view returns them.
 //!
-//! **Scheduled for deletion in M1**, with the rest of [`crate::compat`].
+//! **Scheduled for deletion**, with the rest of [`crate::compat`].
 
 use crate::Result;
 
 /// The text and name extracted from a PPTX slide.
 ///
-/// **Scheduled for deletion in M1**, with the rest of [`crate::compat`].
+/// **Scheduled for deletion**, with the rest of [`crate::compat`].
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct SlideData {
@@ -24,7 +23,7 @@ pub struct SlideData {
 /// The text, one-based number and shape count extracted from a legacy PPT
 /// slide.
 ///
-/// **Scheduled for deletion in M1**, with the rest of [`crate::compat`].
+/// **Scheduled for deletion**, with the rest of [`crate::compat`].
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct LegacySlideData {
@@ -38,7 +37,7 @@ pub struct LegacySlideData {
 
 /// A slide of a presentation.
 ///
-/// **Scheduled for deletion in M1**, with the rest of [`crate::compat`].
+/// **Scheduled for deletion**, with the rest of [`crate::compat`].
 #[derive(Debug, Clone)]
 #[allow(
     clippy::large_enum_variant,
@@ -60,7 +59,7 @@ pub enum Slide {
 impl Slide {
     /// The text content of the slide.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     ///
     /// # Errors
     ///
@@ -79,7 +78,7 @@ impl Slide {
     /// The slide's one-based position in the presentation, for legacy
     /// PowerPoint slides; `None` for PPTX and ODP slides.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     #[must_use]
     pub fn number(&self) -> Option<usize> {
         match self {
@@ -96,7 +95,7 @@ impl Slide {
     /// title; `None` for legacy PowerPoint and PPTX slides, whose extracted
     /// data does not model a distinct title.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     ///
     /// # Errors
     ///
@@ -120,7 +119,7 @@ impl Slide {
     /// The number of shapes on the slide, for legacy PowerPoint slides;
     /// `None` for PPTX and ODP slides.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     #[must_use]
     pub fn shape_count(&self) -> Option<usize> {
         match self {
@@ -136,7 +135,7 @@ impl Slide {
     /// The slide's non-content name, for PPTX slides; `None` when the format
     /// does not expose a name or the slide has none.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     ///
     /// # Errors
     ///

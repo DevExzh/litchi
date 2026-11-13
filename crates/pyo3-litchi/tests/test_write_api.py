@@ -1,7 +1,7 @@
 """The unified write API: ``litchi_py.create``, the ``File`` write verbs
 (``set``, ``add``, ``remove``, ``move``, ``swap``), transactions (``edit``,
 ``Edit``), OfficeCLI batches (``batch``, ``apply``) and publication
-(``save``, ``save_as``, ``to_bytes``, ``unsign``) — M3, record 0255.
+(``save``, ``save_as``, ``to_bytes``, ``unsign``).
 
 Oracles, strongest first:
 
@@ -37,7 +37,7 @@ SIGNED_XLSX = "poi/test-data/xmldsign/hello-world-signed.xlsx"
 LOCKED = ("ole/doc/PasswordProtected.doc", "ole/xls/password.xls")
 #: The only PPT fixture whose shapes the native PPT editor accepts.
 #: A PPT whose third shape holds plain text. (`datetime.ppt` holds only
-#: date fields, whose text a set now refuses: record 0304.)
+#: date fields, whose text a set refuses.)
 EDITABLE_PPT = "ole/ppt/text_shapes.ppt"
 SLIDESHOW_PPT = "ole/ppt/SampleShow.ppt"
 NOTES_PPT = "poi/test-data/slideshow/basic_test_ppt_file.ppt"
@@ -48,18 +48,18 @@ RTF_INPUT = rb"{\rtf1\ansi First\par Second\par Third\par Fourth}"
 #: The formats ``create`` builds.
 CREATABLE = (
     "docx", "xlsx", "pptx", "xlsb", "doc", "xls", "ppt", "rtf", "ods", "odt", "odp",
-    # The remaining ODF formats (record 0282).
+    # The remaining ODF formats.
     "oth", "odm", "odg", "odc", "odi", "odb", "odf",
-    # Numbers builds a blank workbook (record 0297).
+    # Numbers builds a blank workbook.
     "numbers",
-    # Pages builds its minimal document (record 0299), Keynote its minimal
-    # presentation (record 0298).
+    # Pages builds its minimal document, Keynote its minimal
+    # presentation.
     "pages", "keynote",
 )
-#: The formats File holds read-only, and a fixture of each: none since ODT
-#: (0276), ODS (0277) and ODP (0278) gained writers.
+#: The formats File holds read-only, and a fixture of each: none since ODT,
+#: ODS and ODP gained writers.
 READ_ONLY: tuple[tuple[str, str], ...] = ()
-#: An ODP fixture for the presentation write verbs (record 0278).
+#: An ODP fixture for the presentation write verbs.
 ODP_INPUT = "odf/odp/tdf169979.odp"
 #: Python suggestion of a document_protected error on a locked file.
 PROTECTED_SUGGESTION = (
@@ -153,7 +153,7 @@ class CreateTests(WriteAssertions):
         self.assertError(raised(lambda: L.create(5)), L.PropertyError, "invalid_argument")
 
     def test_iwork_writes_round_trip(self):
-        # Record 0296: the iWork leaves' focused writes through litchi_py.
+        # The iWork leaves' focused writes through litchi_py.
         pages = L.open(fixture("iwork/pages/body-sections-unicode.pages"))
         edited = pages.set("/body/p[2]", {"text": "From Python"})
         self.assertEqual(L.open_bytes(edited.to_bytes()).get("/body/p[2]", 0)["text"], "From Python")
@@ -166,7 +166,7 @@ class CreateTests(WriteAssertions):
         self.assertTrue(L.open_bytes(edited.to_bytes()).get("/slide[1]", 0)["format"]["hidden"])
 
     def test_keynote_structural_writes_round_trip(self):
-        # Record 0298: Keynote slides, paragraphs and drawables.
+        # Keynote slides, paragraphs and drawables.
         deck = L.open(fixture("iwork/keynote/multi-slide.key"))
         copied, path = deck.add("/", "slide", {"from": "/slide[2]"}, index=0)
         self.assertEqual(path, "/slide[1]")
@@ -187,7 +187,7 @@ class CreateTests(WriteAssertions):
         self.assertEqual(paragraph, "/slide[2]/placeholder[2]/paragraph[4]")
         edited = added.set(body + "/p[1]", {"text": "Changed"})
         self.assertEqual(edited.get(body + "/p[1]", 0)["text"], "Changed")
-        # Record 0309: removing a title placeholder hides it (`hidden` is
+        # Removing a title placeholder hides it (`hidden` is
         # set-only); setting `hidden` to false shows it again.
         hidden = deck.remove("/slide[1]/placeholder[title]")
         self.assertNotEqual(hidden.to_bytes(), deck.to_bytes())
@@ -198,7 +198,7 @@ class CreateTests(WriteAssertions):
         self.assertEqual(len(grown.query("slide")), len(created.query("slide")) + 1)
 
     def test_numbers_sheets_and_tables_are_added_and_removed(self):
-        # Record 0301: Numbers sheet and table lifecycle through litchi_py.
+        # Numbers sheet and table lifecycle through litchi_py.
         workbook = L.create("numbers")
         added, path = workbook.add("/", "sheet", {"name": "Extra"}, index=0)
         self.assertEqual(path, "/sheet[1]")
@@ -212,7 +212,7 @@ class CreateTests(WriteAssertions):
         self.assertEqual(L.open_bytes(removed.to_bytes()).get("/", 0)["format"]["sheetCount"], 1)
 
     def test_iwork_element_writes_round_trip(self):
-        # Record 0309: Numbers rows and columns, character properties and
+        # Numbers rows and columns, character properties and
         # table cells across the iWork formats.
         workbook = L.create("numbers").set("/sheet[1]/table[1]/B2", {"value": 5})
         rows = workbook.get("/sheet[1]/table[1]", 0)["format"]["rowCount"]
@@ -323,7 +323,7 @@ class DocxVerbTests(WriteAssertions):
 
 class OoxmlFollowUpTests(WriteAssertions):
     def test_record_0325_follow_ups(self):
-        """Record 0325: story paragraphs, marks, level keys, links, note runs."""
+        """Story paragraphs, marks, level keys, links, note runs."""
         doc = L.create("docx")
         doc, _ = doc.add("/body", "paragraph", {"text": "Body"})
         doc, _ = doc.add("/", "header", {"text": "Top"})
@@ -376,7 +376,7 @@ class PptxVerbTests(WriteAssertions):
     def setUp(self):
         file = L.create("pptx")
         # A blank layout: slides added from a layout with placeholders hold
-        # those placeholders as shapes (record 0252).
+        # those placeholders as shapes.
         layout = "Blank"
         file, self.first = file.add("/", "slide", {"layout": layout})
         file, self.second = file.add("/", "slide", {"layout": layout})
@@ -407,7 +407,7 @@ class PptxVerbTests(WriteAssertions):
         self.assertEqual(self.assertReopens(changed).get(shape, 0)["text"], "Changed")
 
     def test_smartart(self):
-        # Record 0284: typed SmartArt CRUD passes through unchanged.
+        # Typed SmartArt CRUD passes through unchanged.
         file, art = self.file.add(self.first, "smartart", {"layout": "process", "text": "Plan\n\tScope\nShip"})
         self.assertEqual(art, "/slide[1]/smartart[1]")
         view = file.get(art, 0)
@@ -419,7 +419,7 @@ class PptxVerbTests(WriteAssertions):
         self.assertEqual(self.assertReopens(file).get(art, 0)["text"], "Plan\n\tSize\nLearn")
 
     def test_record_0321_elements(self):
-        # Record 0321: theme, master and layout names, hyperlinks and media.
+        # Theme, master and layout names, hyperlinks and media.
         theme = self.file.set("/theme", {"accent1": "FF0000", "majorFont": "Georgia"})
         view = self.assertReopens(theme).get("/theme", 0)["format"]
         self.assertEqual((view["accent1"], view["headingFont"]), ("#FF0000", "Georgia"))
@@ -443,7 +443,7 @@ class PptxVerbTests(WriteAssertions):
         self.assertError(error, L.PropertyError, "missing_property")
 
     def test_record_0333_p0_residue(self):
-        # Record 0333: paragraph, run, table and row adds, removals, cell
+        # Paragraph, run, table and row adds, removals, cell
         # properties and comment removal.
         file, shape = self.file.add(self.first, "shape", {"text": "alpha", "width": "2in", "height": "1in"})
         file, paragraph = file.add(shape, "paragraph", {"text": "beta", "bold": True})
@@ -508,7 +508,7 @@ class LegacyVerbTests(WriteAssertions):
         self.assertEqual(order(show.move("/slide[2]", index=0)), titles[::-1])
         self.assertEqual(order(show.swap("/slide[1]", "/slide[2]")), titles[::-1])
         self.assertEqual(order(show.remove("/slide[2]")), titles[:1])
-        # PowerPoint-authored text of another length (record 0260): the
+        # PowerPoint-authored text of another length: the
         # title is slide-list text, the subtitle has paragraphs.
         retitled = show.set("/slide[1]/shape[1]", {"text": "A longer replacement title"})
         self.assertEqual(retitled.get("/slide[1]/shape[1]", 0)["text"], "A longer replacement title")
@@ -547,7 +547,7 @@ class RtfVerbTests(WriteAssertions):
 
 
 class OdtVerbTests(WriteAssertions):
-    """ODT writes through the leaf body edits (record 0276)."""
+    """ODT writes through the leaf body edits."""
 
     def test_round_trip(self):
         source = L.open(fixture("odf/corpus/writer-table.odt"))
@@ -582,7 +582,7 @@ class OdtVerbTests(WriteAssertions):
 
 
 class OdpVerbTests(WriteAssertions):
-    """ODP writes through checked scene splices (record 0278)."""
+    """ODP writes through checked scene splices."""
 
     def test_round_trip(self):
         file = L.open(fixture(ODP_INPUT))
@@ -610,7 +610,7 @@ class OdpVerbTests(WriteAssertions):
 
 
 class FlatOdfTests(WriteAssertions):
-    """Flat ODF (record 0292): .fodt opens, and every flat family edits its
+    """Flat ODF: .fodt opens, and every flat family edits its
     packaged projection and republishes into the flat bytes."""
 
     def test_flat_text_paragraph_round_trip(self):
@@ -628,7 +628,7 @@ class FlatOdfTests(WriteAssertions):
         drawing = L.open(fixture("libreoffice-core/xmloff/qa/unit/data/tdf161327_LatheEndAngle.fodg"))
         renamed = drawing.set("/page[1]", {"name": "Flat"})
         self.assertEqual(L.open_bytes(renamed.to_bytes()).get("/page[1]", 0)["format"]["name"], "Flat")
-        # Record 0292: object-format verbs are element-level.
+        # Object-format verbs are element-level.
         chart = L.create("odc")
         for values in ("t.B2:B5", "t.C2:C5"):
             chart, _ = chart.add("/", "series", {"values": values})
@@ -637,7 +637,7 @@ class FlatOdfTests(WriteAssertions):
 
 
 class OdfObjectTests(WriteAssertions):
-    """ODF object formats (record 0288): producer drawing structure, the
+    """ODF object formats: producer drawing structure, the
     metadata family and typed chart writes."""
 
     def test_producer_drawing_structure_and_metadata(self):
@@ -676,7 +676,7 @@ class OdfObjectTests(WriteAssertions):
 
 
     def test_xlsx_worksheet_features(self):
-        """Record 0320: notes, conditional formats, validations and links."""
+        """Notes, conditional formats, validations and links."""
         book = L.create("xlsx")
         book, note = book.add("/Sheet1", "comment", {"ref": "B2", "text": "Check", "author": "Ann"})
         self.assertEqual(note, "/sheet[1]/comment[1]")
@@ -695,7 +695,7 @@ class OdfObjectTests(WriteAssertions):
         self.assertEqual(reopened.get("/Sheet1/hyperlink[1]", 0)["format"]["url"], "https://example.test/")
 
     def test_xlsb_worksheet_features(self):
-        """Record 0322: XLSB takes the XLSX worksheet-feature vocabulary."""
+        """XLSB takes the XLSX worksheet-feature vocabulary."""
         book = L.create("xlsb")
         book, note = book.add("/Sheet1", "comment", {"ref": "B2", "text": "Check", "author": "Ann"})
         self.assertEqual(note, "/sheet[1]/comment[1]")
@@ -716,7 +716,7 @@ class OdfObjectTests(WriteAssertions):
         self.assertEqual(reopened.get("/Sheet1/rowbreak[1]", 0)["format"]["row"], 10)
 
     def test_xls_worksheet_features(self):
-        """Record 0327: XLS takes the XLSX worksheet-feature vocabulary."""
+        """XLS takes the XLSX worksheet-feature vocabulary."""
         book = L.create("xls")
         book, note = book.add("/Sheet1", "comment", {"ref": "B2", "text": "Check", "author": "Ann"})
         self.assertEqual(note, "/sheet[1]/comment[1]")
@@ -737,7 +737,7 @@ class OdfObjectTests(WriteAssertions):
         self.assertEqual(reopened.get("/Sheet1/rowbreak[1]", 0)["format"]["row"], 10)
 
     def test_ods_worksheet_features(self):
-        """Record 0327: ODS takes the XLSX worksheet-feature vocabulary."""
+        """ODS takes the XLSX worksheet-feature vocabulary."""
         book = L.open(fixture("odf/corpus/calc-two-sheets.ods"))
         book, rule = book.add(
             "/sheet1",
@@ -786,10 +786,8 @@ class CapabilityAgreementTests(WriteAssertions):
                     error = raised(lambda: call(file))
                     self.assertIsInstance(error, L.UnsupportedError)
                     self.assertEqual(error.code, verbs[verb]["code"])
-        # DOC (0258), PPT (0260) and XLS (0259) support every write verb.
-        # DOC (0258), PPT (0260), XLS (0259), ODS (0277), ODT (0276), ODP
-        # (0278), OTH and ODM (0282) and the ODF object formats (0292) support
-        # every write verb; object-format gaps are element-level.
+        # DOC, PPT, XLS, ODS, ODT, ODP, OTH and ODM and the ODF object
+        # formats support every write verb; object-format gaps are element-level.
 
     def test_read_only_formats_refuse_every_write(self):
         for relative, name in READ_ONLY:
@@ -802,7 +800,7 @@ class CapabilityAgreementTests(WriteAssertions):
 
 
 class OdsRoundTripTests(WriteAssertions):
-    """ODS writes through the unified layer (record 0277)."""
+    """ODS writes through the unified layer."""
 
     def test_cells_sheets_and_metadata_round_trip(self):
         source = L.open(fixture("odf/corpus/calc-two-sheets.ods"))
@@ -876,7 +874,7 @@ class PropsTests(WriteAssertions):
 
 
 # ---------------------------------------------------------------------------
-# Patches (record 0347)
+# Patches
 # ---------------------------------------------------------------------------
 
 
@@ -951,7 +949,7 @@ class PatchTests(WriteAssertions):
         self.assertIsInstance(error, L.LitchiError)
 
     def test_a_numbers_swap_patch(self):
-        # Record 0347: a Numbers sheet swap, and its inverse.
+        # A Numbers sheet swap, and its inverse.
         workbook = L.create("numbers")
         workbook, _ = workbook.add("/", "sheet", {"name": "Second"})
         commit = workbook.edit(lambda tx: tx.swap("/sheet[1]", "/sheet[2]"))
@@ -1087,7 +1085,7 @@ class BatchTests(WriteAssertions):
         self.assertEqual(error.item, 0)
 
     def test_find_and_replace_report_the_match_count(self):
-        # Record 0273: ``find``/``replace`` props on ``set``.
+        # ``find``/``replace`` props on ``set``.
         file = L.create("xlsx")
         file = file.set("/sheet[1]/A1", {"value": "draft one, draft two"})
         commit = file.apply({"command": "set", "path": "/", "props": {"find": "draft", "replace": "final"}})
@@ -1370,7 +1368,7 @@ class ErrorClassTests(WriteAssertions):
 
 
 class MetadataKeywordsTests(WriteAssertions):
-    """The keywords are a list (record 0354): ``metadata()`` and the root
+    """The keywords are a list: ``metadata()`` and the root
     node's ``format`` give a list of str; a set takes a list, or text split
     at ";" and ","."""
 

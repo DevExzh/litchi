@@ -372,7 +372,7 @@ fn native_final_slide_refuses_and_notes_slides_leave_with_their_slide() {
     assert!(patch.is_noop());
     assert_eq!(after.to_bytes().unwrap(), before);
 
-    // Record 0303: a slide's own notes slide leaves with it, on the eager
+    // A slide's own notes slide leaves with it, on the eager
     // and the source-backed owner.
     for mode in [SourceMode::Eager, SourceMode::Auto] {
         let dependency =

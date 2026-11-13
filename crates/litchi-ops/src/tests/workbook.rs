@@ -733,9 +733,9 @@ mod ods {
             ),
             Some(litchi_core::FileFormat::Ods)
         );
-        // Flat ODS opens through the leaf's flat owner (record 0277); both
+        // Flat ODS opens through the leaf's flat owner; both
         // routes agree with detection, and an edit republishes into the
-        // flat bytes (record 0292).
+        // flat bytes.
         let opened = crate::open_bytes(FLAT_ODS.to_vec()).unwrap();
         assert_eq!(opened.format(), Some(litchi_core::FileFormat::Ods));
         assert_eq!(opened.text().unwrap(), "value");

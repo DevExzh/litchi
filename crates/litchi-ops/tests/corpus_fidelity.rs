@@ -1,8 +1,7 @@
-//! Full-corpus fidelity regression (record 0289, plan step 26, design §14
-//! layer 3).
+//! Full-corpus fidelity regression (design §14 layer 3).
 //!
 //! Every file under `test-data/` that the unified layer opens as a claimed
-//! format (the iWork formats since record 0296) goes through `open` (file-backed, the retained source)
+//! format goes through `open` (file-backed, the retained source)
 //! → `edit` with no mutation → `save_as`, and the saved bytes must equal
 //! the input bytes. Signed files cannot be edited without consuming their
 //! signature, so they go through `open` → `save_as` instead; locked
@@ -12,20 +11,20 @@
 //! new value and back, and the reopened value must equal the original.
 //! Whether the reverted bytes also equal the input is reported, not
 //! required: a revert is a second edit, and the leaves may normalize what
-//! they rewrite. A structural round trip follows on XLS, PPTX and RTF
-//! (record 0293), Pages (record 0299), Keynote (record 0298), Numbers
-//! (record 0301) and XLSB (record 0322): a row inserted and removed, a slide
+//! they rewrite. A structural round trip follows on XLS, PPTX and RTF,
+//! Pages, Keynote, Numbers
+//! and XLSB: a row inserted and removed, a slide
 //! or paragraph moved and moved back, a Pages paragraph added and removed,
 //! a Keynote slide duplicated and a slide added and both removed, a Numbers
 //! table added and removed, or an XLSB note added and removed, must read
-//! back with the same node texts. DOC (record 0324) adds a bookmark and a
-//! hyperlink to its first body paragraph and removes both; DOCX (record
-//! 0335) adds a picture and a comment to its first body paragraph, sets
+//! back with the same node texts. DOC adds a bookmark and a
+//! hyperlink to its first body paragraph and removes both; DOCX
+//! adds a picture and a comment to its first body paragraph, sets
 //! each once, and removes both; ODT, OTH and ODM
-//! (record 0328) add a tab stop to the first body paragraph and remove it,
-//! and ODP (record 0328) a line break to its first shape's first paragraph.
+//! add a tab stop to the first body paragraph and remove it,
+//! and ODP a line break to its first shape's first paragraph.
 //!
-//! An iWork package directory (the app-authored bundle form, record 0306)
+//! An iWork package directory (the app-authored bundle form)
 //! is a corpus entry too: a copy of it goes through `open` → empty `edit`
 //! → `save()` in place, and every file of the saved bundle must equal the
 //! source file of the same name.
@@ -37,7 +36,7 @@
 //!
 //! Every Office-extension file that does not open is listed in
 //! [`NOT_OPENED`] with its expected typed code and class (invalid, fuzzed,
-//! legacy version, opens leniently, or reader gap; record 0341): a new
+//! legacy version, opens leniently, or reader gap): a new
 //! refusal, a changed code or a listed file that opens fails the test, and
 //! the lenient class is opened with its leniency here.
 //!
@@ -220,7 +219,7 @@ fn copy_tree(from: &Path, to: &Path) {
     }
 }
 
-/// The no-op round trip of a package directory (record 0306): a copy is
+/// The no-op round trip of a package directory: a copy is
 /// opened, edited with no mutation and saved in place; every saved file must
 /// equal its source.
 fn run_bundle(relative: &str, dir: &Path) -> Result<Outcome, String> {
@@ -279,7 +278,7 @@ struct Outcome {
     /// walk) or `-` (not attempted).
     revert: &'static str,
     revert_detail: String,
-    /// Structural round trip (record 0293): `byte-exact`, `value-exact`,
+    /// Structural round trip: `byte-exact`, `value-exact`,
     /// `mismatch`, `one-way` (the inverse is refused, typed), `refused`,
     /// `none` (nothing to move) or `-` (not attempted for the format).
     structure: &'static str,
@@ -458,7 +457,7 @@ fn extensionless_native_documents_have_valid_save_destinations() {
     }
 }
 
-/// A 1x1 PNG, the DOCX structural probe's image (record 0335).
+/// A 1x1 PNG, the DOCX structural probe's image.
 const PROBE_PNG: &str = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 
 /// Texts of the nodes at `paths`, for the value check of a structural round
@@ -470,8 +469,8 @@ fn texts(file: &File, paths: &[&str]) -> Vec<Option<String>> {
         .collect()
 }
 
-/// A structural edit and its inverse on the formats whose structure record
-/// 0293 extended to producer files: XLS inserts a row at the top of the
+/// A structural edit and its inverse on the formats whose structural
+/// edits reach producer files: XLS inserts a row at the top of the
 /// first sheet and removes it again; PPTX moves the first slide after the
 /// second and back; RTF moves the first body paragraph after the second and
 /// back. The reverted file must read back with the same node texts; whether
@@ -528,7 +527,7 @@ fn structure(file: &File, input: &[u8]) -> (&'static str, String) {
                 }),
             )
         },
-        // Record 0324: a bookmark and a hyperlink added to the first body
+        // A bookmark and a hyperlink added to the first body
         // paragraph and removed again, through the DOC bookmark-table and
         // field editors.
         Some(FileFormat::Doc) => {
@@ -560,9 +559,9 @@ fn structure(file: &File, input: &[u8]) -> (&'static str, String) {
                 }),
             )
         },
-        // Record 0335: a picture and a comment added to the first body
+        // A picture and a comment added to the first body
         // paragraph, each set once, and both removed again, through the
-        // leaf picture and comment edits; record 0345 resolves the comment.
+        // leaf picture and comment edits.
         Some(FileFormat::Docx) => {
             if count("/body", "paragraph") == 0 {
                 return ("none", String::new());
@@ -583,7 +582,7 @@ fn structure(file: &File, input: &[u8]) -> (&'static str, String) {
                             .prop("author", "Litchi")
                             .prop("text", "Structural probe"),
                     )?;
-                    // Record 0345: resolving the comment writes its
+                    // Resolving the comment writes its
                     // `commentsExtended` entry, which the removal strips.
                     commented.file.set(
                         commented.path.to_string().as_str(),
@@ -600,7 +599,7 @@ fn structure(file: &File, input: &[u8]) -> (&'static str, String) {
                 }),
             )
         },
-        // Record 0328: a tab stop added to the first body paragraph and
+        // A tab stop added to the first body paragraph and
         // removed again, through the leaf paragraph-property edit.
         Some(FileFormat::Odt | FileFormat::Oth | FileFormat::Odm) => {
             if count("/body", "paragraph") == 0 {
@@ -625,7 +624,7 @@ fn structure(file: &File, input: &[u8]) -> (&'static str, String) {
                 }),
             )
         },
-        // Record 0328: a line break appended to the first shape's first
+        // A line break appended to the first shape's first
         // paragraph and removed again, through the leaf scene splices.
         Some(FileFormat::Odp) => {
             if file.get("/slide[1]/shape[1]/paragraph[1]").is_err() {
@@ -648,7 +647,7 @@ fn structure(file: &File, input: &[u8]) -> (&'static str, String) {
                 }),
             )
         },
-        // Record 0299: a Pages paragraph added at the start of the body and
+        // A Pages paragraph added at the start of the body and
         // removed again, through the leaf paragraph transaction.
         Some(FileFormat::Pages) => (
             "paragraph add+remove",
@@ -664,7 +663,7 @@ fn structure(file: &File, input: &[u8]) -> (&'static str, String) {
             }),
             Box::new(|file: &File| file.remove("/body/p[1]")),
         ),
-        // Record 0298: the first Keynote slide duplicated after itself and a
+        // The first Keynote slide duplicated after itself and a
         // slide added from the theme's default layout at the end, then both
         // removed, through the leaf slide-creation and deletion families.
         Some(FileFormat::Keynote) => (
@@ -689,9 +688,9 @@ fn structure(file: &File, input: &[u8]) -> (&'static str, String) {
                     .remove("/slide[2]")
             }),
         ),
-        // Record 0301: a Numbers table added first in the first sheet and
+        // A Numbers table added first in the first sheet and
         // removed again, through the leaf table-lifecycle and table-order
-        // transactions. Record 0309: a row inserted at the start of the
+        // transactions. A row inserted at the start of the
         // original table and removed again, through the leaf topology
         // transaction (skipped where that table refuses it, typed).
         Some(FileFormat::Numbers) => {
@@ -723,7 +722,7 @@ fn structure(file: &File, input: &[u8]) -> (&'static str, String) {
                 }),
             )
         },
-        // Record 0322: an XLSB note added on the first worksheet's last cell
+        // An XLSB note added on the first worksheet's last cell
         // and removed again, through the leaf note transaction (the comments
         // part, its VML note shape and `BrtLegacyDrawing`).
         Some(FileFormat::Xlsb) => {
@@ -873,7 +872,7 @@ const OFFICE: &[&str] = &[
     "odm", "odf", "pages", "key", "numbers",
 ];
 
-/// Why an Office-extension file of the corpus does not open (record 0341).
+/// Why an Office-extension file of the corpus does not open.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Refusal {
     /// The input breaks its specification and the strict reader refuses it.
@@ -901,7 +900,7 @@ impl Refusal {
 }
 
 /// Every Office-extension file of the corpus that does not open: the file,
-/// its expected typed code, the class and why (record 0341). A file that
+/// its expected typed code, the class and why. A file that
 /// fails differently, a new file that does not open, and a listed file
 /// that now opens all fail the test.
 const NOT_OPENED: &[(&str, &str, Refusal, &str)] = &[
@@ -1113,13 +1112,13 @@ const NOT_OPENED: &[(&str, &str, Refusal, &str)] = &[
         "rtf/test10001Encoding.rtf",
         "unsupported_capability",
         Refusal::Gap,
-        "\\ansicpg10001 (Mac Japanese) has no exact codec; refused as unsupported (record 0347)",
+        "\\ansicpg10001 (Mac Japanese) has no exact codec; refused as unsupported",
     ),
     (
         "rtf/test10007Encoding.rtf",
         "unsupported_capability",
         Refusal::Gap,
-        "\\ansicpg10007 (Mac Cyrillic) has no exact codec; refused as unsupported (record 0347)",
+        "\\ansicpg10007 (Mac Cyrillic) has no exact codec; refused as unsupported",
     ),
 ];
 
@@ -1208,7 +1207,7 @@ fn open_empty_edit_save_is_byte_identical() {
         "structure none",
     ];
     let mut markdown = format!(
-        "# Corpus fidelity (records 0289 and 0293, generated)\n\n\
+        "# Corpus fidelity (generated)\n\n\
          Generated by `crates/litchi-ops/tests/corpus_fidelity.rs` over every file\n\
          under `test-data/` that opens as a claimed format; rewrite with\n\
          `LITCHI_REPORT_DIR=/path/to/scratch`. `exact`: open → empty edit → save is byte-identical;\n\
@@ -1218,8 +1217,7 @@ fn open_empty_edit_save_is_byte_identical() {
          set one text property and set it back; `byte-exact` also matches the\n\
          input bytes, `value-exact` only the value, `one-way` the set back was\n\
          refused (typed), `refused` every candidate set was refused (typed),\n\
-         `none` no settable text within 400 nodes. Structure (record 0293,\n\
-         XLS, PPTX and RTF only): insert a row at the top of the first sheet\n\
+         `none` no settable text within 400 nodes. Structure (XLS, PPTX and RTF only): insert a row at the top of the first sheet\n\
          and remove it, or move the first slide or body paragraph after the\n\
          second and back; `byte-exact` also matches the input bytes,\n\
          `value-exact` only the moved nodes' text, `refused` the forward edit\n\
@@ -1261,9 +1259,9 @@ fn open_empty_edit_save_is_byte_identical() {
             .collect();
         let _ = writeln!(markdown, "| {extension} | {} |", codes.join(", "));
     }
-    // Record 0341: each file that does not open, classified.
+    // Each file that does not open, classified.
     markdown.push_str(
-        "\n### Each file, classified (record 0341)\n\n\
+        "\n### Each file, classified\n\n\
          | file | code | class | why |\n|---|---|---|---|\n",
     );
     let mut triage = Vec::new();

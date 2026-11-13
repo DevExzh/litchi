@@ -1,4 +1,4 @@
-//! Raw-layer unit tests (record 0336).
+//! Raw-layer unit tests.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, reason = "tests")]
 
@@ -390,7 +390,7 @@ fn raw_layer_verbs_answer_by_package() {
 }
 
 /// A chart's embedded workbook carries the workbook's own content type, as
-/// Word writes it; validation accepts it (record 0336).
+/// Word writes it; validation accepts it.
 #[cfg(feature = "docx")]
 #[test]
 fn docx_with_a_chart_validates() {

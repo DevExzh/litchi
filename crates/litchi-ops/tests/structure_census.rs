@@ -1,7 +1,7 @@
-//! Structural-edit census over the corpus (record 0293).
+//! Structural-edit census over the corpus.
 //!
 //! An ignored diagnostic: for every corpus file of the formats whose
-//! structural verbs record 0289 found refused on producer files, it tries
+//! structural verbs were refused on producer files, it tries
 //! the structural edits and tallies the typed refusal messages:
 //!
 //! - XLS: insert a row and a column at the start of each worksheet (up to

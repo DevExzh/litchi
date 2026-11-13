@@ -1,4 +1,4 @@
-//! Unified PPTX paragraph and run `add`/`remove` (record 0333) in shape,
+//! Unified PPTX paragraph and run `add`/`remove` in shape,
 //! table-cell and notes bodies, through both native owner routes, read back
 //! through `get` and after a byte round trip.
 #![cfg(feature = "pptx")]

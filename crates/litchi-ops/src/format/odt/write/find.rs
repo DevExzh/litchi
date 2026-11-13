@@ -1,6 +1,5 @@
 //! ODT (and OTH/ODM, which share this adapter) find/replace and template
-//! merge (record 0295) over the shared text surface
-//! (`crate::find::surface`).
+//! merge over the shared text surface (`crate::find::surface`).
 //!
 //! The leaf body index lists every paragraph and heading of `office:text`
 //! (tables, sections, lists, frames, text boxes and notes included) and their
@@ -84,7 +83,7 @@ pub(crate) fn find_replace(
         let body = file.body()?;
         // A paragraph without a candidate holds no match (every match lies
         // in one paragraph, and `may_match` is exact when it says no), so
-        // only candidates are listed (record 0302).
+        // only candidates are listed.
         let matcher = spec.matcher();
         let (runs, ids) = surface_of(body, &scope, |text| matcher.may_match(text))?;
         let (changes, matches) = surface::find(&runs, spec, replacement, format, limits)?;

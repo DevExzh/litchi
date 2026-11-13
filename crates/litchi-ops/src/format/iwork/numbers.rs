@@ -1,6 +1,6 @@
 //! Apple Numbers workbooks (`.numbers`): sheets, their tables, the tables'
 //! stored cells and merged ranges, read from `litchi_numbers::Package` and
-//! written through its focused transactions (records 0296 and 0297).
+//! written through its focused transactions.
 //!
 //! A Numbers sheet holds tables, and cells belong to a table: a cell's path
 //! is `/sheet[N]/table[M]/A1`, or by name `/Sheet 1/Table 1/A1`; a merged
@@ -11,7 +11,7 @@
 //! |---|---|---|
 //! | `set` | `cell` `value`/`formula`/`cachedValue` | `edit_table_cells` (one per table) |
 //! | `set` | `cell` `numberFormat` | `edit_table_cell_{number,percentage}_format` |
-//! | `set` | `cell` `comment` (`null` clears) | `set_table_cell_comment`, `clear_table_cell_comment` (record 0318) |
+//! | `set` | `cell` `comment` (`null` clears) | `set_table_cell_comment`, `clear_table_cell_comment` |
 //! | `add` | `comment` under a cell (`text`) | `set_table_cell_comment` |
 //! | `remove` | `<cell>/comment` | `clear_table_cell_comment` |
 //! | `set` | `sheet`/`table` `name` | `edit_names` (one for every rename) |
@@ -22,8 +22,8 @@
 //! | `move` | `table` within its sheet | `edit_table_order` |
 //! | `add`/`remove` | `sheet` | `edit_sheet_lifecycle` (+ `edit_sheet_order` for a position) |
 //! | `add`/`remove` | `table` | `edit_table_lifecycle` (+ `edit_table_order` for a position) |
-//! | `add`/`remove` | `row`/`col` of a table | `edit_table_topology` (record 0309) |
-//! | `swap` | two `sheet`s | two `edit_sheet_order` moves (record 0347) |
+//! | `add`/`remove` | `row`/`col` of a table | `edit_table_topology` |
+//! | `swap` | two `sheet`s | two `edit_sheet_order` moves |
 //! | `swap` | two `table`s of one sheet | two `edit_table_order` moves |
 //! | `swap` | two `table`s of two sheets | two `edit_table_relocation`s, then two `edit_table_order` moves (two tables of one name pass through a temporary `edit_names` rename) |
 //!
@@ -157,7 +157,7 @@ pub(crate) const MERGE_PROPS: &[PropSpec] = &[{
     spec
 }];
 
-const FOLLOW_UP: &str = "record 0297 follow-ups (IWORK_API_REQUESTS.md)";
+const FOLLOW_UP: &str = "not supported yet";
 
 static GAPS: [GapSpec; 1] = [GapSpec {
     subject: Subject::Operation {
@@ -178,7 +178,7 @@ static OPERATION_GAPS: [GapSpec; 5] = [
             context: "a workbook without a table",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "record 0301 follow-ups (IWORK_API_REQUESTS.md request 5)",
+        follow_up: "not supported yet",
         reason: "a new table copies the structure (styles, sizes, storage layout) of the workbook's first table; a workbook with no table has no template yet",
     },
     GapSpec {
@@ -188,8 +188,8 @@ static OPERATION_GAPS: [GapSpec; 5] = [
             context: "formulas the coordinate shift refuses, merges",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "record 0329 follow-ups (IWORK_API_REQUESTS.md request 6)",
-        reason: "rows and columns move every formula reference into the table, the table's own formulas and other tables' (record 0318); a removed row or column a surviving formula reads turns into #REF! (ranges shrink), and a shared formula whose cells diverge is split (record 0329); refused: a chart or other non-table owner reading the table, volatile, spanning, error or spill dependency state, a removal whose cells the cell writer cannot clear under a range that reads them, merged cells, filters, categories, pivots and (for columns) sort rules, and removing a hidden or bordered row or column",
+        follow_up: "not supported yet",
+        reason: "rows and columns move every formula reference into the table, the table's own formulas and other tables'; a removed row or column a surviving formula reads turns into #REF! (ranges shrink), and a shared formula whose cells diverge is split; refused: a chart or other non-table owner reading the table, volatile, spanning, error or spill dependency state, a removal whose cells the cell writer cannot clear under a range that reads them, merged cells, filters, categories, pivots and (for columns) sort rules, and removing a hidden or bordered row or column",
     },
     GapSpec {
         subject: Subject::Operation {
@@ -198,7 +198,7 @@ static OPERATION_GAPS: [GapSpec; 5] = [
             context: "height and visibility",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "record 0309 follow-ups",
+        follow_up: "not supported yet",
         reason: "rows and columns are structural only here: their sizes and hidden states are not wired to the leaf's dimension transaction",
     },
     GapSpec {
@@ -208,7 +208,7 @@ static OPERATION_GAPS: [GapSpec; 5] = [
             context: "rows and columns",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "record 0347 F1 (a row and column move in `table::topology`)",
+        follow_up: "a row and column move in `table::topology`",
         reason: "the leaf topology transaction inserts and removes rows and columns but does not reorder them; reordering must carry storage, headers, UIDs, borders, merges and every formula coordinate that reads the table",
     },
     GapSpec {
@@ -218,7 +218,7 @@ static OPERATION_GAPS: [GapSpec; 5] = [
             context: "rows and columns",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "record 0347 F1 (a row and column move in `table::topology`)",
+        follow_up: "a row and column move in `table::topology`",
         reason: "a swap is two moves, and the leaf topology transaction does not reorder rows or columns; sheets and tables swap",
     },
 ];
@@ -355,9 +355,9 @@ pub enum EditError {
     Topology(litchi_numbers::table::topology::Error),
     /// Cell character properties.
     TextStyle(litchi_numbers::cell::text_style::Error),
-    /// A sheet-chart point-size transaction (D7-A).
+    /// A sheet-chart point-size transaction.
     ChartFont(litchi_numbers::sheet::chart::font::Error),
-    /// A cell comment (record 0318).
+    /// A cell comment.
     Comment(litchi_numbers::cell::comment::Error),
 }
 
@@ -404,10 +404,9 @@ impl EditError {
         })
     }
 
-    /// The unified code: a refusal reports its kind's code (record 0351
-    /// §2.4, record 0361), a configured budget `limit_exceeded`, a malformed
-    /// source or a patch for another base `invalid_input`, the rest
-    /// `internal_error`.
+    /// The unified code: a refusal reports its kind's code, a configured
+    /// budget `limit_exceeded`, a malformed source or a patch for another
+    /// base `invalid_input`, the rest `internal_error`.
     pub(crate) fn code(&self) -> Code {
         macro_rules! family {
             ($error:expr, $module:path) => {{
@@ -497,7 +496,7 @@ pub(crate) enum Patch {
     Topology(litchi_numbers::table::topology::Patch),
     /// Cell character properties.
     TextStyle(litchi_numbers::cell::text_style::Patch),
-    /// A sheet-chart point-size set (D7-A).
+    /// A sheet-chart point-size set.
     ChartFontSize(litchi_numbers::sheet::chart::font::Patch),
     /// A cell comment set or cleared.
     Comment(litchi_numbers::cell::comment::Patch),
@@ -577,7 +576,7 @@ fn region_ref(region: Region) -> String {
 
 /// Build the eager tree of `package`: the workbook, its sheets and their
 /// tables, reading each table's merged regions. A table's cells and merged
-/// ranges are a lazily built part ([`Cells`], record 0305).
+/// ranges are a lazily built part ([`Cells`]).
 ///
 /// # Errors
 ///
@@ -673,13 +672,13 @@ pub(crate) fn build_charts(package: &Package, sheet_index: usize) -> Result<supe
 }
 
 /// The cells, merged ranges, rows and columns of one table, each tree item
-/// materialized the first time a read reaches it (record 0305): slot `i`
+/// materialized the first time a read reaches it: slot `i`
 /// below the cell count is the table's `i`-th stored cell in row-major
 /// order, the slots past it its merged ranges, then its rows and its
-/// columns (record 0309; `add` and `remove` address them as `row[N]` and
-/// `col[N]`, and their items are built together on the first read of
-/// one). A cell step looks its cell up in the leaf's sorted cell list, so
-/// `get` of one cell builds one item.
+/// columns (`add` and `remove` address them as `row[N]` and `col[N]`, and
+/// their items are built together on the first read of one). A cell step
+/// looks its cell up in the leaf's sorted cell list, so `get` of one cell
+/// builds one item.
 pub(crate) struct Cells {
     sheet: usize,
     table: usize,
@@ -692,8 +691,8 @@ pub(crate) struct Cells {
     axes: [u32; 2],
     /// The row items, then the column items.
     axis_items: std::sync::OnceLock<Box<[super::tree::Item]>>,
-    /// The table's cell comments, read on the first cell item (record
-    /// 0318): `(position, text)` in row-major order.
+    /// The table's cell comments, read on the first cell item:
+    /// `(position, text)` in row-major order.
     comments: std::sync::OnceLock<Box<[(At, String)]>>,
 }
 
@@ -1315,11 +1314,11 @@ struct Staged {
     renames_tables: Vec<(usize, usize, String)>,
     cells: BTreeMap<(usize, usize), Vec<Change>>,
     formats: Vec<(Address, DisplayFormat)>,
-    /// Cell character properties, per table (record 0309).
+    /// Cell character properties, per table.
     text_styles: BTreeMap<(usize, usize), Vec<(At, CharacterProperties)>>,
-    /// Cell comments, in call order; `None` clears (record 0318).
+    /// Cell comments, in call order; `None` clears.
     comments: Vec<(Address, Option<String>)>,
-    /// Chart point-size writes, in call order (D7-A).
+    /// Chart point-size writes, in call order.
     chart_sizes: Vec<(
         usize,
         usize,
@@ -1972,7 +1971,7 @@ fn cell_at(file: &Iwork, path: &PathArg<'_>) -> Result<Address> {
     }
 }
 
-/// Add a comment (`text`) to a cell that has none (record 0318).
+/// Add a comment (`text`) to a cell that has none.
 fn add_comment(
     file: &Iwork,
     package: &Package,
@@ -2536,7 +2535,7 @@ pub(crate) fn swap(
     if axis_target(file, left.path()).is_some() || axis_target(file, right.path()).is_some() {
         return Err(refusal(
             Code::UnsupportedCapability,
-            "Numbers rows and columns are inserted and removed, not reordered; the leaf topology transaction has no row or column move (follow-up: record 0347 F1)",
+            "Numbers rows and columns are inserted and removed, not reordered; the leaf topology transaction has no row or column move",
         ));
     }
     let left = node_at::<Numbers>(file, left)?;

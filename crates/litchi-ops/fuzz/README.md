@@ -4,7 +4,7 @@ smoke_queries` runs deterministic mutations of harvested selectors across three
 fake format families. The `query_plan` libFuzzer target also compiles and runs
 plans with bounded output. This validates the engine, not production adapters.
 
-Batch payloads (record 0334): `batch_payload` feeds arbitrary bytes to
+Batch payloads: `batch_payload` feeds arbitrary bytes to
 `batch::from_bytes` with a required `SourceLimits` profile (64 KiB, 64 items),
 the OfficeCLI batch JSON ingress. Every input either fails with `corrupt_batch` or `limit_exceeded`, or
 decodes to `BatchItem`s that validate, survive `into_owned`, lower their path
@@ -44,17 +44,16 @@ A libFuzzer campaign needs `cargo +nightly fuzz run batch_payload
 corpus/batch_payload` from this directory, with build output outside the
 checkout as in `../../litchi-core/fuzz/README.md`.
 
-`regression-*.json` are libFuzzer finds of record 0334: a relative path whose
-canonical spelling read back as sheet notation (finding F2) and long numbers
-that drifted by ULPs across wire round trips (finding F1). Record 0338 fixed
-both, and the harness now requires exact fixed points: the path display
+`regression-*.json` are libFuzzer finds: a relative path whose
+canonical spelling read back as sheet notation and long numbers
+that drifted by ULPs across wire round trips. Both are fixed,
+and the harness now requires exact fixed points: the path display
 reparses through `PathArg::parse` to the same path and spelling, and the wire
 form decodes to equal items (numbers included) and re-serializes to the same
 bytes.
 
 Without nightly or `cargo-fuzz`, the libFuzzer targets still build and run on
-the stable toolchain with LLVM's coverage pass (this is how record 0334 ran
-them):
+the stable toolchain with LLVM's coverage pass:
 
 ```sh
 RUSTFLAGS="-Cpasses=sancov-module -Cllvm-args=-sanitizer-coverage-level=4 \

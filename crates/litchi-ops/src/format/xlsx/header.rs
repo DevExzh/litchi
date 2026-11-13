@@ -1,4 +1,4 @@
-//! Header-row predicates on workbooks (record 0010 §5.4): `row[Salary>5000
+//! Header-row predicates on workbooks: `row[Salary>5000
 //! and Region=EMEA]` names table columns by their headers.
 //!
 //! The binding follows OfficeCLI (`ExcelHandler.Query.RowWhere.cs`

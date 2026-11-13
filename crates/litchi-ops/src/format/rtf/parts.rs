@@ -1,6 +1,6 @@
-//! The RTF parts of record 0328: sections, bookmarks, main-story fields
-//! and tables of contents, paragraph tab stops, text boxes and drawing
-//! shapes, read from the native model's source-ordered collections.
+//! The RTF parts: sections, bookmarks, main-story fields and tables of
+//! contents, paragraph tab stops, text boxes and drawing shapes, read
+//! from the native model's source-ordered collections.
 
 use std::borrow::Cow;
 

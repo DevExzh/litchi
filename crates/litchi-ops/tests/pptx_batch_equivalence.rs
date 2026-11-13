@@ -1,5 +1,5 @@
-//! Batch equivalence for unsigned PPTX (record 0348, the rule of records
-//! 0015 and 0314): a batch of sets publishes exactly what its items publish
+//! Batch equivalence for unsigned PPTX:
+//! a batch of sets publishes exactly what its items publish
 //! when applied one at a time, or refuses with the same code at the same item.
 //! A signed batch is an admission-level protected write: it refuses before
 //! consuming its stream and therefore has no item scope.  Its behavior is
@@ -449,7 +449,7 @@ fn deck() -> Vec<u8> {
 
 #[test]
 fn refused_bodies_fail_the_batch_at_the_item_that_reads_them() {
-    // Record 0348: a cell or notes body holding a value the text-body
+    // A cell or notes body holding a value the text-body
     // reader refuses. Items that read that body refuse as their single set
     // does, at their own index; the others still coalesce.
     let base = deck();

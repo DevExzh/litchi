@@ -1,4 +1,4 @@
-//! `text` names a workbook cell's `value` (record 0269): OfficeCLI's XLSX
+//! `text` names a workbook cell's `value`: OfficeCLI's XLSX
 //! cell handler accepts it (`case "value" or "text"`), so the corpus scripts
 //! use it on every data row. XLSB and XLS take the same alias; ODS has no
 //! unified cell writer yet. The alias resolves to the same registry entry,

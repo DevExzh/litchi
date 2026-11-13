@@ -1,4 +1,4 @@
-//! The structured keyword list (record 0354): `Metadata::keywords` is a
+//! The structured keyword list: `Metadata::keywords` is a
 //! `Vec<String>` in every format, the node view writes it as a JSON array,
 //! a set takes a list or text split at `;` and `,`, and an unchanged list
 //! keeps the source's own keyword text.

@@ -1,4 +1,4 @@
-//! XLSB workbook views (record 0010 section 6).
+//! XLSB workbook views.
 //!
 //! The projections use the XLSB node bridge directly. A view opens one
 //! semantic sheet at a time, walks its sparse typed grid, and leaves later

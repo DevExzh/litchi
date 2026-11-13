@@ -1,5 +1,4 @@
-//! The resolver: walks a path step by step through a [`Navigate`] adapter
-//! (record 0010 §4.1).
+//! The resolver: walks a path step by step through a [`Navigate`] adapter.
 //!
 //! For each step it normalizes the name through the family vocabulary's
 //! static alias table (§4.2), classifies the predicates (§4.3) into a
@@ -67,7 +66,7 @@ pub(crate) fn find_from<'f, N: Navigate<'f>>(
 /// caller's [`Navigate::check_source`] after it: a source that changed
 /// before or during `read` fails that check, whose error wins over what
 /// `read` returned, so one check after the whole resolution gives what a
-/// check around each nested read gave (record 0262).
+/// check around each nested read gave.
 fn fenced<'f, N: Navigate<'f>, T>(nav: &N, read: impl FnOnce() -> T) -> T {
     let _scope = super::fence::Scope::enter(nav.fence_key());
     read()
@@ -303,7 +302,7 @@ fn classify<'s, 'f, N: Navigate<'f>>(
     Ok(Some((Resolved { kind, select }, rule)))
 }
 
-/// Classifies a step's predicates for its element (record 0010 §4.3).
+/// Classifies a step's predicates for its element.
 fn select<'s>(
     spot: &Spot<'_, '_>,
     step: &'s Step<'s>,

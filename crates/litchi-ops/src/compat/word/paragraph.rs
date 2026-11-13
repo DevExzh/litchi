@@ -5,7 +5,7 @@ use crate::Result;
 
 /// A paragraph of a word-processing document.
 ///
-/// **Scheduled for deletion in M1**, with the rest of [`crate::compat`].
+/// **Scheduled for deletion**, with the rest of [`crate::compat`].
 #[derive(Debug, Clone)]
 #[allow(
     clippy::large_enum_variant,
@@ -30,7 +30,7 @@ pub enum Paragraph {
 impl Paragraph {
     /// The text content of the paragraph.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     ///
     /// # Errors
     ///
@@ -51,7 +51,7 @@ impl Paragraph {
 
     /// The runs of the paragraph.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     ///
     /// # Errors
     ///

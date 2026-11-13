@@ -1,4 +1,4 @@
-//! Unified XLSB read coverage (M1 R4d).
+//! Unified XLSB read coverage.
 //!
 //! These tests deliberately enter through [`crate::File`].  The leaf tests in
 //! `tests.rs` already cover the `Xlsb` handle and its worksheet trait; this

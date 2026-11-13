@@ -684,8 +684,7 @@ enum MutationTargets {
     Destination(Batch<destination::Target>),
     /// Native picture indices.
     Picture(Batch<usize>),
-    /// Sections, bookmarks, fields, tables of contents and tab stops
-    /// (record 0328).
+    /// Sections, bookmarks, fields, tables of contents and tab stops.
     Mark(Batch<marks::Target>),
 }
 

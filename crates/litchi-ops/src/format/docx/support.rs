@@ -1,6 +1,6 @@
 //! Test-only access to the DOCX adapter for tests and examples outside the
 //! crate: the counting-allocator test and the timing probe. `File::get`,
-//! `find`, `query` and `view` (M1 step R5) are the public surface; this
+//! `find`, `query` and `view` are the public surface; this
 //! module is not public API.
 
 use litchi_core::FileFormat;

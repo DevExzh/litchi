@@ -1,4 +1,4 @@
-//! `File::dump` round trips (record 0336): a dump replayed with `batch` onto
+//! `File::dump` round trips: a dump replayed with `batch` onto
 //! a created document of the same format rebuilds the readable tree.
 //!
 //! For each file: `dump` it, replay the dump atomically onto

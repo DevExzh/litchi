@@ -225,7 +225,7 @@ pub fn create_with(format: FileFormat, options: &CreateOptions) -> Result<File> 
     }
 
     // The ODF text-family formats start from the leaf's minimal package and
-    // are then owned by the ODT body machinery (record 0282).
+    // are then owned by the ODT body machinery.
     #[cfg(feature = "oth")]
     if format == FileFormat::Oth {
         return crate::format::odt::write::create_from(options, format, || {

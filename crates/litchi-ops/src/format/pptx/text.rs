@@ -1,8 +1,8 @@
-//! Values of a shape's text and tables, in OfficeCLI's spellings (record
-//! 0010 §2.3; `PowerPointHandler.NodeBuilder.cs`).
+//! Values of a shape's text and tables, in OfficeCLI's spellings
+//! (`PowerPointHandler.NodeBuilder.cs`).
 //!
-//! Text values come from the leaf's DrawingML text-body reader
-//! (L-PPTX-R7), which reports local properties only; table values come from
+//! Text values come from the leaf's DrawingML text-body reader,
+//! which reports local properties only; table values come from
 //! the leaf's table reader over the graphic frame. Every function here
 //! borrows the leaf value and allocates only where OfficeCLI's text is
 //! composed (`1.5x`, `33%`, a cell's text).
@@ -84,7 +84,7 @@ pub(crate) fn cell_text(item: &TableItem) -> Result<String> {
     }
 }
 
-/// A table row's height (`a:tr@h`, record 0333).
+/// A table row's height (`a:tr@h`).
 pub(crate) fn row_height(item: &TableItem) -> Result<Option<i64>> {
     let table = table(&item.table.handle)?;
     match table.rows()?.get(item.row as usize) {
@@ -93,7 +93,7 @@ pub(crate) fn row_height(item: &TableItem) -> Result<Option<i64>> {
     }
 }
 
-/// A table cell's text body with its local properties (record 0333);
+/// A table cell's text body with its local properties;
 /// `None` for a missing cell or a cell without a body.
 pub(crate) fn cell_body(item: &TableItem) -> Result<Option<Body>> {
     let table = table(&item.table.handle)?;
@@ -103,8 +103,7 @@ pub(crate) fn cell_body(item: &TableItem) -> Result<Option<Body>> {
     }
 }
 
-/// A table cell's local properties: fill, vertical anchor and insets
-/// (record 0333).
+/// A table cell's local properties: fill, vertical anchor and insets.
 pub(crate) fn cell_properties(item: &TableItem) -> Result<litchi_pptx::table::CellProperties> {
     let table = table(&item.table.handle)?;
     match table.cell(item.row as usize, item.column as usize)? {

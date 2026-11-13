@@ -1,5 +1,4 @@
-//! Allocation evidence for the query walker (record 0010 §5.3, §9.2, M1
-//! step R3).
+//! Allocation evidence for the query walker.
 //!
 //! The performance bar requires that a query visits nodes without
 //! allocating: the walk's stack, child counters and ancestor memo grow with
@@ -7,7 +6,7 @@
 //! predicates are compiled once per query, not per node. These tests run the
 //! same compiled plans over a small and a large fake document of the same
 //! depth and count, with a per-thread counting allocator (the pattern of
-//! `litchi-core`'s `selector_allocations` test, record 0005), the allocations
+//! `litchi-core`'s `selector_allocations` test), the allocations
 //! of each whole walk: they must be equal, and few.
 //!
 //! The fake formats are compiled under the `test-support` feature only, so

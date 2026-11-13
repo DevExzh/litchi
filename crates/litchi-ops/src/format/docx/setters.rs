@@ -20,21 +20,21 @@ use crate::value::{Base, Length, LengthContext, Scalar, Scheme, parse_number};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Setter {
     ParagraphText,
-    /// A hyperlink's display text (record 0251a).
+    /// A hyperlink's display text.
     HyperlinkText,
     /// A table cell's text, replacing its content with one paragraph.
     CellText,
-    /// A new cell's preferred width, `w:tcW` (record 0345).
+    /// A new cell's preferred width, `w:tcW`.
     CellWidth,
-    /// A grid column's width in twips (record 0345).
+    /// A grid column's width in twips.
     ColumnWidth,
-    /// A new column's cell text (record 0345).
+    /// A new column's cell text.
     ColumnText,
-    /// A hyperlink's external target (record 0251b).
+    /// A hyperlink's external target.
     HyperlinkUrl,
     /// A new hyperlink's bookmark target.
     HyperlinkAnchor,
-    /// A hyperlink's screen tip, `w:tooltip` (record 0345).
+    /// A hyperlink's screen tip, `w:tooltip`.
     HyperlinkTooltip,
     /// A new table's row count.
     TableRows,
@@ -48,7 +48,7 @@ pub(crate) enum Setter {
     TableData,
     /// A new row's cell count.
     RowColumns,
-    /// Every table border but the diagonals: `border.all` (record 0342).
+    /// Every table border but the diagonals: `border.all`.
     TableBorderAll,
     /// A table's top border.
     TableBorderTop,
@@ -62,7 +62,7 @@ pub(crate) enum Setter {
     TableBorderHorizontal,
     /// A table's inside vertical border, between columns.
     TableBorderVertical,
-    /// A row's height, without a rule (`auto`, record 0342).
+    /// A row's height, without a rule (`auto`).
     RowHeight,
     /// A row's exact height.
     RowHeightExact,
@@ -74,12 +74,12 @@ pub(crate) enum Setter {
     RowCantSplit,
     /// Whether a row's end mark is hidden.
     RowHidden,
-    /// A paragraph's list kind (record 0251e); applied through the
+    /// A paragraph's list kind; applied through the
     /// numbering part, not the paragraph's properties.
     ParagraphListStyle,
-    /// A paragraph list's restart value (record 0251e).
+    /// A paragraph list's restart value.
     ParagraphListStart,
-    /// A new picture's image source (record 0251d).
+    /// A new picture's image source.
     PictureSrc,
     /// A new picture's width.
     PictureWidth,
@@ -89,7 +89,7 @@ pub(crate) enum Setter {
     PictureAlt,
     /// A new picture's name.
     PictureName,
-    /// A new comment's author (record 0251c).
+    /// A new comment's author.
     CommentAuthor,
     /// A new comment's author initials.
     CommentInitials,
@@ -97,14 +97,14 @@ pub(crate) enum Setter {
     CommentDate,
     /// A new comment's text.
     CommentText,
-    /// A comment's resolved state, `w15:done` (record 0345).
+    /// A comment's resolved state, `w15:done`.
     CommentDone,
-    /// A new comment's reply parent, by comment id (record 0345).
+    /// A new comment's reply parent, by comment id.
     CommentParent,
     /// A new comment's range start: after this 1-based run, 0 for the
-    /// paragraph start (record 0345).
+    /// paragraph start.
     CommentRunStart,
-    /// Whether a new comment has range markers (record 0345).
+    /// Whether a new comment has range markers.
     CommentRange,
     ParagraphStyle,
     ParagraphAlign,
@@ -538,7 +538,7 @@ enum Side {
 }
 
 impl Setter {
-    /// Apply a table property (record 0342): the style and the borders.
+    /// Apply a table property: the style and the borders.
     pub(crate) fn apply_table(
         self,
         table: &mut direct::Table,
@@ -589,7 +589,7 @@ impl Setter {
         Ok(())
     }
 
-    /// Apply a row property (record 0342): the height and the header,
+    /// Apply a row property: the height and the header,
     /// keep-together and hidden flags. A flag set to `false` is removed, as
     /// OfficeCLI removes it.
     pub(crate) fn apply_row(self, row: &mut direct::Row, value: Option<Scalar<'_>>) -> Result<()> {

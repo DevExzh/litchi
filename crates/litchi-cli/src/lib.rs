@@ -2,9 +2,9 @@
 //!
 //! The `litchi` binary is a thin shell over `litchi-ops`' public API: it
 //! parses arguments, calls one operation, saves the result and prints it. It
-//! adds no document behaviour of its own (unified-ops record 0256). Verbs and
-//! options follow OfficeCLI's command shapes, so OfficeCLI example scripts
-//! replay with `officecli` replaced by `litchi`.
+//! adds no document behaviour of its own. Verbs and options follow
+//! OfficeCLI's command shapes, so OfficeCLI example scripts replay with
+//! `officecli` replaced by `litchi`.
 //!
 //! | Verb | `litchi-ops` call |
 //! |---|---|
@@ -22,7 +22,7 @@
 //! | `schema <type>` | `litchi_ops::schema` |
 //! | `merge <template> <data> --out <file> [--format json\|csv\|tsv] [--missing keep\|empty] [--no-fields] [--force]`, or OfficeCLI's `merge <template> <output> --data <json\|file>` | `merge::Data::from_json`/`from_csv`, then `File::merge` and `File::save_with` per record (refusing existing outputs unless `--force`); several records need `{n}` in the output name |
 //! | `refresh <file> [--clock DATETIME] [--write-cache] [--require-page-numbers] [--no-dirty] [--out F]` | `File::refresh_with_options`, then `File::save` (in place, as OfficeCLI) or `File::save_as`; nothing is written when every result is current |
-//! | `dump <file> [/] [--format batch] [--out F]` | `File::dump`; the JSON array on stdout (or `--out`), skipped content as `warning[...]` lines on stderr (record 0336) |
+//! | `dump <file> [/] [--format batch] [--out F]` | `File::dump`; the JSON array on stdout (or `--out`), skipped content as `warning[...]` lines on stderr |
 //! | `raw <file> [<part>] [--out F]` | `File::parts` without a part, else `File::raw`: the XML on stdout, or the bytes to `--out` |
 //! | `raw-set <file> <part> --xpath X --action A [--xml X] [--out F]` | `File::raw_set`, then a save in place (or to `--out`) |
 //! | `add-part <file> <parent> --type T [--name P] [--content-type C --relationship R --data F] [--out F]` | `File::add_part`; prints OfficeCLI's `Created T part: relId=... path=...` |
@@ -46,12 +46,11 @@
 //! properties apply atomically, each skipped property is printed on stderr
 //! as `warning[unsupported_property]: ...` with its `property` line (and in
 //! the item's `warnings` with `--json`), and the run exits 9. Invalid values
-//! and every other failure still refuse the command (`batch::Unsupported`,
-//! record 0269). A command that still fails after skipping prints the
-//! skipped properties as `warning[...]` blocks before its `error[...]`
-//! (with `--json`, the error's `warnings`), and exits with the failure's own
-//! status: the failure is that of the command without them
-//! (`litchi_ops::Error::warnings`, record 0271).
+//! and every other failure still refuse the command (`batch::Unsupported`).
+//! A command that still fails after skipping prints the skipped properties
+//! as `warning[...]` blocks before its `error[...]` (with `--json`, the
+//! error's `warnings`), and exits with the failure's own status: the failure
+//! is that of the command without them (`litchi_ops::Error::warnings`).
 //!
 //! # Output
 //!

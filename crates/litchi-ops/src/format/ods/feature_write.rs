@@ -1,12 +1,12 @@
-//! Add, set and remove of ODS worksheet features (record 0327).
+//! Add, set and remove of ODS worksheet features.
 //!
 //! Every verb admits its properties through the kind's registry table in
-//! `features` (the XLSX vocabulary of record 0320), builds the leaf value
-//! and stages one leaf `Edit`: hyperlinks are `text:a` anchors of a cell
-//! (the worksheet family), the other kinds provenance splices of
-//! `content.xml` (and `styles.xml` for a conditional format's cell style)
-//! through the `sheet_features` verbs, so every element they do not touch
-//! keeps its bytes.
+//! `features` (the XLSX vocabulary), builds the leaf value and stages one
+//! leaf `Edit`: hyperlinks are `text:a` anchors of a cell (the worksheet
+//! family), the other kinds provenance splices of `content.xml` (and
+//! `styles.xml` for a conditional format's cell style) through the
+//! `sheet_features` verbs, so every element they do not touch keeps its
+//! bytes.
 //!
 //! Formulas (CF values and rules, validation formulas) are written in A1
 //! syntax without a leading `=` and converted to OpenFormula references

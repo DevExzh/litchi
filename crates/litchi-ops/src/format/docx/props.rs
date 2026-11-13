@@ -1,9 +1,8 @@
 //! What a DOCX node shows in its view and offers to queries: its text,
-//! preview, style, child count and `format` entries (record 0010 §2.3,
-//! §2.4, §4.5.3).
+//! preview, style, child count and `format` entries.
 //!
-//! `format` reads the node's typed direct properties once (L-DOCX-R4:
-//! `Paragraph::direct_properties`, `Run::direct_properties`,
+//! `format` reads the node's typed direct properties once
+//! (`Paragraph::direct_properties`, `Run::direct_properties`,
 //! `Table::properties`, `Row::properties`, `Cell::properties`) and yields
 //! the entries by table index. Values are local, never effective: nothing
 //! is inherited from styles or document defaults (ADR 0004). An
@@ -123,7 +122,7 @@ pub(super) fn preview<'n>(node: &'n Node<'_>) -> Result<Option<Preview<'n>>> {
 
 /// The `style` member of a paragraph: its style id, or `Normal` when it
 /// names none (OfficeCLI prints the style's display name, which needs the
-/// styles part; M1-Δ4).
+/// styles part).
 pub(super) fn style<'n>(node: &'n Node<'_>) -> Result<Option<Cow<'n, str>>> {
     Ok(match &node.value {
         Value::Paragraph { paragraph, .. } => Some(Cow::Owned(
@@ -134,7 +133,7 @@ pub(super) fn style<'n>(node: &'n Node<'_>) -> Result<Option<Cow<'n, str>>> {
 }
 
 /// The `childCount` member: the children the view lists, or `None` for a
-/// body whose blocks no request has read (M1-Δ1).
+/// body whose blocks no request has read.
 pub(super) fn child_count(node: &Node<'_>) -> Result<Option<u32>> {
     let count = match &node.value {
         Value::Document => {
@@ -292,7 +291,7 @@ pub(super) fn format<'n>(node: &'n Node<'_>) -> Result<Format<'n>> {
     require_valid(invalid)?;
     // A part element's semantic identity (`type`) is an ordinary property;
     // its native identifiers (`id`, `ilvl`) are raw-only, as list ids are
-    // for RTF (record 0319).
+    // for RTF.
     if let Props::Mark(_) = &props {
         return Ok(Format::new(
             super::marks::table(node.kind),
@@ -310,7 +309,7 @@ pub(super) fn format<'n>(node: &'n Node<'_>) -> Result<Format<'n>> {
         );
     }
     let table = node.kind.spec().props;
-    // An axis's `role` is semantic: it selects and is shown (record 0335).
+    // An axis's `role` is semantic: it selects and is shown.
     let hidden = if node.kind == Kind::Axis {
         &[]
     } else {
@@ -339,7 +338,7 @@ pub(crate) struct TableProps {
 }
 
 /// A comment's identity, author and text, and its `commentsExtended`
-/// state and reply parent (record 0345).
+/// state and reply parent.
 pub(crate) struct CommentProps {
     id: u32,
     author: String,
@@ -365,14 +364,14 @@ pub(crate) enum Props<'a> {
     /// A display equation: `mode` is `display`.
     Equation,
     /// The core properties and, when the part is present and valid, the
-    /// application properties (record 0342).
+    /// application properties.
     Document(
         Box<Metadata>,
         Option<Box<litchi_ooxml_common::properties::app::Props>>,
     ),
     Paragraph {
         /// The handle the paragraph's style and list properties read the
-        /// styles and numbering parts through (record 0319).
+        /// styles and numbering parts through.
         docx: &'a super::Docx,
         props: Box<direct::Paragraph>,
         /// Validated native identifier, available only to raw query access.
@@ -393,18 +392,18 @@ pub(crate) enum Props<'a> {
     Picture(Arc<litchi_docx::image::InlineImage>),
     /// A chart: its frame, and its chart part read through the handle.
     Chart(&'a super::Docx, Arc<super::chart::ChartValue>),
-    /// A SmartArt graphic (record 0295).
+    /// A SmartArt graphic.
     SmartArt(Arc<super::smartart::SmartArtValue>),
-    /// A chart's series or axis (record 0335).
+    /// A chart's series or axis.
     ChartChild(&'a super::Docx, Arc<super::chart::ChartValue>, Kind, u32),
-    /// A graphic's content node (record 0335).
+    /// A graphic's content node.
     DiagramNode(Arc<super::smartart::DiagramNodeValue>),
-    /// A styles, numbering, story or note element (record 0319).
+    /// A styles, numbering, story or note element.
     Part(super::parts::PartProps<'a>),
     /// A tab stop, break, bookmark, field, table of contents, watermark or
-    /// text box (record 0319).
+    /// text box.
     Mark(Arc<super::marks::MarkValue>),
-    /// A table grid column's width in twips (record 0345).
+    /// A table grid column's width in twips.
     Column(Option<u32>),
 }
 
@@ -611,7 +610,7 @@ fn document<'a>(metadata: &Metadata, index: usize) -> Option<NodeValue<'a>> {
 }
 
 /// An `extended.*` key of the root: the application properties, as
-/// OfficeCLI's `ExtendedPropertiesHandler` reads them (record 0342).
+/// OfficeCLI's `ExtendedPropertiesHandler` reads them.
 fn extended<'a>(
     app: &litchi_ooxml_common::properties::app::Props,
     index: usize,
@@ -984,7 +983,7 @@ fn comment_value<'a>(
 }
 
 /// A comment's resolved state and reply parent (the parent comment's id),
-/// from its last paragraph's `commentsExtended` entry (record 0345):
+/// from its last paragraph's `commentsExtended` entry:
 /// unresolved and no parent without one.
 fn comment_thread(
     docx: &super::Docx,
@@ -1010,7 +1009,7 @@ fn comment_thread(
 /// The path of the paragraph comment `id` is anchored to, as OfficeCLI's
 /// `FindCommentAnchorPath` finds it: the paragraph holding its range start,
 /// or failing that its reference (a point comment), anywhere in the main
-/// story's body, tables and content controls (record 0345). One walk of
+/// story's body, tables and content controls. One walk of
 /// the story finds every comment's anchor; the handle keeps the map.
 pub(super) fn comment_anchor(docx: &super::Docx, id: u32) -> Result<Option<String>> {
     if let Some(anchors) = docx.parts().comment_anchors.get() {
@@ -1440,7 +1439,7 @@ fn view_kinds(kind: Kind) -> KindSet<Kind> {
     match kind {
         Kind::Paragraph => KindSet::of(Kind::Run),
         // Bookmarks, fields, tables of contents, the watermark and text
-        // boxes are reached by path and query, not listed (record 0319).
+        // boxes are reached by path and query, not listed.
         Kind::Document => KindSet::of(Kind::Body)
             .with(Kind::Styles)
             .with(Kind::Header)

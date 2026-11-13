@@ -1,4 +1,4 @@
-//! Speaker-notes text through the native eager edit (record 0252).
+//! Speaker-notes text through the native eager edit.
 //!
 //! `/slide[N]/notes` replaces an existing notes page's text; a slide's
 //! `notes` property also creates the page when the slide has none. Source

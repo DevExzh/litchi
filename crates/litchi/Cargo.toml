@@ -78,11 +78,11 @@ odt = ["dep:litchi-odt", "odf-common", "dep:litchi-ops", "litchi-ops/odt"]
 ods = ["dep:litchi-ods", "odf-common", "sheet", "dep:litchi-ops", "litchi-ops/ods"]
 odp = ["dep:litchi-odp", "odf-common", "dep:litchi-ops", "litchi-ops/odp"]
 # OpenDocument HTML templates and master documents open through the unified
-# ODT adapter (record 0282).
+# ODT adapter.
 oth = ["odt", "litchi-ops/oth"]
 odm = ["odt", "litchi-ops/odm"]
 # The OpenDocument object formats open through the unified object-tree
-# adapter (record 0282).
+# adapter.
 odg = ["odf-common", "dep:litchi-ops", "litchi-ops/odg"]
 odc = ["odf-common", "dep:litchi-ops", "litchi-ops/odc"]
 odi = ["odf-common", "dep:litchi-ops", "litchi-ops/odi"]
@@ -117,7 +117,7 @@ ooxml-common = ["dep:litchi-ooxml-common"]
 drawingml = ["dep:litchi-drawingml"]
 odf-common = ["dep:litchi-odf-common"]
 sheet = ["dep:litchi-sheet"]
-# Delimited (CSV/TSV/PRN), SYLK, DIF and fixed-width text workbooks (record 0354).
+# Delimited (CSV/TSV/PRN), SYLK, DIF and fixed-width text workbooks.
 sheet-text = ["sheet", "dep:litchi-sheet-text"]
 sign = [
     "dep:litchi-sign",
@@ -265,7 +265,7 @@ serde-saphyr = { version = "2.1.1", optional = true } # YAML metadata serializat
 
 [build-dependencies]
 # (none) — `build.rs` derives `cfg(litchi_unified)` from the format features
-# above without dependencies (record 0334); iwa proto compilation lives in
+# above without dependencies; iwa proto compilation lives in
 # `crates/litchi-iwa-protos/build.rs`.
 
 [dev-dependencies]

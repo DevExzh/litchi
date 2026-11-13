@@ -1,35 +1,15 @@
-//! Differential evidence for records 0262 and 0267: representative queries
+//! Differential evidence for the query walker: representative queries
 //! over the XLSX, DOCX, PPTX, XLS and XLSB corpora return exactly what they
 //! returned before the query-walker optimizations (typed comparison, small
 //! nodes, direct iteration, walker shortcuts) and the streaming cell cursors.
 //!
-//! `tests/golden/query_corpus/digests.json` holds the digests the trunk
-//! build before record 0262 printed (`examples/query_corpus_digest.rs`, base
-//! `949224c319`; re-recorded over the larger corpus after the merge into
-//! trunk, where the pre-0262 build `ab7e4b7480` and the merged build
-//! `80915b091b` printed byte-identical digests). The XLS and XLSB digests
-//! were added by record 0267, printed by trunk `4d1afe92bc` before its
-//! changes. The ODS and flat ODS digests were added by record 0277, printed
-//! by its read adapter before the ODS writers landed; the ODT digests were
-//! added by record 0276 the same way, and the ODP and flat ODP digests by
-//! record 0278, printed by its read adapter before the ODP write handlers
-//! landed. The ODM digests were added by record 0282, printed by the build
-//! that first opened ODM through the shared ODT adapter, and the ODG, ODC,
-//! ODB and ODF formula digests by the same record from the object-tree
-//! adapter's reads. The Pages, Keynote and Numbers digests were added by
-//! record 0296, printed by the iWork object-tree adapter's reads. Record 0290
-//! re-blessed `pptx placeholder` (0 → 4,644 matches) when a bare
-//! `placeholder` selector started matching the shapes with a placeholder
-//! binding. The flat ODT and flat ODG digests were added by record 0292,
-//! printed by the build that first opened `.fodt` and `.fodg`, before any
-//! flat write landed. Record 0341 re-blessed the flat ODP digests (two
-//! LibreOffice files that write `&apos;` and `&lt;` now open) and the
-//! Keynote digests (the generated `unified-ops/0294/shapes.key`, which
-//! holds a line and a group). Each digest covers, file by file, every match's kind,
+//! `tests/golden/query_corpus/digests.json` holds the recorded digests
+//! (`examples/query_corpus_digest.rs` prints them). The digests of each
+//! further format (XLS, XLSB, the ODF and flat ODF formats, Pages, Keynote
+//! and Numbers) were recorded by the build that first read the format,
+//! before its write handlers landed. Each digest covers, file by file, every match's kind,
 //! path, positional path and text, and every error, so a changed result set
-//! on any file changes it. Record 0432 re-blessed the Numbers digests
-//! (two new native fixtures), and record 0433 those of Numbers and Keynote
-//! (three more). Set `LITCHI_BLESS_GOLDEN=1` to write the current
+//! on any file changes it. Set `LITCHI_BLESS_GOLDEN=1` to write the current
 //! build's digests instead, after showing that a change of results is
 //! intended.
 

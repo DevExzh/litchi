@@ -1,5 +1,5 @@
-//! `File.refresh` (record 0279): the options from keyword arguments, the
-//! refresh with the GIL released, and the summary as a dict.
+//! `File.refresh`: the options from keyword arguments, the refresh with the
+//! GIL released, and the summary as a dict.
 
 use litchi::refresh::{Clock, Options, PageNumbers, Summary};
 use litchi::transaction::SemanticLimits;

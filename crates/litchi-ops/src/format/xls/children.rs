@@ -23,8 +23,7 @@ enum State<'f> {
         sheet: usize,
         cells: litchi_xls::worksheet::StoredCells<'f>,
     },
-    /// A positional worksheet's cells through the leaf's cell cursor
-    /// (record 0267).
+    /// A positional worksheet's cells through the leaf's cell cursor.
     Stream(Box<Stream<'f>>),
     Done,
     Sheets {
@@ -48,7 +47,7 @@ enum State<'f> {
         grid: Grid,
         rows: std::vec::IntoIter<u32>,
     },
-    /// A worksheet's features (record 0327).
+    /// A worksheet's features.
     Features {
         sheet: usize,
         items: std::vec::IntoIter<super::features::Feature>,
@@ -369,7 +368,7 @@ impl<'f> Children<'f> {
                         || kinds.contains(Kind::Column)
                         || kinds.contains(Kind::Row)) =>
             {
-                // A walk scoped to worksheet features lists them (record 0327).
+                // A walk scoped to worksheet features lists them.
                 let mut items = Vec::new();
                 for kind in super::features::KINDS {
                     if kinds.contains(kind) {

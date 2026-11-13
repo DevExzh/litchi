@@ -1,5 +1,5 @@
-//! ODS find/replace and template merge (record 0295) over the shared text
-//! surface (`crate::find::surface`).
+//! ODS find/replace and template merge over the shared text surface
+//! (`crate::find::surface`).
 //!
 //! As the other workbooks: the workbook searches every sheet; a sheet,
 //! cell, range, row or column its own cells; each logical text cell is one

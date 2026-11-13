@@ -1,4 +1,4 @@
-//! Add, set and remove of worksheet features (record 0320).
+//! Add, set and remove of worksheet features.
 //!
 //! Every verb admits its properties through the kind's registry table in
 //! `features`, builds the leaf value, and publishes one leaf commit:
@@ -1719,7 +1719,7 @@ impl Xlsx {
         let mut geometry = Geometry::default();
         let (mut flip_h, mut flip_v) = (None, None);
         let picture = feature.kind == Kind::Picture;
-        // A new image for the picture (record 0338).
+        // A new image for the picture.
         let mut image = None;
         let admitted: Vec<(Option<PictureKey>, Option<ShapeKey>, &'static str, Arg)> = if picture {
             admit(&features::PICTURE_TABLE, Operation::Set, props)?
@@ -1809,7 +1809,7 @@ impl Xlsx {
         }
         if let Some((bytes, content_type, extension)) = image {
             // Path resolution read the picture; the leaf does not read the
-            // drawing again to find its image (record 0347).
+            // drawing again to find its image.
             edit.replace_element_image(
                 sheet,
                 feature.index as usize,

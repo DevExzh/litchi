@@ -1,4 +1,4 @@
-//! Unified writes of OpenDocument presentations (record 0278): scene
+//! Unified writes of OpenDocument presentations: scene
 //! splices through the leaf `Package::edit()`, exact no-ops, coalesced
 //! batches, metadata, creation and atomic publication.
 
@@ -375,7 +375,7 @@ fn create_save_and_flat_refusals() {
     {
         let source_path = fixture(relative);
         let flat = litchi_ops::open(&source_path).unwrap();
-        // Record 0292: a flat presentation edits its packaged projection and
+        // A flat presentation edits its packaged projection and
         // republishes the edit into its flat bytes (`flat_odf_unified.rs`).
         // The projection admission now handles these producers' empty
         // master-page names; prove that the page rename is real and

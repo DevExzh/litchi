@@ -1,5 +1,5 @@
 //! The ODP write registry: one table per element kind, layered on the read
-//! tables of [`super::spec`] (record 0278).
+//! tables of [`super::spec`].
 
 use super::spec::{
     CELL_PROPS, CHARACTER_KEYS, FRAME_PROPS, GROUP_PROPS, NOTES_PROPS, PARAGRAPH_PROPS, RUN_PROPS,
@@ -24,7 +24,7 @@ pub(crate) enum Setter {
     Width,
     /// `svg:height`.
     Height,
-    /// Bold, through a derived automatic style (record 0308).
+    /// Bold, through a derived automatic style.
     Bold,
     /// Italic.
     Italic,
@@ -131,8 +131,7 @@ const fn write_entries<const N: usize>(
 
 const GEOMETRY: &[&str] = &["name", "x", "y", "width", "height"];
 
-/// A shape's geometry and the character formatting of its whole text
-/// (record 0316).
+/// A shape's geometry and the character formatting of its whole text.
 const SHAPE_WRITABLE: &[&str] = &[
     "name",
     "x",
@@ -275,62 +274,62 @@ const fn operation_gap(
     }
 }
 
-/// The ODP write contexts the adapter refuses (record 0278 §6).
+/// The ODP write contexts the adapter refuses.
 pub(crate) static WRITE_GAPS: [GapSpec; 10] = [
     operation_gap(
         "set",
         "run",
         "field-run",
-        "M6 ODP field editing",
+        "ODP field editing",
         "page-number, date and other field runs are computed by the producer and refuse text",
     ),
     operation_gap(
         "set",
         "shape",
         "character-format",
-        "0316 ODP inherited shape formatting",
+        "ODP inherited shape formatting",
         "bold, italic, underline, size, colour and font are set on paragraphs, runs (links and fields included), and on a shape, table cell or notes story as a whole (each paragraph and every run that overrides the value); reads resolve the node's style chain through the common styles of styles.xml but not a shape's graphic or presentation style, and text sets write plain paragraphs in the first paragraph's style",
     ),
     operation_gap(
         "set",
         "shape",
         "non-paragraph-story",
-        "M6 ODP rich text boxes",
+        "ODP rich text boxes",
         "a whole-story text set refuses a text box that holds drawing objects or other non-paragraph children; set paragraphs or runs instead",
     ),
     operation_gap(
         "add",
         "shape",
         "positioned-insert",
-        "M6 ODP z-order insertion",
+        "ODP z-order insertion",
         "new text boxes are appended at the end of the slide's objects; move them afterwards",
     ),
     operation_gap(
         "add",
         "shape",
         "picture-table-chart",
-        "M6 ODP media and table creation",
+        "ODP media and table creation",
         "only text boxes are added; pictures, tables, charts and media need package resources the scene splice does not author",
     ),
     operation_gap(
         "move",
         "paragraph",
         "story-reorder",
-        "M6 ODP paragraph ordering",
+        "ODP paragraph ordering",
         "paragraphs, runs, rows and cells are not moved or swapped; slides and top-level slide objects are",
     ),
     operation_gap(
         "remove",
         "slide",
         "referenced-page",
-        "M6 ODP reference rewriting",
+        "ODP reference rewriting",
         "a slide (or a renamed slide) whose name links, custom shows or other markup reference is refused rather than leaving a dangling reference",
     ),
     operation_gap(
         "remove",
         "shape",
         "referenced-object",
-        "M6 ODP reference rewriting",
+        "ODP reference rewriting",
         "an object whose draw:id or xml:id animations or other markup reference is refused; notes-page objects are not removed",
     ),
     operation_gap(
@@ -344,7 +343,7 @@ pub(crate) static WRITE_GAPS: [GapSpec; 10] = [
         "set",
         "presentation",
         "extended-metadata",
-        "0288 ODF user-defined and statistics metadata",
+        "ODF user-defined and statistics metadata",
         "/metadata writes title, subject, description, author, lastModifiedBy, language and keywords through the ODF metadata family; dates, statistics and custom.<name> are refused",
     ),
 ];

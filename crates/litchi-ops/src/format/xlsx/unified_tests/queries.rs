@@ -1,4 +1,4 @@
-//! Queries and header-row predicates on workbooks (record 0010 §5).
+//! Queries and header-row predicates on workbooks.
 
 use super::{SML, SheetPart, both, kitchen, query, query_paths, workbook};
 use crate::Code;

@@ -1,6 +1,5 @@
-//! The ODP elements of record 0328: shape and text hyperlinks, line
-//! breaks, table columns, media typing, formula objects and chart series
-//! and axes.
+//! The ODP parts: shape and text hyperlinks, line breaks, table columns,
+//! media typing, formula objects and chart series and axes.
 //!
 //! Hyperlinks, line breaks, columns and media read the bytes of their
 //! indexed node through `litchi_odp::scene::parts` on demand. Formula
@@ -268,8 +267,7 @@ pub(crate) fn shape_action(
     })
 }
 
-/// Refuse script, data, file and archive links (OfficeCLI's allow-list,
-/// record 0321).
+/// Refuse script, data, file and archive links (OfficeCLI's allow-list).
 pub(crate) fn check_url(link: &str) -> std::result::Result<(), &'static str> {
     let lower = link.trim().to_ascii_lowercase();
     if ["javascript:", "vbscript:", "data:", "file:", "jar:"]

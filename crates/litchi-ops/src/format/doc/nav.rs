@@ -592,7 +592,7 @@ impl<'f> Inspect<'f> for Nav<'f> {
 }
 
 // ---------------------------------------------------------------------------
-// Parts and marks (record 0324)
+// Parts and marks
 // ---------------------------------------------------------------------------
 
 /// The text boxes and shapes listed after the body's blocks, when wanted.

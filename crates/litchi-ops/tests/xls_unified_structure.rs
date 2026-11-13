@@ -406,7 +406,7 @@ fn signed_and_encrypted_workbooks_refuse_structure_edits() {
     }
 }
 
-/// Record 0316: an array formula and a data table move whole with their
+/// An array formula and a data table move whole with their
 /// cells, on both owners, and removing the inserted row and column restores
 /// the input bytes.
 #[test]

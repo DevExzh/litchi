@@ -218,8 +218,8 @@ mod families {
     }
 }
 
-/// One OPC container index per OOXML open (record 0003 §2.5), counted by
-/// the detection probe counter.
+/// One OPC container index per OOXML open, counted by the detection
+/// probe counter.
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 mod one_index {
     use super::super::test_data;
@@ -576,8 +576,7 @@ mod limits {
     }
 }
 
-/// An execution context bounds an open by its cancellation token only
-/// (record 0008, finding A1).
+/// An execution context bounds an open by its cancellation token only.
 #[cfg(any(
     feature = "doc",
     feature = "docx",
@@ -610,8 +609,8 @@ mod execution {
         (source, ExecutionContext::new(budget, token, limits))
     }
 
-    /// Record 0008 A1: the managed source-backed DOCX route refuses to read
-    /// the Word-authored fixtures, so an open under a context keeps the
+    /// The managed source-backed DOCX route refuses to read the
+    /// Word-authored fixtures, so an open under a context keeps the
     /// ordinary owners. Every DOCX fixture reads under one.
     #[cfg(feature = "docx")]
     #[test]
@@ -640,7 +639,7 @@ mod execution {
             assert_eq!(bytes.text().unwrap(), file.text().unwrap());
             read += 1;
         }
-        assert_eq!(read, 19, "the Word-authored DOCX fixtures of record 0008");
+        assert_eq!(read, 19, "the Word-authored DOCX fixtures");
     }
 
     #[test]
@@ -662,7 +661,7 @@ mod execution {
 }
 
 /// [`SourceMode::Eager`](crate::SourceMode::Eager) builds the eager owner
-/// from the eager detection route (record 0008, finding A5).
+/// from the eager detection route.
 #[cfg(feature = "docx")]
 mod eager {
     use super::super::test_data;
@@ -813,12 +812,12 @@ mod tail {
 }
 
 /// ZIP inputs at the edges of OOXML and OpenDocument detection, through the
-/// openers. M0a step S9 moved these cases here from the tests of the
+/// openers. These cases moved here from the tests of the
 /// per-family probes (`detect_docx_source_bytes`,
 /// `detect_workbook_source_bytes`, `detect_presentation_source_bytes`,
 /// `detect_prepared_ods`, `detect_prepared_odp` and
 /// `detect_workbook_source_path`) that the format-family types used, which
-/// S9 deleted with those types.
+/// were deleted with those types.
 #[cfg(any(
     feature = "docx",
     feature = "pptx",

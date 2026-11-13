@@ -1,5 +1,5 @@
-//! PPTX structural edits on producer decks through the unified API
-//! (record 0303): slides that own Parts, p14 sections, and an OLE frame
+//! PPTX structural edits on producer decks through the unified API:
+//! slides that own Parts, p14 sections, and an OLE frame
 //! under markup compatibility.
 
 #![cfg(feature = "pptx")]

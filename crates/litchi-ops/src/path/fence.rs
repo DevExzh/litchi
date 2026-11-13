@@ -1,4 +1,4 @@
-//! Source-freshness fence scopes (record 0262).
+//! Source-freshness fence scopes.
 //!
 //! A source-backed handle brackets each public read with a check that its
 //! source has not changed (`Navigate::check_source`), so a changed source

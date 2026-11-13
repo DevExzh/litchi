@@ -1,7 +1,7 @@
 //! DOCX package semantics in Markdown, through `litchi::open`,
 //! `litchi::open_bytes` and the eager owner (`SourceMode::Eager`).
 //!
-//! M0a step S8c ported these tests from the facade's `Document`. The two
+//! These tests were ported from the facade's `Document`. The two
 //! projection tests compared the path route with the facade's byte route
 //! only; they now also pin the Markdown the facade produced for their
 //! documents, recorded before the facade types were removed.

@@ -2,9 +2,9 @@
 //! the workbook view's static `WorkbookTrait`, against the eager leaf
 //! `litchi::xlsb::Workbook` as the oracle.
 //!
-//! M0a step S8c ported these tests from the facade's workbook type and its
-//! XLSB-specific workbook openers: the facade's source-backed path and
-//! byte routes are `litchi::open` and `litchi::open_bytes`, its
+//! These tests were ported from the facade's workbook type and its
+//! XLSB-specific workbook openers: the facade's source-backed path and byte
+//! routes are `litchi::open` and `litchi::open_bytes`, its
 //! `Box<dyn WorkbookTrait>` is the `WorkbookView` of `File::workbook`, its
 //! eager byte entry is `SourceMode::Eager` (and the leaf it wrapped), and its
 //! `*_with_limits` forms are `OpenOptions::ooxml_limits`. Errors that crossed

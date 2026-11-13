@@ -4,7 +4,7 @@
 //! (`format::odf_tree`); every ODF object format turns it on. The adapter's
 //! code needs at least one object format, so it is gated on this cfg rather
 //! than on the umbrella feature, and `--features odf-objects` alone builds
-//! the umbrella's dependencies only (record 0358a).
+//! the umbrella's dependencies only.
 
 const OBJECT_FORMATS: [&str; 5] = ["ODG", "ODC", "ODI", "ODB", "ODF_FORMULA"];
 

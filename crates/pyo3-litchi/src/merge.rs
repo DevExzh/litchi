@@ -1,5 +1,5 @@
-//! `File.merge` (record 0274): the data record from a dict or JSON text,
-//! the merge with the GIL released, and the summary as a dict.
+//! `File.merge`: the data record from a dict or JSON text, the merge with the
+//! GIL released, and the summary as a dict.
 
 use litchi::merge::{Data, Missing, Options, Record, Summary};
 use litchi::transaction::SemanticLimits;

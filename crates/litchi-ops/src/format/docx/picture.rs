@@ -1,4 +1,4 @@
-//! Inline picture insertion (record 0251d).
+//! Inline picture insertion.
 //!
 //! `add(<paragraph>, picture, {src, width, height, alt, name})` reads the
 //! image from a base64 `data:` URI or a local file path, bounded by the
@@ -6,7 +6,7 @@
 //! `insert_picture_at`: a media part, its relationship and a run holding
 //! the inline drawing, in one commit.
 //!
-//! `set` (record 0335) writes `width`, `height` (the drawing's and the
+//! `set` writes `width`, `height` (the drawing's and the
 //! shape's extent; one side keeps the other), `alt`, `name` and `src` (a
 //! new image part the picture then names) through the leaf
 //! `set_picture_at`; `remove` drops the drawing, and its run when the run
@@ -151,7 +151,7 @@ pub(super) fn new_picture(props: &Props<'_>) -> Result<NewPicture> {
     Ok(picture)
 }
 
-/// The admitted values of a picture `set` (record 0335).
+/// The admitted values of a picture `set`.
 fn picture_change(props: &Props<'_>) -> Result<(PictureChange, (Option<i64>, Option<i64>))> {
     let mut change = PictureChange::new();
     let mut size = (None, None);
@@ -225,7 +225,7 @@ fn picture_target(docx: &Docx, node: &Node<'_>) -> Result<(ElementPath, Position
 }
 
 impl Docx {
-    /// A `set` whose targets are pictures (record 0335); `Err` hands the
+    /// A `set` whose targets are pictures; `Err` hands the
     /// editor back for other targets.
     pub(super) fn try_set_picture(
         &self,
@@ -270,7 +270,7 @@ impl Docx {
         edit.commit(self).map(Ok)
     }
 
-    /// Remove pictures selected by their paths (record 0335).
+    /// Remove pictures selected by their paths.
     pub(super) fn remove_pictures(&self, editor: DocxEditor, nodes: &[Node<'_>]) -> Result<Commit> {
         let mut targets = Vec::with_capacity(nodes.len());
         for node in nodes {

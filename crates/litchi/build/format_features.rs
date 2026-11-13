@@ -4,8 +4,8 @@
 //! format with a plain (not weak, `?`) `"litchi-ops/<format>"` item. Every
 //! such feature makes `litchi::open` and `File` available, so the build
 //! script emits `cfg(litchi_unified)` when any one is enabled, and no
-//! hand-written `#[cfg(any(feature = ...))]` list can omit a format (record
-//! 0334). The facade's unit tests include this file to pin the derived set.
+//! hand-written `#[cfg(any(feature = ...))]` list can omit a format. The
+//! facade's unit tests include this file to pin the derived set.
 //!
 //! The parser reads only the `[features]` table: a key, `=`, and an array of
 //! double-quoted strings, which may span lines. Comments and other tables are

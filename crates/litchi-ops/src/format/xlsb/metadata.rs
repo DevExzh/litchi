@@ -1,4 +1,4 @@
-//! XLSB document metadata on the workbook root (records 0253, 0261).
+//! XLSB document metadata on the workbook root.
 //!
 //! A set on `/` with OfficeCLI's document-property keys commits one leaf
 //! [`litchi_xlsb::metadata`] transaction. A source-backed handle commits the
@@ -140,8 +140,7 @@ impl Xlsb {
                     });
             }
         }
-        // Stage on the workbook itself: no copy into a package first
-        // (record 0281).
+        // Stage on the workbook itself: no copy into a package first.
         let editor = self.editor_for_write()?;
         let (target, patch, metadata) = commit(
             editor.edit_metadata_with_options(native_options(limits.max_snapshot_bytes())),

@@ -1,19 +1,18 @@
 //! Element names and their rules: the static alias, case-folding and
-//! predicate tables of record 0010 §4.2–§4.3, harvested from OfficeCLI.
+//! predicate tables, harvested from OfficeCLI.
 //!
 //! One [`Vocabulary`] per format family names the elements of every format in
 //! it: [`WORD`] serves DOCX, DOC, RTF and ODT; [`PRESENTATION`] serves PPTX,
-//! PPT and ODP; [`WORKBOOK`] serves XLSX, XLSB, XLS and ODS (record 0010 §4.8:
-//! "tier 2 uses the same paths and kinds as its OOXML sibling"). A format
-//! adapter maps the canonical names it models to its own element kinds
+//! PPT and ODP; [`WORKBOOK`] serves XLSX, XLSB, XLS and ODS (tier 2 uses the
+//! same paths and kinds as its OOXML sibling). A format adapter maps the
+//! canonical names it models to its own element kinds
 //! (`ElementKind::from_name`); the names it does not model stay known
 //! concepts, which is what lets the resolver tell `unsupported_capability`
 //! from an unknown name.
 //!
 //! Every table is a `static` sorted array, checked at compile time. Lookups
 //! scan the few aliases that share a name's first letter, through an index
-//! computed at compile time ([`AliasIndex`], record 0291); they never
-//! allocate.
+//! computed at compile time ([`AliasIndex`]); they never allocate.
 //!
 //! # Sources
 //!
@@ -25,7 +24,7 @@
 //! `merge` rewrite). Canonical names are the segments OfficeCLI's node
 //! builders emit (`p`/`r` in Word, `paragraph`/`run` in presentations,
 //! `col[B]` in workbooks). Element names that OfficeCLI's handlers or
-//! `schemas/help` accept beyond the plan's §4.2 table (Word `tab`, `ptab`,
+//! `schemas/help` accept beyond the alias table (Word `tab`, `ptab`,
 //! `fieldChar`; presentation `zoom`, `model3d`; workbook `slicer`,
 //! `sparkline`, ...) are included as canonical names so that they classify as
 //! known concepts.
@@ -50,7 +49,7 @@ pub(crate) enum Case {
     ///
     /// Workbook adapters whose leaf has its own canonical name key (XLSX
     /// `sheet::key`, NFD plus default case folding) use that key instead, as
-    /// record 0010 §4.2 requires for sheet names.
+    /// sheet names require.
     Caseless,
 }
 
@@ -229,7 +228,7 @@ pub(crate) struct Vocabulary {
     /// The family's top-level path forms, for `unsupported_path` suggestions.
     pub(crate) roots: &'static str,
     /// Lookup tables over `aliases` and `elements`, computed at compile
-    /// time by [`Vocabulary::indexed`] (record 0291).
+    /// time by [`Vocabulary::indexed`].
     pub(crate) index: AliasIndex,
 }
 
@@ -237,11 +236,11 @@ pub(crate) struct Vocabulary {
 /// [`AliasIndex::rules`].
 const MAX_ALIASES: usize = 128;
 
-/// Compile-time lookup tables of a [`Vocabulary`] (record 0291). A path step
-/// is classified on every `get`, `find` and `set`; a binary search over the
-/// alias table with a case-folding comparison cost about 400 instructions
-/// per step, and the element rule another 300. The tables below make both a
-/// short scan of the aliases that share the step's first letter.
+/// Compile-time lookup tables of a [`Vocabulary`]. A path step is classified
+/// on every `get`, `find` and `set`; a binary search over the alias table
+/// with a case-folding comparison cost about 400 instructions per step, and
+/// the element rule another 300. The tables below make both a short scan of
+/// the aliases that share the step's first letter.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct AliasIndex {
     /// For each ASCII byte `b`, aliases `starts[b]..starts[b + 1]` begin
@@ -850,7 +849,7 @@ pub(crate) static ODT: Vocabulary = Vocabulary {
 #[cfg(feature = "odt")]
 const _: () = assert!(well_formed(&ODT) && names_are_aliases(&ODT) && ODT.elements.len() <= 128);
 
-/// OpenDocument drawings (record 0282): pages, their shapes and layers.
+/// OpenDocument drawings: pages, their shapes and layers.
 #[cfg(feature = "odg")]
 pub(crate) static DRAWING: Vocabulary = Vocabulary {
     family: Family::Other,
@@ -870,7 +869,7 @@ pub(crate) static DRAWING: Vocabulary = Vocabulary {
 #[cfg(feature = "odg")]
 const _: () = assert!(well_formed(&DRAWING) && names_are_aliases(&DRAWING));
 
-/// OpenDocument charts (record 0282): axes, series and the legend.
+/// OpenDocument charts: axes, series and the legend.
 #[cfg(feature = "odc")]
 pub(crate) static CHART: Vocabulary = Vocabulary {
     family: Family::Other,
@@ -890,7 +889,7 @@ pub(crate) static CHART: Vocabulary = Vocabulary {
 #[cfg(feature = "odc")]
 const _: () = assert!(well_formed(&CHART) && names_are_aliases(&CHART));
 
-/// OpenDocument images (record 0282): the image frame and `/metadata`.
+/// OpenDocument images: the image frame and `/metadata`.
 #[cfg(feature = "odi")]
 pub(crate) static IMAGE: Vocabulary = Vocabulary {
     family: Family::Other,
@@ -913,7 +912,7 @@ pub(crate) static IMAGE: Vocabulary = Vocabulary {
 #[cfg(feature = "odi")]
 const _: () = assert!(well_formed(&IMAGE) && names_are_aliases(&IMAGE));
 
-/// OpenDocument databases (record 0282): tables, their columns and queries.
+/// OpenDocument databases: tables, their columns and queries.
 #[cfg(feature = "odb")]
 pub(crate) static DATABASE: Vocabulary = Vocabulary {
     family: Family::Other,
@@ -933,7 +932,7 @@ pub(crate) static DATABASE: Vocabulary = Vocabulary {
 #[cfg(feature = "odb")]
 const _: () = assert!(well_formed(&DATABASE) && names_are_aliases(&DATABASE));
 
-/// OpenDocument formulas (record 0282): the MathML element tree.
+/// OpenDocument formulas: the MathML element tree.
 #[cfg(feature = "odf-formula")]
 pub(crate) static MATH: Vocabulary = Vocabulary {
     family: Family::Other,
@@ -948,9 +947,9 @@ pub(crate) static MATH: Vocabulary = Vocabulary {
 #[cfg(feature = "odf-formula")]
 const _: () = assert!(well_formed(&MATH) && names_are_aliases(&MATH));
 
-/// Apple Numbers workbooks (record 0296): sheets hold tables, and cells
-/// belong to a table. A sheet or a table is named by the step itself
-/// (`/Sheet 1/Table 1/A1`), and a table's cells are its A1 steps.
+/// Apple Numbers workbooks: sheets hold tables, and cells belong to a
+/// table. A sheet or a table is named by the step itself (`/Sheet
+/// 1/Table 1/A1`), and a table's cells are its A1 steps.
 #[cfg(feature = "numbers")]
 pub(crate) static NUMBERS: Vocabulary = Vocabulary {
     family: Family::Workbook,
@@ -1041,7 +1040,7 @@ const fn word_elements_without_paragraph_identity() -> [ElementRule; WORD.elemen
 /// every other shape (`/slide[1]/title[2]` is the second shape). Query
 /// selectors narrow them, as OfficeCLI's do: `title` selects title and
 /// centred-title placeholders, `textbox` every other shape (query
-/// compilation, M1 step R3).
+/// compilation).
 pub(crate) static PRESENTATION: Vocabulary = Vocabulary {
     family: Family::Presentation,
     root: "presentation",
@@ -1199,7 +1198,7 @@ pub(crate) static WORKBOOK: Vocabulary = Vocabulary {
         ("picture", "picture"),
         ("pivot", "pivottable"),
         ("pivottable", "pivottable"),
-        // OfficeCLI's run path step, `/Sheet1/A1/r[N]` (record 0338).
+        // OfficeCLI's run path step, `/Sheet1/A1/r[N]`.
         ("r", "run"),
         ("range", "range"),
         ("row", "row"),
@@ -1283,7 +1282,7 @@ mod index_tests {
         .to_vec()
     }
 
-    /// The binary searches the index replaced (record 0291).
+    /// The binary searches the index replaced.
     fn searched_canonical(vocabulary: &Vocabulary, name: &str) -> Option<&'static str> {
         vocabulary
             .aliases

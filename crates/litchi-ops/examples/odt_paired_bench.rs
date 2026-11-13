@@ -161,10 +161,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
         report("query_all", paragraphs, result);
 
-        // Record 0280: the fair leaf equivalent of the same query. Each
-        // match is kept as a retainable handle with its positional address
-        // (the parent and the ordinal among its paragraph siblings), which
-        // is what a unified node and its path carry.
+        // The fair leaf equivalent of the same query. Each match is kept
+        // as a retainable handle with its positional address (the parent
+        // and the ordinal among its paragraph siblings), which is what a
+        // unified node and its path carry.
         let result = paired(
             || {
                 let body = document.body().expect("body");

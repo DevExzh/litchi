@@ -94,37 +94,37 @@
     "issues": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the issues view needs the validators `validate` adds"
     },
     "forms": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the forms view needs the validators `validate` adds"
     },
     "html": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     "svg": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     "screenshot": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     "pdf": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     }
   },
@@ -3910,7 +3910,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended",
+        "followUp": "not supported yet",
         "reason": "zoom and 3D-model frames sit in markup-compatibility content the scene reads as its fallback"
       }
     },
@@ -3936,7 +3936,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended",
+        "followUp": "not supported yet",
         "reason": "zoom and 3D-model frames sit in markup-compatibility content the scene reads as its fallback"
       }
     },
@@ -4559,7 +4559,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended",
+        "followUp": "not supported yet",
         "reason": "the timing tree is not read per shape yet"
       }
     },
@@ -4724,7 +4724,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended",
+        "followUp": "not supported yet",
         "reason": "notes slides are read through /slide[N]/notes; their parts have no adapter node"
       }
     },
@@ -4747,7 +4747,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended",
+        "followUp": "not supported yet",
         "reason": "notes slides are read through /slide[N]/notes; their parts have no adapter node"
       }
     },
@@ -4805,42 +4805,42 @@
       "subject": "element",
       "element": "zoom",
       "code": "unsupported_capability",
-      "followUp": "M1-extended",
+      "followUp": "not supported yet",
       "reason": "zoom and 3D-model frames sit in markup-compatibility content the scene reads as its fallback"
     },
     {
       "subject": "element",
       "element": "model3d",
       "code": "unsupported_capability",
-      "followUp": "M1-extended",
+      "followUp": "not supported yet",
       "reason": "zoom and 3D-model frames sit in markup-compatibility content the scene reads as its fallback"
     },
     {
       "subject": "element",
       "element": "animation",
       "code": "unsupported_capability",
-      "followUp": "M1-extended",
+      "followUp": "not supported yet",
       "reason": "the timing tree is not read per shape yet"
     },
     {
       "subject": "element",
       "element": "noteSlide",
       "code": "unsupported_capability",
-      "followUp": "M1-extended",
+      "followUp": "not supported yet",
       "reason": "notes slides are read through /slide[N]/notes; their parts have no adapter node"
     },
     {
       "subject": "element",
       "element": "notesMaster",
       "code": "unsupported_capability",
-      "followUp": "M1-extended",
+      "followUp": "not supported yet",
       "reason": "notes slides are read through /slide[N]/notes; their parts have no adapter node"
     },
     {
       "subject": "element",
       "element": "diagram",
       "code": "unsupported_path",
-      "followUp": "none: out of scope (record 0332, design §10)",
+      "followUp": "none: out of scope",
       "reason": "OfficeCLI's diagram renders Mermaid text into shapes or a picture; rendering is outside the unified API, and SmartArt is the smartart element"
     },
     {
@@ -4848,7 +4848,7 @@
       "element": "presentation",
       "key": "defaultFont",
       "code": "unsupported_capability",
-      "followUp": "L-PPTX-R4",
+      "followUp": "not supported yet",
       "reason": "the root does not read the theme part; read bodyFont of /theme"
     },
     {
@@ -4856,7 +4856,7 @@
       "element": "slide",
       "key": "background",
       "code": "unsupported_capability",
-      "followUp": "M1-extended",
+      "followUp": "not supported yet",
       "reason": "slide backgrounds are not read per slide yet"
     },
     {
@@ -4864,7 +4864,7 @@
       "element": "slide",
       "key": "transition",
       "code": "unsupported_capability",
-      "followUp": "M1-extended",
+      "followUp": "not supported yet",
       "reason": "slide transitions are not read per slide yet"
     },
     {
@@ -4872,7 +4872,7 @@
       "element": "slide",
       "key": "notes",
       "code": "unsupported_capability",
-      "followUp": "M1-Δ1",
+      "followUp": "not supported yet",
       "reason": "the slide's notes live in another part; read /slide[N]/notes"
     },
     {
@@ -4880,7 +4880,7 @@
       "element": "shape",
       "key": "fill",
       "code": "unsupported_capability",
-      "followUp": "L-PPTX-R6b",
+      "followUp": "not supported yet",
       "reason": "the shape record keeps no spPr fill, line or geometry span"
     },
     {
@@ -4888,7 +4888,7 @@
       "element": "shape",
       "key": "opacity",
       "code": "unsupported_capability",
-      "followUp": "L-PPTX-R6b",
+      "followUp": "not supported yet",
       "reason": "the shape record keeps no spPr fill, line or geometry span"
     },
     {
@@ -4896,7 +4896,7 @@
       "element": "shape",
       "key": "geometry",
       "code": "unsupported_capability",
-      "followUp": "L-PPTX-R6b",
+      "followUp": "not supported yet",
       "reason": "the shape record keeps no spPr fill, line or geometry span"
     },
     {
@@ -4904,7 +4904,7 @@
       "element": "shape",
       "key": "line",
       "code": "unsupported_capability",
-      "followUp": "L-PPTX-R6b",
+      "followUp": "not supported yet",
       "reason": "the shape record keeps no spPr fill, line or geometry span"
     },
     {
@@ -4912,7 +4912,7 @@
       "element": "shape",
       "key": "lineWidth",
       "code": "unsupported_capability",
-      "followUp": "L-PPTX-R6b",
+      "followUp": "not supported yet",
       "reason": "the shape record keeps no spPr fill, line or geometry span"
     },
     {
@@ -4920,7 +4920,7 @@
       "element": "shape",
       "key": "valign",
       "code": "unsupported_capability",
-      "followUp": "L-PPTX-R7b",
+      "followUp": "not supported yet",
       "reason": "the text-body reader applies body-property defaults, so local values are unknown"
     },
     {
@@ -4928,7 +4928,7 @@
       "element": "shape",
       "key": "margin",
       "code": "unsupported_capability",
-      "followUp": "L-PPTX-R7b",
+      "followUp": "not supported yet",
       "reason": "the text-body reader applies body-property defaults, so local values are unknown"
     },
     {
@@ -4936,7 +4936,7 @@
       "element": "shape",
       "key": "wrap",
       "code": "unsupported_capability",
-      "followUp": "L-PPTX-R7b",
+      "followUp": "not supported yet",
       "reason": "the text-body reader applies body-property defaults, so local values are unknown"
     },
     {
@@ -4944,7 +4944,7 @@
       "element": "shape",
       "key": "autoFit",
       "code": "unsupported_capability",
-      "followUp": "L-PPTX-R7b",
+      "followUp": "not supported yet",
       "reason": "the text-body reader applies body-property defaults, so local values are unknown"
     },
     {
@@ -4952,7 +4952,7 @@
       "element": "shape",
       "key": "textDirection",
       "code": "unsupported_capability",
-      "followUp": "L-PPTX-R7b",
+      "followUp": "not supported yet",
       "reason": "the text-body reader applies body-property defaults, so local values are unknown"
     },
     {
@@ -4960,7 +4960,7 @@
       "element": "shape",
       "key": "list",
       "code": "unsupported_capability",
-      "followUp": "M1-extended",
+      "followUp": "not supported yet",
       "reason": "bullets are read but not yet named in OfficeCLI's list vocabulary"
     },
     {
@@ -4968,7 +4968,7 @@
       "element": "paragraph",
       "key": "list",
       "code": "unsupported_capability",
-      "followUp": "M1-extended",
+      "followUp": "not supported yet",
       "reason": "bullets are read but not yet named in OfficeCLI's list vocabulary"
     },
     {
@@ -4976,7 +4976,7 @@
       "element": "table",
       "key": "colWidths",
       "code": "unsupported_capability",
-      "followUp": "L-PPTX-R8",
+      "followUp": "not supported yet",
       "reason": "the table node does not list its grid widths; read /slide[N]/table[N]/col[N]"
     },
     {
@@ -4984,7 +4984,7 @@
       "element": "tc",
       "key": "colspan",
       "code": "unsupported_capability",
-      "followUp": "L-PPTX-R8",
+      "followUp": "not supported yet",
       "reason": "the table reader does not read cell properties yet"
     },
     {
@@ -4992,7 +4992,7 @@
       "element": "tc",
       "key": "rowspan",
       "code": "unsupported_capability",
-      "followUp": "L-PPTX-R8",
+      "followUp": "not supported yet",
       "reason": "the table reader does not read cell properties yet"
     },
     {
@@ -5000,7 +5000,7 @@
       "element": "picture",
       "key": "crop",
       "code": "unsupported_capability",
-      "followUp": "0333-F4",
+      "followUp": "not supported yet",
       "reason": "the picture reader does not model the blip fill's a:srcRect yet"
     },
     {
@@ -5008,7 +5008,7 @@
       "element": "picture",
       "key": "cropLeft",
       "code": "unsupported_capability",
-      "followUp": "0333-F4",
+      "followUp": "not supported yet",
       "reason": "the picture reader does not model the blip fill's a:srcRect yet"
     },
     {
@@ -5016,7 +5016,7 @@
       "element": "picture",
       "key": "cropTop",
       "code": "unsupported_capability",
-      "followUp": "0333-F4",
+      "followUp": "not supported yet",
       "reason": "the picture reader does not model the blip fill's a:srcRect yet"
     },
     {
@@ -5024,7 +5024,7 @@
       "element": "picture",
       "key": "cropRight",
       "code": "unsupported_capability",
-      "followUp": "0333-F4",
+      "followUp": "not supported yet",
       "reason": "the picture reader does not model the blip fill's a:srcRect yet"
     },
     {
@@ -5032,7 +5032,7 @@
       "element": "picture",
       "key": "cropBottom",
       "code": "unsupported_capability",
-      "followUp": "0333-F4",
+      "followUp": "not supported yet",
       "reason": "the picture reader does not model the blip fill's a:srcRect yet"
     },
     {
@@ -5040,7 +5040,7 @@
       "element": "picture",
       "key": "mediaType",
       "code": "unsupported_capability",
-      "followUp": "L-PPTX-R11",
+      "followUp": "not supported yet",
       "reason": "a picture node does not report its media kind; read /slide[N]/video[N] or audio[N]"
     },
     {
@@ -5050,7 +5050,7 @@
       "context": "path-read",
       "code": "unsupported_capability",
       "followUp": "File::metadata(); /metadata node reads with the shared metadata vocabulary",
-      "reason": "`set(\"/metadata\", ..)` writes the OOXML document properties (root-metadata keys and custom.<name>, record 0253); the path is set-only, and reads go through File::metadata() and the root node"
+      "reason": "`set(\"/metadata\", ..)` writes the OOXML document properties (root-metadata keys and custom.<name>); the path is set-only, and reads go through File::metadata() and the root node"
     },
     {
       "subject": "operation",
@@ -5058,7 +5058,7 @@
       "element": "presentation",
       "context": "template",
       "code": "unsupported_capability",
-      "followUp": "M2 PPTX creation options",
+      "followUp": "PPTX creation options",
       "reason": "native PPTX template creation is not integrated"
     },
     {
@@ -5067,7 +5067,7 @@
       "element": "presentation",
       "context": "strict",
       "code": "unsupported_capability",
-      "followUp": "M2 PPTX creation options",
+      "followUp": "PPTX creation options",
       "reason": "native PPTX Strict creation is not integrated"
     },
     {
@@ -5076,7 +5076,7 @@
       "element": "presentation",
       "context": "unrepresentable-metadata",
       "code": "unsupported_capability",
-      "followUp": "M2 PPTX creation options",
+      "followUp": "PPTX creation options",
       "reason": "initial metadata is committed through the leaf metadata transaction; content_type, last_backup and codepage have no OOXML property part and are refused rather than dropped"
     },
     {
@@ -5085,7 +5085,7 @@
       "element": "shape",
       "context": "non-append-placement",
       "code": "unsupported_capability",
-      "followUp": "M2 PPTX non-append shape placement",
+      "followUp": "PPTX non-append shape placement",
       "reason": "PPTX shape creation currently supports append placement only"
     },
     {
@@ -5094,7 +5094,7 @@
       "element": "shape",
       "context": "non-slide-parent",
       "code": "unsupported_capability",
-      "followUp": "M2 PPTX group/master/layout shape creation",
+      "followUp": "PPTX group/master/layout shape creation",
       "reason": "text-box creation requires a top-level slide parent; group, master and layout insertion remain pending"
     },
     {
@@ -5103,7 +5103,7 @@
       "element": "slide",
       "context": "positional-owner",
       "code": "unsupported_capability",
-      "followUp": "M2 PPTX positional-owner slide ordering",
+      "followUp": "PPTX positional-owner slide ordering",
       "reason": "source-backed PPTX slide ordering maintains p14 sections but still refuses outline slide lists, numeric presentation ranges, and unknown or opaque metadata extensions"
     },
     {
@@ -5112,7 +5112,7 @@
       "element": "slide",
       "context": "positional-owner",
       "code": "unsupported_capability",
-      "followUp": "M2 PPTX positional-owner slide ordering",
+      "followUp": "PPTX positional-owner slide ordering",
       "reason": "source-backed PPTX slide ordering maintains p14 sections but still refuses outline slide lists, numeric presentation ranges, and unknown or opaque metadata extensions"
     },
     {
@@ -5121,7 +5121,7 @@
       "element": "slide",
       "context": "dependency-topology",
       "code": "unsupported_capability",
-      "followUp": "M2 PPTX dependency-aware slide removal",
+      "followUp": "PPTX dependency-aware slide removal",
       "reason": "native PPTX slide removal removes the notes, comments, pictures, media and other Parts the slide owns exclusively and keeps shared ones; a slide another slide jumps to, or whose relationships name a missing Part, is still refused"
     },
     {
@@ -5130,7 +5130,7 @@
       "element": "slide",
       "context": "final-slide",
       "code": "invalid_value",
-      "followUp": "M2 PPTX final-slide removal policy",
+      "followUp": "PPTX final-slide removal policy",
       "reason": "native PPTX slide removal currently preserves the final slide and cannot remove the last slide from a presentation"
     },
     {
@@ -5139,7 +5139,7 @@
       "element": "slide",
       "context": "canonical-target",
       "code": "unsupported_capability",
-      "followUp": "M2 PPTX equivalent relationship-target spellings",
+      "followUp": "PPTX equivalent relationship-target spellings",
       "reason": "source-backed PPTX slide removal requires canonical owner-relative relationship targets so inverse replay can restore the original OPC spelling"
     },
     {
@@ -5148,7 +5148,7 @@
       "element": "shape",
       "context": "dependency-topology",
       "code": "unsupported_capability",
-      "followUp": "M2 PPTX dependency-aware shape removal",
+      "followUp": "PPTX dependency-aware shape removal",
       "reason": "shape removal refuses retained connector or animation references to removed IDs; source-backed removal preserves unused relationships and parts, while eager removal prunes unreachable relationship closure"
     },
     {
@@ -5157,7 +5157,7 @@
       "element": "shape",
       "context": "non-top-level",
       "code": "unsupported_capability",
-      "followUp": "M2 PPTX grouped/master/layout shape removal",
+      "followUp": "PPTX grouped/master/layout shape removal",
       "reason": "native PPTX shape removal currently requires a top-level slide shape; grouped children and master or layout shapes remain outside the admitted topology"
     },
     {
@@ -5166,7 +5166,7 @@
       "element": "shape",
       "context": "native-shape-text-preservation",
       "code": "unsupported_capability",
-      "followUp": "M2 PPTX structural and rich-text editing",
+      "followUp": "PPTX structural and rich-text editing",
       "reason": "text replacement requires an existing slide shape text body and native edit admission; master/layout shapes, text-body creation and rich-text formatting remain pending"
     },
     {
@@ -5175,49 +5175,49 @@
       "element": "presentation",
       "context": "managed-signature-removal",
       "code": "unsupported_capability",
-      "followUp": "M2 PPTX managed source-preserving signature removal",
+      "followUp": "PPTX managed source-preserving signature removal",
       "reason": "explicit signature removal requires native eager materialization, which managed sources refuse"
     },
     {
       "subject": "view",
       "mode": "issues",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the issues view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "forms",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the forms view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "html",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "svg",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "screenshot",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "pdf",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     }
   ]

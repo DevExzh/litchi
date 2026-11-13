@@ -600,7 +600,7 @@
       "subject": "element",
       "element": "r",
       "code": "unsupported_capability",
-      "followUp": "record 0309 follow-up: Pages run elements",
+      "followUp": "follow-up: Pages run elements",
       "reason": "Pages body text has no run elements in the tree yet; character properties are written on a whole paragraph (`font.*` on `p`) through the leaf's section::text_style family, and Package::section_text_runs reads the runs"
     },
     {
@@ -609,7 +609,7 @@
       "element": "metadata",
       "context": "path-read",
       "code": "unsupported_capability",
-      "followUp": "record 0299 Pages metadata node",
+      "followUp": "Pages metadata node",
       "reason": "`set(\"/metadata\", ..)` writes the document properties through the leaf metadata family; the path is set-only, and reads go through File::metadata()"
     },
     {
@@ -618,7 +618,7 @@
       "element": "tc",
       "context": "cells in a formula graph",
       "code": "unsupported_capability",
-      "followUp": "record 0309 follow-ups",
+      "followUp": "not supported yet",
       "reason": "body-table cells take text, numbers, booleans and clears through table::values; a formula cell, or one a formula or chart reads, is refused so no calculation cache goes stale"
     },
     {
@@ -627,7 +627,7 @@
       "element": "tbl",
       "context": "a document without a body table",
       "code": "unsupported_capability",
-      "followUp": "record 0329 follow-up: a built-in table template",
+      "followUp": "follow-up: a built-in table template",
       "reason": "a new body table copies the structure (styles, header counts, storage layout) of the document's first body table; a document without one has none to copy"
     },
     {
@@ -636,8 +636,8 @@
       "element": "p",
       "context": "a paragraph that anchors a chart, image or footnote",
       "code": "unsupported_capability",
-      "followUp": "record 0301 follow-up: delete those anchored objects with their paragraph",
-      "reason": "a paragraph whose anchors are all body tables is removed with its tables (record 0301); removing one that anchors a chart, image or footnote, or moving any anchored paragraph, would delete or move an object the leaf has no transaction for here"
+      "followUp": "follow-up: delete those anchored objects with their paragraph",
+      "reason": "a paragraph whose anchors are all body tables is removed with its tables; removing one that anchors a chart, image or footnote, or moving any anchored paragraph, would delete or move an object the leaf has no transaction for here"
     },
     {
       "subject": "operation",
@@ -652,42 +652,42 @@
       "subject": "view",
       "mode": "issues",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the issues view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "forms",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the forms view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "html",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "svg",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "screenshot",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "pdf",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     }
   ],
@@ -696,7 +696,7 @@
     "support": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0295 follow-up: a find adapter over the format's text edits",
+      "followUp": "follow-up: a find adapter over the format's text edits",
       "reason": "find/replace is not integrated for this format"
     },
     "keywords": {
@@ -727,7 +727,7 @@
         "set": true,
         "writeGap": {
           "code": "unsupported_capability",
-          "followUp": "record 0010 Q3: an owner-approved regular-expression dependency",
+          "followUp": "an owner-approved regular-expression dependency",
           "reason": "Litchi has no approved regular-expression engine; `regex=true` and OfficeCLI's `r\"...\"` patterns are refused"
         }
       }

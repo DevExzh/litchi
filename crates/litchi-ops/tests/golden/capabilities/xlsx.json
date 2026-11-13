@@ -88,37 +88,37 @@
     "issues": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the issues view needs the validators `validate` adds"
     },
     "forms": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the forms view needs the validators `validate` adds"
     },
     "html": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     "svg": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     "screenshot": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     "pdf": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     }
   },
@@ -2876,7 +2876,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended (R4x)",
+        "followUp": "not supported yet",
         "reason": "pivot tables are not projected into nodes yet"
       }
     },
@@ -2899,7 +2899,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended (R4x)",
+        "followUp": "not supported yet",
         "reason": "slicers are not projected into nodes yet"
       }
     },
@@ -2922,7 +2922,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended (R4x)",
+        "followUp": "not supported yet",
         "reason": "sparkline groups are not projected into nodes yet"
       }
     },
@@ -3431,7 +3431,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended (R4x)",
+        "followUp": "not supported yet",
         "reason": "merged ranges are not listed as nodes yet; cells report them as `merge`"
       }
     },
@@ -3851,7 +3851,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended (R4x)",
+        "followUp": "not supported yet",
         "reason": "OLE objects are not projected into nodes yet"
       }
     },
@@ -4054,35 +4054,35 @@
       "subject": "element",
       "element": "pivottable",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "pivot tables are not projected into nodes yet"
     },
     {
       "subject": "element",
       "element": "slicer",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "slicers are not projected into nodes yet"
     },
     {
       "subject": "element",
       "element": "sparkline",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "sparkline groups are not projected into nodes yet"
     },
     {
       "subject": "element",
       "element": "mergeCell",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "merged ranges are not listed as nodes yet; cells report them as `merge`"
     },
     {
       "subject": "element",
       "element": "ole",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "OLE objects are not projected into nodes yet"
     },
     {
@@ -4090,7 +4090,7 @@
       "element": "workbook",
       "key": "calc.mode",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "calculation properties are read by the eager owner only"
     },
     {
@@ -4098,7 +4098,7 @@
       "element": "workbook",
       "key": "firstSheet",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "the workbook views are not retained by the source-backed catalog"
     },
     {
@@ -4106,31 +4106,31 @@
       "element": "sheet",
       "key": "freeze",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
-      "reason": "sheet views are read by the leaf (L-XLSX-R2) but not projected yet"
+      "followUp": "not supported yet",
+      "reason": "sheet views are read by the leaf but not projected yet"
     },
     {
       "subject": "property",
       "element": "sheet",
       "key": "zoom",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
-      "reason": "sheet views are read by the leaf (L-XLSX-R2) but not projected yet"
+      "followUp": "not supported yet",
+      "reason": "sheet views are read by the leaf but not projected yet"
     },
     {
       "subject": "property",
       "element": "sheet",
       "key": "autoFilter",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
-      "reason": "the auto-filter is read by the leaf (L-XLSX-R2) but not projected yet"
+      "followUp": "not supported yet",
+      "reason": "the auto-filter is read by the leaf but not projected yet"
     },
     {
       "subject": "property",
       "element": "sheet",
       "key": "tabColor",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "sheet properties are not readable on the source-backed owner yet"
     },
     {
@@ -4138,7 +4138,7 @@
       "element": "sheet",
       "key": "protect",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "sheet protection is not readable on the source-backed owner yet"
     },
     {
@@ -4146,7 +4146,7 @@
       "element": "sheet",
       "key": "printArea",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "print settings are not projected yet"
     },
     {
@@ -4154,15 +4154,15 @@
       "element": "cell",
       "key": "computedValue",
       "code": "unsupported_capability",
-      "followUp": "M4 follow-up: project computed values in cell views",
-      "reason": "node views do not evaluate; `File::evaluate` and `File::recalculate` compute formula results (record 0266)"
+      "followUp": "follow-up: project computed values in cell views",
+      "reason": "node views do not evaluate; `File::evaluate` and `File::recalculate` compute formula results"
     },
     {
       "subject": "property",
       "element": "cell",
       "key": "link",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "hyperlink targets are not resolved into cell properties yet"
     },
     {
@@ -4170,7 +4170,7 @@
       "element": "cell",
       "key": "tooltip",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "hyperlink targets are not resolved into cell properties yet"
     },
     {
@@ -4178,7 +4178,7 @@
       "element": "cell",
       "key": "display",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "hyperlink targets are not resolved into cell properties yet"
     },
     {
@@ -4186,7 +4186,7 @@
       "element": "cell",
       "key": "phonetic",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "the XLSX cell model does not keep phonetic runs"
     },
     {
@@ -4194,7 +4194,7 @@
       "element": "cell",
       "key": "richtext",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "the XLSX cell model flattens rich-text runs into plain text"
     },
     {
@@ -4202,7 +4202,7 @@
       "element": "cell",
       "key": "alt",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "in-cell pictures are not read"
     },
     {
@@ -4210,7 +4210,7 @@
       "element": "column",
       "key": "numberformat",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "column styles are not readable on the source-backed owner yet"
     },
     {
@@ -4219,21 +4219,21 @@
       "element": "cell",
       "context": "gradient-fill-projection",
       "code": "unsupported_capability",
-      "followUp": "M1 XLSX lossless scalar gradient property projection",
+      "followUp": "XLSX lossless scalar gradient property projection",
       "reason": "ordinary fill readback follows OfficeCLI RGB stop text and integer degrees; complete geometry, stop positions and native colors remain available through Node::cell_format"
     },
     {
       "subject": "element",
       "element": "detectedtable",
       "code": "unsupported_capability",
-      "followUp": "0339-F5 (deferred-P1): header-row table detection in queries",
+      "followUp": "header-row table detection in queries",
       "reason": "OfficeCLI's detectedtable is a header-row block found heuristically in unstructured cells and reported by table queries; Litchi's queries return declared tables only"
     },
     {
       "subject": "element",
       "element": "smartart",
       "code": "unsupported_capability",
-      "followUp": "0339-F6 (deferred-P1): a worksheet-drawing diagram model in litchi-xlsx",
+      "followUp": "a worksheet-drawing diagram model in litchi-xlsx",
       "reason": "litchi-xlsx reads and writes pictures, shapes and charts in worksheet drawings but has no diagram model; a SmartArt frame is kept as it is and is not a node"
     },
     {
@@ -4242,7 +4242,7 @@
       "element": "workbook",
       "context": "template",
       "code": "unsupported_capability",
-      "followUp": "use Flavor::Document; M2 XLSX template creation",
+      "followUp": "use Flavor::Document; XLSX template creation",
       "reason": "the XLSX creator currently authors ordinary workbooks and refuses template requests"
     },
     {
@@ -4260,7 +4260,7 @@
       "element": "workbook",
       "context": "unrepresentable-initial-metadata",
       "code": "unsupported_capability",
-      "followUp": "CreateOptions::metadata (OOXML document properties, record 0253)",
+      "followUp": "CreateOptions::metadata (OOXML document properties)",
       "reason": "initial metadata is committed through the leaf metadata transaction; content_type, last_backup and codepage have no OOXML property part and are refused rather than dropped"
     },
     {
@@ -4269,7 +4269,7 @@
       "element": "workbook",
       "context": "execution-context-budgeting",
       "code": "unsupported_capability",
-      "followUp": "managed OOXML open and publication (record 0008 A1)",
+      "followUp": "managed OOXML open and publication",
       "reason": "OpenOptions::execution checks open-boundary cancellation only; unified opens do not yet retain a managed owner for publication budgeting"
     },
     {
@@ -4279,7 +4279,7 @@
       "context": "path-read",
       "code": "unsupported_capability",
       "followUp": "File::metadata(); /metadata node reads with the shared metadata vocabulary",
-      "reason": "`set(\"/metadata\", ..)` writes the OOXML document properties (root-metadata keys and custom.<name>, record 0253); the path is set-only, and reads go through File::metadata() and the root node"
+      "reason": "`set(\"/metadata\", ..)` writes the OOXML document properties (root-metadata keys and custom.<name>); the path is set-only, and reads go through File::metadata() and the root node"
     },
     {
       "subject": "operation",
@@ -4287,7 +4287,7 @@
       "element": "range",
       "context": "merge-native-preservation-guards",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSX dependency-aware and compatibility-aware merge edits",
+      "followUp": "XLSX dependency-aware and compatibility-aware merge edits",
       "reason": "native merge edits refuse follower content, overlapping geometry, table intersections, group formulas and unmodeled or compatibility-owned payloads instead of discarding them"
     },
     {
@@ -4296,7 +4296,7 @@
       "element": "column",
       "context": "unit-qualified-width-input",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSX OfficeCLI column width input conversion",
+      "followUp": "XLSX OfficeCLI column width input conversion",
       "reason": "column width accepts native character-unit numbers; OfficeCLI unit-qualified width conversion remains pending"
     },
     {
@@ -4305,7 +4305,7 @@
       "element": "workbook",
       "context": "row-column-table-targets",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSX row/column payload and table write admission",
+      "followUp": "XLSX row/column payload and table write admission",
       "reason": "row and column layout properties support scoped selectors; whole-row/column cell payloads, styles, table-driven keys and table writes remain pending"
     },
     {
@@ -4314,7 +4314,7 @@
       "element": "workbook",
       "context": "structural-and-coalesced-commands",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSX structure and native transaction coalescing",
+      "followUp": "XLSX structure and native transaction coalescing",
       "reason": "worksheet lifecycle commands and distinct direct cell payload coalescing are integrated; other structural targets, broader coalescing and read commands remain pending"
     },
     {
@@ -4323,7 +4323,7 @@
       "element": "cell",
       "context": "officecli-input-conventions",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSX OfficeCLI input policy",
+      "followUp": "XLSX OfficeCLI input policy",
       "reason": "cell values preserve typed scalar input; formulas use native formula text without a leading equals sign; OfficeCLI string inference and extended clear modes remain pending"
     },
     {
@@ -4332,7 +4332,7 @@
       "element": "cell",
       "context": "number-format-input-repair",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSX explicit number-format compatibility input policy",
+      "followUp": "XLSX explicit number-format compatibility input policy",
       "reason": "numberformat accepts checked native codes and OfficeCLI keyword aliases; malformed quotes are rejected under strict defaults rather than repaired by dropping trailing characters"
     },
     {
@@ -4341,7 +4341,7 @@
       "element": "cell",
       "context": "fill-replacement-opaque-content",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSX lossless replacement of extended fill children",
+      "followUp": "XLSX lossless replacement of extended fill children",
       "reason": "typed solid, pattern and gradient fills support whole-fill replacement; a changed replacement refuses opaque content inside the replaced pattern or gradient child, while exact no-ops retain it"
     },
     {
@@ -4350,7 +4350,7 @@
       "element": "cell",
       "context": "border-color-without-line",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSX explicit invisible-border color authoring policy",
+      "followUp": "XLSX explicit invisible-border color authoring policy",
       "reason": "border colors require a resulting visible line; strict input admission rejects colors OfficeCLI silently discards on an unstyled side; clearing a line retains existing source color markup"
     },
     {
@@ -4359,7 +4359,7 @@
       "element": "cell",
       "context": "border-opaque-content",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSX lossless replacement of extended border content",
+      "followUp": "XLSX lossless replacement of extended border content",
       "reason": "granular border edits preserve unrelated markup; removing a side or color refuses opaque content that would be discarded"
     },
     {
@@ -4368,7 +4368,7 @@
       "element": "cell",
       "context": "border-color-projection",
       "code": "unsupported_capability",
-      "followUp": "M1 XLSX complete scalar border color projection",
+      "followUp": "XLSX complete scalar border color projection",
       "reason": "ordinary border color readback follows OfficeCLI RGB projection; native theme, indexed, automatic colors and tints remain available through Node::cell_format"
     },
     {
@@ -4377,7 +4377,7 @@
       "element": "cell",
       "context": "border-native-only-edges",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSX logical and interior border property vocabulary",
+      "followUp": "XLSX logical and interior border property vocabulary",
       "reason": "the native border editor supports Strict start/end edges, interior edges and outline; the unified OfficeCLI vocabulary currently exposes physical left/right, top/bottom and diagonal edges only"
     },
     {
@@ -4386,7 +4386,7 @@
       "element": "cell",
       "context": "style-resource-compaction",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSX generated style resource lifecycle",
+      "followUp": "XLSX generated style resource lifecycle",
       "reason": "cell formatting edits reuse matching resources and retain existing stylesheet records; reverting formatting across separate commits can retain unused generated records"
     },
     {
@@ -4395,7 +4395,7 @@
       "element": "cell",
       "context": "font-authoring-profile",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSX stylesheet creation, markup compatibility and inherited formatting",
+      "followUp": "XLSX stylesheet creation, markup compatibility and inherited formatting",
       "reason": "supported cell formatting edits preserve proven Ignorable markup and require existing direct font and cell-format tables; alternate content, unproven directives, escaped namespace bindings and inherited formatting remain unsupported"
     },
     {
@@ -4404,7 +4404,7 @@
       "element": "sheet",
       "context": "non-worksheet-tabs",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSX non-worksheet tab removal",
+      "followUp": "XLSX non-worksheet tab removal",
       "reason": "worksheet removal uses native dependency guards; removal of chart, dialog and macro tabs remains pending"
     },
     {
@@ -4413,49 +4413,49 @@
       "element": "sheet",
       "context": "officecli-sheet-input-conventions",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSX sheet creation property and replay conventions",
+      "followUp": "XLSX sheet creation property and replay conventions",
       "reason": "sheet creation supports name, hidden and explicit placement, defaulting name to Sheet plus catalog count plus one; ifExists, placeholder claiming and additional sheet properties remain pending"
     },
     {
       "subject": "view",
       "mode": "issues",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the issues view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "forms",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the forms view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "html",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "svg",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "screenshot",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "pdf",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     }
   ]

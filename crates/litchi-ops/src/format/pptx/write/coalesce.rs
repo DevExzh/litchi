@@ -6,14 +6,14 @@
 //! the already-coerced payload; no second presentation model is retained.
 //!
 //! Besides shape text and geometry, a run takes character and paragraph
-//! formatting of a direct shape, paragraph or run path (record 0333):
+//! formatting of a direct shape, paragraph or run path:
 //! consecutive formatting plans of a slide publish as one native
 //! `set_text_properties` batch, so a formatting batch is one leaf commit.
 //! A plan overlapping an earlier plan of the run (the same shape's text,
 //! the same paragraph or run) closes the run first, so each plan's change
 //! is judged against the text it formats.
 //!
-//! Record 0346 (record 0333 F3) adds paragraph `text`, table cells (their
+//! A run also takes paragraph `text`, table cells (their
 //! text, formatting, fill, anchor and insets), the paragraphs and runs of
 //! cell bodies, and the paragraphs and runs of the speaker notes. Notes
 //! pages are separate parts the source-backed slide edit does not stage, so
@@ -41,19 +41,19 @@ use std::sync::Arc;
 pub(crate) struct Plan {
     target: Target,
     text: Option<String>,
-    /// Rich formatting of the shape's body, a paragraph or a run (record
-    /// 0333); `None` for a text or geometry plan.
+    /// Rich formatting of the shape's body, a paragraph or a run;
+    /// `None` for a text or geometry plan.
     format: Option<Box<Format>>,
     changed: bool,
-    /// Whether the leaf reports the plan's change when the run stages it
-    /// (record 0348): a table-cell plan, whose target is not read before
+    /// Whether the leaf reports the plan's change when the run stages it:
+    /// a table-cell plan, whose target is not read before
     /// staging; `changed` is then unknown until the commit.
     reported: bool,
     staged_bytes: usize,
     /// Original target text used to prove a signed cancellation.
     original_text: Option<String>,
-    /// Whether the target is a text body of the slide's notes page (record
-    /// 0346), which a separate native call edits.
+    /// Whether the target is a text body of the slide's notes page,
+    /// which a separate native call edits.
     notes: bool,
 }
 
@@ -73,7 +73,7 @@ enum Scope {
     Paragraph(usize),
     /// One run child, by paragraph and child index.
     Run(usize, usize),
-    /// One table cell, by row and column (record 0346).
+    /// One table cell, by row and column.
     Cell(usize, usize),
     /// One paragraph of a table cell's body.
     CellParagraph(usize, usize, usize),
@@ -83,7 +83,7 @@ enum Scope {
 
 /// The scopes a run's plans of one shape touch, indexed so an overlap test
 /// costs O(1) however many cells or paragraphs of the shape a batch
-/// formats (record 0346).
+/// formats.
 #[derive(Default)]
 struct Touched {
     shape: bool,
@@ -187,7 +187,7 @@ struct Item {
 enum BatchKind {
     Text,
     Properties,
-    /// Rich formatting through `set_text_properties` (record 0333).
+    /// Rich formatting through `set_text_properties`.
     Format,
 }
 
@@ -198,20 +198,18 @@ struct CachedScene {
     scene: Option<Scene>,
     shapes: Box<[usize]>,
     placeholders: Box<[usize]>,
-    /// The scene positions of the slide's root tables, in `table[M]` order
-    /// (record 0346).
+    /// The scene positions of the slide's root tables, in `table[M]` order.
     tables: Box<[usize]>,
     /// Each table indexed so far, by scene position: its cells'
-    /// paragraphs and text runs, indexed once per run (records 0346, 0348).
+    /// paragraphs and text runs, indexed once per run.
     cells: HashMap<usize, Arc<Cells>>,
     /// The notes page's body placeholder: its notes-scene position and
-    /// body; `Some(None)` when the slide has none (record 0346).
+    /// body; `Some(None)` when the slide has none.
     notes: Option<NotesBody>,
 }
 
 /// A notes page's body placeholder: its notes-scene position and the
-/// paragraphs and text runs of its body; `None` when the slide has none
-/// (records 0346, 0348).
+/// paragraphs and text runs of its body; `None` when the slide has none.
 pub(crate) type NotesBody = Option<(
     usize,
     Arc<litchi_pptx::shape::BodyTextIndex>,
@@ -222,7 +220,7 @@ type CapturedBody = Arc<litchi_drawingml::text::body::Body>;
 type CapturedRow = Vec<Option<CapturedBody>>;
 
 /// One table's cells, by row and position in the row: the paragraphs and
-/// text runs plans address (record 0348). Their properties and text are not
+/// text runs plans address. Their properties and text are not
 /// read: the leaf reports each cell plan's change when the run stages it.
 pub(crate) struct Cells {
     index: litchi_pptx::table::CellTextIndex,
@@ -417,8 +415,8 @@ impl Run {
     /// share one slide publication. A refusal drops the entire edit and is
     /// located by wire-order replay.
     ///
-    /// The third value holds, for each plan whose change the leaf reports
-    /// (record 0348), its wire index and change; [`Self::stage`] returned
+    /// The third value holds, for each plan whose change the leaf reports,
+    /// its wire index and change; [`Self::stage`] returned
     /// `false` for it.
     pub(crate) fn commit(self) -> Result<(Pptx, Commit, Vec<(usize, bool)>)> {
         let Self {
@@ -695,7 +693,7 @@ fn shape_plan(
     }))
 }
 
-/// The paragraph or run a direct text path names (record 0333).
+/// The paragraph or run a direct text path names.
 #[derive(Clone, Copy)]
 enum TextStep {
     Paragraph(usize),
@@ -732,7 +730,7 @@ fn text_plan(
         return Ok(None);
     }
     // A line break in run text is refused by the ordinary writer.
-    // Paragraph text rebuilds the paragraph's runs (record 0346).
+    // Paragraph text rebuilds the paragraph's runs.
     if matches!(step, TextStep::Run(..))
         && values
             .text()
@@ -877,7 +875,7 @@ fn format_plan(
     }))
 }
 
-/// Whether `values` change a paragraph, its text included (record 0346).
+/// Whether `values` change a paragraph, its text included.
 fn paragraph_changed(
     values: &TextValues,
     paragraph: &litchi_drawingml::text::body::Paragraph,
@@ -886,7 +884,7 @@ fn paragraph_changed(
         || values.text().is_some_and(|text| text != paragraph.text())
 }
 
-/// A cell or notes path (record 0346): zero-based ordinals.
+/// A cell or notes path: zero-based ordinals.
 #[derive(Clone, Copy)]
 struct StoryPath {
     slide: usize,
@@ -951,7 +949,7 @@ fn story_path(path: &Path<'_>) -> Option<StoryPath> {
 }
 
 /// A formatting plan of a table cell, a cell paragraph or run, or a notes
-/// paragraph or run (record 0346). Tables and the notes body are read once
+/// paragraph or run. Tables and the notes body are read once
 /// per run and slide (the run's base is immutable); anything the plan
 /// cannot judge falls back to the ordinary writer.
 #[allow(
@@ -1057,7 +1055,7 @@ fn story_plan(
                 return Ok(None);
             };
             // The paragraph and listed run the text step names, and the
-            // run's child index; the leaf reports the change (record 0348).
+            // run's child index; the leaf reports the change.
             let Some(paragraph) = story.paragraph.filter(|p| *p < index.paragraph_count()) else {
                 return Ok(None);
             };
@@ -1130,8 +1128,7 @@ fn story_plan(
                 story_text(body, story.paragraph, story.run)
             });
             let (row_at, column_at) = (Position::new(row), Position::new(column));
-            // The leaf reports the change when the run stages the plan
-            // (record 0348).
+            // The leaf reports the change when the run stages the plan.
             let unknown = false;
             match (story.paragraph, story.run) {
                 (None, _) => (
@@ -1309,7 +1306,7 @@ fn cache_scene(scene: Scene) -> Result<CachedScene> {
     })
 }
 
-/// Read slide `slide`'s notes body placeholder (record 0346).
+/// Read slide `slide`'s notes body placeholder.
 fn read_notes(
     file: &Pptx,
     slide: usize,
@@ -1318,7 +1315,7 @@ fn read_notes(
 ) -> Result<NotesBody> {
     // As the navigator resolves `/slide[N]/notes/paragraph[K]`: the notes
     // page must have notes text, and its first body placeholder holds the
-    // paragraphs (record 0348).
+    // paragraphs.
     let Some((true, scene)) = file.slide_notes_view(slide)? else {
         return Ok(None);
     };
@@ -1331,7 +1328,7 @@ fn read_notes(
     });
     Ok(match found {
         // `Slide::notes` has read the body (its text): its structure is
-        // indexed without reading it again (record 0348).
+        // indexed without reading it again.
         Some(handle) => match handle.view().common().read_text_index() {
             Ok(Some(index)) => {
                 let body = if capture_text {
@@ -1643,7 +1640,7 @@ fn stage_batch(
                     .map_err(native_error),
             };
         }
-        // The leaf reports each edit's change (record 0348).
+        // The leaf reports each edit's change.
         let flags = match edit {
             NativeEdit::Source(edit) => edit
                 .set_text_property_chunks_per_edit(Position::new(slide), &chunks)
@@ -1732,8 +1729,8 @@ fn stage_batch(
 }
 
 /// One notes page's formatting plans, through the eager editor's notes
-/// text verb in 256-edit chunks (record 0346), staged in one pass over the
-/// notes part (record 0348).
+/// text verb in 256-edit chunks, staged in one pass over the
+/// notes part.
 fn stage_notes(
     edit: &mut NativeEdit,
     slide: usize,
@@ -1769,7 +1766,7 @@ fn stage_notes(
         )
         .map_err(allocation)?;
     chunks.extend(edits.chunks(litchi_pptx::opened::MAX_SHAPE_PROPERTIES_REPLACEMENTS));
-    // The leaf reports each edit's change (record 0348).
+    // The leaf reports each edit's change.
     let flags = edit
         .set_notes_text_property_chunks_per_edit(slide, &chunks)
         .map_err(native_error)?;

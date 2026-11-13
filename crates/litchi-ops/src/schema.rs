@@ -286,8 +286,8 @@ impl Serialize for Schema {
 }
 
 /// The keywords `set` takes beside an element's properties: text
-/// find/replace (record 0273), a Litchi addition. OfficeCLI documents them
-/// as cross-cutting `set` keywords outside its element schemas.
+/// find/replace, a Litchi addition. OfficeCLI documents them as
+/// cross-cutting `set` keywords outside its element schemas.
 struct KeywordsJson(Schema);
 
 impl Serialize for KeywordsJson {

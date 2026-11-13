@@ -1,4 +1,4 @@
-"""Template merge (record 0274): ``File.merge``.
+"""Template merge: ``File.merge``.
 
 Oracles: read-back through the unified read API, immutability of the
 template File, and the summary's keys against the stub's ``_MergeSummary``.
@@ -58,7 +58,7 @@ class MergeTests(unittest.TestCase):
 
 
     def test_more_formats_merge(self):
-        # Record 0295: binary, legacy, RTF and ODF templates merge too.
+        # Binary, legacy, RTF and ODF templates merge too.
         book = L.create("xlsb").set("/Sheet1/A1", {"value": "Hi {{who}}"})
         self.assertEqual(book.merge({"who": "you"}).file.get("/Sheet1/A1", depth=0)["text"], "Hi you")
         text, _ = L.create("odt").add("/body", "paragraph", {"text": "Dear {{who}}"})

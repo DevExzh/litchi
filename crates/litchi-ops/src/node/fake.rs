@@ -1,4 +1,4 @@
-//! A fake format for testing the node view (record 0010 §10.2, step R1).
+//! A fake format for testing the node view.
 //!
 //! Compiled for this crate's tests and under the `test-support` feature only.
 //! Its element kinds and property tables mirror the keys, order and JSON
@@ -156,7 +156,7 @@ const ITEM_PROPS: &[PropSpec] = &[
 static CHART_GAP: GapSpec = GapSpec {
     subject: Subject::Element("chart"),
     code: Code::UnsupportedCapability,
-    follow_up: "L-FAKE-R1",
+    follow_up: "not supported yet",
     reason: "the fake leaf has no chart reader",
 };
 
@@ -300,7 +300,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
     gaps: &[GapSpec {
         subject: Subject::Axis("/header"),
         code: Code::UnsupportedPath,
-        follow_up: "M6",
+        follow_up: "not supported yet",
         reason: "the fake format has no stories",
     }],
 };
@@ -320,7 +320,7 @@ enum ChildCount {
     Listed,
     /// A fixed count, whether or not the children are listed.
     Known(u32),
-    /// Not known without decoding an untouched part (M1-Δ1): omitted.
+    /// Not known without decoding an untouched part: omitted.
     Unknown,
 }
 

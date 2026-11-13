@@ -1,5 +1,5 @@
 //! XLSB CSV/TSV import: every field staged in one native cell-values edit of
-//! the target worksheet and published by one commit (record 0266).
+//! the target worksheet and published by one commit.
 
 use litchi_core::FileFormat;
 use litchi_core::sheet::WorkbookTrait as _;

@@ -220,7 +220,7 @@ fn identity<'s>(select: Select<'s>, key: &str) -> Option<Option<&'s str>> {
 }
 
 impl<'f> Nav<'f> {
-    /// Resolve one step to a part of record 0328 under `parent`.
+    /// Resolve one step to a part under `parent`.
     fn part(
         &self,
         parent: &Node<'f>,
@@ -375,8 +375,8 @@ impl<'f> Inspect<'f> for Nav<'f> {
 
     fn childless(&self, node: &Node<'f>, kinds: KindSet<Kind>) -> bool {
         // A body element none of whose child elements projects to one of
-        // `kinds` lists no such children (record 0280): a paragraph of runs
-        // when the walk looks for paragraphs. Every other node is entered.
+        // `kinds` lists no such children: a paragraph of runs when the walk
+        // looks for paragraphs. Every other node is entered.
         if super::parts::has_part_children(node.kind, kinds) {
             return false;
         }

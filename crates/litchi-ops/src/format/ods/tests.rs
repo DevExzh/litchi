@@ -189,10 +189,10 @@ fn broken_package(mimetype: &str) -> Vec<u8> {
     writer.finish().unwrap().into_inner()
 }
 
-/// Record 0287: a walk that wants only cells lists a sheet's content cells
-/// directly; it must find exactly the cells, in the same order and with the
-/// same paths and previews, that the phased sheet walk finds when it also
-/// lists rows, columns and merges.
+/// A walk that wants only cells lists a sheet's content cells directly; it
+/// must find exactly the cells, in the same order and with the same paths
+/// and previews, that the phased sheet walk finds when it also lists rows,
+/// columns and merges.
 #[test]
 fn cell_only_walks_match_the_phased_sheet_walk() {
     let mut fixtures: Vec<&str> = FIXTURES.to_vec();
@@ -229,9 +229,9 @@ fn cell_only_walks_match_the_phased_sheet_walk() {
     }
 }
 
-/// Record 0287: the binary-searched row runs find exactly the run
-/// `Sheet::cell` finds, at every run boundary of every fixture sheet
-/// (including the huge padding runs producers write).
+/// The binary-searched row runs find exactly the run `Sheet::cell`
+/// finds, at every run boundary of every fixture sheet (including the
+/// huge padding runs producers write).
 #[test]
 fn row_ends_find_the_runs_sheet_cell_finds() {
     let mut fixtures: Vec<&str> = FIXTURES.to_vec();

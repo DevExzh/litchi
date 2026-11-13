@@ -320,7 +320,7 @@ fn xlsb_cell_capabilities_advertise_scalar_and_clear_writes() {
     );
     let formula = cell.property("formula").expect("formula capability");
     assert!(formula.get());
-    assert!(formula.set(), "formula text is authored (record 0261)");
+    assert!(formula.set(), "formula text is authored");
 }
 
 #[test]

@@ -1,10 +1,9 @@
 //! The facade's entry points into the unified operations API (ADR 0033).
 //!
 //! `litchi-ops` owns [`File`](crate::File) and its single-pass openers, and
-//! since record 0296 (owner decision D1) it opens Apple Pages, Keynote and
-//! Numbers packages itself, as `File::Pages`, `File::Keynote` and
-//! `File::Numbers`, package directories included (record 0306). These
-//! openers are `litchi_ops::open` and its variants.
+//! it opens Apple Pages, Keynote and Numbers packages itself, as
+//! `File::Pages`, `File::Keynote` and `File::Numbers`, package directories
+//! included. These openers are `litchi_ops::open` and its variants.
 
 use std::path::Path;
 

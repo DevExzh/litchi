@@ -1,5 +1,5 @@
 //! DOCX writes beyond the direct body through the format-neutral `File`
-//! facade (record 0251a): paragraphs and runs inside table cells, content
+//! facade: paragraphs and runs inside table cells, content
 //! controls and hyperlinks; hyperlink and cell text; and table, row and cell
 //! structure. Every case runs on both owners, reads back through `get`, and
 //! survives a save and reopen.

@@ -66,8 +66,7 @@ fn property_inputs_keep_types_order_and_first_equals_split() {
 }
 
 /// JSON numbers decode correctly rounded and the canonical wire form is a
-/// fixed point (record 0338 F1: the workspace's `serde_json` has
-/// `float_roundtrip`).
+/// fixed point (the workspace's `serde_json` has `float_roundtrip`).
 #[test]
 fn numbers_decode_correctly_rounded_and_round_trip_exactly() {
     // Correctly rounded values, checked against Python's `float()`.
@@ -93,8 +92,7 @@ fn numbers_decode_correctly_rounded_and_round_trip_exactly() {
         let rewire = serde_json::to_vec(&again).unwrap();
         assert_eq!(rewire, wire, "{text}: the wire form is not a fixed point");
     }
-    // The 121-digit literal of record 0334 (finding F1): stable from the
-    // first round trip.
+    // A 121-digit literal: stable from the first round trip.
     let long = format!("9{}", "7".repeat(120));
     let json = format!(r#"[{{"command":"set","props":{{"n":{long}}}}}]"#);
     let items = from_bytes(json.as_bytes(), &SourceLimits::default()).unwrap();
@@ -182,8 +180,8 @@ fn malformed_fields_and_nested_properties_are_refused() {
         ("xml", "[]"),
         ("props", "true"),
         ("props", r#"{"text":{}}"#),
-        // An array value is a list of strings (record 0354); anything else
-        // inside it is refused.
+        // An array value is a list of strings; anything else inside it is
+        // refused.
         ("props", r#"{"text":[1]}"#),
         ("props", r#"{"text":["a",[]]}"#),
         ("props", r#"["missing-equals"]"#),

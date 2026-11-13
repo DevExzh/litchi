@@ -1,11 +1,11 @@
-//! Typed node-view values (record 0010 §2.3): what one `format` entry holds,
-//! and how each value is written.
+//! Typed node-view values: what one `format` entry holds, and how each value
+//! is written.
 //!
 //! Values keep OfficeCLI's JSON types: booleans as booleans, counts and
 //! indices as numbers, positions and extents as unit-qualified strings,
 //! colours as `#RRGGBB` or scheme references. Lengths and colours are the
 //! canonical [`crate::value`] types, so a value prints exactly the way the
-//! coercion that reads it in M2 parses it. A [`Length`] is stored in EMU; the
+//! coercion that reads it parses it. A [`Length`] is stored in EMU; the
 //! property's [`ValueType`] picks how it is written (`"2.54cm"` for a
 //! position, `"11pt"` for a font size), so the node view needs no per-node
 //! strings.
@@ -18,7 +18,7 @@ use serde::ser::{Serialize, Serializer};
 use crate::value::{Color, Length, Scalar, ValueType};
 
 /// A `format` key: the OfficeCLI property name, which is also the key `set`
-/// accepts in M2 (`bold`, `font.latin`, `x`, `cachedValue`).
+/// accepts (`bold`, `font.latin`, `x`, `cachedValue`).
 ///
 /// ```
 /// use litchi_ops::node::Key;
@@ -34,7 +34,7 @@ pub type Key = &'static str;
 /// JSON boolean, [`Value::Int`] and [`Value::Number`] are JSON numbers, and
 /// every other variant is a JSON string. The text of a value is its
 /// [`Scalar`]'s canonical text ([`Value::as_scalar`]), which is the form `set`
-/// accepts in M2 and the form query comparison reads; a [`Length`] prints in
+/// accepts and the form query comparison reads; a [`Length`] prints in
 /// OfficeCLI's centimetre-first form there, while the node view writes it in
 /// the style its key's [`ValueType`] calls for.
 ///
@@ -71,7 +71,7 @@ pub enum Value<'a> {
     /// A colour.
     Color(Color),
     /// A list of text items, a JSON array of strings (the metadata
-    /// keywords, record 0354).
+    /// keywords).
     List(Cow<'a, [String]>),
 }
 

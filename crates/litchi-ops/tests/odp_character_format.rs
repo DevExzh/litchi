@@ -1,5 +1,5 @@
-//! ODP character formatting through derived automatic styles (record 0308,
-//! G-ODP-1): bold, italic, underline, size, colour and font on runs and
+//! ODP character formatting through derived automatic styles:
+//! bold, italic, underline, size, colour and font on runs and
 //! paragraphs. A set never changes a style other markup may share; it
 //! copies the node's automatic style under a new name, merges the
 //! properties, and points the node at the copy. Every other byte of
@@ -166,7 +166,7 @@ fn batches_and_refusals() {
     assert_eq!(error.code(), Code::UnsupportedProperty, "{error}");
 }
 
-/// Record 0316: a shape, a table cell and the notes take formatting as a
+/// A shape, a table cell and the notes take formatting as a
 /// whole; every run then reads it, and the inverse restores the bytes.
 #[test]
 fn shapes_cells_and_notes_take_formatting_as_a_whole() {

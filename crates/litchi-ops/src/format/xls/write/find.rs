@@ -1,4 +1,4 @@
-//! XLS find/replace and template merge (record 0295) over the shared text
+//! XLS find/replace and template merge over the shared text
 //! surface (`crate::find::surface`).
 //!
 //! As XLSX and XLSB: the workbook searches every worksheet; a sheet, cell,
@@ -7,7 +7,7 @@
 //! one native value assignment. The BIFF8 editor admits a bounded number of
 //! staged changes per edit, so changes are committed in native edits of
 //! [`CHUNK`] cells, each on the previous one's result, inside one unified
-//! mutation (as CSV import does, record 0266).
+//! mutation (as CSV import does).
 //!
 //! A cell showing a formatted shared string loses its formatting runs when
 //! its text changes; the native editor refuses removing the last reference

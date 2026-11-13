@@ -1,4 +1,4 @@
-//! The DOCX P0 residue of record 0335 through the unified API: picture
+//! DOCX writes through the unified API: picture
 //! `set`, `remove` and `query`; comment `set` (replies refused); SmartArt
 //! `set`, `remove` and its nodes; and the series and axis nodes of DOCX
 //! charts. Every write is read back on both owners after a byte round
@@ -204,7 +204,7 @@ fn comments_are_set() {
     }
 }
 
-/// Record 0345 writes replies and resolution (`docx_p0_final.rs`); what
+/// Replies and resolution are written (`docx_p0_final.rs`); what
 /// stays refused: a reply parent on `set`, a value of the wrong type, an
 /// empty author and the identity.
 #[test]

@@ -50,19 +50,19 @@
     "merge": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "template merge for the ODF object formats and iWork (record 0295)",
+      "followUp": "template merge for the ODF object formats and iWork",
       "reason": "template merge fills word-processing, presentation and spreadsheet templates"
     },
     "replace": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0295 follow-up: a find adapter over the format's text edits",
+      "followUp": "follow-up: a find adapter over the format's text edits",
       "reason": "find/replace is not integrated for this format"
     },
     "refresh": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0295 follow-up: field refresh for PPT, RTF and the ODF object formats",
+      "followUp": "follow-up: field refresh for PPT, RTF and the ODF object formats",
       "reason": "this format has no field refresh adapter"
     },
     "save": {
@@ -74,7 +74,7 @@
     "dump": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0336 follow-up: dump plans for the remaining formats",
+      "followUp": "follow-up: dump plans for the remaining formats",
       "reason": "this format's write verbs cannot yet rebuild its node tree on a created document"
     },
     "raw": {
@@ -86,13 +86,13 @@
     "add-part": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0336 follow-up: raw ODF part writes through the ODF package publisher",
+      "followUp": "follow-up: raw ODF part writes through the ODF package publisher",
       "reason": "raw part writes cover OOXML (DOCX, XLSX, PPTX, XLSB)"
     },
     "raw-set": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0336 follow-up: raw ODF part writes through the ODF package publisher",
+      "followUp": "follow-up: raw ODF part writes through the ODF package publisher",
       "reason": "raw part writes cover OOXML (DOCX, XLSX, PPTX, XLSB)"
     }
   },
@@ -112,37 +112,37 @@
     "issues": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the issues view needs the validators `validate` adds"
     },
     "forms": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the forms view needs the validators `validate` adds"
     },
     "html": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     "svg": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     "screenshot": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     "pdf": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     }
   },
@@ -340,7 +340,7 @@
       "element": "table",
       "context": "a table definition (columns, keys and types)",
       "code": "unsupported_capability",
-      "followUp": "0282 ODB typed table creation",
+      "followUp": "ODB typed table creation",
       "reason": "creating a table needs a typed column schema the unified registry does not have yet"
     },
     {
@@ -349,7 +349,7 @@
       "element": "column",
       "context": "a column definition",
       "code": "unsupported_capability",
-      "followUp": "0282 ODB typed column creation",
+      "followUp": "ODB typed column creation",
       "reason": "creating a column needs a typed data type the unified registry does not have yet"
     },
     {
@@ -358,7 +358,7 @@
       "element": "query",
       "context": "the `name` property (renaming a query)",
       "code": "unsupported_capability",
-      "followUp": "0282 ODB query rename",
+      "followUp": "ODB query rename",
       "reason": "the leaf has no query rename; remove and add the query instead"
     },
     {
@@ -367,7 +367,7 @@
       "element": "column",
       "context": "a column into another table",
       "code": "unsupported_capability",
-      "followUp": "0292 ODB cross-table column transfer",
+      "followUp": "ODB cross-table column transfer",
       "reason": "a column belongs to its table's schema; columns move and swap within their table"
     },
     {
@@ -376,7 +376,7 @@
       "element": "table",
       "context": "a database that mixes table representations and definitions",
       "code": "unsupported_capability",
-      "followUp": "0292 ODB mixed table collections",
+      "followUp": "ODB mixed table collections",
       "reason": "representations and definitions order in separate collections, so one unified table order cannot be published"
     },
     {
@@ -385,49 +385,49 @@
       "element": "metadata",
       "context": "path-read",
       "code": "unsupported_capability",
-      "followUp": "0288 ODF object metadata node",
+      "followUp": "ODF object metadata node",
       "reason": "`set(\"/metadata\", ..)` writes meta.xml through the ODF metadata family; the path is set-only, and reads go through File::metadata()"
     },
     {
       "subject": "view",
       "mode": "issues",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the issues view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "forms",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the forms view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "html",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "svg",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "screenshot",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "pdf",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     }
   ]

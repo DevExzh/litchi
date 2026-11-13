@@ -2,9 +2,9 @@
 //! order, each with its kind, properties aligned with its spec table, text,
 //! and the leaf positions writes address it by.
 //!
-//! The shape follows the ODF object-tree adapter (`format::odf_tree`,
-//! record 0282); the iWork adapter keeps its own copy so the two families
-//! evolve independently (record 0296).
+//! The shape follows the ODF object-tree adapter (`format::odf_tree`);
+//! the iWork adapter keeps its own copy so the two families evolve
+//! independently.
 
 use litchi_core::Position;
 use std::sync::OnceLock;
@@ -85,14 +85,14 @@ pub(crate) struct Item {
     leaf: [u32; 4],
     /// The item's position among its parent's children of its kind.
     ordinal: u32,
-    /// The lazily built part holding the item's children (record 0305), or
-    /// 0 when they are in its own part.
+    /// The lazily built part holding the item's children, or 0 when they
+    /// are in its own part.
     part: u32,
 }
 
 impl Item {
     /// An item of `spec` at `path` outside any builder: a lazily
-    /// materialized element (a Keynote slide, a Numbers cell, record 0305).
+    /// materialized element (a Keynote slide, a Numbers cell).
     #[cfg(any(feature = "keynote", feature = "numbers"))]
     pub(crate) fn detached<K: ElementKind>(
         spec: &'static ElementSpec<K>,
@@ -301,7 +301,7 @@ impl<K: ElementKind> TreeBuilder<K> {
     /// The contents of a table whose holding tree lists `stand_in`: the
     /// anchor (index [`ROOT`]) is a copy of the stand-in, whose properties
     /// the table's reader completes, and the rows and cells pushed under it
-    /// take their paths and ordinals from it (record 0312).
+    /// take their paths and ordinals from it.
     #[cfg(any(feature = "keynote", feature = "pages"))]
     pub(crate) fn from_stand_in(
         elements: &'static [ElementSpec<K>],

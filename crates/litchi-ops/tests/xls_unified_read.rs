@@ -137,7 +137,7 @@ fn navigation_query_and_views_are_public_and_owner_parity_is_stable() {
 
         // The native fixture contains a formula cell. It is a real,
         // queryable cell with the same canonical coordinate as scalar cells,
-        // and both owner routes render its formula text (record 0259).
+        // and both owner routes render its formula text.
         let formula = file.get("/sheet[1]/E5").expect("formula cell");
         assert_eq!(formula.kind(), "cell");
         assert_eq!(formula.path().to_string(), "/sheet[1]/E5");
@@ -258,12 +258,12 @@ fn unsupported_legacy_axes_return_typed_capability_gaps() {
         let error = file.get(path).expect_err(path);
         assert_code(&error, Code::UnsupportedCapability);
     }
-    // Notes are readable (record 0327); this fixture has none.
+    // Notes are readable; this fixture has none.
     assert_code(
         &file.get("/sheet[1]/comment[1]").expect_err("no note"),
         Code::PathNotFound,
     );
-    // Defined names are readable (record 0259); this fixture has none.
+    // Defined names are readable; this fixture has none.
     assert_code(
         &file.get("/namedrange[1]").expect_err("no defined name"),
         Code::PathNotFound,

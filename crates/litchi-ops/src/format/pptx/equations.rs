@@ -1,4 +1,4 @@
-//! Office Math equations (record 0321, L-PPTX-R11).
+//! Office Math equations.
 //!
 //! `/slide[N]/shape[M]/equation[K]` is the K-th equation in the text of a
 //! shape; `/slide[N]/equation[K]` the K-th of the slide. Each reads

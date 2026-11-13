@@ -58,7 +58,7 @@ static OPERATION_GAPS: [GapSpec; 3] = [
             context: "a MathML element with attributes other than `mathvariant`, or a subtree",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0292 formula subtree authoring",
+        follow_up: "formula subtree authoring",
         reason: "`add` creates one element from `tag`, `text` and `mathvariant`; nested subtrees are built by further adds, and other attributes need typed values",
     },
     GapSpec {
@@ -68,7 +68,7 @@ static OPERATION_GAPS: [GapSpec; 3] = [
             context: "the `text` of a layout (non-token) element",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0282 formula layout text",
+        follow_up: "formula layout text",
         reason: "only MathML token elements hold character data",
     },
     super::METADATA_PATH_GAP,
@@ -309,7 +309,7 @@ fn insertion(
 }
 
 /// Add one MathML element (`tag` required; `text` for token elements;
-/// `mathvariant`) under `/` or another element (record 0292).
+/// `mathvariant`) under `/` or another element.
 pub(crate) fn add(
     file: &OdfTree,
     package: &litchi_odf_formula::Package,
@@ -382,8 +382,8 @@ pub(crate) fn add(
     Ok((commit, path))
 }
 
-/// Move one MathML element among its siblings or under another element
-/// (record 0292). The leaf validates the content model of the result.
+/// Move one MathML element among its siblings or under another element.
+/// The leaf validates the content model of the result.
 pub(crate) fn move_to(
     file: &OdfTree,
     package: &litchi_odf_formula::Package,

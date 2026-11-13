@@ -1,4 +1,4 @@
-//! PPTX find/replace (records 0273, 0285): `set` with `find=`.
+//! PPTX find/replace: `set` with `find=`.
 //!
 //! The scope is the target's subtree, as OfficeCLI's find reads it: the
 //! presentation searches every slide and its speaker notes; a slide its
@@ -10,7 +10,7 @@
 //! table cell), and format properties become run-span edits (`RunSpan`,
 //! `CellRunSpan`) on exactly the replaced or matched text, all through one
 //! native edit. The run rewrite is the one template merge uses
-//! (`find::rewrite_ranges`, record 0285).
+//! (`find::rewrite_ranges`).
 //!
 //! Masters and layouts are not searched yet.
 
@@ -293,8 +293,7 @@ impl Pptx {
     }
 
     /// Every text body of the presentation: each slide's shapes, groups and
-    /// table cells, then its notes page (the bodies template merge fills,
-    /// record 0285).
+    /// table cells, then its notes page (the bodies template merge fills).
     pub(super) fn presentation_scopes(
         &self,
         may_match: &impl Fn(&str) -> bool,
@@ -403,7 +402,7 @@ impl Pptx {
                 "find searches the presentation, slides, notes, shapes, groups, tables, rows, cells, paragraphs and runs",
             )
             .with_property(crate::find::FIND)
-            .with_suggestion("comments, masters and layouts are not searched yet (record 0285)")),
+            .with_suggestion("comments, masters and layouts are not searched yet")),
         }
     }
 
@@ -443,7 +442,7 @@ impl Pptx {
 }
 
 /// The body of a paragraph, run or line break, narrowed to it: a slide
-/// shape's, a table cell's or the notes page's (record 0333).
+/// shape's, a table cell's or the notes page's.
 fn text_scope(
     text: &crate::format::pptx::node::TextItem,
     run: Option<usize>,
@@ -486,7 +485,7 @@ fn slide_of(tree: &TreeItem) -> Result<usize> {
 }
 
 /// The cells of a table frame (one row, or one cell, when given), each a
-/// text body run edits address (record 0285).
+/// text body run edits address.
 fn cell_scopes(
     tree: &TreeItem,
     only_row: Option<usize>,

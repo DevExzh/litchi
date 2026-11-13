@@ -1,4 +1,4 @@
-//! Header-row predicate binding for XLSB workbooks (record 0010 §5.4).
+//! Header-row predicate binding for XLSB workbooks.
 //!
 //! A binding first considers structured tables, then the same conservative
 //! detected-table heuristic used by the XLSX adapter. Diagnostics contain only

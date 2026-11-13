@@ -47,7 +47,7 @@ pub(crate) enum Item {
     Notes(NotesItem),
     /// One paragraph of a text shape: the text between paragraph marks.
     Paragraph(ParagraphItem),
-    /// An element of the record-0323 surface (comments, table rows, cells
+    /// An element of the element surface (comments, table rows, cells
     /// and columns, hyperlinks, runs, line breaks, the theme, charts).
     Element(Box<Element>),
 }
@@ -165,7 +165,7 @@ impl<'f> Node<'f> {
         }
     }
 
-    /// Construct a record-0323 element node under `parent_steps`.
+    /// Construct an element node under `parent_steps`.
     pub(crate) fn element_node(
         file: &'f Ppt,
         parent_steps: &[PathStep<'static>],
@@ -181,7 +181,7 @@ impl<'f> Node<'f> {
         }
     }
 
-    /// The record-0323 element carried by this node.
+    /// The element carried by this node.
     pub(crate) fn element_item(&self) -> Option<&Element> {
         match &self.item {
             Item::Element(element) => Some(element),
@@ -519,7 +519,7 @@ enum PropKind<'a> {
         kind: Kind,
         shape: &'a ShapeEnum<'static>,
     },
-    /// A record-0323 element's values, in its table's order.
+    /// An element's values, in its table's order.
     Element(Values<'a>),
 }
 

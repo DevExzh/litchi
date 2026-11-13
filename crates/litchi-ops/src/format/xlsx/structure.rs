@@ -1,4 +1,4 @@
-//! Structural XLSX sheet verbs (record 0102).
+//! Structural XLSX sheet verbs.
 //!
 //! The unified structural surface is intentionally limited to workbook sheet
 //! tabs.  Sheet names, tab order and removal dependencies remain owned by the
@@ -62,7 +62,7 @@ impl Xlsx {
         // encryption policy ahead of authored property conversion, matching
         // the cell and DOCX write adapters.
         let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
-        // The element kind first (record 0269, finding X1): a kind the
+        // The element kind first: a kind the
         // workbook cannot add is `unsupported_element` whatever its parent;
         // an addable kind under the wrong parent is `unsupported_type`.
         let kind = new_kind(node.kind(), node.props())?;
@@ -75,7 +75,7 @@ impl Xlsx {
             drop(source);
             return self.add_feature(&parent, kind, implied, node, limits);
         }
-        // A worksheet cell and a rich-text run (record 0338).
+        // A worksheet cell and a rich-text run.
         if matches!(kind, NewKind::Cell) {
             drop(source);
             return self.add_cell(&parent, &node, limits);
@@ -287,14 +287,14 @@ impl Xlsx {
 #[derive(Clone, Copy)]
 enum NewKind {
     Sheet,
-    /// A worksheet chart (record 0270), added under its sheet.
+    /// A worksheet chart, added under its sheet.
     Chart,
-    /// A worksheet feature (record 0320), with the rule type a CF element
+    /// A worksheet feature, with the rule type a CF element
     /// word implies.
     Feature(Kind, Option<&'static str>),
-    /// A worksheet cell (record 0338), under a sheet, row or cell.
+    /// A worksheet cell, under a sheet, row or cell.
     Cell,
-    /// A rich-text run (record 0338), under a cell.
+    /// A rich-text run, under a cell.
     Run,
 }
 

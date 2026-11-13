@@ -1,4 +1,4 @@
-//! DOCX views (record 0010 §6): the text, annotated, outline and stats
+//! DOCX views: the text, annotated, outline and stats
 //! modes, with OfficeCLI's content and JSON shapes (`WordHandler.View.cs`).
 //!
 //! The views walk the body in visible order through the adapter's own
@@ -20,8 +20,8 @@
 //! Departures from OfficeCLI, all from reading local properties only
 //! (ADR 0004) or from parts the adapter does not read yet:
 //!
-//! - styles are style ids, not display names (M1-Δ4); run formats, fonts
-//!   and sizes are the run's own properties, not the effective ones (M1-Δ2);
+//! - styles are style ids, not display names; run formats, fonts
+//!   and sizes are the run's own properties, not the effective ones;
 //! - list markers, field results, form fields, OLE placeholders, the
 //!   watermark and the file name are not shown; equations show their
 //!   visible text, not LaTeX;
@@ -31,11 +31,11 @@
 //! - the annotated view lists the paragraph's addressable runs (the `r[N]`
 //!   set), not every descendant run.
 
-// `File::view`, `view_to` and `view_json` (M1 step R5) are the production
+// `File::view`, `view_to` and `view_json` are the production
 // callers; until they land, the tests are.
 #![cfg_attr(
     not(test),
-    allow(dead_code, reason = "M1 step R5 exposes the views through File::view")
+    allow(dead_code, reason = "the views are exposed through File::view")
 )]
 
 use std::collections::HashMap;
@@ -687,7 +687,7 @@ fn outline(docx: &Docx) -> Result<Outline> {
 /// The outline level OfficeCLI's `GetParagraphOutlineLevel` gives a
 /// paragraph: its own `w:outlineLvl` (0-8, as level 1-9), else a level
 /// from its style: a `Heading`/`heading`/`标题` style's first digit,
-/// `Title` 0, `Subtitle` 1. Styles are read by id (M1-Δ4).
+/// `Title` 0, `Subtitle` 1. Styles are read by id.
 fn heading_level(node: &Node<'_>) -> Result<Option<u8>> {
     let Value::Paragraph { paragraph, .. } = &node.value else {
         return Ok(None);
@@ -959,7 +959,7 @@ impl Serialize for Distribution {
 // JSON
 // ---------------------------------------------------------------------------
 
-/// A DOCX view as OfficeCLI's JSON (record 0010 §6.1).
+/// A DOCX view as OfficeCLI's JSON.
 #[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub(crate) enum Json {

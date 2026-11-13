@@ -1,4 +1,4 @@
-//! DOC parts and marks through the unified API (record 0324): styles,
+//! DOC parts and marks through the unified API: styles,
 //! numbering, paragraph style and list keys, hyperlinks, bookmarks, fields,
 //! tables of contents, sections, tab stops, text boxes and shapes. Reads
 //! answer the DOCX paths and keys; writes round-trip through a reopen, equal

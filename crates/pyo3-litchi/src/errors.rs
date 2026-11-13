@@ -252,8 +252,8 @@ pub(crate) enum Opener {
 
 impl Opener {
     /// The opener that reads `format`, if any does. ODM and OTH read as
-    /// documents through the ODT adapter (record 0282); the OpenDocument
-    /// object formats belong to none of the three families.
+    /// documents through the ODT adapter; the OpenDocument object
+    /// formats belong to none of the three families.
     fn of(format: FileFormat) -> Option<Self> {
         match format {
             FileFormat::Doc

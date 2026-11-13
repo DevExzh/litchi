@@ -1,4 +1,4 @@
-//! SmartArt in Word documents (record 0295, record 0284 follow-up 0284a):
+//! SmartArt in Word documents:
 //! inline insertion into an existing document through the authored spec,
 //! and the document-wide `smartart` element read from the leaf inventory.
 #![cfg(feature = "docx")]
@@ -137,7 +137,7 @@ fn refusals_leave_the_document_unchanged() {
         .add("/body/p[1]", NewNode::new("smartart").prop("text", "A"))
         .unwrap()
         .file;
-    // `set` writes the outline (record 0335); an unknown key is refused.
+    // `set` writes the outline; an unknown key is refused.
     let error = added
         .set("/smartart[1]", props! { "color" => "red" })
         .unwrap_err();

@@ -22,7 +22,7 @@ use std::sync::{Arc, OnceLock};
 pub(crate) enum Proof {
     Source(litchi_pptx::source::Patch),
     Eager(litchi_pptx::opened::Patch),
-    /// A document-metadata patch (record 0253).
+    /// A document-metadata patch.
     Metadata(litchi_pptx::metadata::Patch),
     /// Proofs from two native edits that make up one facade operation.
     ///
@@ -157,7 +157,7 @@ pub(super) struct ShapeValues {
     /// Rich formatting for every paragraph and run of the text body.
     pub(super) format: text::TextValues,
     /// Whether the payload assigns a click action (`link`, `tooltip`), which
-    /// the hyperlink verbs write (record 0325).
+    /// the hyperlink verbs write.
     pub(super) click: bool,
 }
 
@@ -358,7 +358,7 @@ impl Pptx {
             };
             return self.set_comment(comment.slide, comment.index, &props, limits);
         }
-        // Modern comment threads and replies (record 0346).
+        // Modern comment threads and replies.
         if let Some(commit) = self.try_set_modern_comment(&target, &props, limits)? {
             return Ok(commit);
         }
@@ -374,7 +374,7 @@ impl Pptx {
         if let Some(commit) = self.try_set_row(&target, &props, limits)? {
             return Ok(commit);
         }
-        // Table-level sets (record 0342).
+        // Table-level sets.
         if let Some(commit) = self.try_set_table(&target, &props, limits)? {
             return Ok(commit);
         }
@@ -683,7 +683,7 @@ struct Target {
     bounds: Option<(i64, i64, i64, i64)>,
 }
 
-/// The text of a new notes page (record 0346): its `text`, empty when the
+/// The text of a new notes page: its `text`, empty when the
 /// call assigns none.
 pub(in crate::format::pptx) fn notes_add_text(
     props: &Props<'_>,

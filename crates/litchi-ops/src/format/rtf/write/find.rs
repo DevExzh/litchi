@@ -1,4 +1,4 @@
-//! RTF find/replace (record 0273): `set` with `find=` and `replace=`.
+//! RTF find/replace: `set` with `find=` and `replace=`.
 //!
 //! The document root and the body search every main-story paragraph, a
 //! paragraph itself, and a run only its own text (OfficeCLI's run scope).
@@ -65,8 +65,8 @@ impl Rtf {
                     })?;
                     wanted.push((paragraph, node.run_position()));
                 },
-                // Record 0275 added tables, stories, links, pictures, styles
-                // and lists; RTF find still searches body paragraphs only.
+                // RTF also has tables, stories, links, pictures, styles and
+                // lists; RTF find still searches body paragraphs only.
                 _ => {
                     return Err(Error::new(
                         Code::UnsupportedType,
@@ -175,9 +175,9 @@ impl Rtf {
         })
     }
 
-    /// Template merge (record 0295): placeholders in every main-story
-    /// paragraph, rewritten run by run so each run keeps its formatting;
-    /// one native commit. `None` means nothing matched.
+    /// Template merge: placeholders in every main-story paragraph,
+    /// rewritten run by run so each run keeps its formatting; one native
+    /// commit. `None` means nothing matched.
     pub(crate) fn merge(
         &self,
         record: &Record,

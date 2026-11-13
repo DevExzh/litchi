@@ -1,4 +1,4 @@
-//! Queries: CSS-like selectors over a document (record 0010 §5, M1 step R3).
+//! Queries: CSS-like selectors over a document.
 //!
 //! A selector arrives as text, a parsed [`Query`], or a compiled [`Plan`]
 //! through [`IntoQuery`]. It is compiled once per format into a [`Plan`]
@@ -24,18 +24,18 @@
 //! | `a > b`, `a b` | child and descendant combinators, chained freely |
 //! | `a, b` | a union, each node yielded once, in document order |
 //! | `/body/tbl[1]/…`, `Sheet1!…` | a scope resolved as a path |
-//! | `row[Salary>5000]` | header-row predicates: columns named by a table's header (record 0010 §5.4) |
+//! | `row[Salary>5000]` | header-row predicates: columns named by a table's header |
 //!
 //! Regular-expression literals (`~= r"…"`) are refused with
-//! `unsupported_capability`: the workspace has no regex engine (record 0010
-//! open question Q3). An unknown key is a [`Diagnostic`], not an error.
+//! `unsupported_capability`: the workspace has no regex engine. An unknown
+//! key is a [`Diagnostic`], not an error.
 //!
 //! # Example
 //!
 //! ```
 //! use litchi_ops::query::{IntoQuery, Plan, Query};
 //!
-//! // Parse once; a format adapter compiles and runs it (M1 steps R4, R5).
+//! // Parse once; a format adapter compiles and runs it.
 //! let arg = "paragraph[style=Heading1]:contains(revenue)".into_query()?;
 //! assert!(arg.query().is_some());
 //!
@@ -47,30 +47,30 @@
 //!
 //! # OfficeCLI deltas
 //!
-//! Record 0010 §11.4: matches stream as typed nodes in document order with
-//! `limit`, not as collected node maps grouped by kind (M1-Δ19); `:contains`
-//! is case-insensitive everywhere (M1-Δ10); `:has`, `:not` and combinators
-//! take any selector, not only OfficeCLI's literal forms (M1-Δ21). This
-//! implementation adds: `[last()]` on the selected element cannot be combined
-//! with `,` alternatives (it would break document order); at most one
-//! positional predicate applies to the selected element; positional
-//! predicates inside `:has` and `:not` lists select among siblings; `:empty`
-//! holds for no text or white space only in every format (OfficeCLI's Word
-//! rule; its Excel handler requires empty text); a header-row query scans the
-//! bound table's data rows by number, rows without a record included, only
-//! when it is the query's single alternative, and otherwise matches rows that
-//! have a record; and the diagnostics are computed from the property tables
-//! before the walk rather than from the matched nodes after it.
+//! Matches stream as typed nodes in document order with `limit`, not as
+//! collected node maps grouped by kind; `:contains` is case-insensitive
+//! everywhere; `:has`, `:not` and combinators take any selector, not only
+//! OfficeCLI's literal forms. This implementation adds: `[last()]` on the
+//! selected element cannot be combined with `,` alternatives (it would break
+//! document order); at most one positional predicate applies to the selected
+//! element; positional predicates inside `:has` and `:not` lists select among
+//! siblings; `:empty` holds for no text or white space only in every format
+//! (OfficeCLI's Word rule; its Excel handler requires empty text); a
+//! header-row query scans the bound table's data rows by number, rows without
+//! a record included, only when it is the query's single alternative, and
+//! otherwise matches rows that have a record; and the diagnostics are
+//! computed from the property tables before the walk rather than from the
+//! matched nodes after it.
 
-// The format adapters of M1 step R4 and `File::query` (step R5) are the
-// production callers of the query engine; until they land, only the
-// test-only fake formats run it.
+// The format adapters and `File::query` are the production callers of
+// the query engine; until they land, only the test-only fake formats
+// run it.
 #![cfg_attr(
     not(test),
     allow(
         dead_code,
-        reason = "M1 steps R4 and R5 run the query engine; until then only the test-only fake \
-                  formats do"
+        reason = "the format adapters and `File::query` run the query engine; until they land \
+                  only the test-only fake formats do"
     )
 )]
 
@@ -97,7 +97,7 @@ use inspect::Inspect;
 use walk::Walk;
 
 /// Runs `selector` over the document the adapter `nav` reads: the entry
-/// point `File::query` dispatches to (M1 step R5).
+/// point `File::query` dispatches to.
 pub(crate) fn run<'q, 'f, N>(nav: N, selector: impl IntoQuery<'q>) -> Result<Walk<'q, 'f, N>>
 where
     N: Inspect<'f>,

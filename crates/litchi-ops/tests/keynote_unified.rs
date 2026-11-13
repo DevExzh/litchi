@@ -1,4 +1,4 @@
-//! Unified Keynote reads and writes (record 0298): slides with their
+//! Unified Keynote reads and writes: slides with their
 //! layouts, placeholders, speaker notes, paragraphs, runs, drawables and
 //! tables; `set` of texts, paragraphs, frames and visibility; `add` of
 //! slides (from a layout or as a copy), paragraphs, text boxes, shapes and
@@ -384,7 +384,7 @@ fn adds_paragraphs_text_boxes_shapes_and_pictures() {
 #[test]
 fn removes_slides_paragraphs_and_drawables() {
     let file = read("multi-slide.key");
-    // F8 (record 0296) is closed: a multi-slide deck deletes slides.
+    // A multi-slide deck deletes slides.
     let removed = file.remove("/slide[3]").expect("remove slide");
     assert_eq!(
         titles(&reopen(&removed)),
@@ -408,7 +408,7 @@ fn removes_slides_paragraphs_and_drawables() {
         .remove("/slide[1]/placeholder[title]/p[1]")
         .unwrap_err();
     assert_eq!(error.code(), Code::InvalidArgument);
-    // A title placeholder is hidden on its slide (record 0309).
+    // A title placeholder is hidden on its slide.
     file.remove("/slide[1]/placeholder[title]")
         .expect("hide the title placeholder");
     let tables = read("slide-table-read-native.key");
@@ -667,7 +667,7 @@ fn a_batch_of_sets_publishes_one_commit_per_family() {
     assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
 }
 
-/// A long run of paragraph sets on one text (record 0340: staged paragraph
+/// A long run of paragraph sets on one text (staged paragraph
 /// by paragraph, joined once) publishes one commit and what its items
 /// publish one at a time, including sets that bring a paragraph back to its
 /// base text, empty paragraphs, repeated targets and the parent's other
@@ -1450,7 +1450,7 @@ fn placeholders_are_hidden_and_shown() {
             .expect("read"),
         Some(State::Visible)
     );
-    // The unified `hidden` reads the per-slide state (record 0312).
+    // The unified `hidden` reads the per-slide state.
     assert_eq!(prop(&file, BODY, "hidden").as_deref(), Some("false"));
     assert_eq!(
         prop(&reopen(&removed), BODY, "hidden").as_deref(),
@@ -1464,7 +1464,7 @@ fn placeholders_are_hidden_and_shown() {
 
 #[test]
 fn placeholder_runs_take_character_properties() {
-    // Record 0312: title and body placeholders style their slide's own
+    // Title and body placeholders style their slide's own
     // storage, as text boxes do.
     let file = read("multi-slide.key");
     let run = "/slide[1]/placeholder[title]/p[1]/run[1]";
@@ -1498,7 +1498,7 @@ fn placeholder_runs_take_character_properties() {
 
 #[test]
 fn notes_runs_take_character_properties() {
-    // Record 0329: speaker notes list their runs, which take character
+    // Speaker notes list their runs, which take character
     // properties as placeholder runs do.
     let file = read("multi-slide.key")
         .set(

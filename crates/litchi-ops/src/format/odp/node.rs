@@ -59,7 +59,7 @@ pub(crate) enum Item {
     /// A presentation page layout.
     Layout(usize),
     /// A shape's hyperlink: its click action, else its first link run's
-    /// target (record 0328).
+    /// target.
     ShapeLink(ObjectRef),
     /// A link run's hyperlink.
     RunLink(StoryRef, usize, usize),
@@ -534,8 +534,8 @@ pub(crate) struct Props<'a> {
     kind: Kind,
     values: PropValues<'a>,
     /// The character properties a story's runs share, resolved once on the
-    /// first such read (record 0316), in `CHARACTER_KEYS` order.
-    /// Boxed: most nodes never read it, and the projection stays small.
+    /// first such read, in `CHARACTER_KEYS` order. Boxed: most nodes never
+    /// read it, and the projection stays small.
     shared: std::cell::OnceCell<Box<[Option<Value<'static>>; 6]>>,
 }
 
@@ -550,10 +550,10 @@ enum PropValues<'a> {
         number: usize,
     },
     /// An object, with its text story for the shared character
-    /// formatting read on demand (record 0316).
+    /// formatting read on demand.
     Object(&'a Object, Option<&'a Story>, &'a Odp),
     /// A paragraph or run with the character properties its style chain
-    /// resolves to (record 0316).
+    /// resolves to.
     Paragraph(
         &'a litchi_odp::scene::Paragraph,
         litchi_odp::scene::TextProperties,
@@ -567,7 +567,7 @@ enum PropValues<'a> {
     Comment(&'a litchi_odp::annotation::Info),
     Master(&'a litchi_odp::master::Summary),
     Layout(&'a litchi_odp::layout::Layout),
-    /// A video, audio or formula object (record 0328).
+    /// A video, audio or formula object.
     Special {
         object: &'a Object,
         reference: &'a ObjectRef,
@@ -665,7 +665,7 @@ impl<'a> Props<'a> {
                     Ok::<_, crate::Error>(PropValues::None),
                     |(paragraph, run)| {
                         // A run inherits what its own style leaves unset from
-                        // its paragraph (record 0316).
+                        // its paragraph.
                         let styles = node.file.automatic_styles()?;
                         let common = node.file.common_styles()?;
                         let mut resolved = styles.resolve_run(common, run);
@@ -980,7 +980,7 @@ impl Props<'_> {
     }
 }
 
-/// The character properties every run of `story` shares (record 0316), in
+/// The character properties every run of `story` shares, in
 /// `CHARACTER_KEYS` order: each run's style chain over its paragraph's; a
 /// paragraph without runs counts by its own. A property is `None` when the
 /// runs differ or none sets it.
@@ -1021,7 +1021,7 @@ fn shared_characters(file: &Odp, story: &Story) -> [Option<Value<'static>>; 6] {
     shared
 }
 
-/// A character property (record 0308) a node's style chain resolves to.
+/// A character property a node's style chain resolves to.
 fn character<'a>(
     properties: &'a litchi_odp::scene::TextProperties,
     key: &str,

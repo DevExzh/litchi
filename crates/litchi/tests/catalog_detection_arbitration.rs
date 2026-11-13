@@ -2,8 +2,8 @@
 //!
 //! Detection is asserted through the facade's detection functions; opens go
 //! through `litchi::open*`, with OPC read limits passed as
-//! `OpenOptions::ooxml_limits` (M0a step S8c ported the opens from the
-//! facade's `Document`, `Presentation` and `Workbook` types).
+//! `OpenOptions::ooxml_limits` (the opens were ported from the facade's
+//! `Document`, `Presentation` and `Workbook` types).
 
 #![allow(
     clippy::expect_used,

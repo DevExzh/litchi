@@ -1,9 +1,9 @@
 //! Unified PPT notes, paragraphs, shape identity and PowerPoint-authored
-//! text (record 0260).
+//! text.
 //!
 //! The fixtures are PowerPoint-authored decks copied into `test-data`, so
 //! the tests exercise the outline-backed placeholders, special-information
-//! and ruler records that record 0255 found refused.
+//! and ruler records that used to be refused.
 
 #![cfg(feature = "ppt")]
 

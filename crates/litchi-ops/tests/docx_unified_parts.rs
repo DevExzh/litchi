@@ -1,5 +1,5 @@
 //! DOCX styles, numbering, headers, footers, footnotes and endnotes through
-//! the format-neutral `File` facade (record 0319): every element is read on
+//! the format-neutral `File` facade: every element is read on
 //! both owners, written, read back and reopened.
 #![cfg(feature = "docx")]
 
@@ -252,7 +252,7 @@ fn numbering_definitions_instances_and_levels_round_trip() {
 
 #[test]
 fn level_keys_build_definitions_and_instances_in_one_call() {
-    // Record 0325: OfficeCLI's `level<N>.*` keys ("Mode A"), as
+    // OfficeCLI's `level<N>.*` keys ("Mode A"), as
     // numbering.sh lines 46, 160, 200 and 222 use them.
     let file = litchi_ops::create(litchi_core::FileFormat::Docx).unwrap();
     let added = file
@@ -494,7 +494,7 @@ fn the_root_lists_its_parts_in_officecli_order() {
 
 #[test]
 fn story_paragraphs_and_runs_are_read_and_written() {
-    // Record 0325: `/header[N]/p[M]`, `/footer[N]/p[M]`, `/footnote[N]/p[M]`
+    // `/header[N]/p[M]`, `/footer[N]/p[M]`, `/footnote[N]/p[M]`
     // and `/endnote[N]/p[M]` with the body paragraph machinery.
     let base = litchi_ops::create(litchi_core::FileFormat::Docx)
         .unwrap()

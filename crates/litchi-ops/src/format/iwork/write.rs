@@ -39,7 +39,7 @@ pub(crate) enum LeafPatch {
     Keynote(super::keynote::Patch),
     #[cfg(feature = "numbers")]
     NumbersCells(litchi_numbers::table::cells::Patch),
-    /// One of the other Numbers transactions (record 0297).
+    /// One of the other Numbers transactions.
     #[cfg(feature = "numbers")]
     Numbers(super::numbers::Patch),
 }
@@ -241,7 +241,7 @@ pub(crate) fn text(value: &PropValue<'_>, key: &'static str) -> Result<Option<St
         .map_err(|error| error.with_property(key))
 }
 
-/// The character properties of a `font.*` write (record 0309).
+/// The character properties of a `font.*` write.
 #[cfg(feature = "numbers")]
 pub(crate) use litchi_numbers::cell::text_style::CharacterProperties as FontProperties;
 #[cfg(all(feature = "pages", not(feature = "numbers")))]
@@ -327,7 +327,7 @@ pub(crate) fn font_property(
 }
 
 /// A table-cell value of a `text` or `value` key: text, a finite number,
-/// a boolean, or `None` (clear) for `null` (record 0309).
+/// a boolean, or `None` (clear) for `null`.
 #[cfg(any(feature = "keynote", feature = "pages"))]
 pub(crate) enum CellScalar {
     Text(String),
@@ -361,10 +361,10 @@ pub(crate) fn cell_scalar(key: &str, value: &PropValue<'_>) -> Result<CellScalar
         .map_err(|error| error.with_property("value"))
 }
 
-/// The size, name and seeded text of a new Keynote or Pages table (record
-/// 0329), from the OfficeCLI table keys: `rows`, `cols` (or `columns`),
-/// `name`, and `data` (rows separated by `;`, cells by `,`). A missing size
-/// is taken from `data`.
+/// The size, name and seeded text of a new Keynote or Pages table, from the
+/// OfficeCLI table keys: `rows`, `cols` (or `columns`), `name`, and `data`
+/// (rows separated by `;`, cells by `,`). A missing size is taken from
+/// `data`.
 #[cfg(any(feature = "keynote", feature = "pages"))]
 #[derive(Debug, Default)]
 pub(crate) struct TableRequest {
@@ -608,7 +608,7 @@ pub(crate) fn set<'p, 'v>(
     }
 }
 
-/// Add one element (Pages paragraphs; Numbers merged ranges, record 0297).
+/// Add one element (Pages paragraphs; Numbers merged ranges).
 pub(crate) fn add<'p, 'n>(
     file: &Iwork,
     parent: PathArg<'p>,
@@ -691,7 +691,7 @@ pub(crate) fn move_to<'p, 'q>(
 }
 
 /// Exchange two elements (Pages paragraphs; Keynote slides, paragraphs and
-/// drawables; Numbers sheets and tables, record 0347).
+/// drawables; Numbers sheets and tables).
 pub(crate) fn swap<'p, 'q>(
     file: &Iwork,
     left: PathArg<'p>,

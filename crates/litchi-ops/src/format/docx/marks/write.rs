@@ -1,8 +1,8 @@
-//! Writes of the DOCX marks (record 0319): paragraph tab stops are set,
+//! Writes of the DOCX marks: paragraph tab stops are set,
 //! added and removed through the paragraph's typed properties; breaks are
 //! added as a run holding one `w:br` and removed with that run.
 //!
-//! Bookmarks, fields and tables of contents (record 0325) are written
+//! Bookmarks, fields and tables of contents are written
 //! through the leaf's field index (`document::fields`): a bookmark is added
 //! around a run of text (`insert_bookmark_at`), renamed and removed (its
 //! markers only, keeping its content); a field is added as a complex field
@@ -47,12 +47,12 @@ fn error(code: Code, message: &'static str) -> Error {
 pub(in super::super) enum NewMark {
     Tab,
     Break,
-    /// A bookmark (record 0325).
+    /// A bookmark.
     Bookmark,
     /// A field: `field`, or OfficeCLI's field-type shortcut (`page`,
-    /// `date`, ...), whose name is the field type (record 0325).
+    /// `date`, ...), whose name is the field type.
     Field(Option<&'static str>),
-    /// A table of contents (record 0325).
+    /// A table of contents.
     Toc,
 }
 
@@ -857,7 +857,7 @@ impl Docx {
             );
         }
         let text = values.text.filter(|text| !text.is_empty());
-        // A bookmark in a header, footer or note paragraph (record 0325).
+        // A bookmark in a header, footer or note paragraph.
         if parent.element_kind() == Kind::Paragraph
             && let Some((key, path)) = super::super::element::story_path(parent)?
         {
@@ -966,7 +966,7 @@ impl Docx {
                     return Err(refusal("fields need the owning package editor"));
                 };
                 match &story {
-                    // A header, footer or note paragraph (record 0325).
+                    // A header, footer or note paragraph.
                     Some((key, _)) => {
                         eager.edit_story(
                             super::super::story::target(key),

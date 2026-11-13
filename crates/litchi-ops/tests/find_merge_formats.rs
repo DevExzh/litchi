@@ -1,5 +1,5 @@
-//! Find/replace and template merge on the legacy, RTF and ODF formats
-//! (record 0295): the shared text-surface engine over each format's native
+//! Find/replace and template merge on the legacy, RTF and ODF formats:
+//! the shared text-surface engine over each format's native
 //! run, paragraph or cell edits; one atomic commit, exact no-ops, round
 //! trips and typed refusals.
 

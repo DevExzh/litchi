@@ -275,7 +275,7 @@ mod locked {
 
     /// Word 2007 writes a stub `WordDocument` stream next to the encrypted
     /// package (LibreOffice's `Encrypted_MSO2007_abc.docx`); the container
-    /// is still an encrypted OOXML package, not a DOC (record 0341).
+    /// is still an encrypted OOXML package, not a DOC.
     #[test]
     fn an_encrypted_ooxml_package_with_a_stub_word_stream_is_locked() {
         let mut info = vec![3, 0, 2, 0];
@@ -442,8 +442,7 @@ mod unlock {
     }
 
     /// LibreOffice's Word 2007 fixture (a stub `WordDocument` stream beside
-    /// the encrypted package) opens locked and unlocks with its password
-    /// (record 0341).
+    /// the encrypted package) opens locked and unlocks with its password.
     #[cfg(feature = "docx")]
     #[test]
     fn a_word_2007_encrypted_docx_unlocks() {

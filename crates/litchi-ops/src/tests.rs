@@ -1,7 +1,6 @@
 //! `File` tests: the single-pass openers, the family views, the `Locked` and
 //! `Signed` states, and the facade's in-source document, presentation and
-//! workbook tests, ported onto `File` with the same semantics (record 0003
-//! §4, step S6).
+//! workbook tests, ported onto `File` with the same semantics.
 
 #![allow(
     clippy::expect_used,

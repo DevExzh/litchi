@@ -1,5 +1,4 @@
-//! Path resolution and query inspection for ODS workbook nodes (record
-//! 0277).
+//! Path resolution and query inspection for ODS workbook nodes.
 
 use std::borrow::Cow;
 use std::fmt;
@@ -27,8 +26,8 @@ const MAX_COLUMN: u32 = 16_383;
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Nav<'f> {
     file: &'f Ods,
-    /// Look coordinates up through the snapshot's cached row-run ends
-    /// (record 0287), for callers that resolve many coordinates.
+    /// Look coordinates up through the snapshot's cached row-run ends,
+    /// for callers that resolve many coordinates.
     indexed_rows: bool,
 }
 

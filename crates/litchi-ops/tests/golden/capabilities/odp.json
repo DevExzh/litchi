@@ -65,7 +65,7 @@
     "dump": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0336 follow-up: dump plans for the remaining formats",
+      "followUp": "follow-up: dump plans for the remaining formats",
       "reason": "this format's write verbs cannot yet rebuild its node tree on a created document"
     },
     "raw": {
@@ -77,13 +77,13 @@
     "add-part": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0336 follow-up: raw ODF part writes through the ODF package publisher",
+      "followUp": "follow-up: raw ODF part writes through the ODF package publisher",
       "reason": "raw part writes cover OOXML (DOCX, XLSX, PPTX, XLSB)"
     },
     "raw-set": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0336 follow-up: raw ODF part writes through the ODF package publisher",
+      "followUp": "follow-up: raw ODF part writes through the ODF package publisher",
       "reason": "raw part writes cover OOXML (DOCX, XLSX, PPTX, XLSB)"
     }
   },
@@ -103,37 +103,37 @@
     "issues": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the issues view needs the validators `validate` adds"
     },
     "forms": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the forms view needs the validators `validate` adds"
     },
     "html": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     "svg": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     "screenshot": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     "pdf": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     }
   },
@@ -2078,7 +2078,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M6 ODP notes master",
+        "followUp": "ODP notes master",
         "reason": "the master page's presentation:notes is not projected as a node"
       }
     },
@@ -2101,7 +2101,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M6 ODP notes pages",
+        "followUp": "ODP notes pages",
         "reason": "speaker notes are exposed as /slide[N]/notes; the notes page's drawing objects are not nodes"
       }
     },
@@ -2127,7 +2127,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M6 ODP animation nodes",
+        "followUp": "ODP animation nodes",
         "reason": "the leaf keeps slide animation trees inert; they are not projected as nodes"
       }
     },
@@ -2291,21 +2291,21 @@
       "subject": "element",
       "element": "notesMaster",
       "code": "unsupported_capability",
-      "followUp": "M6 ODP notes master",
+      "followUp": "ODP notes master",
       "reason": "the master page's presentation:notes is not projected as a node"
     },
     {
       "subject": "element",
       "element": "noteSlide",
       "code": "unsupported_capability",
-      "followUp": "M6 ODP notes pages",
+      "followUp": "ODP notes pages",
       "reason": "speaker notes are exposed as /slide[N]/notes; the notes page's drawing objects are not nodes"
     },
     {
       "subject": "element",
       "element": "animation",
       "code": "unsupported_capability",
-      "followUp": "M6 ODP animation nodes",
+      "followUp": "ODP animation nodes",
       "reason": "the leaf keeps slide animation trees inert; they are not projected as nodes"
     },
     {
@@ -2313,7 +2313,7 @@
       "element": "shape",
       "key": "fill",
       "code": "unsupported_capability",
-      "followUp": "M6 ODP graphic styles",
+      "followUp": "ODP graphic styles",
       "reason": "fill and line come from automatic graphic styles, which the adapter does not resolve"
     },
     {
@@ -2348,7 +2348,7 @@
       "subject": "element",
       "element": "diagram",
       "code": "unsupported_path",
-      "followUp": "none: out of scope (record 0332, design §10)",
+      "followUp": "none: out of scope",
       "reason": "OfficeCLI's diagram renders Mermaid text into shapes or a picture; rendering is outside the unified API"
     },
     {
@@ -2357,7 +2357,7 @@
       "element": "run",
       "context": "field-run",
       "code": "unsupported_capability",
-      "followUp": "M6 ODP field editing",
+      "followUp": "ODP field editing",
       "reason": "page-number, date and other field runs are computed by the producer and refuse text"
     },
     {
@@ -2366,7 +2366,7 @@
       "element": "shape",
       "context": "character-format",
       "code": "unsupported_capability",
-      "followUp": "0316 ODP inherited shape formatting",
+      "followUp": "ODP inherited shape formatting",
       "reason": "bold, italic, underline, size, colour and font are set on paragraphs, runs (links and fields included), and on a shape, table cell or notes story as a whole (each paragraph and every run that overrides the value); reads resolve the node's style chain through the common styles of styles.xml but not a shape's graphic or presentation style, and text sets write plain paragraphs in the first paragraph's style"
     },
     {
@@ -2375,7 +2375,7 @@
       "element": "shape",
       "context": "non-paragraph-story",
       "code": "unsupported_capability",
-      "followUp": "M6 ODP rich text boxes",
+      "followUp": "ODP rich text boxes",
       "reason": "a whole-story text set refuses a text box that holds drawing objects or other non-paragraph children; set paragraphs or runs instead"
     },
     {
@@ -2384,7 +2384,7 @@
       "element": "shape",
       "context": "positioned-insert",
       "code": "unsupported_capability",
-      "followUp": "M6 ODP z-order insertion",
+      "followUp": "ODP z-order insertion",
       "reason": "new text boxes are appended at the end of the slide's objects; move them afterwards"
     },
     {
@@ -2393,7 +2393,7 @@
       "element": "shape",
       "context": "picture-table-chart",
       "code": "unsupported_capability",
-      "followUp": "M6 ODP media and table creation",
+      "followUp": "ODP media and table creation",
       "reason": "only text boxes are added; pictures, tables, charts and media need package resources the scene splice does not author"
     },
     {
@@ -2402,7 +2402,7 @@
       "element": "paragraph",
       "context": "story-reorder",
       "code": "unsupported_capability",
-      "followUp": "M6 ODP paragraph ordering",
+      "followUp": "ODP paragraph ordering",
       "reason": "paragraphs, runs, rows and cells are not moved or swapped; slides and top-level slide objects are"
     },
     {
@@ -2411,7 +2411,7 @@
       "element": "slide",
       "context": "referenced-page",
       "code": "unsupported_capability",
-      "followUp": "M6 ODP reference rewriting",
+      "followUp": "ODP reference rewriting",
       "reason": "a slide (or a renamed slide) whose name links, custom shows or other markup reference is refused rather than leaving a dangling reference"
     },
     {
@@ -2420,7 +2420,7 @@
       "element": "shape",
       "context": "referenced-object",
       "code": "unsupported_capability",
-      "followUp": "M6 ODP reference rewriting",
+      "followUp": "ODP reference rewriting",
       "reason": "an object whose draw:id or xml:id animations or other markup reference is refused; notes-page objects are not removed"
     },
     {
@@ -2438,49 +2438,49 @@
       "element": "presentation",
       "context": "extended-metadata",
       "code": "unsupported_capability",
-      "followUp": "0288 ODF user-defined and statistics metadata",
+      "followUp": "ODF user-defined and statistics metadata",
       "reason": "/metadata writes title, subject, description, author, lastModifiedBy, language and keywords through the ODF metadata family; dates, statistics and custom.<name> are refused"
     },
     {
       "subject": "view",
       "mode": "issues",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the issues view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "forms",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the forms view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "html",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "svg",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "screenshot",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "pdf",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     }
   ]

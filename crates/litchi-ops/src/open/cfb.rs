@@ -4,11 +4,11 @@
 //!
 //! A compound file with `EncryptionInfo` and `EncryptedPackage` is an
 //! encrypted OOXML package ([MS-OFFCRYPTO] 2.3.4), even when it also holds a
-//! legacy host stream: Word 2007 writes a stub `WordDocument` stream next
-//! to the encrypted package (record 0341). Otherwise the host-stream
-//! precedence is the facade's: `WordDocument`, then `PowerPoint Document`
-//! or `Current User`, then `Workbook` or `Book`. Binary DOC, PPT and XLS
-//! encryption never uses an `EncryptedPackage` stream.
+//! legacy host stream: Word 2007 writes a stub `WordDocument` stream next to
+//! the encrypted package. Otherwise the host-stream precedence is the
+//! facade's: `WordDocument`, then `PowerPoint Document` or `Current User`,
+//! then `Workbook` or `Book`. Binary DOC, PPT and XLS encryption never uses
+//! an `EncryptedPackage` stream.
 
 use std::io::Cursor;
 #[cfg(any(unix, windows))]

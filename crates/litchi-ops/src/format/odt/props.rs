@@ -17,7 +17,7 @@ pub(crate) enum Props<'a> {
     Body(Kind, LeafNodeRef<'a>),
     Style(StyleRef<'a>),
     Metadata(Box<Metadata>),
-    /// A part of record 0328.
+    /// A part.
     Part(PartRef<'a>),
     Empty,
 }

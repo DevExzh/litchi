@@ -1,7 +1,7 @@
 //! Handle for PowerPoint OOXML (`.pptx`) inputs.
 //!
-//! [`Pptx`] is one `Arc` over the opened presentation (record 0003 §2.2). The
-//! state holds one of two owners (§2.3):
+//! [`Pptx`] is one `Arc` over the opened presentation. The
+//! state holds one of two owners:
 //!
 //! - the source-backed [`SourceBackedPresentation`](litchi_pptx::SourceBackedPresentation),
 //!   which every path, byte and prepared route builds today. It keeps the
@@ -12,7 +12,7 @@
 //!   from an already parsed OPC package.
 //!
 //! Core-properties metadata is a lazily filled sidecar for the source owner
-//! and is read at open for the eager owner, as the facade does today (§1.6).
+//! and is read at open for the eager owner, as the facade does today.
 //!
 //! # Routes
 //!
@@ -32,7 +32,7 @@
 //! up-front `check_source` calls), and the leaf checks the revision again
 //! after each payload read. A source changed after open is therefore reported
 //! as a typed [`Code::IoError`](crate::Code::IoError) whose leaf error is the
-//! OPC `SourceChanged` (finding F10: the facade flattened these to a string
+//! OPC `SourceChanged` (the facade flattened these to a string
 //! in `text`, `slide_count`, `slides`, `slide`, `metadata` and
 //! `tolerance_report`).
 
@@ -126,30 +126,29 @@ pub(crate) const SETTABLE: &[&str] = &[
     "slideLayout",
     "col",
     "hyperlink",
-    // Their click action (record 0325).
+    // Their click action.
     "picture",
     "group",
-    // Text and rich formatting through the native text edits (record
-    // 0252), speaker-notes text, and legacy comments (record 0252 §6).
+    // Text and rich formatting through the native text edits,
+    // speaker-notes text, and legacy comments.
     "tc",
     "paragraph",
     "run",
     "notes",
     "comment",
-    // Modern comment threads and replies (record 0346).
+    // Modern comment threads and replies.
     "modernComment",
     "reply",
-    // Table row height (record 0333).
+    // Table row height.
     "tr",
-    // Table name and style switches (record 0342).
+    // Table name and style switches.
     "table",
-    // Document properties on the root, through the metadata writer (record
-    // 0338).
+    // Document properties on the root, through the metadata writer.
     "presentation",
 ];
 
 /// The root's capability table: its document-property keys are settable on
-/// `/` (record 0338).
+/// `/`.
 static PRESENTATION_CAPABILITY_PROPS: [crate::node::spec::PropSpec;
     spec::PRESENTATION_PROPS.len()] =
     crate::format::metadata::root_capability(spec::PRESENTATION_PROPS);
@@ -165,16 +164,16 @@ pub(crate) const SHAPE_ADDABLE: &[&str] = &[
     "video",
     "audio",
     "media",
-    // Pictures (`src`) and legacy comments (record 0252).
+    // Pictures (`src`) and legacy comments.
     "picture",
     "comment",
     // Modern comment threads and replies (`parent`), speaker notes and
-    // placeholders (record 0346).
+    // placeholders.
     "modernComment",
     "notes",
     "placeholder",
     // Paragraphs and runs of shape, cell and notes bodies, tables and table
-    // rows (record 0333).
+    // rows.
     "paragraph",
     "run",
     "tr",
@@ -199,13 +198,12 @@ pub(crate) const REMOVABLE: &[&str] = &[
     "video",
     "audio",
     "media",
-    // Paragraphs, runs and line breaks of text bodies, and table rows
-    // (record 0333).
+    // Paragraphs, runs and line breaks of text bodies, and table rows.
     "paragraph",
     "run",
     "linebreak",
     "tr",
-    // Legacy and modern comments and replies (record 0333).
+    // Legacy and modern comments and replies.
     "comment",
     "modernComment",
     "reply",
@@ -224,7 +222,7 @@ pub(crate) fn capability_props(element: &str) -> Option<&'static [crate::node::s
         "tc" => CELL_CAPABILITY_PROPS,
         "notes" => NOTES_CAPABILITY_PROPS,
         "comment" => COMMENT_CAPABILITY_PROPS,
-        // Modern comment add and set, reply set (record 0346).
+        // Modern comment add and set, reply set.
         "modernComment" => spec::MODERN_COMMENT_CAPABILITY_PROPS,
         "reply" => spec::REPLY_CAPABILITY_PROPS,
         "picture" => PICTURE_CAPABILITY_PROPS,
@@ -279,15 +277,15 @@ struct PptxState {
     eager_catalog: OnceLock<Box<[EagerSlide]>>,
     /// The number of slide masters, read once: every query from the root
     /// asks for it, and reading it parses the presentation part, whose cost
-    /// grows with the deck (record 0262).
+    /// grows with the deck.
     masters: OnceLock<usize>,
-    /// Master and layout scenes and layout counts (record 0280).
+    /// Master and layout scenes and layout counts.
     related: owner::Related,
     /// Eager slide scenes, shared with every handle a write derives from
     /// this one (see [`scenes`]).
     scenes: Arc<scenes::Scenes>,
     /// The eager package a source-backed handle commits metadata on,
-    /// materialized by the first metadata set (record 0262; see
+    /// materialized by the first metadata set (see
     /// `metadata::Pptx::metadata_owner`).
     metadata_package: OnceLock<Arc<pptx::Package>>,
     /// Successful native source promotion, shared by readers and editors.
@@ -297,12 +295,12 @@ struct PptxState {
     /// Explicit signature removal never replaces the original source cache.
     unsigned_promotion: OnceLock<Mutex<Option<Arc<pptx::Package>>>>,
     /// The last table a coalesced cell batch read on this handle: its slide,
-    /// scene position and cells (record 0346), so a batch's first plan and
+    /// scene position and cells, so a batch's first plan and
     /// its run read the table once.
     cells: Mutex<Option<(usize, usize, Arc<write::coalesce::Cells>)>>,
     /// The notes body the last coalesced notes batch read on this handle:
     /// its slide and the body placeholder's notes-scene position and body,
-    /// `None` when the slide has none (record 0348), so a batch's first plan
+    /// `None` when the slide has none, so a batch's first plan
     /// and its run read the notes page once.
     notes: Mutex<Option<(usize, write::coalesce::NotesBody)>>,
 }
@@ -312,10 +310,10 @@ struct EagerSlide {
     target: PackURI,
 }
 
-/// The two states of the PPTX owner (record 0003 §2.3).
+/// The two states of the PPTX owner.
 enum PptxOwner {
     /// Source-backed, read-only. Its package is the retained source an editor
-    /// is built from (L-PPTX-1).
+    /// is built from.
     Source(pptx::SourceBackedPresentation),
     /// Eager, editable through `edit`.
     Eager(Arc<pptx::Package>),
@@ -594,7 +592,7 @@ impl Pptx {
         Ok(handle)
     }
 
-    /// This handle's signature disposition (record 0013).
+    /// This handle's signature disposition.
     pub(crate) fn signature(&self) -> Signature {
         self.0.signature()
     }
@@ -996,7 +994,7 @@ impl Pptx {
     }
 
     /// The cells of the table at scene position `frame` of slide `slide`,
-    /// read once per handle (record 0346).
+    /// read once per handle.
     fn table_cells(
         &self,
         slide: usize,
@@ -1021,7 +1019,7 @@ impl Pptx {
     }
 
     /// The notes body of slide `slide` for coalesced notes plans, read once
-    /// per handle (record 0348).
+    /// per handle.
     fn notes_body(
         &self,
         slide: usize,
@@ -1042,8 +1040,8 @@ impl Pptx {
         Ok(body)
     }
 
-    /// Whether [`Self::editable_owner`] hands out the eager package (record
-    /// 0346): coalesced notes formatting needs the eager editor.
+    /// Whether [`Self::editable_owner`] hands out the eager package:
+    /// coalesced notes formatting needs the eager editor.
     fn edits_eagerly(&self) -> bool {
         self.0.revision.is_none()
             && (matches!(self.0.owner, PptxOwner::Eager(_))
@@ -1244,8 +1242,7 @@ fn eager_slide<'a>(
 
 /// The slide part at `position` of an eager package, not yet read as a
 /// slide: its decoded payload, whose identity keys the eager scene cache,
-/// is known first, so a cached scene is found without reading the part
-/// (record 0326).
+/// is known first, so a cached scene is found without reading the part.
 pub(super) struct EagerSlidePart<'a> {
     opc: &'a litchi_opc::OpcPackage,
     part: &'a dyn litchi_opc::part::Part,

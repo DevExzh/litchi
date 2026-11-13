@@ -29,9 +29,9 @@ enum Footprint {
     Run(StoryRef, usize, usize),
     Attribute(ObjectRef, Attribute),
     PageName(usize),
-    /// Character formatting of a paragraph or run of the story (record
-    /// 0308): it reads the story's runs, so it never shares a run with a
-    /// text write of the same story.
+    /// Character formatting of a paragraph or run of the story: it reads
+    /// the story's runs, so it never shares a run with a text write of
+    /// the same story.
     Format(StoryRef),
 }
 
@@ -176,7 +176,7 @@ impl Odp {
             return Ok(None);
         }
         let nodes = resolve_nodes(self, target, limits)?;
-        // Hyperlink sets (record 0328) take the ordinary route.
+        // Hyperlink sets take the ordinary route.
         if nodes
             .iter()
             .any(|node| node.element() == crate::format::odp::Kind::Hyperlink)

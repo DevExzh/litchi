@@ -1,6 +1,6 @@
-//! `import`, `evaluate` and `recalculate` (record 0266): CSV/TSV import into
-//! a worksheet and formula evaluation, over `File::import`,
-//! `File::evaluate` and `File::recalculate`.
+//! `import`, `evaluate` and `recalculate`: CSV/TSV import into a worksheet
+//! and formula evaluation, over `File::import`, `File::evaluate` and
+//! `File::recalculate`.
 
 use std::io::{Read as _, Write};
 use std::path::{Path, PathBuf};

@@ -1,4 +1,4 @@
-//! PPTX refresh (record 0279): slide-number and date fields (`a:fld`) in
+//! PPTX refresh: slide-number and date fields (`a:fld`) in
 //! slide text, rewritten through the native run-text edits in one commit.
 
 use litchi_core::Position;

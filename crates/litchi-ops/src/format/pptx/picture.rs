@@ -1,4 +1,4 @@
-//! Picture insertion through the native eager edit (record 0252).
+//! Picture insertion through the native eager edit.
 //!
 //! `add(/slide[N], picture, {src, x, y, width, height, name})` reads the
 //! image from a `data:` URI (base64) or a local file path, admits it against
@@ -238,8 +238,8 @@ impl Pptx {
 
 impl Pptx {
     /// A `set` of a picture's frame (`x`, `y`, `width`, `height`),
-    /// alternative text (`alt`) or image (`src`), in one native edit
-    /// (record 0333); `None` for other targets. Click actions are split off
+    /// alternative text (`alt`) or image (`src`), in one native edit;
+    /// `None` for other targets. Click actions are split off
     /// before (`try_set_click`).
     pub(super) fn try_set_picture(
         &self,

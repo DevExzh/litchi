@@ -1,5 +1,4 @@
-//! Allocation evidence for path resolution (record 0010 §4.1 and §9.2, M1
-//! step R2).
+//! Allocation evidence for path resolution.
 //!
 //! The performance bar requires that resolving a short path allocates nothing
 //! on the success path: names fold into a stack buffer, the alias and rule
@@ -75,7 +74,7 @@ fn allocations<T>(body: impl FnOnce() -> T) -> usize {
 }
 
 /// Typical three- to six-step paths, each with at most one predicate per
-/// step, so parsing the text allocates nothing either (record 0005).
+/// step, so parsing the text allocates nothing either.
 const TEXT_PATHS: &[(Document, &str, &str)] = &[
     (Document::Word, "/body/p[2]/r[1]", "r"),
     (Document::Word, "/body/tbl[1]/tr[2]/tc[1]/p[1]/r[2]", "r"),

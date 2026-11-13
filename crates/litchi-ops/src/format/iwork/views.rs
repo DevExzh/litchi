@@ -1,5 +1,5 @@
 //! Textual views of an iWork object tree: text, annotated text, outline and
-//! statistics, in the shapes of the ODF object-tree adapter (record 0282).
+//! statistics, in the shapes of the ODF object-tree adapter.
 
 use std::collections::BTreeMap;
 use std::fmt;

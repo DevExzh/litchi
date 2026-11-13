@@ -1,4 +1,4 @@
-//! Batch equivalence over the iWork corpus (record 0314): a batch of sets
+//! Batch equivalence over the iWork corpus: a batch of sets
 //! publishes exactly what its items publish when applied one at a time.
 //!
 //! Coalesced runs (Pages paragraph texts, Keynote text, frame and

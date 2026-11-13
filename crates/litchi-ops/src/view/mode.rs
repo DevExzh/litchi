@@ -1,4 +1,4 @@
-//! View modes and their options (record 0010 §6.1).
+//! View modes and their options.
 //!
 //! File rendering methods take a [`Mode`]. Internal [`Options`] retain the
 //! adapter controls pending typed public option integration.
@@ -25,9 +25,9 @@ pub enum Mode {
     Outline,
     /// Counts (`stats`, `s`).
     Stats,
-    /// Validation findings (`issues`, `i`): `unsupported_capability` in M1.
+    /// Validation findings (`issues`, `i`): refused with `unsupported_capability`.
     Issues,
-    /// Form fields (`forms`, `f`): `unsupported_capability` in M1.
+    /// Form fields (`forms`, `f`): refused with `unsupported_capability`.
     Forms,
     /// HTML (`html`, `h`): `unsupported_capability`.
     Html,
@@ -94,12 +94,12 @@ impl Mode {
     }
 
     /// The `unsupported_capability` error of a mode the format does not
-    /// render (record 0010 §6.1, M1-Δ20).
+    /// render.
     pub(crate) fn unsupported(self) -> Error {
         let reason = match self {
-            Self::Issues | Self::Forms => "needs validators that M2's `validate` adds",
+            Self::Issues | Self::Forms => "needs validators that `validate` adds",
             Self::Html | Self::Svg | Self::Screenshot | Self::Pdf => {
-                "rendering is outside the unified layer (design §10)"
+                "rendering is outside the unified layer"
             },
             _ => "is not supported for this format",
         };

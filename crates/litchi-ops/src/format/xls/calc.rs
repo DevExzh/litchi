@@ -1,4 +1,4 @@
-//! The XLS worksheet cells formula evaluation loads (record 0266).
+//! The XLS worksheet cells formula evaluation loads.
 
 use litchi_core::sheet::CellValue;
 

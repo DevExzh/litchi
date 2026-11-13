@@ -22,7 +22,7 @@ use crate::format::xlsx::Xlsx;
 ///
 /// [`File::workbook`](crate::File::workbook) returns it. Its inherent reads
 /// keep each format's behavior, including sheet-name matching: XLSX matches
-/// names case-insensitively, the other formats exactly (record 0003 F15).
+/// names case-insensitively, the other formats exactly.
 ///
 /// The view also implements [`WorkbookTrait`] by static dispatch to the
 /// format handle, so a formula evaluator generic over the trait reads it

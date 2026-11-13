@@ -29,7 +29,7 @@ pub struct Node<'f> {
     file: &'f Xls,
     item: Item<'f>,
     /// The position of the node's worksheet; its path is written from it
-    /// and the item when asked for (record 0262), so walks move a smaller
+    /// and the item when asked for, so walks move a smaller
     /// node.
     sheet: usize,
 }
@@ -45,7 +45,7 @@ pub(super) enum Item<'f> {
     /// The defined name at this index of the workbook's non-macro names.
     NamedRange(usize),
     /// A worksheet feature: a note, hyperlink, picture, shape, conditional
-    /// format, validation, auto-filter or page break (record 0327).
+    /// format, validation, auto-filter or page break.
     Feature(std::sync::Arc<super::features::Feature>),
 }
 
@@ -434,7 +434,7 @@ pub(crate) enum Props<'a> {
         name: &'a litchi_xls::DefinedName,
         scope: Option<Cow<'a, str>>,
     },
-    /// A worksheet feature and its worksheet's name (record 0327).
+    /// A worksheet feature and its worksheet's name.
     Feature(&'a super::features::Feature, String),
 }
 

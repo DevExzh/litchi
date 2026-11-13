@@ -1,7 +1,7 @@
-//! ODS worksheet features as unified nodes (record 0327): hyperlinks,
-//! pictures and shapes, conditional formats (`cf`), content validations,
-//! the auto-filter and manual page breaks, with the XLSX property vocabulary
-//! of record 0320. Cell annotations (`comment`) keep their own node.
+//! ODS worksheet features as unified nodes: hyperlinks, pictures and shapes,
+//! conditional formats (`cf`), content validations, the auto-filter and
+//! manual page breaks, with the XLSX property vocabulary. Cell annotations
+//! (`comment`) keep their own node.
 //!
 //! Every feature is a child of its worksheet, addressed by its position
 //! among the worksheet's features of its kind (`/Sheet1/cf[1]`; the
@@ -774,55 +774,55 @@ const fn ods_gap(
 static DIRECTION_GAP: GapSpec = ods_gap(
     "conditionalFormatting",
     "direction",
-    "record 0327: wontfix (format)",
+    "wontfix (format)",
     "an ODF data bar has no direction; LibreOffice draws bars from the axis",
 );
 static PRIORITY_GAP: GapSpec = ods_gap(
     "conditionalFormatting",
     "stopIfTrue",
-    "record 0327: wontfix (format)",
+    "wontfix (format)",
     "ODF conditional formats have no stop-if-true flag; LibreOffice applies the first matching rule",
 );
 static STD_DEV_GAP: GapSpec = ods_gap(
     "conditionalFormatting",
     "stdDev",
-    "record 0327: wontfix (format)",
+    "wontfix (format)",
     "an ODF average condition has no standard-deviation band",
 );
 static REVERSE_GAP: GapSpec = ods_gap(
     "conditionalFormatting",
     "reverse",
-    "record 0327: wontfix (format)",
+    "wontfix (format)",
     "an ODF icon set has no reversed order",
 );
 static CRITERIA_GAP: GapSpec = ods_gap(
     "autofilter",
     "criteria0",
-    "record 0327 follow-up: ODS auto-filter column criteria",
+    "follow-up: ODS auto-filter column criteria",
     "the auto-filter database range is authored; its table:filter conditions are kept but not authored",
 );
 static BREAK_SPAN_GAP: GapSpec = ods_gap(
     "rowbreak",
     "min",
-    "record 0327: wontfix (format)",
+    "wontfix (format)",
     "an ODF page break is a row or column style property and spans the whole sheet",
 );
 static BREAK_SPAN_MAX_GAP: GapSpec = ods_gap(
     "rowbreak",
     "max",
-    "record 0327: wontfix (format)",
+    "wontfix (format)",
     "an ODF page break is a row or column style property and spans the whole sheet",
 );
 static COL_BREAK_SPAN_GAP: GapSpec = ods_gap(
     "colbreak",
     "min",
-    "record 0327: wontfix (format)",
+    "wontfix (format)",
     "an ODF page break is a row or column style property and spans the whole sheet",
 );
 static COL_BREAK_SPAN_MAX_GAP: GapSpec = ods_gap(
     "colbreak",
     "max",
-    "record 0327: wontfix (format)",
+    "wontfix (format)",
     "an ODF page break is a row or column style property and spans the whole sheet",
 );
 
@@ -830,7 +830,7 @@ const fn drawing_gap(element: &'static str, key: &'static str) -> GapSpec {
     ods_gap(
         element,
         key,
-        "record 0327 follow-up: ODS drawing transforms, effects and text styling",
+        "follow-up: ODS drawing transforms, effects and text styling",
         "the ODS drawing editor authors frames, names, descriptions, text, solid fills and strokes; draw:transform, effects, crops and shape text styles are not authored",
     )
 }
@@ -838,13 +838,13 @@ const fn drawing_gap(element: &'static str, key: &'static str) -> GapSpec {
 static ANCHOR_GAP: GapSpec = ods_gap(
     "picture",
     "anchor",
-    "record 0327 follow-up: ODS cell-anchored drawings",
+    "follow-up: ODS cell-anchored drawings",
     "an ODS drawing added through the unified layer is placed on the sheet in lengths; anchoring it to cells needs the sheet's row and column geometry",
 );
 static SHAPE_ANCHOR_GAP: GapSpec = ods_gap(
     "shape",
     "anchor",
-    "record 0327 follow-up: ODS cell-anchored drawings",
+    "follow-up: ODS cell-anchored drawings",
     "an ODS drawing added through the unified layer is placed on the sheet in lengths; anchoring it to cells needs the sheet's row and column geometry",
 );
 static PICTURE_ROTATION_GAP: GapSpec = drawing_gap("picture", "rotation");

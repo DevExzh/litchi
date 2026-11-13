@@ -1,4 +1,4 @@
-//! [`NewNode`]: the element created by `File::add` (record 0015 §2.1).
+//! [`NewNode`]: the element created by `File::add`.
 
 use std::borrow::Cow;
 use std::fmt;

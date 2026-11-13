@@ -1,8 +1,8 @@
 //! Allocation evidence for values and bounded XLS read projections.
 //!
 //! The unified-operations performance bar requires value coercion to
-//! allocate nothing on the success path (goal, "Allocation discipline";
-//! record 0010 §7.3). A counting global allocator pins that property for
+//! allocate nothing on the success path (goal, "Allocation discipline").
+//! A counting global allocator pins that property for
 //! the listed coercion cases (excluding long grouped-number normalization),
 //! for the canonical renderings written into a fixed buffer, and for query
 //! comparison; it also pins that building a failed parse's error is free, so
@@ -567,7 +567,7 @@ fn ppt_selected_reads_add_constant_allocations_over_native_slide_reads() {
         );
     };
     // Both legs measure warm reads: the presentation's one-slide shape memo
-    // (record 0260) serves the facade and native handles alike.
+    // serves the facade and native handles alike.
     native(&small_native);
     native(&large_native);
     let small_base = allocation_measure(|| native(&small_native));

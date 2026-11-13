@@ -1,4 +1,4 @@
-//! Immutable XLSB merged-range writes (record 0261).
+//! Immutable XLSB merged-range writes.
 //!
 //! `set(range, {merge: true})` merges exactly that range and
 //! `{merge: false}` (or null) removes exactly that merge. Every selected

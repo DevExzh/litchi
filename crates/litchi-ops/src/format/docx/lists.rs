@@ -1,4 +1,4 @@
-//! `listStyle` on paragraphs (record 0251e).
+//! `listStyle` on paragraphs.
 //!
 //! `set <paragraph> listStyle=bullet|ordered|none [start=N]` follows
 //! OfficeCLI's `ApplyListStyle`:
@@ -12,7 +12,7 @@
 //!
 //! The paragraph keeps its list level, or takes level 0.
 //!
-//! `add <container> --type paragraph listStyle=... [start=N]` (record 0342)
+//! `add <container> --type paragraph listStyle=... [start=N]`
 //! numbers the new paragraph the same way, after OfficeCLI's add path: it
 //! continues the list of the nearest preceding paragraph of the container at
 //! the same or a shallower level (deeper items are skipped) when that list
@@ -70,7 +70,7 @@ pub(super) fn start(value: Option<crate::value::Scalar<'_>>) -> Result<u32> {
 }
 
 /// Number the paragraph just inserted at `position` of `container` as
-/// `request` asks (record 0342). Its own level (`numLevel`) is kept, or it
+/// `request` asks. Its own level (`numLevel`) is kept, or it
 /// takes level 0.
 pub(super) fn number_added(
     edit: &mut litchi_docx::document::Edit,

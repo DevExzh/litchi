@@ -1,15 +1,14 @@
 //! The `/metadata` write path of the ODF adapters over the shared ODF
-//! metadata family (ADR 0034 §7, record 0288).
+//! metadata family (ADR 0034 §7).
 //!
 //! `set("/metadata", props)` stages each key on the leaf's
 //! `Package::edit_metadata()` (`litchi_odf_common::metadata::Edit`) and
 //! commits once: the leaf splices only the touched `office:meta` children
 //! (or adds a `meta.xml` to a package without one) and never stamps a date.
-//! `title`, `subject`, `description`, `author` (`meta:initial-creator`),
-//! `lastModifiedBy` (`dc:creator`) and `language` take text; `keywords`
-//! takes a list (one `meta:keyword` per keyword) or text split at `;` and
-//! `,` (record 0354); `null` removes the element. The other root-metadata keys of the OLE and
-//! OOXML formats are a typed `unsupported_capability`; an unknown key is
+//! `title`, `subject`, `description`, `author` (`meta:initial-creator`), `lastModifiedBy`
+//! (`dc:creator`) and `language` take text; `keywords` takes a list (one `meta:keyword` per
+//! keyword) or text split at `;` and `,`; `null` removes the element. The other root-metadata
+//! keys of the OLE and OOXML formats are a typed `unsupported_capability`; an unknown key is
 //! `unsupported_property`.
 
 use litchi_core::FileFormat;
@@ -85,7 +84,7 @@ pub(crate) fn field(key: &str, format: FileFormat) -> Result<Field> {
             Code::UnsupportedCapability,
             "the ODF metadata family writes title, subject, description, author, lastModifiedBy, language and keywords",
         )
-        .with_suggestion("follow-up: ODF user-defined and statistics metadata (record 0288)")
+        .with_suggestion("follow-up: ODF user-defined and statistics metadata")
     } else {
         Error::new(
             Code::UnsupportedProperty,

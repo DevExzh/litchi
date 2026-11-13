@@ -1,6 +1,6 @@
 # Provenance
 
-Fixtures copied verbatim from the local upstream checkouts under `3rdparty/` (record 0251b), so tests never read `3rdparty/`.
+Fixtures copied verbatim from the local upstream checkouts under `3rdparty/`, so tests never read `3rdparty/`.
 
 | File | Upstream | Upstream path | License | Bytes | SHA-256 |
 |---|---|---|---|---:|---|

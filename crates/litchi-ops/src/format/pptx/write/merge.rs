@@ -1,8 +1,8 @@
-//! PPTX template merge (record 0274): placeholders in every paragraph of
+//! PPTX template merge: placeholders in every paragraph of
 //! every slide shape, table cell and notes page, rewritten run by run
 //! through the native text edits, so each run keeps its formatting; one
 //! native commit. The text bodies and the run rewrite are the ones
-//! find/replace uses (record 0285).
+//! find/replace uses.
 
 use std::ops::Range;
 
@@ -81,7 +81,7 @@ pub(crate) fn merge(
                 .with_format(litchi_core::FileFormat::Pptx)
                 .with_suggestion("remove line breaks from the data or split the paragraph"));
             }
-            // The run rewrite find/replace uses (record 0285): a value takes
+            // The run rewrite find/replace uses: a value takes
             // the place of its placeholder's first character, in that run.
             let rewrites = rewrite_ranges(
                 &pieces,

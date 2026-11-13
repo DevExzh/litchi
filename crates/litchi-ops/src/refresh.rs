@@ -1,10 +1,9 @@
-//! Field and table-of-contents refresh (design §13 P0, record 0279).
+//! Field and table-of-contents refresh (design §13).
 //!
 //! [`File::refresh`](crate::File::refresh) recomputes the derived results a
 //! document caches: tables of contents and computable fields in DOCX,
 //! computable fields in DOC, ODT, OTH and ODM, slide numbers and dates in
-//! PPTX and ODP, and formula results in XLSX, XLSB and XLS (records 0279
-//! and 0295). Every field the
+//! PPTX and ODP, and formula results in XLSX, XLSB and XLS. Every field the
 //! refresh meets is reported in the [`Summary`] with a [`Status`]; the
 //! changed results are published in one atomic unified operation (XLS may
 //! use several native chunks). A document whose supported results are all
@@ -65,7 +64,7 @@
 //! text boxes, with numeric pictures (`\#`) or other switches are
 //! [`Status::Unsupported`]. Only the main story is refreshed.
 //!
-//! # Other formats (record 0295)
+//! # Other formats
 //!
 //! | Format | Fields |
 //! |---|---|
@@ -970,11 +969,10 @@ pub(crate) fn workbook_summary(
 #[cfg(any(feature = "docx", feature = "doc", feature = "odt", feature = "odp"))]
 pub(crate) type Skip = (Status, Option<&'static str>);
 
-/// The new displayed text of an ODF text field (record 0295): `name` is the
-/// element's local name (`date`, `title`, ...), `fixed` its `text:fixed`,
-/// `styled` whether it names a data style. Page fields are the caller's
-/// (they need layout in a text document, the slide position in a
-/// presentation).
+/// The new displayed text of an ODF text field: `name` is the element's
+/// local name (`date`, `title`, ...), `fixed` its `text:fixed`, `styled`
+/// whether it names a data style. Page fields are the caller's (they need
+/// layout in a text document, the slide position in a presentation).
 #[cfg(any(feature = "odt", feature = "odp"))]
 pub(crate) fn odf_field(
     name: &str,
@@ -1042,9 +1040,9 @@ mod word {
 
     use super::Skip;
 
-    /// The new result of a Word field that is not a table of contents (DOCX,
-    /// and DOC since record 0295): `bookmark` reads a bookmark's text for
-    /// `REF`, `counts` the main story's words and non-space characters.
+    /// The new result of a Word field that is not a table of contents (DOCX
+    /// and DOC): `bookmark` reads a bookmark's text for `REF`, `counts` the
+    /// main story's words and non-space characters.
     pub(crate) fn word_field(
         kind: &str,
         instruction: &Instruction,
@@ -1146,8 +1144,8 @@ mod word {
             "TITLE" => &metadata.title,
             "SUBJECT" => &metadata.subject,
             "AUTHOR" => &metadata.author,
-            // The keyword list joined with `, ` (record 0354): the
-            // source's own separators are not kept in the list.
+            // The keyword list joined with `, `: the source's own
+            // separators are not kept in the list.
             "KEYWORDS" => return Some(metadata.keywords.join(", ")),
             "COMMENTS" => &metadata.description,
             "LASTSAVEDBY" => &metadata.last_modified_by,

@@ -1,12 +1,12 @@
 //! Representative selectors over the workbook, document and presentation
 //! corpus, with one digest per format and selector of everything the
-//! queries return (records 0262 and 0267).
+//! queries return.
 //!
 //! The digest of a selector hashes, file by file in path order, each match's
 //! kind, path, positional path and text, or the error code that refused or
 //! ended the walk, so two builds that return the same result sets on every
 //! file produce the same digests. `tests/query_corpus_differential.rs`
-//! compares them with the digests the build before record 0262 printed
+//! compares them with the recorded digests
 //! (`tests/golden/query_corpus/digests.json`); the example
 //! `query_corpus_digest` prints them, so any two builds can be compared.
 //!
@@ -64,16 +64,16 @@ pub(crate) const XLSX: &[&str] = &[
     "namedrange",
 ];
 
-/// Legacy and binary workbook selectors (record 0267): the XLSX selectors,
+/// Legacy and binary workbook selectors: the XLSX selectors,
 /// so the three worksheet adapters are held to the same routes. XLS and
-/// XLSB digests were recorded from trunk `4d1afe92bc` before the streaming
+/// XLSB digests were recorded before the streaming
 /// cell cursors.
 pub(crate) const XLS: &[&str] = XLSX;
 
-/// Binary workbook selectors (record 0267); see [`XLS`].
+/// Binary workbook selectors; see [`XLS`].
 pub(crate) const XLSB: &[&str] = XLSX;
 
-/// OpenDocument spreadsheet selectors (record 0277): the XLSX selectors,
+/// OpenDocument spreadsheet selectors: the XLSX selectors,
 /// over packaged `.ods` and flat `.fods` files. Recorded from the ODS read
 /// adapter before its writers landed.
 pub(crate) const ODS: &[&str] = XLSX;
@@ -144,7 +144,7 @@ pub(crate) const PPTX: &[&str] = &[
     "comment",
 ];
 
-/// OpenDocument text selectors (record 0276): the element kinds of the body
+/// OpenDocument text selectors: the element kinds of the body
 /// index, character formatting predicates, structure, positions and nested
 /// selectors.
 #[cfg(feature = "odt")]
@@ -185,7 +185,7 @@ pub(crate) const ODT: &[&str] = &[
     "/body/r[bold=true]",
 ];
 
-/// OpenDocument drawing selectors (record 0282), recorded from the
+/// OpenDocument drawing selectors, recorded from the
 /// object-tree adapter's reads.
 #[cfg(feature = "odg")]
 pub(crate) const ODG: &[&str] = &[
@@ -202,7 +202,7 @@ pub(crate) const ODG: &[&str] = &[
     "/page[1]/shape",
 ];
 
-/// OpenDocument chart selectors (record 0282).
+/// OpenDocument chart selectors.
 #[cfg(feature = "odc")]
 pub(crate) const ODC: &[&str] = &[
     "axis",
@@ -212,7 +212,7 @@ pub(crate) const ODC: &[&str] = &[
     "series[values]",
 ];
 
-/// OpenDocument database selectors (record 0282).
+/// OpenDocument database selectors.
 #[cfg(feature = "odb")]
 pub(crate) const ODB: &[&str] = &[
     "table",
@@ -224,7 +224,7 @@ pub(crate) const ODB: &[&str] = &[
     "table[columnCount>2]",
 ];
 
-/// OpenDocument formula selectors (record 0282).
+/// OpenDocument formula selectors.
 #[cfg(feature = "odf-formula")]
 pub(crate) const ODF_FORMULA: &[&str] = &[
     "element",
@@ -234,7 +234,7 @@ pub(crate) const ODF_FORMULA: &[&str] = &[
     "element:contains(x)",
 ];
 
-/// OpenDocument presentation selectors (record 0278), recorded from the
+/// OpenDocument presentation selectors, recorded from the
 /// read adapter before its write handlers landed.
 #[cfg(feature = "odp")]
 pub(crate) const ODP: &[&str] = &[
@@ -277,7 +277,7 @@ pub(crate) const ODP: &[&str] = &[
     "slideLayout",
 ];
 
-/// Apple Pages selectors (record 0296), recorded from the iWork read
+/// Apple Pages selectors, recorded from the iWork read
 /// adapter.
 #[cfg(feature = "pages")]
 pub(crate) const PAGES: &[&str] = &[
@@ -289,7 +289,7 @@ pub(crate) const PAGES: &[&str] = &[
     "section[paragraphCount>1]",
     "p[last()]",
     "p:not(:empty)",
-    // Record 0299: anchored objects, body tables, headers, footers and
+    // Anchored objects, body tables, headers, footers and
     // footnotes.
     "p[objects>0]",
     "tbl",
@@ -300,7 +300,7 @@ pub(crate) const PAGES: &[&str] = &[
     "footnote",
 ];
 
-/// Apple Keynote selectors (records 0296 and 0298).
+/// Apple Keynote selectors.
 #[cfg(feature = "keynote")]
 pub(crate) const KEYNOTE: &[&str] = &[
     "slide",
@@ -311,7 +311,7 @@ pub(crate) const KEYNOTE: &[&str] = &[
     "slide > placeholder",
     "placeholder:contains(a)",
     "slide[last()]",
-    // Record 0298: paragraphs, runs, drawables, tables and layouts.
+    // Paragraphs, runs, drawables, tables and layouts.
     "paragraph",
     "placeholder > p",
     "notes > p",
@@ -326,7 +326,7 @@ pub(crate) const KEYNOTE: &[&str] = &[
     "slide[layout]",
 ];
 
-/// Apple Numbers selectors (record 0296).
+/// Apple Numbers selectors.
 #[cfg(feature = "numbers")]
 pub(crate) const NUMBERS: &[&str] = &[
     "sheet",
@@ -338,7 +338,7 @@ pub(crate) const NUMBERS: &[&str] = &[
     "cell:contains(a)",
     "table > cell",
     "sheet[name~=Sheet]",
-    // Record 0297: merged ranges.
+    // Merged ranges.
     "mergeCell",
     "table[mergeCount>0]",
     "cell[mergeAnchor=true]",
@@ -404,7 +404,7 @@ fn record_matches(
     count
 }
 
-/// Early-stopping queries on cold handles (record 0267): for every
+/// Early-stopping queries on cold handles: for every
 /// selector, a freshly opened file-backed handle runs `limit(3)` and a
 /// freshly opened in-memory handle runs `first()`, so the first matches of
 /// a sheet that no earlier query has read are compared too. Keys are
@@ -519,15 +519,15 @@ pub(crate) fn digests(root: &Path) -> BTreeMap<String, String> {
         ("fods", FileFormat::Ods, ODS),
         #[cfg(feature = "odt")]
         ("odt", FileFormat::Odt, ODT),
-        // Flat text documents read through the ODT adapter (record 0292).
+        // Flat text documents read through the ODT adapter.
         #[cfg(feature = "odt")]
         ("fodt", FileFormat::Odt, ODT),
-        // ODM master documents run the ODT selectors (record 0282).
+        // ODM master documents run the ODT selectors.
         #[cfg(feature = "odm")]
         ("odm", FileFormat::Odm, ODT),
         #[cfg(feature = "odg")]
         ("odg", FileFormat::Odg, ODG),
-        // Flat drawings read through the object-tree adapter (record 0292).
+        // Flat drawings read through the object-tree adapter.
         #[cfg(feature = "odg")]
         ("fodg", FileFormat::Odg, ODG),
         #[cfg(feature = "odc")]

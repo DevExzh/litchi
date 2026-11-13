@@ -1,5 +1,4 @@
-//! [`EditOptions`]: the configuration of one explicit `File` transaction
-//! (record 0351 §2.5 rule 7, record 0362).
+//! [`EditOptions`]: the configuration of one explicit `File` transaction.
 
 use super::SemanticLimits;
 

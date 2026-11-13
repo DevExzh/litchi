@@ -1,4 +1,4 @@
-//! The last PPTX P0 rows (record 0346): legacy comment author, initials and
+//! More PPTX writes: legacy comment author, initials and
 //! date writes and `direction` on add; modern comment add and set; notes
 //! and placeholder text on add; slide title, text and layout writes. Every
 //! case runs on both owners.
@@ -717,7 +717,7 @@ fn notes_are_added() {
     }
 }
 
-// Record 0346 (record 0333 F3): cell, notes and paragraph-text batches
+// Cell, notes and paragraph-text batches
 // coalesce into one native commit.
 
 type Plan = Vec<(String, litchi_ops::Props<'static>)>;
@@ -969,7 +969,7 @@ fn source_owned_notes_keep_the_ordinary_writer() {
     assert_eq!(after.to_bytes().unwrap(), sequential(&source, &items));
 }
 
-// Record 0348: a cell plan's change is the leaf's report from its batched
+// A cell plan's change is the leaf's report from its batched
 // staging; the table is indexed, not read, before planning.
 
 /// Each item's change and the file after it, applied one `set` at a time.

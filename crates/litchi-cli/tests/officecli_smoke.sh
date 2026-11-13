@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Replays a few command lines of OfficeCLI's example scripts through `litchi`
-# (record 0256). It is the seed of the OfficeCLI example-corpus harness of
-# plan step 17: each replayed line is cited as `<file>:<line>` of the copies
-# vendored under `test-data/officecli/examples/` (record 0257; provenance in
+# Replays a few command lines of OfficeCLI's example scripts through `litchi`.
+# It is the seed of the OfficeCLI example-corpus harness:
+# each replayed line is cited as `<file>:<line>` of the copies
+# vendored under `test-data/officecli/examples/` (provenance in
 # `test-data/officecli/PROVENANCE.md`) and kept as OfficeCLI wrote it, with
 # `officecli` replaced by the binary under test. Every `step` checks that its
 # cited line exists and runs the same verb. A line whose status is not 0 is a

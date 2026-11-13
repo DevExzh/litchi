@@ -1,4 +1,4 @@
-//! DOCX `set` (record 0015 W5a).
+//! DOCX `set`.
 //!
 //! The handler resolves the target once, proves every node against the main
 //! story's direct transaction positions, admits every property before it
@@ -77,7 +77,7 @@ impl Commit {
     }
 
     /// A commit from its parts, for a route that publishes outside the
-    /// main-document edit (record 0338: metadata).
+    /// main-document edit (metadata).
     pub(super) const fn from_parts(
         file: Docx,
         patch: litchi_docx::document::Patch,
@@ -127,14 +127,14 @@ enum TargetKind {
     Run,
     Hyperlink,
     Cell,
-    /// A table's borders (record 0342).
+    /// A table's borders.
     Table,
-    /// A row's height and flags (record 0342).
+    /// A row's height and flags.
     Row,
 }
 
 /// Where a set lands: a direct-body paragraph or run on the body-position
-/// route, or any other element through its leaf element path (record 0251a).
+/// route, or any other element through its leaf element path.
 #[derive(Clone)]
 enum Selection {
     Body(WriteSelection),
@@ -185,7 +185,7 @@ impl Docx {
     /// [`Self::set`] for single-operation `File::set`, which keeps only the
     /// committed handle: the leaf's patch is dropped where the commit
     /// returns instead of travelling up the call chain, and a direct body
-    /// paragraph's text skips the generic resolver (record 0305).
+    /// paragraph's text skips the generic resolver.
     pub(crate) fn set_file(&self, target: &TargetArg<'_>, props: Props<'_>) -> Result<Self> {
         self.set_file_with_limits(target, props, &SemanticLimits::default())
     }
@@ -218,8 +218,8 @@ impl Docx {
         self.direct_body_paragraph(target, props)
     }
 
-    /// [`Self::direct_paragraph`] on either owner (the batch text runs of
-    /// record 0355a read the body index both owners cache).
+    /// [`Self::direct_paragraph`] on either owner (the batch text runs
+    /// read the body index both owners cache).
     fn direct_body_paragraph(&self, target: &TargetArg<'_>, props: &Props<'_>) -> Option<Position> {
         let mut keys = props.iter();
         let (Some((key, _)), None) = (keys.next(), keys.next()) else {
@@ -288,7 +288,7 @@ impl Docx {
         // Build the editor first. Besides preserving the signed exact-no-op
         // exception and refusing read-only handles, this makes an empty
         // property list honor the same security policy as a non-empty write.
-        // Core document properties on `/` or `/metadata` (record 0338); the
+        // Core document properties on `/` or `/metadata`; the
         // metadata route applies the same edit policy without building a
         // main-document editor.
         let props = if crate::format::metadata::is_target(target)
@@ -312,8 +312,7 @@ impl Docx {
             Ok(commit) => return Ok(O::from_commit(commit)),
             Err(editor) => editor,
         };
-        // Pictures, comments, SmartArt graphics and their nodes (record
-        // 0335).
+        // Pictures, comments, SmartArt graphics and their nodes.
         let editor = match self.try_set_picture(editor, &nodes, &props)? {
             Ok(commit) => return Ok(O::from_commit(commit)),
             Err(editor) => editor,
@@ -326,22 +325,22 @@ impl Docx {
             Ok(commit) => return Ok(O::from_commit(commit)),
             Err(editor) => editor,
         };
-        // Table grid columns (record 0345).
+        // Table grid columns.
         let editor = match self.try_set_column(editor, &nodes, &props)? {
             Ok(commit) => return Ok(O::from_commit(commit)),
             Err(editor) => editor,
         };
-        // Styles, numbering, headers, footers and notes (record 0319).
+        // Styles, numbering, headers, footers and notes.
         let editor = match self.try_set_parts(editor, &nodes, &props)? {
             Ok(commit) => return Ok(O::from_commit(commit)),
             Err(editor) => editor,
         };
-        // Tab stops (record 0319).
+        // Tab stops.
         let editor = match self.try_set_marks(editor, &nodes, &props)? {
             Ok(commit) => return Ok(O::from_commit(commit)),
             Err(editor) => editor,
         };
-        // Header, footer and note paragraphs and runs (record 0325).
+        // Header, footer and note paragraphs and runs.
         let editor = match self.try_set_story(editor, &nodes, &props)? {
             Ok(commit) => return Ok(O::from_commit(commit)),
             Err(editor) => editor,
@@ -374,7 +373,7 @@ impl Docx {
         self.owner().check_source()?;
         // A hyperlink target change stages a relationship, which only the
         // owning package publishes.
-        // So does a new list definition (record 0251e).
+        // So does a new list definition.
         let new_lists = request
             .is_some_and(|request| !matches!(request.style, Some(super::lists::Style::None)));
         let editor = if new_lists
@@ -396,7 +395,7 @@ impl Docx {
                 return O::publish(editor, self);
             }
             // A table's or row's assignments are spliced in one property
-            // edit per target (record 0342).
+            // edit per target.
             if matches!(targets[0].kind, TargetKind::Table | TargetKind::Row) {
                 for target in &targets {
                     editor.format_structure(target, &assignments)?;
@@ -439,8 +438,8 @@ impl Docx {
         O::publish(editor, self)
     }
 
-    /// `set` on paragraphs and runs of headers, footers and notes (record
-    /// 0325): the main document's element-path setters, run on each story
+    /// `set` on paragraphs and runs of headers, footers and notes:
+    /// the main document's element-path setters, run on each story
     /// through the leaf's story edit. `Err(editor)` hands the editor back
     /// when no target is in a story.
     fn try_set_story(
@@ -547,8 +546,7 @@ impl Docx {
     }
 
     /// A paragraph or run style named by display name is written as the
-    /// style's identifier; an unknown name is written as given (record 0319,
-    /// M1-Δ4).
+    /// style's identifier; an unknown name is written as given.
     fn resolve_style_names(&self, assignments: &mut [Assignment<'_>]) -> Result<()> {
         for assignment in assignments {
             if !matches!(
@@ -603,7 +601,7 @@ impl Docx {
 }
 
 /// What a `set` publishes: the complete [`Commit`] (transactions keep its
-/// patch and diagnostics), or only the committed handle (record 0305).
+/// patch and diagnostics), or only the committed handle.
 pub(super) trait Publish: Sized {
     /// Commit `edit` over `source`.
     fn publish(edit: WorkEdit, source: &Docx) -> Result<Self>;
@@ -611,7 +609,7 @@ pub(super) trait Publish: Sized {
     /// A commit another route already made.
     fn from_commit(commit: Commit) -> Self;
 
-    /// A core-properties set on `source` (record 0338).
+    /// A core-properties set on `source`.
     fn metadata(source: &Docx, props: &Props<'_>, snapshot_budget: usize) -> Result<Self>;
 }
 
@@ -772,7 +770,7 @@ impl WorkEdit {
     }
 
     /// Apply every admitted assignment of a table or row target in one
-    /// property edit (record 0342).
+    /// property edit.
     fn format_structure(&mut self, target: &Target, assignments: &[Assignment<'_>]) -> Result<()> {
         let Selection::Element(path) = &target.selection else {
             return Err(Error::new(
@@ -816,7 +814,7 @@ impl WorkEdit {
 
     /// Apply one admitted assignment to an element reached by its leaf path.
     /// Join a paragraph to a list, or remove its numbering, in one
-    /// formatting operation (record 0251e). An explicit `level` wins over
+    /// formatting operation. An explicit `level` wins over
     /// the planned one.
     fn set_numbering(
         &mut self,
@@ -1223,7 +1221,7 @@ impl WorkEdit {
             .map_err(Error::from))
     }
 
-    /// Change the direct properties of the table at `path` (record 0342).
+    /// Change the direct properties of the table at `path`.
     pub(super) fn format_table_at(
         &mut self,
         path: &litchi_docx::document::ElementPath,
@@ -1246,7 +1244,7 @@ impl WorkEdit {
             .map_err(Error::from))
     }
 
-    /// Insert a grid column into the table at `table` (record 0345).
+    /// Insert a grid column into the table at `table`.
     pub(super) fn insert_column_at(
         &mut self,
         table: &litchi_docx::document::ElementPath,
@@ -1259,7 +1257,7 @@ impl WorkEdit {
             .map_err(Error::from))
     }
 
-    /// Set a grid column's width (record 0345).
+    /// Set a grid column's width.
     pub(super) fn set_column_width_at(
         &mut self,
         table: &litchi_docx::document::ElementPath,
@@ -1272,7 +1270,7 @@ impl WorkEdit {
             .map_err(Error::from))
     }
 
-    /// Remove a grid column and its cells (record 0345).
+    /// Remove a grid column and its cells.
     pub(super) fn remove_column_at(
         &mut self,
         table: &litchi_docx::document::ElementPath,
@@ -1284,7 +1282,7 @@ impl WorkEdit {
             .map_err(Error::from))
     }
 
-    /// Insert a cell into the row at `row` (record 0345).
+    /// Insert a cell into the row at `row`.
     pub(super) fn insert_cell_at(
         &mut self,
         row: &litchi_docx::document::ElementPath,
@@ -1553,7 +1551,7 @@ fn admit_table<'a, const N: usize, const A: usize>(
     Ok(assignments)
 }
 
-/// Split the `listStyle` and `start` assignments (record 0251e) from the
+/// Split the `listStyle` and `start` assignments from the
 /// others, which stay in `assignments`. The list is changed only when it
 /// holds one of them (a moved list is a copy of its inline element).
 fn list_request(assignments: &mut Few<Assignment<'_>>) -> Result<Option<super::lists::Request>> {

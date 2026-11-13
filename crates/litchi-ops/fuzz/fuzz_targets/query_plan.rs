@@ -1,6 +1,6 @@
 #![no_main]
 
-//! Query plan compilation fuzz target (M1 step R3, record 0010 §5.2).
+//! Query plan compilation fuzz target.
 //!
 //! Every UTF-8 input that parses as a selector compiles, for each of the
 //! three fake format families, either to a plan or to a typed refusal

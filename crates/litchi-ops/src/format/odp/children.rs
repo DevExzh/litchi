@@ -16,15 +16,14 @@ pub(crate) struct Children<'f> {
     counters: [usize; Kind::COUNT],
     /// Annotation inventory indices of a slide, read once.
     comments: Vec<usize>,
-    /// The parts of record 0328 listed after the structural children, when
-    /// a query names them.
+    /// The parts listed after the structural children, when a query names
+    /// them.
     tail: Option<std::vec::IntoIter<Node<'f>>>,
 }
 
 /// Whether `kinds` is a view's or a wildcard's set rather than a query
-/// naming kinds: the parts of record 0328 are listed only when asked for
-/// by name, so views and `*` list the structural children they listed
-/// before.
+/// naming kinds: the parts are listed only when asked for by name, so
+/// views and `*` list the structural children they listed before.
 fn wildcard(kinds: KindSet<Kind>) -> bool {
     kinds.contains(Kind::Connector) && kinds.contains(Kind::Comment)
 }
@@ -98,7 +97,7 @@ impl<'f> Children<'f> {
         })
     }
 
-    /// The part children of the parent the query asks for (record 0328).
+    /// The part children of the parent the query asks for.
     fn extras(&self) -> Result<Vec<Node<'f>>> {
         let kinds = self.kinds;
         if wildcard(kinds) {
@@ -243,7 +242,7 @@ impl<'f> Children<'f> {
                     };
                     // A query naming video, audio or equation objects (and
                     // not the media or embedded objects they are) lists
-                    // them as such (record 0328).
+                    // them as such.
                     let mut kind = physical;
                     if !wildcard(self.kinds)
                         && ((physical == Kind::Media

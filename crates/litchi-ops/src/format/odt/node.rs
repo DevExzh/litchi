@@ -97,11 +97,11 @@ pub(crate) enum Target<'f> {
     Body(Body<'f>, NodeId),
     /// A common style.
     Style(Style<'f>),
-    /// A part of record 0328, read through the handle's part index.
+    /// A part, read through the handle's part index.
     Part(Part),
 }
 
-/// A part of record 0328: an index into the handle's part index
+/// A part: an index into the handle's part index
 /// ([`litchi_odt::body::Parts`]), its fields or its equations.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Part {
@@ -127,8 +127,8 @@ pub(crate) enum Part {
     Column(NodeId, u32),
 }
 
-// Record 0287: nodes move through every query; keep this one no larger
-// than it is (the unified node is as large as its largest format node).
+// Nodes move through every query; keep this one no larger than it is
+// (the unified node is as large as its largest format node).
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(size_of::<Node<'static>>() <= 176);
 
@@ -140,8 +140,8 @@ pub struct Node<'f> {
     pub(super) kind: Kind,
     pub(super) target: Target<'f>,
     pub(super) address: Address,
-    /// Text the node spells out on first use (record 0287 keeps it in one
-    /// slot so the node stays small).
+    /// Text the node spells out on first use (kept in one slot so the
+    /// node stays small).
     spelled: OnceLock<Spelled>,
 }
 
@@ -295,8 +295,8 @@ impl<'f> Node<'f> {
     }
 
     /// The node's children, in document order: the structural kinds (the
-    /// parts of record 0328 under a structural parent are reached by path
-    /// and query only).
+    /// parts under a structural parent are reached by path and query
+    /// only).
     pub fn children(&self) -> ViewChildren<'_, 'f> {
         match Children::view(self) {
             Ok(children) => ViewChildren::odt(children),

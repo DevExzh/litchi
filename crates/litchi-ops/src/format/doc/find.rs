@@ -1,4 +1,4 @@
-//! DOC find/replace and template merge (record 0295) over the shared text
+//! DOC find/replace and template merge over the shared text
 //! surface (`crate::find::surface`).
 //!
 //! The document root and the body search every ordinary main-story

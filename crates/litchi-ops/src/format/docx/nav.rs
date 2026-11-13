@@ -1,18 +1,17 @@
-//! The DOCX adapter's read access for path resolution and queries (record
-//! 0010 §4.1, §4.5, §5.3): [`Nav`] implements `Navigate` and `Inspect` over
-//! a [`Docx`] handle.
+//! The DOCX adapter's read access for path resolution and queries:
+//! [`Nav`] implements `Navigate` and `Inspect` over a [`Docx`] handle.
 //!
 //! Each step reads only its own axis:
 //!
 //! | Step | Leaf read | Cost |
 //! |---|---|---|
-//! | `/body` | the visible main part and its body block index (L-DOCX-R1/R2) | once per part generation, then shared |
+//! | `/body` | the visible main part and its body block index | once per part generation, then shared |
 //! | `p[N]`, `tbl[N]`, `sdt[N]`, `oMathPara[N]`, `section[N]` | the container's block index by kind and ordinal | O(1) |
-//! | `p[@paraId=X]` | the index's identifier table (L-DOCX-R7) | one start-tag pass per index, then O(log n) |
+//! | `p[@paraId=X]` | the index's identifier table | one start-tag pass per index, then O(log n) |
 //! | `sdt[@sdtId=N]` | each content control's `w:sdtPr` | O(content controls) |
 //! | `tr[N]`, `tc[N]` | the table's rows, the row's cells | the table's range |
 //! | `tc[K]/p[J]`, `sdt[N]/p[M]` | the cell's or control's own block index | the cell or control |
-//! | `r[N]` | the paragraph's addressable runs (L-DOCX-R8) | one pass over the paragraph |
+//! | `r[N]` | the paragraph's addressable runs | one pass over the paragraph |
 //! | `hyperlink[N]` | the paragraph's direct hyperlinks and the main part's relationships | one pass over the paragraph |
 //!
 //! Nothing else is decoded: a `get` reads the main document part only.
@@ -56,7 +55,7 @@ thread_local! {
 }
 
 /// The body's block index of `docx`, shared with every other view of the
-/// same main-part generation (L-DOCX-R1/R2).
+/// same main-part generation.
 pub(super) fn load_body(docx: &Docx) -> Result<Blocks> {
     #[cfg(test)]
     BODY_LOADS.with(|loads| loads.set(loads.get() + 1));
@@ -65,7 +64,7 @@ pub(super) fn load_body(docx: &Docx) -> Result<Blocks> {
     }
     // The handle's package is immutable, so its body index is too; a
     // source-backed owner's source fence is checked where the operation
-    // finishes (record 0355a: one body index per batch base).
+    // finishes (one body index per batch base).
     let blocks = match docx.owner() {
         DocxOwner::Eager(package) => package.document()?.body_blocks()?,
         DocxOwner::Source(package) => package.document()?.body_blocks()?,
@@ -140,7 +139,7 @@ pub(super) fn comments(docx: &Docx) -> Result<Vec<litchi_docx::comment::Comment>
     docx.owner().finish(result)
 }
 
-/// The `commentsExtended` entries of the main document (record 0345);
+/// The `commentsExtended` entries of the main document;
 /// empty when the part is absent. A part the leaf refuses as malformed
 /// reads as empty, so a comment's other properties stay readable.
 pub(super) fn comments_extended(
@@ -325,7 +324,7 @@ pub(super) fn container_of(node: &Node<'_>) -> Result<Option<Blocks>> {
             Some(control) => Some(control.blocks()?),
             None => None,
         },
-        // Header, footer and note stories (record 0325).
+        // Header, footer and note stories.
         Value::Part(part) => super::parts::story_blocks(node.docx, *part)?,
         _ => None,
     })
@@ -351,7 +350,7 @@ impl<'f> Navigate<'f> for Nav<'f> {
     type Children = Children<'f>;
 
     const FORMAT: FileFormat = FileFormat::Docx;
-    /// `w:customXml` wrappers are flattened (record 0010 D4): their content
+    /// `w:customXml` wrappers are flattened: their content
     /// is addressed as the container's own children, and the wrappers are
     /// not elements of the visible view.
     const ABSENT: &'static [&'static str] = &["customXml"];
@@ -458,7 +457,7 @@ impl<'f> Navigate<'f> for Nav<'f> {
             },
             (Value::Table(block), Kind::Row) => {
                 if let Select::Ordinal(position) = step.select {
-                    // Read the table only up to the addressed row (record 0281).
+                    // Read the table only up to the addressed row.
                     let row = match block.indexed()?.table() {
                         Some(table) => table.row(position.get())?,
                         None => None,
@@ -487,7 +486,7 @@ impl<'f> Navigate<'f> for Nav<'f> {
                     None => Lookup::NotApplicable,
                 })
             },
-            // Grid columns (record 0345).
+            // Grid columns.
             (Value::Table(block), Kind::Column) => {
                 super::column::pick_column(self.docx, parent, block, &step.select)
             },
@@ -570,11 +569,11 @@ impl<'f> Navigate<'f> for Nav<'f> {
             (Value::Document | Value::Body(_), Kind::Chart) => {
                 super::chart::pick_document_chart(self.docx, &step.select)
             },
-            // SmartArt is addressed document-wide too (record 0295).
+            // SmartArt is addressed document-wide too.
             (Value::Document | Value::Body(_), Kind::SmartArt) => {
                 super::smartart::pick_document_smartart(self.docx, &step.select)
             },
-            // A chart's series and axes, a graphic's nodes (record 0335).
+            // A chart's series and axes, a graphic's nodes.
             (Value::Chart(chart), Kind::Series | Kind::Axis) => {
                 super::chart::pick_chart_child(self.docx, parent, chart, kind, &step.select)
             },
@@ -597,12 +596,12 @@ impl<'f> Navigate<'f> for Nav<'f> {
                     None => Lookup::NotApplicable,
                 })
             },
-            // Styles, numbering, headers, footers and notes (record 0319).
+            // Styles, numbering, headers, footers and notes.
             (Value::Document | Value::Part(_), kind) if super::parts::is_part_kind(kind) => {
                 super::parts::child(self.docx, parent, step)
             },
             // Tab stops, breaks, bookmarks, fields, tables of contents, the
-            // watermark and text boxes (record 0319).
+            // watermark and text boxes.
             (_, kind) if super::marks::is_mark_kind(kind) => {
                 super::marks::child(self.docx, parent, step)
             },

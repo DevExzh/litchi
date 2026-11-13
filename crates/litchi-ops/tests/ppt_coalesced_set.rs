@@ -547,7 +547,7 @@ fn explicit_limits_and_native_operation_rollover_preserve_atomicity() {
         assert_eq!(source.to_bytes().expect("limit rollback"), before);
     }
 
-    // One past the native primary-edit bound (16384 since record 0264)
+    // One past the native primary-edit bound (16384)
     // exceeds the default unified operation bound, so select wider limits.
     let bytes = many_shapes(NATIVE_ROLLOVER + 1);
     let source = eager(&bytes);

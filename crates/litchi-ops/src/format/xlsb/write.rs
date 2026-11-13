@@ -51,11 +51,9 @@ pub(crate) enum Patch {
         retained_bytes: usize,
     },
     Cells(Vec<NativeCellPatch>),
-    /// A document-metadata patch with its canonical package images (record
-    /// 0253).
+    /// A document-metadata patch with its canonical package images.
     Metadata(Box<super::metadata::Images>),
-    /// A worksheet-feature patch with its canonical package images (record
-    /// 0322).
+    /// A worksheet-feature patch with its canonical package images.
     Feature(Box<super::feature_write::Images>),
 }
 
@@ -143,7 +141,7 @@ impl Commit {
         self.after
     }
 
-    /// Adapt a metadata commit (record 0253).
+    /// Adapt a metadata commit.
     pub(super) fn from_metadata(after: Xlsb, images: super::metadata::Images) -> Self {
         let operations = images.authored_operations;
         let snapshot_bytes = images.retained_bytes();
@@ -155,7 +153,7 @@ impl Commit {
         }
     }
 
-    /// Adapt a worksheet-feature commit (record 0322).
+    /// Adapt a worksheet-feature commit.
     pub(super) fn from_feature(after: Xlsb, images: super::feature_write::Images) -> Self {
         let operations = images.operation_count();
         let snapshot_bytes = images.retained_bytes();
@@ -2844,7 +2842,7 @@ pub(crate) mod sheet_coalesce {
 /// original mutation index for deferred native failures while letting a
 /// sequence of ordinary scalar writes or removals share one package-owned
 /// edit.
-/// CSV/TSV import through one native edit (record 0266).
+/// CSV/TSV import through one native edit.
 pub(crate) mod find;
 pub(crate) mod import;
 #[cfg(feature = "eval")]

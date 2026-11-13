@@ -1,7 +1,7 @@
-//! ODS worksheet features through the unified API (record 0327):
+//! ODS worksheet features through the unified API:
 //! hyperlinks, pictures, shapes, conditional formats, content validations,
 //! the auto-filter and page breaks, each added, read back on both owners,
-//! set, queried and removed, with the XLSX vocabulary of record 0320.
+//! set, queried and removed, with the XLSX vocabulary.
 #![cfg(feature = "ods")]
 #![allow(clippy::expect_used, clippy::unwrap_used, reason = "test assertions")]
 
@@ -482,7 +482,7 @@ fn validations_bind_cells() {
         // Cell values survive the binding.
         assert_eq!(prop(&file, "/Sheet1/A3", "type").as_deref(), Some("String"));
         // The worksheet family refuses a cell write that would drop the
-        // binding (record 0327 follow-up), so the validation stays whole.
+        // binding, so the validation stays whole.
         let error = file.set("/Sheet1/A2", props! { "value" => 7 }).unwrap_err();
         assert_eq!(error.code(), Code::InvalidValue);
         let edited = file

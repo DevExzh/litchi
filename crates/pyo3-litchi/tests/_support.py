@@ -1,7 +1,7 @@
 """Shared helpers for the litchi_py read-API oracle.
 
 The oracle pins the read-only Python API of ``crates/pyo3-litchi`` as it
-behaves before M0a step S8a moves the bindings onto the unified
+behaved before the bindings moved onto the unified
 ``litchi::File``. Run it with ``crates/pyo3-litchi/tests/run_tests.sh``. The
 tests come in three tiers: contract, snapshot and known drift.
 
@@ -47,8 +47,8 @@ L = litchi_py
 # ---------------------------------------------------------------------------
 
 #: The 21 variants of the core ``litchi::FileFormat`` enum
-#: (crates/litchi-core/src/detection/types.rs). Record 0003 §5.1 expects the
-#: Python enum and the stub to converge on this set in S8a.
+#: (crates/litchi-core/src/detection/types.rs). The Python enum and the
+#: stub converge on this set.
 CORE_FORMAT_NAMES = frozenset(
     {
         "Doc", "Docx", "Ppt", "Pptx", "Xls", "Xlsx", "Xlsb", "Rtf",
@@ -58,20 +58,20 @@ CORE_FORMAT_NAMES = frozenset(
 )
 
 #: Variants the runtime ``litchi_py.FileFormat`` exposes: every core variant
-#: (S8a added ``Odb``, which the bindings used to map to ``Doc``; drift D1).
+#: (including ``Odb``, which the bindings used to map to ``Doc``; drift D1).
 RUNTIME_FORMAT_NAMES = CORE_FORMAT_NAMES
 
 #: Public runtime members the stub does not declare, by class. Empty since
-#: S8a declared the six missing ODF formats (drift D2); ``test_stub_sync``
+#: the stub declares the six missing ODF formats (drift D2); ``test_stub_sync``
 #: tolerates exactly these, so anything new fails.
 KNOWN_RUNTIME_ONLY_MEMBERS: dict = {}
 
 #: Base classes the stub declares that the runtime class does not have.
-#: Empty since S8a dropped the false ``Enum`` base of ``FileFormat`` (drift D3).
+#: Empty since the stub dropped the false ``Enum`` base of ``FileFormat`` (drift D3).
 KNOWN_STUB_BASE_DRIFT: frozenset = frozenset()
 
 #: API the README's "API Reference" lists that the module does not have.
-#: Empty since S8a removed the unimplemented Worksheet API from the README
+#: Empty since the unimplemented Worksheet API was removed from the README
 #: (drift D5).
 KNOWN_README_ONLY_API: frozenset = frozenset()
 

@@ -1,4 +1,4 @@
-# ODS conditional-aggregate native observations (record 0358)
+# ODS conditional-aggregate native observations
 
 `observations.json` is a lossless re-encoding of the 64 selected LibreOffice
 conditional-aggregate observations (`SUMIF`, `SUMIFS`, `COUNTIF`, `COUNTIFS`,

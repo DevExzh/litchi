@@ -1,4 +1,4 @@
-//! Structural DOCX verbs over the direct main story (M2 W5a).
+//! Structural DOCX verbs over the direct main story.
 //!
 //! This module deliberately keeps the supported surface small and proved:
 //! direct main-body paragraphs and their direct runs.  The leaf transaction
@@ -100,7 +100,7 @@ impl Docx {
         // admission failure below.
         let editor = self.edit_with_snapshot_budget(snapshot_budget)?;
         let parent = resolve_path(self, &parent)?;
-        // Header, footer and note paragraphs and runs (record 0325).
+        // Header, footer and note paragraphs and runs.
         let editor = match self.try_add_story(editor, &parent, &node)? {
             Ok(added) => return Ok(added),
             Err(editor) => editor,
@@ -171,13 +171,13 @@ impl Docx {
             ) => {
                 return self.add_nested(editor, &parent, kind, &node);
             },
-            // Styles, numbering, headers, footers and notes (record 0319).
+            // Styles, numbering, headers, footers and notes.
             (NewKind::Part(part), _) => return self.add_part(editor, &parent, part, &node),
-            // Tab stops and breaks (record 0319).
+            // Tab stops and breaks.
             (NewKind::Mark(mark), _) => return self.add_mark(editor, &parent, mark, &node),
         };
         self.owner().check_source()?;
-        // A new list definition is a new part (record 0342), which only the
+        // A new list definition is a new part, which only the
         // owning package publishes.
         let editor = match &planned {
             PlannedNode::Paragraph(_, Some(_)) => self.eager_editor(editor)?,
@@ -233,7 +233,7 @@ impl Docx {
     fn remove_inner<'p>(&self, target: TargetArg<'p>, snapshot_budget: usize) -> Result<Commit> {
         let editor = self.edit_with_snapshot_budget(snapshot_budget)?;
         let nodes = self.resolve_targets(&target)?;
-        // Header, footer and note paragraphs and runs (record 0325).
+        // Header, footer and note paragraphs and runs.
         let editor = match self.try_remove_story(editor, &nodes)? {
             Ok(commit) => return Ok(commit),
             Err(editor) => editor,
@@ -416,16 +416,16 @@ pub(super) enum NewKind {
     Run,
     Table,
     Row,
-    /// A table cell (record 0345).
+    /// A table cell.
     Cell,
-    /// A table grid column (record 0345).
+    /// A table grid column.
     Column,
     Hyperlink,
     Comment,
     Picture,
     Chart,
     SmartArt,
-    /// A SmartArt content node (record 0335).
+    /// A SmartArt content node.
     Node,
     Part(super::parts::write::NewPart),
     Mark(super::marks::write::NewMark),
@@ -558,8 +558,8 @@ pub(super) fn new_paragraph(props: &Props<'_>) -> Result<NewParagraph> {
     Ok(paragraph)
 }
 
-/// A new paragraph and the list its `listStyle` and `start` ask for (record
-/// 0342), which [`super::lists::number_added`] applies once it is inserted.
+/// A new paragraph and the list its `listStyle` and `start` ask for, which
+/// [`super::lists::number_added`] applies once it is inserted.
 pub(super) fn new_paragraph_with_list(
     props: &Props<'_>,
 ) -> Result<(NewParagraph, Option<super::lists::Request>)> {

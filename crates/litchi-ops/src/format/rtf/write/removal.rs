@@ -1,10 +1,10 @@
-//! Coalesced direct picture removals inside one transaction (record 0280).
+//! Coalesced direct picture removals inside one transaction.
 //!
 //! `Edit::remove("/body/p[N]/picture[M]")` published one native commit per
-//! call, so 64 removals cost 52–56× the native batch (record 0275). A run
-//! keeps the handle it started from and the native indices of the pictures
-//! its commands removed, and publishes them as one native removal, the
-//! commit a query `remove` of the same pictures makes.
+//! call, so 64 removals cost 52–56× the native batch. A run keeps the
+//! handle it started from and the native indices of the pictures its
+//! commands removed, and publishes them as one native removal, the commit
+//! a query `remove` of the same pictures makes.
 //!
 //! Each command's path is resolved as it would be against the candidate
 //! after the earlier removals: removing a picture changes no paragraph and

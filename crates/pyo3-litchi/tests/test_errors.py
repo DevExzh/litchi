@@ -1,15 +1,15 @@
 """Error behaviour of the openers and of reads after the source changes.
 
-Contract tier (keep green through S8a):
-  * exception classes are checked with ``isinstance``, so S8a may raise
+Contract tier (keep green):
+  * exception classes are checked with ``isinstance``, so the bindings may raise
     subclasses (for example a ``LitchiError`` family, design §8) but must keep
     ``except OSError`` / ``except ValueError`` / ``except Exception`` working
     where they work today;
   * messages are checked only for semantic fragments: the detected format of
-    a wrong-family input (record 0003 D7), "password", "source changed".
+    a wrong-family input, "password", "source changed".
 
-Snapshot tier: ``MessageSnapshotTests`` pins the exact messages. S8a changed
-them deliberately (design §8: errors carry code/message/suggestion, and
+Snapshot tier: ``MessageSnapshotTests`` pins the exact messages. They were changed
+deliberately (design §8: errors carry code/message/suggestion, and
 ``str()`` is the message followed by the suggestion). Change the table only
 on purpose, and name the difference in the commit message.
 
@@ -47,14 +47,14 @@ ACCEPTED = (
 )
 
 #: Flat ODF the unified opener refuses: a flat formula (no flat reader) and
-#: a flat ODP whose drawing body the leaf refuses. Flat ODS (record 0277) and
-#: flat ODT (record 0292) open.
+#: a flat ODP whose drawing body the leaf refuses. Flat ODS and
+#: flat ODT open.
 FLAT_ODF = ("odf/flat/minimal-formula.fodf", "odf/drawing/multicolor-gradient.fodp")
 FLAT_ODS = "odf/ods/grid-padding.fods"
 FLAT_ODT = "odf/odt/form-controls.fodt"
 
 #: ODF object formats no family opener reads: ``litchi_py.open`` holds them
-#: as ``File`` (record 0282), but they are neither documents,
+#: as ``File``, but they are neither documents,
 #: presentations nor workbooks.
 DETECTED_NOT_OPENED = (
     "libreoffice-core/desktop/qa/data/BlankDrawDocument.odg",
@@ -95,7 +95,7 @@ class PathErrorTests(unittest.TestCase):
                 with self.subTest(opener=opener.__name__):
                     with self.assertRaises(OSError):
                         opener.open(missing)
-            # Workbook raised a bare Exception before S8a (drift D4a, now an
+            # Workbook raised a bare Exception before the fix (drift D4a, now an
             # OSError; see test_known_drift).
             with self.assertRaises(Exception):
                 L.Workbook.open(missing)
@@ -153,13 +153,13 @@ class UnsupportedInputTests(unittest.TestCase):
                     with self.assertRaises(ValueError):
                         opener.open(path)
             with self.subTest(fixture=relative, opener="Workbook"):
-                # A bare Exception before S8a (drift D4c, now a ValueError;
+                # A bare Exception before the fix (drift D4c, now a ValueError;
                 # see test_known_drift).
                 with self.assertRaises(Exception):
                     L.Workbook.open(path)
 
     def test_flat_odt_opens_as_a_document(self):
-        # Record 0292: flat text documents read through the ODT adapter.
+        # Flat text documents read through the ODT adapter.
         document = L.Document.open(fixture(FLAT_ODT))
         self.assertIsInstance(document.text(), str)
         for opener in (L.Presentation, L.Workbook):
@@ -229,7 +229,7 @@ class SourceChangeTests(unittest.TestCase):
                         self.assertIn("source changed", str(caught.exception).lower())
 
     def test_eagerly_read_formats_ignore_a_changed_source(self):
-        # Snapshot of today's routing: if S8a makes one of these source-backed,
+        # Snapshot of today's routing: if one of these becomes source-backed,
         # it must refuse like SOURCE_BACKED; move the row there deliberately.
         for opener, relative in self.EAGER:
             with self.subTest(fixture=relative):
@@ -243,7 +243,7 @@ class SourceChangeTests(unittest.TestCase):
 
 @unittest.skipUnless(sys.platform.startswith("linux"), "I/O messages are platform text")
 class MessageSnapshotTests(unittest.TestCase):
-    """Exact messages (snapshot tier), as S8a left them."""
+    """Exact messages (snapshot tier)."""
 
     NOT_OFFICE = "not a recognized Office file"
     NO_ZIP_MAGIC = "ZIP error: OOXML-suffixed input does not have ZIP magic"
@@ -303,7 +303,7 @@ class MessageSnapshotTests(unittest.TestCase):
             ]
             for relative, name in zip(FLAT_ODF[:1], ("Odf",)):
                 rows += [(opener, fixture(relative), self.FLAT.format(name)) for opener in OPENERS]
-            # Flat ODP opens through the leaf's flat reader (record 0278),
+            # Flat ODP opens through the leaf's flat reader,
             # which refuses this drawing-bodied fixture.
             rows += [
                 (opener, fixture(FLAT_ODF[1]), "Invalid format: flat ODP has a misplaced or empty office:body")

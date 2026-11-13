@@ -40,8 +40,7 @@
 //!
 //! # Refused additions
 //!
-//! Every format answers an `add` it cannot perform the same way (record
-//! 0269):
+//! Every format answers an `add` it cannot perform the same way:
 //!
 //! | Refusal | Code |
 //! |---|---|
@@ -312,13 +311,13 @@ pub enum Source {
     None,
     /// A bounded batch JSON ingress error.
     Batch(crate::batch::Error),
-    /// A CSV/TSV import decoding or parsing error (record 0266).
+    /// A CSV/TSV import decoding or parsing error.
     Import(crate::import::Error),
-    /// A template merge data error (record 0274).
+    /// A template merge data error.
     Merge(crate::merge::Error),
-    /// A raw-layer validation that could not complete (record 0336).
+    /// A raw-layer validation that could not complete.
     Raw(crate::raw::Error),
-    /// A formula evaluation refusal or bound (record 0266).
+    /// A formula evaluation refusal or bound.
     #[cfg(all(
         feature = "eval",
         any(feature = "xlsx", feature = "xlsb", feature = "xls")
@@ -438,7 +437,7 @@ pub enum Source {
     /// LaTeX.
     #[cfg(feature = "formula")]
     Formula(litchi_formula::FormulaError),
-    /// A Pages, Keynote or Numbers leaf error (record 0296).
+    /// A Pages, Keynote or Numbers leaf error.
     #[cfg(feature = "iwork-adapter")]
     Iwork(crate::format::iwork::LeafError),
 }
@@ -696,11 +695,10 @@ impl Error {
     /// keeping its typed leaf and message: [`Code::InvalidArgument`] for
     /// input that does not parse, [`Code::InvalidValue`] for an authored property,
     /// [`Code::DuplicateName`] for a conflicting authored name, and
-    /// [`Code::OutOfRange`] for a position outside
-    /// its collection, and [`Code::UnsupportedCapability`] for a write the
-    /// leaf refuses on a document it already parsed (ODS, record 0277). A
-    /// leaf crate reports such input with the same error it
-    /// reports for malformed file content, so only the call site that
+    /// [`Code::OutOfRange`] for a position outside its collection, and
+    /// [`Code::UnsupportedCapability`] for a write the leaf refuses on a document
+    /// it already parsed (ODS). A leaf crate reports such input with the same
+    /// error it reports for malformed file content, so only the call site that
     /// received the argument can tell the two apart.
     #[cfg(any(
         feature = "xlsx",
@@ -1060,9 +1058,9 @@ impl Classify for ExecutionError {
     }
 }
 
-/// The one classification of the shared edit refusal (record 0351): every
-/// format's `Error::Refused(Refusal)` reports its kind's code, so the same
-/// refusal is the same code in every format.
+/// The one classification of the shared edit refusal: every format's
+/// `Error::Refused(Refusal)` reports its kind's code, so the same refusal
+/// is the same code in every format.
 impl Classify for litchi_core::edit::Refusal {
     fn classify(&self) -> Class {
         self.kind().classify()
@@ -1075,9 +1073,8 @@ impl Classify for litchi_core::edit::RefusalKind {
     }
 }
 
-/// The one code of each refusal kind (record 0351 §2.4), for callers that
-/// map a leaf error to a [`Code`] directly (the iWork leaf errors, record
-/// 0361).
+/// The one code of each refusal kind, for callers that map a leaf error
+/// to a [`Code`] directly (the iWork leaf errors).
 pub(crate) const fn refusal_code(kind: litchi_core::edit::RefusalKind) -> Code {
     use litchi_core::edit::RefusalKind;
 
@@ -1174,8 +1171,7 @@ impl Classify for litchi_drawingml::Error {
     }
 }
 
-/// Whether a shared OOXML error is a typed budget of a shared family
-/// (record 0360).
+/// Whether a shared OOXML error is a typed budget of a shared family.
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 fn mce_limit(error: &litchi_ooxml_common::mce::Error) -> bool {
     matches!(error, litchi_ooxml_common::mce::Error::LimitExceeded { .. })
@@ -1183,14 +1179,14 @@ fn mce_limit(error: &litchi_ooxml_common::mce::Error) -> bool {
 
 /// Whether a shared MCE policy rejected the caller's configured bound before
 /// processing started. This is an invalid argument, not an exhausted document
-/// resource (record 0360).
+/// resource.
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 fn mce_invalid_limit(error: &litchi_ooxml_common::mce::Error) -> bool {
     matches!(error, litchi_ooxml_common::mce::Error::InvalidLimit { .. })
 }
 
 /// Whether a shared OOXML error is a typed budget of a shared family,
-/// including a typed MCE budget nested in the common wrapper (record 0360).
+/// including a typed MCE budget nested in the common wrapper.
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 fn common_limit(error: &litchi_ooxml_common::Error) -> bool {
     match error {
@@ -1341,7 +1337,7 @@ impl Classify for litchi_docx::Error {
             | Self::ExternalHyperlinkDetachmentLimit { .. }
             | Self::ExternalHyperlinkRedactionLimit { .. }
             | Self::SectionInventoryLimit { .. } => Class::of(Code::LimitExceeded),
-            // The shared OOXML families' typed budgets (record 0360).
+            // The shared OOXML families' typed budgets.
             Self::Common(litchi_ooxml_common::Error::Opc(error)) => error.classify(),
             Self::Common(error) if classify_common_semantic(error).is_some() => {
                 classify_common_semantic(error).unwrap_or_else(|| Class::of(Code::CorruptFile))
@@ -1388,7 +1384,7 @@ impl Classify for litchi_docx::document::Error {
             Self::Refused { reason, .. } => reason.kind().classify(),
             Self::Transfer(refusal) => refusal.kind().classify(),
             Self::Limit { .. } => Class::of(Code::LimitExceeded),
-            // A patch for another base: the caller supplied it (record 0351).
+            // A patch for another base: the caller supplied it.
             Self::PatchConflict => Class::of(Code::InvalidInput),
             Self::SemanticPrecondition => Class::of(Code::InvalidArgument),
             Self::Durable(_) | Self::Composition(_) | Self::InvalidDurable(_) => {
@@ -1407,7 +1403,7 @@ impl Classify for litchi_docx::metadata::Error {
             Self::Signed => Class::of(Code::DocumentProtected),
             Self::Limit { .. } => Class::of(Code::LimitExceeded),
             Self::PatchConflict => Class::of(Code::InvalidInput),
-            // Application and custom properties (record 0342).
+            // Application and custom properties.
             Self::Properties(error) => match error {
                 litchi_ooxml_common::properties::Error::Refused(refusal) => refusal.classify(),
                 litchi_ooxml_common::properties::Error::Invalid(_) => Class::of(Code::InvalidValue),
@@ -1449,7 +1445,7 @@ impl Classify for litchi_pptx::Error {
             Self::Drawing(error) => error.classify(),
             Self::Signed => Class::suggest(Code::DocumentProtected, SIGNED_SUGGESTION),
             Self::SourceChanged { .. } => Class::of(Code::IoError),
-            // A patch for another base: the caller supplied it (record 0351).
+            // A patch for another base: the caller supplied it.
             Self::PatchConflict => Class::of(Code::InvalidInput),
             // Every well-formed refusal is classified by its shared kind;
             // operation and reason remain content-free diagnostics only.
@@ -1540,7 +1536,7 @@ impl Classify for litchi_xlsx::Error {
                 Class::of(Code::LimitExceeded)
             },
             // Typed refusals, patches for another base and invalid configured
-            // limits (record 0360).
+            // limits.
             Self::Refused(refusal) => refusal.classify(),
             Self::PatchConflict { .. } => Class::of(Code::InvalidInput),
             Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
@@ -1651,7 +1647,7 @@ impl Classify for litchi_xlsb::package::PackageError {
             },
             Self::UnsupportedOpenPolicy { .. } => Class::of(Code::InvalidArgument),
             // Typed refusals, patches for another base and invalid configured
-            // limits (record 0360b).
+            // limits.
             Self::Refused(refusal) => refusal.classify(),
             Self::PatchConflict { .. } => Class::of(Code::InvalidInput),
             Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
@@ -1778,11 +1774,11 @@ impl Classify for litchi_doc::body_text::Error {
                 Code::DocumentProtected,
                 "native encrypted DOC edits are not supported; edit a decrypted copy",
             ),
-            // Not refusals of a well-formed request (record 0362): a missing
-            // position is `out_of_range` as DOCX `OutOfBounds` and the RTF
-            // positional errors are, a taken resource identifier is a
-            // duplicate, an exhausted budget is a limit, and removing the
-            // sole paragraph is the DOC family's final-element argument error.
+            // Not refusals of a well-formed request: a missing position is
+            // `out_of_range` as DOCX `OutOfBounds` and the RTF positional
+            // errors are, a taken resource identifier is a duplicate, an
+            // exhausted budget is a limit, and removing the sole paragraph is
+            // the DOC family's final-element argument error.
             Self::Refused(
                 Refusal::ParagraphNotFound | Refusal::TargetNotFound | Refusal::SectionNotFound,
             ) => Class::of(Code::OutOfRange),
@@ -1795,7 +1791,7 @@ impl Classify for litchi_doc::body_text::Error {
                 Code::InvalidValue,
                 "name the bookmark with 1 through 39 letters, digits, `_`, `.` or `-`, unused by another bookmark",
             ),
-            // Every other refusal by its kind alone (record 0351 §2.4).
+            // Every other refusal by its kind alone.
             Self::Refused(refusal) => refusal.kind().classify(),
             Self::PatchConflict => Class::of(Code::InvalidInput),
             // A three-way semantic overlap remains a caller-resolvable
@@ -1968,7 +1964,7 @@ impl From<litchi_xls::package::edit::Error> for Error {
     fn from(error: litchi_xls::package::edit::Error) -> Self {
         let class = error.classify();
         // The leaf names the exact refusal (the dependency record, the
-        // reader check); the code summary alone would hide it (record 0293).
+        // reader check); the code summary alone would hide it.
         let message = error.to_string();
         Self::from_class(
             class,
@@ -2050,8 +2046,8 @@ impl Classify for litchi_ppt::package::edit::Error {
                 litchi_ppt::slide_order::Error::Package(error) => error.classify(),
                 litchi_ppt::slide_order::Error::Text(error) => error.classify(),
                 litchi_ppt::slide_order::Error::Composition(error) => error.classify(),
-                // By kind alone (record 0351 §2.4); a protected refusal is a
-                // signed source, which keeps the signature suggestion.
+                // By kind alone; a protected refusal is a signed source,
+                // which keeps the signature suggestion.
                 litchi_ppt::slide_order::Error::Refused(refusal) => match refusal.kind() {
                     litchi_core::edit::RefusalKind::Protected => {
                         Class::suggest(Code::DocumentProtected, SIGNED_SUGGESTION)
@@ -2532,7 +2528,7 @@ impl Classify for litchi_doc::source_backed::Error {
             ),
             // A missing position is `out_of_range`, as in the body editor.
             Self::Refused(Refusal::ParagraphNotFound) => Class::of(Code::OutOfRange),
-            // Every other refusal by its kind alone (record 0351 §2.4).
+            // Every other refusal by its kind alone.
             Self::Refused(refusal) => refusal.kind().classify(),
             Self::InvalidData(_) => Class::of(Code::CorruptFile),
             Self::Limit(_) => Class::of(Code::LimitExceeded),
@@ -2548,10 +2544,10 @@ impl Classify for litchi_ppt::text_edit::Error {
         match self {
             Self::Package(error) => error.classify(),
             Self::Source(error) => error.classify(),
-            // By kind alone (record 0351 §2.4). `UnsupportedSource`, the
-            // leaf's one refusal for signed, encrypted and otherwise
-            // unsupported containers, is unsupported content: a signed
-            // handle is refused before it reaches the leaf.
+            // By kind alone. `UnsupportedSource`, the leaf's one refusal
+            // for signed, encrypted and otherwise unsupported
+            // containers, is unsupported content: a signed handle is
+            // refused before it reaches the leaf.
             Self::Refused(refusal) => refusal.kind().classify(),
             Self::PatchConflict => Class::of(Code::InvalidInput),
             Self::Signed => Class::suggest(Code::DocumentProtected, SIGNED_SUGGESTION),
@@ -2626,7 +2622,7 @@ macro_rules! from_leaf {
         $(#[$cfg])*
         impl From<$leaf> for Error {
             // An error conversion is never the hot path: keep it out of the
-            // callers' bodies (record 0353a).
+            // callers' bodies.
             #[cold]
             #[inline(never)]
             fn from(error: $leaf) -> Self {
@@ -2753,8 +2749,8 @@ from_leaf!(
     litchi_xls::SourceBackedError => XlsSource, Some(FileFormat::Xls)
 );
 from_leaf!(#[cfg(feature = "ppt")] litchi_ppt::Error => Ppt, Some(FileFormat::Ppt));
-// Legacy OLE metadata (record 0254): the shared property-set conversion and
-// the three leaf metadata transaction families.
+// Legacy OLE metadata: the shared property-set conversion and the three
+// leaf metadata transaction families.
 #[cfg(any(feature = "doc", feature = "xls", feature = "ppt"))]
 const ENCRYPTED_METADATA_SUGGESTION: &str = "leave the metadata unset for an encrypted legacy document; its encrypted summary stream is not authored";
 

@@ -1,6 +1,5 @@
-//! One test per row of the record 0003 §2.6 classification table (with the
-//! record 0007 Q1 codes), one per reachable wildcard arm, the size assertion,
-//! and the `Display`/suggestion format.
+//! One test per row of the classification table, one per reachable wildcard
+//! arm, the size assertion, and the `Display`/suggestion format.
 
 use std::collections::HashSet;
 use std::collections::TryReserveError;
@@ -143,8 +142,8 @@ fn source_returns_the_typed_leaf_error() {
     assert!(matches!(error.leaf(), Source::Core(_)));
 }
 
-// S2 follow-up: `Display` is facade-level, so an error-chain printer that
-// walks `source()` shows the leaf's text once, as the cause.
+// `Display` is facade-level, so an error-chain printer that walks
+// `source()` shows the leaf's text once, as the cause.
 #[test]
 fn display_does_not_repeat_the_leaf_text() {
     let error = Error::from(litchi_core::Error::ResourceLimit(resource_limit()));
@@ -528,7 +527,7 @@ fn row_wrong_family_is_unsupported_format_with_detection() {
     assert_eq!(error.detected(), Some(FileFormat::Pptx));
 }
 
-// Row: feature disabled; iWork input in M0a -> `unsupported_format` plus a
+// Row: feature disabled; iWork input -> `unsupported_format` plus a
 // suggestion.
 #[test]
 fn row_disabled_feature_and_iwork_are_unsupported_format_with_suggestion() {
@@ -591,11 +590,11 @@ fn row_malformed_input_is_corrupt_file() {
     );
 }
 
-// Row: `ResourceLimit`, OPC `Limit`, leaf limit errors -> `limit_exceeded`
-// (record 0007, Q1), with the limit detail kept in the typed source.
+// Row: `ResourceLimit`, OPC `Limit`, leaf limit errors -> `limit_exceeded`,
+// with the limit detail kept in the typed source.
 /// The typed budgets of the shared OOXML families (Custom XML, Web
 /// Extensions, document properties, Ribbon), carried by each OOXML crate's
-/// shared-error variant, are limit errors (record 0360).
+/// shared-error variant, are limit errors.
 #[test]
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 fn shared_ooxml_family_limits_are_limit_exceeded() {
@@ -797,7 +796,7 @@ fn shared_ooxml_semantic_errors_keep_their_wire_classes() {
 
 /// A shared MCE policy rejects malformed caller bounds before reading input;
 /// hosts must preserve that as an invalid argument rather than an exhausted file
-/// resource (record 0360).
+/// resource.
 #[test]
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 fn shared_ooxml_invalid_mce_limits_are_invalid_arguments() {
@@ -989,7 +988,7 @@ fn row_unsupported_operations_are_unsupported_capability() {
         litchi_doc::Error::UnsupportedEncryption(litchi_doc::EncryptionKind::XorObfuscation),
         Code::UnsupportedCapability,
     );
-    // An `\ansicpg` without an exact codec (record 0347).
+    // An `\ansicpg` without an exact codec.
     #[cfg(feature = "rtf")]
     assert_code(
         litchi_rtf::Error::UnsupportedCodePage(10001),
@@ -1159,7 +1158,7 @@ fn row_allocation_commit_and_other_are_internal_error() {
     );
 }
 
-// Row: cancellation -> `cancelled` (record 0007, Q1).
+// Row: cancellation -> `cancelled`.
 #[test]
 fn row_cancellation_is_cancelled() {
     assert_code(ExecutionError::Cancelled, Code::Cancelled);
@@ -1465,8 +1464,8 @@ fn formula_conversion_errors_keep_their_typed_source() {
     );
 }
 
-// The source-backed legacy editors and the compound-file signature editor
-// (record 0013). Their classifiers name every current variant of
+// The source-backed legacy editors and the compound-file signature editor.
+// Their classifiers name every current variant of
 // `litchi_doc::source_backed::Error`, `litchi_cfb::OverlayError` and
 // `litchi_sign::Error`, so those wildcard arms only catch variants added
 // later; the refusal wildcards below are reachable.
@@ -2380,9 +2379,9 @@ fn edit_refusals_classify_by_kind_alone() {
     }
 }
 
-// Record 0358 (W6): ODF refusals classify by kind alone, a patch made for
-// another base is the caller's input, and a changed write of a signed
-// package is protected.
+// ODF refusals classify by kind alone, a patch made for another base is
+// the caller's input, and a changed write of a signed package is
+// protected.
 #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
 #[test]
 fn odf_refusals_classify_by_kind_and_patch_conflicts_are_invalid_input() {
@@ -2615,8 +2614,8 @@ fn odp_public_source_replay_classifies_actual_stale_and_conflicting_inputs() {
     assert!(matches!(conflict.leaf(), Source::OdpTailAppend(_)));
 }
 
-// Record 0351 (W1): DOCX refusals classify by kind alone, a patch made for
-// another base is the caller's input, and a broken invariant is internal.
+// DOCX refusals classify by kind alone, a patch made for another base is
+// the caller's input, and a broken invariant is internal.
 #[cfg(feature = "docx")]
 #[test]
 fn docx_refusals_classify_by_kind_and_patch_conflicts_are_invalid_input() {
@@ -2711,7 +2710,7 @@ fn docx_refusals_classify_by_kind_and_patch_conflicts_are_invalid_input() {
         litchi_docx::metadata::Error::PatchConflict,
         Code::InvalidInput,
     );
-    // Record 0355a: document refusal reasons classify by their kind.
+    // Document refusal reasons classify by their kind.
     for (reason, code) in [
         (litchi_docx::document::Refusal::RunNotFound, Code::NotFound),
         (

@@ -1,5 +1,5 @@
 //! The text, annotated, outline and stats views in OfficeCLI's shapes
-//! (record 0010 §6, `ExcelHandler.View.cs`).
+//! (`ExcelHandler.View.cs`).
 
 use super::{Mode, Options, SheetRange, both, kitchen, open_path, view};
 use crate::Code;

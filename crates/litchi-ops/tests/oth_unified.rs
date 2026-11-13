@@ -1,5 +1,5 @@
-//! Unified OTH (OpenDocument HTML template, `text-web`) documents (record
-//! 0282): reads, writes, save and create through the shared ODT adapter.
+//! Unified OTH (OpenDocument HTML template, `text-web`) documents:
+//! reads, writes, save and create through the shared ODT adapter.
 //! The package keeps its `text-web` MIME type.
 
 #![cfg(feature = "oth")]

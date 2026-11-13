@@ -1,4 +1,4 @@
-//! Handle for OpenDocument Presentation (`.odp`) inputs (record 0278).
+//! Handle for OpenDocument Presentation (`.odp`) inputs.
 //!
 //! The handle retains the leaf owner it was opened as: the immutable
 //! `litchi_odp::Package` with its parsed `Presentation` projection (byte
@@ -49,17 +49,16 @@ struct OdpState {
     odf_options: litchi_odf_common::OpenOptions,
     /// The scene index of the owner's `content.xml`, built on first use.
     scene: OnceLock<Scene>,
-    /// The automatic styles of `content.xml`, indexed on first use (record
-    /// 0308).
+    /// The automatic styles of `content.xml`, indexed on first use.
     styles: OnceLock<litchi_odp::scene::AutomaticStyles>,
     /// The common styles of `styles.xml` (or the flat document), indexed
-    /// on first use (record 0316).
+    /// on first use.
     common_styles: OnceLock<litchi_odp::scene::CommonStyles>,
     /// Master pages, layouts and annotations, each parsed on first use.
     masters: OnceLock<Vec<litchi_odp::master::Summary>>,
     layouts: OnceLock<Vec<litchi_odp::layout::Layout>>,
     annotations: OnceLock<Vec<litchi_odp::annotation::Info>>,
-    /// The formula objects and charts of record 0328, read on first use.
+    /// The formula objects and charts, read on first use.
     parts: OnceLock<parts::Index>,
     /// The package a source-backed owner materializes for its first write.
     materialized: OnceLock<litchi_odp::Package>,
@@ -81,7 +80,7 @@ pub(crate) enum OdpOwner {
     #[cfg(any(unix, windows))]
     Source(litchi_odp::SourceBackedPresentation),
     /// A flat (single XML document) presentation; edits go through its
-    /// packaged projection (record 0292).
+    /// packaged projection.
     Flat(litchi_odp::flat::Presentation),
 }
 
@@ -234,13 +233,13 @@ impl Odp {
 
     /// A projection refusal of a flat presentation: the flat reader admitted
     /// the document, so a part the packaged reader or editor refuses is a
-    /// gap of the edit, not a corrupt file (record 0292).
+    /// gap of the edit, not a corrupt file.
     pub(crate) fn flat_refusal(&self, error: Error) -> Error {
         if self.is_flat() && error.code() == Code::CorruptFile {
             return error
                 .caused_by_argument(Code::UnsupportedCapability)
                 .with_suggestion(
-                    "follow-up: 0292 flat ODF projection admission; the packaged reader refuses this flat document's parts",
+                    "follow-up: flat ODF projection admission; the packaged reader refuses this flat document's parts",
                 );
         }
         error
@@ -248,7 +247,7 @@ impl Odp {
 
     /// Adopt the package one checked edit published, keeping the origin. A
     /// flat presentation republishes the edit of its projection into its
-    /// flat bytes, element by element (record 0292).
+    /// flat bytes, element by element.
     pub(crate) fn with_package(&self, package: litchi_odp::Package) -> Result<Self> {
         if let OdpOwner::Flat(flat) = &self.0.owner {
             let flat_limits = litchi_odf_common::flat::Limits::from_options(flat.options());
@@ -316,7 +315,7 @@ impl Odp {
                     "initial ODP metadata supports title, author, subject, description and keywords only",
                 )
                 .with_format(FileFormat::Odp)
-                .with_suggestion("set the other fields after creation is integrated (M6 ODP metadata)"));
+                .with_suggestion("set the other fields after creation is integrated (ODP metadata)"));
             }
             builder.set_metadata(simple);
         }
@@ -382,8 +381,8 @@ impl Odp {
         Ok(self.0.styles.get_or_init(|| styles))
     }
 
-    /// The common styles of the snapshot, indexed on first use (record
-    /// 0316): what automatic styles inherit through their parents.
+    /// The common styles of the snapshot, indexed on first use: what
+    /// automatic styles inherit through their parents.
     pub(crate) fn common_styles(&self) -> Result<&litchi_odp::scene::CommonStyles> {
         if let Some(styles) = self.0.common_styles.get() {
             return Ok(styles);
@@ -436,7 +435,7 @@ impl Odp {
         Ok(self.0.annotations.get_or_init(|| annotations))
     }
 
-    /// The formula objects and charts of record 0328, read on first use.
+    /// The formula objects and charts, read on first use.
     pub(crate) fn parts(&self) -> Result<&parts::Index> {
         if let Some(index) = self.0.parts.get() {
             return Ok(index);
@@ -486,7 +485,7 @@ impl Odp {
                 Ok(self.0.materialized.get_or_init(|| package))
             },
             // A flat presentation edits its packaged projection and
-            // republishes the edit into its flat bytes (record 0292).
+            // republishes the edit into its flat bytes.
             OdpOwner::Flat(flat) => {
                 if let Some(package) = self.0.materialized.get() {
                     return Ok(package);

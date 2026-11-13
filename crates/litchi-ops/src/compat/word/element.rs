@@ -6,7 +6,7 @@ use super::{Paragraph, Table};
 /// table, as [`DocumentView::elements`](crate::DocumentView::elements)
 /// returns them.
 ///
-/// **Scheduled for deletion in M1**, with the rest of [`crate::compat`].
+/// **Scheduled for deletion**, with the rest of [`crate::compat`].
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum DocumentElement {
@@ -19,7 +19,7 @@ pub enum DocumentElement {
 impl DocumentElement {
     /// Whether this element is a paragraph.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     #[must_use]
     pub fn is_paragraph(&self) -> bool {
         matches!(self, Self::Paragraph(_))
@@ -27,7 +27,7 @@ impl DocumentElement {
 
     /// Whether this element is a table.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     #[must_use]
     pub fn is_table(&self) -> bool {
         matches!(self, Self::Table(_))
@@ -35,7 +35,7 @@ impl DocumentElement {
 
     /// The paragraph, when this element is one.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     #[must_use]
     pub fn as_paragraph(&self) -> Option<&Paragraph> {
         match self {
@@ -46,7 +46,7 @@ impl DocumentElement {
 
     /// The table, when this element is one.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     #[must_use]
     pub fn as_table(&self) -> Option<&Table> {
         match self {
@@ -57,7 +57,7 @@ impl DocumentElement {
 
     /// Consume the element and return its paragraph, when it is one.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     #[must_use]
     pub fn into_paragraph(self) -> Option<Paragraph> {
         match self {
@@ -68,7 +68,7 @@ impl DocumentElement {
 
     /// Consume the element and return its table, when it is one.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     #[must_use]
     pub fn into_table(self) -> Option<Table> {
         match self {

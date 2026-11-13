@@ -1,4 +1,4 @@
-"""Field refresh (record 0279): ``File.refresh``.
+"""Field refresh: ``File.refresh``.
 
 Oracles: the summary's keys against the stub's ``_RefreshSummary``, the
 written formula cache read back through ``evaluate``, the exact no-op, and

@@ -1,4 +1,4 @@
-//! Immutable XLSX cell writes (record 0097).
+//! Immutable XLSX cell writes.
 //!
 //! This adapter resolves direct cells, ranges and scoped selectors, admits
 //! every property through the XLSX write registry, converts authored scalar
@@ -103,7 +103,7 @@ impl Commit {
         result
     }
 
-    /// Adapt a metadata commit (record 0253). The workbook patch is empty:
+    /// Adapt a metadata commit. The workbook patch is empty:
     /// the leaf metadata patch changes only the `docProps` parts, which the
     /// retained endpoints' content comparison observes.
     pub(super) fn from_metadata(
@@ -226,15 +226,13 @@ pub(super) fn edit_with_snapshot_limit(
 enum CellOperation {
     Set(xlsx::cell::Content),
     Clear,
-    /// Rich-text runs, written as the cell's inline rich string (record
-    /// 0338).
+    /// Rich-text runs, written as the cell's inline rich string.
     Rich(xlsx::RichText),
-    /// `type` without a value: each target's stored value is converted
-    /// (record 0338).
+    /// `type` without a value: each target's stored value is converted.
     Retype(CellType),
 }
 
-/// A cell `type` (record 0338).
+/// A cell `type`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CellType {
     String,
@@ -391,7 +389,7 @@ impl Xlsx {
         if let Some(commit) = self.try_set_metadata(&target, &props, limits)? {
             return Ok(commit);
         }
-        // Rich-text runs (record 0338).
+        // Rich-text runs.
         if let Some(commit) = self.try_set_run(&target, &props, limits)? {
             return Ok(commit);
         }
@@ -401,8 +399,7 @@ impl Xlsx {
         if let Some(commit) = self.try_set_feature(&target, &props, limits)? {
             return Ok(commit);
         }
-        // Cell hyperlinks (`link`, `tooltip`, `display`) share the cell edit
-        // (record 0320).
+        // Cell hyperlinks (`link`, `tooltip`, `display`) share the cell edit.
         let (link, props) = super::feature_write::split_cell_link(&props)?;
         if let Some(link) = link {
             return self.set_cell_link(&target, &props, &link, limits);
@@ -1725,7 +1722,7 @@ fn admit_properties_inner(props: &Props<'_>, limits: &SemanticLimits) -> Result<
     Ok(operation)
 }
 
-/// Combine `type` and `runs` with the payload (record 0338), as OfficeCLI's
+/// Combine `type` and `runs` with the payload, as OfficeCLI's
 /// `Set`/`AddCell` do: `runs` (with or without `type=richtext`) writes the
 /// runs; `type=richtext` with a text value writes one unformatted run; any
 /// other type converts the value, or each target's stored value when no
@@ -2943,7 +2940,7 @@ fn apply_operation(
     Ok(())
 }
 
-/// Convert the value stored at `address` to `cell_type` (record 0338): an
+/// Convert the value stored at `address` to `cell_type`: an
 /// empty coordinate is left alone, and a formula cell is refused.
 fn retype(
     worksheet: &mut xlsx::workbook::edit::Sheet<'_>,
@@ -3098,7 +3095,7 @@ fn property_error(error: Error, key: &crate::props::Key<'_>) -> Error {
 /// run never shadows cell state in the unified layer: the native
 /// `xlsx::workbook::edit::Sheet::state` view is the authority for each staged before/after
 /// pair.
-/// CSV/TSV import through one native edit (record 0266).
+/// CSV/TSV import through one native edit.
 mod find;
 pub(crate) mod import;
 pub(crate) mod merge;
@@ -3163,7 +3160,7 @@ pub(crate) mod coalesce {
         edit: xlsx::workbook::Edit,
         items: Vec<Item>,
         /// Each staged target's charge; a key is present exactly when the
-        /// target was staged in this run (record 0377: one map, not a set
+        /// target was staged in this run (one map, not a set
         /// and a map, per cell).
         charges: HashMap<CellTarget, usize>,
         initial: Option<HashMap<CellTarget, xlsx::State>>,
@@ -3220,7 +3217,7 @@ pub(crate) mod coalesce {
                 }
                 // Merges and cell hyperlinks (`link`, `tooltip`, `display`
                 // and their aliases) have their own ordinary set paths; the
-                // payload admission below does not know them (record 0330).
+                // payload admission below does not know them.
                 if props.iter().any(|(key, _)| {
                     key.as_str().eq_ignore_ascii_case("merge")
                         || super::super::spec::CELL_LINK_TABLE
@@ -3274,7 +3271,7 @@ pub(crate) mod coalesce {
                 let Some(operation) = assignments.payload else {
                     return Ok(None);
                 };
-                // Runs and retypes have their own staging (record 0338).
+                // Runs and retypes have their own staging.
                 if matches!(operation, CellOperation::Rich(_) | CellOperation::Retype(_)) {
                     return Ok(None);
                 }

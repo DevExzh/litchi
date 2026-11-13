@@ -1,5 +1,5 @@
-//! Formula evaluation through the `litchi-eval` engine (design §13 P0,
-//! record 0266; the `eval` feature).
+//! Formula evaluation through the `litchi-eval` engine (design §13;
+//! the `eval` feature).
 //!
 //! [`File::evaluate`] evaluates one cell and [`File::recalculate`] evaluates
 //! every formula of an XLSX, XLSB or XLS workbook. Both are reads: they never

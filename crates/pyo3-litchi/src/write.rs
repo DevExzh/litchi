@@ -1,5 +1,5 @@
-//! The unified write surface (design §3 and §8, goal M3): the pieces the
-//! write verbs of [`crate::file::File`] share, the [`Commit`] result of
+//! The unified write surface (design §3 and §8): the pieces the write
+//! verbs of [`crate::file::File`] share, the [`Commit`] result of
 //! `edit`, `batch` and `apply`, and the [`Edit`] transaction.
 //!
 //! Every verb converts its Python arguments to owned Rust values once, with

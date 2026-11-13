@@ -1,5 +1,5 @@
 //! The node view: a borrowed projection of one typed node into OfficeCLI's
-//! `DocumentNode` members (record 0010 §2.1–§2.5).
+//! `DocumentNode` members.
 
 use std::borrow::Cow;
 use std::fmt;
@@ -16,8 +16,8 @@ use super::value::{Key, Value};
 use crate::error::{Error, Result};
 
 /// The deepest `depth` a view honours; larger requests are refused. It bounds
-/// the serializer's recursion (record 0010 §2.5; OfficeCLI clamps to 256 and
-/// has no output cap, M1-Δ7).
+/// the serializer's recursion (OfficeCLI clamps to 256 and has no output
+/// cap).
 pub const MAX_VIEW_DEPTH: u32 = 64;
 
 /// The default node budget of a view: serializing more nodes is
@@ -107,7 +107,7 @@ impl Default for ViewOptions {
 /// Word paragraphs and slide shapes preview their text cut to
 /// [`PREVIEW_CHARS`] characters plus `...` (OfficeCLI cuts UTF-16 code units;
 /// Litchi cuts characters); a shape without text previews its name, a slide
-/// its title or `(untitled)`, a cell its A1 reference (record 0010 §2.4).
+/// its title or `(untitled)`, a cell its A1 reference.
 ///
 /// ```
 /// use std::borrow::Cow;
@@ -160,7 +160,7 @@ impl fmt::Display for Preview<'_> {
 /// adapter's node implements it; [`Node`] dispatches with one `match`.
 ///
 /// Each method reads only what its member needs: `child_count` returns
-/// `None` rather than decode a part the request did not touch (M1-Δ1), and
+/// `None` rather than decode a part the request did not touch, and
 /// `format` parses the node's property set once.
 pub(crate) trait Project<'f> {
     /// The OfficeCLI `type`.
@@ -211,7 +211,7 @@ pub(crate) trait Project<'f> {
 /// `text`, `preview`, `style`, `childCount`, `format`, `children`) in
 /// OfficeCLI's order, omitting `text`, `preview` and `style` when absent, as
 /// OfficeCLI's `WhenWritingNull` does. `childCount` is omitted only when
-/// counting would decode a part the request did not touch (M1-Δ1).
+/// counting would decode a part the request did not touch.
 ///
 /// ```
 /// use litchi_ops::node::{Node, ViewOptions};
@@ -358,7 +358,7 @@ pub struct Format<'a> {
 #[derive(Debug)]
 #[cfg_attr(
     not(test),
-    allow(dead_code, reason = "constructed by the format adapters (R4-R7)")
+    allow(dead_code, reason = "constructed by the format adapters")
 )]
 pub(crate) enum Source<'a> {
     /// A node without readable properties.
@@ -444,7 +444,7 @@ impl<'a> Source<'a> {
 
 #[cfg_attr(
     not(test),
-    allow(dead_code, reason = "constructed by the format adapters (R4-R7)")
+    allow(dead_code, reason = "constructed by the format adapters")
 )]
 impl<'a> Format<'a> {
     /// The entries of `source` for a kind whose property table is `props`.
@@ -471,8 +471,8 @@ impl<'a> Format<'a> {
 
     /// The value of the property at `index` in the kind's table, if the
     /// node has it, whatever the iterator has already yielded: the query
-    /// walker's direct read of one key (record 0010 §5.3). Never allocates
-    /// beyond what the leaf accessor returns.
+    /// walker's direct read of one key. Never allocates beyond what the
+    /// leaf accessor returns.
     pub(crate) fn get(&self, index: usize) -> Option<Value<'a>> {
         if index < self.props.len() {
             self.source.get(index)
@@ -607,7 +607,7 @@ pub struct Children<'n, 'f> {
 
 #[cfg_attr(
     not(test),
-    allow(dead_code, reason = "constructed by the format adapters (R4-R7)")
+    allow(dead_code, reason = "constructed by the format adapters")
 )]
 enum Inner<'n, 'f> {
     Empty(PhantomData<(&'n (), Node<'f>)>),
@@ -661,7 +661,7 @@ impl<'n, 'f> Children<'n, 'f> {
     /// Children that could not be listed: yields `error`, then nothing.
     #[cfg_attr(
         not(test),
-        allow(dead_code, reason = "constructed by the format adapters (R4-R7)")
+        allow(dead_code, reason = "constructed by the format adapters")
     )]
     pub(crate) const fn failed(error: Error) -> Self {
         Self {

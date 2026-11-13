@@ -1,7 +1,7 @@
-//! XLSB find/replace and template merge (record 0295) over the shared text
+//! XLSB find/replace and template merge over the shared text
 //! surface (`crate::find::surface`).
 //!
-//! As XLSX (record 0273): the workbook searches every worksheet; a sheet,
+//! As XLSX: the workbook searches every worksheet; a sheet,
 //! cell, range, row or column its own cells. Each stored text value is one
 //! group. Formula cells and other values are not searched. A rich-text cell
 //! (an inline `BrtCellRString`, or a cell whose text is a formatted shared

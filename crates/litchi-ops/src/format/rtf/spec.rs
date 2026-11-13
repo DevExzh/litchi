@@ -57,7 +57,7 @@ pub enum Kind {
     Num,
     /// A list level (`/numbering/abstractNum[N]/level[L]`).
     Level,
-    /// A section (`/section[N]`, record 0328).
+    /// A section (`/section[N]`).
     Section,
     /// A main-story bookmark (`/bookmark[N]`, `/bookmark[@name=X]`).
     Bookmark,
@@ -746,8 +746,7 @@ pub(crate) static DIRECTION: Tokens = Tokens::new("direction", &["ltr", "rtl"], 
 /// Page extents and margins, printed as OfficeCLI prints extents.
 pub(crate) const EXTENT: LengthSpec = LengthSpec::EXTENT;
 
-/// A section's page setup (record 0328), under the DOCX section keys DOC
-/// uses (record 0324).
+/// A section's page setup, under the DOCX section keys DOC uses.
 pub(crate) const SECTION_PROPS: &[PropSpec] = &[
     prop("type", ValueType::Token(&SECTION_TYPE), READ_SET),
     prop("pageWidth", ValueType::Length(EXTENT), READ_SET),
@@ -1170,20 +1169,20 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
             GapSpec {
                 subject: Subject::Element("formfield"),
                 code: crate::Code::UnsupportedCapability,
-                follow_up: "record 0328 follow-up: RTF form fields (FORMTEXT, FORMCHECKBOX, FORMDROPDOWN) as formfield nodes and their writes",
+                follow_up: "follow-up: RTF form fields (FORMTEXT, FORMCHECKBOX, FORMDROPDOWN) as formfield nodes and their writes",
                 reason: "RTF form fields are read by the native model but not yet projected into generic paths and queries",
             },
             read_gap("ole"),
             GapSpec {
                 subject: Subject::Element("equation"),
                 code: crate::Code::UnsupportedCapability,
-                follow_up: "record 0328 follow-up: RTF EQ fields and math zones as equation nodes",
+                follow_up: "follow-up: RTF EQ fields and math zones as equation nodes",
                 reason: "RTF equation fields and math zones are read by the native model but not yet projected",
             },
             GapSpec {
                 subject: Subject::Element("revision"),
                 code: crate::Code::UnsupportedCapability,
-                follow_up: "record 0328 follow-up: RTF revision nodes and accept/reject (P2)",
+                follow_up: "follow-up: RTF revision nodes and accept/reject",
                 reason: "RTF revision marks are read by the native model but not yet projected",
             },
             GapSpec {
@@ -1195,59 +1194,59 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
             GapSpec {
                 subject: Subject::Element("watermark"),
                 code: crate::Code::UnsupportedCapability,
-                follow_up: "record 0328 follow-up: the RTF header WordArt watermark",
+                follow_up: "follow-up: the RTF header WordArt watermark",
                 reason: "a watermark is a header shape the story reads do not project",
             },
-            // OfficeCLI elements the RTF adapter has no kind for (record 0339).
+            // OfficeCLI elements the RTF adapter has no kind for.
             word_family_gap(
                 "chart",
-                "record 0328 (deferred-P1): RTF charts as chart nodes",
+                "RTF charts as chart nodes",
                 "embedded charts are kept as objects; they are not projected as chart nodes",
             ),
             word_family_gap(
                 "series",
-                "record 0328 (deferred-P1): RTF charts as chart nodes",
+                "RTF charts as chart nodes",
                 "chart series follow the chart gap",
             ),
             word_family_gap(
                 "axis",
-                "record 0328 (deferred-P1): RTF charts as chart nodes",
+                "RTF charts as chart nodes",
                 "chart axes follow the chart gap",
             ),
             word_family_gap(
                 "bookmarkEnd",
-                "record 0328 (deferred-P1)",
+                "not supported yet",
                 "a bookmark is one node over its start and end; a standalone end marker is not addressed on its own",
             ),
             word_family_gap(
                 "permStart",
-                "record 0328 (deferred-P1)",
+                "not supported yet",
                 "RTF editing-permission ranges are not projected as nodes",
             ),
             word_family_gap(
                 "ptab",
-                "record 0328 (deferred-P1)",
+                "not supported yet",
                 "positional tabs are not projected as nodes",
             ),
             word_family_gap(
                 "col",
-                "record 0328 (deferred-P1)",
+                "not supported yet",
                 "table columns are not nodes; cell widths are read on each cell",
             ),
             word_family_gap(
                 "fieldChar",
-                "none: out of scope (record 0332)",
+                "none: out of scope",
                 "a complex field is one field node; its field-character and instruction parts are not separate elements",
             ),
             word_family_gap(
                 "instrText",
-                "none: out of scope (record 0332)",
+                "none: out of scope",
                 "a complex field is one field node; its field-character and instruction parts are not separate elements",
             ),
             GapSpec {
                 subject: Subject::Element("diagram"),
                 code: crate::Code::UnsupportedPath,
-                follow_up: "none: out of scope (record 0332, design §10)",
+                follow_up: "none: out of scope",
                 reason: "OfficeCLI's diagram renders Mermaid text into shapes or a picture; rendering is outside the unified API",
             },
         ],
@@ -1261,8 +1260,8 @@ const _: () = assert!(
     "a query kind set holds 128 kinds"
 );
 
-/// A gap for an OfficeCLI Word element the table has no kind for (record
-/// 0339): naming it is `unsupported_capability`.
+/// A gap for an OfficeCLI Word element the table has no kind for: naming
+/// it is `unsupported_capability`.
 const fn word_family_gap(
     element: &'static str,
     follow_up: &'static str,
@@ -1292,7 +1291,7 @@ pub(crate) const SETTABLE: &[&str] = &[
     "field", "toc", "tab",
 ];
 /// Elements the unified RTF writer creates: paragraphs (under the body)
-/// and runs. The body itself is a parent, never added (record 0289).
+/// and runs. The body itself is a parent, never added.
 pub(crate) const ADDABLE: &[&str] = &["p", "r", "tab"];
 /// Elements the unified RTF writer removes.
 pub(crate) const REMOVABLE: &[&str] = &["p", "r", "picture", "bookmark", "tab"];
@@ -1316,14 +1315,14 @@ const fn operation_gap(
     }
 }
 
-const RICH_RUN: &str = "M6 RTF rich run preservation";
-const RICH_PARAGRAPH: &str = "M6 RTF rich paragraph preservation";
-const TABLE_EDITOR: &str = "record 0275 follow-up: native RTF table structure editor";
-const STORY_EDITOR: &str = "record 0275 follow-up: native RTF story lifecycle editor";
-const FIELD_EDITOR: &str = "record 0275 follow-up: native RTF field instruction editor";
-const PICTURE_EDITOR: &str = "record 0275 follow-up: native RTF picture insertion";
-const STYLE_EDITOR: &str = "record 0275 follow-up: native RTF style application";
-const LIST_EDITOR: &str = "record 0275 follow-up: native RTF list editor";
+const RICH_RUN: &str = "RTF rich run preservation";
+const RICH_PARAGRAPH: &str = "RTF rich paragraph preservation";
+const TABLE_EDITOR: &str = "follow-up: native RTF table structure editor";
+const STORY_EDITOR: &str = "follow-up: native RTF story lifecycle editor";
+const FIELD_EDITOR: &str = "follow-up: native RTF field instruction editor";
+const PICTURE_EDITOR: &str = "follow-up: native RTF picture insertion";
+const STYLE_EDITOR: &str = "follow-up: native RTF style application";
+const LIST_EDITOR: &str = "follow-up: native RTF list editor";
 
 /// RTF write refusals that the format-level verb support would otherwise
 /// hide: every element the reader projects but the native editor cannot yet
@@ -1375,14 +1374,14 @@ pub(crate) static WRITE_GAPS: [GapSpec; 33] = [
         "move",
         "run",
         "native-run-edit",
-        "M6 RTF atomic native run edits",
+        "RTF atomic native run edits",
         "run reordering requires an atomic native character-run editor that preserves paragraph boundaries and formatting controls",
     ),
     operation_gap(
         "swap",
         "run",
         "native-run-edit",
-        "M6 RTF atomic native run edits",
+        "RTF atomic native run edits",
         "run swapping requires an atomic native character-run editor that preserves paragraph boundaries and formatting controls",
     ),
     operation_gap(

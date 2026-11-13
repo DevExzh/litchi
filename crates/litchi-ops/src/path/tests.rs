@@ -59,7 +59,7 @@ fn kind<F: Fixture>(name: &str) -> Kind<F> {
 
 #[test]
 fn the_plans_m1_aliases_are_present() {
-    // Record 0010 §4.2, one row per alias.
+    // One row per alias.
     let word: &[(&str, &str)] = &[
         ("paragraph", "p"),
         ("P", "p"),
@@ -167,7 +167,7 @@ fn the_plans_m1_aliases_are_present() {
 
 #[test]
 fn every_story_axis_is_a_known_element() {
-    // The `Axis` table of record 0005: each name belongs to some family.
+    // The `Axis` table: each name belongs to some family.
     let axes = [
         "body",
         "chart",
@@ -918,7 +918,7 @@ fn elements_without_a_model_are_unsupported_capabilities() {
         &fail::<Word>("/body/chart[1]"),
         Code::UnsupportedCapability,
         "reading \"chart\" elements from Docx is not supported yet at byte 6",
-        Some("follow-up L-TEST-R1; capabilities() lists this gap"),
+        Some("follow-up not supported yet; capabilities() lists this gap"),
     );
     assert_error(
         &fail::<Word>("/tableofcontents[1]"),

@@ -1,4 +1,4 @@
-//! XLSB path resolution and query inspection (record 0010 §4.1, §4.7, §5.3).
+//! XLSB path resolution and query inspection.
 //!
 //! Workbook tabs are resolved in complete catalog order. Worksheet payload
 //! paths then use the retained sparse grid bridge, whose coordinates are
@@ -265,7 +265,7 @@ pub(super) fn tab_count(file: &Xlsb) -> Result<usize> {
 /// Fence a public operation around both its source read and result creation.
 pub(super) fn finish<T>(file: &Xlsb, operation: impl FnOnce() -> Result<T>) -> Result<T> {
     // Inside a resolver or query step, whose check after the step covers
-    // this read, the read runs alone (record 0262).
+    // this read, the read runs alone.
     if crate::path::fence::is_active(fence_key(file)) {
         return operation();
     }

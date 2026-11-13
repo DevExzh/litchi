@@ -1,4 +1,4 @@
-//! Unified reads of OpenDocument presentations (record 0278): path
+//! Unified reads of OpenDocument presentations: path
 //! resolution, node views, queries and view modes over the scene index.
 
 #![cfg(feature = "odp")]
@@ -89,7 +89,7 @@ fn missing_gaps_and_absent_concepts_are_typed() {
         Code::PathNotFound
     );
     assert!(file.find("/slide[9]").unwrap().is_none());
-    // Record 0328: video frames are typed media, so a slide without one
+    // Video frames are typed media, so a slide without one
     // has no `video[1]`; animations remain a gap.
     assert_eq!(
         file.get("/slide[1]/video[1]").unwrap_err().code(),
@@ -188,7 +188,7 @@ fn flat_presentations_open_for_reads() {
     let file = open("libreoffice-core/sd/qa/unit/data/draw-image-link.fodp");
     assert!(file.get("/slide[1]").is_ok());
     assert!(file.view(Mode::Outline).unwrap().starts_with("1 slides"));
-    // Record 0341: XML's predefined entities no longer make the leaf
+    // XML's predefined entities no longer make the leaf
     // refuse a flat presentation.
     let theme = open("libreoffice-core/xmloff/qa/unit/data/theme.fodp");
     assert!(theme.get("/slide[1]").is_ok());

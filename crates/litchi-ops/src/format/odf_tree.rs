@@ -1,6 +1,6 @@
 //! Handles for the OpenDocument object formats without a text, sheet or
-//! slide body (record 0282): drawings (`.odg`), charts (`.odc`), images
-//! (`.odi`), databases (`.odb`) and formulas (`.odf`).
+//! slide body: drawings (`.odg`), charts (`.odc`), images (`.odi`),
+//! databases (`.odb`) and formulas (`.odf`).
 //!
 //! Each handle retains its leaf's immutable `Package` and an object tree
 //! built once at open from the leaf's read-only projection: pages and
@@ -96,11 +96,11 @@ struct State {
     /// The caller-selected ODF ingress policy retained across publication
     /// and raw package reads.
     odf_options: litchi_odf_common::OpenOptions,
-    /// Built at open; after a write, on the first read (record 0288).
+    /// Built at open; after a write, on the first read.
     tree: std::sync::OnceLock<Tree>,
     origin: Option<Arc<Path>>,
     /// The flat single-XML bytes (`.fodg`) a flat handle publishes; its
-    /// owner is the leaf's packaged read projection (record 0292).
+    /// owner is the leaf's packaged read projection.
     flat: Option<FlatSource>,
 }
 
@@ -291,7 +291,7 @@ impl OdfTree {
     /// Adopt a leaf owner (an open, a commit result or a fresh package).
     /// A tree whose build can fail is built here, so the open refuses a
     /// database whose catalog it cannot read; the others are built on the
-    /// first read, as after a commit (record 0377a).
+    /// first read, as after a commit.
     pub(crate) fn from_owner(
         owner: Owner,
         origin: Option<Arc<Path>>,
@@ -313,7 +313,7 @@ impl OdfTree {
 
     /// Open a flat single-XML drawing (`.fodg`) detection recognized: the
     /// leaf reads the flat parts as a package projection; publication
-    /// writes the flat bytes unchanged (record 0292).
+    /// writes the flat bytes unchanged.
     #[cfg(feature = "odg")]
     pub(crate) fn from_flat(bytes: Vec<u8>, options: &OpenOptions) -> Result<Self> {
         let format = FileFormat::Odg;
@@ -346,7 +346,7 @@ impl OdfTree {
 
     /// The handle over a committed leaf owner: a packaged file adopts it;
     /// a flat drawing republishes the edit of its packaged projection into
-    /// its flat bytes, element by element (record 0292).
+    /// its flat bytes, element by element.
     pub(crate) fn republish(&self, owner: Owner) -> Result<Self> {
         let Some(flat) = self.0.flat.as_ref() else {
             return Self::from_commit(owner, self.origin().cloned(), self.0.odf_options);
@@ -387,7 +387,7 @@ impl OdfTree {
     /// catalog, which can fail, but not on a committed package: the ODB
     /// leaf's commit parses the new catalog with the same default limits
     /// before it publishes, and a metadata commit leaves the catalog's
-    /// `content.xml` as it was (records 0291 and 0292 made the same change independently; before, a database tree was
+    /// `content.xml` as it was (before, a database tree was
     /// built here and a single `set` on a 1,000-query database parsed the
     /// catalog twice).
     pub(crate) fn from_commit(
@@ -701,7 +701,7 @@ impl fmt::Debug for OdfTree {
     }
 }
 
-/// The `/metadata` path of the object formats: set-only (record 0288).
+/// The `/metadata` path of the object formats: set-only.
 #[cfg(any(
     feature = "odg",
     feature = "odc",
@@ -715,7 +715,7 @@ pub(crate) const METADATA_PATH_GAP: crate::node::spec::GapSpec = crate::node::sp
         context: "path-read",
     },
     code: crate::Code::UnsupportedCapability,
-    follow_up: "0288 ODF object metadata node",
+    follow_up: "ODF object metadata node",
     reason: "`set(\"/metadata\", ..)` writes meta.xml through the ODF metadata family; the path is set-only, and reads go through File::metadata()",
 };
 
@@ -965,9 +965,9 @@ mod tests {
         }
     }
 
-    /// Record 0291: a database handle committed by `set` builds its tree on
-    /// the first read, and that tree is the one a fresh open builds. (`add`
-    /// reads the new tree to report the added node's path.)
+    /// A database handle committed by `set` builds its tree on the first
+    /// read, and that tree is the one a fresh open builds. (`add` reads the
+    /// new tree to report the added node's path.)
     #[test]
     fn committed_database_trees_are_built_on_first_read() {
         let mut file = crate::create(FileFormat::Odb).expect("create");
@@ -992,9 +992,9 @@ mod tests {
         assert!(lazy.contains("SELECT 20"));
     }
 
-    /// Record 0377a: an opened database builds (and so validates) its tree at
-    /// open.  The ODB-only portion stays behind this module's `odb` gate so
-    /// the ODC-only build never names the optional database owner.
+    /// An opened database builds (and so validates) its tree at open. The
+    /// ODB-only portion stays behind this module's `odb` gate so the ODC-only
+    /// build never names the optional database owner.
     #[test]
     fn opened_database_trees_validate_at_open() {
         let database = crate::create(FileFormat::Odb).expect("create database");
@@ -1070,8 +1070,8 @@ mod odc_tests {
 
     use crate::File;
 
-    /// Record 0377a: an opened chart builds its tree on the first read, and
-    /// that tree is the one the leaf owner builds.
+    /// An opened chart builds its tree on the first read, and that tree is
+    /// the one the leaf owner builds.
     #[test]
     fn opened_chart_trees_are_built_on_first_read() {
         let chart = crate::create(FileFormat::Odc).expect("create chart");

@@ -1,5 +1,5 @@
-//! Handles for the Apple iWork formats (record 0296, owner decision D1):
-//! Pages documents, Keynote presentations and Numbers workbooks.
+//! Handles for the Apple iWork formats: Pages documents, Keynote
+//! presentations and Numbers workbooks.
 //!
 //! Each handle retains its leaf's immutable `Package` and an object tree
 //! built from the leaf's read-only projection on the first read: the body,
@@ -7,19 +7,18 @@
 //! title and body placeholders and notes of a Keynote presentation; the
 //! sheets, tables and stored cells of a Numbers workbook. Keynote slides and
 //! their children and Numbers table cells are lazily built parts of the
-//! tree, built as reads reach them (record 0305). Paths, queries and node
+//! tree, built as reads reach them. Paths, queries and node
 //! views run over that tree through one generic adapter (`Nav`),
 //! parameterized by a per-format `Flavor`, in the shape of the ODF
-//! object-tree adapter (record 0282). Writes stage the leaf's own focused
-//! transactions (section text, slide text, slide skip/order/deletion, table
-//! cells), address their targets through the leaf positions the tree
-//! recorded, and adopt the committed package as a new handle whose tree is
-//! built on its first read.
+//! object-tree adapter. Writes stage the leaf's own focused transactions
+//! (section text, slide text, slide skip/order/deletion, table cells),
+//! address their targets through the leaf positions the tree recorded, and
+//! adopt the committed package as a new handle whose tree is built on its
+//! first read.
 //!
 //! Package directories (the app-authored bundle form) open for every format:
-//! the leaf converts the bundle to its single-file form (records 0299 and
-//! 0306), and `save()` writes the bundle form back in place (records 0301
-//! and 0306).
+//! the leaf converts the bundle to its single-file form, and `save()` writes
+//! the bundle form back in place.
 
 /// Declares a field-less kind enum with its vocabulary mapping.
 macro_rules! kinds {
@@ -108,14 +107,13 @@ struct State {
     /// tree remains lazy and unrelated container inventories are untouched.
     chart: OnceLock<Result<ChartCache>>,
     /// The complete Pages tree, whose section headers and footers are built
-    /// the first time a read reaches them (record 0299). Every item of
-    /// `tree` keeps its index here, so nodes taken from either tree stay
-    /// valid.
+    /// the first time a read reaches them. Every item of `tree` keeps its
+    /// index here, so nodes taken from either tree stay valid.
     #[cfg(feature = "pages")]
     full: OnceLock<Built>,
     /// The global index of each Pages section's first paragraph, then the
     /// paragraph count: what a coalesced `/body/p[N]` set needs, without
-    /// building the tree (record 0302).
+    /// building the tree.
     #[cfg(feature = "pages")]
     paragraph_starts: OnceLock<Box<[usize]>>,
     origin: Option<Arc<Path>>,
@@ -123,7 +121,7 @@ struct State {
 
 /// The object tree, or the error building it raised (a lazily decoded
 /// Keynote slide can fail) beside a root-only tree; and its lazily built
-/// parts, the `k`-th at [`At`] part `k` (record 0305).
+/// parts, the `k`-th at [`At`] part `k`.
 struct Built {
     tree: Tree,
     error: Option<Error>,
@@ -653,8 +651,7 @@ impl Iwork {
     /// staged in a sibling temporary file.
     pub(crate) fn save_to(&self, path: &Path, options: &crate::SaveOptions) -> Result<u64> {
         // A package saved over a package directory (its origin when it was
-        // opened from one) is written back as a directory (records 0301 and
-        // 0306).
+        // opened from one) is written back as a directory.
         if std::fs::symlink_metadata(path).is_ok_and(|metadata| metadata.is_dir()) {
             if options.overwrite == crate::Overwrite::Refuse {
                 return Err(Error::new(
@@ -692,8 +689,8 @@ impl Iwork {
         Ok(written)
     }
 
-    /// A fresh package of `format`: the Pages (record 0299), Numbers (record
-    /// 0297) and Keynote (record 0298) leaves' deterministic `Package::new()`.
+    /// A fresh package of `format`: the Pages, Numbers and Keynote leaves'
+    /// deterministic `Package::new()`.
     pub(crate) fn create(format: FileFormat, options: &crate::CreateOptions) -> Result<Self> {
         #[cfg(feature = "numbers")]
         if format == FileFormat::Numbers {
@@ -756,11 +753,10 @@ impl Iwork {
 
     /// Open an app-authored package directory of `format`: the leaf
     /// captures the bundle once, under the caller's leaf options, and
-    /// converts it to its single-file form (records 0299 and 0306). The
+    /// converts it to its single-file form. The
     /// directory is the handle's origin, so `save()` writes the bundle back
-    /// in place (records 0301 and 0306); `save_as` to a file path writes the
-    /// single-file package. [`OpenOptions::max_input_bytes`] bounds the
-    /// converted package.
+    /// in place; `save_as` to a file path writes the single-file package.
+    /// [`OpenOptions::max_input_bytes`] bounds the converted package.
     pub(crate) fn open_directory(
         path: &Path,
         format: FileFormat,

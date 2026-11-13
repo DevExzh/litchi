@@ -77,7 +77,7 @@ static OPERATION_GAPS: [GapSpec; 5] = [
             context: "a chart outside the leaf's lossless typed definition surface",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0288 ODC lossless producer definitions",
+        follow_up: "ODC lossless producer definitions",
         reason: "title, type, size, series and axis writes replace the chart through its typed definition; a producer chart the leaf cannot project losslessly is refused rather than rewritten",
     },
     GapSpec {
@@ -87,7 +87,7 @@ static OPERATION_GAPS: [GapSpec; 5] = [
             context: "data points, data labels, regressions and series styles",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0288 ODC series detail writes",
+        follow_up: "ODC series detail writes",
         reason: "the unified registry writes a series' ranges, label, class and axis; its data points, labels, regression curves and styles stay as authored",
     },
     GapSpec {
@@ -97,7 +97,7 @@ static OPERATION_GAPS: [GapSpec; 5] = [
             context: "a chart outside the leaf's lossless typed definition surface",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0288 ODC lossless producer definitions",
+        follow_up: "ODC lossless producer definitions",
         reason: "series and axes reorder, and the legend is added or removed, through the chart's typed definition; a producer chart the leaf cannot project losslessly is refused rather than rewritten",
     },
     GapSpec {
@@ -545,7 +545,7 @@ fn definition(package: &litchi_odc::Package) -> Result<Definition> {
                 "the chart cannot be projected losslessly into a typed definition",
             )
             .with_format(FileFormat::Odc)
-            .with_suggestion("follow-up: 0288 ODC lossless producer definitions");
+            .with_suggestion("follow-up: ODC lossless producer definitions");
         }
         refused
     })
@@ -851,8 +851,8 @@ fn reorder(
     commit(file, edit, operations, limits)
 }
 
-/// Move an axis among the axes or a series among the series (record 0292),
-/// through the chart's typed definition.
+/// Move an axis among the axes or a series among the series, through the
+/// chart's typed definition.
 pub(crate) fn move_to(
     file: &OdfTree,
     package: &litchi_odc::Package,

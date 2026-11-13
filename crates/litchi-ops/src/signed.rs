@@ -1,6 +1,5 @@
 //! The [`Signed`] state of [`File`]: a readable input whose signature must
-//! be consumed explicitly before it is edited (ADR 0006 `Signed<T>`; record
-//! 0003 §2.6; record 0007 Q4; record 0013, the signature policy).
+//! be consumed explicitly before it is edited (ADR 0006 `Signed<T>`).
 
 use std::fmt;
 use std::sync::Arc;
@@ -26,7 +25,7 @@ pub enum SignatureOrigin {
     Cfb,
 }
 
-/// A signed input. Every signed input opens as `Signed` (record 0007 Q4).
+/// A signed input. Every signed input opens as `Signed`.
 ///
 /// Reads go to the [`File`] it wraps: [`File::format`], [`File::text`] and
 /// the other reads of a [`File::Signed`] answer for the wrapped file, and
@@ -142,8 +141,8 @@ impl Signed {
     /// returned file only.
     ///
     /// Re-signing with caller keys (`resign`) is deferred until the signing
-    /// providers have an explicit, credential-safe input in the unified layer
-    /// (record 0013); the format crates keep their own signing APIs.
+    /// providers have an explicit, credential-safe input in the unified layer;
+    /// the format crates keep their own signing APIs.
     ///
     /// ```no_run
     /// use litchi_ops::File;
@@ -207,6 +206,6 @@ mod tests {
         assert_traits::<SignatureOrigin>();
         assert_traits::<Signed>();
     };
-    // One pointer, so `File` stays a tag plus one pointer (record 0003 D2).
+    // One pointer, so `File` stays a tag plus one pointer.
     const _: () = assert!(size_of::<Signed>() == size_of::<usize>());
 }

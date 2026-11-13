@@ -1,4 +1,4 @@
-//! The children of XLSX nodes, read lazily (record 0010 §2.5, §5.3).
+//! The children of XLSX nodes, read lazily.
 //!
 //! One iterator serves two readers:
 //!
@@ -8,8 +8,7 @@
 //!   that hold content or carry row formatting, and such a row lists the
 //!   records that hold content; a row resolved by path or matched by a query
 //!   lists all its records, as OfficeCLI's row path does. A range lists its
-//!   stored records only, unless the view asks for dense stubs (record 0010
-//!   Q9).
+//!   stored records only, unless the view asks for dense stubs.
 //! - **The query walker** asks for the kinds it needs under the path tree of
 //!   the spec table: a workbook's sheets and defined names; a worksheet's
 //!   columns, then its rows and cells in row-major order, then its tables;
@@ -20,7 +19,7 @@
 //! a cursor that copies at most [`BATCH`] coordinates, each with its
 //! record's position, at a time out of one borrowed range scan. So the
 //! iterator owns no borrow, a cell costs one reference-count increment, its
-//! node reads its record again in O(1) (record 0262), and a walk that stops
+//! node reads its record again in O(1), and a walk that stops
 //! early has scanned at most one batch past its last match. Row numbers are
 //! collected once per worksheet walk that lists rows, because the leaf's row
 //! traversal cannot resume mid-way.
@@ -68,17 +67,17 @@ enum State {
         rect: Rect,
         next: Option<Address>,
     },
-    /// A worksheet's features (record 0320).
+    /// A worksheet's features.
     Features {
         sheet: usize,
         items: std::vec::IntoIter<super::features::Feature>,
     },
-    /// A worksheet's charts, or a chart's series and axes (record 0270).
+    /// A worksheet's charts, or a chart's series and axes.
     Charts {
         sheet: usize,
         items: std::vec::IntoIter<(Kind, ChartItem)>,
     },
-    /// A cell's rich-text runs, for a walk that wants runs (record 0338).
+    /// A cell's rich-text runs, for a walk that wants runs.
     Runs {
         sheet: usize,
         at: Address,
@@ -133,7 +132,7 @@ enum Phase {
         next: usize,
     },
     /// Every stored record through the leaf's cell cursor, which parses only
-    /// the leading rows a walk that stops early visits (record 0267).
+    /// the leading rows a walk that stops early visits.
     Stream(Box<Stream>),
     Tables {
         parts: std::vec::IntoIter<TablePart>,
@@ -317,7 +316,7 @@ impl<'f> Children<'f> {
                         || kinds.contains(Kind::Table)
                         || kinds.contains(Kind::Chart)) =>
             {
-                // A walk scoped to worksheet features lists them (record 0320).
+                // A walk scoped to worksheet features lists them.
                 let mut items = Vec::new();
                 for kind in super::features::KINDS {
                     if kinds.contains(kind) {
@@ -390,7 +389,7 @@ impl<'f> Children<'f> {
                 grid: range.grid.clone(),
                 cursor: Box::new(Cursor::new(range.rect, false)),
             },
-            // A cell's runs, only for a walk that wants them (record 0338).
+            // A cell's runs, only for a walk that wants them.
             Item::Cell(_) if kinds.contains(Kind::Run) => match super::runs::cell_runs(node)? {
                 Some((sheet, at, rich)) => State::Runs {
                     sheet,

@@ -1,5 +1,5 @@
 //! DOCX tab stops, breaks, bookmarks, fields, tables of contents, the
-//! watermark and text boxes through the `File` facade (record 0319), on both
+//! watermark and text boxes through the `File` facade, on both
 //! owners.
 #![cfg(feature = "docx")]
 
@@ -227,7 +227,7 @@ fn text(file: &File, path: &str) -> String {
 
 #[test]
 fn bookmarks_fields_and_tables_of_contents_are_written() {
-    // Record 0325: OfficeCLI's add, set and remove of bookmarks, fields
+    // OfficeCLI's add, set and remove of bookmarks, fields
     // and tables of contents.
     let start = litchi_ops::create(litchi_core::FileFormat::Docx)
         .unwrap()
@@ -361,7 +361,7 @@ fn bookmarks_fields_and_tables_of_contents_are_written() {
 
 #[test]
 fn fields_go_into_story_paragraphs_and_take_officecli_types() {
-    // Record 0325: fields.sh's footer page numbers, REF \h and IF fields.
+    // Fields.sh's footer page numbers, REF \h and IF fields.
     let file = litchi_ops::create(litchi_core::FileFormat::Docx)
         .unwrap()
         .add("/body", NewNode::new("paragraph").prop("text", "Body"))

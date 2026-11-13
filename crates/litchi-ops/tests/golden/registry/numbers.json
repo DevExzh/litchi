@@ -408,7 +408,7 @@
       "element": "cell",
       "context": "cross-table formula references",
       "code": "unsupported_capability",
-      "followUp": "record 0297 follow-ups (IWORK_API_REQUESTS.md)",
+      "followUp": "not supported yet",
       "reason": "formula text is parsed with local A1 references and the authorable function subset; references to other tables need source-bound table handles"
     },
     {
@@ -417,7 +417,7 @@
       "element": "table",
       "context": "a workbook without a table",
       "code": "unsupported_capability",
-      "followUp": "record 0301 follow-ups (IWORK_API_REQUESTS.md request 5)",
+      "followUp": "not supported yet",
       "reason": "a new table copies the structure (styles, sizes, storage layout) of the workbook's first table; a workbook with no table has no template yet"
     },
     {
@@ -426,8 +426,8 @@
       "element": "row",
       "context": "formulas the coordinate shift refuses, merges",
       "code": "unsupported_capability",
-      "followUp": "record 0329 follow-ups (IWORK_API_REQUESTS.md request 6)",
-      "reason": "rows and columns move every formula reference into the table, the table's own formulas and other tables' (record 0318); a removed row or column a surviving formula reads turns into #REF! (ranges shrink), and a shared formula whose cells diverge is split (record 0329); refused: a chart or other non-table owner reading the table, volatile, spanning, error or spill dependency state, a removal whose cells the cell writer cannot clear under a range that reads them, merged cells, filters, categories, pivots and (for columns) sort rules, and removing a hidden or bordered row or column"
+      "followUp": "not supported yet",
+      "reason": "rows and columns move every formula reference into the table, the table's own formulas and other tables'; a removed row or column a surviving formula reads turns into #REF! (ranges shrink), and a shared formula whose cells diverge is split; refused: a chart or other non-table owner reading the table, volatile, spanning, error or spill dependency state, a removal whose cells the cell writer cannot clear under a range that reads them, merged cells, filters, categories, pivots and (for columns) sort rules, and removing a hidden or bordered row or column"
     },
     {
       "subject": "operation",
@@ -435,7 +435,7 @@
       "element": "row",
       "context": "height and visibility",
       "code": "unsupported_capability",
-      "followUp": "record 0309 follow-ups",
+      "followUp": "not supported yet",
       "reason": "rows and columns are structural only here: their sizes and hidden states are not wired to the leaf's dimension transaction"
     },
     {
@@ -444,7 +444,7 @@
       "element": "row",
       "context": "rows and columns",
       "code": "unsupported_capability",
-      "followUp": "record 0347 F1 (a row and column move in `table::topology`)",
+      "followUp": "a row and column move in `table::topology`",
       "reason": "the leaf topology transaction inserts and removes rows and columns but does not reorder them; reordering must carry storage, headers, UIDs, borders, merges and every formula coordinate that reads the table"
     },
     {
@@ -453,49 +453,49 @@
       "element": "row",
       "context": "rows and columns",
       "code": "unsupported_capability",
-      "followUp": "record 0347 F1 (a row and column move in `table::topology`)",
+      "followUp": "a row and column move in `table::topology`",
       "reason": "a swap is two moves, and the leaf topology transaction does not reorder rows or columns; sheets and tables swap"
     },
     {
       "subject": "view",
       "mode": "issues",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the issues view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "forms",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the forms view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "html",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "svg",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "screenshot",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "pdf",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     }
   ],
@@ -504,7 +504,7 @@
     "support": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0295 follow-up: a find adapter over the format's text edits",
+      "followUp": "follow-up: a find adapter over the format's text edits",
       "reason": "find/replace is not integrated for this format"
     },
     "keywords": {
@@ -535,7 +535,7 @@
         "set": true,
         "writeGap": {
           "code": "unsupported_capability",
-          "followUp": "record 0010 Q3: an owner-approved regular-expression dependency",
+          "followUp": "an owner-approved regular-expression dependency",
           "reason": "Litchi has no approved regular-expression engine; `regex=true` and OfficeCLI's `r\"...\"` patterns are refused"
         }
       }

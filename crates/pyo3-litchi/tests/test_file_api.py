@@ -1,5 +1,4 @@
-"""The unified read API: ``litchi_py.open``/``open_bytes`` and ``File``
-(M1 step R9, record 0010 §8.2).
+"""The unified read API: ``litchi_py.open``/``open_bytes`` and ``File``.
 
 Oracles, strongest first:
 
@@ -162,7 +161,7 @@ class OpenTests(ErrorAssertions):
         )
 
     def test_every_odf_format_opens_as_a_file(self):
-        # Record 0282: the remaining ODF formats have File variants.
+        # The remaining ODF formats have File variants.
         for relative, name in (
             ("libreoffice-core/desktop/qa/data/BlankDrawDocument.odg", "Odg"),
             ("odf/odc-producer-evidence/odfdom-created.odc", "Odc"),
@@ -176,7 +175,7 @@ class OpenTests(ErrorAssertions):
                 self.assertEqual(file.get("/", 0)["path"], "/")
 
     def test_iwork_packages_open_as_files(self):
-        # litchi::File holds Apple iWork since record 0296 (owner decision D1).
+        # litchi::File holds Apple iWork.
         for relative, name, path, text in (
             ("iwork/pages/basic.pages", "Pages", "/body/p[1]", "Litchi native Pages fixture"),
             (
@@ -199,7 +198,7 @@ class OpenTests(ErrorAssertions):
                 self.assertEqual(file.to_bytes(), read_fixture(relative))
 
     def test_iwork_package_directories_open_and_save_back_in_place(self):
-        # Records 0299, 0301 and 0306: every iWork leaf converts the
+        # Every iWork leaf converts the
         # app-authored directory to its single-file form; the directory is
         # the origin, so save() writes the bundle back.
         for relative, single, name, path in (
@@ -255,7 +254,7 @@ class NodeViewGoldenTests(unittest.TestCase):
                 self.assertSameView(file.find(path), golden(f"node_view/{expected}"))
 
     def test_docx_stories_are_read(self):
-        # Headers and notes were listed gaps (L-DOCX-R5) until record 0319.
+        # Headers and notes used to be listed gaps.
         cases = (
             ("ooxml/docx/headerFooter.docx", "/header[@type=default]", "header", "/header[2]"),
             ("ooxml/docx/footnotes.docx", "/footnote[1]", "footnote", "/footnotes/footnote[1]"),
@@ -279,7 +278,7 @@ class NodeViewGoldenTests(unittest.TestCase):
         self.assertEqual(comments["childCount"], 1)
         comment = file.get("/comments/comment[1]")
         self.assertEqual(comment["format"]["author"], "Unbekannter Autor")
-        # Three paragraphs, the middle one empty, one per line (record 0251c).
+        # Three paragraphs, the middle one empty, one per line.
         self.assertEqual(comment["text"], "This is the first line\n\nThis is the second line")
 
     def test_xlsx_fixtures(self):
@@ -624,7 +623,7 @@ class ViewTests(ErrorAssertions):
 
     def test_view_options_are_not_offered_yet(self):
         # litchi-ops keeps its view options (OfficeCLI's --start, --end,
-        # --max-lines, --cols, --range) internal; record 0255 follow-up F2.
+        # --max-lines, --cols, --range) internal.
         file = open_fixture(DRAWING)
         for keyword in ("start", "end", "max_lines", "columns", "range"):
             with self.subTest(keyword=keyword):
@@ -669,7 +668,7 @@ class SchemaTests(unittest.TestCase):
     def test_stub_typed_dict_matches_the_export(self):
         fields = typed_dict_fields(STUB_PATH)["_Schema"]
         self.assertEqual(list(L.schema("xlsx")), [key for key in fields if key != "pending"])
-        # Every claimed format has a registry since record 0296, so no
+        # Every claimed format has a registry, so no
         # format exports the `pending` shape in this build.
         self.assertEqual(L.schema("pages"), golden("registry/pages.json"))
         self.assertTrue(L.schema("numbers")["elements"])
@@ -731,7 +730,7 @@ class CapabilitiesTests(unittest.TestCase):
 
 
 class PptxReadTests(unittest.TestCase):
-    """PPTX reads through the unified reader (M1 step R4c, on trunk)."""
+    """PPTX reads through the unified reader."""
 
     def test_reads_answer_slide_paths(self):
         file = open_fixture(PPTX)
@@ -927,7 +926,7 @@ class TextAndMetadataTests(unittest.TestCase):
                 "last_modified_by": "Nick Burch",
                 "created": "2015-03-13T11:12:37Z",
                 "modified": "2015-03-13T11:16:26Z",
-                # docProps/app.xml joins the core properties (record 0253).
+                # docProps/app.xml joins the core properties.
                 "application": "Microsoft Excel",
                 "security": 0,
             },

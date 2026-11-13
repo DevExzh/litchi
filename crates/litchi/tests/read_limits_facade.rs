@@ -6,8 +6,8 @@
 //! refused input reports [`litchi::Code::LimitExceeded`] and keeps the
 //! limit, the observed value and the resource in its typed OPC source.
 //!
-//! M0a step S8c ported these tests from the facade's `Document`,
-//! `Presentation` and `sheet` openers with a `*_with_limits` form.
+//! These tests were ported from the facade's `Document`, `Presentation` and
+//! `sheet` openers with a `*_with_limits` form.
 
 #![cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 #![allow(

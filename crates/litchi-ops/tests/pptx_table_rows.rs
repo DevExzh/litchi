@@ -1,4 +1,4 @@
-//! Unified PPTX table rows (record 0333): `tr` add with seed texts and
+//! Unified PPTX table rows: `tr` add with seed texts and
 //! placement, `set height`, `remove`, merge consistency, on both owners and
 //! after a byte round trip.
 #![cfg(feature = "pptx")]
@@ -256,7 +256,7 @@ fn tables_are_added_from_data_or_a_grid() {
     }
 }
 
-/// `ppt/tables/tables-nested.sh:86` (record 0342): a table-level set of the
+/// `ppt/tables/tables-nested.sh:86`: a table-level set of the
 /// frame's name and the six style switches; equal values are a no-op, and
 /// add-only keys are refused without a change.
 #[test]

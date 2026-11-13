@@ -1,4 +1,4 @@
-//! XLS refresh (record 0295, record 0279 follow-up F8): recalculate every
+//! XLS refresh: recalculate every
 //! formula through the `eval` engine and, with `write_cache`, write each
 //! stale or missing result back as the `Formula` record's cached result
 //! (`FormulaCache`), keeping the formula tokens. Writes are committed in

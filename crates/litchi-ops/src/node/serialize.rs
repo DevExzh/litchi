@@ -1,5 +1,5 @@
 //! Streaming serialization of a node view into OfficeCLI's eight-member
-//! `DocumentNode` JSON (record 0010 §2.1, §2.7).
+//! `DocumentNode` JSON.
 //!
 //! The serializer writes each node as a struct in OfficeCLI's member order
 //! (`path`, `type`, `text`, `preview`, `style`, `childCount`, `format`,
@@ -10,9 +10,9 @@
 //! next is read. Nothing is collected: no `DocumentNode`, no map, no `String`
 //! per node.
 //!
-//! Recursion is one level per view depth, which [`MAX_VIEW_DEPTH`] bounds
-//! (record 0010 risk 12). A shared counter stops the walk with
-//! `output_too_large` once more than `max_nodes` nodes would be written.
+//! Recursion is one level per view depth, which [`MAX_VIEW_DEPTH`] bounds.
+//! A shared counter stops the walk with `output_too_large` once more than
+//! `max_nodes` nodes would be written.
 //!
 //! [`MAX_VIEW_DEPTH`]: super::MAX_VIEW_DEPTH
 

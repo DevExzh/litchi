@@ -1,7 +1,7 @@
-//! Markdown for Pages documents and Keynote presentations (record 0306):
-//! the unified `File`'s object tree, rendered the way the document and
-//! presentation families render (paragraphs; one `# Slide N` section per
-//! slide). Numbers workbooks are refused like every workbook.
+//! Markdown for Pages documents and Keynote presentations: the unified
+//! `File`'s object tree, rendered the way the document and presentation
+//! families render (paragraphs; one `# Slide N` section per slide).
+//! Numbers workbooks are refused like every workbook.
 
 use std::borrow::Cow;
 

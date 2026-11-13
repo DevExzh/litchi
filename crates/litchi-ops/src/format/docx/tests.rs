@@ -424,9 +424,9 @@ fn editor_is_built_from_either_owner_without_reindexing() {
     assert_eq!(cold_loads(&source), 1);
 }
 
-/// Record 0011 closed the leaf gap M0a recorded: both owners admit Word
-/// documents whose markup compatibility cannot change content (a declared
-/// namespace, a root `mc:Ignorable`) and build editors over the same bytes.
+/// Both owners admit Word documents whose markup compatibility cannot change
+/// content (a declared namespace, a root `mc:Ignorable`) and build editors
+/// over the same bytes.
 #[test]
 fn editor_admits_word_markup_compatibility_on_both_owners() {
     for name in FIXTURES {
@@ -537,7 +537,7 @@ fn transaction_errors_are_classified_and_typed() {
     }
 }
 
-// --- Fence scopes (record 0315) ------------------------------------------
+// --- Fence scopes ------------------------------------------
 
 /// A source that counts its version observations and can be changed.
 struct Versioned {
@@ -612,11 +612,11 @@ fn observed_docx_query(paragraphs: usize, selector: &str) -> (usize, usize, usiz
     )
 }
 
-/// Record 0315 (record 0310 G7): inside a query step the DOCX child
+/// Inside a query step the DOCX child
 /// iterator and the node reads share the step's closing check, as the
-/// XLSX, XLSB and PPTX adapters' do (record 0262), instead of checking the
-/// source before and after every child. Every match is still checked once
-/// (owner decision 2026-10-14, record 0280 G1): ten more matching runs cost
+/// XLSX, XLSB and PPTX adapters' do, instead of checking the
+/// source before and after every child. Every match is still checked once:
+/// ten more matching runs cost
 /// ten more checks, and ten more runs that do not match cost none. A source
 /// changed between two pulls still fails the next pull.
 #[test]

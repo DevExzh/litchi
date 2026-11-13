@@ -1,5 +1,5 @@
-//! The signature policy audit (record 0013): every signed input a `File`
-//! opens follows ADR 0006's explicit policy, on every open route.
+//! The signature policy audit: every signed input a `File` opens follows
+//! ADR 0006's explicit policy, on every open route.
 //!
 //! For each signed fixture and each route:
 //!
@@ -19,7 +19,7 @@
 //! those inputs are signed here: an OPC signature origin, signature part and
 //! relationships for XLSB, as `litchi-xlsb`'s own tests build them, and both
 //! a legacy `_signatures` stream and an `_xmlsignatures` storage for DOC, PPT
-//! and XLS, as S6's security tests mark them.
+//! and XLS, as the security tests mark them.
 
 use std::io::Cursor;
 use std::sync::Arc;

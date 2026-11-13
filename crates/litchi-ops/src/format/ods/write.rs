@@ -1,5 +1,4 @@
-//! Unified ODS writes over the leaf `Package::edit` transaction (record
-//! 0277).
+//! Unified ODS writes over the leaf `Package::edit` transaction.
 //!
 //! Every verb resolves its targets against this immutable snapshot, admits
 //! the unified property shape through the registry, and stages the whole
@@ -45,7 +44,7 @@ use crate::value::Scalar;
 pub(crate) enum Patch {
     /// A primary document transaction.
     Document(litchi_ods::document::Patch),
-    /// A `/metadata` commit of the metadata family (record 0288).
+    /// A `/metadata` commit of the metadata family.
     Metadata(litchi_ods::metadata::Patch),
 }
 
@@ -98,7 +97,7 @@ enum Target {
         sheet: u32,
         rect: (u32, u32, u32, u32),
     },
-    /// A worksheet feature, written through `feature_write` (record 0327).
+    /// A worksheet feature, written through `feature_write`.
     Feature(u32),
 }
 
@@ -195,7 +194,7 @@ pub(super) fn odf_leaf(error: litchi_odf_common::Error, code: Code) -> Error {
 
 impl Ods {
     /// Admit an edit: the source is current. A flat spreadsheet edits its
-    /// packaged projection (record 0292).
+    /// packaged projection.
     pub(crate) fn admit_edit(&self) -> Result<()> {
         self.check_source()
     }
@@ -213,7 +212,7 @@ impl Ods {
 
     /// A new handle over a committed package, keeping this handle's origin.
     /// A flat spreadsheet republishes the edit of its projection into its
-    /// flat bytes, element by element (record 0292).
+    /// flat bytes, element by element.
     pub(crate) fn with_package(&self, package: Package) -> Result<Self> {
         if let Some(flat) = self.flat_bytes() {
             let options = self
@@ -606,7 +605,7 @@ impl CellAssignments {
             // The cell's hyperlinks live in its text (`text:a`), and the
             // registry has no writable link: a value set that changes the
             // text would drop them, so it is refused until `clear` removes
-            // them explicitly; the same value keeps them (record 0304).
+            // them explicitly; the same value keeps them.
             let same = cell.value == new_value && cell.text == new_text;
             if !cell.hyperlinks.is_empty() && !same {
                 return Err(Error::new(
@@ -1334,7 +1333,7 @@ fn remove_targets(file: &Ods, targets: &[Target], limits: &SemanticLimits) -> Re
             Code::UnsupportedCapability,
             "removing an ODS column needs a logical column editor the leaf does not have",
         )
-        .with_suggestion("follow-up: ODS adapter (record 0277)")),
+        .with_suggestion("follow-up: ODS adapter")),
         _ => Err(refusal(
             Code::UnsupportedElement,
             "ODS removes cells, ranges, sheets, rows, named ranges, annotations and merge spans",

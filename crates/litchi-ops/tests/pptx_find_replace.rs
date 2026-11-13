@@ -1,8 +1,8 @@
-//! PPTX find/replace through `set` with `find=` (record 0273), on both
+//! PPTX find/replace through `set` with `find=`, on both
 //! native owners: cross-run matches collapse into the run where they start,
 //! format properties apply to exactly the replaced or matched text, the
 //! scope is the target's subtree, zero matches are an exact no-op, and
-//! table cells and speaker notes are searched run by run (record 0285).
+//! table cells and speaker notes are searched run by run.
 #![cfg(feature = "pptx")]
 
 use litchi_core::Position;

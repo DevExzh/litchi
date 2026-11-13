@@ -1,19 +1,17 @@
-//! The `/metadata` set path of the OOXML formats (XLSX, PPTX, XLSB), record
-//! 0253, and DOCX (records 0338 and 0342).
+//! The `/metadata` set path of the OOXML formats (XLSX, PPTX, XLSB) and
+//! DOCX.
 //!
 //! `set("/metadata", props)` stages document properties through each
 //! format's leaf `metadata` transaction. OfficeCLI's spelling, a set on the
 //! root `/` (`set / title=...`), routes to the same writer for DOCX, XLSX
-//! and PPTX (record 0338); [`is_root`] and [`names_metadata`] decide it. The keys are the 22 OfficeCLI
-//! root-metadata spellings the legacy OLE formats accept on the same path
-//! (record 0254; matched ASCII case-insensitively), plus `custom.<name>` for
-//! custom properties. `null` removes a property. `keywords` takes a list,
-//! or text split at `;` and `,` (record 0354). A key no OOXML part stores
-//! (`contentType`) is refused by the leaf with a typed
-//! `UnsupportedProperty` refusal whose reason is fixed and content-free.
-//! Unlike OfficeCLI, a set never stamps `modified` (ADR 0006,
-//! determinism). The path is set-only; reads go through `File::metadata()`
-//! and the root node's properties.
+//! and PPTX; [`is_root`] and [`names_metadata`] decide it. The keys are the 22 OfficeCLI
+//! root-metadata spellings the legacy OLE formats accept on the same path (matched ASCII
+//! case-insensitively), plus `custom.<name>` for custom properties. `null` removes a
+//! property. `keywords` takes a list, or text split at `;` and `,`. A key no OOXML part
+//! stores (`contentType`) is refused by the leaf with a typed `UnsupportedProperty`
+//! refusal whose reason is fixed and content-free. Unlike OfficeCLI, a set never stamps
+//! `modified` (ADR 0006, determinism). The path is set-only; reads go through
+//! `File::metadata()` and the root node's properties.
 
 #![cfg_attr(
     not(any(feature = "pptx", feature = "xlsx", feature = "xlsb")),
@@ -65,7 +63,7 @@ enum Field {
 }
 
 /// Every key, sorted by ASCII-lowercase name for binary search; the same
-/// spellings as record 0254's OLE table.
+/// spellings as the OLE table.
 static KEYS: [(&str, Field); 22] = [
     ("application", Field::Application),
     ("author", Field::Author),
@@ -165,7 +163,7 @@ pub(crate) fn is_target(target: &TargetArg<'_>) -> bool {
 }
 
 /// Whether `target` is the document root `/`: OfficeCLI's spelling of a
-/// metadata set (record 0338).
+/// metadata set.
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx"))]
 pub(crate) fn is_root(target: &TargetArg<'_>) -> bool {
     target.path().is_some_and(|path| {
@@ -198,8 +196,8 @@ const fn is_key(name: &str) -> bool {
 }
 
 /// `props` with every metadata key settable: the root element's capability
-/// table, whose set route is the metadata writer (record 0338). The keys
-/// stay in their read order; only `access.set` changes.
+/// table, whose set route is the metadata writer. The keys stay in their
+/// read order; only `access.set` changes.
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx"))]
 pub(crate) const fn root_capability<const N: usize>(
     props: &[crate::node::spec::PropSpec],
@@ -312,7 +310,7 @@ impl Assignments {
     }
 
     /// Apply the core-property assignments to `metadata`; the application
-    /// fields are left to [`Self::apply_app`] (DOCX, record 0342).
+    /// fields are left to [`Self::apply_app`] (DOCX).
     #[cfg(feature = "docx")]
     pub(crate) fn apply_core(&self, metadata: &mut Metadata) {
         let core = Self {
@@ -345,8 +343,7 @@ impl Assignments {
     }
 
     /// `base` with the application-property assignments applied: every
-    /// element the assignments do not name keeps its value (DOCX, record
-    /// 0342).
+    /// element the assignments do not name keeps its value (DOCX).
     #[cfg(feature = "docx")]
     pub(crate) fn apply_app(&self, base: Option<properties::app::Props>) -> properties::app::Props {
         let mut props = base.unwrap_or_default();

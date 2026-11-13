@@ -6,16 +6,16 @@
 //! node's typed value, plus typed equality: a literal that coerces to the
 //! key's type equals a value it coerces to (`[fill=red]` matches `#FF0000`).
 //!
-//! Evaluation reads only what the operator needs (record 0262). What
-//! OfficeCLI reads from the canonical text (its number, unit and EMU value)
-//! is taken from the typed value directly where the text is known to read
-//! back to it: an integer, a finite number, a length in its key's style.
-//! Text is written only for a substring test, for colours, and for an
-//! equality whose literal could match the text without matching its number
-//! (a leading `#`, or non-ASCII letters that fold to ASCII). A text's EMU
-//! value is read only when a comparison gets that far. The result is always
-//! the one the written text gives; the tests check that against the
-//! write-then-read evaluation.
+//! Evaluation reads only what the operator needs. What OfficeCLI reads from
+//! the canonical text (its number, unit and EMU value) is taken from the
+//! typed value directly where the text is known to read back to it: an
+//! integer, a finite number, a length in its key's style. Text is written
+//! only for a substring test, for colours, and for an equality whose
+//! literal could match the text without matching its number (a leading `#`,
+//! or non-ASCII letters that fold to ASCII). A text's EMU value is read
+//! only when a comparison gets that far. The result is always the one the
+//! written text gives; the tests check that against the write-then-read
+//! evaluation.
 
 use std::cmp::Ordering;
 use std::fmt::Write as _;
@@ -434,8 +434,8 @@ impl<'q> Test<'q> {
     /// # Errors
     ///
     /// Returns `unsupported_capability` for a regular-expression literal
-    /// (`~= r"..."`): the workspace has no regex engine (record 0010, open
-    /// question Q3), and for an operator this version does not know.
+    /// (`~= r"..."`): the workspace has no regex engine, and for an
+    /// operator this version does not know.
     pub fn compare(op: CompareOp, value: &'q Value<'q>, ty: Option<ValueType>) -> Result<Self> {
         Ok(Self::with_text(op, literal(op, value)?, ty))
     }
@@ -486,8 +486,8 @@ impl<'q> Test<'q> {
 }
 
 /// The literal of a grammar comparison, after refusing what query comparison
-/// does not evaluate: a regular-expression literal (`~= r"..."`, record 0010
-/// open question Q3) and an operator this version does not know.
+/// does not evaluate: a regular-expression literal (`~= r"..."`) and an
+/// operator this version does not know.
 pub(crate) fn literal<'v>(op: CompareOp, value: &'v Value<'_>) -> Result<&'v str> {
     if !matches!(
         op,
@@ -620,8 +620,8 @@ impl Compiled {
         let Some(actual) = actual else {
             return self.op == Op::Ne;
         };
-        // A list (the keyword list, record 0354) holds when one of its
-        // items does; `!=` when none equals; `exists` when it has an item.
+        // A list (the keyword list) holds when one of its items does; `!=`
+        // when none equals; `exists` when it has an item.
         if let Scalar::List(items) = actual {
             return match self.op {
                 Op::Exists => !items.is_empty(),
@@ -783,9 +783,9 @@ impl std::fmt::Debug for Test<'_> {
     }
 }
 
-/// The evaluation before record 0262, kept verbatim as the oracle the tests
-/// compare [`Compiled::eval`] with: write the value's canonical text, then
-/// read everything OfficeCLI reads from it.
+/// The earlier evaluation, kept verbatim as the oracle the tests compare
+/// [`Compiled::eval`] with: write the value's canonical text, then read
+/// everything OfficeCLI reads from it.
 #[cfg(test)]
 pub(crate) mod reference {
     use std::cmp::Ordering;

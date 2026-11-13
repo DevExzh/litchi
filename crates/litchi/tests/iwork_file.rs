@@ -1,6 +1,6 @@
-//! Apple iWork through the unified `File` (record 0306): the behaviours the
-//! deleted read-only `litchi::iwork::Document` was tested for, carried over
-//! to `litchi::open` — package-directory parity, frozen captures, loose
+//! Apple iWork through the unified `File`: the behaviours the deleted
+//! read-only `litchi::iwork::Document` was tested for, carried over to
+//! `litchi::open` — package-directory parity, frozen captures, loose
 //! `Index/` bundles, typed path failures, inclusive limits and the Numbers
 //! compatibility fixture.
 
@@ -234,7 +234,7 @@ fn directory_input_limits_are_inclusive_and_content_free() {
 /// workbook's text (one sheet, its two canonical tables in drawable order,
 /// the typed number). The deleted snapshot also listed a table model
 /// detached from every sheet; detached models are not document content, and
-/// no `File` element addresses them (record 0306).
+/// no `File` element addresses them.
 #[test]
 fn the_numbers_compatibility_fixture_reads_its_rooted_tables() {
     let hex = include_str!("../../../test-data/synthetic-iwork/numbers/compatibility-oracles.hex");
@@ -253,14 +253,14 @@ fn the_numbers_compatibility_fixture_reads_its_rooted_tables() {
         "Rooted sheet\nSecond canonical\nFirst canonical\n-1234.5"
     );
     // The object tree refuses this synthetic source, typed: its table-merge
-    // storage is not a native shape (follow-up in record 0306).
+    // storage is not a native shape.
     let error = file.query("table").map(|_| ()).unwrap_err();
     assert_eq!(error.code(), Code::InvalidInput, "{error:?}");
 }
 
-/// Markdown goes through `File` (record 0306): Pages paragraphs, one
-/// `# Slide N` section per Keynote slide; a Numbers workbook is refused
-/// like every workbook.
+/// Markdown goes through `File`: Pages paragraphs, one `# Slide N`
+/// section per Keynote slide; a Numbers workbook is refused like every
+/// workbook.
 #[cfg(feature = "markdown")]
 #[test]
 fn pages_and_keynote_convert_to_markdown_through_file() {

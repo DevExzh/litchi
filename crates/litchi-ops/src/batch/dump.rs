@@ -1,5 +1,5 @@
 //! `File::dump`: a document written out as an OfficeCLI v2 batch, the
-//! inverse of [`File::batch`] (record 0336).
+//! inverse of [`File::batch`].
 //!
 //! The dump walks the node view and emits the commands that rebuild it on
 //! a [`create`](crate::create)d document of the same format: `add` for the
@@ -22,7 +22,7 @@ use crate::capabilities::{Capabilities, Support};
 use crate::node::{Node, Value, ViewOptions};
 use crate::{Code, Error, File, PropValue, Props, Result};
 
-/// A document as OfficeCLI v2 batch items (record 0336).
+/// A document as OfficeCLI v2 batch items.
 ///
 /// The first item is `{"command":"meta","dumpVersion":2}`: soft line
 /// breaks in run text are `\u{b}` (OfficeCLI's `\v`), and a `\n` in a
@@ -124,7 +124,7 @@ pub(crate) const fn support(format: FileFormat) -> Support {
     } else {
         Support::Unsupported {
             code: Code::UnsupportedCapability,
-            follow_up: "record 0336 follow-up: dump plans for the remaining formats",
+            follow_up: "follow-up: dump plans for the remaining formats",
             reason: "this format's write verbs cannot yet rebuild its node tree on a created document",
         }
     }
@@ -133,7 +133,7 @@ pub(crate) const fn support(format: FileFormat) -> Support {
 impl File {
     /// Write the document out as an OfficeCLI v2 batch that rebuilds it on
     /// a [`create`](crate::create)d document of the same format (OfficeCLI
-    /// `dump`; record 0336). See [`Dump`].
+    /// `dump`). See [`Dump`].
     ///
     /// Supported: DOCX, ODT, RTF and DOC body paragraphs, runs (with
     /// hyperlinks, breaks and tabs) and tables; XLSX, XLSB, ODS and XLS
@@ -173,9 +173,7 @@ fn refused(file: &File) -> Error {
         Code::UnsupportedCapability,
         "dump is not available for this format",
     )
-    .with_suggestion(
-        "dump covers DOCX, ODT, RTF, DOC, XLSX, XLSB, ODS, XLS and PPTX (record 0336)",
-    );
+    .with_suggestion("dump covers DOCX, ODT, RTF, DOC, XLSX, XLSB, ODS, XLS and PPTX");
     match file.format() {
         Some(format) => error.with_format(format),
         None => error,

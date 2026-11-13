@@ -1,4 +1,4 @@
-//! Unified reads of OpenDocument spreadsheets (record 0277): path
+//! Unified reads of OpenDocument spreadsheets: path
 //! resolution, queries, node views and the view modes over packaged and
 //! flat ODS, on both open routes.
 

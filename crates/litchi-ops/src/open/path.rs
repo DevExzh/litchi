@@ -468,7 +468,7 @@ mod zip {
             super::super::input_ceiling(options),
         )?;
         let file = super::super::bytes::zip_fallback(bytes, options, &detection_limits, tail)?;
-        // An iWork package saves back to its path (record 0296).
+        // An iWork package saves back to its path.
         #[cfg(feature = "iwork-adapter")]
         if file.iwork().is_some() {
             return Ok(super::super::attach_origin(
@@ -556,9 +556,9 @@ mod zip {
                         .with_origin(Some(super::stable_origin(path)?)),
                 ))
             },
-            // The other packaged ODF formats (record 0282) have no
-            // source-backed owner: their packages are read whole once and
-            // adopted through the detection-prepared byte route.
+            // The other packaged ODF formats have no source-backed owner:
+            // their packages are read whole once and adopted through the
+            // detection-prepared byte route.
             #[cfg(any(feature = "odt", odf_objects))]
             other => {
                 let _ = (error, length);

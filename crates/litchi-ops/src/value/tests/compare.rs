@@ -377,11 +377,10 @@ fn typed_values_compare_as_their_canonical_text() {
 }
 
 /// Values whose canonical text exercises every way the evaluation reads a
-/// value without writing it (record 0262): integers, finite numbers around
-/// .NET's positional/scientific switch and the 2^53 and EMU ranges,
-/// lengths in every unit form and beyond 2^53 hundredths, and the values
-/// that are still written (text, tokens, booleans, colours, non-finite
-/// numbers).
+/// value without writing it: integers, finite numbers around .NET's
+/// positional/scientific switch and the 2^53 and EMU ranges, lengths in
+/// every unit form and beyond 2^53 hundredths, and the values that are
+/// still written (text, tokens, booleans, colours, non-finite numbers).
 fn differential_values() -> Vec<Scalar<'static>> {
     let mut values = vec![
         Scalar::Bool(true),
@@ -632,8 +631,8 @@ const DIFFERENTIAL_LITERALS: &[&str] = &[
 
 /// The evaluation reads values without writing their text where it can; it
 /// gives exactly what writing the canonical text and reading it gives (the
-/// evaluation before record 0262, kept as `reference_eval`), for every
-/// operator, key type and value.
+/// earlier evaluation, kept as `reference_eval`), for every operator, key
+/// type and value.
 #[test]
 fn evaluation_agrees_with_writing_and_reading_the_text() {
     static UNDERLINE: Tokens = Tokens::new("underline", &["single", "double"], &[("sgl", 0)]);

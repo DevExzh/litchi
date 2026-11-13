@@ -1,4 +1,4 @@
-//! DOCX field and table-of-contents refresh (record 0279): plan new
+//! DOCX field and table-of-contents refresh: plan new
 //! results over the leaf's field index, then rewrite them in one native
 //! commit.
 

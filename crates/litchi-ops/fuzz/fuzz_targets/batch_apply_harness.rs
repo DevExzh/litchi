@@ -1,4 +1,4 @@
-//! OfficeCLI batch execution over small created documents (record 0334).
+//! OfficeCLI batch execution over small created documents.
 //!
 //! Inputs that decode (see `batch_payload_harness`) run as one batch against
 //! a blank DOCX, XLSX and PPTX document, atomically and best effort with

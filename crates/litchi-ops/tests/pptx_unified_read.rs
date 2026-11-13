@@ -1,4 +1,4 @@
-//! Public PPTX unified-read coverage (M1 R4c/R5).
+//! Public PPTX unified-read coverage.
 //!
 //! The fixture deliberately contains mixed shape-tree kinds, nested groups,
 //! repeated native identities, text bodies, notes and legacy comments. Every

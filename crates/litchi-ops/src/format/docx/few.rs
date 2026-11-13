@@ -3,7 +3,7 @@
 //! A DOCX `set` builds three lists per call: the resolved nodes, the
 //! admitted targets and the admitted assignments. The common call has one
 //! of each, and allocating each list cost about as much as resolving the
-//! path (record 0302). [`Few`] keeps that element inline and spills to a
+//! path. [`Few`] keeps that element inline and spills to a
 //! `Vec` from the second one on.
 
 use std::ops::{Deref, DerefMut};

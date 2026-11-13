@@ -1,4 +1,4 @@
-//! The last DOCX P0 writes of record 0345 through the unified API, after
+//! More DOCX writes through the unified API, after
 //! OfficeCLI's word schemas: the hyperlink screen tip, cell insertion and
 //! cell text on `add`, the table `col` element, and comment replies,
 //! resolution and anchors (`commentsExtended`). Each write is read back

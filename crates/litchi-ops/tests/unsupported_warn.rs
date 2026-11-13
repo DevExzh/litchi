@@ -1,4 +1,4 @@
-//! The command channel's unsupported-property policy (record 0269):
+//! The command channel's unsupported-property policy:
 //! `batch::Unsupported::Warn` applies a command's supported properties,
 //! atomically, and reports each refused one; `Refuse`, the default, refuses
 //! the whole command. Invalid values and every other failure still fail.
@@ -179,7 +179,7 @@ fn warn_batches_report_per_item_and_stay_atomic() {
 #[cfg(feature = "xlsx")]
 #[test]
 fn warn_batches_keep_the_native_runs() {
-    // Record 0281: an atomic warn batch coalesces like a refusing one. A
+    // An atomic warn batch coalesces like a refusing one. A
     // homogeneous batch is one native commit under both policies.
     let file = create(FileFormat::Xlsx).unwrap();
     let paths: Vec<String> = (1..=100).map(|row| format!("/Sheet1/A{row}")).collect();
@@ -346,8 +346,8 @@ fn warn_adds_the_element_without_the_refused_properties() {
 
 /// A cell `set` carrying a hyperlink takes the ordinary cell-link path in a
 /// batch too: the coalesced cell-payload run declines it instead of refusing
-/// `link` and `tooltip`, which the registry lists as settable (record 0330,
-/// the OfficeCLI corpus line `excel/cell-formatting.sh:158`).
+/// `link` and `tooltip`, which the registry lists as settable (the
+/// OfficeCLI corpus line `excel/cell-formatting.sh:158`).
 #[cfg(feature = "xlsx")]
 #[test]
 fn cell_links_in_a_batch_are_applied_not_skipped() {

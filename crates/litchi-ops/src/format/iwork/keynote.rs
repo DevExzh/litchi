@@ -2,7 +2,7 @@
 //! title and body placeholders, speaker notes, the drawables each slide owns
 //! (text boxes and shapes, pictures, lines, movies, audio, tables, charts
 //! and groups) with their frames, and the paragraphs and character runs of
-//! every text, read from `litchi_keynote::Package` (records 0296 and 0298).
+//! every text, read from `litchi_keynote::Package`.
 //!
 //! The vocabulary is the presentation family's, as PPTX and ODP read it:
 //! `slide`, `placeholder`, `notes`, `shape` (text boxes and shapes),
@@ -224,56 +224,56 @@ static OPERATION_GAPS: [GapSpec; 8] = [
         "add",
         "run",
         "a new character run",
-        "IWORK_API_REQUESTS.md request 10 (Keynote character-style writes)",
+        "Keynote character-style writes",
         "a run is a styled span of a paragraph; add a paragraph or set its text",
     ),
     operation_gap(
         "set",
         "tc",
         "cells in a formula graph",
-        "record 0309 follow-ups",
+        "not supported yet",
         "slide-table cells take text, numbers, booleans and clears; a formula cell, or one a formula or chart reads, is refused so no calculation cache goes stale",
     ),
     operation_gap(
         "add",
         "table",
         "a deck without a slide table",
-        "record 0329 follow-up: a built-in table template",
+        "follow-up: a built-in table template",
         "a new table copies the structure (styles, header counts, storage layout) of the deck's first slide table; a deck without one has none to copy",
     ),
     operation_gap(
         "remove",
         "table",
         "a slide table, chart or group",
-        "record 0298 follow-up: structural removal of tables, charts and groups",
+        "follow-up: structural removal of tables, charts and groups",
         "the leaf's drawable removal refuses tables, charts and groups",
     ),
     operation_gap(
         "add",
         "video",
         "a new movie or audio clip",
-        "record 0309 follow-up: wire slide::movie and slide::audio creation",
+        "follow-up: wire slide::movie and slide::audio creation",
         "the leaf's movie and audio creation families need the clip's poster, duration and placement, which `add` does not take yet",
     ),
     operation_gap(
         "set",
         "video",
         "the frame of a movie, audio clip, line, table, chart or group",
-        "record 0298 follow-up: wire slide::movie::geometry; the drawable family refuses the others",
+        "follow-up: wire slide::movie::geometry; the drawable family refuses the others",
         "the leaf's drawable geometry refuses tables, charts, groups, lines and movies",
     ),
     operation_gap(
         "remove",
         "placeholder",
         "slide-number and object placeholders",
-        "record 0309 follow-ups",
+        "not supported yet",
         "`remove` hides a title or body placeholder on its slide (and `hidden` = false shows it again); slide-number and object placeholders have no unified element",
     ),
     operation_gap(
         "add",
         "placeholder",
         "a new placeholder",
-        "record 0309 follow-ups",
+        "not supported yet",
         "a slide's placeholders come from its layout; show a hidden one with `hidden` = false, or add a slide from a layout",
     ),
 ];
@@ -617,8 +617,7 @@ struct Deferred {
     /// The paragraph items, in text order.
     paragraphs: Vec<u32>,
     slide: usize,
-    /// The drawable holding the text, or [`NONE`] for the speaker notes
-    /// (record 0329).
+    /// The drawable holding the text, or [`NONE`] for the speaker notes.
     drawable: usize,
 }
 
@@ -706,7 +705,7 @@ fn runs(tree: &mut TreeBuilder<Kind>, deferred: &Deferred, runs: &[TextRun]) {
 /// Build the eager tree of `package`: the presentation, whose slides are a
 /// lazily materialized part ([`Slides`]); each slide's children are a
 /// lazily built part ([`build_slide`]), built the first time a read
-/// reaches them (record 0305).
+/// reaches them.
 pub(crate) fn build(package: &Package) -> Result<(super::Tree, Box<[super::Part]>)> {
     let read = |error| leaf_refusal(LeafError::Keynote(error), FileFormat::Keynote);
     let slides = package.slides().map_err(read)?;
@@ -773,8 +772,8 @@ fn slide_step(index: usize) -> crate::node::PathStep<'static> {
 }
 
 /// The slides of a presentation, each item materialized the first time a
-/// read reaches it (record 0305): a slide's `layout` reads the theme's
-/// layout catalog, decoded once, on the first slide item.
+/// read reaches it: a slide's `layout` reads the theme's layout catalog,
+/// decoded once, on the first slide item.
 pub(crate) struct Slides {
     items: Box<[std::sync::OnceLock<Box<super::tree::Item>>]>,
     /// The layout each slide was made from; `None` when the layout reader
@@ -868,9 +867,9 @@ impl Slides {
 /// join the part the first time a read reaches a paragraph's children.
 /// Every item of the part without runs keeps its index.
 ///
-/// A table is a stand-in holding its frame (record 0312): reading a table
-/// decodes it, so its name, size, rows and cells are built the first time
-/// a read reaches them ([`build_table`]). Returns the tree and, for each
+/// A table is a stand-in holding its frame: reading a table decodes it,
+/// so its name, size, rows and cells are built the first time a read
+/// reaches them ([`build_table`]). Returns the tree and, for each
 /// stand-in in order, the table's selector (its position among the
 /// slide's tables in z-order) and the stand-in's index.
 pub(crate) fn build_slide(
@@ -905,7 +904,7 @@ pub(crate) fn build_slide(
             .iter()
             .position(|drawable| drawable.kind() == kind);
         let drawable = position.and_then(|position| drawables.get(position));
-        // A hidden placeholder keeps its text on its slide (record 0312).
+        // A hidden placeholder keeps its text on its slide.
         let hidden = package
             .slide_placeholder_visibility(selector, role)
             .ok()
@@ -1035,9 +1034,9 @@ pub(crate) fn build_slide(
 
 /// Build the contents of the slide table whose stand-in is `stand_in` and
 /// whose selector among its slide's tables is `ordinal`: its name, size,
-/// rows and cells (record 0312). A table the leaf's cell reader refuses,
-/// or one with more cells than a slide's part addresses, keeps its frame
-/// without rows.
+/// rows and cells. A table the leaf's cell reader refuses, or one with
+/// more cells than a slide's part addresses, keeps its frame without
+/// rows.
 pub(crate) fn build_table(
     package: &Package,
     stand_in: &super::tree::Item,

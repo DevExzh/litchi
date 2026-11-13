@@ -1,5 +1,4 @@
-//! Unit tests of query compilation and the walker over the fake formats
-//! (record 0010 §5).
+//! Unit tests of query compilation and the walker over the fake formats.
 
 use super::compile::compile;
 use super::fake::{Doc, FakeKind, Item, Nav, Node, SheetKind, SlideKind, Table, WordKind};
@@ -382,7 +381,7 @@ fn unknown_and_foreign_element_names_are_typed_errors() {
     assert!(
         error
             .suggestion()
-            .is_some_and(|text| text.contains("L-FAKE-R1"))
+            .is_some_and(|text| text.contains("not supported yet"))
     );
     assert_eq!(fail(&book(), "slicer").code(), Code::UnsupportedCapability);
     assert_eq!(fail(&book(), "pivot").code(), Code::UnsupportedCapability);
@@ -1263,10 +1262,10 @@ fn compiled_plans_bind_structure_once() {
 // OfficeCLI corpus and hostile input
 // ---------------------------------------------------------------------------
 
-/// Every selector harvested from OfficeCLI (record 0005) compiles for the
-/// fake format of at least one family, or is refused with a typed code that
-/// says why; none is an internal error. Compiled plans run on that family's
-/// fixture, where a scope the fixture does not have is `path_not_found`.
+/// Every selector harvested from OfficeCLI compiles for the fake format of
+/// at least one family, or is refused with a typed code that says why; none
+/// is an internal error. Compiled plans run on that family's fixture, where
+/// a scope the fixture does not have is `path_not_found`.
 #[test]
 fn harvested_officecli_selectors_compile_or_fail_typed() {
     let text = include_str!("../../../litchi-core/tests/fixtures/officecli_selectors.txt");
@@ -1299,7 +1298,7 @@ fn harvested_officecli_selectors_compile_or_fail_typed() {
 
 /// Harvested selectors no fake family compiles: elements the fakes do not
 /// model (`unsupported_capability`), list as gaps (`chart`, `pivottable`) or
-/// no vocabulary knows (`drawing`), and a regex literal (record 0010 Q3).
+/// no vocabulary knows (`drawing`), and a regex literal.
 const REFUSED: &[&str] = &[
     "/numbering",
     "/revision[@author=Alice]",
@@ -1690,7 +1689,7 @@ fn sparse_row_probes_are_bounded_and_terminal_row_does_not_overflow() {
     assert!(run(&nav, "row[Region=West]").unwrap().next().is_none());
 }
 
-/// Record 0280: the walker skips nodes the adapter reports childless
+/// The walker skips nodes the adapter reports childless
 /// (`Inspect::childless`). On every ODT and flat-ODT fixture, a query for
 /// each element kind returns exactly the nodes of that kind an unpruned
 /// depth-first walk over `Navigate::children` (all kinds) finds, in the
@@ -1799,7 +1798,7 @@ fn odt_queries_match_an_unpruned_walk() {
 }
 
 // ---------------------------------------------------------------------------
-// The single-subject fast path (record 0315)
+// The single-subject fast path
 // ---------------------------------------------------------------------------
 
 /// The identity of a fake node: its element (by address) and worksheet, or

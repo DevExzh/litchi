@@ -1,8 +1,8 @@
-//! ODS document properties (record 0277): initial metadata at creation and
-//! the `/metadata` set path.
+//! ODS document properties: initial metadata at creation and the
+//! `/metadata` set path.
 //!
 //! `set("/metadata", props)` commits through the leaf's ADR 0034 §7
-//! metadata family (`Package::edit_metadata`, record 0288; the shared
+//! metadata family (`Package::edit_metadata`; the shared
 //! `format::odf_metadata` path): `title`, `subject`, `description`,
 //! `author`, `lastModifiedBy`, `language` and `keywords`; `null` removes a
 //! field. Every other root-metadata key the OLE and OOXML formats accept is

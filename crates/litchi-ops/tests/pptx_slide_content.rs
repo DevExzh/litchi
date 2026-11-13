@@ -1,4 +1,4 @@
-//! Unified PPTX notes, pictures and layout placeholders (record 0252).
+//! Unified PPTX notes, pictures and layout placeholders.
 #![cfg(feature = "pptx")]
 
 use litchi_ops::{Code, File, NewNode, OpenOptions, PropValue, SourceMode, props};
@@ -293,7 +293,7 @@ fn comments_are_added_and_set() {
         .map(|error| error.code());
     assert_eq!(code, Some(Code::MissingProperty));
     // A date that is not an XML dateTime is a typed value refusal, not a
-    // corrupt comments part (record 0330).
+    // corrupt comments part.
     let Err(error) = file.add(
         "/slide[1]",
         NewNode::new("comment")

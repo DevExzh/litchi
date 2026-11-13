@@ -1,5 +1,5 @@
-//! The DOCX part elements (record 0319): styles and numbering (L-DOCX-R6),
-//! headers, footers, footnotes and endnotes (L-DOCX-R5).
+//! The DOCX part elements: styles and numbering,
+//! headers, footers, footnotes and endnotes.
 //!
 //! | Path | Node | Leaf read |
 //! |---|---|---|
@@ -51,21 +51,20 @@ pub(crate) struct Cache {
     story_kinds: OnceLock<Vec<Option<StoryKind>>>,
     footnotes: OnceLock<Vec<Note>>,
     endnotes: OnceLock<Vec<Note>>,
-    /// The main story's bookmarks and fields, read on first use (record
-    /// 0325; the marks of record 0319).
+    /// The main story's bookmarks and fields, read on first use.
     pub(super) bookmarks: OnceLock<Vec<litchi_docx::bookmark::Bookmark>>,
     pub(super) fields: OnceLock<Vec<litchi_docx::Field>>,
     /// The SmartArt inventory in document order, each graphic's outline
-    /// read on first use (record 0335).
+    /// read on first use.
     pub(super) smartarts: OnceLock<Arc<[Arc<super::smartart::SmartArtValue>]>>,
-    /// The chart parts read so far, by main-document relationship (record
-    /// 0335): a chart's series and axes resolve against its projection.
+    /// The chart parts read so far, by main-document relationship:
+    /// a chart's series and axes resolve against its projection.
     pub(super) charts:
         std::sync::Mutex<Vec<(Box<str>, Option<Arc<crate::format::chart::Summary>>)>>,
     /// Each comment's anchor path by comment id, from one walk of the main
-    /// story on first use (record 0345).
+    /// story on first use.
     pub(super) comment_anchors: OnceLock<Arc<std::collections::HashMap<u32, String>>>,
-    /// The `commentsExtended` entries, read on first use (record 0345).
+    /// The `commentsExtended` entries, read on first use.
     pub(super) comment_threads: OnceLock<Arc<[litchi_docx::modern_comments::Extended]>>,
 }
 
@@ -73,7 +72,7 @@ pub(crate) struct Cache {
 pub(crate) struct Story {
     part: StoryPart,
     xml: OnceLock<Arc<Vec<u8>>>,
-    /// The story's block index, built on first use (record 0325).
+    /// The story's block index, built on first use.
     blocks: OnceLock<litchi_docx::Blocks>,
 }
 
@@ -241,7 +240,7 @@ pub(super) fn notes(docx: &Docx, kind: litchi_docx::document::NoteKind) -> Resul
 }
 
 /// The story the address step `kind[ordinal]` (a header, footer, footnote
-/// or endnote) names: its leaf key and its part value (record 0325).
+/// or endnote) names: its leaf key and its part value.
 pub(super) fn story_of(
     docx: &Docx,
     kind: Kind,
@@ -282,7 +281,7 @@ fn ordinal_u32(index: usize) -> u32 {
     u32::try_from(index).unwrap_or(u32::MAX)
 }
 
-/// The block index of a header, footer or note story (record 0325): its
+/// The block index of a header, footer or note story: its
 /// paragraphs and tables are addressed as `/header[N]/p[M]`, ...; `None` for
 /// other part values.
 pub(super) fn story_blocks(docx: &Docx, value: PartValue) -> Result<Option<litchi_docx::Blocks>> {
@@ -947,8 +946,8 @@ pub(crate) enum PartSetter {
     AbstractNum(AbstractKey),
     /// An instance value.
     Num(NumKey),
-    /// A `level<N>.*` key of a new definition (OfficeCLI's "Mode A",
-    /// record 0325): the value of level `level` (0–8).
+    /// A `level<N>.*` key of a new definition (OfficeCLI's "Mode A"):
+    /// the value of level `level` (0–8).
     LevelSeed { level: u8, key: SeedKey },
     /// A story's or note's text.
     Text,
@@ -1009,11 +1008,11 @@ pub(crate) enum NumKey {
     StartOverride(u8),
     Continue,
     /// A key of the definition a new instance creates without an
-    /// `abstractNumId` (OfficeCLI's "Mode A", record 0325).
+    /// `abstractNumId` (OfficeCLI's "Mode A").
     Template(AbstractKey),
 }
 
-/// What a `level<N>.*` key sets on its level (record 0325).
+/// What a `level<N>.*` key sets on its level.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SeedKey {
     /// A level value (`format`, `text`, `start`, `indent`, `hanging`,
@@ -1202,7 +1201,7 @@ const fn seed_run(
 }
 
 /// A numbering table whose entries are followed by OfficeCLI's
-/// `level<N>.*` keys for levels 0–8 (record 0325).
+/// `level<N>.*` keys for levels 0–8.
 macro_rules! seeded_registry {
     ($vis:vis $name:ident, $table:ident { $($entry:expr),* $(,)? }) => {
         seeded_registry!(@build $vis $name, $table [$($entry),*] [0 1 2 3 4 5 6 7 8]);
@@ -1332,7 +1331,7 @@ crate::registry::registry! {
 
 // `/numbering/abstractNum[@id=N]`, in its order; the level-0 seeds are
 // add-only, as OfficeCLI's bare `format`, `text`, `start` and `indent`, and
-// so are its `level<N>.*` keys (record 0325).
+// so are its `level<N>.*` keys.
 seeded_registry! {
     pub(crate) ABSTRACT_NUM_PROPS, ABSTRACT_NUM_REGISTRY {
     ra("id", ValueType::Int, PartSetter::AbstractNum(AbstractKey::Id), Constraint::Int { min: 0, max: i32::MAX as i64 }),
@@ -1348,8 +1347,7 @@ seeded_registry! {
 }
 
 // `/numbering/num[@id=N]`. Without an `abstractNumId`, the definition keys
-// and `level<N>.*` create the definition too (OfficeCLI's "Mode A", record
-// 0325).
+// and `level<N>.*` create the definition too (OfficeCLI's "Mode A").
 seeded_registry! {
     pub(crate) NUM_PROPS, NUM_REGISTRY {
     ra("id", ValueType::Int, PartSetter::Num(NumKey::Id), Constraint::Int { min: 1, max: i32::MAX as i64 }),
@@ -1618,7 +1616,7 @@ fn int_text(text: Option<&str>) -> Option<NodeValue<'static>> {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum From {
     /// The node's own key, by its position in the kind's own-key list
-    /// (record 0326: a read matches the position, not the name).
+    /// (a read matches the position, not the name).
     Own(u8),
     /// A run key; `font` falls back to the ASCII slot.
     Run(usize),
@@ -1990,7 +1988,7 @@ fn internal(message: &'static str) -> Error {
 }
 
 /// A paragraph's `styleName`, `numFmt`, `listStyle` or `start`, read through
-/// the styles and numbering parts (record 0319). Only the paragraph's own
+/// the styles and numbering parts. Only the paragraph's own
 /// `w:pStyle` and `w:numPr` are followed, never the style's inherited
 /// numbering (ADR 0004).
 pub(super) fn paragraph_part_value<'a>(

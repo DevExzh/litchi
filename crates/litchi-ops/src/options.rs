@@ -1,5 +1,4 @@
-//! Options for opening an input: [`OpenOptions`] and [`SourceMode`]
-//! (record 0003 §2.5, decision D5).
+//! Options for opening an input: [`OpenOptions`] and [`SourceMode`].
 //!
 //! Plain `open(path)` needs none of this. [`OpenOptions::default`] is the
 //! common case, and every knob left unset keeps the leaf crate's own bounded
@@ -67,7 +66,7 @@ pub struct OpenOptions {
     /// Source-backed versus eager owner selection.
     pub(crate) source_mode: SourceMode,
     /// Whether the handle retains the source its edit entry is built from
-    /// (record 0003 §2.3; record 0007 Q3 default `true`).
+    /// (default `true`).
     pub(crate) retain_source: bool,
     /// OOXML package read limits shared by DOCX, PPTX, XLSX and XLSB.
     #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
@@ -157,9 +156,8 @@ impl OpenOptions {
     /// before and after detection and returns
     /// [`Code::Cancelled`](crate::Code::Cancelled) when it is set. The leaf
     /// parsers do not yet charge the context's budget: the source-backed DOCX
-    /// owner refuses markup-compatibility content under a context (record
-    /// 0008, finding A1), so no opener builds a context-managed owner until
-    /// that is fixed.
+    /// owner refuses markup-compatibility content under a context, so no
+    /// opener builds a context-managed owner until that is fixed.
     ///
     /// ```
     /// use std::num::{NonZeroU64, NonZeroUsize};
@@ -307,7 +305,7 @@ impl OpenOptions {
     }
 
     /// Replace the Pages ingress options (source and semantic limits) used
-    /// for Pages packages and package directories (record 0306).
+    /// for Pages packages and package directories.
     ///
     /// Semantic limits apply on the single detection pass; source limits
     /// other than the leaf defaults make the leaf parse the package again
@@ -327,7 +325,7 @@ impl OpenOptions {
     }
 
     /// Replace the Keynote ingress options (source and semantic limits) used
-    /// for Keynote packages and package directories (record 0306).
+    /// for Keynote packages and package directories.
     ///
     /// ```
     /// let options = litchi_ops::OpenOptions::new()
@@ -342,8 +340,8 @@ impl OpenOptions {
     }
 
     /// Replace the Numbers ingress options (source and semantic limits) used
-    /// for Numbers packages and package directories (record 0306); following
-    /// the same ingress-option contract as the Pages setter above.
+    /// for Numbers packages and package directories; following the same
+    /// ingress-option contract as the Pages setter above.
     ///
     /// ```
     /// let options = litchi_ops::OpenOptions::new()
@@ -506,10 +504,7 @@ mod tests {
         assert_eq!(options.max_input_bytes, None);
         assert!(options.execution.is_none());
         assert_eq!(options.source_mode, SourceMode::Auto);
-        assert!(
-            options.retain_source,
-            "record 0007 Q3: retain_source defaults to true"
-        );
+        assert!(options.retain_source, "retain_source defaults to true");
         #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
         {
             assert_eq!(options.ooxml_limits, None);

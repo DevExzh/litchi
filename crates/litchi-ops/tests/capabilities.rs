@@ -149,36 +149,35 @@ fn ordinary_reports_hide_native_selection_fields() {
     for element in caps.elements() {
         let writable_element = matches!(element.name(), "paragraph" | "run");
         let operations = element.operations();
-        // Record 0251a: cells and hyperlinks take `text`; tables and rows
+        // Cells and hyperlinks take `text`; tables and rows
         // are added and removed; cells, hyperlinks and content controls are
         // removed.
         let (set, add, remove) = match element.name() {
             "paragraph" | "run" | "hyperlink" => (true, true, true),
-            // Record 0345: cells are added too, and grid columns are
+            // Cells are added too, and grid columns are
             // set, added and removed.
             "cell" | "column" => (true, true, true),
-            // Record 0251c: comments are added and removed; record 0335:
-            // set too.
-            // Record 0342: table borders and row height and flags are set.
+            // Comments are added, removed and set.
+            // Table borders and row height and flags are set.
             "table" | "row" => (true, true, true),
-            // Record 0251d: pictures are added; record 0295: SmartArt too;
-            // record 0335: both are set and removed, as are SmartArt nodes.
+            // Pictures and SmartArt are added, set and removed, as are
+            // SmartArt nodes.
             "comment" | "picture" | "smartart" | "node" => (true, true, true),
-            // Record 0335: chart series and axes are set.
+            // Chart series and axes are set.
             "series" | "axis" => (true, false, false),
-            // Record 0283: charts are added, set and removed.
+            // Charts are added, set and removed.
             "chart" => (true, true, true),
             "sdt" => (false, false, true),
-            // Record 0338: the root sets the core document properties.
+            // The root sets the core document properties.
             "document" => (true, false, false),
-            // Record 0319: styles, numbering, headers, footers and notes.
+            // Styles, numbering, headers, footers and notes.
             "style" | "abstractNum" | "num" | "level" | "header" | "footer" | "footnote"
             | "endnote" => (true, true, true),
-            // Record 0319: tab stops are set, added and removed; breaks
+            // Tab stops are set, added and removed; breaks
             // are added and removed.
             "tab" => (true, true, true),
             "break" => (false, true, true),
-            // Record 0325: bookmarks and tables of contents are set, added
+            // Bookmarks and tables of contents are set, added
             // and removed; fields are set and added.
             "bookmark" | "toc" => (true, true, true),
             "field" => (true, true, false),
@@ -242,14 +241,13 @@ fn ordinary_reports_hide_native_selection_fields() {
                 } else if element.name() == "paragraph"
                     && matches!(property.name(), "listStyle" | "start")
                 {
-                    // Record 0251e sets list kinds through the numbering
-                    // part; record 0319 reads them back; record 0342 seeds
-                    // a new paragraph's list.
+                    // List kinds are set through the numbering part and
+                    // read back; `add` seeds a new paragraph's list.
                     assert!(property.get(), "{}", property.name());
                     assert!(property.set(), "{}", property.name());
                     assert!(property.add(), "{}", property.name());
                 } else if element.name() == "paragraph" && property.name() == "numFmt" {
-                    // Record 0319: read through the numbering part.
+                    // Read through the numbering part.
                     assert!(property.get(), "{}", property.name());
                     assert!(!property.set(), "{}", property.name());
                     assert!(!property.add(), "{}", property.name());
@@ -272,19 +270,19 @@ fn ordinary_reports_hide_native_selection_fields() {
                         | "rStyle"
                 )
             {
-                // Record 0251b: the target and the run formatting seed a new
+                // The target and the run formatting seed a new
                 // hyperlink; only `url` changes an existing one.
                 assert!(property.get(), "hyperlink {}", property.name());
                 assert!(property.add(), "hyperlink {}", property.name());
                 assert_eq!(property.set(), property.name() == "url");
             } else if element.name() == "hyperlink" && property.name() == "tooltip" {
-                // Record 0345: the screen tip is added and set.
+                // The screen tip is added and set.
                 assert!(property.get() && property.set() && property.add());
             } else if element.name() == "cell" && property.name() == "width" {
-                // Record 0345: a new cell's width.
+                // A new cell's width.
                 assert!(property.get() && !property.set() && property.add());
             } else if element.name() == "column" {
-                // Record 0345: the grid column's width is read, set and
+                // The grid column's width is read, set and
                 // added; its text seeds the new cells.
                 assert_eq!(property.get(), property.name() == "width");
                 assert_eq!(property.set(), property.name() == "width");
@@ -295,7 +293,7 @@ fn ordinary_reports_hide_native_selection_fields() {
                     "anchoredTo" | "done" | "parentId" | "runStart" | "range"
                 )
             {
-                // Record 0345: OfficeCLI's comment schema.
+                // OfficeCLI's comment schema.
                 let name = property.name();
                 assert_eq!(
                     property.get(),
@@ -304,8 +302,8 @@ fn ordinary_reports_hide_native_selection_fields() {
                 assert_eq!(property.set(), name == "done", "comment {name}");
                 assert_eq!(property.add(), name != "anchoredTo", "comment {name}");
             } else if element.name() == "picture" && property.name() != "relId" {
-                // Record 0251d: the extent, name and alternative text seed a
-                // new picture; `src` is write-only. Record 0335: each is
+                // The extent, name and alternative text seed a
+                // new picture; `src` is write-only. Each is
                 // also set.
                 assert_eq!(
                     property.get(),
@@ -316,16 +314,16 @@ fn ordinary_reports_hide_native_selection_fields() {
                 assert!(property.set(), "picture {}", property.name());
                 assert!(property.add(), "picture {}", property.name());
             } else if element.name() == "comment" && property.name() != "id" {
-                // Record 0251c: author, initials, date and text seed a new
-                // comment; record 0335 sets them.
+                // Author, initials, date and text seed a new
+                // comment; `set` writes them too.
                 assert!(property.get(), "comment {}", property.name());
                 assert!(property.set(), "comment {}", property.name());
                 assert!(property.add(), "comment {}", property.name());
             } else if element.name() == "smartart" {
-                // Record 0295: layout, text, name, alternative text and
+                // Layout, text, name, alternative text and
                 // extent seed a new graphic; the projection reads layout,
-                // its identifier, the node count and the outline. Record
-                // 0335 sets the layout and the outline.
+                // its identifier, the node count and the outline. `set`
+                // writes the layout and the outline.
                 assert_eq!(
                     property.set(),
                     matches!(property.name(), "layout" | "text"),
@@ -365,7 +363,7 @@ fn ordinary_reports_hide_native_selection_fields() {
                     | "watermark"
                     | "textbox"
             ) {
-                // Record 0319: the part and mark registries declare each
+                // The part and mark registries declare each
                 // key.
                 assert!(
                     property.set() || property.add() || property.get(),
@@ -374,9 +372,9 @@ fn ordinary_reports_hide_native_selection_fields() {
                     property.name()
                 );
             } else if element.name() == "document" {
-                // Record 0338: every root key is a document property, set
+                // Every root key is a document property, set
                 // through the metadata writer; of the application keys
-                // (record 0342) the derived counts and the producer are
+                // the derived counts and the producer are
                 // read only.
                 let settable = !property.name().starts_with("extended.")
                     || matches!(
@@ -387,7 +385,7 @@ fn ordinary_reports_hide_native_selection_fields() {
                 assert_eq!(property.set(), settable, "document {}", property.name());
                 assert!(!property.add(), "document {}", property.name());
             } else if matches!(element.name(), "series" | "axis" | "node") {
-                // Record 0335: chart series and axes read and set the PPTX
+                // Chart series and axes read and set the PPTX
                 // keys; a SmartArt node reads its level, and its text is
                 // write-only.
                 assert!(
@@ -397,7 +395,7 @@ fn ordinary_reports_hide_native_selection_fields() {
                     property.name()
                 );
             } else if element.name() == "chart" {
-                // Record 0283: chart keys seed a new chart and most are
+                // Chart keys seed a new chart and most are
                 // also settable; the registry declares each.
                 assert!(
                     property.set() || property.add() || property.get(),
@@ -406,7 +404,7 @@ fn ordinary_reports_hide_native_selection_fields() {
                 );
             } else if property.name() == "text" {
                 // `text` of a hyperlink or cell is write-only; a cell's is
-                // also added (record 0345).
+                // also added.
                 assert!(!property.get(), "{} text", element.name());
                 assert!(property.set(), "{} text", element.name());
             } else if matches!(element.name(), "table" | "row")
@@ -418,7 +416,7 @@ fn ordinary_reports_hide_native_selection_fields() {
             } else if element.name() == "table"
                 && (property.name().starts_with("border.") || property.name() == "style")
             {
-                // Record 0342: the style and the write-only borders are set
+                // The style and the write-only borders are set
                 // and seeded.
                 assert_eq!(
                     property.get(),
@@ -439,7 +437,7 @@ fn ordinary_reports_hide_native_selection_fields() {
                         | "height.atLeast"
                 )
             {
-                // Record 0342: the row height and flags are set; the height
+                // The row height and flags are set; the height
                 // rules are write-only.
                 assert_eq!(
                     property.get(),
@@ -470,8 +468,6 @@ fn docx_write_context_gaps_are_explicit() {
         .collect();
     assert_eq!(
         operation_gaps.len(),
-        // Record 0345 closed the cell-insertion gap and deleted the stale
-        // table-properties gap (record 0342 sets tables and rows).
         25 + if cfg!(feature = "encryption") { 8 } else { 0 }
     );
 
@@ -647,9 +643,9 @@ fn xlsx_reports_keep_selection_semantic_and_declare_cell_and_sheet_writes() {
             !path.contains("<id>") && !path.contains("[@id=") && !path.contains("[@rId=")
         }));
         // Chart writes have their own report test (`tests/charts.rs`),
-        // worksheet features theirs (`tests/xlsx_features.rs`, record 0320),
-        // the root's metadata keys theirs (`tests/root_metadata.rs`, record
-        // 0338), and rich-text runs theirs (`tests/xlsx_cells_runs.rs`).
+        // worksheet features theirs (`tests/xlsx_features.rs`),
+        // the root's metadata keys theirs (`tests/root_metadata.rs`),
+        // and rich-text runs theirs (`tests/xlsx_cells_runs.rs`).
         if matches!(
             element.name(),
             "workbook"
@@ -671,7 +667,7 @@ fn xlsx_reports_keep_selection_semantic_and_declare_cell_and_sheet_writes() {
         }
         for property in element.properties() {
             // Cell hyperlinks and the sheet auto-filter are write-only
-            // setters (record 0320).
+            // setters.
             let link_write = (element.name() == "cell"
                 && matches!(property.name(), "link" | "tooltip" | "display"))
                 || (element.name() == "sheet" && property.name() == "autoFilter");
@@ -730,7 +726,7 @@ fn xlsx_reports_keep_selection_semantic_and_declare_cell_and_sheet_writes() {
                         | "superscript"
                         | "subscript"
                         | "merge"
-                        // Record 0338: the cell type, rich-text runs and
+                        // The cell type, rich-text runs and
                         // the address of an added cell.
                         | "type"
                         | "runs"
@@ -770,7 +766,7 @@ fn xlsx_reports_keep_selection_semantic_and_declare_cell_and_sheet_writes() {
                 "{}",
                 property.name()
             );
-            // Record 0338: an added cell takes the cell setters.
+            // An added cell takes the cell setters.
             let cell_add = element.name() == "cell"
                 && cell_write
                 && !matches!(property.name(), "clear" | "merge");
@@ -785,8 +781,7 @@ fn xlsx_reports_keep_selection_semantic_and_declare_cell_and_sheet_writes() {
 }
 
 #[cfg(feature = "pptx")]
-/// Rich text setters of record 0252, and the shape fill, geometry and slide
-/// transition of record 0269.
+/// Rich text setters, and the shape fill, geometry and slide transition.
 fn pptx_text_format_set(element: &str, property: &str) -> bool {
     match element {
         "shape" | "placeholder" => matches!(
@@ -831,8 +826,8 @@ fn pptx_text_format_set(element: &str, property: &str) -> bool {
                 | "underline"
                 | "strike"
         ),
-        // The click action (record 0325); a picture's frame, alternative
-        // text and image (record 0333).
+        // The click action; a picture's frame, alternative
+        // text and image.
         "picture" => matches!(
             property,
             "link" | "tooltip" | "x" | "y" | "width" | "height" | "alt" | "src"
@@ -859,25 +854,25 @@ fn pptx_text_format_set(element: &str, property: &str) -> bool {
         ),
         "notes" => property == "text",
         "slide" => matches!(property, "notes" | "transition"),
-        // Modern comment threads and replies (record 0346).
+        // Modern comment threads and replies.
         "modernComment" => matches!(
             property,
             "text" | "author" | "initials" | "created" | "resolved"
         ),
         "reply" => matches!(property, "text" | "author" | "initials" | "created"),
-        // Author, initials and date since record 0346.
+        // Author, initials and date.
         "comment" => matches!(
             property,
             "text" | "x" | "y" | "author" | "initials" | "date"
         ),
-        // Table rows (record 0333).
+        // Table rows.
         "tr" => property == "height",
         _ => false,
     }
 }
 
 #[cfg(feature = "pptx")]
-/// What a new paragraph or run takes on `add` (record 0333): its text and
+/// What a new paragraph or run takes on `add`: its text and
 /// formatting, but not a run's click action.
 fn pptx_text_add(element: &str, property: &str) -> bool {
     (matches!(element, "paragraph" | "run")
@@ -892,7 +887,7 @@ fn pptx_text_add(element: &str, property: &str) -> bool {
 }
 
 #[cfg(feature = "pptx")]
-/// A new row's keys (record 0333): its height, OfficeCLI's `cols` check and
+/// A new row's keys: its height, OfficeCLI's `cols` check and
 /// the `c1`…`c20` seed texts.
 fn pptx_row_add(property: &str) -> bool {
     matches!(property, "height" | "cols")
@@ -903,7 +898,7 @@ fn pptx_row_add(property: &str) -> bool {
 }
 
 #[cfg(feature = "pptx")]
-/// Text-box formatting a shape takes on `add` (record 0269).
+/// Text-box formatting a shape takes on `add`.
 fn pptx_shape_add(property: &str) -> bool {
     matches!(property, "text" | "x" | "y" | "width" | "height")
         || pptx_text_format_set("shape", property)
@@ -927,7 +922,7 @@ fn pptx_write_only(element: &str, property: &str) -> bool {
         "picture" => property == "src",
         "tr" => property != "height" && pptx_row_add(property),
         "table" => property == "data",
-        // A comment's reading direction, on add (record 0346).
+        // A comment's reading direction, on add.
         "comment" => property == "direction",
         _ => false,
     }
@@ -949,10 +944,10 @@ fn pptx_reports_selection_and_structural_writes() {
         assert!(element.paths().all(|(path, _)| {
             !path.contains("<id>") && !path.contains("[@id=") && !path.contains("[@rId=")
         }));
-        // Chart (record 0270), SmartArt (record 0284) and the record 0321
+        // Chart, SmartArt and the other
         // elements' writes have their own report tests (`tests/charts.rs`,
         // `tests/smartart.rs`, `tests/pptx_elements.rs`), and so do the
-        // root's metadata keys (`tests/root_metadata.rs`, record 0338).
+        // root's metadata keys (`tests/root_metadata.rs`).
         if matches!(
             element.name(),
             "presentation"
@@ -990,7 +985,7 @@ fn pptx_reports_selection_and_structural_writes() {
                     || pptx_text_format_set(element.name(), property.name())
                     || (element.name() == "slide"
                         && matches!(property.name(), "name" | "hidden" | "layout"))
-                    // Record 0342: a table-level set.
+                    // A table-level set.
                     || (element.name() == "table"
                         && matches!(
                             property.name(),
@@ -1010,7 +1005,7 @@ fn pptx_reports_selection_and_structural_writes() {
                     property.name(),
                     "layout" | "name" | "hidden" | "title" | "text"
                 );
-            // Record 0346: notes and placeholders on add.
+            // Notes and placeholders on add.
             let notes_add = element.name() == "notes" && property.name() == "text";
             let placeholder_add =
                 element.name() == "placeholder" && matches!(property.name(), "phType" | "text");
@@ -1057,9 +1052,9 @@ fn pptx_reports_selection_and_structural_writes() {
     ] {
         let operations = caps.element(kind).unwrap().operations();
         assert!(operations.remove, "{kind}");
-        // Charts (record 0270) and SmartArt (record 0284) are settable,
-        // pictures and groups take a click action (record 0325), and tables
-        // their name and style switches (record 0342).
+        // Charts and SmartArt are settable,
+        // pictures and groups take a click action, and tables
+        // their name and style switches.
         assert_eq!(
             operations.set,
             matches!(kind, "chart" | "smartart" | "picture" | "group" | "table"),
@@ -1090,7 +1085,7 @@ fn pptx_reports_selection_and_structural_writes() {
         assert_eq!(property.add(), add, "{}", property.name());
     }
     let placeholder = caps.element("placeholder").unwrap();
-    // Placeholder insertion (record 0346).
+    // Placeholder insertion.
     assert!(placeholder.operations().add);
     assert!(placeholder.operations().remove);
     for property in placeholder.properties() {
@@ -1157,7 +1152,7 @@ fn pptx_reports_selection_and_structural_writes() {
             })
             .unwrap_or_else(|| panic!("source-backed slide {verb} remains an explicit gap"));
         assert_eq!(gap.code(), Code::UnsupportedCapability);
-        assert_eq!(gap.follow_up(), "M2 PPTX positional-owner slide ordering");
+        assert_eq!(gap.follow_up(), "PPTX positional-owner slide ordering");
         assert_eq!(
             gap.reason(),
             "source-backed PPTX slide ordering maintains p14 sections but still refuses outline slide lists, numeric presentation ranges, and unknown or opaque metadata extensions"
@@ -1178,17 +1173,17 @@ fn pptx_reports_selection_and_structural_writes() {
     for (context, follow_up, reason) in [
         (
             "dependency-topology",
-            "M2 PPTX dependency-aware slide removal",
+            "PPTX dependency-aware slide removal",
             "native PPTX slide removal removes the notes, comments, pictures, media and other Parts the slide owns exclusively and keeps shared ones; a slide another slide jumps to, or whose relationships name a missing Part, is still refused",
         ),
         (
             "final-slide",
-            "M2 PPTX final-slide removal policy",
+            "PPTX final-slide removal policy",
             "native PPTX slide removal currently preserves the final slide and cannot remove the last slide from a presentation",
         ),
         (
             "canonical-target",
-            "M2 PPTX equivalent relationship-target spellings",
+            "PPTX equivalent relationship-target spellings",
             "source-backed PPTX slide removal requires canonical owner-relative relationship targets so inverse replay can restore the original OPC spelling",
         ),
     ] {
@@ -1217,12 +1212,12 @@ fn pptx_reports_selection_and_structural_writes() {
     for (context, follow_up, reason) in [
         (
             "dependency-topology",
-            "M2 PPTX dependency-aware shape removal",
+            "PPTX dependency-aware shape removal",
             "shape removal refuses retained connector or animation references to removed IDs; source-backed removal preserves unused relationships and parts, while eager removal prunes unreachable relationship closure",
         ),
         (
             "non-top-level",
-            "M2 PPTX grouped/master/layout shape removal",
+            "PPTX grouped/master/layout shape removal",
             "native PPTX shape removal currently requires a top-level slide shape; grouped children and master or layout shapes remain outside the admitted topology",
         ),
     ] {
@@ -1413,7 +1408,7 @@ fn pptx_structural_capabilities_follow_owner_and_retention_policy() {
             || pptx_text_format_set("shape", property.name());
         assert_eq!(property.set(), set, "{}", property.name());
     }
-    // Placeholder insertion follows shape insertion (record 0346).
+    // Placeholder insertion follows shape insertion.
     assert!(source_caps.element("placeholder").unwrap().operations().add);
     assert!(
         source_caps
@@ -1672,9 +1667,9 @@ fn xlsb_reports_keep_selection_semantic_and_declare_sheet_and_cell_writes() {
         .expect("computed values in cell views remain an explicit XLSB capability gap");
     assert_eq!(
         computed_value.follow_up(),
-        "M4 follow-up: project computed values in cell views"
+        "follow-up: project computed values in cell views"
     );
-    // Record 0266: import and evaluation are worksheet verbs.
+    // Import and evaluation are worksheet verbs.
     assert!(caps.verb(Verb::Import).is_supported());
     assert!(caps.verb(Verb::Evaluate).is_supported());
     for context in [
@@ -1711,7 +1706,7 @@ fn xlsb_reports_keep_selection_semantic_and_declare_sheet_and_cell_writes() {
             "XLSB must not advertise {unsupported}"
         );
     }
-    // Record 0261: formatting reads and writes.
+    // Formatting reads and writes.
     for supported in ["font.bold", "fill", "border.left", "numberformat"] {
         let property = cell.property(supported).expect("advertised");
         assert!(property.get() && property.set(), "{supported}");
@@ -1720,7 +1715,7 @@ fn xlsb_reports_keep_selection_semantic_and_declare_sheet_and_cell_writes() {
         assert!(element.paths().all(|(path, _)| {
             !path.contains("<id>") && !path.contains("[@id=") && !path.contains("[@rId=")
         }));
-        // Record 0261: the cell setters (also accepted by ranges) and `merge`.
+        // The cell setters (also accepted by ranges) and `merge`.
         const CELL_WRITES: &[&str] = &[
             "value",
             "formula",
@@ -1752,7 +1747,7 @@ fn xlsb_reports_keep_selection_semantic_and_declare_sheet_and_cell_writes() {
             "alignment.shrinkToFit",
             "alignment.readingOrder",
         ];
-        // Record 0322: the worksheet features use the XLSX feature tables.
+        // The worksheet features use the XLSX feature tables.
         if [
             "comment",
             "hyperlink",

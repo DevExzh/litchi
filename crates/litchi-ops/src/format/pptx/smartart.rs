@@ -1,4 +1,4 @@
-//! Typed SmartArt CRUD on slides (record 0284).
+//! Typed SmartArt CRUD on slides.
 //!
 //! - `get`/`query`: `/slide[N]/smartart[M]` reads its frame and its data
 //!   model (`layout`, `layoutId`, `nodeCount`, the outline as `text`);

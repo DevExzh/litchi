@@ -318,7 +318,7 @@ impl<'v> Values<'v> {
 /// Rewrite `pieces` (contiguous text: each piece follows the previous one)
 /// for `ranges` of their joined text, each replaced by its value: a range
 /// collapses into the piece where it starts, as a find does. Template merge
-/// plans its placeholders through this (record 0285).
+/// plans its placeholders through this.
 ///
 /// # Errors
 ///

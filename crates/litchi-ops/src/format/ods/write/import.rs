@@ -1,6 +1,5 @@
-//! ODS CSV/TSV import (record 0295, record 0266 follow-up F8): every field
-//! staged through the worksheet family of one leaf edit and published by
-//! one commit.
+//! ODS CSV/TSV import: every field staged through the worksheet family of
+//! one leaf edit and published by one commit.
 //!
 //! Inferred values take their native ODF types: numbers are `float`
 //! cells, `TRUE`/`FALSE` `boolean` cells, and ISO dates `date` cells with
@@ -120,7 +119,7 @@ pub(crate) fn import(
                         Code::UnsupportedCapability,
                         "ODS import writes values; formulas need OpenFormula translation",
                     )
-                    .with_suggestion("import without `formulas(true)` (record 0295 follow-up)"));
+                    .with_suggestion("import without `formulas(true)`"));
                 },
             };
             let mut cell = fresh(existing);

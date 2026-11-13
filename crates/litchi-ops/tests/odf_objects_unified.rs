@@ -1,5 +1,5 @@
-//! Unified reads and writes of the OpenDocument object formats (record
-//! 0282): drawings, charts, images, databases and formulas, through the
+//! Unified reads and writes of the OpenDocument object formats:
+//! drawings, charts, images, databases and formulas, through the
 //! object-tree adapter over each leaf's `Package` and `Edit`.
 
 #![cfg(any(
@@ -112,7 +112,7 @@ mod odg {
             Some("2cm")
         );
         // Structural writes on a LibreOffice-authored drawing publish as
-        // exact-source splices (record 0288).
+        // exact-source splices.
         let producer = file
             .add(
                 "/page[1]",
@@ -236,8 +236,8 @@ mod odg {
             text(&file, &format!("/page[2]/shape[{count}]")).as_deref(),
             Some("Front")
         );
-        // A shape moves into another page, here the empty first page
-        // (record 0292), and swaps across pages.
+        // A shape moves into another page, here the empty first page,
+        // and swaps across pages.
         let moved_text = text(&file, &format!("/page[2]/shape[{count}]"));
         let file = file
             .move_to(
@@ -495,7 +495,7 @@ mod odc {
         );
         // This producer chart holds content outside the leaf's lossless
         // typed surface, so a structural removal and a title write are typed
-        // refusals; attribute writes stay exact-span splices (record 0288).
+        // refusals; attribute writes stay exact-span splices.
         let error = file.remove("/series[1]").expect_err("lossy typed edit");
         assert_eq!(error.code(), Code::UnsupportedCapability);
         let error = file
@@ -663,7 +663,7 @@ mod odc {
             .expect_err("mixed kinds");
         assert_eq!(error.code(), Code::UnsupportedType);
 
-        // The legend: add, set, remove (record 0292).
+        // The legend: add, set, remove.
         assert!(file.find("/legend").unwrap().is_none());
         let added = file
             .add("/", NewNode::new("legend").prop("position", "bottom"))
@@ -745,7 +745,7 @@ mod odi {
         assert_eq!(prop(&file, "/frame[1]", "title").as_deref(), Some("Mark"));
         // A fresh image frame has no geometry and its compact content keeps
         // no `svg` namespace declaration: the leaf declares it with the
-        // inserted geometry (record 0288).
+        // inserted geometry.
         let file = file
             .set(
                 "/frame[1]",
@@ -780,7 +780,7 @@ mod odi {
             .add("/", litchi_ops::NewNode::new("frame"))
             .expect_err("one frame");
         assert_eq!(error.code(), Code::UnsupportedCapability);
-        // The singletons move and swap only onto themselves (record 0292).
+        // The singletons move and swap only onto themselves.
         let same = file
             .move_to("/frame[1]", litchi_ops::Placement::Start)
             .expect("self move");

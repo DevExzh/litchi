@@ -1,5 +1,5 @@
 //! [`IntoPath`]: the one way `get` and `find` take a path, as text or as a
-//! parsed [`Path`] (record 0010 §8.1, decision D9).
+//! parsed [`Path`].
 
 use std::borrow::Cow;
 use std::fmt;
@@ -11,9 +11,8 @@ use crate::{Code, Error, Result};
 /// A value `get` and `find` accept as a path.
 ///
 /// Text is parsed once, borrowing from the input, so short paths allocate
-/// nothing (record 0005). A parsed [`Path`], by value or by reference, is used
-/// as is: parse once with [`Path::parse`] and resolve it many times without
-/// parsing again.
+/// nothing. A parsed [`Path`], by value or by reference, is used as is: parse
+/// once with [`Path::parse`] and resolve it many times without parsing again.
 ///
 /// Text that starts with `/` is an absolute path. Text in Excel notation
 /// (`Sheet1!A1`, `'My Data'!A1:C5`, `Sheet1!3:3`, `Sheet1!B:B`) becomes the
@@ -221,7 +220,7 @@ impl<'p> PathArg<'p> {
         self.origin
     }
 
-    /// The same path, borrowed: no step is copied (record 0291).
+    /// The same path, borrowed: no step is copied.
     pub(crate) fn reborrow(&self) -> PathArg<'_> {
         PathArg {
             held: Held::Borrowed(self.path()),
@@ -251,8 +250,7 @@ impl<'p, 'q: 'p> From<&'p Path<'q>> for PathArg<'p> {
     }
 }
 
-/// The canonical spelling of the path: a fixed point of [`PathArg::parse`]
-/// (record 0338 F2).
+/// The canonical spelling of the path: a fixed point of [`PathArg::parse`].
 ///
 /// It is the core grammar's spelling, except for a relative path whose first
 /// step name the core grammar writes bare but [`PathArg::parse`] would read
@@ -501,8 +499,7 @@ pub(crate) fn validate(arg: &PathArg<'_>) -> Result<()> {
         }
     }
     // Writing the canonical spelling is most of a short path's admission
-    // cost (record 0280); a path whose spelling cannot reach the limit skips
-    // it.
+    // cost; a path whose spelling cannot reach the limit skips it.
     if spelling_bound(arg.path()) <= limits::MAX_INPUT_BYTES {
         return Ok(());
     }
@@ -570,7 +567,7 @@ mod spelling_tests {
     use super::spelling_bound;
 
     /// The admission shortcut's bound never undercounts the canonical
-    /// spelling (record 0280).
+    /// spelling.
     #[test]
     fn the_spelling_bound_covers_the_canonical_spelling() {
         let names = ["p", "Sheet 1", "a/b", "\"q\"", "x\\y]", "Ünïcødé", ""];
@@ -605,9 +602,8 @@ mod spelling_tests {
     }
 }
 
-/// The canonical spelling is a fixed point of [`PathArg::parse`] (record
-/// 0338 F2): reparsing it gives the same path, and spelling that again gives
-/// the same text.
+/// The canonical spelling is a fixed point of [`PathArg::parse`]: reparsing
+/// it gives the same path, and spelling that again gives the same text.
 #[cfg(test)]
 mod display_tests {
     use litchi_core::selector::{Path, Step};

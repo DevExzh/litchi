@@ -38,7 +38,7 @@ enum Format {
     Size(u16),
     Color(Option<[u8; 3]>),
     Font(String),
-    /// A character style, by stylesheet index (record 0324).
+    /// A character style, by stylesheet index.
     Style(u16),
 }
 
@@ -212,7 +212,7 @@ fn invalid(message: &'static str, key: &'static str) -> Error {
 }
 
 /// A direct paragraph `bold` or `italic` assignment a coalesced body run
-/// stages (record 0359a): the leaf property, the requested value, and
+/// stages: the leaf property, the requested value, and
 /// whether every run of the resolved paragraph already reads as it (the
 /// isolated setter's no-op test).
 pub(super) fn paragraph_toggle(

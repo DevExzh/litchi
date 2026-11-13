@@ -1,4 +1,4 @@
-//! DOCX find/replace over fields and every story (record 0285): field
+//! DOCX find/replace over fields and every story: field
 //! results are searched as OfficeCLI's find reads them, instructions never
 //! are, a table of contents spanning paragraphs keeps its structure, and the
 //! document root also searches headers, footers, footnotes and endnotes;
@@ -141,7 +141,7 @@ fn a_table_of_contents_spanning_paragraphs_keeps_its_field() {
     for eager in [false, true] {
         let file = open(eager, package(TOC));
         let before = member(&file, "word/document.xml");
-        // The 0279 finding: a find over the body reaches the table's
+        // A find over the body reaches the table's
         // entries. They are field results, searched as OfficeCLI and Word
         // search them, consistently in every paragraph of the result.
         let (after, matched) = find(&file, "/body", replace("Introduction", "Overview"));

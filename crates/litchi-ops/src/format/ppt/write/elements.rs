@@ -1,4 +1,4 @@
-//! Unified writes of the record-0323 element surface: slide comments (and,
+//! Unified writes of the element surface: slide comments (and,
 //! as they land, table cells and hyperlinks).
 //!
 //! Every write resolves its targets against the read navigation, admits its
@@ -253,7 +253,7 @@ pub(super) fn table_layout_refusal(verb: &'static str) -> Error {
         },
     )
     .with_format(FileFormat::Ppt)
-    .with_suggestion("set cell text instead; table layout edits remain a follow-up (record 0323)")
+    .with_suggestion("set cell text instead; table layout edits remain a follow-up")
 }
 
 /// Set the text of every selected table cell in one native edit.
@@ -682,7 +682,7 @@ pub(super) fn set_runs(
     finish_commit(file, native, limits)
 }
 
-/// Dispatch a `set` whose targets are record-0323 elements; `None` for other
+/// Dispatch a `set` whose targets are elements; `None` for other
 /// targets. One call's targets share one element kind.
 pub(super) fn set(
     file: &Ppt,

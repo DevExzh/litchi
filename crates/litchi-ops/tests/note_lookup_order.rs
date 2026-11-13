@@ -1,4 +1,4 @@
-//! Record 0326: a note's `get` picks the selected note without building
+//! A note's `get` picks the selected note without building
 //! every note (XLSX and XLSB). Each step form must still give the node the
 //! listing gives at that position, in row-major order of the cells.
 #![cfg(any(feature = "xlsx", feature = "xlsb"))]

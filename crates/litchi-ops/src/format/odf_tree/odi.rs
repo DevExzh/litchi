@@ -63,7 +63,7 @@ static OPERATION_GAPS: [GapSpec; 4] = [
             context: "an ODI image holds exactly one frame",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0282 ODI single frame",
+        follow_up: "ODI single frame",
         reason: "the ODI leaf admits exactly one image frame",
     },
     GapSpec {
@@ -73,7 +73,7 @@ static OPERATION_GAPS: [GapSpec; 4] = [
             context: "an ODI image holds exactly one frame",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0282 ODI single frame",
+        follow_up: "ODI single frame",
         reason: "an image package without its frame is not an ODI image",
     },
     GapSpec {
@@ -93,7 +93,7 @@ static OPERATION_GAPS: [GapSpec; 4] = [
             context: "the `source` property (the image payload)",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0282 ODI image payload writes",
+        follow_up: "ODI image payload writes",
         reason: "replacing the image payload needs a typed source value the unified registry does not have yet",
     },
 ];
@@ -377,7 +377,7 @@ pub(crate) fn add(
             Code::UnsupportedCapability,
             "an ODI image holds exactly one frame; set the existing `/frame[1]` instead",
         )
-        .with_suggestion("follow-up: 0282 ODI single frame"),
+        .with_suggestion("follow-up: ODI single frame"),
         "metadata" => refusal(
             Code::InvalidArgument,
             "an ODI image always has `/metadata`; set its properties instead",
@@ -410,7 +410,7 @@ pub(crate) fn remove(
                     Code::UnsupportedCapability,
                     "an ODI image holds exactly one frame, which cannot be removed",
                 )
-                .with_suggestion("follow-up: 0282 ODI single frame"));
+                .with_suggestion("follow-up: ODI single frame"));
             },
             _ => return Err(element_refusal("remove", node)),
         }

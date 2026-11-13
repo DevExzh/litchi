@@ -1,15 +1,15 @@
 //! Apple iWork inputs (Pages, Keynote, Numbers) for the read classes.
 //!
 //! `litchi::open` opens iWork packages and package directories as
-//! `File::Pages`, `File::Keynote` and `File::Numbers` (records 0296 and
-//! 0306), and `litchi_py.open` returns them as unified files. The family
-//! views (`File::document`, `presentation`, `workbook`) do not cover iWork,
-//! so the `Document`, `Presentation` and `Workbook` read classes hold the
-//! opened `File` and project the leaf package it retains: Pages text and one
-//! paragraph per text block, Keynote text and each slide's text, Numbers
-//! sheet names and the sheet/table/cell text layout. These are the
-//! projections the classes made before (risk R6 in record 0003), now read
-//! from the one `File` open instead of a second, semantic-only open.
+//! `File::Pages`, `File::Keynote` and `File::Numbers`, and `litchi_py.open`
+//! returns them as unified files. The family views (`File::document`,
+//! `presentation`, `workbook`) do not cover iWork, so the `Document`,
+//! `Presentation` and `Workbook` read classes hold the opened `File` and
+//! project the leaf package it retains: Pages text and one paragraph per
+//! text block, Keynote text and each slide's text, Numbers sheet names and
+//! the sheet/table/cell text layout. These are the projections the classes
+//! made before, now read from the one `File` open instead of a second,
+//! semantic-only open.
 
 use litchi::{Code, File, FileFormat};
 

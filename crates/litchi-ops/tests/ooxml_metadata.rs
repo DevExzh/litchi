@@ -1,4 +1,4 @@
-//! OOXML document metadata through the unified root path (record 0253).
+//! OOXML document metadata through the unified root path.
 #![cfg(all(feature = "xlsx", feature = "pptx", feature = "xlsb"))]
 
 use litchi_core::{FileFormat, Metadata};
@@ -181,7 +181,7 @@ fn capabilities_name_the_set_only_metadata_path_and_the_root_reads() {
                 .property(key)
                 .unwrap_or_else(|| panic!("{format:?} {key}"));
             // XLSX and PPTX also set them on the root, as OfficeCLI spells
-            // it (record 0338); XLSB writes them through `/metadata` only.
+            // it; XLSB writes them through `/metadata` only.
             let root_set = format != FileFormat::Xlsb;
             assert!(
                 property.get() && property.set() == root_set,

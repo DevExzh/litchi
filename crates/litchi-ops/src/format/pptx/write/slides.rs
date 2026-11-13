@@ -35,7 +35,7 @@ impl Pptx {
     ) -> Result<Commit> {
         let mut name = None;
         let mut hidden = None;
-        // The layout retargets the slide's layout relationship (record 0346).
+        // The layout retargets the slide's layout relationship.
         let mut layout = None;
         // `Some(None)` removes the slide's direct transition.
         let mut transition: Option<Option<litchi_pptx::transition::Transition>> = None;
@@ -168,8 +168,7 @@ impl Pptx {
         }
         let source = self.editable_owner_for_write()?;
         // A layout change edits the slide's relationships, which the
-        // source-backed slide edit does not stage: a source owner is promoted
-        // (record 0346).
+        // source-backed slide edit does not stage: a source owner is promoted.
         let promoted = match (&source, &layout) {
             (Editable::Source(_), Some(_)) => Some(Editable::Eager(self.eager_base(&source)?)),
             _ => None,

@@ -653,8 +653,8 @@ fn slide_body_span_edit_uses_only_public_semantic_facade_types()
     Ok(())
 }
 
-/// A focused leaf edit never mutates an opened unified `File` (record 0306
-/// carries this over from the deleted read-only `litchi::iwork` snapshot).
+/// A focused leaf edit never mutates an opened unified `File` (carried over
+/// from the deleted read-only `litchi::iwork` snapshot).
 #[test]
 fn focused_slide_text_edit_does_not_mutate_an_opened_file() -> Result<(), Box<dyn std::error::Error>>
 {

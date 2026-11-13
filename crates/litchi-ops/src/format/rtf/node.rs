@@ -26,9 +26,9 @@ const MAX_STEPS: usize = 4;
 const _: () = assert!(MAX_STEPS <= crate::node::INLINE_STEPS);
 
 /// A positional path of at most [`MAX_STEPS`] steps, stored compactly as
-/// kinds and positions (record 0287): a node no longer carries four full
-/// [`PathStep`]s (224 bytes) and writes them only when its path is read. A
-/// style's step is its name, read from the node's style.
+/// kinds and positions: a node no longer carries four full [`PathStep`]s
+/// (224 bytes) and writes them only when its path is read. A style's step
+/// is its name, read from the node's style.
 #[derive(Clone, Copy)]
 pub(crate) struct Steps {
     positions: [usize; MAX_STEPS],
@@ -123,7 +123,7 @@ pub(crate) enum Item<'f> {
     AbstractNum(&'f List<'f>),
     Num(&'f ListOverride),
     Level(&'f ListLevel<'f>),
-    /// A section with its native index (record 0328).
+    /// A section with its native index.
     Section {
         index: usize,
         value: &'f litchi_rtf::Section<'f>,
@@ -156,8 +156,8 @@ pub(crate) enum Item<'f> {
     },
 }
 
-// Record 0287: nodes move through every query; keep this one no larger
-// than it is (the unified node is as large as its largest format node).
+// Nodes move through every query; keep this one no larger than it is
+// (the unified node is as large as its largest format node).
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(size_of::<Node<'static>>() <= 160);
 

@@ -164,8 +164,8 @@ impl<'a> PresentationView<'a> {
 
     /// Slide text for the Markdown adapter: `(slide number, text)` per slide.
     /// Legacy PowerPoint takes its fast path, which skips shape parsing; the
-    /// other formats project [`Self::slides`]. The adapter moves onto the node
-    /// view in M1.
+    /// other formats project [`Self::slides`]. The adapter will move onto the
+    /// node view.
     ///
     /// # Errors
     ///

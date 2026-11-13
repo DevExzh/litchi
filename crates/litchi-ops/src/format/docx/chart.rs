@@ -1,4 +1,4 @@
-//! Typed chart CRUD in Word documents (record 0283).
+//! Typed chart CRUD in Word documents.
 //!
 //! - `add(/body/p[N], chart, {chartType, title, data, categories, legend,
 //!   catTitle, axisTitle, name, alt, width, height, ...})` builds an
@@ -247,7 +247,7 @@ pub(crate) enum SeriesSetter {
     Color,
 }
 
-/// A chart series (`/body/p[N]/chart[M]/series[K]`, record 0335): the
+/// A chart series (`/body/p[N]/chart[M]/series[K]`): the
 /// PPTX and XLSX series vocabulary.
 pub(crate) const SERIES_WRITE_TABLE: Table<SeriesSetter, 4, 0> = Table::new(
     [
@@ -284,7 +284,7 @@ pub(crate) enum AxisSetter {
     Max,
 }
 
-/// A chart axis (`/body/p[N]/chart[M]/axis[@role=ROLE]`, record 0335).
+/// A chart axis (`/body/p[N]/chart[M]/axis[@role=ROLE]`).
 pub(crate) const AXIS_WRITE_TABLE: Table<AxisSetter, 4, 0> = Table::new(
     [
         Entry::read(PropSpec::new("role", ValueType::Text)),
@@ -443,7 +443,7 @@ pub(super) fn pick_document_chart<'f>(
 }
 
 /// The series and axes of a chart node, in the order PPTX and XLSX list
-/// them: the series, then the axes (record 0335).
+/// them: the series, then the axes.
 pub(super) fn chart_children(
     docx: &Docx,
     chart: &Arc<ChartValue>,
@@ -824,7 +824,7 @@ impl Docx {
         self.commit_chart_edit(editor, chart, edit, size).map(Ok)
     }
 
-    /// The edit of a `set` on a chart's series or axis (record 0335).
+    /// The edit of a `set` on a chart's series or axis.
     fn chart_child_edit(
         &self,
         chart: &ChartValue,

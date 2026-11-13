@@ -37,7 +37,7 @@ impl<'f> Nav<'f> {
 
     /// Resolve direct structural coordinates without decoding their payload.
     /// The native edit inventory supplies cell facts for a coalesced run; a
-    /// row or column named by its number carries no grid (record 0310: the
+    /// row or column named by its number carries no grid (the
     /// layout writer reads only its sheet and index, and building the grid
     /// read every cell of the worksheet per call on a positional owner).
     pub(super) const fn coordinates(file: &'f Xls) -> Self {
@@ -218,7 +218,7 @@ impl<'f> Nav<'f> {
 }
 
 /// The sheet step of a handle's last cell `get` and the worksheet it
-/// resolved to (record 0315, record 0310 G8).
+/// resolved to.
 ///
 /// A text-path `get` of a cell (`/sheet[1]/A7`, `/Data/B2`) resolves its
 /// sheet step through the vocabulary and the worksheet catalog on every
@@ -255,7 +255,7 @@ impl SheetStep {
 }
 
 /// `File::get` of an XLS path: the general resolver, except that a cell
-/// path whose sheet step the handle cached (record 0315) starts from the
+/// path whose sheet step the handle cached starts from the
 /// cached worksheet. The fast route makes the resolver's reads in the
 /// resolver's order inside the same fence — the root, the worksheet by its
 /// catalog position, the cell — and closes with the same source check; on

@@ -1,4 +1,4 @@
-//! Coalesced ODS cell writes for batches and closure edits (record 0277).
+//! Coalesced ODS cell writes for batches and closure edits.
 //!
 //! Consecutive direct cell assignments (`value`, `text`, `clear`,
 //! `formula`) to distinct coordinates share one leaf `Edit`: the run plans
@@ -48,7 +48,7 @@ impl Ods {
             return Ok(None);
         }
         // A batch resolves many coordinates of one snapshot: find each row
-        // by binary search over the cached row runs (record 0287).
+        // by binary search over the cached row runs.
         let node = crate::path::resolve::get(&Nav::with_indexed_rows(self), path)?;
         let Target::Cell { sheet, row, column } = Target::of(&node) else {
             return Ok(None);

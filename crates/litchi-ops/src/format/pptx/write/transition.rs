@@ -1,5 +1,5 @@
 //! OfficeCLI's slide `transition` shorthand, `TYPE[-DIR...][-SPEED|-MS]`,
-//! parsed into the native typed transition (record 0269).
+//! parsed into the native typed transition.
 //!
 //! The vocabulary follows OfficeCLI's `transition.json` and its handler
 //! (`PowerPointHandler.Animations.cs`, `ApplyTransition`): the type token

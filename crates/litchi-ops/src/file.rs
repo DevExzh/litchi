@@ -1,5 +1,5 @@
 //! The flat [`File`] enum and its format-neutral read surface (design
-//! section 4; record 0003 §2.1, §2.2 and §2.4).
+//! section 4).
 
 #[cfg(feature = "doc")]
 use crate::format::doc::Doc;
@@ -39,7 +39,7 @@ use crate::view::WorkbookView;
 use crate::{Locked, Signed, ToleranceReport};
 
 /// The broad family of a format, reported as data rather than as an enum
-/// layer around the per-format variants (record 0003 §2.1, decision D1).
+/// layer around the per-format variants.
 ///
 /// ```
 /// use litchi_core::FileFormat;
@@ -97,8 +97,7 @@ impl Family {
 }
 
 /// One opened input: a flat enum with one variant per format, plus the
-/// not-yet-editable [`Locked`] and [`Signed`] states (ADR 0033 §4, record
-/// 0003 §2.1).
+/// not-yet-editable [`Locked`] and [`Signed`] states (ADR 0033 §4).
 ///
 /// Every variant is one `Arc`-backed handle, so a `File` is a tag and one
 /// pointer, is `Send + Sync`, and clones with one reference-count increment.
@@ -112,13 +111,13 @@ impl Family {
 /// the leaf's editable owner. RTF retains its native package and supports
 /// paragraph text, insertion and paragraph-ordering writes. ODS retains its
 /// leaf package and supports cell, sheet, row, named-range, annotation and
-/// metadata writes (record 0277); ODT and ODP remain read-only for now.
-/// The Apple iWork variants (`Pages`, `Keynote`, `Numbers`, record 0296)
+/// metadata writes; ODT and ODP remain read-only for now.
+/// The Apple iWork variants (`Pages`, `Keynote`, `Numbers`)
 /// retain the leaf `Package` and write through its focused transactions;
 /// an iWork package directory opens as its single-file form and saves back
-/// as a directory (records 0301 and 0306, see [`crate::open`]).
-/// The enum is `#[non_exhaustive]`: further formats join as variants. Each
-/// variant exists only when its cargo feature is enabled.
+/// as a directory (see [`crate::open`]). The enum is `#[non_exhaustive]`:
+/// further formats join as variants. Each variant exists only when its cargo
+/// feature is enabled.
 ///
 /// The format-neutral reads are methods on `File` itself; family-specific
 /// reads go through `File::document`, `File::presentation` and
@@ -176,13 +175,13 @@ pub enum File {
     #[cfg(feature = "odt")]
     Odt(Odt),
     /// An OpenDocument HTML template (`.oth`, `text-web`), read and written
-    /// through the ODT content model (record 0282). Opened only when the
-    /// `oth` cargo feature is on.
+    /// through the ODT content model. Opened only when the `oth` cargo
+    /// feature is on.
     #[cfg(feature = "odt")]
     Oth(Odt),
     /// An OpenDocument master document (`.odm`), read and written through
-    /// the ODT content model (record 0282); linked sub-documents stay links.
-    /// Opened only when the `odm` cargo feature is on.
+    /// the ODT content model; linked sub-documents stay links. Opened only
+    /// when the `odm` cargo feature is on.
     #[cfg(feature = "odt")]
     Odm(Odt),
     /// An OpenDocument Spreadsheet workbook: packaged `.ods` (editable) or
@@ -193,8 +192,8 @@ pub enum File {
     #[cfg(feature = "odp")]
     Odp(Odp),
     /// An OpenDocument drawing (`.odg`, `.otg`), read and written through
-    /// the object-tree adapter (record 0282). Opened when the `odg` cargo
-    /// feature is on.
+    /// the object-tree adapter. Opened when the `odg` cargo feature is
+    /// on.
     #[cfg(odf_objects)]
     Odg(OdfTree),
     /// An OpenDocument chart (`.odc`); opened with the `odc` feature.
@@ -212,8 +211,8 @@ pub enum File {
     #[cfg(odf_objects)]
     Odf(OdfTree),
     /// An Apple Pages document (`.pages`), read and written through the
-    /// iWork object-tree adapter (record 0296). Opened when the `pages`
-    /// cargo feature is on.
+    /// iWork object-tree adapter. Opened when the `pages` cargo feature
+    /// is on.
     #[cfg(feature = "iwork-adapter")]
     Pages(Iwork),
     /// An Apple Keynote presentation (`.key`); opened with the `keynote`
@@ -238,7 +237,7 @@ const _: () = {
     assert_handle::<Locked>();
     assert_handle::<Signed>();
     assert_handle::<Error>();
-    // A tag plus one pointer (record 0003 decision D2).
+    // A tag plus one pointer.
     assert!(size_of::<File>() == 2 * size_of::<usize>());
 };
 #[cfg(target_pointer_width = "64")]

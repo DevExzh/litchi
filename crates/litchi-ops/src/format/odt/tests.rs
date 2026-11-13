@@ -189,7 +189,7 @@ fn malformed_body_is_a_typed_core_error() {
     assert_eq!(error.format(), Some(FileFormat::Odt));
 }
 
-/// The unified reads of the record 0276 adapter.
+/// The unified reads of the ODT adapter.
 mod unified {
     use super::*;
     use crate::view::Mode;

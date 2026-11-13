@@ -1,4 +1,4 @@
-//! Tests of the XLSX adapter (M1 step R4b, record 0010 §4.7, §5.4, §6, §9.2):
+//! Tests of the XLSX adapter:
 //! path resolution, OfficeCLI-shaped node views (golden JSON), queries and
 //! header rows, the view modes, decode counts and the path round trip.
 
@@ -344,8 +344,8 @@ fn plans_compile_for_xlsx_and_run_on_any_workbook() {
             ]
         );
     }
-    // Pages body tables (record 0299) and Keynote slide tables (record 0298)
-    // have cells: the plan compiles for them too.
+    // Pages body tables and Keynote slide tables have cells: the plan
+    // compiles for them too.
     let other = crate::query::Plan::compile(&query, litchi_core::FileFormat::Keynote);
     #[cfg(feature = "keynote")]
     assert_eq!(

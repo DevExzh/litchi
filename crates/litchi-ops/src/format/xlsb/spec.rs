@@ -53,7 +53,7 @@ pub(crate) const SHEET_WRITE_TABLE: Table<SheetSetter, 3, 0> = Table::new(
 /// Read-schema projection of the XLSB sheet write registry.
 pub(crate) const SHEET_WRITE_PROPS: &[PropSpec] = &SHEET_WRITE_TABLE.readable();
 
-/// XLSB's cell setter vocabulary (records 0168, 0261).
+/// XLSB's cell setter vocabulary.
 ///
 /// Payloads: the common scalar union (`value`), an explicit `clear: true`
 /// (a null `value` is admitted through the registry's clear path and has the
@@ -307,7 +307,7 @@ pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 29, 25> = Table::new(
         ),
     ],
     [
-        // `text` names `value`, as in the XLSX cell registry (record 0269).
+        // `text` names `value`, as in the XLSX cell registry.
         Alias {
             name: "text",
             entry: 0,
@@ -710,7 +710,7 @@ impl NamedRangeKey {
     }
 }
 
-/// The XLSB defined-name setters (record 0261): `add` takes `name`, `ref`
+/// The XLSB defined-name setters: `add` takes `name`, `ref`
 /// and an optional `scope` (a sheet name; absent is workbook scope); `set`
 /// replaces `ref`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -791,37 +791,37 @@ const fn property_gap(
 }
 
 // The binary leaf already retains these parts, but the XLSB adapter does
-// not project them into ordinary nodes yet (record 0322 projects the
-// worksheet features).  Keep the reasons format-local; in particular, do not
+// not project them into ordinary nodes yet (the worksheet features are
+// projected).  Keep the reasons format-local; in particular, do not
 // inherit the XLSX follow-ups from the shared table.
 static PIVOT_GAP: GapSpec = element_gap(
     "pivottable",
-    "M1-extended (R4x)",
+    "not supported yet",
     "XLSB pivot tables are retained by the leaf but not projected into unified nodes yet",
 );
 static SLICER_GAP: GapSpec = element_gap(
     "slicer",
-    "M1-extended (R4x)",
+    "not supported yet",
     "XLSB slicers are retained by the leaf but not projected into unified nodes yet",
 );
 static SPARKLINE_GAP: GapSpec = element_gap(
     "sparkline",
-    "M1-extended (R4x)",
+    "not supported yet",
     "XLSB sparkline groups are retained by the leaf but not projected into unified nodes yet",
 );
 static MERGE_GAP: GapSpec = element_gap(
     "mergeCell",
-    "M1-extended (R4x)",
+    "not supported yet",
     "XLSB merged ranges are retained by the leaf but are not listed as nodes yet",
 );
 static OLE_GAP: GapSpec = element_gap(
     "ole",
-    "M1-extended (R4x)",
+    "not supported yet",
     "XLSB OLE objects are retained by the leaf but are not projected into nodes yet",
 );
 static RUN_GAP: GapSpec = element_gap(
     "run",
-    "M1-extended (R4x)",
+    "not supported yet",
     "the XLSB cell model exposes a cell value, not a unified rich-text run node",
 );
 
@@ -843,7 +843,7 @@ const fn with_props(
     }
 }
 
-/// A chart axis resolves by its role, like the XLSX axis (record 0322).
+/// A chart axis resolves by its role, like the XLSX axis.
 const XLSB_AXIS: ElementSpec<Kind> = ElementSpec {
     props: super::chart::AXIS_PROPS,
     identities: &["role"],
@@ -938,15 +938,15 @@ static ELEMENTS: [ElementSpec<Kind>; 26] = [
 // not claim a read.  The values are the same gaps as XLSX's table, but the
 // reasons describe the XLSB leaf and its deferred binary parts.
 static GAPS: &[GapSpec] = &[
-    // OfficeCLI's heuristic table node (record 0339).
+    // OfficeCLI's heuristic table node.
     element_gap(
         "detectedtable",
-        "0339-F5 (deferred-P1): header-row table detection in queries",
+        "header-row table detection in queries",
         "OfficeCLI's detectedtable is a header-row block found heuristically in unstructured cells and reported by table queries; Litchi's queries return declared tables only",
     ),
-    // Defined names are added, retargeted and removed (record 0261), but
+    // Defined names are added, retargeted and removed, but
     // only the last name can go: removing an earlier one would renumber the
-    // name index every formula's name references use (record 0330).
+    // name index every formula's name references use.
     GapSpec {
         subject: Subject::Operation {
             verb: "remove",
@@ -954,247 +954,247 @@ static GAPS: &[GapSpec] = &[
             context: "earlier-name",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "XLSB defined-name index renumbering (record 0330)",
+        follow_up: "XLSB defined-name index renumbering",
         reason: "only the workbook's last defined name can be removed; an earlier one would renumber every formula's name references",
     },
     property_gap(
         "workbook",
         "calc.mode",
-        "M1-extended (R4x)",
+        "not supported yet",
         "XLSB calculation properties are retained by the leaf but not projected into the workbook node",
     ),
     property_gap(
         "workbook",
         "firstSheet",
-        "M1-extended (R4x)",
+        "not supported yet",
         "the XLSB workbook node does not expose the authored first-sheet setting yet",
     ),
     property_gap(
         "sheet",
         "freeze",
-        "M1-extended (R4x)",
+        "not supported yet",
         "XLSB sheet views are retained by the leaf but freeze panes are not projected yet",
     ),
     property_gap(
         "sheet",
         "zoom",
-        "M1-extended (R4x)",
+        "not supported yet",
         "XLSB sheet views are retained by the leaf but zoom is not projected yet",
     ),
     property_gap(
         "sheet",
         "autoFilter",
-        "M1-extended (R4x)",
+        "not supported yet",
         "XLSB auto-filter metadata is retained by the leaf but not projected into a sheet node yet",
     ),
     property_gap(
         "sheet",
         "tabColor",
-        "M1-extended (R4x)",
+        "not supported yet",
         "XLSB sheet tab color is not projected into the sheet node yet",
     ),
     property_gap(
         "sheet",
         "protect",
-        "M1-extended (R4x)",
+        "not supported yet",
         "XLSB sheet protection metadata is retained by the leaf but not projected yet",
     ),
     property_gap(
         "sheet",
         "printArea",
-        "M1-extended (R4x)",
+        "not supported yet",
         "XLSB print settings are not projected into the sheet node yet",
     ),
     property_gap(
         "cell",
         "computedValue",
-        "M4 follow-up: project computed values in cell views",
-        "node views do not evaluate; `File::evaluate` and `File::recalculate` compute formula results from the full grid (record 0266); the source cached-value fallback has no formula text",
+        "follow-up: project computed values in cell views",
+        "node views do not evaluate; `File::evaluate` and `File::recalculate` compute formula results from the full grid; the source cached-value fallback has no formula text",
     ),
     property_gap(
         "cell",
         "superscript",
-        "M1-extended (R4d)",
+        "not supported yet",
         "the XLSB node does not project font records into cell properties",
     ),
     property_gap(
         "cell",
         "subscript",
-        "M1-extended (R4d)",
+        "not supported yet",
         "the XLSB node does not project font records into cell properties",
     ),
     property_gap(
         "cell",
         "font.outline",
-        "M1-extended (R4d)",
+        "not supported yet",
         "the XLSB node does not project font records into cell properties",
     ),
     property_gap(
         "cell",
         "font.shadow",
-        "M1-extended (R4d)",
+        "not supported yet",
         "the XLSB node does not project font records into cell properties",
     ),
     property_gap(
         "cell",
         "font.condense",
-        "M1-extended (R4d)",
+        "not supported yet",
         "the XLSB node does not project font records into cell properties",
     ),
     property_gap(
         "cell",
         "font.extend",
-        "M1-extended (R4d)",
+        "not supported yet",
         "the XLSB node does not project font records into cell properties",
     ),
     property_gap(
         "cell",
         "font.charset",
-        "M1-extended (R4d)",
+        "not supported yet",
         "the XLSB node does not project font records into cell properties",
     ),
     property_gap(
         "cell",
         "font.family",
-        "M1-extended (R4d)",
+        "not supported yet",
         "the XLSB node does not project font records into cell properties",
     ),
     property_gap(
         "cell",
         "alignment.relativeIndent",
-        "M1-extended (R4d)",
+        "not supported yet",
         "the XLSB node does not project this alignment attribute into cell properties",
     ),
     property_gap(
         "cell",
         "alignment.justifyLastLine",
-        "M1-extended (R4d)",
+        "not supported yet",
         "the XLSB node does not project this alignment attribute into cell properties",
     ),
     property_gap(
         "cell",
         "font.scheme",
-        "M1-extended (R4d)",
+        "not supported yet",
         "the XLSB node does not project font records into cell properties",
     ),
     property_gap(
         "cell",
         "fillPattern",
-        "M1-extended (R4d)",
+        "not supported yet",
         "the XLSB node does not project fill records into cell properties",
     ),
     property_gap(
         "cell",
         "fillBg",
-        "M1-extended (R4d)",
+        "not supported yet",
         "the XLSB node does not project fill records into cell properties",
     ),
     property_gap(
         "cell",
         "border.diagonal",
-        "M1-extended (R4d)",
+        "not supported yet",
         "the XLSB node does not project border records into cell properties",
     ),
     property_gap(
         "cell",
         "border.diagonal.color",
-        "M1-extended (R4d)",
+        "not supported yet",
         "the XLSB node does not project border records into cell properties",
     ),
     property_gap(
         "cell",
         "border.diagonalUp",
-        "M1-extended (R4d)",
+        "not supported yet",
         "the XLSB node does not project border records into cell properties",
     ),
     property_gap(
         "cell",
         "border.diagonalDown",
-        "M1-extended (R4d)",
+        "not supported yet",
         "the XLSB node does not project border records into cell properties",
     ),
     property_gap(
         "cell",
         "protection.locked",
-        "M1-extended (R4d)",
+        "not supported yet",
         "the XLSB node does not project cell protection metadata",
     ),
     property_gap(
         "cell",
         "protection.hidden",
-        "M1-extended (R4d)",
+        "not supported yet",
         "the XLSB node does not project cell protection metadata",
     ),
     property_gap(
         "cell",
         "quotePrefix",
-        "M1-extended (R4d)",
+        "not supported yet",
         "the XLSB node does not project quote-prefix metadata into cell properties",
     ),
     property_gap(
         "cell",
         "numFmtId",
-        "M1-extended (R4d)",
+        "not supported yet",
         "native number-format IDs remain in the XLSB style table and are not admitted as unified properties",
     ),
     property_gap(
         "cell",
         "link",
-        "M1-extended (R4x)",
+        "not supported yet",
         "XLSB hyperlink targets are retained by the leaf but not resolved into cell properties yet",
     ),
     property_gap(
         "cell",
         "tooltip",
-        "M1-extended (R4x)",
+        "not supported yet",
         "XLSB hyperlink tooltips are not resolved into cell properties yet",
     ),
     property_gap(
         "cell",
         "display",
-        "M1-extended (R4x)",
+        "not supported yet",
         "XLSB cells expose stored values, not a separately formatted display string",
     ),
     property_gap(
         "cell",
         "phonetic",
-        "M1-extended (R4x)",
+        "not supported yet",
         "XLSB phonetic runs are retained by the leaf but not projected into cell properties yet",
     ),
     property_gap(
         "cell",
         "richtext",
-        "M1-extended (R4x)",
+        "not supported yet",
         "the XLSB cell model exposes a flattened value and no unified rich-text run node",
     ),
     property_gap(
         "cell",
         "alt",
-        "M1-extended (R4x)",
+        "not supported yet",
         "XLSB in-cell pictures are not read by the unified adapter",
     ),
     property_gap(
         "namedrange",
         "comment",
-        "M1-extended (R4d)",
+        "not supported yet",
         "the XLSB defined-name projection reads name, ref and scope; BrtName comments are not projected yet",
     ),
     property_gap(
         "namedrange",
         "volatile",
-        "M1-extended (R4d)",
+        "not supported yet",
         "the XLSB defined-name projection reads name, ref and scope; macro and volatile flags are not projected yet",
     ),
     property_gap(
         "namedrange",
         "hidden",
-        "M1-extended (R4d)",
+        "not supported yet",
         "the XLSB defined-name projection reads name, ref and scope; the hidden flag is not projected yet",
     ),
     property_gap(
         "column",
         "numberformat",
-        "M1-extended (R4x)",
+        "not supported yet",
         "XLSB column styles are not projected into column nodes yet",
     ),
 ];

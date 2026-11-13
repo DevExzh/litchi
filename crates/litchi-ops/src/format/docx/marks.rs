@@ -1,4 +1,4 @@
-//! The DOCX marks of record 0319: paragraph tab stops and breaks,
+//! The DOCX marks: paragraph tab stops and breaks,
 //! bookmarks, fields, tables of contents, the watermark and text boxes.
 //!
 //! | Path | Node | Leaf read |
@@ -499,24 +499,23 @@ pub(crate) enum MarkSetter {
     TabKind,
     TabLeader,
     BreakType,
-    /// A bookmark's name, and its text on add (record 0325).
+    /// A bookmark's name, and its text on add.
     BookmarkName,
     BookmarkText,
     /// A field's type on add, its instruction, its cached result text, and
-    /// the name and format a typed field's instruction takes (record 0325).
+    /// the name and format a typed field's instruction takes.
     FieldType,
     FieldInstruction,
     FieldText,
     FieldName,
     FieldFormat,
     /// A `REF`-family field's `\\h` switch and an `IF` field's expression
-    /// and texts (record 0325).
+    /// and texts.
     FieldHyperlink,
     FieldExpression,
     FieldTrueText,
     FieldFalseText,
-    /// A table of contents' levels and switches, and its title on add
-    /// (record 0325).
+    /// A table of contents' levels and switches, and its title on add.
     TocLevels,
     TocHyperlinks,
     TocPageNumbers,
@@ -617,7 +616,7 @@ crate::registry::registry! {
 }
 
 // A bookmark: its name and native identifier; `name` is renamed on set
-// and, with `text`, seeds a new one (record 0325).
+// and, with `text`, seeds a new one.
 crate::registry::registry! {
     pub(crate) BOOKMARK_PROPS, BOOKMARK_REGISTRY: MarkSetter {
     rsa("name", ValueType::Text, MarkSetter::BookmarkName, Constraint::NotEmpty),
@@ -628,8 +627,7 @@ crate::registry::registry! {
 
 // A field: its type, instruction, lock and whether it has a result. A new
 // field takes OfficeCLI's `fieldType` (with `name` and `format`) or a raw
-// `instruction`; `set` replaces the instruction or the result `text`
-// (record 0325).
+// `instruction`; `set` replaces the instruction or the result `text`.
 crate::registry::registry! {
     pub(crate) FIELD_PROPS, FIELD_REGISTRY: MarkSetter {
     read_add("fieldType", ValueType::Text, MarkSetter::FieldType),
@@ -648,7 +646,7 @@ crate::registry::registry! {
 }
 
 // A table of contents, from its `TOC` field's switches; written on add and
-// set, with a `title` heading on add (record 0325).
+// set, with a `title` heading on add.
 crate::registry::registry! {
     pub(crate) TOC_PROPS, TOC_REGISTRY: MarkSetter {
     rsa("levels", ValueType::Text, MarkSetter::TocLevels, Constraint::NotEmpty),

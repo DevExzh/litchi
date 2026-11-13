@@ -1,4 +1,4 @@
-//! Typed chart CRUD shared by the PPTX and XLSX adapters (record 0270).
+//! Typed chart CRUD shared by the PPTX and XLSX adapters.
 //!
 //! The chart model, writer, reader and source-preserving editor live in
 //! `litchi-drawingml` ([`litchi_drawingml::chart`]); each host leaf places
@@ -14,7 +14,7 @@
 //! - [`ChartEdit`], the admitted values of a chart, series or axis `set`,
 //!   applied through the source-preserving chart editor.
 //!
-//! XLSB (record 0322) reads worksheet charts through [`Summary`] only.
+//! XLSB reads worksheet charts through [`Summary`] only.
 #![cfg_attr(
     not(any(feature = "pptx", feature = "xlsx", feature = "docx")),
     allow(
@@ -273,8 +273,8 @@ pub(crate) fn parse_data(text: &str) -> Result<Vec<Series>> {
 }
 
 /// The chart formatting keys: written by `add`, rewritten by a `set` that
-/// rebuilds an authored chart (record 0283), and read back from the chart
-/// part where the spec carries them.
+/// rebuilds an authored chart, and read back from the chart part where
+/// the spec carries them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum FormatKey {
     Colors,
@@ -1685,7 +1685,7 @@ pub(crate) fn join_values(values: &[f64]) -> String {
 /// source-preserving for titles, the legend, names, values, categories,
 /// series colors and axis ranges; a rebuild from the chart's spec for a
 /// changed family, replaced data, formatting keys, and every edit of an
-/// extended chart (record 0283).
+/// extended chart.
 #[derive(Debug, Default)]
 pub(crate) struct ChartEdit {
     pub(crate) title: Option<Option<String>>,

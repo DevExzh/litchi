@@ -1,4 +1,4 @@
-//! DOCX find/replace (records 0273, 0285): `set` with `find=`.
+//! DOCX find/replace: `set` with `find=`.
 //!
 //! The scope is the target's subtree. The document root searches the main
 //! story and, as OfficeCLI's root find does, every header, footer, footnote
@@ -17,7 +17,7 @@
 //! runs the replacement splits out, through the ordinary DOCX run setters.
 //!
 //! `mc:AlternateContent` wrappers in runs (drawings and text boxes with a
-//! fallback, record 0307) are opaque: their text, text boxes included, is
+//! fallback) are opaque: their text, text boxes included, is
 //! not searched, and a match that would span one is refused.
 
 use litchi_core::FileFormat;
@@ -289,8 +289,7 @@ fn plan(
 }
 
 /// Refuse a find with a match that would cross the object of an
-/// `mc:AlternateContent` wrapper (a drawing or text box with a fallback;
-/// record 0307).
+/// `mc:AlternateContent` wrapper (a drawing or text box with a fallback).
 ///
 /// The leaf lists a wrapper as one opaque object, which ends a text group as
 /// a picture does, so no match ever spans it and the wrapper is never split
@@ -356,7 +355,7 @@ fn refuse_alternate_spans(
             )
             .with_property(crate::find::FIND)
             .with_suggestion(
-                "find text on one side of the object; its own text is not searched (record 0307)",
+                "find text on one side of the object; its own text is not searched",
             ));
             }
             Ok(())
@@ -400,7 +399,7 @@ fn reach(nodes: &[Node<'_>]) -> Result<Reach> {
                 )
                 .with_property(crate::find::FIND)
                 .with_suggestion(
-                    "the document root also searches headers, footers, footnotes and endnotes (record 0285)",
+                    "the document root also searches headers, footers, footnotes and endnotes",
                 ));
             },
         }

@@ -62,7 +62,7 @@
     "raw": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0336: package parts exist in OOXML and packaged ODF only",
+      "followUp": "package parts exist in OOXML and packaged ODF only",
       "reason": "this format has no package parts"
     },
     "validate": {
@@ -71,13 +71,13 @@
     "add-part": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0336: package parts exist in OOXML and packaged ODF only",
+      "followUp": "package parts exist in OOXML and packaged ODF only",
       "reason": "this format has no package parts"
     },
     "raw-set": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0336: package parts exist in OOXML and packaged ODF only",
+      "followUp": "package parts exist in OOXML and packaged ODF only",
       "reason": "this format has no package parts"
     }
   },
@@ -97,37 +97,37 @@
     "issues": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the issues view needs the validators `validate` adds"
     },
     "forms": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the forms view needs the validators `validate` adds"
     },
     "html": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     "svg": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     "screenshot": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     "pdf": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     }
   },
@@ -857,7 +857,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended (R6b)",
+        "followUp": "not supported yet",
         "reason": "the legacy XLS Package read bridge does not project ListObject records into unified nodes yet"
       }
     },
@@ -1006,7 +1006,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended (R6b)",
+        "followUp": "not supported yet",
         "reason": "legacy XLS chart metadata is not projected into unified nodes yet"
       }
     },
@@ -1029,7 +1029,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended (R6b)",
+        "followUp": "not supported yet",
         "reason": "legacy XLS chart series are not projected into unified nodes yet"
       }
     },
@@ -1052,7 +1052,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended (R6b)",
+        "followUp": "not supported yet",
         "reason": "legacy XLS chart axes are not projected into unified nodes yet"
       }
     },
@@ -1078,7 +1078,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended (R6b)",
+        "followUp": "not supported yet",
         "reason": "legacy XLS pivot tables are not projected into unified nodes yet"
       }
     },
@@ -1101,7 +1101,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended (R6b)",
+        "followUp": "not supported yet",
         "reason": "legacy XLS slicers are not projected into unified nodes yet"
       }
     },
@@ -1124,7 +1124,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended (R6b)",
+        "followUp": "not supported yet",
         "reason": "legacy XLS sparkline groups are not projected into unified nodes yet"
       }
     },
@@ -1633,7 +1633,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended (R6b)",
+        "followUp": "not supported yet",
         "reason": "legacy XLS merged ranges are not projected into unified nodes yet"
       }
     },
@@ -2053,7 +2053,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended (R6b)",
+        "followUp": "not supported yet",
         "reason": "legacy XLS OLE objects are not projected into unified nodes yet"
       }
     },
@@ -2176,7 +2176,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended (R6b)",
+        "followUp": "not supported yet",
         "reason": "legacy XLS rich-text runs are flattened by the native cell projection"
       }
     }
@@ -2186,77 +2186,77 @@
       "subject": "element",
       "element": "table",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R6b)",
+      "followUp": "not supported yet",
       "reason": "the legacy XLS Package read bridge does not project ListObject records into unified nodes yet"
     },
     {
       "subject": "element",
       "element": "chart",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R6b)",
+      "followUp": "not supported yet",
       "reason": "legacy XLS chart metadata is not projected into unified nodes yet"
     },
     {
       "subject": "element",
       "element": "series",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R6b)",
+      "followUp": "not supported yet",
       "reason": "legacy XLS chart series are not projected into unified nodes yet"
     },
     {
       "subject": "element",
       "element": "axis",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R6b)",
+      "followUp": "not supported yet",
       "reason": "legacy XLS chart axes are not projected into unified nodes yet"
     },
     {
       "subject": "element",
       "element": "pivottable",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R6b)",
+      "followUp": "not supported yet",
       "reason": "legacy XLS pivot tables are not projected into unified nodes yet"
     },
     {
       "subject": "element",
       "element": "slicer",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R6b)",
+      "followUp": "not supported yet",
       "reason": "legacy XLS slicers are not projected into unified nodes yet"
     },
     {
       "subject": "element",
       "element": "sparkline",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R6b)",
+      "followUp": "not supported yet",
       "reason": "legacy XLS sparkline groups are not projected into unified nodes yet"
     },
     {
       "subject": "element",
       "element": "mergeCell",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R6b)",
+      "followUp": "not supported yet",
       "reason": "legacy XLS merged ranges are not projected into unified nodes yet"
     },
     {
       "subject": "element",
       "element": "ole",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R6b)",
+      "followUp": "not supported yet",
       "reason": "legacy XLS OLE objects are not projected into unified nodes yet"
     },
     {
       "subject": "element",
       "element": "run",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R6b)",
+      "followUp": "not supported yet",
       "reason": "legacy XLS rich-text runs are flattened by the native cell projection"
     },
     {
       "subject": "element",
       "element": "detectedtable",
       "code": "unsupported_capability",
-      "followUp": "WP10 (record 0339 F5): header-row table detection in queries",
+      "followUp": "header-row table detection in queries",
       "reason": "OfficeCLI's detectedtable is a header-row block found heuristically in unstructured cells and reported by table queries; Litchi's queries return declared tables only"
     },
     {
@@ -2265,7 +2265,7 @@
       "element": "row",
       "context": "header-column-predicates",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R6b)",
+      "followUp": "not supported yet",
       "reason": "legacy XLS does not yet bind row predicate names to header columns"
     },
     {
@@ -2274,7 +2274,7 @@
       "element": "cell",
       "context": "non-worksheet-tab",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R6b)",
+      "followUp": "not supported yet",
       "reason": "chart and macro tabs retain catalog positions but do not expose ordinary worksheet cells"
     },
     {
@@ -2283,7 +2283,7 @@
       "element": "workbook",
       "context": "non-worksheet-content",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R6b)",
+      "followUp": "not supported yet",
       "reason": "text, outline and cell statistics cover ordinary worksheets; chart and macro payloads remain unprojected"
     },
     {
@@ -2291,7 +2291,7 @@
       "element": "workbook",
       "key": "activeTab",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R6b)",
+      "followUp": "not supported yet",
       "reason": "the legacy XLS Package read bridge does not project the workbook window selection"
     },
     {
@@ -2299,7 +2299,7 @@
       "element": "cell",
       "key": "evaluated",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R6b)",
+      "followUp": "not supported yet",
       "reason": "the XLS adapter has no formula evaluator or stable cached-result admission flag"
     },
     {
@@ -2307,7 +2307,7 @@
       "element": "cell",
       "key": "arrayformula",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R6b)",
+      "followUp": "not supported yet",
       "reason": "array-formula metadata is not projected by the Package read bridge"
     },
     {
@@ -2315,7 +2315,7 @@
       "element": "cell",
       "key": "arrayref",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R6b)",
+      "followUp": "not supported yet",
       "reason": "array-formula ranges are not projected by the Package read bridge"
     },
     {
@@ -2324,7 +2324,7 @@
       "element": "workbook",
       "context": "template",
       "code": "unsupported_capability",
-      "followUp": "use Flavor::Document; M2 XLS template creation",
+      "followUp": "use Flavor::Document; XLS template creation",
       "reason": "the XLS creator currently authors ordinary workbooks and refuses template requests"
     },
     {
@@ -2342,7 +2342,7 @@
       "element": "workbook",
       "context": "unrepresentable-initial-metadata",
       "code": "unsupported_capability",
-      "followUp": "CreateOptions::metadata (OLE property sets, record 0254)",
+      "followUp": "CreateOptions::metadata (OLE property sets)",
       "reason": "initial metadata is written to the OLE property sets; identifier, hyperlink_base and unzoned timestamps have no property-set slot and are refused rather than dropped"
     },
     {
@@ -2360,7 +2360,7 @@
       "element": "cell",
       "context": "native-dependency-closure",
       "code": "unsupported_capability",
-      "followUp": "M2 XLS dependency-complete cell removal",
+      "followUp": "XLS dependency-complete cell removal",
       "reason": "formula cells and unrepresented range or drawing dependencies remain refused; removing the last rich or opaque string identity requires a semantic inverse that retains its metadata"
     },
     {
@@ -2369,7 +2369,7 @@
       "element": "cell",
       "context": "non-scalar-properties",
       "code": "unsupported_capability",
-      "followUp": "M2 XLS font, number-format and protection setters",
+      "followUp": "XLS font, number-format and protection setters",
       "reason": "alignment, border line styles and palette fill colors are written through a reused or authored XF; font, border colors, number format, protection, rotation and reading order are read-only because a new XF must keep an existing font/number-format/protection prefix, and formatting is set in its own call rather than together with value, clear or formula"
     },
     {
@@ -2378,7 +2378,7 @@
       "element": "cell",
       "context": "existing-formula-cells",
       "code": "unsupported_capability",
-      "followUp": "M4 XLS dependency-aware formula replacement",
+      "followUp": "XLS dependency-aware formula replacement",
       "reason": "an existing Formula record (possibly a shared, array or table owner, or a string-cache group) is not replaced by a value, clear or new formula; authored formulas use the BIFF8 tokenizer, which refuses 3-D, external and name references, and carry an empty cached result with always-recalculate set"
     },
     {
@@ -2387,7 +2387,7 @@
       "element": "cell",
       "context": "native-dependency-closure",
       "code": "unsupported_capability",
-      "followUp": "M2 XLS dependency-complete scalar replacement",
+      "followUp": "XLS dependency-complete scalar replacement",
       "reason": "admitted scalar storage-family replacements preserve the XF and use native row-block and SST rewrites; packed MulBlank cells, unsupported formula ownership, non-adjacent ExtSST records and removal of the last rich or opaque string identity remain typed refusals until their dependency closures and semantic inverses are represented"
     },
     {
@@ -2396,7 +2396,7 @@
       "element": "sheet",
       "context": "tab-state",
       "code": "unsupported_capability",
-      "followUp": "M2 XLS worksheet visibility setters",
+      "followUp": "XLS worksheet visibility setters",
       "reason": "the XLS writer renames worksheets but does not change hidden or very-hidden tab state; added tabs are visible"
     },
     {
@@ -2405,7 +2405,7 @@
       "element": "sheet",
       "context": "native-dependency-closure",
       "code": "unsupported_capability",
-      "followUp": "M2 XLS dependency-closing tab removal",
+      "followUp": "XLS dependency-closing tab removal",
       "reason": "one ordinary worksheet per call; tabs that an internal 3-D reference range, a sheet-scoped name, a pivot data connection, a drawing or a pivot view still uses are refused, as are the last tab, the last visible tab, chart/macro tabs and macro-bearing or structure-protected workbooks"
     },
     {
@@ -2414,7 +2414,7 @@
       "element": "sheet",
       "context": "native-dependency-closure",
       "code": "unsupported_capability",
-      "followUp": "M2 XLS 3-D range rewriting",
+      "followUp": "XLS 3-D range rewriting",
       "reason": "tab order changes that would make an internal 3-D reference range noncontiguous, or that a protected or shared workbook structure forbids, are refused; cells, rows and columns do not move"
     },
     {
@@ -2423,7 +2423,7 @@
       "element": "row",
       "context": "outline-and-defaults",
       "code": "unsupported_capability",
-      "followUp": "M2 XLS outline and default-layout setters",
+      "followUp": "XLS outline and default-layout setters",
       "reason": "row height and hidden and column width and hidden are written; outline level, collapsed state, clearing a custom size and worksheet default sizes are read-only"
     },
     {
@@ -2432,7 +2432,7 @@
       "element": "namedrange",
       "context": "native-editor",
       "code": "unsupported_capability",
-      "followUp": "M2 XLS defined-name editor",
+      "followUp": "XLS defined-name editor",
       "reason": "defined names are read from the workbook's Lbl records; adding, changing and removing them needs a native Lbl/ExternSheet editor the leaf does not have"
     },
     {
@@ -2441,49 +2441,49 @@
       "element": "row",
       "context": "native-dependency-closure",
       "code": "unsupported_capability",
-      "followUp": "M2 XLS formula and name rewriting for axis shifts",
+      "followUp": "XLS formula and name rewriting for axis shifts",
       "reason": "row and column insertion requires an explicit position and takes no properties; workbooks whose formulas, names, tables or array/shared formulas the native axis shift cannot rewrite are refused, and deletion is limited to empty rows and columns"
     },
     {
       "subject": "view",
       "mode": "issues",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the issues view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "forms",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the forms view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "html",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "svg",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "screenshot",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "pdf",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     }
   ]

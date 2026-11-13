@@ -1,4 +1,4 @@
-//! The PPTX element kinds and their spec table (record 0010 §4.6, §7.2).
+//! The PPTX element kinds and their spec table.
 //!
 //! One [`Kind`] per element of the presentation vocabulary the adapter
 //! knows; [`SPEC`] holds, at each kind's ordinal, its OfficeCLI type,
@@ -46,7 +46,7 @@ pub(crate) enum Kind {
     Group,
     /// A `p:cxnSp`.
     Connector,
-    /// A graphic frame holding a SmartArt diagram (record 0010 M1-Δ15).
+    /// A graphic frame holding a SmartArt diagram.
     SmartArt,
     /// A graphic frame holding an OLE object.
     Ole,
@@ -96,7 +96,7 @@ pub(crate) enum Kind {
     NoteSlide,
     /// The notes master (gap).
     NotesMaster,
-    /// A content node of a SmartArt graphic (record 0284).
+    /// A content node of a SmartArt graphic.
     SmartArtNode,
 }
 
@@ -148,7 +148,7 @@ impl Kind {
     }
 
     /// Whether the kind is an element of a shape tree: what a slide or a
-    /// group lists, each kind with its own counter (record 0010 D5).
+    /// group lists, each kind with its own counter.
     pub(crate) const fn is_tree_kind(self) -> bool {
         matches!(
             self,
@@ -333,7 +333,7 @@ pub(crate) static UNDERLINE: Tokens = Tokens::new(
 );
 
 /// A table cell's vertical anchor, as OfficeCLI prints it (`top`, `center`,
-/// `bottom` for `t`, `ctr`, `b`; record 0333).
+/// `bottom` for `t`, `ctr`, `b`).
 pub(crate) static VALIGN: Tokens = Tokens::new(
     "vertical alignment",
     &["top", "center", "bottom"],
@@ -628,7 +628,7 @@ props! {
 
 props! {
     /// A chart frame (`ChartToNode`): the frame properties, then what its
-    /// chart part says (record 0270). The keys up to `zorder` are
+    /// chart part says. The keys up to `zorder` are
     /// [`FRAME_PROPS`] in the same order.
     CHART_PROPS, ChartKey {
         Name = "name": ValueType::Text,
@@ -676,7 +676,7 @@ const _: () = assert!(ChartKey::Zorder as usize + 1 == FRAME_PROPS.len());
 
 props! {
     /// A picture or a group (`PictureToNode`, `BuildGroupNode`): the frame
-    /// properties, then its click action (record 0325). The keys up to
+    /// properties, then its click action. The keys up to
     /// `zorder` are [`FRAME_PROPS`] in the same order.
     LINKED_FRAME_PROPS, LinkedFrameKey {
         Name = "name": ValueType::Text,
@@ -720,8 +720,8 @@ props! {
 }
 
 props! {
-    /// A SmartArt frame (`SmartArtToNode`), then what its data model says
-    /// (record 0284): the layout token (`list`, `process`, ... for the
+    /// A SmartArt frame (`SmartArtToNode`), then what its data model says:
+    /// the layout token (`list`, `process`, ... for the
     /// layouts Litchi authors, else the last segment of the layout's unique
     /// identifier), the layout's unique identifier and the node count.
     SMARTART_PROPS, SmartArtKey {
@@ -739,7 +739,7 @@ props! {
 }
 
 props! {
-    /// A SmartArt content node (record 0284): its one-based nesting level.
+    /// A SmartArt content node: its one-based nesting level.
     NODE_PROPS, NodeKey {
         Level = "level": ValueType::Int,
     }
@@ -785,7 +785,7 @@ props! {
 }
 
 props! {
-    /// A table row (`table-row.json`, record 0333): its height.
+    /// A table row (`table-row.json`): its height.
     ROW_PROPS, RowKey {
         Height = "height": EXTENT,
     }
@@ -793,7 +793,7 @@ props! {
 
 props! {
     /// A table cell (`TableCellToNode`): its local solid fill, vertical
-    /// anchor and insets (record 0333).
+    /// anchor and insets.
     CELL_PROPS, CellKey {
         Fill = "fill": DRAWING_COLOR,
         Valign = "valign": ValueType::Token(&VALIGN),
@@ -844,7 +844,7 @@ props! {
     /// A modern threaded comment, with replies as child nodes. `initials`,
     /// `resolved` (the thread's `resolved` status) and `parent` (a reply's
     /// thread; never set on a thread, add only) follow OfficeCLI's
-    /// `ModernCommentToNode` (record 0346); the native GUID `id` is raw.
+    /// `ModernCommentToNode`; the native GUID `id` is raw.
     MODERN_COMMENT_PROPS, ModernCommentKey {
         Text = "text": ValueType::Text,
         Author = "author": ValueType::Text,
@@ -864,8 +864,8 @@ props! {
 }
 
 props! {
-    /// A reply in a modern threaded comment; `parent` is its thread's path
-    /// (record 0346), and the native GUID `id` is raw.
+    /// A reply in a modern threaded comment; `parent` is its thread's path,
+    /// and the native GUID `id` is raw.
     REPLY_PROPS, ReplyKey {
         Text = "text": ValueType::Text,
         Author = "author": ValueType::Text,
@@ -878,15 +878,15 @@ props! {
 }
 
 props! {
-    /// An Office Math equation of slide text (`equation.json`, record
-    /// 0321): its OMML as a LaTeX-like formula.
+    /// An Office Math equation of slide text (`equation.json`):
+    /// its OMML as a LaTeX-like formula.
     EQUATION_PROPS, EquationKey {
         Formula = "formula": ValueType::Text,
     }
 }
 
 props! {
-    /// A media picture (`media.json`, record 0321): the frame keys of
+    /// A media picture (`media.json`): the frame keys of
     /// [`FRAME_PROPS`], in order, then the PowerPoint 2010 playback trim in
     /// milliseconds.
     MEDIA_PROPS, MediaKey {
@@ -908,7 +908,7 @@ props! {
 
 props! {
     /// A shape's or run's click action (`PowerPointHandler.Query.cs`
-    /// hyperlink branch, record 0321).
+    /// hyperlink branch).
     HYPERLINK_PROPS, HyperlinkKey {
         Link = "link": ValueType::Text,
         Tooltip = "tooltip": ValueType::Text,
@@ -916,16 +916,15 @@ props! {
 }
 
 props! {
-    /// A table grid column (`PowerPointHandler.Query.cs` `col` branch,
-    /// record 0321).
+    /// A table grid column (`PowerPointHandler.Query.cs` `col` branch).
     COLUMN_PROPS, ColumnKey {
         Width = "width": EXTENT,
     }
 }
 
 props! {
-    /// The presentation theme (`PowerPointHandler.Theme.cs` `GetThemeNode`,
-    /// record 0321): the color scheme's twelve slots, the major and minor
+    /// The presentation theme (`PowerPointHandler.Theme.cs` `GetThemeNode`):
+    /// the color scheme's twelve slots, the major and minor
     /// fonts, and the color scheme's name.
     THEME_PROPS, ThemeKey {
         Dark1 = "dk1": DRAWING_COLOR,
@@ -972,15 +971,15 @@ const ALTERNATE: &str =
 const NOTES_PARTS: &str =
     "notes slides are read through /slide[N]/notes; their parts have no adapter node";
 
-static ZOOM_GAP: GapSpec = element_gap("zoom", "M1-extended", ALTERNATE);
-static MODEL3D_GAP: GapSpec = element_gap("model3d", "M1-extended", ALTERNATE);
+static ZOOM_GAP: GapSpec = element_gap("zoom", "not supported yet", ALTERNATE);
+static MODEL3D_GAP: GapSpec = element_gap("model3d", "not supported yet", ALTERNATE);
 static ANIMATION_GAP: GapSpec = element_gap(
     "animation",
-    "M1-extended",
+    "not supported yet",
     "the timing tree is not read per shape yet",
 );
-static NOTE_SLIDE_GAP: GapSpec = element_gap("noteSlide", "M1-extended", NOTES_PARTS);
-static NOTES_MASTER_GAP: GapSpec = element_gap("notesMaster", "M1-extended", NOTES_PARTS);
+static NOTE_SLIDE_GAP: GapSpec = element_gap("noteSlide", "not supported yet", NOTES_PARTS);
+static NOTES_MASTER_GAP: GapSpec = element_gap("notesMaster", "not supported yet", NOTES_PARTS);
 
 const fn property_gap(
     element: &'static str,
@@ -1120,7 +1119,7 @@ const fn gap(
     }
 }
 
-/// The PPTX spec table (record 0010 §7.2).
+/// The PPTX spec table.
 pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
     root: Presentation,
     elements: &[
@@ -1544,86 +1543,86 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
         ),
     ],
     gaps: &[
-        // OfficeCLI's Mermaid `diagram` (record 0339).
+        // OfficeCLI's Mermaid `diagram`.
         GapSpec {
             subject: Subject::Element("diagram"),
             code: Code::UnsupportedPath,
-            follow_up: "none: out of scope (record 0332, design §10)",
+            follow_up: "none: out of scope",
             reason: "OfficeCLI's diagram renders Mermaid text into shapes or a picture; rendering is outside the unified API, and SmartArt is the smartart element",
         },
         property_gap(
             "presentation",
             "defaultFont",
-            "L-PPTX-R4",
+            "not supported yet",
             "the root does not read the theme part; read bodyFont of /theme",
         ),
         property_gap(
             "slide",
             "background",
-            "M1-extended",
+            "not supported yet",
             "slide backgrounds are not read per slide yet",
         ),
         property_gap(
             "slide",
             "transition",
-            "M1-extended",
+            "not supported yet",
             "slide transitions are not read per slide yet",
         ),
         property_gap(
             "slide",
             "notes",
-            "M1-Δ1",
+            "not supported yet",
             "the slide's notes live in another part; read /slide[N]/notes",
         ),
-        property_gap("shape", "fill", "L-PPTX-R6b", SHAPE_FILL),
-        property_gap("shape", "opacity", "L-PPTX-R6b", SHAPE_FILL),
-        property_gap("shape", "geometry", "L-PPTX-R6b", SHAPE_FILL),
-        property_gap("shape", "line", "L-PPTX-R6b", SHAPE_FILL),
-        property_gap("shape", "lineWidth", "L-PPTX-R6b", SHAPE_FILL),
-        property_gap("shape", "valign", "L-PPTX-R7b", BODY_PROPS),
-        property_gap("shape", "margin", "L-PPTX-R7b", BODY_PROPS),
-        property_gap("shape", "wrap", "L-PPTX-R7b", BODY_PROPS),
-        property_gap("shape", "autoFit", "L-PPTX-R7b", BODY_PROPS),
-        property_gap("shape", "textDirection", "L-PPTX-R7b", BODY_PROPS),
+        property_gap("shape", "fill", "not supported yet", SHAPE_FILL),
+        property_gap("shape", "opacity", "not supported yet", SHAPE_FILL),
+        property_gap("shape", "geometry", "not supported yet", SHAPE_FILL),
+        property_gap("shape", "line", "not supported yet", SHAPE_FILL),
+        property_gap("shape", "lineWidth", "not supported yet", SHAPE_FILL),
+        property_gap("shape", "valign", "not supported yet", BODY_PROPS),
+        property_gap("shape", "margin", "not supported yet", BODY_PROPS),
+        property_gap("shape", "wrap", "not supported yet", BODY_PROPS),
+        property_gap("shape", "autoFit", "not supported yet", BODY_PROPS),
+        property_gap("shape", "textDirection", "not supported yet", BODY_PROPS),
         property_gap(
             "shape",
             "list",
-            "M1-extended",
+            "not supported yet",
             "bullets are read but not yet named in OfficeCLI's list vocabulary",
         ),
         property_gap(
             "paragraph",
             "list",
-            "M1-extended",
+            "not supported yet",
             "bullets are read but not yet named in OfficeCLI's list vocabulary",
         ),
         property_gap(
             "table",
             "colWidths",
-            "L-PPTX-R8",
+            "not supported yet",
             "the table node does not list its grid widths; read /slide[N]/table[N]/col[N]",
         ),
         property_gap(
             "tc",
             "colspan",
-            "L-PPTX-R8",
+            "not supported yet",
             "the table reader does not read cell properties yet",
         ),
         property_gap(
             "tc",
             "rowspan",
-            "L-PPTX-R8",
+            "not supported yet",
             "the table reader does not read cell properties yet",
         ),
-        property_gap("picture", "crop", "0333-F4", CROP),
-        property_gap("picture", "cropLeft", "0333-F4", CROP),
-        property_gap("picture", "cropTop", "0333-F4", CROP),
-        property_gap("picture", "cropRight", "0333-F4", CROP),
-        property_gap("picture", "cropBottom", "0333-F4", CROP),
+        property_gap("picture", "crop", "not supported yet", CROP),
+        property_gap("picture", "cropLeft", "not supported yet", CROP),
+        property_gap("picture", "cropTop", "not supported yet", CROP),
+        property_gap("picture", "cropRight", "not supported yet", CROP),
+        property_gap("picture", "cropBottom", "not supported yet", CROP),
         property_gap(
             "picture",
             "mediaType",
-            "L-PPTX-R11",
+            "not supported yet",
             "a picture node does not report its media kind; read /slide[N]/video[N] or audio[N]",
         ),
     ],
@@ -1640,12 +1639,12 @@ pub(super) enum ShapeSetter {
     Height,
     /// Rich formatting applied to every paragraph and run of the text body.
     Format(TextSetter),
-    /// The click action (`link`, `tooltip`; record 0325), written through the
+    /// The click action (`link`, `tooltip`), written through the
     /// hyperlink verbs rather than the text edit.
     Click(ClickKey),
 }
 
-/// The click-action keys of shapes, runs, pictures and groups (record 0325).
+/// The click-action keys of shapes, runs, pictures and groups.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(super) enum ClickKey {
     Link,
@@ -1669,22 +1668,22 @@ pub(super) enum TextSetter {
     ShapeFill,
     /// A shape's preset geometry (`a:prstGeom`).
     Geometry,
-    /// A run's click action (record 0325), written through the hyperlink
+    /// A run's click action, written through the hyperlink
     /// verbs rather than the text edit.
     Click(ClickKey),
-    /// `a:rPr@u` (record 0333).
+    /// `a:rPr@u`.
     Underline,
-    /// `a:rPr@strike` (record 0333).
+    /// `a:rPr@strike`.
     Strike,
-    /// A table cell's vertical anchor (record 0333).
+    /// A table cell's vertical anchor.
     Valign,
-    /// One table cell inset (record 0333).
+    /// One table cell inset.
     Margin(litchi_pptx::opened::CellMargin),
-    /// Every table cell inset at once (`padding`, record 0333).
+    /// Every table cell inset at once (`padding`).
     Padding,
 }
 
-/// A text write entry that a new paragraph or run also takes (record 0333).
+/// A text write entry that a new paragraph or run also takes.
 const fn text_add_entry(spec: PropSpec, setter: TextSetter) -> crate::registry::Entry<TextSetter> {
     let mut entry = text_entry(spec, setter);
     entry.access = crate::registry::Access::SetAndAdd(setter);
@@ -1890,7 +1889,7 @@ const fn cell_write_entries() -> [crate::registry::Entry<TextSetter>; CELL_WRITE
     entries
 }
 /// OfficeCLI's table-cell aliases of writable properties
-/// (`table-cell.json`, record 0333).
+/// (`table-cell.json`).
 const CELL_WRITE_ALIASES: [crate::registry::Alias; 17] = {
     use crate::registry::Alias;
     const BASE: usize = CELL_PROPS.len();
@@ -1932,8 +1931,8 @@ const fn shape_write_entries() -> [crate::registry::Entry<ShapeSetter>; SHAPE_WR
         clear: true,
     };
     let mut entries = [text; SHAPE_WRITE_COUNT];
-    // Write-only until the shape record keeps its `p:spPr` fill and geometry
-    // (read gap L-PPTX-R6b); writable since record 0269.
+    // Write-only until the shape record keeps its `p:spPr` fill and geometry;
+    // writable.
     entries[SHAPE_PROPS.len() + 1] = Entry {
         spec: write_only("fill", ValueType::Text),
         access: Access::SetAndAdd(ShapeSetter::Format(TextSetter::ShapeFill)),
@@ -1983,7 +1982,7 @@ const fn shape_write_entries() -> [crate::registry::Entry<ShapeSetter>; SHAPE_WR
             None
         };
         if let Some(setter) = setter {
-            // Text boxes take their formatting at creation too (record 0269):
+            // Text boxes take their formatting at creation too:
             // the native add and the body formatting stage in one edit.
             entries[index].access = Access::SetAndAdd(setter);
             if matches!(setter, ShapeSetter::Format(_)) {
@@ -2054,7 +2053,7 @@ pub(crate) const PARAGRAPH_PROP_ALIASES: &[crate::registry::PropAlias] =
 pub(crate) const RUN_PROP_ALIASES: &[crate::registry::PropAlias] = &RUN_WRITE_TABLE.prop_aliases();
 
 /// The placeholder's capability rows: the shape's, with `add` only for the
-/// keys a new placeholder takes, `phType` and `text` (record 0346).
+/// keys a new placeholder takes, `phType` and `text`.
 const fn placeholder_capability_props() -> [PropSpec; SHAPE_WRITE_COUNT] {
     let mut props = SHAPE_WRITE_TABLE.readable();
     let mut index = 0;
@@ -2082,7 +2081,7 @@ const fn const_eq(left: &str, right: &str) -> bool {
     true
 }
 
-/// A new placeholder's keys (record 0346): its type, required, and text.
+/// A new placeholder's keys: its type, required, and text.
 #[derive(Clone, Copy)]
 pub(super) enum PlaceholderSetter {
     Kind,
@@ -2120,13 +2119,11 @@ pub(super) enum SlideProperty {
     Hidden,
     /// Speaker-notes text; set only, routed before slide metadata.
     Notes,
-    /// The slide's direct transition, OfficeCLI's shorthand (record 0269).
+    /// The slide's direct transition, OfficeCLI's shorthand.
     Transition,
-    /// OfficeCLI's `title` shorthand on add: the title placeholder's text
-    /// (record 0346).
+    /// OfficeCLI's `title` shorthand on add: the title placeholder's text.
     Title,
-    /// OfficeCLI's `text` shorthand on add: the body placeholder's text
-    /// (record 0346).
+    /// OfficeCLI's `text` shorthand on add: the body placeholder's text.
     Text,
 }
 const SLIDE_WRITE_COUNT: usize = SLIDE_PROPS.len() + 4;
@@ -2138,7 +2135,7 @@ const fn slide_write_entries() -> [crate::registry::Entry<SlideProperty>; SLIDE_
         entries[index] = Entry::read(SLIDE_PROPS[index]);
         index += 1;
     }
-    // Settable since record 0346: the slide's layout relationship.
+    // Settable: the slide's layout relationship.
     entries[0] = Entry {
         spec: SLIDE_PROPS[0],
         access: Access::SetAndAdd(SlideProperty::Layout),
@@ -2163,7 +2160,7 @@ const fn slide_write_entries() -> [crate::registry::Entry<SlideProperty>; SLIDE_
         constraint: Constraint::None,
         clear: true,
     };
-    // Write-only until slides read their transition (read gap M1-extended).
+    // Write-only until slides read their transition.
     entries[SLIDE_PROPS.len() + 1] = Entry {
         spec: write_only("transition", ValueType::Text),
         // Set only: a source-backed slide insertion refuses markup
@@ -2191,7 +2188,7 @@ const fn slide_write_entries() -> [crate::registry::Entry<SlideProperty>; SLIDE_
 pub(super) const SLIDE_WRITE_TABLE: crate::registry::Table<SlideProperty, SLIDE_WRITE_COUNT, 0> =
     crate::registry::Table::new(slide_write_entries(), []);
 
-/// Speaker-notes `text` (set and, since record 0346, add; null clears the
+/// Speaker-notes `text` (set and add; null clears the
 /// text).
 const fn notes_write_entries() -> [crate::registry::Entry<()>; NOTES_PROPS.len()] {
     use crate::registry::{Access, Constraint, Entry};
@@ -2215,7 +2212,7 @@ pub(super) enum CommentSetter {
     Date,
     X,
     Y,
-    /// The reading direction of the text (`add` only, record 0346):
+    /// The reading direction of the text (`add` only):
     /// `rtl` prefixes a right-to-left mark, as OfficeCLI does, since
     /// `p:cm` has no direction attribute.
     Direction,
@@ -2227,7 +2224,7 @@ const fn comment_write_entries() -> [crate::registry::Entry<CommentSetter>; COMM
     let mut index = 0;
     while index < COMMENT_PROPS.len() {
         let spec = COMMENT_PROPS[index];
-        // Author, initials and date are settable since record 0346.
+        // Author, initials and date are settable.
         let access = if index == CommentKey::Text as usize {
             Some(Access::SetAndAdd(CommentSetter::Text))
         } else if index == CommentKey::Author as usize {
@@ -2279,7 +2276,7 @@ pub(super) const COMMENT_WRITE_TABLE: crate::registry::Table<
 );
 pub(crate) const COMMENT_CAPABILITY_PROPS: &[PropSpec] = &COMMENT_WRITE_TABLE.readable();
 
-/// Modern comment and reply assignments (record 0346).
+/// Modern comment and reply assignments.
 #[derive(Clone, Copy)]
 pub(super) enum ModernSetter {
     Text,
@@ -2374,13 +2371,13 @@ pub(crate) const REPLY_CAPABILITY_PROPS: &[PropSpec] = &REPLY_WRITE_TABLE.readab
 pub(super) enum PictureSetter {
     Src,
     Name,
-    /// The alternative text (`cNvPr@descr`, record 0333).
+    /// The alternative text (`cNvPr@descr`).
     Alt,
     X,
     Y,
     Width,
     Height,
-    /// The click action (record 0325).
+    /// The click action.
     Click(ClickKey),
 }
 const PICTURE_WRITE_COUNT: usize = LINKED_FRAME_PROPS.len() + 1;
@@ -2414,8 +2411,7 @@ const fn picture_write_entries() -> [crate::registry::Entry<PictureSetter>; PICT
                 Some(setter) => Entry {
                     spec,
                     // Pictures are named at creation only, as in OfficeCLI;
-                    // their frame, alternative text and image are also set
-                    // (record 0333).
+                    // their frame, alternative text and image are also set.
                     access: if matches!(setter, PictureSetter::Name) {
                         Access::Add(setter)
                     } else {
@@ -2467,7 +2463,7 @@ pub(super) const PICTURE_WRITE_TABLE: crate::registry::Table<
 );
 pub(crate) const PICTURE_CAPABILITY_PROPS: &[PropSpec] = &PICTURE_WRITE_TABLE.readable();
 
-/// Group assignments: its click action (record 0325).
+/// Group assignments: its click action.
 const fn group_write_entries() -> [crate::registry::Entry<ClickKey>; LINKED_FRAME_PROPS.len()] {
     use crate::registry::{Access, Constraint, Entry};
     let mut entries = [Entry::read(LINKED_FRAME_PROPS[0]); LINKED_FRAME_PROPS.len()];
@@ -2503,7 +2499,7 @@ pub(super) const GROUP_WRITE_TABLE: crate::registry::Table<
 pub(crate) const GROUP_CAPABILITY_PROPS: &[PropSpec] = &GROUP_WRITE_TABLE.readable();
 pub(crate) const SLIDE_CAPABILITY_PROPS: &[PropSpec] = &SLIDE_WRITE_TABLE.readable();
 
-/// Chart assignments (record 0270): `add` builds a chart, `set` edits the
+/// Chart assignments: `add` builds a chart, `set` edits the
 /// title, legend, categories and category-axis title of an existing one.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum ChartSetter {
@@ -2523,8 +2519,7 @@ pub(super) enum ChartSetter {
     Format(crate::format::chart::FormatKey),
     /// `series{N}`, by its zero-based number.
     Numbered(u8),
-    /// `series{N}.name`, `.values` or `.color`, by the zero-based number
-    /// (record 0271).
+    /// `series{N}.name`, `.values` or `.color`, by the zero-based number.
     Dotted(u8, crate::format::chart::SeriesField),
 }
 const CHART_FORMAT_START: usize = CHART_PROPS.len() + 2;
@@ -2657,7 +2652,7 @@ pub(super) const CHART_WRITE_TABLE: crate::registry::Table<ChartSetter, CHART_WR
     );
 pub(crate) const CHART_CAPABILITY_PROPS: &[PropSpec] = &CHART_WRITE_TABLE.readable();
 
-/// Chart-series assignments (record 0270).
+/// Chart-series assignments.
 #[derive(Clone, Copy)]
 pub(super) enum SeriesSetter {
     Name,
@@ -2696,7 +2691,7 @@ pub(super) const SERIES_WRITE_TABLE: crate::registry::Table<
 > = crate::registry::Table::new(series_write_entries(), []);
 pub(crate) const SERIES_CAPABILITY_PROPS: &[PropSpec] = &SERIES_WRITE_TABLE.readable();
 
-/// Chart-axis assignments (record 0270).
+/// Chart-axis assignments.
 #[derive(Clone, Copy)]
 pub(super) enum AxisSetter {
     Title,
@@ -2730,7 +2725,7 @@ pub(super) const AXIS_WRITE_TABLE: crate::registry::Table<AxisSetter, { AXIS_PRO
     crate::registry::Table::new(axis_write_entries(), []);
 pub(crate) const AXIS_CAPABILITY_PROPS: &[PropSpec] = &AXIS_WRITE_TABLE.readable();
 
-/// SmartArt assignments (record 0284): `add` authors a graphic from a text
+/// SmartArt assignments: `add` authors a graphic from a text
 /// outline with a layout; `set` rebuilds it with another layout or outline.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum SmartArtSetter {
@@ -2802,7 +2797,7 @@ pub(super) const SMARTART_WRITE_TABLE: crate::registry::Table<
 > = crate::registry::Table::new(smartart_write_entries(), []);
 pub(crate) const SMARTART_CAPABILITY_PROPS: &[PropSpec] = &SMARTART_WRITE_TABLE.readable();
 
-/// SmartArt node assignments (record 0284): the node's text.
+/// SmartArt node assignments: the node's text.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum NodeSetter {
     Text,
@@ -2823,7 +2818,7 @@ pub(super) const NODE_WRITE_TABLE: crate::registry::Table<NodeSetter, NODE_WRITE
     crate::registry::Table::new(node_write_entries(), []);
 pub(crate) const NODE_CAPABILITY_PROPS: &[PropSpec] = &NODE_WRITE_TABLE.readable();
 
-/// Theme assignments (record 0321): every theme property is settable; the
+/// Theme assignments: every theme property is settable; the
 /// setter is the key it writes.
 const fn theme_write_entries() -> [crate::registry::Entry<ThemeKey>; THEME_PROPS.len()] {
     use crate::registry::{Access, Constraint, Entry};
@@ -2876,7 +2871,7 @@ pub(super) const THEME_WRITE_TABLE: crate::registry::Table<ThemeKey, { THEME_PRO
 pub(crate) const THEME_CAPABILITY_PROPS: &[PropSpec] = &THEME_WRITE_TABLE.readable();
 
 /// A catalog entry's write table: `name` (index 0 of its read table) is
-/// settable (record 0321).
+/// settable.
 const fn named_write_entries<const N: usize>(
     props: &[PropSpec],
 ) -> [crate::registry::Entry<()>; N] {
@@ -2902,7 +2897,7 @@ pub(super) const LAYOUT_WRITE_TABLE: crate::registry::Table<(), { LAYOUT_PROPS.l
     crate::registry::Table::new(named_write_entries(LAYOUT_PROPS), []);
 pub(crate) const LAYOUT_CAPABILITY_PROPS: &[PropSpec] = &LAYOUT_WRITE_TABLE.readable();
 
-/// Table insertion assignments (record 0333): OfficeCLI's `add --type
+/// Table insertion assignments: OfficeCLI's `add --type
 /// table` keys Litchi authors: `rows`, `cols`, `data`, `name` and the frame.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum TableSetter {
@@ -2915,11 +2910,11 @@ pub(super) enum TableSetter {
     Height,
     Data,
     /// An `a:tblPr` style switch, by its position in [`TABLE_SWITCHES`]
-    /// (record 0342: set only).
+    /// (set only).
     Switch(u8),
 }
 
-/// The table style switches a table-level `set` writes (record 0342), in
+/// The table style switches a table-level `set` writes, in
 /// [`TableSetter::Switch`] order.
 pub(super) const TABLE_SWITCHES: [TableKey; 6] = [
     TableKey::FirstRow,
@@ -2964,7 +2959,7 @@ const fn table_write_entries() -> [crate::registry::Entry<TableSetter>; TABLE_WR
         entries[index] = match setter {
             Some(setter) => Entry {
                 spec,
-                // Record 0342: `name` is set too, and the style switches
+                // `name` is set too, and the style switches
                 // are set only.
                 access: match setter {
                     TableSetter::Name => Access::SetAndAdd(setter),
@@ -3010,7 +3005,7 @@ pub(super) const TABLE_WRITE_TABLE: crate::registry::Table<TableSetter, TABLE_WR
     );
 pub(crate) const TABLE_CAPABILITY_PROPS: &[PropSpec] = &TABLE_WRITE_TABLE.readable();
 
-/// Table row assignments (record 0333): `height` on `add` and `set`; on
+/// Table row assignments: `height` on `add` and `set`; on
 /// `add`, OfficeCLI's `cols` check and `c1`…`c20` seed texts.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum RowSetter {
@@ -3059,7 +3054,7 @@ pub(super) const ROW_WRITE_TABLE: crate::registry::Table<RowSetter, ROW_WRITE_CO
     crate::registry::Table::new(row_write_entries(), []);
 pub(crate) const ROW_CAPABILITY_PROPS: &[PropSpec] = &ROW_WRITE_TABLE.readable();
 
-/// Table column assignments (record 0321): `width` on `add` and `set`, seed
+/// Table column assignments: `width` on `add` and `set`, seed
 /// `text` on `add` (OfficeCLI's `table-column.json`).
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum ColumnSetter {
@@ -3090,7 +3085,7 @@ pub(super) const COLUMN_WRITE_TABLE: crate::registry::Table<ColumnSetter, 2, 0> 
     crate::registry::Table::new(column_write_entries(), []);
 pub(crate) const COLUMN_CAPABILITY_PROPS: &[PropSpec] = &COLUMN_WRITE_TABLE.readable();
 
-/// Hyperlink assignments (record 0321): `link` (alias `url`) and `tooltip`
+/// Hyperlink assignments: `link` (alias `url`) and `tooltip`
 /// on `add` and `set`.
 const fn hyperlink_write_entries() -> [crate::registry::Entry<HyperlinkKey>; 2] {
     use crate::registry::{Access, Constraint, Entry};
@@ -3119,7 +3114,7 @@ pub(super) const HYPERLINK_WRITE_TABLE: crate::registry::Table<HyperlinkKey, 2, 
     );
 pub(crate) const HYPERLINK_CAPABILITY_PROPS: &[PropSpec] = &HYPERLINK_WRITE_TABLE.readable();
 
-/// Media picture assignments (record 0321): `add` embeds a file (`src`)
+/// Media picture assignments: `add` embeds a file (`src`)
 /// with its poster image (`poster`), a name and a frame.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum MediaSetter {

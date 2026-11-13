@@ -10,7 +10,7 @@ use super::number::{DotNetDouble, parse_integer, parse_number};
 use super::token::Tokens;
 
 /// The scalar type of a property: how its text is coerced and how its value
-/// prints. A property registry entry (M2) and a node view key (M1) carry one;
+/// prints. A property registry entry and a node view key carry one;
 /// a query compiles each literal against the key's type once.
 ///
 /// ```
@@ -43,8 +43,8 @@ pub enum ValueType {
     Length(LengthSpec),
     /// A color in a [`ColorContext`].
     Color(ColorContext),
-    /// A list of text items (the metadata keywords, record 0354). Text
-    /// coerces to itself: the format splits it at `;` and `,`.
+    /// A list of text items (the metadata keywords). Text coerces to
+    /// itself: the format splits it at `;` and `,`.
     List,
 }
 

@@ -10,9 +10,9 @@ pub(crate) struct Matcher<'p> {
     folded: Option<Box<[char]>>,
     /// The case-sensitive searcher, built once: `str::find` builds its
     /// searcher on every call, which cost more than the scan of a short
-    /// paragraph (record 0302). A byte match of a UTF-8 pattern in UTF-8
-    /// text starts and ends on character boundaries, so its offsets are the
-    /// ones `str::find` reports.
+    /// paragraph. A byte match of a UTF-8 pattern in UTF-8 text starts and
+    /// ends on character boundaries, so its offsets are the ones
+    /// `str::find` reports.
     finder: Option<memchr::memmem::Finder<'p>>,
     whole_word: bool,
 }

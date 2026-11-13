@@ -1,4 +1,4 @@
-//! XLSX rich-text runs (record 0338): `/<sheet>/<A1>/run[N]` (also
+//! XLSX rich-text runs: `/<sheet>/<A1>/run[N]` (also
 //! `r[N]`), OfficeCLI's `run` element.
 //!
 //! A run is one `r` of a cell's rich string: an inline rich string or a
@@ -11,7 +11,7 @@
 //! Writes go through [`litchi_xlsx::RichRun::apply_font`], which keeps every
 //! run property a change does not name, and publish the cell's runs as its
 //! own inline rich string ([`litchi_xlsx::workbook::edit::Sheet::set_rich_text`]),
-//! as find/replace does (record 0295). `set` on a run changes it, `add`
+//! as find/replace does. `set` on a run changes it, `add`
 //! under a cell inserts one (a plain text cell becomes rich, its text the
 //! first run, as OfficeCLI's `AddRun` does), `remove` deletes one; as
 //! OfficeCLI's removal, no run left is empty text and one unformatted run

@@ -1,5 +1,4 @@
-//! Handle for PowerPoint binary (`.ppt`) inputs (record 0003 §2.3, M0a step
-//! S5d).
+//! Handle for PowerPoint binary (`.ppt`) inputs.
 //!
 //! The facade reaches the PPT reader by two routes, and the handle has one
 //! crate-internal constructor for each:
@@ -92,7 +91,7 @@ pub(crate) const WRITE_GAPS: &[GapSpec] = &[
             context: "object-storage",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0323-F8 PPT OLE object writes",
+        follow_up: "PPT OLE object writes",
         reason: "embedding an OLE object needs a new ExOleObjStg storage, an ExOleEmbedContainer and a picture frame with its preview; OLE frames are read (progId, linked, frame) only",
     },
     GapSpec {
@@ -102,7 +101,7 @@ pub(crate) const WRITE_GAPS: &[GapSpec] = &[
             context: "object-storage",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0323-F8 PPT OLE object writes",
+        follow_up: "PPT OLE object writes",
         reason: "OLE frame geometry and object replacement are not written; the frame is read only",
     },
     GapSpec {
@@ -112,7 +111,7 @@ pub(crate) const WRITE_GAPS: &[GapSpec] = &[
             context: "media-objects",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0323-F9 PPT media writes",
+        follow_up: "PPT media writes",
         reason: "a movie or sound needs an external-media object, its sound collection entry and a media picture frame; media frames are read only",
     },
     GapSpec {
@@ -122,7 +121,7 @@ pub(crate) const WRITE_GAPS: &[GapSpec] = &[
             context: "media-objects",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0323-F9 PPT media writes",
+        follow_up: "PPT media writes",
         reason: "media frame geometry and playback are not written through the media element; the frame is read only",
     },
     GapSpec {
@@ -132,7 +131,7 @@ pub(crate) const WRITE_GAPS: &[GapSpec] = &[
             context: "theme-package",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0323-F10 PPT theme writes",
+        follow_up: "PPT theme writes",
         reason: "the theme is an OPC package inside each master's RoundTripThemeAtom; re-encoding it (and the masters' legacy color schemes that PowerPoint 97-2003 reads) is not modeled",
     },
     GapSpec {
@@ -142,7 +141,7 @@ pub(crate) const WRITE_GAPS: &[GapSpec] = &[
             context: "graph-object",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0323-F7 PPT chart series and axes",
+        follow_up: "PPT chart series and axes",
         reason: "the embedded Graph object's chart stream is read through MS-OGRAPH; chart, series and axis writes are not integrated",
     },
     GapSpec {
@@ -152,7 +151,7 @@ pub(crate) const WRITE_GAPS: &[GapSpec] = &[
             context: "text-positions",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0323-F4 PPT run and line-break insertion and removal",
+        follow_up: "PPT run and line-break insertion and removal",
         reason: "inserting or removing a run or line break changes the text length, which every position-dependent record (style, special-information and interaction runs, fields) of the body would have to follow; runs are formatted and their text replaced in place",
     },
     GapSpec {
@@ -162,7 +161,7 @@ pub(crate) const WRITE_GAPS: &[GapSpec] = &[
             context: "text-positions",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0323-F4 PPT run and line-break insertion and removal",
+        follow_up: "PPT run and line-break insertion and removal",
         reason: "removing a run changes the text length that the body's position-dependent records hold",
     },
     GapSpec {
@@ -172,7 +171,7 @@ pub(crate) const WRITE_GAPS: &[GapSpec] = &[
             context: "text-positions",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0323-F4 PPT run and line-break insertion and removal",
+        follow_up: "PPT run and line-break insertion and removal",
         reason: "a line break is a vertical-tab character of the text atom; inserting one changes the text length that the body's position-dependent records hold",
     },
     GapSpec {
@@ -182,7 +181,7 @@ pub(crate) const WRITE_GAPS: &[GapSpec] = &[
             context: "table-layout",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0323-F1 PPT table re-layout",
+        follow_up: "PPT table re-layout",
         reason: "a legacy table is a group of positioned cell shapes and border lines; inserting a row would re-lay out every later cell, line and the group anchor, which the leaf does not model",
     },
     GapSpec {
@@ -192,7 +191,7 @@ pub(crate) const WRITE_GAPS: &[GapSpec] = &[
             context: "table-layout",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0323-F1 PPT table re-layout",
+        follow_up: "PPT table re-layout",
         reason: "a legacy table is a group of positioned cell shapes and border lines; inserting a column would re-lay out every later cell, line and the group anchor, which the leaf does not model",
     },
     GapSpec {
@@ -202,7 +201,7 @@ pub(crate) const WRITE_GAPS: &[GapSpec] = &[
             context: "table-layout",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0323-F1 PPT table re-layout",
+        follow_up: "PPT table re-layout",
         reason: "removing a row would re-lay out the table group's later cells and border lines, which the leaf does not model",
     },
     GapSpec {
@@ -212,7 +211,7 @@ pub(crate) const WRITE_GAPS: &[GapSpec] = &[
             context: "table-layout",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0323-F1 PPT table re-layout",
+        follow_up: "PPT table re-layout",
         reason: "removing a column would re-lay out the table group's later cells and border lines, which the leaf does not model",
     },
     GapSpec {
@@ -222,7 +221,7 @@ pub(crate) const WRITE_GAPS: &[GapSpec] = &[
             context: "native-cell-text",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0323-F2 PPT nested tables and rich cell text",
+        follow_up: "PPT nested tables and rich cell text",
         reason: "cell text follows the shape-text closure rules (a changed length refuses over several formatting runs or position-dependent records); tables inside groups and merged-away cells are refused",
     },
     GapSpec {
@@ -242,7 +241,7 @@ pub(crate) const WRITE_GAPS: &[GapSpec] = &[
             context: "native-slide-dependencies",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 PPT dependency-preserving slide removal",
+        follow_up: "PPT dependency-preserving slide removal",
         reason: "slide removal requires native closure admission; unsupported dependent records refuse atomically",
     },
     GapSpec {
@@ -252,7 +251,7 @@ pub(crate) const WRITE_GAPS: &[GapSpec] = &[
             context: "native-visibility-record",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 PPT visibility atom insertion",
+        follow_up: "PPT visibility atom insertion",
         reason: "slide visibility writes require one native-admitted SSSlideInfoAtom; insertion of missing timing records is not integrated",
     },
     GapSpec {
@@ -262,7 +261,7 @@ pub(crate) const WRITE_GAPS: &[GapSpec] = &[
             context: "native-shape-preservation",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 PPT nested-shape and rich-text edits",
+        follow_up: "PPT nested-shape and rich-text edits",
         reason: "top-level shape, outline placeholder, paragraph and notes text and shape anchors require native closure admission: a changed text length refuses where interactions, field metacharacters or several formatting or language runs hold character positions; nested groups, new text bodies and rich-text formatting remain unsupported",
     },
     GapSpec {
@@ -272,7 +271,7 @@ pub(crate) const WRITE_GAPS: &[GapSpec] = &[
             context: "native-write-coalescing",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 PPT broader native edit runs and performance qualification",
+        follow_up: "PPT broader native edit runs and performance qualification",
         reason: "distinct direct shape text/geometry sets share native transactions; selectors, repeated shapes, reads and structural edits close the run; broader coalescing and frozen-harness qualification remain open",
     },
 ];
@@ -291,11 +290,11 @@ pub(crate) use write::WriteCommit;
 pub struct Ppt(Arc<Opened<PptState>>);
 
 struct PptState {
-    /// The reader every M0a read goes through, built at open exactly as the
+    /// The reader every read goes through, built at open exactly as the
     /// facade builds it.
     presentation: litchi_ppt::Presentation,
-    /// The OLE property-set projection, read at open as the facade reads it
-    /// (record 0003 §1.6); `None` when the streams are absent, unreadable or
+    /// The OLE property-set projection, read at open as the facade reads it;
+    /// `None` when the streams are absent, unreadable or
     /// empty.
     metadata: Option<Metadata>,
     /// The source limits the reader was built under, inherited by editors.
@@ -308,7 +307,7 @@ struct PptState {
     owner: PptOwner,
 }
 
-/// The two source states of [`Ppt`] (record 0003 §2.3).
+/// The two source states of [`Ppt`].
 enum PptOwner {
     /// Filesystem route: the positional package detection opened.
     Source(Package),
@@ -790,7 +789,7 @@ impl Ppt {
     /// and the reader is built (with `password` when [`Locked::unlock`]
     /// supplies one). Then the parse moves into the retained source; no byte
     /// is copied and the container is not indexed again. This keeps the
-    /// input alive for as long as the handle (risk R5);
+    /// input alive for as long as the handle;
     /// [`OpenOptions::retain_source`]`(false)` releases it instead.
     ///
     /// An encrypted presentation opened without a password comes back as
@@ -838,7 +837,7 @@ impl Ppt {
         Self(self.0.removal_authorized())
     }
 
-    /// This handle's signature disposition (record 0013).
+    /// This handle's signature disposition.
     pub(crate) fn signature(&self) -> Signature {
         self.0.signature()
     }
@@ -1192,7 +1191,7 @@ mod tests {
         let bytes = fixture("SampleShow.ppt");
         let length = u64::try_from(bytes.len()).unwrap();
         let retained = open_bytes(bytes.clone(), &OpenOptions::default()).unwrap();
-        // Risk R5: the byte route now keeps exactly the input alive.
+        // The byte route now keeps exactly the input alive.
         assert_eq!(retained.retained_input_len(), Some(length));
 
         let released = open_bytes(bytes, &OpenOptions::default().retain_source(false)).unwrap();

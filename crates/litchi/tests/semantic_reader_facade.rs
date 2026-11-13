@@ -1,7 +1,7 @@
-//! The iWork semantic namespaces hold types only (record 0334): the facade's
-//! one opener is `litchi::open`, and format-specific reads go through the
-//! leaf openers the format modules re-export. These tests read each fixture
-//! both ways and keep the leaf readers' typed wrong-family routing.
+//! The iWork semantic namespaces hold types only: the facade's one opener is
+//! `litchi::open`, and format-specific reads go through the leaf openers the
+//! format modules re-export. These tests read each fixture both ways and
+//! keep the leaf readers' typed wrong-family routing.
 
 #[cfg(feature = "pages")]
 #[test]

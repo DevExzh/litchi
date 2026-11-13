@@ -74,7 +74,7 @@ static OPERATION_GAPS: [GapSpec; 5] = [
             context: "a shape other than a text rectangle",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0282 ODG typed shape creation",
+        follow_up: "ODG typed shape creation",
         reason: "the adapter adds text rectangles; other geometries need typed shape values",
     },
     GapSpec {
@@ -84,7 +84,7 @@ static OPERATION_GAPS: [GapSpec; 5] = [
             context: "a group member, or a shape whose identity a connector or link on its page names, into another page",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0292 ODG cross-page reference rewriting",
+        follow_up: "ODG cross-page reference rewriting",
         reason: "a shape moves to another page with its bytes unchanged; group members move with their group, and an identity dependency that would cross pages is refused rather than left dangling",
     },
     GapSpec {
@@ -94,7 +94,7 @@ static OPERATION_GAPS: [GapSpec; 5] = [
             context: "two groups on different pages",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0292 ODG cross-page group swap",
+        follow_up: "ODG cross-page group swap",
         reason: "a cross-page swap is two transfers addressed by position; two group subtrees shift each other's positions, so move them one at a time",
     },
     GapSpec {
@@ -104,7 +104,7 @@ static OPERATION_GAPS: [GapSpec; 5] = [
             context: "a page another page's `draw:page-name` names",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0288 ODG reference rewriting",
+        follow_up: "ODG reference rewriting",
         reason: "the leaf refuses removing a page a link or thumbnail references rather than leaving it dangling",
     },
     super::METADATA_PATH_GAP,
@@ -568,7 +568,7 @@ fn anchor(file: &OdfTree, path: &PathArg<'_>, kind: Kind) -> Result<usize> {
 }
 
 /// Move a page within the drawing, or a shape within its page or into
-/// another page (record 0292).
+/// another page.
 pub(crate) fn move_to(
     file: &OdfTree,
     package: &litchi_odg::Package,
@@ -670,7 +670,7 @@ pub(crate) fn swap(
                     Code::UnsupportedCapability,
                     "swapping two ODG groups across pages is not supported; move them one at a time",
                 )
-                .with_suggestion("follow-up: 0292 ODG cross-page group swap"));
+                .with_suggestion("follow-up: ODG cross-page group swap"));
             };
             edit.move_shape_to_page(a_page, a_shape, b_page, b_shape)
                 .map_err(staging)?;

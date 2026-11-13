@@ -1,4 +1,4 @@
-//! DOC marks under the DOCX vocabulary (record 0324): paragraph
+//! DOC marks under the DOCX vocabulary: paragraph
 //! `hyperlink[M]` (main-story `HYPERLINK` fields) and `tab[M]` (tab stops),
 //! the document's `bookmark[N]`, `field[N]`, `toc[N]` and `section[N]`, and
 //! the body's `textbox[N]` and `shape[N]`.

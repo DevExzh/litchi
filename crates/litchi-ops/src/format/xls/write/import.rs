@@ -1,6 +1,6 @@
 //! XLS CSV/TSV import: the fields are staged in native `Package::edit`s of
 //! at most 1,024 cells, each committed on the last, inside one unified
-//! transaction (record 0266).
+//! transaction.
 //!
 //! BIFF8 has no unified number-format write yet, so inferred dates are kept
 //! as their ISO text ([`Summary::dates_as_text`]). Existing formula cells are

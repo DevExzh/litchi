@@ -1,4 +1,4 @@
-//! The record-0323 element surface of legacy PowerPoint: slide comments,
+//! The element surface of legacy PowerPoint: slide comments,
 //! table rows, cells and columns, hyperlinks, text runs, line breaks, the
 //! theme and charts.
 //!
@@ -17,7 +17,7 @@ use super::spec::Kind;
 use crate::Result;
 use crate::node::{Preview, Value};
 
-/// One record-0323 element.
+/// One element of the element surface.
 #[derive(Clone)]
 pub(crate) enum Element {
     /// A slide comment: its slide, its zero-based position among the slide's

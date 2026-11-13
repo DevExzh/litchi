@@ -45,8 +45,7 @@ struct OdtState {
     /// and raw package reads.
     odf_options: litchi_odf_common::OpenOptions,
     /// The package's format: ODT, or an ODF text-family format read through
-    /// the same content model (OTH web template, ODM master document,
-    /// record 0282).
+    /// the same content model (OTH web template, ODM master document).
     format: FileFormat,
     /// The immutable leaf package: set for eager owners, materialized on
     /// first use for a filesystem-backed owner.
@@ -57,14 +56,13 @@ struct OdtState {
     /// Child identities by parent and unified kind, built on the first
     /// ordinal lookup past [`DIRECT_SCAN`] children.
     kinds: OnceLock<KindIndex>,
-    /// The part index of record 0328 (list styles, master-page regions,
-    /// tables of contents, shapes, objects and columns), its body fields and
-    /// its equations, built on the first read of a part.
+    /// The part index (list styles, master-page regions, tables of contents,
+    /// shapes, objects and columns), its body fields and its equations,
+    /// built on the first read of a part.
     parts: OnceLock<parts::Index>,
     origin: Option<Arc<Path>>,
     /// The flat single-XML document (`.fodt`) this handle reads, whose
-    /// bytes it publishes; the package is its read projection (record
-    /// 0292).
+    /// bytes it publishes; the package is its read projection.
     flat: Option<litchi_odt::flat::Document>,
 }
 
@@ -114,7 +112,7 @@ const _: () = {
 };
 
 /// Typed ODF limit failures stay `Source::Odf`; every other failure keeps
-/// its common-core payload as `Source::Core`, exactly as before W3.
+/// its common-core payload as `Source::Core`.
 pub(crate) fn odf_error(error: litchi_odf_common::Error) -> Error {
     match error {
         litchi_odf_common::Error::Core(error) => core_error(error),
@@ -180,7 +178,7 @@ impl Odt {
 
     /// Opens a flat single-XML text document (`.fodt`) detection
     /// recognized. Reads go through the leaf's packaged projection of the
-    /// flat parts; publication writes the flat bytes (record 0292).
+    /// flat parts; publication writes the flat bytes.
     pub(crate) fn from_flat(bytes: Vec<u8>, options: &OpenOptions) -> Result<Self> {
         let flat_options = options.odf_open_options();
         let flat = litchi_odt::flat::Document::from_bytes_with_options(&bytes, flat_options)
@@ -210,8 +208,7 @@ impl Odt {
     }
 
     /// The handle over a committed package: a packaged document adopts it;
-    /// a flat document republishes the edit into its flat bytes (record
-    /// 0292).
+    /// a flat document republishes the edit into its flat bytes.
     pub(crate) fn adopt(&self, package: litchi_odt::Package) -> Result<Self> {
         match self.flat() {
             Some(flat) => {
@@ -413,7 +410,7 @@ impl Odt {
         }
     }
 
-    /// The part index of record 0328, built on the first part read.
+    /// The part index, built on the first part read.
     pub(crate) fn parts(&self) -> Result<&parts::Index> {
         if let Some(index) = self.0.parts.get() {
             return Ok(index);

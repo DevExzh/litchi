@@ -1,4 +1,4 @@
-"""Python mirror of the record 0289 corpus fidelity report (design §14 layer 3).
+"""Python mirror of the corpus fidelity report (design §14 layer 3).
 
 ``crates/litchi-ops/tests/corpus_fidelity.rs`` opens every claimed-format
 file under ``test-data/``, runs an empty edit, saves it and requires the
@@ -43,7 +43,7 @@ def load_rows():
         lines = handle.read().splitlines()
     header = lines[0].split("\t")
     rows = [dict(zip(header, line.split("\t"))) for line in lines[1:] if line]
-    # Package directories (record 0306) are saved in place by the Rust test;
+    # Package directories are saved in place by the Rust test;
     # this mirror replays single files only.
     return [row for row in rows if not (TEST_DATA / row["file"]).is_dir()]
 

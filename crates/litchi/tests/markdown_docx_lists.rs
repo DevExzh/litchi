@@ -1,5 +1,5 @@
 //! DOCX list numbering in Markdown, through `litchi::open` and
-//! `litchi::open_bytes` (M0a step S8c ported these tests from the facade's
+//! `litchi::open_bytes` (these tests were ported from the facade's
 //! `Document`).
 
 #![cfg(all(feature = "docx", feature = "markdown"))]

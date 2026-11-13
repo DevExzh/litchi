@@ -200,7 +200,7 @@ pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 15, 1> = Table::new(
         format_entry("fill", CellSetter::Fill, false),
         format_entry("fillBg", CellSetter::FillBg, false),
     ],
-    // `text` names `value`, as in the XLSX cell registry (record 0269).
+    // `text` names `value`, as in the XLSX cell registry.
     [Alias {
         name: "text",
         entry: 0,
@@ -444,76 +444,76 @@ const fn property_gap(
 static ACTIVE_TAB_GAP: GapSpec = property_gap(
     "workbook",
     "activeTab",
-    "M1-extended (R6b)",
+    "not supported yet",
     "the legacy XLS Package read bridge does not project the workbook window selection",
 );
 static EVALUATED_GAP: GapSpec = property_gap(
     "cell",
     "evaluated",
-    "M1-extended (R6b)",
+    "not supported yet",
     "the XLS adapter has no formula evaluator or stable cached-result admission flag",
 );
 static ARRAY_FORMULA_GAP: GapSpec = property_gap(
     "cell",
     "arrayformula",
-    "M1-extended (R6b)",
+    "not supported yet",
     "array-formula metadata is not projected by the Package read bridge",
 );
 static ARRAY_REF_GAP: GapSpec = property_gap(
     "cell",
     "arrayref",
-    "M1-extended (R6b)",
+    "not supported yet",
     "array-formula ranges are not projected by the Package read bridge",
 );
 
 static TABLE_GAP: GapSpec = gap(
     "table",
-    "M1-extended (R6b)",
+    "not supported yet",
     "the legacy XLS Package read bridge does not project ListObject records into unified nodes yet",
 );
 static CHART_GAP: GapSpec = gap(
     "chart",
-    "M1-extended (R6b)",
+    "not supported yet",
     "legacy XLS chart metadata is not projected into unified nodes yet",
 );
 static SERIES_GAP: GapSpec = gap(
     "series",
-    "M1-extended (R6b)",
+    "not supported yet",
     "legacy XLS chart series are not projected into unified nodes yet",
 );
 static AXIS_GAP: GapSpec = gap(
     "axis",
-    "M1-extended (R6b)",
+    "not supported yet",
     "legacy XLS chart axes are not projected into unified nodes yet",
 );
 static PIVOT_GAP: GapSpec = gap(
     "pivottable",
-    "M1-extended (R6b)",
+    "not supported yet",
     "legacy XLS pivot tables are not projected into unified nodes yet",
 );
 static SLICER_GAP: GapSpec = gap(
     "slicer",
-    "M1-extended (R6b)",
+    "not supported yet",
     "legacy XLS slicers are not projected into unified nodes yet",
 );
 static SPARKLINE_GAP: GapSpec = gap(
     "sparkline",
-    "M1-extended (R6b)",
+    "not supported yet",
     "legacy XLS sparkline groups are not projected into unified nodes yet",
 );
 static MERGE_GAP: GapSpec = gap(
     "mergeCell",
-    "M1-extended (R6b)",
+    "not supported yet",
     "legacy XLS merged ranges are not projected into unified nodes yet",
 );
 static OLE_GAP: GapSpec = gap(
     "ole",
-    "M1-extended (R6b)",
+    "not supported yet",
     "legacy XLS OLE objects are not projected into unified nodes yet",
 );
 static RUN_GAP: GapSpec = gap(
     "run",
-    "M1-extended (R6b)",
+    "not supported yet",
     "legacy XLS rich-text runs are flattened by the native cell projection",
 );
 
@@ -596,10 +596,10 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
     root: workbook::SPEC.root,
     elements: &ELEMENTS,
     gaps: &[
-        // OfficeCLI's heuristic table node (record 0339).
+        // OfficeCLI's heuristic table node.
         gap(
             "detectedtable",
-            "WP10 (record 0339 F5): header-row table detection in queries",
+            "header-row table detection in queries",
             "OfficeCLI's detectedtable is a header-row block found heuristically in unstructured cells and reported by table queries; Litchi's queries return declared tables only",
         ),
         GapSpec {
@@ -609,7 +609,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
                 context: "header-column-predicates",
             },
             code: Code::UnsupportedCapability,
-            follow_up: "M1-extended (R6b)",
+            follow_up: "not supported yet",
             reason: "legacy XLS does not yet bind row predicate names to header columns",
         },
         GapSpec {
@@ -619,7 +619,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
                 context: "non-worksheet-tab",
             },
             code: Code::UnsupportedCapability,
-            follow_up: "M1-extended (R6b)",
+            follow_up: "not supported yet",
             reason: "chart and macro tabs retain catalog positions but do not expose ordinary worksheet cells",
         },
         GapSpec {
@@ -629,7 +629,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
                 context: "non-worksheet-content",
             },
             code: Code::UnsupportedCapability,
-            follow_up: "M1-extended (R6b)",
+            follow_up: "not supported yet",
             reason: "text, outline and cell statistics cover ordinary worksheets; chart and macro payloads remain unprojected",
         },
         ACTIVE_TAB_GAP,
@@ -642,7 +642,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
 check_format_spec!(SPEC);
 
 /// Elements whose properties the unified XLS writer sets (the worksheet
-/// features of record 0327 included).
+/// features included).
 pub(crate) const SETTABLE: &[&str] = &[
     "cell",
     "sheet",
@@ -726,70 +726,70 @@ pub(crate) static WRITE_GAPS: [GapSpec; 11] = [
         "remove",
         "cell",
         "native-dependency-closure",
-        "M2 XLS dependency-complete cell removal",
+        "XLS dependency-complete cell removal",
         "formula cells and unrepresented range or drawing dependencies remain refused; removing the last rich or opaque string identity requires a semantic inverse that retains its metadata",
     ),
     operation_gap(
         "set",
         "cell",
         "non-scalar-properties",
-        "M2 XLS font, number-format and protection setters",
+        "XLS font, number-format and protection setters",
         "alignment, border line styles and palette fill colors are written through a reused or authored XF; font, border colors, number format, protection, rotation and reading order are read-only because a new XF must keep an existing font/number-format/protection prefix, and formatting is set in its own call rather than together with value, clear or formula",
     ),
     operation_gap(
         "set",
         "cell",
         "existing-formula-cells",
-        "M4 XLS dependency-aware formula replacement",
+        "XLS dependency-aware formula replacement",
         "an existing Formula record (possibly a shared, array or table owner, or a string-cache group) is not replaced by a value, clear or new formula; authored formulas use the BIFF8 tokenizer, which refuses 3-D, external and name references, and carry an empty cached result with always-recalculate set",
     ),
     operation_gap(
         "set",
         "cell",
         "native-dependency-closure",
-        "M2 XLS dependency-complete scalar replacement",
+        "XLS dependency-complete scalar replacement",
         "admitted scalar storage-family replacements preserve the XF and use native row-block and SST rewrites; packed MulBlank cells, unsupported formula ownership, non-adjacent ExtSST records and removal of the last rich or opaque string identity remain typed refusals until their dependency closures and semantic inverses are represented",
     ),
     operation_gap(
         "set",
         "sheet",
         "tab-state",
-        "M2 XLS worksheet visibility setters",
+        "XLS worksheet visibility setters",
         "the XLS writer renames worksheets but does not change hidden or very-hidden tab state; added tabs are visible",
     ),
     operation_gap(
         "remove",
         "sheet",
         "native-dependency-closure",
-        "M2 XLS dependency-closing tab removal",
+        "XLS dependency-closing tab removal",
         "one ordinary worksheet per call; tabs that an internal 3-D reference range, a sheet-scoped name, a pivot data connection, a drawing or a pivot view still uses are refused, as are the last tab, the last visible tab, chart/macro tabs and macro-bearing or structure-protected workbooks",
     ),
     operation_gap(
         "move",
         "sheet",
         "native-dependency-closure",
-        "M2 XLS 3-D range rewriting",
+        "XLS 3-D range rewriting",
         "tab order changes that would make an internal 3-D reference range noncontiguous, or that a protected or shared workbook structure forbids, are refused; cells, rows and columns do not move",
     ),
     operation_gap(
         "set",
         "row",
         "outline-and-defaults",
-        "M2 XLS outline and default-layout setters",
+        "XLS outline and default-layout setters",
         "row height and hidden and column width and hidden are written; outline level, collapsed state, clearing a custom size and worksheet default sizes are read-only",
     ),
     operation_gap(
         "set",
         "namedrange",
         "native-editor",
-        "M2 XLS defined-name editor",
+        "XLS defined-name editor",
         "defined names are read from the workbook's Lbl records; adding, changing and removing them needs a native Lbl/ExternSheet editor the leaf does not have",
     ),
     operation_gap(
         "add",
         "row",
         "native-dependency-closure",
-        "M2 XLS formula and name rewriting for axis shifts",
+        "XLS formula and name rewriting for axis shifts",
         "row and column insertion requires an explicit position and takes no properties; workbooks whose formulas, names, tables or array/shared formulas the native axis shift cannot rewrite are refused, and deletion is limited to empty rows and columns",
     ),
 ];

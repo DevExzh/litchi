@@ -91,12 +91,12 @@
       "propertyGaps": {
         "workbook.date1904": {
           "code": "unsupported_capability",
-          "followUp": "ODS adapter follow-up (record 0277)",
+          "followUp": "ODS adapter follow-up",
           "reason": "the ODS null date lives in settings.xml, which is not projected yet"
         },
         "activeTab": {
           "code": "unsupported_capability",
-          "followUp": "ODS adapter follow-up (record 0277)",
+          "followUp": "ODS adapter follow-up",
           "reason": "the ODS active table lives in settings.xml, which is not projected yet"
         }
       }
@@ -213,12 +213,12 @@
       "propertyGaps": {
         "hidden": {
           "code": "unsupported_capability",
-          "followUp": "ODS adapter follow-up (record 0277)",
+          "followUp": "ODS adapter follow-up",
           "reason": "ODS sheet visibility lives in the table's automatic style, which is not resolved yet"
         },
         "visibility": {
           "code": "unsupported_capability",
-          "followUp": "ODS adapter follow-up (record 0277)",
+          "followUp": "ODS adapter follow-up",
           "reason": "ODS sheet visibility lives in the table's automatic style, which is not resolved yet"
         }
       },
@@ -342,17 +342,17 @@
       "propertyGaps": {
         "font.bold": {
           "code": "unsupported_capability",
-          "followUp": "ODS adapter follow-up (record 0277)",
+          "followUp": "ODS adapter follow-up",
           "reason": "ODS cell formatting lives in named and automatic styles, which node views do not resolve yet; set `style` to apply a named style"
         },
         "numberformat": {
           "code": "unsupported_capability",
-          "followUp": "ODS adapter follow-up (record 0277)",
+          "followUp": "ODS adapter follow-up",
           "reason": "ODS number formats are data styles referenced by the cell style, which node views do not resolve yet"
         },
         "computedValue": {
           "code": "unsupported_capability",
-          "followUp": "ODS adapter follow-up (record 0277)",
+          "followUp": "ODS adapter follow-up",
           "reason": "ODS formulas use OpenFormula syntax; `File::evaluate` covers the Excel-syntax workbook formats only"
         }
       },
@@ -456,12 +456,12 @@
       "propertyGaps": {
         "height": {
           "code": "unsupported_capability",
-          "followUp": "ODS adapter follow-up (record 0277)",
+          "followUp": "ODS adapter follow-up",
           "reason": "ODS row heights live in row styles, which are not resolved yet"
         },
         "hidden": {
           "code": "unsupported_capability",
-          "followUp": "ODS adapter follow-up (record 0277)",
+          "followUp": "ODS adapter follow-up",
           "reason": "ODS row visibility is not modeled by the leaf worksheet projection"
         }
       },
@@ -500,12 +500,12 @@
       "propertyGaps": {
         "width": {
           "code": "unsupported_capability",
-          "followUp": "ODS adapter follow-up (record 0277)",
+          "followUp": "ODS adapter follow-up",
           "reason": "ODS column widths live in column styles, which are not resolved yet"
         },
         "hidden": {
           "code": "unsupported_capability",
-          "followUp": "ODS adapter follow-up (record 0277)",
+          "followUp": "ODS adapter follow-up",
           "reason": "ODS column visibility is not modeled by the leaf worksheet projection"
         }
       },
@@ -546,7 +546,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "ODS adapter follow-up (record 0277)",
+        "followUp": "ODS adapter follow-up",
         "reason": "ODS database ranges are read by the leaf but not projected into unified table nodes yet"
       }
     },
@@ -706,7 +706,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "ODS adapter follow-up (record 0277)",
+        "followUp": "ODS adapter follow-up",
         "reason": "ODS chart objects are read by the leaf but not projected into unified nodes yet"
       }
     },
@@ -729,7 +729,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "ODS adapter follow-up (record 0277)",
+        "followUp": "ODS adapter follow-up",
         "reason": "ODS chart series are not projected into unified nodes yet"
       }
     },
@@ -752,7 +752,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "ODS adapter follow-up (record 0277)",
+        "followUp": "ODS adapter follow-up",
         "reason": "ODS chart axes are not projected into unified nodes yet"
       }
     },
@@ -778,7 +778,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "ODS adapter follow-up (record 0277)",
+        "followUp": "ODS adapter follow-up",
         "reason": "ODS data pilot tables are read by the leaf but not projected into unified nodes yet"
       }
     },
@@ -824,7 +824,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "ODS adapter follow-up (record 0277)",
+        "followUp": "ODS adapter follow-up",
         "reason": "ODS sparkline groups are read by the leaf but not projected into unified nodes yet"
       }
     },
@@ -992,7 +992,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327: wontfix (format)",
+            "followUp": "wontfix (format)",
             "reason": "ODF conditional formats have no stop-if-true flag; LibreOffice applies the first matching rule"
           }
         },
@@ -1069,7 +1069,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327: wontfix (format)",
+            "followUp": "wontfix (format)",
             "reason": "an ODF average condition has no standard-deviation band"
           }
         },
@@ -1156,7 +1156,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327: wontfix (format)",
+            "followUp": "wontfix (format)",
             "reason": "an ODF icon set has no reversed order"
           }
         },
@@ -1238,7 +1238,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327: wontfix (format)",
+            "followUp": "wontfix (format)",
             "reason": "an ODF data bar has no direction; LibreOffice draws bars from the axis"
           }
         }
@@ -1281,7 +1281,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS auto-filter column criteria",
+            "followUp": "follow-up: ODS auto-filter column criteria",
             "reason": "the auto-filter database range is authored; its table:filter conditions are kept but not authored"
           }
         }
@@ -1480,7 +1480,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS drawing transforms, effects and text styling",
+            "followUp": "follow-up: ODS drawing transforms, effects and text styling",
             "reason": "the ODS drawing editor authors frames, names, descriptions, text, solid fills and strokes; draw:transform, effects, crops and shape text styles are not authored"
           }
         },
@@ -1491,7 +1491,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS drawing transforms, effects and text styling",
+            "followUp": "follow-up: ODS drawing transforms, effects and text styling",
             "reason": "the ODS drawing editor authors frames, names, descriptions, text, solid fills and strokes; draw:transform, effects, crops and shape text styles are not authored"
           }
         },
@@ -1520,7 +1520,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS cell-anchored drawings",
+            "followUp": "follow-up: ODS cell-anchored drawings",
             "reason": "an ODS drawing added through the unified layer is placed on the sheet in lengths; anchoring it to cells needs the sheet's row and column geometry"
           }
         },
@@ -1531,7 +1531,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS drawing transforms, effects and text styling",
+            "followUp": "follow-up: ODS drawing transforms, effects and text styling",
             "reason": "the ODS drawing editor authors frames, names, descriptions, text, solid fills and strokes; draw:transform, effects, crops and shape text styles are not authored"
           }
         },
@@ -1542,7 +1542,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS drawing transforms, effects and text styling",
+            "followUp": "follow-up: ODS drawing transforms, effects and text styling",
             "reason": "the ODS drawing editor authors frames, names, descriptions, text, solid fills and strokes; draw:transform, effects, crops and shape text styles are not authored"
           }
         },
@@ -1553,7 +1553,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS drawing transforms, effects and text styling",
+            "followUp": "follow-up: ODS drawing transforms, effects and text styling",
             "reason": "the ODS drawing editor authors frames, names, descriptions, text, solid fills and strokes; draw:transform, effects, crops and shape text styles are not authored"
           }
         },
@@ -1564,7 +1564,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS drawing transforms, effects and text styling",
+            "followUp": "follow-up: ODS drawing transforms, effects and text styling",
             "reason": "the ODS drawing editor authors frames, names, descriptions, text, solid fills and strokes; draw:transform, effects, crops and shape text styles are not authored"
           }
         },
@@ -1575,7 +1575,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS drawing transforms, effects and text styling",
+            "followUp": "follow-up: ODS drawing transforms, effects and text styling",
             "reason": "the ODS drawing editor authors frames, names, descriptions, text, solid fills and strokes; draw:transform, effects, crops and shape text styles are not authored"
           }
         },
@@ -1586,7 +1586,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS drawing transforms, effects and text styling",
+            "followUp": "follow-up: ODS drawing transforms, effects and text styling",
             "reason": "the ODS drawing editor authors frames, names, descriptions, text, solid fills and strokes; draw:transform, effects, crops and shape text styles are not authored"
           }
         },
@@ -1597,7 +1597,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS drawing transforms, effects and text styling",
+            "followUp": "follow-up: ODS drawing transforms, effects and text styling",
             "reason": "the ODS drawing editor authors frames, names, descriptions, text, solid fills and strokes; draw:transform, effects, crops and shape text styles are not authored"
           }
         },
@@ -1608,7 +1608,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS drawing transforms, effects and text styling",
+            "followUp": "follow-up: ODS drawing transforms, effects and text styling",
             "reason": "the ODS drawing editor authors frames, names, descriptions, text, solid fills and strokes; draw:transform, effects, crops and shape text styles are not authored"
           }
         },
@@ -1619,7 +1619,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS drawing transforms, effects and text styling",
+            "followUp": "follow-up: ODS drawing transforms, effects and text styling",
             "reason": "the ODS drawing editor authors frames, names, descriptions, text, solid fills and strokes; draw:transform, effects, crops and shape text styles are not authored"
           }
         }
@@ -1710,7 +1710,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS drawing transforms, effects and text styling",
+            "followUp": "follow-up: ODS drawing transforms, effects and text styling",
             "reason": "the ODS drawing editor authors frames, names, descriptions, text, solid fills and strokes; draw:transform, effects, crops and shape text styles are not authored"
           }
         },
@@ -1722,7 +1722,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS drawing transforms, effects and text styling",
+            "followUp": "follow-up: ODS drawing transforms, effects and text styling",
             "reason": "the ODS drawing editor authors frames, names, descriptions, text, solid fills and strokes; draw:transform, effects, crops and shape text styles are not authored"
           }
         },
@@ -1733,7 +1733,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS drawing transforms, effects and text styling",
+            "followUp": "follow-up: ODS drawing transforms, effects and text styling",
             "reason": "the ODS drawing editor authors frames, names, descriptions, text, solid fills and strokes; draw:transform, effects, crops and shape text styles are not authored"
           }
         },
@@ -1744,7 +1744,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS drawing transforms, effects and text styling",
+            "followUp": "follow-up: ODS drawing transforms, effects and text styling",
             "reason": "the ODS drawing editor authors frames, names, descriptions, text, solid fills and strokes; draw:transform, effects, crops and shape text styles are not authored"
           }
         },
@@ -1755,7 +1755,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS drawing transforms, effects and text styling",
+            "followUp": "follow-up: ODS drawing transforms, effects and text styling",
             "reason": "the ODS drawing editor authors frames, names, descriptions, text, solid fills and strokes; draw:transform, effects, crops and shape text styles are not authored"
           }
         },
@@ -1767,7 +1767,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS drawing transforms, effects and text styling",
+            "followUp": "follow-up: ODS drawing transforms, effects and text styling",
             "reason": "the ODS drawing editor authors frames, names, descriptions, text, solid fills and strokes; draw:transform, effects, crops and shape text styles are not authored"
           }
         },
@@ -1778,7 +1778,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS drawing transforms, effects and text styling",
+            "followUp": "follow-up: ODS drawing transforms, effects and text styling",
             "reason": "the ODS drawing editor authors frames, names, descriptions, text, solid fills and strokes; draw:transform, effects, crops and shape text styles are not authored"
           }
         },
@@ -1789,7 +1789,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS drawing transforms, effects and text styling",
+            "followUp": "follow-up: ODS drawing transforms, effects and text styling",
             "reason": "the ODS drawing editor authors frames, names, descriptions, text, solid fills and strokes; draw:transform, effects, crops and shape text styles are not authored"
           }
         },
@@ -1800,7 +1800,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS drawing transforms, effects and text styling",
+            "followUp": "follow-up: ODS drawing transforms, effects and text styling",
             "reason": "the ODS drawing editor authors frames, names, descriptions, text, solid fills and strokes; draw:transform, effects, crops and shape text styles are not authored"
           }
         },
@@ -1811,7 +1811,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS drawing transforms, effects and text styling",
+            "followUp": "follow-up: ODS drawing transforms, effects and text styling",
             "reason": "the ODS drawing editor authors frames, names, descriptions, text, solid fills and strokes; draw:transform, effects, crops and shape text styles are not authored"
           }
         },
@@ -1835,7 +1835,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS cell-anchored drawings",
+            "followUp": "follow-up: ODS cell-anchored drawings",
             "reason": "an ODS drawing added through the unified layer is placed on the sheet in lengths; anchoring it to cells needs the sheet's row and column geometry"
           }
         },
@@ -1846,7 +1846,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS drawing transforms, effects and text styling",
+            "followUp": "follow-up: ODS drawing transforms, effects and text styling",
             "reason": "the ODS drawing editor authors frames, names, descriptions, text, solid fills and strokes; draw:transform, effects, crops and shape text styles are not authored"
           }
         },
@@ -1857,7 +1857,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS drawing transforms, effects and text styling",
+            "followUp": "follow-up: ODS drawing transforms, effects and text styling",
             "reason": "the ODS drawing editor authors frames, names, descriptions, text, solid fills and strokes; draw:transform, effects, crops and shape text styles are not authored"
           }
         },
@@ -1868,7 +1868,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS drawing transforms, effects and text styling",
+            "followUp": "follow-up: ODS drawing transforms, effects and text styling",
             "reason": "the ODS drawing editor authors frames, names, descriptions, text, solid fills and strokes; draw:transform, effects, crops and shape text styles are not authored"
           }
         },
@@ -1879,7 +1879,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS drawing transforms, effects and text styling",
+            "followUp": "follow-up: ODS drawing transforms, effects and text styling",
             "reason": "the ODS drawing editor authors frames, names, descriptions, text, solid fills and strokes; draw:transform, effects, crops and shape text styles are not authored"
           }
         },
@@ -1890,7 +1890,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS drawing transforms, effects and text styling",
+            "followUp": "follow-up: ODS drawing transforms, effects and text styling",
             "reason": "the ODS drawing editor authors frames, names, descriptions, text, solid fills and strokes; draw:transform, effects, crops and shape text styles are not authored"
           }
         },
@@ -1901,7 +1901,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS drawing transforms, effects and text styling",
+            "followUp": "follow-up: ODS drawing transforms, effects and text styling",
             "reason": "the ODS drawing editor authors frames, names, descriptions, text, solid fills and strokes; draw:transform, effects, crops and shape text styles are not authored"
           }
         },
@@ -1912,7 +1912,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS drawing transforms, effects and text styling",
+            "followUp": "follow-up: ODS drawing transforms, effects and text styling",
             "reason": "the ODS drawing editor authors frames, names, descriptions, text, solid fills and strokes; draw:transform, effects, crops and shape text styles are not authored"
           }
         },
@@ -1923,7 +1923,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS drawing transforms, effects and text styling",
+            "followUp": "follow-up: ODS drawing transforms, effects and text styling",
             "reason": "the ODS drawing editor authors frames, names, descriptions, text, solid fills and strokes; draw:transform, effects, crops and shape text styles are not authored"
           }
         },
@@ -1934,7 +1934,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327 follow-up: ODS drawing transforms, effects and text styling",
+            "followUp": "follow-up: ODS drawing transforms, effects and text styling",
             "reason": "the ODS drawing editor authors frames, names, descriptions, text, solid fills and strokes; draw:transform, effects, crops and shape text styles are not authored"
           }
         }
@@ -1971,7 +1971,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "ODS adapter follow-up (record 0277)",
+        "followUp": "ODS adapter follow-up",
         "reason": "ODS embedded objects are read by the leaf but not projected into unified nodes yet"
       }
     },
@@ -2011,7 +2011,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327: wontfix (format)",
+            "followUp": "wontfix (format)",
             "reason": "an ODF page break is a row or column style property and spans the whole sheet"
           }
         },
@@ -2022,7 +2022,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327: wontfix (format)",
+            "followUp": "wontfix (format)",
             "reason": "an ODF page break is a row or column style property and spans the whole sheet"
           }
         }
@@ -2071,7 +2071,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327: wontfix (format)",
+            "followUp": "wontfix (format)",
             "reason": "an ODF page break is a row or column style property and spans the whole sheet"
           }
         },
@@ -2082,7 +2082,7 @@
           "get": false,
           "writeGap": {
             "code": "unsupported_property",
-            "followUp": "record 0327: wontfix (format)",
+            "followUp": "wontfix (format)",
             "reason": "an ODF page break is a row or column style property and spans the whole sheet"
           }
         }
@@ -2114,7 +2114,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "ODS adapter follow-up (record 0277)",
+        "followUp": "ODS adapter follow-up",
         "reason": "ODS rich cell text is flattened into the cell's displayed text"
       }
     }
@@ -2124,7 +2124,7 @@
       "subject": "element",
       "element": "detectedtable",
       "code": "unsupported_capability",
-      "followUp": "WP11 (record 0339 F5): header-row table detection in queries",
+      "followUp": "header-row table detection in queries",
       "reason": "OfficeCLI's detectedtable is a header-row block found heuristically in unstructured cells and reported by table queries; Litchi's queries return declared tables only"
     },
     {
@@ -2133,7 +2133,7 @@
       "element": "row",
       "context": "header-column-predicates",
       "code": "unsupported_capability",
-      "followUp": "ODS adapter follow-up (record 0277)",
+      "followUp": "ODS adapter follow-up",
       "reason": "ODS does not yet bind row predicate names to header columns"
     },
     {
@@ -2142,7 +2142,7 @@
       "element": "cell",
       "context": "styled-blank-cells",
       "code": "unsupported_capability",
-      "followUp": "ODS adapter follow-up (record 0277)",
+      "followUp": "ODS adapter follow-up",
       "reason": "queries enumerate content cells (a value, text, formula, link or merge span); styled blank padding runs are addressable by coordinate only"
     },
     {
@@ -2151,7 +2151,7 @@
       "element": "metadata",
       "context": "path-read",
       "code": "unsupported_capability",
-      "followUp": "ODS adapter follow-up (record 0277)",
+      "followUp": "ODS adapter follow-up",
       "reason": "`set(\"/metadata\", ..)` writes meta.xml; the path is set-only, and reads go through File::metadata() and the workbook root"
     },
     {
@@ -2160,8 +2160,8 @@
       "element": "metadata",
       "context": "unowned-fields",
       "code": "unsupported_capability",
-      "followUp": "ODS adapter follow-up (record 0277)",
-      "reason": "the ODF metadata family (record 0288) writes title, subject, description, author, lastModifiedBy, language and keywords; created, modified, revision, template, statistics and custom.<name> are refused"
+      "followUp": "ODS adapter follow-up",
+      "reason": "the ODF metadata family writes title, subject, description, author, lastModifiedBy, language and keywords; created, modified, revision, template, statistics and custom.<name> are refused"
     },
     {
       "subject": "operation",
@@ -2169,7 +2169,7 @@
       "element": "cell",
       "context": "formatting-properties",
       "code": "unsupported_capability",
-      "followUp": "ODS adapter follow-up (record 0277)",
+      "followUp": "ODS adapter follow-up",
       "reason": "cell formatting is applied by naming an existing cell style (`style`); direct font, fill, border, alignment and number-format keys need an automatic-style author in the unified layer"
     },
     {
@@ -2178,7 +2178,7 @@
       "element": "cell",
       "context": "formula-evaluation",
       "code": "unsupported_capability",
-      "followUp": "ODS adapter follow-up (record 0277)",
+      "followUp": "ODS adapter follow-up",
       "reason": "an authored OpenFormula is stored inert with the cell's cached value (or none); the unified layer does not evaluate ODS formulas"
     },
     {
@@ -2187,7 +2187,7 @@
       "element": "sheet",
       "context": "producer-table-markup",
       "code": "unsupported_capability",
-      "followUp": "ODS adapter follow-up (record 0277)",
+      "followUp": "ODS adapter follow-up",
       "reason": "a rename copies the table fragment under its new name and drops the original; the leaf refuses sheets with formulas, ranges, drawings, forms, protection or other dependency owners, and the writer refuses names a formula or named range still uses"
     },
     {
@@ -2196,7 +2196,7 @@
       "element": "sheet",
       "context": "native-dependency-closure",
       "code": "unsupported_capability",
-      "followUp": "ODS adapter follow-up (record 0277)",
+      "followUp": "ODS adapter follow-up",
       "reason": "the leaf moves only dependency-free worksheets: formulas, named/database/validation/print ranges, settings, scripts and tracked changes are refused; an added sheet placed before the end is moved the same way"
     },
     {
@@ -2205,7 +2205,7 @@
       "element": "row",
       "context": "logical-row-shift",
       "code": "unsupported_capability",
-      "followUp": "ODS adapter follow-up (record 0277)",
+      "followUp": "ODS adapter follow-up",
       "reason": "rows are inserted, removed, moved and swapped through the leaf's logical row editor, which refuses formulas, merges, ranges, validations, drawings, annotations and other coordinate owners on the worksheet"
     },
     {
@@ -2214,7 +2214,7 @@
       "element": "col",
       "context": "native-editor",
       "code": "unsupported_capability",
-      "followUp": "ODS adapter follow-up (record 0277)",
+      "followUp": "ODS adapter follow-up",
       "reason": "inserting or removing a column that shifts cells needs a logical column editor the leaf does not have"
     },
     {
@@ -2223,7 +2223,7 @@
       "element": "row",
       "context": "layout",
       "code": "unsupported_capability",
-      "followUp": "ODS adapter follow-up (record 0277)",
+      "followUp": "ODS adapter follow-up",
       "reason": "row height and visibility, and column width and visibility, live in automatic styles the unified writer does not author yet"
     },
     {
@@ -2232,7 +2232,7 @@
       "element": "namedrange",
       "context": "scope",
       "code": "unsupported_capability",
-      "followUp": "ODS adapter follow-up (record 0277)",
+      "followUp": "ODS adapter follow-up",
       "reason": "a named range's scope is fixed once added; named expressions are retargeted through `ref` and are not added"
     },
     {
@@ -2241,8 +2241,8 @@
       "element": "workbook",
       "context": "flat-odf",
       "code": "unsupported_capability",
-      "followUp": "ODS adapter follow-up (record 0277)",
-      "reason": "flat single-XML spreadsheets (.fods) are edited through the leaf's packaged projection and republished element by element (record 0292); an edit that adds a package member or changes a part's root has no flat form and is refused, as is a projection the packaged reader refuses"
+      "followUp": "ODS adapter follow-up",
+      "reason": "flat single-XML spreadsheets (.fods) are edited through the leaf's packaged projection and republished element by element; an edit that adds a package member or changes a part's root has no flat form and is refused, as is a projection the packaged reader refuses"
     },
     {
       "subject": "operation",
@@ -2250,49 +2250,49 @@
       "element": "cell",
       "context": "coalescing",
       "code": "unsupported_capability",
-      "followUp": "ODS adapter follow-up (record 0277)",
+      "followUp": "ODS adapter follow-up",
       "reason": "consecutive direct cell value, text, clear and formula sets share one leaf edit; style, merge, range and query sets and every other verb close the run"
     },
     {
       "subject": "view",
       "mode": "issues",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the issues view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "forms",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the forms view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "html",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "svg",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "screenshot",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "pdf",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     }
   ],
@@ -2329,7 +2329,7 @@
         "set": true,
         "writeGap": {
           "code": "unsupported_capability",
-          "followUp": "record 0010 Q3: an owner-approved regular-expression dependency",
+          "followUp": "an owner-approved regular-expression dependency",
           "reason": "Litchi has no approved regular-expression engine; `regex=true` and OfficeCLI's `r\"...\"` patterns are refused"
         }
       }

@@ -4,12 +4,12 @@
 //! `tests/golden/markdown_corpus.tsv` records, for every DOCX, DOC, RTF,
 //! ODT, PPTX, PPT and ODP fixture under `test-data`, under three option sets
 //! and on the path and byte routes, the length and FNV-1a digest of the
-//! facade types' Markdown, or the facade's refusal. M0a step S8c recorded it
-//! from the facade types, and step S9 deleted those types together with
+//! facade types' Markdown, or the facade's refusal. It was recorded from the
+//! facade types, which were then deleted together with
 //! `markdown_file_parity.rs`, which pinned the golden to them. This test
-//! carries that parity past S9: `File` produces the same bytes where the
-//! facade produced Markdown, and refuses where the facade refused. The golden
-//! is fixed reference data now: a difference is a behaviour change to review,
+//! carries that parity on: `File` produces the same bytes where the facade
+//! produced Markdown, and refuses where the facade refused. The golden is
+//! fixed reference data now: a difference is a behaviour change to review,
 //! not output to record again.
 
 #![cfg(all(

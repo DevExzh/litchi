@@ -1,4 +1,4 @@
-//! Public `File` dispatch for the XLSX unified read adapter (M1 R4b).
+//! Public `File` dispatch for the XLSX unified read adapter.
 #![cfg(feature = "xlsx")]
 
 use std::io::{Cursor, Write as _};

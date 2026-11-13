@@ -55,9 +55,9 @@ pub struct Workbook {
 impl Workbook {
     fn read(path: &std::path::Path) -> Result<Source, Failure> {
         match litchi::open(path) {
-            // `litchi::File` opens Numbers packages and package directories
-            // (records 0296 and 0306), but its family views do not cover
-            // them; this reader projects the package the file retains.
+            // `litchi::File` opens Numbers packages and package
+            // directories, but its family views do not cover them; this
+            // reader projects the package the file retains.
             Ok(file) if file.format() == Some(CoreFormat::Numbers) => Ok(Source::Numbers(file)),
             Ok(file) => match file.workbook() {
                 Ok(_) => Ok(Source::File(file)),

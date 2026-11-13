@@ -2,7 +2,7 @@
 
 `parse_iwork` is the bounded root-coordinator replacement for the retired
 migration host's fuzz target. It owns fuzz coverage of the iWork arm of
-`litchi::open_bytes` (record 0306: the `litchi::iwork` snapshot facade is
+`litchi::open_bytes` (the `litchi::iwork` snapshot facade is
 deleted), exercising bounded package admission, format dispatch, the unified
 object trees of all three formats (text, outline, stats, queries and their
 paths), and the exact no-op publication. This root target does not claim generic host media-asset coverage; any

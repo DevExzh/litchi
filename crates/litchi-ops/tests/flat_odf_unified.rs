@@ -1,4 +1,4 @@
-//! Flat (single-XML) OpenDocument through the unified layer (record 0292):
+//! Flat (single-XML) OpenDocument through the unified layer:
 //! `.fodt` and `.fodg` open and read through their families' adapters over
 //! the leaves' packaged projections; every flat family publishes its flat
 //! bytes unchanged, and an edit of the projection republishes into the flat

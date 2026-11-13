@@ -1,4 +1,4 @@
-//! Table rows (record 0333).
+//! Table rows.
 //!
 //! `/slide[N]/table[M]/tr[R]` reads one `a:tr` (`height`). `add` under a
 //! table inserts a row (`height`, default the first row's; OfficeCLI's
@@ -14,7 +14,7 @@
 //!
 //! `set(/slide[N]/table[M], {name, firstRow, lastRow, firstCol, lastCol,
 //! bandedRows, bandedCols})` renames the frame and changes the table's
-//! style switches (record 0342).
+//! style switches.
 //!
 //! Source owners are promoted to an eager package, as column writes are.
 
@@ -122,7 +122,7 @@ impl Pptx {
         ))
     }
 
-    /// A table-level `set` (record 0342): the frame's `name` and the
+    /// A table-level `set`: the frame's `name` and the
     /// table's style switches. `None` for other targets.
     pub(super) fn try_set_table(
         &self,
@@ -428,8 +428,7 @@ const TABLE_WIDTH: i64 = 8_229_600;
 const TABLE_ROW_HEIGHT: i64 = 370_840;
 
 impl Pptx {
-    /// `add(/slide[N], table, {rows, cols, data, x, y, width, height, name})`
-    /// (record 0333).
+    /// `add(/slide[N], table, {rows, cols, data, x, y, width, height, name})`.
     pub(super) fn add_table(
         &self,
         parent: PathArg<'_>,

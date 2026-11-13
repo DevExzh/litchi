@@ -304,7 +304,7 @@ pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[
     prop("size", ValueType::Length(LengthSpec::FONT_SIZE), SET_ONLY),
     prop("color", ValueType::Color(ColorContext::Word), SET_ONLY),
     prop("font", ValueType::Text, SET_ONLY),
-    // Record 0324: the paragraph style (`istd`) and its list binding.
+    // The paragraph style (`istd`) and its list binding.
     prop("style", ValueType::Text, READ_SET),
     prop("styleId", ValueType::Text, READ_SET),
     prop("styleName", ValueType::Text, READ_SET),
@@ -332,7 +332,7 @@ pub(crate) const RUN_PROPS: &[PropSpec] = &[
     prop("smallcaps", ValueType::Bool, Access::READ),
     prop("superscript", ValueType::Bool, Access::READ),
     prop("subscript", ValueType::Bool, Access::READ),
-    // Record 0324: the run's character style (`sprmCIstd`).
+    // The run's character style (`sprmCIstd`).
     prop("rStyle", ValueType::Text, READ_SET),
 ];
 
@@ -497,7 +497,7 @@ const fn read(name: &'static str, ty: ValueType) -> PropSpec {
 /// `/styles`: the number of styles.
 pub(crate) const STYLES_PROPS: &[PropSpec] = &[read("count", ValueType::Int)];
 
-/// A style, in the DOCX style order (record 0319): identity and UI flags,
+/// A style, in the DOCX style order: identity and UI flags,
 /// then the style's own character properties, then its own paragraph
 /// properties. Values are the style's direct `UPX` properties, never the
 /// inherited chain.
@@ -558,7 +558,7 @@ pub(crate) const NUMBERING_PROPS: &[PropSpec] = &[
 ];
 
 /// A list definition (`LSTF`). Its `id` is the native index, a raw
-/// identity (record 0319 §3).
+/// identity.
 pub(crate) const ABSTRACT_NUM_PROPS: &[PropSpec] = &[
     raw("id", ValueType::Int),
     read("type", ValueType::Token(&MULTI_LEVEL_TYPE)),
@@ -1093,84 +1093,75 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
     gaps: &[
         element_gap(
             "equation",
-            "record 0324 follow-up 4: DOC EQ fields and MTEF equation objects as `equation` nodes",
+            "DOC EQ fields and MTEF equation objects as `equation` nodes",
         ),
         element_gap(
             "formfield",
-            "record 0324 follow-up 3: DOC FORMTEXT, FORMCHECKBOX and FORMDROPDOWN nodes and writes",
+            "DOC FORMTEXT, FORMCHECKBOX and FORMDROPDOWN nodes and writes",
         ),
         element_gap(
             "picture",
-            "record 0324 follow-up 5: DOC inline and floating pictures as `picture` nodes",
+            "DOC inline and floating pictures as `picture` nodes",
         ),
-        element_gap(
-            "ole",
-            "record 0324 follow-up 5: DOC embedded objects as `ole` nodes",
-        ),
-        element_gap(
-            "revision",
-            "record 0324 follow-up 2: DOC revision nodes and accept/reject (P2)",
-        ),
-        element_gap(
-            "watermark",
-            "record 0324 follow-up 6: the DOC header WordArt watermark",
-        ),
+        element_gap("ole", "DOC embedded objects as `ole` nodes"),
+        element_gap("revision", "DOC revision nodes and accept/reject"),
+        element_gap("watermark", "the DOC header WordArt watermark"),
         GapSpec {
             subject: Subject::Element("sdt"),
             code: crate::Code::UnsupportedPath,
             follow_up: "none: content controls are DOCX-only",
             reason: "Word 97-2003 binary documents have no structured document tags",
         },
-        // OfficeCLI elements the DOC adapter has no kind for (record 0339).
+        // OfficeCLI elements the DOC adapter has no kind for.
         word_family_gap(
             "chart",
-            "record 0324 (deferred-P1): DOC charts as chart nodes",
+            "DOC charts as chart nodes",
             "embedded charts are kept as objects; they are not projected as chart nodes",
         ),
         word_family_gap(
             "series",
-            "record 0324 (deferred-P1): DOC charts as chart nodes",
+            "DOC charts as chart nodes",
             "chart series follow the chart gap",
         ),
         word_family_gap(
             "axis",
-            "record 0324 (deferred-P1): DOC charts as chart nodes",
+            "DOC charts as chart nodes",
             "chart axes follow the chart gap",
         ),
         word_family_gap(
             "bookmarkEnd",
-            "record 0324 (deferred-P1)",
+            "not supported yet",
             "a bookmark is one node over its start and end; a standalone end marker is not addressed on its own",
         ),
         word_family_gap(
             "permStart",
-            "record 0324 (deferred-P1)",
+            "not supported yet",
             "DOC editing-permission ranges are not projected as nodes",
         ),
         word_family_gap(
             "ptab",
-            "record 0324 (deferred-P1)",
+            "not supported yet",
             "positional tabs are not projected as nodes",
         ),
         word_family_gap(
             "col",
-            "record 0324 (deferred-P1)",
+            "not supported yet",
             "table columns are not nodes; cell widths are read on each cell",
         ),
         word_family_gap(
             "fieldChar",
-            "none: out of scope (record 0332)",
+            "none: out of scope",
             "a complex field is one field node; its field-character and instruction parts are not separate elements",
         ),
         word_family_gap(
             "instrText",
-            "none: out of scope (record 0332)",
+            "none: out of scope",
             "a complex field is one field node; its field-character and instruction parts are not separate elements",
         ),
         GapSpec {
             subject: Subject::Element("diagram"),
             code: crate::Code::UnsupportedPath,
-            follow_up: "none: out of scope (record 0332, design §10)",
+            follow_up: "none: out of scope",
             reason: "OfficeCLI's diagram renders Mermaid text into shapes or a picture; rendering is outside the unified API",
         },
     ],
@@ -1183,7 +1174,7 @@ const _: () = assert!(
     "a query kind set holds 128 kinds"
 );
 
-/// Elements the unified DOC writer sets (record 0324 adds hyperlinks,
+/// Elements the unified DOC writer sets (including hyperlinks,
 /// bookmarks, tab stops and sections).
 pub(crate) const SETTABLE: &[&str] = &["p", "r", "hyperlink", "bookmark", "tab", "section"];
 /// Elements the unified DOC writer creates.
@@ -1191,8 +1182,8 @@ pub(crate) const ADDABLE: &[&str] = &["p", "hyperlink", "bookmark", "tab"];
 /// Elements the unified DOC writer removes.
 pub(crate) const REMOVABLE: &[&str] = &["p", "r", "hyperlink", "bookmark", "tab"];
 
-/// A gap for an OfficeCLI Word element the table has no kind for (record
-/// 0339): naming it is `unsupported_capability`.
+/// A gap for an OfficeCLI Word element the table has no kind for:
+/// naming it is `unsupported_capability`.
 const fn word_family_gap(
     element: &'static str,
     follow_up: &'static str,

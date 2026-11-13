@@ -1,4 +1,4 @@
-//! Regressions for the claimed-supported cells record 0289's CRUD checklist
+//! Regressions for the claimed-supported cells the CRUD checklist
 //! found failing: each was a single verb that worked through `File::set`
 //! but not through `File::edit`/`File::batch`, or a capability claim the
 //! format does not honour.

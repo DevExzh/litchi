@@ -101,8 +101,8 @@ impl<'f, F: Flavor> Navigate<'f> for Nav<'f, F> {
             Select::None => of_kind.next(),
             Select::Ordinal(position) => {
                 // Children of one kind are usually contiguous: try the slot
-                // `position` past the first of them before counting (record
-                // 0340; the iWork navigator does the same).
+                // `position` past the first of them before counting (the
+                // iWork navigator does the same).
                 let children = tree.item(parent.index()).children();
                 let candidate = children
                     .iter()

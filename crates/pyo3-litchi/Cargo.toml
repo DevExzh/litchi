@@ -11,7 +11,7 @@ doctest = false
 [dependencies]
 
 # The main litchi library. `legacy` is doc, ppt and xls; `iwork` turns on the
-# unified Pages, Keynote and Numbers handles (record 0296).
+# unified Pages, Keynote and Numbers handles.
 litchi = { path = "../litchi", default-features = false, features = [
     "legacy",
     "ooxml",

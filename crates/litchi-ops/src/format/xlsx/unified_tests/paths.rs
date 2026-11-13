@@ -1,4 +1,4 @@
-//! Path resolution and OfficeCLI-shaped node views (record 0010 §2, §4.7).
+//! Path resolution and OfficeCLI-shaped node views.
 
 use super::{both, check_golden, find, get, json, kitchen, open_path, path_of};
 use crate::Code;
@@ -74,7 +74,7 @@ fn misses_and_refusals_carry_one_code_each() {
         ("/Data/pivottable[1]", Code::UnsupportedCapability),
         ("/Data/validation[1]", Code::PathNotFound),
         ("/Data/sparkline[1]", Code::UnsupportedCapability),
-        // Record 0338: runs are read; this cell has none.
+        // Runs are read; this cell has none.
         ("/Data/A1/run[1]", Code::PathNotFound),
         ("/slide[1]", Code::UnsupportedPath),
         ("/body/p[1]", Code::UnsupportedPath),
@@ -112,7 +112,7 @@ fn misses_suggest_what_exists_and_find_returns_none() {
             .is_none()
     );
     assert!(find(file, "/Data/table[3]").expect("a miss").is_none());
-    // A coordinate inside the grid is never a miss (record 0010 §4.7).
+    // A coordinate inside the grid is never a miss.
     assert!(find(file, "/Data/AA100").expect("resolves").is_some());
 }
 

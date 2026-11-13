@@ -1,4 +1,4 @@
-//! PPTX formatting batches coalesce into one native commit (record 0333):
+//! PPTX formatting batches coalesce into one native commit:
 //! run, paragraph and shape-body formatting of direct paths share the
 //! shape-text run, report per-item changes, and keep sequential semantics.
 #![cfg(feature = "pptx")]

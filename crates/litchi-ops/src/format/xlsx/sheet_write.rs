@@ -139,7 +139,7 @@ impl Xlsx {
             return try_set_sheet(self, target, props, limits);
         };
         // The tab properties first, then the auto-filter on their result,
-        // published as one commit of the original snapshot (record 0320).
+        // published as one commit of the original snapshot.
         let Some(positions) = resolve_sheet_targets(self, target, limits)? else {
             return Ok(None);
         };

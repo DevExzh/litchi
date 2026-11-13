@@ -5,7 +5,7 @@
     reason = "test assertions panic on failure"
 )]
 
-//! Record 0275: unified RTF tables, header/footer, note and comment stories,
+//! Unified RTF tables, header/footer, note and comment stories,
 //! hyperlinks, pictures, styles and lists.
 
 use litchi_core::selector::{Path, Scope};
@@ -479,7 +479,7 @@ fn pictures_input() -> Vec<u8> {
 
 /// Consecutive direct picture removals inside one edit publish one native
 /// removal with the bytes, and the history, of the same removals made one
-/// call at a time (record 0280).
+/// call at a time.
 #[test]
 fn direct_picture_removals_coalesce_into_one_commit() {
     let source = open_bytes(pictures_input()).unwrap();

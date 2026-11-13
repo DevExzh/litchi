@@ -1,5 +1,4 @@
-//! DOC metadata: initial metadata at creation and the `/metadata` set path
-//! (record 0254).
+//! DOC metadata: initial metadata at creation and the `/metadata` set path.
 
 use litchi_core::{FileFormat, Metadata};
 use std::mem::size_of;

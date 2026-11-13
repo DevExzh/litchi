@@ -75,7 +75,7 @@ pub(crate) fn staging_error(error: litchi_odf_common::Error) -> Error {
 }
 
 /// A text set's staging error: the refusal of content a text set can
-/// neither keep nor replace (record 0304) stays `unsupported_capability`.
+/// neither keep nor replace stays `unsupported_capability`.
 fn text_error(error: litchi_odf_common::Error) -> Error {
     match error {
         litchi_odf_common::Error::Core(
@@ -640,8 +640,8 @@ fn tab_list<'l>(
     Ok(&mut lists[index].2)
 }
 
-/// Set properties of part targets (record 0328): a header or footer's
-/// text, tab stops. Every other part is read-only.
+/// Set properties of part targets: a header or footer's text, tab
+/// stops. Every other part is read-only.
 fn set_parts(
     file: &Odt,
     nodes: &[Node<'_>],
@@ -753,7 +753,7 @@ fn add_tab(
     Ok((commit, child_path(parent, Kind::Tab, ordinal)))
 }
 
-/// Remove tab stops (record 0328).
+/// Remove tab stops.
 fn remove_tabs(file: &Odt, nodes: &[Node<'_>], limits: &SemanticLimits) -> Result<Commit> {
     use super::node::Part;
     let mut lists: Vec<(NodeId, TabList, TabList)> = Vec::new();
@@ -1399,9 +1399,8 @@ pub(crate) fn create(options: &crate::CreateOptions) -> Result<Odt> {
 }
 
 /// A fresh empty document of an ODF text-family `format` whose minimal
-/// package `base` builds (the ODT body machinery then owns it, record
-/// 0282), with create-time metadata committed through the leaf metadata
-/// edit.
+/// package `base` builds (the ODT body machinery then owns it), with
+/// create-time metadata committed through the leaf metadata edit.
 pub(crate) fn create_from(
     options: &crate::CreateOptions,
     format: FileFormat,

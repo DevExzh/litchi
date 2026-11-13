@@ -1,5 +1,5 @@
-//! Field refresh on the legacy and ODF formats (record 0295, record 0279
-//! follow-up F1): computable fields rewritten in one native commit,
+//! Field refresh on the legacy and ODF formats:
+//! computable fields rewritten in one native commit,
 //! page-number fields kept (`needs_layout`), exact no-ops when current.
 
 #![cfg(any(feature = "doc", feature = "odt", feature = "odp"))]

@@ -280,7 +280,7 @@
       "propertyGaps": {
         "fill": {
           "code": "unsupported_capability",
-          "followUp": "M1-extended",
+          "followUp": "not supported yet",
           "reason": "legacy PPT exposes only common geometry in the unified node view"
         }
       },
@@ -495,7 +495,7 @@
       "propertyGaps": {
         "mediaType": {
           "code": "unsupported_capability",
-          "followUp": "M1-extended",
+          "followUp": "not supported yet",
           "reason": "legacy PPT frame classification is exposed as frameKind"
         }
       },
@@ -972,7 +972,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "0339-F3 (deferred-P1): PPT SmartArt and diagram groups",
+        "followUp": "PPT SmartArt and diagram groups",
         "reason": "a legacy PPT file keeps SmartArt and PowerPoint 97 diagrams as drawn OfficeArt groups, which read as group and shape nodes; no semantic diagram model is projected"
       }
     },
@@ -1549,7 +1549,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "0323-F6 PPT Equation Editor objects",
+        "followUp": "PPT Equation Editor objects",
         "reason": "legacy PPT equations are Equation Editor OLE objects (Equation.3) whose MTEF payload the unified layer does not read as an equation element"
       }
     },
@@ -1575,7 +1575,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "wontfix: PPTX-only (record 0323)",
+        "followUp": "wontfix: PPTX-only",
         "reason": "slide and section zoom are PowerPoint 2016 OOXML objects; the legacy binary format has no zoom record"
       }
     },
@@ -1601,7 +1601,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "wontfix: PPTX-only (record 0323)",
+        "followUp": "wontfix: PPTX-only",
         "reason": "3D models are PowerPoint 2019 OOXML objects; the legacy binary format has no 3D-model record"
       }
     },
@@ -1674,7 +1674,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "0339-F4 (deferred-P1): PPT main and title masters as nodes",
+        "followUp": "PPT main and title masters as nodes",
         "reason": "legacy PPT master records are not exposed as navigable nodes"
       }
     },
@@ -1751,7 +1751,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "0339-F4 (deferred-P1): PPT layouts as nodes",
+        "followUp": "PPT layouts as nodes",
         "reason": "a legacy PPT slide names a layout type in its slide atom (PowerPoint 2007 and later add one master per layout); there are no layout records to expose as navigable nodes yet"
       }
     },
@@ -1937,7 +1937,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "wontfix: PPTX-only (record 0323)",
+        "followUp": "wontfix: PPTX-only",
         "reason": "modern threaded comments are a PowerPoint 2019 OOXML part; legacy PPT comments are Comment10Container records, read and written as comment elements"
       }
     },
@@ -1960,7 +1960,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "wontfix: PPTX-only (record 0323)",
+        "followUp": "wontfix: PPTX-only",
         "reason": "threaded-comment replies are a PowerPoint 2019 OOXML part; legacy PPT comments have no replies"
       }
     },
@@ -2036,7 +2036,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "0323-F5 PPT animation nodes",
+        "followUp": "PPT animation nodes",
         "reason": "the leaf animation codec reads the timing tree and the per-shape AnimationInfo atoms; they are not projected as per-shape nodes"
       }
     },
@@ -2059,7 +2059,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "0323-F7 PPT chart series and axes",
+        "followUp": "PPT chart series and axes",
         "reason": "the MS-OGRAPH chart model reads series, but the unified layer projects a chart node only (type, title, frame)"
       }
     },
@@ -2082,7 +2082,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "0323-F7 PPT chart series and axes",
+        "followUp": "PPT chart series and axes",
         "reason": "the MS-OGRAPH chart model reads axes, but the unified layer projects a chart node only (type, title, frame)"
       }
     },
@@ -2141,7 +2141,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended",
+        "followUp": "not supported yet",
         "reason": "legacy PPT notes slides are not exposed as navigable nodes"
       }
     },
@@ -2164,7 +2164,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended",
+        "followUp": "not supported yet",
         "reason": "legacy PPT notes masters are not exposed as navigable nodes"
       }
     }
@@ -2176,7 +2176,7 @@
       "element": "presentation",
       "context": "template",
       "code": "unsupported_capability",
-      "followUp": "use Flavor::Document; M2 PPT template creation",
+      "followUp": "use Flavor::Document; PPT template creation",
       "reason": "the PPT creator currently authors ordinary presentations and refuses template requests"
     },
     {
@@ -2194,14 +2194,14 @@
       "element": "presentation",
       "context": "unrepresentable-initial-metadata",
       "code": "unsupported_capability",
-      "followUp": "CreateOptions::metadata (OLE property sets, record 0254)",
+      "followUp": "CreateOptions::metadata (OLE property sets)",
       "reason": "initial metadata is written to the OLE property sets; identifier, hyperlink_base and unzoned timestamps have no property-set slot and are refused rather than dropped"
     },
     {
       "subject": "element",
       "element": "diagram",
       "code": "unsupported_path",
-      "followUp": "none: out of scope (record 0332, design §10)",
+      "followUp": "none: out of scope",
       "reason": "OfficeCLI's diagram renders Mermaid text into shapes or a picture; rendering is outside the unified API, and SmartArt is the smartart element"
     },
     {
@@ -2210,7 +2210,7 @@
       "element": "ole",
       "context": "object-storage",
       "code": "unsupported_capability",
-      "followUp": "0323-F8 PPT OLE object writes",
+      "followUp": "PPT OLE object writes",
       "reason": "embedding an OLE object needs a new ExOleObjStg storage, an ExOleEmbedContainer and a picture frame with its preview; OLE frames are read (progId, linked, frame) only"
     },
     {
@@ -2219,7 +2219,7 @@
       "element": "ole",
       "context": "object-storage",
       "code": "unsupported_capability",
-      "followUp": "0323-F8 PPT OLE object writes",
+      "followUp": "PPT OLE object writes",
       "reason": "OLE frame geometry and object replacement are not written; the frame is read only"
     },
     {
@@ -2228,7 +2228,7 @@
       "element": "media",
       "context": "media-objects",
       "code": "unsupported_capability",
-      "followUp": "0323-F9 PPT media writes",
+      "followUp": "PPT media writes",
       "reason": "a movie or sound needs an external-media object, its sound collection entry and a media picture frame; media frames are read only"
     },
     {
@@ -2237,7 +2237,7 @@
       "element": "media",
       "context": "media-objects",
       "code": "unsupported_capability",
-      "followUp": "0323-F9 PPT media writes",
+      "followUp": "PPT media writes",
       "reason": "media frame geometry and playback are not written through the media element; the frame is read only"
     },
     {
@@ -2246,7 +2246,7 @@
       "element": "theme",
       "context": "theme-package",
       "code": "unsupported_capability",
-      "followUp": "0323-F10 PPT theme writes",
+      "followUp": "PPT theme writes",
       "reason": "the theme is an OPC package inside each master's RoundTripThemeAtom; re-encoding it (and the masters' legacy color schemes that PowerPoint 97-2003 reads) is not modeled"
     },
     {
@@ -2255,7 +2255,7 @@
       "element": "chart",
       "context": "graph-object",
       "code": "unsupported_capability",
-      "followUp": "0323-F7 PPT chart series and axes",
+      "followUp": "PPT chart series and axes",
       "reason": "the embedded Graph object's chart stream is read through MS-OGRAPH; chart, series and axis writes are not integrated"
     },
     {
@@ -2264,7 +2264,7 @@
       "element": "run",
       "context": "text-positions",
       "code": "unsupported_capability",
-      "followUp": "0323-F4 PPT run and line-break insertion and removal",
+      "followUp": "PPT run and line-break insertion and removal",
       "reason": "inserting or removing a run or line break changes the text length, which every position-dependent record (style, special-information and interaction runs, fields) of the body would have to follow; runs are formatted and their text replaced in place"
     },
     {
@@ -2273,7 +2273,7 @@
       "element": "run",
       "context": "text-positions",
       "code": "unsupported_capability",
-      "followUp": "0323-F4 PPT run and line-break insertion and removal",
+      "followUp": "PPT run and line-break insertion and removal",
       "reason": "removing a run changes the text length that the body's position-dependent records hold"
     },
     {
@@ -2282,7 +2282,7 @@
       "element": "linebreak",
       "context": "text-positions",
       "code": "unsupported_capability",
-      "followUp": "0323-F4 PPT run and line-break insertion and removal",
+      "followUp": "PPT run and line-break insertion and removal",
       "reason": "a line break is a vertical-tab character of the text atom; inserting one changes the text length that the body's position-dependent records hold"
     },
     {
@@ -2291,7 +2291,7 @@
       "element": "tr",
       "context": "table-layout",
       "code": "unsupported_capability",
-      "followUp": "0323-F1 PPT table re-layout",
+      "followUp": "PPT table re-layout",
       "reason": "a legacy table is a group of positioned cell shapes and border lines; inserting a row would re-lay out every later cell, line and the group anchor, which the leaf does not model"
     },
     {
@@ -2300,7 +2300,7 @@
       "element": "col",
       "context": "table-layout",
       "code": "unsupported_capability",
-      "followUp": "0323-F1 PPT table re-layout",
+      "followUp": "PPT table re-layout",
       "reason": "a legacy table is a group of positioned cell shapes and border lines; inserting a column would re-lay out every later cell, line and the group anchor, which the leaf does not model"
     },
     {
@@ -2309,7 +2309,7 @@
       "element": "tr",
       "context": "table-layout",
       "code": "unsupported_capability",
-      "followUp": "0323-F1 PPT table re-layout",
+      "followUp": "PPT table re-layout",
       "reason": "removing a row would re-lay out the table group's later cells and border lines, which the leaf does not model"
     },
     {
@@ -2318,7 +2318,7 @@
       "element": "col",
       "context": "table-layout",
       "code": "unsupported_capability",
-      "followUp": "0323-F1 PPT table re-layout",
+      "followUp": "PPT table re-layout",
       "reason": "removing a column would re-lay out the table group's later cells and border lines, which the leaf does not model"
     },
     {
@@ -2327,7 +2327,7 @@
       "element": "tc",
       "context": "native-cell-text",
       "code": "unsupported_capability",
-      "followUp": "0323-F2 PPT nested tables and rich cell text",
+      "followUp": "PPT nested tables and rich cell text",
       "reason": "cell text follows the shape-text closure rules (a changed length refuses over several formatting runs or position-dependent records); tables inside groups and merged-away cells are refused"
     },
     {
@@ -2345,7 +2345,7 @@
       "element": "slide",
       "context": "native-slide-dependencies",
       "code": "unsupported_capability",
-      "followUp": "M2 PPT dependency-preserving slide removal",
+      "followUp": "PPT dependency-preserving slide removal",
       "reason": "slide removal requires native closure admission; unsupported dependent records refuse atomically"
     },
     {
@@ -2354,7 +2354,7 @@
       "element": "slide",
       "context": "native-visibility-record",
       "code": "unsupported_capability",
-      "followUp": "M2 PPT visibility atom insertion",
+      "followUp": "PPT visibility atom insertion",
       "reason": "slide visibility writes require one native-admitted SSSlideInfoAtom; insertion of missing timing records is not integrated"
     },
     {
@@ -2363,7 +2363,7 @@
       "element": "shape",
       "context": "native-shape-preservation",
       "code": "unsupported_capability",
-      "followUp": "M2 PPT nested-shape and rich-text edits",
+      "followUp": "PPT nested-shape and rich-text edits",
       "reason": "top-level shape, outline placeholder, paragraph and notes text and shape anchors require native closure admission: a changed text length refuses where interactions, field metacharacters or several formatting or language runs hold character positions; nested groups, new text bodies and rich-text formatting remain unsupported"
     },
     {
@@ -2372,49 +2372,49 @@
       "element": "presentation",
       "context": "native-write-coalescing",
       "code": "unsupported_capability",
-      "followUp": "M2 PPT broader native edit runs and performance qualification",
+      "followUp": "PPT broader native edit runs and performance qualification",
       "reason": "distinct direct shape text/geometry sets share native transactions; selectors, repeated shapes, reads and structural edits close the run; broader coalescing and frozen-harness qualification remain open"
     },
     {
       "subject": "view",
       "mode": "issues",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the issues view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "forms",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the forms view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "html",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "svg",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "screenshot",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "pdf",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     }
   ],
@@ -2451,7 +2451,7 @@
         "set": true,
         "writeGap": {
           "code": "unsupported_capability",
-          "followUp": "record 0010 Q3: an owner-approved regular-expression dependency",
+          "followUp": "an owner-approved regular-expression dependency",
           "reason": "Litchi has no approved regular-expression engine; `regex=true` and OfficeCLI's `r\"...\"` patterns are refused"
         }
       }

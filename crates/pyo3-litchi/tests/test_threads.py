@@ -1,4 +1,4 @@
-"""Handles used from several threads (bug B5, fixed in S8a; ``File``, R9).
+"""Handles used from several threads (bug B5; ``File``).
 
 Every class is ``frozen`` and thread-safe over the ``Send + Sync``
 ``litchi::File``, and the document-wide reads release the GIL. These tests

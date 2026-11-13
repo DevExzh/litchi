@@ -1,6 +1,5 @@
-//! Shared workbook element kinds and baseline spec table (record 0010 §4.2, §4.7,
-//! §7.2): the one table path resolution, the query compiler, the node view
-//! and `capabilities()` read.
+//! Shared workbook element kinds and baseline spec table: the one table path
+//! resolution, the query compiler, the node view and `capabilities()` read.
 //!
 //! Every canonical name of the workbook vocabulary is a [`Kind`], so the
 //! resolver never falls back to an unlisted `unsupported_capability`: the
@@ -468,7 +467,7 @@ props! {
     }
 }
 
-/// An element gap whose leaf model is planned (record 0010 §4.11).
+/// An element gap whose leaf model is planned.
 const fn leaf_gap(element: &'static str, follow_up: &'static str, reason: &'static str) -> GapSpec {
     GapSpec {
         subject: Subject::Element(element),
@@ -495,84 +494,92 @@ const fn prop_gap(
 
 static COMMENT_GAP: GapSpec = leaf_gap(
     "comment",
-    "L-XLSX-R5",
+    "not supported yet",
     "the XLSX leaf has no comments accessor on either owner yet",
 );
 static CHART_GAP: GapSpec = leaf_gap(
     "chart",
-    "L-XLSX-R7",
+    "not supported yet",
     "the XLSX leaf reads chart presence only, not chart parts",
 );
-static SERIES_GAP: GapSpec = leaf_gap("series", "L-XLSX-R7", "chart series need the chart reader");
-static AXIS_GAP: GapSpec = leaf_gap("axis", "L-XLSX-R7", "chart axes need the chart reader");
+static SERIES_GAP: GapSpec = leaf_gap(
+    "series",
+    "not supported yet",
+    "chart series need the chart reader",
+);
+static AXIS_GAP: GapSpec = leaf_gap(
+    "axis",
+    "not supported yet",
+    "chart axes need the chart reader",
+);
 static PIVOT_GAP: GapSpec = leaf_gap(
     "pivottable",
-    "M1-extended (R4x)",
+    "not supported yet",
     "pivot tables are not projected into nodes yet",
 );
 static SLICER_GAP: GapSpec = leaf_gap(
     "slicer",
-    "M1-extended (R4x)",
+    "not supported yet",
     "slicers are not projected into nodes yet",
 );
 static SPARKLINE_GAP: GapSpec = leaf_gap(
     "sparkline",
-    "M1-extended (R4x)",
+    "not supported yet",
     "sparkline groups are not projected into nodes yet",
 );
 static VALIDATION_GAP: GapSpec = leaf_gap(
     "dataValidation",
-    "M1-extended (R4x)",
-    "data validations are read by the leaf (L-XLSX-R2) but not projected into nodes yet",
+    "not supported yet",
+    "data validations are read by the leaf but not projected into nodes yet",
 );
 static CF_GAP: GapSpec = leaf_gap(
     "conditionalFormatting",
-    "M1-extended (R4x)",
-    "conditional formats are read by the leaf (L-XLSX-R2) but not projected into nodes yet",
+    "not supported yet",
+    "conditional formats are read by the leaf but not projected into nodes yet",
 );
 static AUTOFILTER_GAP: GapSpec = leaf_gap(
     "autofilter",
-    "M1-extended (R4x)",
-    "the auto-filter is read by the leaf (L-XLSX-R2) but not projected into a node yet",
+    "not supported yet",
+    "the auto-filter is read by the leaf but not projected into a node yet",
 );
 static HYPERLINK_GAP: GapSpec = leaf_gap(
     "hyperlink",
-    "M1-extended (R4x)",
-    "hyperlinks are read by the leaf (L-XLSX-R2) but their targets are not resolved into nodes yet",
+    "not supported yet",
+    "hyperlinks are read by the leaf but their targets are not resolved into nodes yet",
 );
 static MERGE_GAP: GapSpec = leaf_gap(
     "mergeCell",
-    "M1-extended (R4x)",
+    "not supported yet",
     "merged ranges are not listed as nodes yet; cells report them as `merge`",
 );
 static PICTURE_GAP: GapSpec = leaf_gap(
     "picture",
-    "L-XLSX-R7",
+    "not supported yet",
     "drawings are not readable on the source-backed owner yet",
 );
 static SHAPE_GAP: GapSpec = leaf_gap(
     "shape",
-    "L-XLSX-R7",
+    "not supported yet",
     "drawings are not readable on the source-backed owner yet",
 );
 static OLE_GAP: GapSpec = leaf_gap(
     "ole",
-    "M1-extended (R4x)",
+    "not supported yet",
     "OLE objects are not projected into nodes yet",
 );
 static ROW_BREAK_GAP: GapSpec = leaf_gap(
     "rowbreak",
-    "M1-extended (R4x)",
+    "not supported yet",
     "page breaks are not readable on the source-backed owner yet",
 );
 static COL_BREAK_GAP: GapSpec = leaf_gap(
     "colbreak",
-    "M1-extended (R4x)",
+    "not supported yet",
     "page breaks are not readable on the source-backed owner yet",
 );
 static RUN_GAP: GapSpec = leaf_gap(
     "run",
-    "M1-extended (R4x)",
+    "not supported yet",
     "the XLSX cell model flattens rich-text runs into plain text",
 );
 
@@ -916,103 +923,103 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
             prop_gap(
                 "workbook",
                 "calc.mode",
-                "M1-extended (R4x)",
+                "not supported yet",
                 "calculation properties are read by the eager owner only",
             ),
             prop_gap(
                 "workbook",
                 "firstSheet",
-                "M1-extended (R4x)",
+                "not supported yet",
                 "the workbook views are not retained by the source-backed catalog",
             ),
             prop_gap(
                 "sheet",
                 "freeze",
-                "M1-extended (R4x)",
-                "sheet views are read by the leaf (L-XLSX-R2) but not projected yet",
+                "not supported yet",
+                "sheet views are read by the leaf but not projected yet",
             ),
             prop_gap(
                 "sheet",
                 "zoom",
-                "M1-extended (R4x)",
-                "sheet views are read by the leaf (L-XLSX-R2) but not projected yet",
+                "not supported yet",
+                "sheet views are read by the leaf but not projected yet",
             ),
             prop_gap(
                 "sheet",
                 "autoFilter",
-                "M1-extended (R4x)",
-                "the auto-filter is read by the leaf (L-XLSX-R2) but not projected yet",
+                "not supported yet",
+                "the auto-filter is read by the leaf but not projected yet",
             ),
             prop_gap(
                 "sheet",
                 "tabColor",
-                "M1-extended (R4x)",
+                "not supported yet",
                 "sheet properties are not readable on the source-backed owner yet",
             ),
             prop_gap(
                 "sheet",
                 "protect",
-                "M1-extended (R4x)",
+                "not supported yet",
                 "sheet protection is not readable on the source-backed owner yet",
             ),
             prop_gap(
                 "sheet",
                 "printArea",
-                "M1-extended (R4x)",
+                "not supported yet",
                 "print settings are not projected yet",
             ),
             prop_gap(
                 "cell",
                 "computedValue",
-                "M4 follow-up: project computed values in cell views",
-                "node views do not evaluate; `File::evaluate` and `File::recalculate` compute formula results (record 0266)",
+                "follow-up: project computed values in cell views",
+                "node views do not evaluate; `File::evaluate` and `File::recalculate` compute formula results",
             ),
             prop_gap(
                 "cell",
                 "link",
-                "M1-extended (R4x)",
+                "not supported yet",
                 "hyperlink targets are not resolved into cell properties yet",
             ),
             prop_gap(
                 "cell",
                 "tooltip",
-                "M1-extended (R4x)",
+                "not supported yet",
                 "hyperlink targets are not resolved into cell properties yet",
             ),
             prop_gap(
                 "cell",
                 "display",
-                "M1-extended (R4x)",
+                "not supported yet",
                 "hyperlink targets are not resolved into cell properties yet",
             ),
             prop_gap(
                 "cell",
                 "phonetic",
-                "M1-extended (R4x)",
+                "not supported yet",
                 "the XLSX cell model does not keep phonetic runs",
             ),
             prop_gap(
                 "cell",
                 "richtext",
-                "M1-extended (R4x)",
+                "not supported yet",
                 "the XLSX cell model flattens rich-text runs into plain text",
             ),
             prop_gap(
                 "cell",
                 "alt",
-                "M1-extended (R4x)",
+                "not supported yet",
                 "in-cell pictures are not read",
             ),
             prop_gap(
                 "column",
                 "numberformat",
-                "M1-extended (R4x)",
+                "not supported yet",
                 "column styles are not readable on the source-backed owner yet",
             ),
             prop_gap(
                 "range",
                 "merge",
-                "M1-extended (R4x)",
+                "not supported yet",
                 "ranges do not report whether they are merged yet",
             ),
         ],

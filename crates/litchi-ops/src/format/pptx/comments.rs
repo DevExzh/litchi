@@ -1,18 +1,18 @@
-//! Legacy slide comments through the native eager edit (record 0252).
+//! Legacy slide comments through the native eager edit.
 //!
 //! `set(/slide[N]/comment[K], {text, author, initials, date, x, y})`
 //! replaces one comment's text, location or date, or re-attributes it
-//! (record 0346: the author is renamed when the comment is their only one,
+//! (the author is renamed when the comment is their only one,
 //! otherwise the comment moves to an author of that name and initials, so
 //! other comments keep their attribution); `add(/slide[N], comment, {text,
 //! author, initials, date, x, y, direction})` appends one, creating the
 //! named author when absent (`direction=rtl` leads the text with a
 //! right-to-left mark, as OfficeCLI does);
-//! `remove(/slide[N]/comment[K])` deletes one (record 0333), as do
+//! `remove(/slide[N]/comment[K])` deletes one, as do
 //! `remove(/slide[N]/moderncomment[K])` (with its replies) and
 //! `remove(/slide[N]/moderncomment[K]/reply[R])` for threaded comments.
-//! Removal keeps the comment authors (other slides may name them; record
-//! 0319's rule: no edit of content the caller did not name) and drops a
+//! Removal keeps the comment authors (other slides may name them:
+//! no edit of content the caller did not name) and drops a
 //! slide's comment part with its last comment, as OfficeCLI does. Source
 //! owners are promoted to an eager package for the edit, since comment
 //! parts are separate parts the source-backed slide edit does not stage.
@@ -32,7 +32,7 @@ use litchi_core::Position;
 use litchi_core::selector::{Path, Predicate, Step};
 use std::sync::Arc;
 
-/// U+200F, prefixed to right-to-left comment text (record 0346).
+/// U+200F, prefixed to right-to-left comment text.
 const RIGHT_TO_LEFT_MARK: char = '\u{200F}';
 
 #[derive(Default)]
@@ -43,7 +43,7 @@ struct Values {
     date: Option<String>,
     x: Option<i64>,
     y: Option<i64>,
-    /// `direction=rtl` on `add` (record 0346).
+    /// `direction=rtl` on `add`.
     rtl: bool,
 }
 
@@ -104,8 +104,8 @@ fn admit(props: &Props<'_>, operation: Operation, limits: &SemanticLimits) -> Re
 
 /// A comment `date` (or a modern comment's `created`) is an XML
 /// `dateTime`, as the comments part requires; anything else is refused here
-/// rather than failing as a corrupt part when the edit serializes it
-/// (record 0330). The accepted forms are the leaf codec's.
+/// rather than failing as a corrupt part when the edit serializes it.
+/// The accepted forms are the leaf codec's.
 fn validate_date_time(value: &str, property: &'static str) -> Result<()> {
     if chrono::DateTime::parse_from_rfc3339(value).is_ok()
         || chrono::NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%S%.f").is_ok()
@@ -162,7 +162,7 @@ impl Pptx {
             location,
         )?;
         // Each setter addresses the comment by its slide position, which
-        // re-attribution keeps (record 0346).
+        // re-attribution keeps.
         if let Some(date) = values.date.as_deref() {
             changed |=
                 edit.set_comment_date_at(slide as usize, Position::new(position as usize), date)?;
@@ -265,7 +265,7 @@ impl Pptx {
 
 impl Pptx {
     /// A `remove` of a legacy comment, modern comment or reply path; `None`
-    /// for other targets (record 0333).
+    /// for other targets.
     pub(super) fn try_remove_comment(
         &self,
         target: &crate::target::TargetArg<'_>,
@@ -343,7 +343,7 @@ impl Pptx {
     }
 }
 
-/// The admitted assignments of a modern comment or reply (record 0346).
+/// The admitted assignments of a modern comment or reply.
 #[derive(Default)]
 struct ModernValues {
     text: Option<String>,
@@ -415,8 +415,7 @@ fn derived_initials(author: &str) -> String {
 }
 
 impl Pptx {
-    /// A `set` of a modern comment or reply path; `None` for other targets
-    /// (record 0346).
+    /// A `set` of a modern comment or reply path; `None` for other targets.
     pub(super) fn try_set_modern_comment(
         &self,
         target: &crate::target::TargetArg<'_>,
@@ -497,7 +496,7 @@ impl Pptx {
 
     /// `add(/slide[N], modernComment, {text, author, initials, created,
     /// resolved, parent})`: a new thread, or with `parent` a reply to that
-    /// thread (record 0346).
+    /// thread.
     pub(super) fn add_modern_comment(
         &self,
         parent: PathArg<'_>,

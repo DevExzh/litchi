@@ -591,7 +591,7 @@ fn many_paragraphs(count: usize) -> File {
     open_bytes(builder.build().unwrap().to_bytes().unwrap()).unwrap()
 }
 
-/// Record 0359a: direct paragraph `bold`/`italic` sets join the body run
+/// Direct paragraph `bold`/`italic` sets join the body run
 /// (one leaf commit), read back as the isolated setter's, and a paragraph
 /// whose text the run replaced closes the run before a toggle.
 #[test]

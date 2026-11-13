@@ -1,5 +1,4 @@
-//! ODS workbook vocabulary, property tables and capability gaps (record
-//! 0277).
+//! ODS workbook vocabulary, property tables and capability gaps.
 //!
 //! The adapter shares the workbook family's element kinds and path tree
 //! (`format::workbook::spec`). The leaf owns typed worksheets, named
@@ -185,7 +184,7 @@ pub(crate) enum CellSetter {
 }
 
 /// Cell assignments. `text` names `value`, as in the other workbook
-/// registries (record 0269).
+/// registries.
 pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 4, 1> = Table::new(
     [
         Entry {
@@ -449,7 +448,7 @@ const fn property_gap(
     }
 }
 
-const FOLLOW_UP: &str = "ODS adapter follow-up (record 0277)";
+const FOLLOW_UP: &str = "ODS adapter follow-up";
 
 static TABLE_GAP: GapSpec = gap(
     "table",
@@ -576,10 +575,10 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
     root: workbook::SPEC.root,
     elements: &ELEMENTS,
     gaps: &[
-        // OfficeCLI's heuristic table node (record 0339).
+        // OfficeCLI's heuristic table node.
         gap(
             "detectedtable",
-            "WP11 (record 0339 F5): header-row table detection in queries",
+            "header-row table detection in queries",
             "OfficeCLI's detectedtable is a header-row block found heuristically in unstructured cells and reported by table queries; Litchi's queries return declared tables only",
         ),
         GapSpec {
@@ -674,7 +673,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
 check_format_spec!(SPEC);
 
 /// Elements whose properties the unified ODS writer sets (the worksheet
-/// features of record 0327 included).
+/// features included).
 pub(crate) const SETTABLE: &[&str] = &[
     "cell",
     "range",
@@ -756,7 +755,7 @@ pub(crate) static WRITE_GAPS: [GapSpec; 12] = [
         "set",
         "metadata",
         "unowned-fields",
-        "the ODF metadata family (record 0288) writes title, subject, description, author, lastModifiedBy, language and keywords; created, modified, revision, template, statistics and custom.<name> are refused",
+        "the ODF metadata family writes title, subject, description, author, lastModifiedBy, language and keywords; created, modified, revision, template, statistics and custom.<name> are refused",
     ),
     operation_gap(
         "set",
@@ -810,7 +809,7 @@ pub(crate) static WRITE_GAPS: [GapSpec; 12] = [
         "set",
         "workbook",
         "flat-odf",
-        "flat single-XML spreadsheets (.fods) are edited through the leaf's packaged projection and republished element by element (record 0292); an edit that adds a package member or changes a part's root has no flat form and is refused, as is a projection the packaged reader refuses",
+        "flat single-XML spreadsheets (.fods) are edited through the leaf's packaged projection and republished element by element; an edit that adds a package member or changes a part's root has no flat form and is refused, as is a projection the packaged reader refuses",
     ),
     operation_gap(
         "batch",

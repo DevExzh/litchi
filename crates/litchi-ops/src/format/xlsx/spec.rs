@@ -273,16 +273,16 @@ pub(crate) enum CellSetter {
     BorderDiagonalColor,
     BorderDiagonalUp,
     BorderDiagonalDown,
-    /// The cell type (record 0338): `string`, `number`, `boolean`, `date`,
+    /// The cell type: `string`, `number`, `boolean`, `date`,
     /// `error` or `richtext`.
     Type,
-    /// Rich-text runs, a JSON array (record 0338).
+    /// Rich-text runs, a JSON array.
     Runs,
-    /// The address of an added cell (record 0338); add-only.
+    /// The address of an added cell; add-only.
     Ref,
 }
 
-/// The cell `type` an `add` or `set` writes (record 0338), with OfficeCLI's
+/// The cell `type` an `add` or `set` writes, with OfficeCLI's
 /// short spellings (`ExcelHandler.Set.Cells.cs`).
 pub(crate) static CELL_TYPE: Tokens = Tokens::new(
     "cell type",
@@ -652,7 +652,7 @@ pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 54, 42> = Table::new(
     [
         // OfficeCLI's cell handler takes `text` as another name of `value`
         // (`ExcelHandler.Set.Cells.cs`, `case "value" or "text"`), although
-        // its help schema lists only `value` (record 0269).
+        // its help schema lists only `value`.
         Alias {
             name: "text",
             entry: 0,
@@ -861,7 +861,7 @@ const fn cell_write_only_count() -> usize {
     count
 }
 
-/// The cell hyperlink setters (record 0320): `link` (alias `url`),
+/// The cell hyperlink setters: `link` (alias `url`),
 /// `tooltip` (alias `screentip`) and `display`, written through the cell
 /// edit; `null`, an empty link or `none` removes the cell's hyperlink.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1001,7 +1001,7 @@ const fn range_capability_array() -> [PropSpec; RANGE_PROPS.len() + CELL_WRITE_P
     while write_index < write_props.len() {
         let mut prop = write_props[write_index];
         prop.access.get = false;
-        // A range is not added (record 0338: cell properties are addable).
+        // A range is not added (cell properties are addable).
         prop.access.add = false;
         props[RANGE_PROPS.len() + write_index] = prop;
         write_index += 1;
@@ -1019,7 +1019,7 @@ pub(crate) static RANGE_CAPABILITY_PROPS: &[PropSpec] = &range_capability_array(
 /// very-hidden policy is exposed by a later adapter.  Keeping this merge
 /// derived from the write table prevents capability metadata and admission
 /// from drifting apart.
-/// The sheet-level auto-filter setter (record 0320): `autoFilter=A1:B5`
+/// The sheet-level auto-filter setter: `autoFilter=A1:B5`
 /// sets the worksheet's auto-filter range; `null`, `none` or `false`
 /// removes it. The filter itself is the `autofilter` element.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1065,7 +1065,7 @@ const fn sheet_capability_array() -> [PropSpec; SHEET_PROPS.len() + 2] {
 pub(crate) static SHEET_CAPABILITY_PROPS: &[PropSpec] = &sheet_capability_array();
 
 /// The workbook root's capability table: its document-property keys are
-/// settable on `/` through the metadata writer (record 0338).
+/// settable on `/` through the metadata writer.
 pub(crate) static WORKBOOK_CAPABILITY_PROPS: [PropSpec; WORKBOOK_PROPS.len()] =
     crate::format::metadata::root_capability(WORKBOOK_PROPS);
 
@@ -1266,7 +1266,7 @@ const fn is_range_merge_gap(gap: &GapSpec) -> bool {
     match gap.subject {
         Subject::Property { element, key } => {
             // Cell hyperlinks and the sheet auto-filter are write-only
-            // setters (record 0320); their read gaps stay.
+            // setters; their read gaps stay.
             same_name(element, "range") && same_name(key, "merge")
         },
         _ => false,
@@ -1286,23 +1286,23 @@ const fn removed_gap_count() -> usize {
     count
 }
 
-/// The shared gaps XLSX keeps, plus its gradient-fill gap and the element
-/// gaps of record 0339.
+/// The shared gaps XLSX keeps, plus its gradient-fill gap and its element
+/// gaps.
 const XLSX_GAP_COUNT: usize =
     workbook::SPEC.gaps.len() - removed_gap_count() + 1 + XLSX_ELEMENT_GAPS.len();
 
-/// OfficeCLI's heuristic table node and SmartArt (record 0339).
+/// OfficeCLI's heuristic table node and SmartArt.
 const XLSX_ELEMENT_GAPS: [GapSpec; 2] = [
     GapSpec {
         subject: Subject::Element("detectedtable"),
         code: crate::error::Code::UnsupportedCapability,
-        follow_up: "0339-F5 (deferred-P1): header-row table detection in queries",
+        follow_up: "header-row table detection in queries",
         reason: "OfficeCLI's detectedtable is a header-row block found heuristically in unstructured cells and reported by table queries; Litchi's queries return declared tables only",
     },
     GapSpec {
         subject: Subject::Element("smartart"),
         code: crate::error::Code::UnsupportedCapability,
-        follow_up: "0339-F6 (deferred-P1): a worksheet-drawing diagram model in litchi-xlsx",
+        follow_up: "a worksheet-drawing diagram model in litchi-xlsx",
         reason: "litchi-xlsx reads and writes pictures, shapes and charts in worksheet drawings but has no diagram model; a SmartArt frame is kept as it is and is not a node",
     },
 ];
@@ -1327,7 +1327,7 @@ const fn xlsx_gaps() -> [GapSpec; XLSX_GAP_COUNT] {
             context: "gradient-fill-projection",
         },
         code: crate::error::Code::UnsupportedCapability,
-        follow_up: "M1 XLSX lossless scalar gradient property projection",
+        follow_up: "XLSX lossless scalar gradient property projection",
         reason: "ordinary fill readback follows OfficeCLI RGB stop text and integer degrees; complete geometry, stop positions and native colors remain available through Node::cell_format",
     };
     let mut extra = 0;
@@ -1341,7 +1341,7 @@ const fn xlsx_gaps() -> [GapSpec; XLSX_GAP_COUNT] {
 static XLSX_GAPS: [GapSpec; XLSX_GAP_COUNT] = xlsx_gaps();
 
 /// The chart elements the shared workbook vocabulary lists as gaps, read
-/// and written by the XLSX adapter (record 0270).
+/// and written by the XLSX adapter.
 const XLSX_CHART: ElementSpec<Kind> = ElementSpec {
     props: super::chart::CHART_PROPS,
     gap: None,
@@ -1363,8 +1363,7 @@ const XLSX_AXIS: ElementSpec<Kind> = ElementSpec {
     ..workbook::SPEC.elements[11]
 };
 
-/// A shared element gap XLSX reads and writes as a worksheet feature
-/// (record 0320).
+/// A shared element gap XLSX reads and writes as a worksheet feature.
 const fn feature(index: usize, props: &'static [PropSpec]) -> ElementSpec<Kind> {
     ElementSpec {
         props,
@@ -1438,7 +1437,7 @@ static XLSX_ELEMENTS: [ElementSpec<Kind>; 26] = [
     ),
     feature(23, super::features::ROW_BREAK_PROPS),
     feature(24, super::features::COL_BREAK_PROPS),
-    // Rich-text runs of a cell (record 0338).
+    // Rich-text runs of a cell.
     ElementSpec {
         props: super::runs::RUN_PROPS,
         gap: None,
@@ -1480,7 +1479,7 @@ mod tests {
             .iter()
             .find(|property| property.name == "formula")
             .expect("formula capability");
-        // Record 0338: an added cell takes the payload setters; `clear` is
+        // An added cell takes the payload setters; `clear` is
         // set-only.
         assert!(!value.access.get && value.access.set && value.access.add);
         assert!(!clear.access.get && clear.access.set && !clear.access.add);

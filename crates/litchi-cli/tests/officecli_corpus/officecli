@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# The `officecli` stand-in of the OfficeCLI example-corpus harness (record
-# 0265). `tests/officecli_corpus.rs` puts this file first on PATH as
+# The `officecli` stand-in of the OfficeCLI example-corpus harness.
+# `tests/officecli_corpus.rs` puts this file first on PATH as
 # `officecli`, so a replayed example script reaches it for every `officecli`
 # call, including `$CLI` and `command officecli`. It translates the command
 # line to the `litchi` binary, runs it, records the call and returns
@@ -15,19 +15,19 @@
 # (NUL-separated OfficeCLI arguments), `status`, `stderr` and, when the line
 # needed a documented translation, `translated` (the delta's id).
 #
-# Translation (record 0265 §3; anything not listed passes through unchanged):
-#   open, close         resident-mode verbs: no-ops here (record 0256 D5),
+# Translation (anything not listed passes through unchanged):
+#   open, close         resident-mode verbs: no-ops here,
 #                       recorded with status `skip`
 #   batch FILE          without --input/--commands reads stdin: `--input -`
 #   add F / --type slide
 #                       without a layout: OfficeCLI picks the deck's first
-#                       layout, Litchi requires a name (0256 D4), so the
+#                       layout, Litchi requires a name, so the
 #                       first layout of Litchi's blank deck is named
 #                       (`layout=Title Slide`); the layout-type aliases
 #                       `blank` and `title` become the layout names
 #                       `Blank` and `Title Slide` (OfficeCLI matches layout
 #                       types too). Tagged `D4`.
-#   set, add, batch     gain `--unsupported warn` (record 0269): OfficeCLI
+#   set, add, batch     gain `--unsupported warn`: OfficeCLI
 #                       applies the supported properties of a command and
 #                       warns about the rest by default, Litchi only when
 #                       asked. A call that skipped properties exits 9 with

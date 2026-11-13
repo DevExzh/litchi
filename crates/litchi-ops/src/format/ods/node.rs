@@ -1,4 +1,4 @@
-//! Typed workbook nodes over the ODS leaf's typed worksheets (record 0277).
+//! Typed workbook nodes over the ODS leaf's typed worksheets.
 //!
 //! A node borrows the handle's owner: a cell node holds the leaf
 //! [`litchi_ods::Cell`] run it reads, a sheet node the
@@ -54,7 +54,7 @@ pub(super) enum Item<'f> {
     Comment(CommentItem),
     Merge(MergeItem),
     /// A worksheet feature: a hyperlink, picture, shape, conditional
-    /// format, validation, auto-filter or page break (record 0327).
+    /// format, validation, auto-filter or page break.
     Feature(std::sync::Arc<super::features::Feature>),
 }
 
@@ -64,8 +64,8 @@ pub(super) struct CellItem<'f> {
     pub(super) at: (u32, u32),
     /// The run covering the coordinate, when one is stored.
     pub(super) cell: Option<&'f Cell>,
-    /// The A1 label, written on first use (record 0287: a walk that never
-    /// reads it writes none).
+    /// The A1 label, written on first use (a walk that never reads it
+    /// writes none).
     label: OnceLock<Label>,
 }
 
@@ -519,7 +519,7 @@ pub(crate) enum Props<'a> {
         sheet: &'a str,
     },
     Merge(Label),
-    /// A worksheet feature (record 0327); its values are owned.
+    /// A worksheet feature; its values are owned.
     Feature(std::sync::Arc<super::features::Feature>),
 }
 

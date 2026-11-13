@@ -61,7 +61,7 @@ static OPERATION_GAPS: [GapSpec; 6] = [
             context: "a table definition (columns, keys and types)",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0282 ODB typed table creation",
+        follow_up: "ODB typed table creation",
         reason: "creating a table needs a typed column schema the unified registry does not have yet",
     },
     GapSpec {
@@ -71,7 +71,7 @@ static OPERATION_GAPS: [GapSpec; 6] = [
             context: "a column definition",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0282 ODB typed column creation",
+        follow_up: "ODB typed column creation",
         reason: "creating a column needs a typed data type the unified registry does not have yet",
     },
     GapSpec {
@@ -81,7 +81,7 @@ static OPERATION_GAPS: [GapSpec; 6] = [
             context: "the `name` property (renaming a query)",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0282 ODB query rename",
+        follow_up: "ODB query rename",
         reason: "the leaf has no query rename; remove and add the query instead",
     },
     GapSpec {
@@ -91,7 +91,7 @@ static OPERATION_GAPS: [GapSpec; 6] = [
             context: "a column into another table",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0292 ODB cross-table column transfer",
+        follow_up: "ODB cross-table column transfer",
         reason: "a column belongs to its table's schema; columns move and swap within their table",
     },
     GapSpec {
@@ -101,7 +101,7 @@ static OPERATION_GAPS: [GapSpec; 6] = [
             context: "a database that mixes table representations and definitions",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0292 ODB mixed table collections",
+        follow_up: "ODB mixed table collections",
         reason: "representations and definitions order in separate collections, so one unified table order cannot be published",
     },
     super::METADATA_PATH_GAP,
@@ -415,7 +415,7 @@ fn single_table_kind(package: &litchi_odb::Package) -> Result<()> {
             Code::UnsupportedCapability,
             "the database mixes table representations and definitions, which order in separate collections",
         )
-        .with_suggestion("follow-up: 0292 ODB mixed table collections"));
+        .with_suggestion("follow-up: ODB mixed table collections"));
     }
     Ok(())
 }
@@ -440,7 +440,7 @@ fn stage_move(
     }
 }
 
-/// Move a table, a column within its table, or a query (record 0292).
+/// Move a table, a column within its table, or a query.
 pub(crate) fn move_to(
     file: &OdfTree,
     package: &litchi_odb::Package,
@@ -460,7 +460,7 @@ pub(crate) fn move_to(
             Code::UnsupportedCapability,
             "an ODB column moves within its own table",
         )
-        .with_suggestion("follow-up: 0292 ODB cross-table column transfer"));
+        .with_suggestion("follow-up: ODB cross-table column transfer"));
     };
     if node.item().type_name() == "table" {
         single_table_kind(package)?;
@@ -489,7 +489,7 @@ pub(crate) fn swap(
             Code::UnsupportedCapability,
             "ODB columns swap within one table",
         )
-        .with_suggestion("follow-up: 0292 ODB cross-table column transfer"));
+        .with_suggestion("follow-up: ODB cross-table column transfer"));
     }
     if left.item().type_name() == "table" {
         single_table_kind(package)?;

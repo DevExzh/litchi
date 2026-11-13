@@ -1,4 +1,4 @@
-//! PPTX views (record 0010 §6): the text, annotated, outline and stats
+//! PPTX views: the text, annotated, outline and stats
 //! modes, with OfficeCLI's content and JSON shapes
 //! (`PowerPointHandler.View.cs`).
 //!

@@ -1,5 +1,4 @@
-//! The DOCX element kinds and their spec table (record 0010 §4.2, §4.5,
-//! §7.2).
+//! The DOCX element kinds and their spec table.
 //!
 //! [`Kind`] names every element the adapter resolves, plus the WordprocessingML
 //! elements OfficeCLI has that Litchi cannot read through this adapter yet;
@@ -12,7 +11,7 @@
 //! (`WordHandler.Navigation.cs`: `ParagraphToNode`, `RunToNode`,
 //! `TableToNode`, `ReadRowProps`, `ReadCellProps`, `SdtBlockToNode`,
 //! `HyperlinkToNode`, `GetRootNode`), restricted to the keys the leaf's typed
-//! direct properties answer (L-DOCX-R4).
+//! direct properties answer.
 
 use crate::error::Code;
 use crate::node::spec::{ElementSpec, FormatSpec, GapSpec, PropSpec, Subject, check_format_spec};
@@ -63,73 +62,73 @@ pub enum Kind {
     Equation,
     /// A body-level section break (`w:sectPr`), `section[N]`.
     Section,
-    /// A header part (record 0319).
+    /// A header part.
     Header,
-    /// A footer part (record 0319).
+    /// A footer part.
     Footer,
-    /// The footnotes part (record 0319).
+    /// The footnotes part.
     Footnotes,
-    /// A footnote (record 0319).
+    /// A footnote.
     Footnote,
-    /// The endnotes part (record 0319).
+    /// The endnotes part.
     Endnotes,
-    /// An endnote (record 0319).
+    /// An endnote.
     Endnote,
-    /// The comments part (record 0251c).
+    /// The comments part.
     Comments,
-    /// A comment (record 0251c).
+    /// A comment.
     Comment,
-    /// The styles part (record 0319).
+    /// The styles part.
     Styles,
-    /// One style (record 0319).
+    /// One style.
     Style,
-    /// The numbering part (record 0319).
+    /// The numbering part.
     Numbering,
-    /// An abstract numbering definition (record 0319).
+    /// An abstract numbering definition.
     AbstractNum,
-    /// A numbering instance (record 0319).
+    /// A numbering instance.
     Num,
-    /// A numbering level (record 0319).
+    /// A numbering level.
     Level,
     /// The settings part (gap).
     Settings,
     /// The theme part (gap).
     Theme,
-    /// A bookmark (record 0319).
+    /// A bookmark.
     Bookmark,
-    /// A field (record 0319).
+    /// A field.
     Field,
     /// A legacy form field (gap).
     FormField,
-    /// An inline picture (record 0251d).
+    /// An inline picture.
     Picture,
-    /// A chart of a paragraph (record 0283).
+    /// A chart of a paragraph.
     Chart,
     /// An embedded OLE object (gap).
     Ole,
-    /// A table of contents (record 0319).
+    /// A table of contents.
     Toc,
     /// A tracked revision (gap).
     Revision,
-    /// The watermark (record 0319).
+    /// The watermark.
     Watermark,
-    /// A text box (record 0319).
+    /// A text box.
     TextBox,
     /// A drawing shape (gap).
     Shape,
-    /// A run break (record 0319).
+    /// A run break.
     Break,
-    /// A paragraph tab stop (record 0319).
+    /// A paragraph tab stop.
     Tab,
-    /// A SmartArt graphic, addressed document-wide (record 0295).
+    /// A SmartArt graphic, addressed document-wide.
     SmartArt,
-    /// A series of a chart (record 0335).
+    /// A series of a chart.
     Series,
-    /// An axis of a chart (record 0335).
+    /// An axis of a chart.
     Axis,
-    /// A content node of a SmartArt graphic (record 0335).
+    /// A content node of a SmartArt graphic.
     Node,
-    /// A grid column of a table, `col[N]` (record 0345): a `w:gridCol` of
+    /// A grid column of a table, `col[N]`: a `w:gridCol` of
     /// `w:tblGrid` and the cells at its slot.
     Column,
 }
@@ -472,7 +471,7 @@ const fn add_only_run(
     }
 }
 
-/// A read property that also seeds a newly added element (record 0251a).
+/// A read property that also seeds a newly added element.
 const fn read_add(
     name: &'static str,
     ty: ValueType,
@@ -520,7 +519,7 @@ const fn read_set(
 }
 
 /// A property that `get` reads, `set` writes and `add` seeds, with no clear
-/// (record 0342: `listStyle` and `start` on a new paragraph).
+/// (`listStyle` and `start` on a new paragraph).
 const fn read_set_add(
     name: &'static str,
     ty: ValueType,
@@ -535,8 +534,8 @@ const fn read_set_add(
     }
 }
 
-/// A write-only property that `set` writes and `add` seeds (record 0342:
-/// table borders); `null` removes it.
+/// A write-only property that `set` writes and `add` seeds (table
+/// borders); `null` removes it.
 const fn write_set_add(
     name: &'static str,
     ty: ValueType,
@@ -553,7 +552,7 @@ const fn write_set_add(
     }
 }
 
-/// A write-only property that only `set` writes (record 0342: the row
+/// A write-only property that only `set` writes (the row
 /// height rules, which read back as `height` and `height.rule`).
 const fn write_set(
     name: &'static str,
@@ -602,7 +601,7 @@ crate::registry::registry! {
     crate::registry::Entry::read(PropSpec::new("revisionNumber", ValueType::Text)),
     crate::registry::Entry::read(PropSpec::new("created", ValueType::Text)),
     crate::registry::Entry::read(PropSpec::new("modified", ValueType::Text)),
-    // `ExtendedPropertiesHandler`: the application properties (record 0342).
+    // `ExtendedPropertiesHandler`: the application properties.
     crate::registry::Entry::read(PropSpec::new("extended.template", ValueType::Text)),
     crate::registry::Entry::read(PropSpec::new("extended.manager", ValueType::Text)),
     crate::registry::Entry::read(PropSpec::new("extended.company", ValueType::Text)),
@@ -619,7 +618,7 @@ crate::registry::registry! {
 
 /// The root's capability table: the core-property keys and the settable
 /// application keys are settable, through the metadata writer on `/` and
-/// `/metadata` (records 0338 and 0342). Same order as [`DOCUMENT_PROPS`],
+/// `/metadata`. Same order as [`DOCUMENT_PROPS`],
 /// so reads index either.
 pub(crate) static DOCUMENT_ROOT_PROPS: [PropSpec; DOCUMENT_PROPS.len()] =
     crate::format::metadata::root_capability(DOCUMENT_PROPS);
@@ -630,7 +629,7 @@ crate::registry::registry! {
     pub(crate) PARAGRAPH_PROPS, PARAGRAPH_REGISTRY: Setter {
     crate::registry::Entry::read(PropSpec::new("paraId", ValueType::Text)),
     writable("style", ValueType::Text, Setter::ParagraphStyle, Constraint::NotEmpty, true),
-    // Record 0319: `styleId` writes the id; `styleName` reads the style's
+    // `styleId` writes the id; `styleName` reads the style's
     // display name and writes a style named by id or display name.
     writable("styleId", ValueType::Text, Setter::ParagraphStyle, Constraint::NotEmpty, true),
     writable("styleName", ValueType::Text, Setter::ParagraphStyle, Constraint::NotEmpty, true),
@@ -659,10 +658,10 @@ crate::registry::registry! {
     writable("contextualSpacing", ValueType::Bool, Setter::ParagraphContextualSpacing, Constraint::None, true),
     writable("numId", ValueType::Text, Setter::ParagraphNumId, Constraint::NotEmpty, true),
     writable("numLevel", ValueType::Text, Setter::ParagraphNumLevel, Constraint::NotEmpty, true),
-    // Record 0319: the numbering part answers the paragraph's list format,
-    // kind and start (record 0251e writes the kind and start).
+    // The numbering part answers the paragraph's list format, kind and
+    // start (the kind and start are written too).
     crate::registry::Entry::read(PropSpec::new("numFmt", ValueType::Text)),
-    // Record 0342: `add` creates or continues the list too.
+    // `add` creates or continues the list too.
     read_set_add("listStyle", ValueType::Text, Setter::ParagraphListStyle, Constraint::NotEmpty),
     read_set_add("start", ValueType::Int, Setter::ParagraphListStart, Constraint::Int { min: 0, max: 32_767 }),
     writable("outlineLvl", ValueType::Int, Setter::ParagraphOutlineLevel, Constraint::Int { min: 0, max: 9 }, true),
@@ -770,7 +769,7 @@ crate::registry::registry! {
     },
     read_add("anchor", ValueType::Text, Setter::HyperlinkAnchor, Constraint::NotEmpty),
     crate::registry::Entry::read(PropSpec::new("docLocation", ValueType::Text)),
-    // Record 0345: the screen tip is written by add and set; `null` removes it.
+    // The screen tip is written by add and set; `null` removes it.
     writable("tooltip", ValueType::Text, Setter::HyperlinkTooltip, Constraint::None, true),
     crate::registry::Entry::read(PropSpec::new("tgtFrame", ValueType::Text)),
     read_add("font", ValueType::Text, Setter::RunFontLatin, Constraint::NotEmpty),
@@ -795,7 +794,7 @@ crate::registry::registry! {
     pub(crate) TABLE_PROPS, TABLE_REGISTRY: Setter {
     read_add("cols", ValueType::Text, Setter::TableColumns, Constraint::NotEmpty),
     read_add("rows", ValueType::Text, Setter::TableRows, Constraint::NotEmpty),
-    // Record 0342: the style is set too.
+    // The style is set too.
     writable("style", ValueType::Text, Setter::TableStyle, Constraint::NotEmpty, false),
     crate::registry::Entry::read(PropSpec::new("rowBandSize", ValueType::Int)),
     crate::registry::Entry::read(PropSpec::new("colBandSize", ValueType::Int)),
@@ -820,7 +819,7 @@ crate::registry::registry! {
     crate::registry::Entry::read(PropSpec::new("description", ValueType::Text)),
     read_add("colWidths", ValueType::Text, Setter::TableColumnWidths, Constraint::NotEmpty),
     add_only("data", ValueType::Text, Setter::TableData, Constraint::None),
-    // Record 0342: `ApplyTableBorders`, `STYLE;SIZE;COLOR[;SPACE]`.
+    // `ApplyTableBorders`, `STYLE;SIZE;COLOR[;SPACE]`.
     write_set_add("border.all", ValueType::Text, Setter::TableBorderAll, Constraint::NotEmpty),
     write_set_add("border.top", ValueType::Text, Setter::TableBorderTop, Constraint::NotEmpty),
     write_set_add("border.bottom", ValueType::Text, Setter::TableBorderBottom, Constraint::NotEmpty),
@@ -835,7 +834,7 @@ crate::registry::registry! {
 // `dxa` unit there, grid counts strings.
 crate::registry::registry! {
     pub(crate) ROW_PROPS, ROW_REGISTRY: Setter {
-    // Record 0342: `height`, `header`, `cantSplit` and `hidden` are set.
+    // `height`, `header`, `cantSplit` and `hidden` are set.
     read_set("height", ValueType::Text, Setter::RowHeight, Constraint::NotEmpty),
     crate::registry::Entry::read(PropSpec::new("height.rule", ValueType::Token(&HEIGHT_RULE))),
     read_set("header", ValueType::Bool, Setter::RowHeader, Constraint::None),
@@ -853,7 +852,7 @@ crate::registry::registry! {
     }
 }
 
-// A table grid column (record 0345), after OfficeCLI's virtual `column`
+// A table grid column, after OfficeCLI's virtual `column`
 // element: `width` (twips) and `text` seed a new column; Litchi also reads
 // and sets the width (the `w:gridCol`).
 crate::registry::registry! {
@@ -867,7 +866,7 @@ crate::registry::registry! {
 // `"50%"`, `"auto"`, `"nil"`) there.
 crate::registry::registry! {
     pub(crate) CELL_PROPS, CELL_REGISTRY: Setter {
-    // Record 0345: `width` and `text` seed a new cell (OfficeCLI's
+    // `width` and `text` seed a new cell (OfficeCLI's
     // `AddCell` honours only these two at add time).
     read_add("width", ValueType::Text, Setter::CellWidth, Constraint::NotEmpty),
     crate::registry::Entry::read(PropSpec::new("valign", ValueType::Token(&VALIGN))),
@@ -886,9 +885,9 @@ crate::registry::registry! {
     }
 }
 
-/// An inline picture of a paragraph (record 0251d): its extent, name,
+/// An inline picture of a paragraph: its extent, name,
 /// alternative text and image relationship; `src` (a `data:` URI or a file
-/// path) seeds a new one. Each but `relId` is also set (record 0335); a
+/// path) seeds a new one. Each but `relId` is also set; a
 /// `src` set replaces the image. Aliases follow OfficeCLI's picture schema.
 pub(crate) const PICTURE_REGISTRY: crate::registry::Table<Setter, 6, 5> =
     crate::registry::Table::new(
@@ -960,9 +959,9 @@ pub(crate) const PICTURE_REGISTRY: crate::registry::Table<Setter, 6, 5> =
 /// The picture element's properties.
 pub(crate) const PICTURE_PROPS: &[PropSpec] = &PICTURE_REGISTRY.readable();
 
-// A comment of the comments part (record 0251c): its identity, author and
-// text; `text` and the author's details seed a new comment and are set
-// (record 0335). Record 0345, after OfficeCLI's comment schema: the
+// A comment of the comments part: its identity, author and
+// text; `text` and the author's details seed a new comment and are set.
+// After OfficeCLI's comment schema: the
 // anchor's path (`anchoredTo`), the resolved state (`done`, alias
 // `resolved`; set too) and the reply parent (`parentId`, the parent's
 // comment id) from `commentsExtended`, and the anchor controls `runStart`
@@ -1099,15 +1098,15 @@ macro_rules! gaps {
 }
 
 gaps! {
-    SETTINGS_GAP: "settings", "L-DOCX-R6 (R4x)", "the settings part has no node adapter yet";
-    THEME_GAP: "theme", "L-DOCX-R6 (R4x)", "the theme part has no node adapter yet";
-    FORM_FIELD_GAP: "formfield", "R4x", "legacy form fields have no located reader yet";
-    OLE_GAP: "ole", "R4x", "embedded objects have no located reader yet";
-    REVISION_GAP: "revision", "R4x", "tracked revisions have no located reader yet";
-    SHAPE_GAP: "shape", "R4x", "drawing shapes have no located reader yet";
+    SETTINGS_GAP: "settings", "not supported yet", "the settings part has no node adapter yet";
+    THEME_GAP: "theme", "not supported yet", "the theme part has no node adapter yet";
+    FORM_FIELD_GAP: "formfield", "not supported yet", "legacy form fields have no located reader yet";
+    OLE_GAP: "ole", "not supported yet", "embedded objects have no located reader yet";
+    REVISION_GAP: "revision", "not supported yet", "tracked revisions have no located reader yet";
+    SHAPE_GAP: "shape", "not supported yet", "drawing shapes have no located reader yet";
 }
 
-/// A gap for an OfficeCLI element the table has no kind for (record 0339):
+/// A gap for an OfficeCLI element the table has no kind for:
 /// naming it is `unsupported_capability`.
 const fn unlisted_gap(
     element: &'static str,
@@ -1323,7 +1322,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 &[],
             ),
             // Story paragraphs are not listed children: unscoped `p`
-            // queries stay in the main story (record 0319).
+            // queries stay in the main story.
             identities(
                 element(
                     K::Header,
@@ -1660,7 +1659,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 super::smartart::NODE_PROPS,
             ),
             // Not a listed table child: table views and child counts stay
-            // the rows (record 0345).
+            // the rows.
             element(
                 K::Column,
                 "column",
@@ -1672,37 +1671,37 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
             ),
         ],
         gaps: &[
-            // OfficeCLI elements this adapter does not list as kinds
-            // (record 0339): each is a typed gap with its disposition.
+            // OfficeCLI elements this adapter does not list as kinds:
+            // each is a typed gap with its disposition.
             unlisted_gap(
                 "bookmarkEnd",
-                "0339-F2 (deferred-P1)",
-                "a bookmark is one node over its start and end markers (record 0319); a standalone end marker is not addressed or added on its own",
+                "not supported yet",
+                "a bookmark is one node over its start and end markers; a standalone end marker is not addressed or added on its own",
             ),
             unlisted_gap(
                 "permStart",
-                "0339-F2 (deferred-P1)",
+                "not supported yet",
                 "editing-permission ranges (w:permStart, w:permEnd) are kept but not projected as nodes",
             ),
             unlisted_gap(
                 "ptab",
-                "0339-F2 (deferred-P1)",
+                "not supported yet",
                 "positional tabs (w:ptab) are kept in their runs but not projected as nodes",
             ),
             unlisted_gap(
                 "fieldChar",
-                "none: out of scope (record 0332)",
+                "none: out of scope",
                 "a complex field is one field node (begin, instruction, result and end); its field-character and instruction runs are not separate elements",
             ),
             unlisted_gap(
                 "instrText",
-                "none: out of scope (record 0332)",
+                "none: out of scope",
                 "a complex field is one field node (begin, instruction, result and end); its field-character and instruction runs are not separate elements",
             ),
             GapSpec {
                 subject: Subject::Element("diagram"),
                 code: Code::UnsupportedPath,
-                follow_up: "none: out of scope (record 0332, design §10)",
+                follow_up: "none: out of scope",
                 reason: "OfficeCLI's diagram renders Mermaid text into shapes or a picture; rendering is outside the unified API, and SmartArt is the smartart element",
             },
             GapSpec {
@@ -1711,7 +1710,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                     key: "type",
                 },
                 code: Code::UnsupportedCapability,
-                follow_up: "R4x",
+                follow_up: "not supported yet",
                 reason: "the leaf reads a content control's id, tag and alias only",
             },
             GapSpec {
@@ -1720,7 +1719,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                     key: "lock",
                 },
                 code: Code::UnsupportedCapability,
-                follow_up: "R4x",
+                follow_up: "not supported yet",
                 reason: "the leaf reads a content control's id, tag and alias only",
             },
             GapSpec {
@@ -1729,7 +1728,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                     key: "pageWidth",
                 },
                 code: Code::UnsupportedCapability,
-                follow_up: "R4x",
+                follow_up: "not supported yet",
                 reason: "section properties are read through the section inventory, which the node view does not wire yet",
             },
             GapSpec {
@@ -1739,8 +1738,8 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                     context: "wrapped-or-unproven-selection",
                 },
                 code: Code::UnsupportedCapability,
-                follow_up: "L-DOCX-W3",
-                reason: "paragraphs in cells and content controls are edited through proven element paths (record 0251a); paragraphs in w:customXml wrappers, wrapped rows or cells, or markup-compatibility content selected outside runs have no proven raw position; alternate content inside runs keeps every position (record 0307)",
+                follow_up: "not supported yet",
+                reason: "paragraphs in cells and content controls are edited through proven element paths; paragraphs in w:customXml wrappers, wrapped rows or cells, or markup-compatibility content selected outside runs have no proven raw position; alternate content inside runs keeps every position",
             },
             GapSpec {
                 subject: Subject::Operation {
@@ -1749,8 +1748,8 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                     context: "wrapped-or-unproven-selection",
                 },
                 code: Code::UnsupportedCapability,
-                follow_up: "L-DOCX-W2",
-                reason: "direct runs and direct runs of hyperlinks are edited (record 0251a); runs in tracked changes, smart tags, custom XML or other wrappers, and paragraphs with comment-reference runs, have no proven raw ordinal",
+                follow_up: "not supported yet",
+                reason: "direct runs and direct runs of hyperlinks are edited; runs in tracked changes, smart tags, custom XML or other wrappers, and paragraphs with comment-reference runs, have no proven raw ordinal",
             },
             GapSpec {
                 subject: Subject::Operation {
@@ -1759,7 +1758,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                     context: "mixed-paragraph-run-fanout",
                 },
                 code: Code::UnsupportedCapability,
-                follow_up: "M2 (homogeneous mutation fanout)",
+                follow_up: "homogeneous mutation fanout",
                 reason: "one DOCX mutation admits one target kind, so a paragraph/run union is refused before staging rather than applying a descendant ordinal to the wrong leaf",
             },
             GapSpec {
@@ -1769,7 +1768,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                     context: "managed-transaction",
                 },
                 code: Code::UnsupportedCapability,
-                follow_up: "L-DOCX-W5",
+                follow_up: "not supported yet",
                 reason: "the formatting transaction has not proven edit admission and publication for execution-context-managed DOCX owners; the read projection remains available",
             },
             GapSpec {
@@ -1779,7 +1778,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                     context: "complex-leaf-content",
                 },
                 code: Code::UnsupportedCapability,
-                follow_up: "L-DOCX-W2 / record 0011 / record 0307 (text-box stories)",
+                follow_up: "text-box stories",
                 reason: "fields and other nested or unmodeled run content lack a proven raw ownership and address mapping for leaf edits; markup-compatibility alternate content in a run is one opaque object, so a text set over one whose branches hold text (a text box) is refused",
             },
             GapSpec {
@@ -1789,7 +1788,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                     context: "managed-transaction",
                 },
                 code: Code::UnsupportedCapability,
-                follow_up: "L-DOCX-W5",
+                follow_up: "not supported yet",
                 reason: "structural insertion uses the unmanaged DOCX transaction path; execution-context-managed owners refuse the leaf splice until managed admission is proven",
             },
             GapSpec {
@@ -1799,8 +1798,8 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                     context: "wrapped-or-unproven-parent",
                 },
                 code: Code::UnsupportedCapability,
-                follow_up: "L-DOCX-W3",
-                reason: "paragraphs are added under the body, cells and block content controls (record 0251a); parents whose raw position is not proven are refused",
+                follow_up: "not supported yet",
+                reason: "paragraphs are added under the body, cells and block content controls; parents whose raw position is not proven are refused",
             },
             GapSpec {
                 subject: Subject::Operation {
@@ -1809,8 +1808,8 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                     context: "wrapped-or-unproven-parent",
                 },
                 code: Code::UnsupportedCapability,
-                follow_up: "L-DOCX-W2",
-                reason: "runs are added beside the direct runs of any proven paragraph (record 0251a); insertion inside a hyperlink and under wrapped paragraphs is refused",
+                follow_up: "not supported yet",
+                reason: "runs are added beside the direct runs of any proven paragraph; insertion inside a hyperlink and under wrapped paragraphs is refused",
             },
             GapSpec {
                 subject: Subject::Operation {
@@ -1819,7 +1818,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                     context: "managed-transaction",
                 },
                 code: Code::UnsupportedCapability,
-                follow_up: "L-DOCX-W5",
+                follow_up: "not supported yet",
                 reason: "structural removal uses the unmanaged DOCX transaction path; execution-context-managed owners refuse the leaf splice until managed admission is proven",
             },
             GapSpec {
@@ -1829,8 +1828,8 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                     context: "wrapped-or-unproven-selection",
                 },
                 code: Code::UnsupportedCapability,
-                follow_up: "L-DOCX-W2 / L-DOCX-W3",
-                reason: "paragraphs, runs, hyperlinks, tables, rows, cells and content controls are removed through proven element paths (record 0251a); wrapped selections, the last paragraph of a cell, the last cell of a row and the last row of a table are refused",
+                follow_up: "not supported yet",
+                reason: "paragraphs, runs, hyperlinks, tables, rows, cells and content controls are removed through proven element paths; wrapped selections, the last paragraph of a cell, the last cell of a row and the last row of a table are refused",
             },
             GapSpec {
                 subject: Subject::Operation {
@@ -1839,7 +1838,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                     context: "complex-leaf-content",
                 },
                 code: Code::UnsupportedCapability,
-                follow_up: "L-DOCX-W2 / record 0011",
+                follow_up: "not supported yet",
                 reason: "paragraph and run dependency scans refuse open ranges, field interiors, tracked changes and story references rather than dropping their relationships",
             },
             GapSpec {
@@ -1849,7 +1848,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                     context: "managed-transaction",
                 },
                 code: Code::UnsupportedCapability,
-                follow_up: "L-DOCX-W5",
+                follow_up: "not supported yet",
                 reason: "paragraph and direct-run movement use the unmanaged DOCX transaction path; execution-context-managed owners refuse the leaf splice until managed admission is proven",
             },
             GapSpec {
@@ -1859,8 +1858,8 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                     context: "wrapped-or-unproven-selection",
                 },
                 code: Code::UnsupportedCapability,
-                follow_up: "L-DOCX-W3",
-                reason: "body paragraphs, direct runs, tables, rows and nested paragraphs move through proven anchors (record 0251a); nested runs and wrapped selections have no proven anchor",
+                follow_up: "not supported yet",
+                reason: "body paragraphs, direct runs, tables, rows and nested paragraphs move through proven anchors; nested runs and wrapped selections have no proven anchor",
             },
             GapSpec {
                 subject: Subject::Operation {
@@ -1869,7 +1868,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                     context: "complex-leaf-content",
                 },
                 code: Code::UnsupportedCapability,
-                follow_up: "L-DOCX-W2 / record 0011",
+                follow_up: "not supported yet",
                 reason: "paragraph and direct-run movement preserves exact source fragments but refuses open ranges, field interiors, namespace changes, tracked changes and unmodeled dependencies",
             },
             GapSpec {
@@ -1879,7 +1878,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                     context: "managed-transaction",
                 },
                 code: Code::UnsupportedCapability,
-                follow_up: "L-DOCX-W5",
+                follow_up: "not supported yet",
                 reason: "paragraph and direct-run swapping compose unmanaged fragment moves; execution-context-managed owners refuse the leaf splice until managed admission is proven",
             },
             GapSpec {
@@ -1889,7 +1888,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                     context: "nested-or-unproven-selection",
                 },
                 code: Code::UnsupportedCapability,
-                follow_up: "L-DOCX-W3",
+                follow_up: "not supported yet",
                 reason: "only direct main-body paragraphs or direct runs can be swapped; nested and wrapped selections have no proven anchors",
             },
             GapSpec {
@@ -1899,13 +1898,13 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                     context: "complex-leaf-content",
                 },
                 code: Code::UnsupportedCapability,
-                follow_up: "L-DOCX-W2 / record 0011",
+                follow_up: "not supported yet",
                 reason: "paragraph and direct-run swapping preserves exact source fragments but refuses field interiors, namespace changes, tracked changes and unmodeled dependencies",
             },
             GapSpec {
                 subject: Subject::View("html"),
                 code: Code::UnsupportedCapability,
-                follow_up: "design §10",
+                follow_up: "not supported yet",
                 reason: "rendering is outside the unified layer",
             },
         ],

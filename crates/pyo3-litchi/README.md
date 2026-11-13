@@ -78,9 +78,9 @@ The unified reader covers .docx, .xlsx, .pptx, .xlsb, .doc, .xls, .ppt and
 `capabilities()`, while their `get`, `find`, `query` and `view` raise
 `UnsupportedError` (`unsupported_capability`) until their readers land, as
 `capabilities()` reports. Apple Pages, Keynote and Numbers packages open as
-`File` too (record 0296), and so does an app-authored package directory of
+`File` too, and so does an app-authored package directory of
 any of the three: the `File` holds its single-file form, and `save()` writes
-it back as a directory (records 0299, 0301 and 0306). The family classes
+it back as a directory. The family classes
 below read iWork inputs through the same `File`.
 
 ### Editing
@@ -433,7 +433,7 @@ mypy your_script.py
 
 ## License
 
-This project is licensed under Apache License, Version 2.0 ([LICENSE](../LICENSE))
+This project is licensed under Apache License, Version 2.0 ([LICENSE](../../LICENSE))
 
 ## Contributing
 

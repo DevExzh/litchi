@@ -111,7 +111,7 @@ impl File {
             #[cfg(feature = "xls")]
             Self::Xls(handle) => {
                 let path = path.into_path()?;
-                // Record 0315: through the handle's sheet-step cache.
+                // Through the handle's sheet-step cache.
                 crate::format::xls::get(handle, &path).map(Node::Xls)
             },
             #[cfg(feature = "rtf")]
@@ -524,7 +524,7 @@ fn pending(file: &File) -> Error {
     file.capabilities().refusal()
 }
 
-/// The formats whose unified-read adapter has landed (record 0010 §10.2).
+/// The formats whose unified-read adapter has landed.
 ///
 /// Matches on it are exhaustive, so an adapter added here without its arms
 /// does not compile.
@@ -533,17 +533,17 @@ pub(crate) enum Adapter {
     /// Legacy binary Word (`.doc`).
     #[cfg(feature = "doc")]
     Doc,
-    /// WordprocessingML (record 0051).
+    /// WordprocessingML.
     #[cfg(feature = "docx")]
     Docx,
-    /// SpreadsheetML (record 0055).
+    /// SpreadsheetML.
     #[cfg(feature = "xlsx")]
     Xlsx,
     #[cfg(feature = "pptx")]
     Pptx,
     #[cfg(feature = "ppt")]
     Ppt,
-    /// OpenDocument Text (`.odt`, tier-3 adapter, record 0276).
+    /// OpenDocument Text (`.odt`, tier-3 adapter).
     #[cfg(feature = "odt")]
     Odt,
     #[cfg(feature = "xlsb")]
@@ -553,34 +553,34 @@ pub(crate) enum Adapter {
     /// Rich Text Format (`.rtf`, tier-3 read adapter).
     #[cfg(feature = "rtf")]
     Rtf,
-    /// OpenDocument Spreadsheet (`.ods`, tier-3 adapter, record 0277).
+    /// OpenDocument Spreadsheet (`.ods`, tier-3 adapter).
     #[cfg(feature = "ods")]
     Ods,
-    /// OpenDocument Presentation (`.odp`, record 0278).
+    /// OpenDocument Presentation (`.odp`).
     #[cfg(feature = "odp")]
     Odp,
-    /// OpenDocument drawing (`.odg`, object-tree adapter, record 0282).
+    /// OpenDocument drawing (`.odg`, object-tree adapter).
     #[cfg(feature = "odg")]
     Odg,
-    /// OpenDocument chart (`.odc`, record 0282).
+    /// OpenDocument chart (`.odc`).
     #[cfg(feature = "odc")]
     Odc,
-    /// OpenDocument image (`.odi`, record 0282).
+    /// OpenDocument image (`.odi`).
     #[cfg(feature = "odi")]
     Odi,
-    /// OpenDocument database (`.odb`, record 0282).
+    /// OpenDocument database (`.odb`).
     #[cfg(feature = "odb")]
     Odb,
-    /// OpenDocument formula (`.odf`, record 0282).
+    /// OpenDocument formula (`.odf`).
     #[cfg(feature = "odf-formula")]
     OdfFormula,
-    /// Apple Pages (`.pages`, iWork object-tree adapter, record 0296).
+    /// Apple Pages (`.pages`, iWork object-tree adapter).
     #[cfg(feature = "pages")]
     Pages,
-    /// Apple Keynote (`.key`, record 0296).
+    /// Apple Keynote (`.key`).
     #[cfg(feature = "keynote")]
     Keynote,
-    /// Apple Numbers (`.numbers`, record 0296).
+    /// Apple Numbers (`.numbers`).
     #[cfg(feature = "numbers")]
     Numbers,
 }
@@ -598,7 +598,7 @@ impl Adapter {
             FileFormat::Xlsx => Some(Self::Xlsx),
             #[cfg(feature = "odt")]
             FileFormat::Odt => Some(Self::Odt),
-            // The ODF text-family formats share the ODT adapter (record 0282).
+            // The ODF text-family formats share the ODT adapter.
             #[cfg(feature = "oth")]
             FileFormat::Oth => Some(Self::Odt),
             #[cfg(feature = "odm")]
@@ -689,8 +689,8 @@ impl Adapter {
 
 /// Runs `$body` with `$spec` bound to the `&'static FormatSpec<Kind>` of
 /// `$adapter`: the one table its resolver, query compiler, node view and
-/// capability report read (record 0010 §7.2). Static dispatch: one arm per
-/// adapter, monomorphic in each.
+/// capability report read. Static dispatch: one arm per adapter,
+/// monomorphic in each.
 macro_rules! with_spec {
     ($adapter:expr, $spec:ident => $body:expr) => {
         match $adapter {

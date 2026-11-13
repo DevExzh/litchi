@@ -180,7 +180,7 @@ pub(crate) struct Gap;
 
 impl GapInfo for Gap {
     fn follow_up(&self) -> &'static str {
-        "L-TEST-R1"
+        "not supported yet"
     }
 }
 
@@ -231,7 +231,7 @@ impl<'f, F: Fixture> Navigate<'f> for Fake<F> {
                 let hit = of_kind.find(|child| {
                     child.attr("n").and_then(|held| held.parse::<usize>().ok()) == Some(number)
                 });
-                // A row with no record still resolves (record 0010 §4.7).
+                // A row with no record still resolves.
                 if hit.is_none() && kind == "row" {
                     return Ok(Lookup::Found(Node::Row(number)));
                 }

@@ -1,5 +1,5 @@
 //! [`File::import`] and [`Edit::import`]: one CSV/TSV import is one
-//! mutation and one native commit (record 0266).
+//! mutation and one native commit.
 
 use super::{Commit, Edit, EditOptions, Error, LimitKind, SemanticLimits};
 use crate::import::{self, Options, Summary};
@@ -214,7 +214,7 @@ fn unsupported(file: &File) -> crate::Error {
     match file.format() {
         Some(litchi_core::FileFormat::Ods) => error
             .with_format(litchi_core::FileFormat::Ods)
-            .with_suggestion("ODS has no unified write path yet (M6)"),
+            .with_suggestion("ODS has no unified write path yet"),
         Some(format) => error.with_format(format),
         None => error,
     }

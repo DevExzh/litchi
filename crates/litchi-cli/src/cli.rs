@@ -64,39 +64,37 @@ pub(crate) enum Command {
     /// Print a format's property registry: every element's properties with
     /// type, unit, values, aliases, constraint and get/set/add flags.
     Schema(Schema),
-    /// Import CSV/TSV data into a worksheet (record 0266).
+    /// Import CSV/TSV data into a worksheet.
     Import(crate::m4::Import),
     /// Evaluate one cell: its value, cached formula result or computed
-    /// result (record 0266).
+    /// result.
     Evaluate(crate::m4::Evaluate),
-    /// Recalculate every formula and compare it with its cached value
-    /// (record 0266).
+    /// Recalculate every formula and compare it with its cached value.
     Recalculate(crate::m4::Recalculate),
     /// Fill a template's `{{key}}` placeholders (DOCX, PPTX, XLSX, XLSB,
     /// DOC, PPT, XLS, RTF and the ODF text, presentation and spreadsheet
     /// formats) and Word merge fields from JSON or CSV data, one output per
-    /// record (records 0274 and 0295).
+    /// record.
     Merge(crate::merge::Merge),
     /// Recompute derived field results: DOCX tables of contents and
-    /// fields, PPTX slide numbers and dates, workbook formula caches
-    /// (record 0279).
+    /// fields, PPTX slide numbers and dates, workbook formula caches.
     Refresh(crate::refresh::Refresh),
     /// Write the document out as a replayable OfficeCLI v2 batch (a JSON
-    /// array `batch` reads; record 0336).
+    /// array `batch` reads).
     Dump(Dump),
-    /// Print a package part's XML, or list the parts (record 0336).
+    /// Print a package part's XML, or list the parts.
     Raw(Raw),
     /// Edit the XML of one part at every element an XPath matches
-    /// (OfficeCLI `raw-set`; record 0336).
+    /// (OfficeCLI `raw-set`).
     #[command(name = "raw-set")]
     RawSet(RawSet),
     /// Add a package part with its content type and relationship, and print
-    /// its relationship id (OfficeCLI `add-part`; record 0336).
+    /// its relationship id (OfficeCLI `add-part`).
     #[command(name = "add-part")]
     AddPart(AddPart),
     /// Check the package structure read-only: ingress, content types,
     /// relationships and their targets, XML well-formedness and the format
-    /// owner's checks. Exits 1 when an error is found (record 0336).
+    /// owner's checks. Exits 1 when an error is found.
     Validate(Validate),
 }
 

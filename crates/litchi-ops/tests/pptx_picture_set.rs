@@ -1,4 +1,4 @@
-//! Unified PPTX picture `set` (record 0333): frame geometry, alternative
+//! Unified PPTX picture `set`: frame geometry, alternative
 //! text and image replacement, alone and with a click action, on both
 //! owners and after a byte round trip.
 #![cfg(feature = "pptx")]

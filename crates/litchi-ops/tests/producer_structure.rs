@@ -1,11 +1,11 @@
-//! Structural edits on files from other producers (record 0293).
+//! Structural edits on files from other producers.
 //!
-//! Record 0289 found that structural edits worked mainly on documents Litchi
-//! made. Each case below failed before record 0293 and pins one producer
+//! Structural edits used to work mainly on documents Litchi
+//! made. Each case below pins one producer
 //! construct the leaves now handle; the inverse edit must restore the input
 //! bytes. The corpus-wide picture is in `corpus_fidelity.rs` (structure
-//! columns) and the ignored `structure_census.rs`. Record 0308 adds the
-//! XLS and RTF producer constructs pinned below.
+//! columns) and the ignored `structure_census.rs`. The XLS and RTF
+//! producer constructs are pinned below as well.
 
 #![cfg(all(
     feature = "xls",
@@ -88,7 +88,7 @@ mod xls {
         assert!(error.message().contains("RgbExtra"), "{}", error.message());
     }
 
-    /// Record 0308: producer constructs the shifts now handle.
+    /// Producer constructs the shifts now handle.
     #[test]
     fn worksheets_without_index_or_dbcell_regenerate_their_row_table() {
         round_trips("ole/xls/WithExtendedStyles.xls");
@@ -132,7 +132,7 @@ mod xls {
     #[test]
     fn locked_drawing_anchors_keep_their_place_over_default_rows() {
         // Comment boxes anchored "don't move or size with cells" over rows
-        // of one height keep their cell coordinates (record 0316).
+        // of one height keep their cell coordinates.
         round_trips("ole/xls/SimpleWithComments.xls");
     }
 
@@ -150,7 +150,7 @@ mod xls {
         );
     }
 
-    /// Record 0316: rule, array and table records, reader repairs and
+    /// Rule, array and table records, reader repairs and
     /// embedded substreams.
     #[test]
     fn conditional_formats_and_validations_shift_with_their_formulas() {
@@ -215,7 +215,7 @@ mod pptx {
 
     #[test]
     fn slides_owning_notes_are_removed_with_them() {
-        // Record 0303: the notes slide only this slide owns leaves with it.
+        // The notes slide only this slide owns leaves with it.
         let (file, _) = input("ooxml/pptx/sample.pptx");
         let removed = file.remove("/slide[2]").unwrap();
         let reopened = litchi_ops::open_bytes(removed.to_bytes().unwrap()).unwrap();
@@ -247,7 +247,7 @@ mod rtf {
             .map(|text| text.into_owned())
     }
 
-    /// Record 0308: a paragraph added to producer RTF is a scoped group, so
+    /// A paragraph added to producer RTF is a scoped group, so
     /// removing it again restores the source bytes.
     #[test]
     fn producer_paragraphs_are_added_and_removed_exactly() {
@@ -267,7 +267,7 @@ mod rtf {
         assert_eq!(removed.to_bytes().unwrap(), bytes);
     }
 
-    /// Record 0308: a paragraph that inherits the root-level state its
+    /// A paragraph that inherits the root-level state its
     /// neighbour set, and a formatting group holding several paragraphs,
     /// move value-exactly.
     #[test]

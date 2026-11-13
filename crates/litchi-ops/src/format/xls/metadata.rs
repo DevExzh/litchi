@@ -1,5 +1,4 @@
-//! XLS metadata: initial metadata at creation and the `/metadata` set path
-//! (record 0254).
+//! XLS metadata: initial metadata at creation and the `/metadata` set path.
 
 use litchi_core::{FileFormat, Metadata};
 use litchi_xls::Package;

@@ -49,7 +49,7 @@ impl Pptx {
         let mut geometry = [None; 4];
         // Run and paragraph formatting of the new body (`size`, `bold`, ...).
         let mut format = TextValues::default();
-        // The click action (record 0325), written in the same native edit.
+        // The click action, written in the same native edit.
         let mut click = super::links::ClickInput::default();
         for (key, value) in node.props().iter() {
             let (_, entry) = SHAPE_WRITE_TABLE

@@ -1,5 +1,5 @@
-//! What a file can do through the unified API (record 0010 §7, M1 step R5):
-//! [`File::capabilities`] and [`Capabilities::of`].
+//! What a file can do through the unified API: [`File::capabilities`] and
+//! [`Capabilities::of`].
 //!
 //! A report names, for one format:
 //!
@@ -25,9 +25,8 @@
 //! # Generation
 //!
 //! The report is generated from the same static `ElementSpec`/`PropSpec`
-//! table each format adapter's resolver, query compiler and node view run on
-//! (record 0010 §7.2). Sharing metadata reduces drift; behavior is also
-//! checked by:
+//! table each format adapter's resolver, query compiler and node view run on.
+//! Sharing metadata reduces drift; behavior is also checked by:
 //!
 //! 1. the spec tables' `const` checks (`check_format_spec!`), and the
 //!    capability checks this module runs on every adapter's table
@@ -74,16 +73,16 @@
 //! `pathSegment` is the last step of its first rooted template, without
 //! predicates.
 //!
-//! # The M2 seam
+//! # The write seam
 //!
-//! M1's `PropSpec` is the read-only subset of an M2 property-registry entry
-//! (record 0010 §7.3). The write side attaches in two places, without
-//! changing this report's shape: each property's access flags (M2's registry
-//! entries turn `set` and `add` on where a typed setter exists), and
-//! [`Element::operations`], whose `add`, `set` and `remove` M2's handler
-//! table answers. DOCX's property and direct structural handlers populate
-//! those flags; unsupported selection and leaf contexts remain explicit
-//! operation gaps, as do the unimplemented write handlers of other formats.
+//! `PropSpec` is the read-only subset of a property-registry entry.
+//! The write side attaches in two places, without changing this report's
+//! shape: each property's access flags (registry entries turn `set` and
+//! `add` on where a typed setter exists), and [`Element::operations`], whose
+//! `add`, `set` and `remove` the handler table answers. DOCX's property and
+//! direct structural handlers populate those flags; unsupported selection
+//! and leaf contexts remain explicit operation gaps, as do the unimplemented
+//! write handlers of other formats.
 
 // In a build without any adapter, `Adapter` (and so `Element`) is
 // uninhabited: everything that holds one is unreachable, and the checks and
@@ -258,48 +257,47 @@ pub enum Verb {
     /// is reported on its own ([`Capabilities::view`]).
     View,
     /// Formula evaluation: `File::evaluate` and `File::recalculate`
-    /// (record 0266, the `eval` feature).
+    /// (the `eval` feature).
     Evaluate,
-    /// Set properties (M2).
+    /// Set properties.
     Set,
-    /// Add an element (M2).
+    /// Add an element.
     Add,
-    /// Remove an element (M2).
+    /// Remove an element.
     Remove,
-    /// Move an element (M2).
+    /// Move an element.
     Move,
-    /// Swap two elements (M2).
+    /// Swap two elements.
     Swap,
     /// Group mutations in an atomic [`File::edit`] closure.
     Edit,
     /// [`File::batch`] and its single-command [`File::apply`] channel.
     Batch,
-    /// CSV/TSV import into a worksheet, [`File::import`] (record 0266).
+    /// CSV/TSV import into a worksheet, [`File::import`].
     Import,
-    /// Template merge, [`File::merge`] (record 0274).
+    /// Template merge, [`File::merge`].
     Merge,
     /// Text find/replace: [`File::set`] with the `find=` and `replace=`
-    /// properties, OfficeCLI's spelling (record 0273). The match count is
+    /// properties, OfficeCLI's spelling. The match count is
     /// [`crate::Applied::matched`].
     Replace,
-    /// Field and table-of-contents refresh, [`File::refresh`] (record 0279).
+    /// Field and table-of-contents refresh, [`File::refresh`].
     Refresh,
-    /// Save in the same format (W4).
+    /// Save in the same format.
     Save,
-    /// Create a new package of this format (W4).
+    /// Create a new package of this format.
     Create,
-    /// [`File::dump`]: the document as an OfficeCLI v2 batch (record 0336).
+    /// [`File::dump`]: the document as an OfficeCLI v2 batch.
     Dump,
     /// [`File::raw`] and [`File::parts`]: package parts as bytes (design
-    /// §12, record 0336).
+    /// §12).
     Raw,
-    /// [`File::validate`]: read-only structural validation (record 0336).
+    /// [`File::validate`]: read-only structural validation.
     Validate,
     /// [`File::add_part`]: a package part with its content type and
-    /// relationship (record 0336).
+    /// relationship.
     AddPart,
-    /// [`File::raw_set`]: an audited XPath-addressed XML edit of one part
-    /// (record 0336).
+    /// [`File::raw_set`]: an audited XPath-addressed XML edit of one part.
     RawSet,
 }
 
@@ -362,7 +360,7 @@ impl Verb {
         }
     }
 
-    /// Whether the verb changes an existing document (M2).
+    /// Whether the verb changes an existing document.
     ///
     /// Saving publishes the current snapshot and creating produces a new
     /// package, so neither operation is an edit of an existing document.
@@ -416,7 +414,7 @@ const _: () = {
 ///
 /// let support = Support::Unsupported {
 ///     code: Code::UnsupportedCapability,
-///     follow_up: "M2",
+///     follow_up: "not supported yet",
 ///     reason: "edit verbs arrive with the write kernel",
 /// };
 /// assert!(!support.is_supported());
@@ -433,7 +431,7 @@ pub enum Support {
         /// The code the refusal returns.
         code: Code,
         /// What makes it available: an action (`Locked::unlock`), a cargo
-        /// feature, a leaf request (`L-XLSX-R5`) or a milestone (`M2`).
+        /// feature or the capability that is missing.
         follow_up: &'static str,
         /// One sentence on why.
         reason: &'static str,
@@ -479,40 +477,38 @@ const SIGNED: Refusal = Refusal {
     reason: "editing requires explicit signature consumption",
 };
 
-/// The structural verbs the iWork leaves do not offer yet (record 0296):
-/// element creation, and removal, moving and swapping where the leaf has
-/// no such transaction (`IWORK_API_REQUESTS.md`).
+/// The structural verbs the iWork leaves do not offer yet: element
+/// creation, and removal, moving and swapping where the leaf has no such
+/// transaction.
 #[cfg_attr(
     not(feature = "iwork-adapter"),
     allow(dead_code, reason = "read only when an iWork format is compiled in")
 )]
 const IWORK_STRUCTURE: Refusal = Refusal {
     code: Code::UnsupportedCapability,
-    follow_up: "IWORK_API_REQUESTS.md",
+    follow_up: "not supported yet",
     reason: "the iWork leaf has no such structural transaction yet",
 };
 
-/// The refusal of every edit verb in M1.
+/// The refusal of every edit verb.
 const EDITS: Refusal = Refusal {
     code: Code::UnsupportedCapability,
-    follow_up: "M2",
-    reason: "edit verbs arrive with the write kernel in milestone M2",
+    follow_up: "not supported yet",
+    reason: "edit verbs arrive with the write kernel",
 };
 
-/// The refusal of publication for a format whose save owner has not landed
-/// in the current W4 wave.
+/// The refusal of publication for a format whose save owner has not landed.
 const SAVE_PENDING: Refusal = Refusal {
     code: Code::UnsupportedCapability,
-    follow_up: "W4",
-    reason: "saving this format is not integrated in the current wave",
+    follow_up: "not supported yet",
+    reason: "saving this format is not integrated",
 };
 
-/// The refusal of creation for a format whose creator has not landed in the
-/// current W4 wave.
+/// The refusal of creation for a format whose creator has not landed.
 const CREATE_PENDING: Refusal = Refusal {
     code: Code::UnsupportedCapability,
-    follow_up: "W4",
-    reason: "creation is not integrated for this format in the current wave",
+    follow_up: "not supported yet",
+    reason: "creation is not integrated for this format",
 };
 
 /// A retained edit source is required for file-specific writes.
@@ -726,7 +722,7 @@ impl Capabilities {
             if self.format == Some(FileFormat::Xls) {
                 return Refusal {
                     code: Code::DocumentProtected,
-                    follow_up: "M2 XLS encryption-preserving publication",
+                    follow_up: "XLS encryption-preserving publication",
                     reason: "the unlocked XLS owner refuses ordinary publication to prevent plaintext output",
                 }.support();
             }
@@ -745,7 +741,7 @@ impl Capabilities {
             }
             return Refusal {
                 code: Code::DocumentProtected,
-                follow_up: "SaveOptions::reencrypt; M2 encryption-profile-preserving native edits",
+                follow_up: "SaveOptions::reencrypt; encryption-profile-preserving native edits",
                 reason: "the unlocked encrypted workbook requires re-encryption for publication and refuses native editing",
             }.support();
         }
@@ -973,7 +969,7 @@ impl Capabilities {
             }
             #[cfg(odf_objects)]
             // Every edit verb dispatches to the object format's leaf; what
-            // a format cannot do is an element-level gap (record 0292).
+            // a format cannot do is an element-level gap.
             if self
                 .adapter()
                 .and_then(crate::format::odf_tree::writes)
@@ -987,9 +983,8 @@ impl Capabilities {
                     Verb::Set | Verb::Edit | Verb::Batch => Support::Supported,
                     Verb::Add if !writes.addable.is_empty() => Support::Supported,
                     Verb::Remove if !writes.removable.is_empty() => Support::Supported,
-                    // Pages exchanges paragraphs (record 0299); Keynote slides,
-                    // paragraphs and drawables (record 0298); Numbers sheets
-                    // and tables (record 0347).
+                    // Pages exchanges paragraphs; Keynote slides, paragraphs
+                    // and drawables; Numbers sheets and tables.
                     Verb::Move | Verb::Swap if !writes.movable.is_empty() => Support::Supported,
                     _ => IWORK_STRUCTURE.support(),
                 };
@@ -1122,8 +1117,7 @@ impl Capabilities {
         if self.format == Some(FileFormat::Odp) && cfg!(feature = "odp") {
             return Support::Supported;
         }
-        // Pages (record 0299), Numbers (record 0297) and Keynote (record
-        // 0298) create their minimal documents.
+        // Pages, Numbers and Keynote create their minimal documents.
         if matches!(
             self.format,
             Some(FileFormat::Pages | FileFormat::Keynote | FileFormat::Numbers)
@@ -1159,21 +1153,21 @@ impl Capabilities {
         }
     }
 
-    /// The raw-layer and dump verbs (record 0336), `None` for the others.
+    /// The raw-layer and dump verbs, `None` for the others.
     fn raw_support(&self, verb: Verb) -> Option<Support> {
         const NO_PARTS: Refusal = Refusal {
             code: Code::UnsupportedCapability,
-            follow_up: "record 0336: package parts exist in OOXML and packaged ODF only",
+            follow_up: "package parts exist in OOXML and packaged ODF only",
             reason: "this format has no package parts",
         };
         const ODF_WRITES: Refusal = Refusal {
             code: Code::UnsupportedCapability,
-            follow_up: "record 0336 follow-up: raw ODF part writes through the ODF package publisher",
+            follow_up: "follow-up: raw ODF part writes through the ODF package publisher",
             reason: "raw part writes cover OOXML (DOCX, XLSX, PPTX, XLSB)",
         };
         const IWORK_VALIDATION: Refusal = Refusal {
             code: Code::UnsupportedCapability,
-            follow_up: "record 0336 follow-up: an iWork package validator from the iWork owners",
+            follow_up: "follow-up: an iWork package validator from the iWork owners",
             reason: "iWork packages are validated by their owners on open; no report-producing validator exists",
         };
         let format = self.format?;
@@ -1285,7 +1279,7 @@ fn coverage(format: Option<FileFormat>) -> Coverage {
 
 /// Why the unified reads of `format` are refused as a whole, when its
 /// adapter is not in this build: the cargo feature that is off, or the
-/// milestone that gives the format a `File` variant.
+/// missing `File` variant.
 fn refused(format: FileFormat) -> Refusal {
     let closed = |follow_up, reason| Refusal {
         code: Code::UnsupportedFormat,
@@ -1321,8 +1315,8 @@ fn refused(format: FileFormat) -> Refusal {
         FileFormat::Keynote => feature("enable the `keynote` cargo feature"),
         FileFormat::Numbers => feature("enable the `numbers` cargo feature"),
         _ => closed(
-            "M6",
-            "the format has no unified `File` variant before milestone M6",
+            "not supported yet",
+            "the format has no unified `File` variant yet",
         ),
     }
 }
@@ -1422,36 +1416,36 @@ fn pptx_shape_remove(file: &File) -> Option<bool> {
     }
 }
 
-/// The view modes no M1 adapter renders, with their follow-ups (record 0010
-/// §6.1, M1-Δ20, design §10).
+/// The view modes no adapter renders, with their follow-ups (design
+/// §10).
 static ISSUES_GAP: GapSpec = view_gap_spec(
     "issues",
-    "M2 (validate)",
-    "the issues view needs the validators M2's `validate` adds (M1-Δ20)",
+    "validate",
+    "the issues view needs the validators `validate` adds",
 );
 static FORMS_GAP: GapSpec = view_gap_spec(
     "forms",
-    "M2 (validate)",
-    "the forms view needs the validators M2's `validate` adds (M1-Δ20)",
+    "validate",
+    "the forms view needs the validators `validate` adds",
 );
 static HTML_GAP: GapSpec = view_gap_spec(
     "html",
-    "design §10 (rendering is out of scope)",
+    "rendering is out of scope",
     "visual rendering is outside the unified layer",
 );
 static SVG_GAP: GapSpec = view_gap_spec(
     "svg",
-    "design §10 (rendering is out of scope)",
+    "rendering is out of scope",
     "visual rendering is outside the unified layer",
 );
 static SCREENSHOT_GAP: GapSpec = view_gap_spec(
     "screenshot",
-    "design §10 (rendering is out of scope)",
+    "rendering is out of scope",
     "visual rendering is outside the unified layer",
 );
 static PDF_GAP: GapSpec = view_gap_spec(
     "pdf",
-    "design §10 (rendering is out of scope)",
+    "rendering is out of scope",
     "visual rendering is outside the unified layer",
 );
 
@@ -1487,7 +1481,7 @@ static DOC_CREATION_OPTION_GAPS: [GapSpec; 3] = [
             context: "unrepresentable-initial-metadata",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "CreateOptions::metadata (OLE property sets, record 0254)",
+        follow_up: "CreateOptions::metadata (OLE property sets)",
         reason: "initial metadata is written to the OLE property sets; identifier, hyperlink_base and unzoned timestamps have no property-set slot and are refused rather than dropped, as is metadata combined with CryptoAPI encryption",
     },
 ];
@@ -1535,7 +1529,7 @@ static RTF_CREATION_OPTION_GAPS: [GapSpec; 3] = [
 static PPT_CREATION_OPTION_GAPS: [GapSpec; 3] = [
     ppt_creation_gap(
         "template",
-        "use Flavor::Document; M2 PPT template creation",
+        "use Flavor::Document; PPT template creation",
         "the PPT creator currently authors ordinary presentations and refuses template requests",
     ),
     ppt_creation_gap(
@@ -1545,7 +1539,7 @@ static PPT_CREATION_OPTION_GAPS: [GapSpec; 3] = [
     ),
     ppt_creation_gap(
         "unrepresentable-initial-metadata",
-        "CreateOptions::metadata (OLE property sets, record 0254)",
+        "CreateOptions::metadata (OLE property sets)",
         "initial metadata is written to the OLE property sets; identifier, hyperlink_base and unzoned timestamps have no property-set slot and are refused rather than dropped",
     ),
 ];
@@ -1601,7 +1595,7 @@ static DOC_WRITE_GAPS: [GapSpec; 6] = [
             context: "structural-edit",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 DOC structural body editing",
+        follow_up: "DOC structural body editing",
         reason: "the DOC write adapter currently replaces existing ordinary paragraph text and does not add elements",
     },
     GapSpec {
@@ -1611,7 +1605,7 @@ static DOC_WRITE_GAPS: [GapSpec; 6] = [
             context: "structural-edit",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 DOC structural body editing",
+        follow_up: "DOC structural body editing",
         reason: "the DOC write adapter currently replaces existing ordinary paragraph text and does not remove elements",
     },
     GapSpec {
@@ -1621,7 +1615,7 @@ static DOC_WRITE_GAPS: [GapSpec; 6] = [
             context: "structural-edit",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 DOC structural body editing",
+        follow_up: "DOC structural body editing",
         reason: "the DOC write adapter currently replaces existing ordinary paragraph text and does not move elements",
     },
     GapSpec {
@@ -1631,7 +1625,7 @@ static DOC_WRITE_GAPS: [GapSpec; 6] = [
             context: "structural-edit",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 DOC structural body editing",
+        follow_up: "DOC structural body editing",
         reason: "the DOC write adapter currently replaces existing ordinary paragraph text and does not reorder elements",
     },
     GapSpec {
@@ -1641,7 +1635,7 @@ static DOC_WRITE_GAPS: [GapSpec; 6] = [
             context: "non-text-command",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 DOC structural batch commands",
+        follow_up: "DOC structural batch commands",
         reason: "DOC atomic batches currently admit paragraph text sets only; structural and read commands remain refused",
     },
 ];
@@ -1679,7 +1673,7 @@ static DOCX_CREATION_OPTION_GAPS: [GapSpec; 2] = [
 static XLSX_CREATION_OPTION_GAPS: [GapSpec; 3] = [
     xlsx_creation_gap(
         "template",
-        "use Flavor::Document; M2 XLSX template creation",
+        "use Flavor::Document; XLSX template creation",
         "the XLSX creator currently authors ordinary workbooks and refuses template requests",
     ),
     xlsx_creation_gap(
@@ -1689,7 +1683,7 @@ static XLSX_CREATION_OPTION_GAPS: [GapSpec; 3] = [
     ),
     xlsx_creation_gap(
         "unrepresentable-initial-metadata",
-        "CreateOptions::metadata (OOXML document properties, record 0253)",
+        "CreateOptions::metadata (OOXML document properties)",
         "initial metadata is committed through the leaf metadata transaction; content_type, last_backup and codepage have no OOXML property part and are refused rather than dropped",
     ),
 ];
@@ -1699,7 +1693,7 @@ static XLSX_CREATION_OPTION_GAPS: [GapSpec; 3] = [
 static XLS_CREATION_OPTION_GAPS: [GapSpec; 3] = [
     xls_creation_gap(
         "template",
-        "use Flavor::Document; M2 XLS template creation",
+        "use Flavor::Document; XLS template creation",
         "the XLS creator currently authors ordinary workbooks and refuses template requests",
     ),
     xls_creation_gap(
@@ -1709,7 +1703,7 @@ static XLS_CREATION_OPTION_GAPS: [GapSpec; 3] = [
     ),
     xls_creation_gap(
         "unrepresentable-initial-metadata",
-        "CreateOptions::metadata (OLE property sets, record 0254)",
+        "CreateOptions::metadata (OLE property sets)",
         "initial metadata is written to the OLE property sets; identifier, hyperlink_base and unzoned timestamps have no property-set slot and are refused rather than dropped",
     ),
 ];
@@ -1719,7 +1713,7 @@ static XLS_CREATION_OPTION_GAPS: [GapSpec; 3] = [
 static XLSB_CREATION_OPTION_GAPS: [GapSpec; 3] = [
     xlsb_creation_gap(
         "template",
-        "use Flavor::Document; M2 XLSB template creation",
+        "use Flavor::Document; XLSB template creation",
         "the XLSB creator currently authors ordinary workbooks and refuses template requests",
     ),
     xlsb_creation_gap(
@@ -1729,7 +1723,7 @@ static XLSB_CREATION_OPTION_GAPS: [GapSpec; 3] = [
     ),
     xlsb_creation_gap(
         "unrepresentable-initial-metadata",
-        "CreateOptions::metadata (OOXML document properties, record 0253)",
+        "CreateOptions::metadata (OOXML document properties)",
         "initial metadata is committed through the leaf metadata transaction; content_type, last_backup and codepage have no OOXML property part and are refused rather than dropped",
     ),
 ];
@@ -1748,7 +1742,7 @@ static XLSB_WRITE_GAPS: [GapSpec; 25] = [
         },
         code: Code::UnsupportedCapability,
         follow_up: "File::metadata(); /metadata node reads with the shared metadata vocabulary",
-        reason: "`set(\"/metadata\", ..)` writes the OOXML document properties (root-metadata keys and custom.<name>, record 0253); the path is set-only, and reads go through File::metadata() and the root node",
+        reason: "`set(\"/metadata\", ..)` writes the OOXML document properties (root-metadata keys and custom.<name>); the path is set-only, and reads go through File::metadata() and the root node",
     },
     GapSpec {
         subject: Subject::Operation {
@@ -1757,7 +1751,7 @@ static XLSB_WRITE_GAPS: [GapSpec; 25] = [
             context: "non-sheet-elements",
         },
         code: Code::UnsupportedElement,
-        follow_up: "M2 XLSB structural add handlers for non-sheet elements",
+        follow_up: "XLSB structural add handlers for non-sheet elements",
         reason: "XLSB structural addition creates complete workbook tabs; cells, ranges, rows, columns, tables and other nodes require their own native lifecycle owners",
     },
     GapSpec {
@@ -1767,7 +1761,7 @@ static XLSB_WRITE_GAPS: [GapSpec; 25] = [
             context: "order-opaque-dependencies",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSB dependency-aware complete-catalog sheet insertion",
+        follow_up: "XLSB dependency-aware complete-catalog sheet insertion",
         reason: "sheet insertion refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies, unmodeled title layouts and markup-compatibility title metadata until their dependencies have a native remapping contract",
     },
     GapSpec {
@@ -1777,7 +1771,7 @@ static XLSB_WRITE_GAPS: [GapSpec; 25] = [
             context: "vba-dependency",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSB dependency-aware complete-catalog sheet insertion",
+        follow_up: "XLSB dependency-aware complete-catalog sheet insertion",
         reason: "sheet insertion refuses workbooks with a VBA project dependency until native catalog identity remapping is available",
     },
     GapSpec {
@@ -1787,7 +1781,7 @@ static XLSB_WRITE_GAPS: [GapSpec; 25] = [
             context: "calculation-chain-dependency",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSB calculation-chain-aware sheet insertion",
+        follow_up: "XLSB calculation-chain-aware sheet insertion",
         reason: "sheet insertion refuses workbooks with a calculation-chain dependency until native sheet positions can be remapped safely",
     },
     GapSpec {
@@ -1797,7 +1791,7 @@ static XLSB_WRITE_GAPS: [GapSpec; 25] = [
             context: "noncontiguous-3d-dependency",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSB 3-D dependency-aware sheet insertion",
+        follow_up: "XLSB 3-D dependency-aware sheet insertion",
         reason: "sheet insertion refuses a position inside an internal 3-D reference range because it would broaden the range",
     },
     GapSpec {
@@ -1807,7 +1801,7 @@ static XLSB_WRITE_GAPS: [GapSpec; 25] = [
             context: "non-sheet-elements",
         },
         code: Code::UnsupportedElement,
-        follow_up: "M2 XLSB non-cell removal handlers",
+        follow_up: "XLSB non-cell removal handlers",
         reason: "XLSB removal deletes complete-catalog sheet tabs and stored cell records; workbook, row, column, table and other non-sheet structural elements require their own native lifecycle owners",
     },
     GapSpec {
@@ -1817,7 +1811,7 @@ static XLSB_WRITE_GAPS: [GapSpec; 25] = [
             context: "order-opaque-dependencies",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSB dependency-aware complete-catalog sheet removal",
+        follow_up: "XLSB dependency-aware complete-catalog sheet removal",
         reason: "sheet removal admits only the selected sheet root and exclusively owned binaryIndex parts; any other outgoing internal relationship, including chart, drawing, comments, tables or adjunct parts, is refused as unsupported until it has a typed dependency disposition, along with shared-workbook revisions, data-model parts, connections, slicers, timelines, pivot-cache and table formula dependencies, unmodeled workbook records, surviving worksheet FRT/AC records and formula groups, opaque volatile dependencies and markup-compatibility title metadata",
     },
     GapSpec {
@@ -1827,7 +1821,7 @@ static XLSB_WRITE_GAPS: [GapSpec; 25] = [
             context: "removed-scoped-names",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSB dependency-aware scoped-name removal",
+        follow_up: "XLSB dependency-aware scoped-name removal",
         reason: "sheet removal refuses workbook or sheet-scoped names that resolve into a removed tab until native name pruning and reference remapping are available",
     },
     GapSpec {
@@ -1837,7 +1831,7 @@ static XLSB_WRITE_GAPS: [GapSpec; 25] = [
             context: "textual-references",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSB dependency-aware textual-reference removal",
+        follow_up: "XLSB dependency-aware textual-reference removal",
         reason: "sheet removal refuses formula-like and textual dependency carriers that still reference a removed tab instead of leaving stale names or links",
     },
     GapSpec {
@@ -1847,7 +1841,7 @@ static XLSB_WRITE_GAPS: [GapSpec; 25] = [
             context: "formula-groups",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSB dependency-aware formula-group removal",
+        follow_up: "XLSB dependency-aware formula-group removal",
         reason: "array, shared and data-table formula-group members require native group lifecycle support before removal",
     },
     GapSpec {
@@ -1857,7 +1851,7 @@ static XLSB_WRITE_GAPS: [GapSpec; 25] = [
             context: "calculation-chain",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSB calculation-chain-aware formula removal",
+        follow_up: "XLSB calculation-chain-aware formula removal",
         reason: "stored formulas cannot be removed while an opaque calculation chain is present",
     },
     GapSpec {
@@ -1867,7 +1861,7 @@ static XLSB_WRITE_GAPS: [GapSpec; 25] = [
             context: "unmodeled-cell-records",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSB additional native cell-record families",
+        follow_up: "XLSB additional native cell-record families",
         reason: "semantic removal refuses worksheets containing reserved cell-record families whose coordinate layout is not modeled",
     },
     GapSpec {
@@ -1887,7 +1881,7 @@ static XLSB_WRITE_GAPS: [GapSpec; 25] = [
             context: "unmodeled-tab-views",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSB multi-window and additional tab-kind view mutation",
+        follow_up: "XLSB multi-window and additional tab-kind view mutation",
         reason: "visibility changes refuse active-tab relocation across multiple workbook windows and selected-view changes on unmodeled dialog or macro tabs",
     },
     GapSpec {
@@ -1897,7 +1891,7 @@ static XLSB_WRITE_GAPS: [GapSpec; 25] = [
             context: "sheet-name-markup-compatibility",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSB markup-compatibility-aware sheet-name dependency rewrites",
+        follow_up: "XLSB markup-compatibility-aware sheet-name dependency rewrites",
         reason: "sheet-name edits refuse a recognized dependency inside an OOXML markup-compatibility alternative instead of selecting or discarding a branch",
     },
     GapSpec {
@@ -1907,7 +1901,7 @@ static XLSB_WRITE_GAPS: [GapSpec; 25] = [
             context: "sheet-name-unmodeled-reference",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSB additional sheet-name reference carriers",
+        follow_up: "XLSB additional sheet-name reference carriers",
         reason: "sheet-name edits refuse formula-like or name-like reference carriers outside the proven rewrite vocabulary so dependent names cannot be left stale",
     },
     GapSpec {
@@ -1917,7 +1911,7 @@ static XLSB_WRITE_GAPS: [GapSpec; 25] = [
             context: "order-opaque-dependencies",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSB dependency-aware complete-catalog sheet ordering",
+        follow_up: "XLSB dependency-aware complete-catalog sheet ordering",
         reason: "sheet ordering refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies, unmodeled title layouts and markup-compatibility title metadata until their historical or ordinal dependencies have a native remapping contract",
     },
     GapSpec {
@@ -1927,7 +1921,7 @@ static XLSB_WRITE_GAPS: [GapSpec; 25] = [
             context: "order-opaque-dependencies",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSB dependency-aware complete-catalog sheet ordering",
+        follow_up: "XLSB dependency-aware complete-catalog sheet ordering",
         reason: "sheet ordering refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies, unmodeled title layouts and markup-compatibility title metadata until their historical or ordinal dependencies have a native remapping contract",
     },
     GapSpec {
@@ -1937,7 +1931,7 @@ static XLSB_WRITE_GAPS: [GapSpec; 25] = [
             context: "vba-dependency",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSB dependency-aware complete-catalog sheet ordering",
+        follow_up: "XLSB dependency-aware complete-catalog sheet ordering",
         reason: "sheet ordering refuses workbooks with a VBA project dependency until native catalog identity remapping is available",
     },
     GapSpec {
@@ -1947,7 +1941,7 @@ static XLSB_WRITE_GAPS: [GapSpec; 25] = [
             context: "vba-dependency",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSB dependency-aware complete-catalog sheet ordering",
+        follow_up: "XLSB dependency-aware complete-catalog sheet ordering",
         reason: "sheet ordering refuses workbooks with a VBA project dependency until native catalog identity remapping is available",
     },
     GapSpec {
@@ -1957,7 +1951,7 @@ static XLSB_WRITE_GAPS: [GapSpec; 25] = [
             context: "calculation-chain-dependency",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSB calculation-chain-aware sheet ordering",
+        follow_up: "XLSB calculation-chain-aware sheet ordering",
         reason: "sheet ordering refuses workbooks with a calculation-chain dependency until native sheet positions can be remapped safely",
     },
     GapSpec {
@@ -1967,7 +1961,7 @@ static XLSB_WRITE_GAPS: [GapSpec; 25] = [
             context: "calculation-chain-dependency",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSB calculation-chain-aware sheet ordering",
+        follow_up: "XLSB calculation-chain-aware sheet ordering",
         reason: "sheet ordering refuses workbooks with a calculation-chain dependency until native sheet positions can be remapped safely",
     },
     GapSpec {
@@ -1977,7 +1971,7 @@ static XLSB_WRITE_GAPS: [GapSpec; 25] = [
             context: "noncontiguous-3d-dependency",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSB 3-D dependency-aware sheet ordering",
+        follow_up: "XLSB 3-D dependency-aware sheet ordering",
         reason: "sheet ordering refuses a permutation that would make an internal 3-D reference noncontiguous",
     },
     GapSpec {
@@ -1987,7 +1981,7 @@ static XLSB_WRITE_GAPS: [GapSpec; 25] = [
             context: "noncontiguous-3d-dependency",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSB 3-D dependency-aware sheet ordering",
+        follow_up: "XLSB 3-D dependency-aware sheet ordering",
         reason: "sheet ordering refuses a permutation that would make an internal 3-D reference noncontiguous",
     },
 ];
@@ -2000,7 +1994,7 @@ static XLSX_MANAGED_PUBLICATION_GAP: GapSpec = GapSpec {
         context: "execution-context-budgeting",
     },
     code: Code::UnsupportedCapability,
-    follow_up: "managed OOXML open and publication (record 0008 A1)",
+    follow_up: "managed OOXML open and publication",
     reason: "OpenOptions::execution checks open-boundary cancellation only; unified opens do not yet retain a managed owner for publication budgeting",
 };
 
@@ -2030,7 +2024,7 @@ const fn encrypted_xlsx_edit_gap(verb: &'static str) -> GapSpec {
             context: "unlocked-encrypted-owner",
         },
         code: Code::DocumentProtected,
-        follow_up: "M2 (XLSX encryption-profile-preserving native edits)",
+        follow_up: "XLSX encryption-profile-preserving native edits",
         reason: "the XLSX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile",
     }
 }
@@ -2099,7 +2093,7 @@ static XLSX_WRITE_GAPS: [GapSpec; 16] = [
         },
         code: Code::UnsupportedCapability,
         follow_up: "File::metadata(); /metadata node reads with the shared metadata vocabulary",
-        reason: "`set(\"/metadata\", ..)` writes the OOXML document properties (root-metadata keys and custom.<name>, record 0253); the path is set-only, and reads go through File::metadata() and the root node",
+        reason: "`set(\"/metadata\", ..)` writes the OOXML document properties (root-metadata keys and custom.<name>); the path is set-only, and reads go through File::metadata() and the root node",
     },
     GapSpec {
         subject: Subject::Operation {
@@ -2108,7 +2102,7 @@ static XLSX_WRITE_GAPS: [GapSpec; 16] = [
             context: "merge-native-preservation-guards",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSX dependency-aware and compatibility-aware merge edits",
+        follow_up: "XLSX dependency-aware and compatibility-aware merge edits",
         reason: "native merge edits refuse follower content, overlapping geometry, table intersections, group formulas and unmodeled or compatibility-owned payloads instead of discarding them",
     },
     GapSpec {
@@ -2118,7 +2112,7 @@ static XLSX_WRITE_GAPS: [GapSpec; 16] = [
             context: "unit-qualified-width-input",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSX OfficeCLI column width input conversion",
+        follow_up: "XLSX OfficeCLI column width input conversion",
         reason: "column width accepts native character-unit numbers; OfficeCLI unit-qualified width conversion remains pending",
     },
     GapSpec {
@@ -2128,7 +2122,7 @@ static XLSX_WRITE_GAPS: [GapSpec; 16] = [
             context: "row-column-table-targets",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSX row/column payload and table write admission",
+        follow_up: "XLSX row/column payload and table write admission",
         reason: "row and column layout properties support scoped selectors; whole-row/column cell payloads, styles, table-driven keys and table writes remain pending",
     },
     GapSpec {
@@ -2138,7 +2132,7 @@ static XLSX_WRITE_GAPS: [GapSpec; 16] = [
             context: "structural-and-coalesced-commands",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSX structure and native transaction coalescing",
+        follow_up: "XLSX structure and native transaction coalescing",
         reason: "worksheet lifecycle commands and distinct direct cell payload coalescing are integrated; other structural targets, broader coalescing and read commands remain pending",
     },
     GapSpec {
@@ -2148,7 +2142,7 @@ static XLSX_WRITE_GAPS: [GapSpec; 16] = [
             context: "officecli-input-conventions",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSX OfficeCLI input policy",
+        follow_up: "XLSX OfficeCLI input policy",
         reason: "cell values preserve typed scalar input; formulas use native formula text without a leading equals sign; OfficeCLI string inference and extended clear modes remain pending",
     },
     GapSpec {
@@ -2158,7 +2152,7 @@ static XLSX_WRITE_GAPS: [GapSpec; 16] = [
             context: "number-format-input-repair",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSX explicit number-format compatibility input policy",
+        follow_up: "XLSX explicit number-format compatibility input policy",
         reason: "numberformat accepts checked native codes and OfficeCLI keyword aliases; malformed quotes are rejected under strict defaults rather than repaired by dropping trailing characters",
     },
     GapSpec {
@@ -2168,7 +2162,7 @@ static XLSX_WRITE_GAPS: [GapSpec; 16] = [
             context: "fill-replacement-opaque-content",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSX lossless replacement of extended fill children",
+        follow_up: "XLSX lossless replacement of extended fill children",
         reason: "typed solid, pattern and gradient fills support whole-fill replacement; a changed replacement refuses opaque content inside the replaced pattern or gradient child, while exact no-ops retain it",
     },
     GapSpec {
@@ -2178,7 +2172,7 @@ static XLSX_WRITE_GAPS: [GapSpec; 16] = [
             context: "border-color-without-line",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSX explicit invisible-border color authoring policy",
+        follow_up: "XLSX explicit invisible-border color authoring policy",
         reason: "border colors require a resulting visible line; strict input admission rejects colors OfficeCLI silently discards on an unstyled side; clearing a line retains existing source color markup",
     },
     GapSpec {
@@ -2188,7 +2182,7 @@ static XLSX_WRITE_GAPS: [GapSpec; 16] = [
             context: "border-opaque-content",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSX lossless replacement of extended border content",
+        follow_up: "XLSX lossless replacement of extended border content",
         reason: "granular border edits preserve unrelated markup; removing a side or color refuses opaque content that would be discarded",
     },
     GapSpec {
@@ -2198,7 +2192,7 @@ static XLSX_WRITE_GAPS: [GapSpec; 16] = [
             context: "border-color-projection",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M1 XLSX complete scalar border color projection",
+        follow_up: "XLSX complete scalar border color projection",
         reason: "ordinary border color readback follows OfficeCLI RGB projection; native theme, indexed, automatic colors and tints remain available through Node::cell_format",
     },
     GapSpec {
@@ -2208,7 +2202,7 @@ static XLSX_WRITE_GAPS: [GapSpec; 16] = [
             context: "border-native-only-edges",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSX logical and interior border property vocabulary",
+        follow_up: "XLSX logical and interior border property vocabulary",
         reason: "the native border editor supports Strict start/end edges, interior edges and outline; the unified OfficeCLI vocabulary currently exposes physical left/right, top/bottom and diagonal edges only",
     },
     GapSpec {
@@ -2218,7 +2212,7 @@ static XLSX_WRITE_GAPS: [GapSpec; 16] = [
             context: "style-resource-compaction",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSX generated style resource lifecycle",
+        follow_up: "XLSX generated style resource lifecycle",
         reason: "cell formatting edits reuse matching resources and retain existing stylesheet records; reverting formatting across separate commits can retain unused generated records",
     },
     GapSpec {
@@ -2228,7 +2222,7 @@ static XLSX_WRITE_GAPS: [GapSpec; 16] = [
             context: "font-authoring-profile",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSX stylesheet creation, markup compatibility and inherited formatting",
+        follow_up: "XLSX stylesheet creation, markup compatibility and inherited formatting",
         reason: "supported cell formatting edits preserve proven Ignorable markup and require existing direct font and cell-format tables; alternate content, unproven directives, escaped namespace bindings and inherited formatting remain unsupported",
     },
     GapSpec {
@@ -2238,7 +2232,7 @@ static XLSX_WRITE_GAPS: [GapSpec; 16] = [
             context: "non-worksheet-tabs",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSX non-worksheet tab removal",
+        follow_up: "XLSX non-worksheet tab removal",
         reason: "worksheet removal uses native dependency guards; removal of chart, dialog and macro tabs remains pending",
     },
     GapSpec {
@@ -2248,7 +2242,7 @@ static XLSX_WRITE_GAPS: [GapSpec; 16] = [
             context: "officecli-sheet-input-conventions",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 XLSX sheet creation property and replay conventions",
+        follow_up: "XLSX sheet creation property and replay conventions",
         reason: "sheet creation supports name, hidden and explicit placement, defaulting name to Sheet plus catalog count plus one; ifExists, placeholder claiming and additional sheet properties remain pending",
     },
 ];
@@ -2291,7 +2285,7 @@ const fn batch_gap(context: &'static str, reason: &'static str) -> GapSpec {
             context,
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 (batch command and transfer families)",
+        follow_up: "batch command and transfer families",
         reason,
     }
 }
@@ -2329,7 +2323,7 @@ const fn encrypted_docx_edit_gap(verb: &'static str) -> GapSpec {
             context: "unlocked-encrypted-owner",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 (DOCX encryption-profile-preserving native edits)",
+        follow_up: "DOCX encryption-profile-preserving native edits",
         reason: "the DOCX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile",
     }
 }
@@ -2408,9 +2402,9 @@ const _: () = {
     }
 };
 
-/// The gap of `mode` for `adapter`: every M1 adapter renders the text,
-/// annotated, outline and stats views and refuses the others (record 0010
-/// §6.1). The liveness tests check each adapter's views against it.
+/// The gap of `mode` for `adapter`: every adapter renders the text,
+/// annotated, outline and stats views and refuses the others. The
+/// liveness tests check each adapter's views against it.
 const fn view_gap(adapter: Adapter, mode: Mode) -> Option<&'static GapSpec> {
     match adapter {
         #[cfg(feature = "doc")]
@@ -2454,7 +2448,7 @@ const fn view_gap(adapter: Adapter, mode: Mode) -> Option<&'static GapSpec> {
     }
 }
 
-/// The M1 rule shared by the adapters.
+/// The rule shared by the adapters.
 const fn m1_view_gap(mode: Mode) -> Option<&'static GapSpec> {
     match mode {
         Mode::Text | Mode::Annotated | Mode::Outline | Mode::Stats => None,
@@ -2569,7 +2563,7 @@ check_capabilities!(crate::format::doc::SPEC);
 #[cfg(feature = "docx")]
 check_capabilities!(crate::format::docx::SPEC);
 
-/// The DOCX part elements `set`, `add` and `remove` write (record 0319).
+/// The DOCX part elements `set`, `add` and `remove` write.
 #[cfg(feature = "docx")]
 const DOCX_PART_WRITES: &[&str] = &[
     "style",
@@ -2834,10 +2828,9 @@ impl Element {
     }
 
     /// Format-level support; owner-state restrictions are reported by `Capabilities::verb`.
-    /// In M1, `get` reads every element
-    /// without a gap and `query` matches every such element the query walker
-    /// reaches from the document root; M2's handler table answers `add`,
-    /// `set` and `remove` here (record 0010 §7.3).
+    /// `get` reads every element without a gap and `query` matches every such
+    /// element the query walker reaches from the document root; the handler table answers
+    /// `add`, `set` and `remove` here.
     #[must_use]
     pub fn operations(&self) -> Operations {
         let readable = self.gap().is_none();
@@ -2851,7 +2844,7 @@ impl Element {
                         "p" | "r"
                             | "hyperlink"
                             | "tc"
-                            // Table borders, row height and flags (record 0342).
+                            // Table borders, row height and flags.
                             | "tbl"
                             | "tr"
                             | "chart"
@@ -2862,7 +2855,7 @@ impl Element {
                             | "smartart"
                             | "node"
                             | "document"
-                            // Table grid columns (record 0345).
+                            // Table grid columns.
                             | "col"
                     )
                     && readable)
@@ -2999,16 +2992,15 @@ impl Element {
                 && readable);
         #[cfg(not(feature = "pptx"))]
         let add = structural;
-        // XLSX cells are added, not removed: a cell is cleared (record 0338).
+        // XLSX cells are added, not removed: a cell is cleared.
         #[cfg(feature = "xlsx")]
         let add = add
             || (self.adapter == Adapter::Xlsx
                 && self.retains_source != Some(false)
                 && self.data().canonical == "cell"
                 && readable);
-        // DOCX pictures (records 0251d, 0335), charts (record 0283) and
-        // SmartArt graphics and nodes (records 0295, 0335) are addable and
-        // removable.
+        // DOCX pictures, charts and SmartArt graphics and nodes are
+        // addable and removable.
         #[cfg(feature = "docx")]
         let add = add
             || (self.adapter == Adapter::Docx
@@ -3024,7 +3016,7 @@ impl Element {
                         | "bookmark"
                         | "field"
                         | "toc"
-                        // Cells and grid columns (record 0345).
+                        // Cells and grid columns.
                         | "tc"
                         | "col"
                 ) || DOCX_PART_WRITES.contains(&self.data().canonical))
@@ -3095,8 +3087,8 @@ impl Element {
                 && readable);
         #[cfg(not(feature = "pptx"))]
         let remove = structural;
-        // DOCX content controls are removable but not yet addable (record
-        // 0251a); cells and grid columns are both (record 0345).
+        // DOCX content controls are removable but not yet addable; cells
+        // and grid columns are both.
         #[cfg(feature = "docx")]
         let remove = remove
             || (self.adapter == Adapter::Docx
@@ -3197,7 +3189,7 @@ impl Element {
     }
 
     /// Whether a selector's keys that are not properties name table header
-    /// columns (`row[Sales>5000]`, record 0010 §5.4): workbook rows.
+    /// columns (`row[Sales>5000]`): workbook rows.
     pub(crate) fn header_columns(&self) -> bool {
         #[cfg(feature = "xls")]
         if self.adapter == Adapter::Xls {
@@ -3372,7 +3364,7 @@ const fn pptx_create_gap(context: &'static str, reason: &'static str) -> GapSpec
             context,
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 PPTX creation options",
+        follow_up: "PPTX creation options",
         reason,
     }
 }
@@ -3387,7 +3379,7 @@ static PPTX_WRITE_GAPS: [GapSpec; 15] = [
         },
         code: Code::UnsupportedCapability,
         follow_up: "File::metadata(); /metadata node reads with the shared metadata vocabulary",
-        reason: "`set(\"/metadata\", ..)` writes the OOXML document properties (root-metadata keys and custom.<name>, record 0253); the path is set-only, and reads go through File::metadata() and the root node",
+        reason: "`set(\"/metadata\", ..)` writes the OOXML document properties (root-metadata keys and custom.<name>); the path is set-only, and reads go through File::metadata() and the root node",
     },
     pptx_create_gap(
         "template",
@@ -3405,7 +3397,7 @@ static PPTX_WRITE_GAPS: [GapSpec; 15] = [
             context: "non-append-placement",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 PPTX non-append shape placement",
+        follow_up: "PPTX non-append shape placement",
         reason: "PPTX shape creation currently supports append placement only",
     },
     GapSpec {
@@ -3415,7 +3407,7 @@ static PPTX_WRITE_GAPS: [GapSpec; 15] = [
             context: "non-slide-parent",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 PPTX group/master/layout shape creation",
+        follow_up: "PPTX group/master/layout shape creation",
         reason: "text-box creation requires a top-level slide parent; group, master and layout insertion remain pending",
     },
     GapSpec {
@@ -3425,7 +3417,7 @@ static PPTX_WRITE_GAPS: [GapSpec; 15] = [
             context: "positional-owner",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 PPTX positional-owner slide ordering",
+        follow_up: "PPTX positional-owner slide ordering",
         reason: "source-backed PPTX slide ordering maintains p14 sections but still refuses outline slide lists, numeric presentation ranges, and unknown or opaque metadata extensions",
     },
     GapSpec {
@@ -3435,7 +3427,7 @@ static PPTX_WRITE_GAPS: [GapSpec; 15] = [
             context: "positional-owner",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 PPTX positional-owner slide ordering",
+        follow_up: "PPTX positional-owner slide ordering",
         reason: "source-backed PPTX slide ordering maintains p14 sections but still refuses outline slide lists, numeric presentation ranges, and unknown or opaque metadata extensions",
     },
     GapSpec {
@@ -3445,7 +3437,7 @@ static PPTX_WRITE_GAPS: [GapSpec; 15] = [
             context: "dependency-topology",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 PPTX dependency-aware slide removal",
+        follow_up: "PPTX dependency-aware slide removal",
         reason: "native PPTX slide removal removes the notes, comments, pictures, media and other Parts the slide owns exclusively and keeps shared ones; a slide another slide jumps to, or whose relationships name a missing Part, is still refused",
     },
     GapSpec {
@@ -3455,7 +3447,7 @@ static PPTX_WRITE_GAPS: [GapSpec; 15] = [
             context: "final-slide",
         },
         code: Code::InvalidValue,
-        follow_up: "M2 PPTX final-slide removal policy",
+        follow_up: "PPTX final-slide removal policy",
         reason: "native PPTX slide removal currently preserves the final slide and cannot remove the last slide from a presentation",
     },
     GapSpec {
@@ -3465,7 +3457,7 @@ static PPTX_WRITE_GAPS: [GapSpec; 15] = [
             context: "canonical-target",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 PPTX equivalent relationship-target spellings",
+        follow_up: "PPTX equivalent relationship-target spellings",
         reason: "source-backed PPTX slide removal requires canonical owner-relative relationship targets so inverse replay can restore the original OPC spelling",
     },
     GapSpec {
@@ -3475,7 +3467,7 @@ static PPTX_WRITE_GAPS: [GapSpec; 15] = [
             context: "dependency-topology",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 PPTX dependency-aware shape removal",
+        follow_up: "PPTX dependency-aware shape removal",
         reason: "shape removal refuses retained connector or animation references to removed IDs; source-backed removal preserves unused relationships and parts, while eager removal prunes unreachable relationship closure",
     },
     GapSpec {
@@ -3485,7 +3477,7 @@ static PPTX_WRITE_GAPS: [GapSpec; 15] = [
             context: "non-top-level",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 PPTX grouped/master/layout shape removal",
+        follow_up: "PPTX grouped/master/layout shape removal",
         reason: "native PPTX shape removal currently requires a top-level slide shape; grouped children and master or layout shapes remain outside the admitted topology",
     },
     GapSpec {
@@ -3495,7 +3487,7 @@ static PPTX_WRITE_GAPS: [GapSpec; 15] = [
             context: "native-shape-text-preservation",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 PPTX structural and rich-text editing",
+        follow_up: "PPTX structural and rich-text editing",
         reason: "text replacement requires an existing slide shape text body and native edit admission; master/layout shapes, text-body creation and rich-text formatting remain pending",
     },
     GapSpec {
@@ -3505,7 +3497,7 @@ static PPTX_WRITE_GAPS: [GapSpec; 15] = [
             context: "managed-signature-removal",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 PPTX managed source-preserving signature removal",
+        follow_up: "PPTX managed source-preserving signature removal",
         reason: "explicit signature removal requires native eager materialization, which managed sources refuse",
     },
 ];
@@ -3623,15 +3615,15 @@ fn option_gap(adapter: Adapter, index: usize) -> Option<Option<&'static GapSpec>
     reason = "OfficeCLI's help schema flags, one per verb"
 )]
 pub struct Operations {
-    /// `add` creates the element (M2).
+    /// `add` creates the element.
     pub add: bool,
-    /// `set` changes its properties (M2).
+    /// `set` changes its properties.
     pub set: bool,
     /// `get` reads it.
     pub get: bool,
     /// `query` matches it.
     pub query: bool,
-    /// `remove` deletes it (M2).
+    /// `remove` deletes it.
     pub remove: bool,
 }
 
@@ -3712,8 +3704,7 @@ impl Iterator for Properties {
                             match self.element.data().canonical {
                                 "slide" => Some(self.element.pptx_slide_add == Some(true)),
                                 "shape" => Some(self.element.pptx_shape_add == Some(true)),
-                                // Placeholder insertion follows shape insertion
-                                // (record 0346).
+                                // Placeholder insertion follows shape insertion.
                                 "placeholder" => Some(self.element.pptx_shape_add == Some(true)),
                                 _ => None,
                             }
@@ -3765,7 +3756,7 @@ impl Property {
         self.spec.access.get
     }
 
-    /// Whether `set` writes the key (M2).
+    /// Whether `set` writes the key.
     #[must_use]
     pub const fn set(&self) -> bool {
         match self.retains_source {
@@ -3806,7 +3797,7 @@ impl Property {
         }
     }
 
-    /// Whether `add` accepts the key when it creates the element (M2).
+    /// Whether `add` accepts the key when it creates the element.
     #[must_use]
     pub const fn add(&self) -> bool {
         if matches!(self.structural_add_supported, Some(false)) {
@@ -3842,8 +3833,7 @@ impl Gap {
         self.spec.code
     }
 
-    /// The leaf request or milestone that closes the gap (`L-XLSX-R5`,
-    /// `M2`).
+    /// What closes the gap: the missing capability, or `not supported yet`.
     #[must_use]
     pub const fn follow_up(&self) -> &'static str {
         self.spec.follow_up

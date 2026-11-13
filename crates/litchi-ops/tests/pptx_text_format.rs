@@ -1,4 +1,4 @@
-//! Unified PPTX rich text writes (record 0252): run and paragraph
+//! Unified PPTX rich text writes: run and paragraph
 //! formatting, paragraph/run/cell text and table-cell fill, through both
 //! native owner routes, read back through `get` and after a byte round trip.
 #![cfg(feature = "pptx")]
@@ -242,7 +242,7 @@ fn edit_closure_composes_text_writes_atomically() {
         assert_eq!(prop(&updated, CELL, "fill").as_deref(), Some("#00FF00"));
         let failed = file.edit(|edit| {
             edit.set(RUN, props! { "bold" => true })?;
-            // A transformed theme colour is not writable (record 0333).
+            // A transformed theme colour is not writable.
             edit.set(CELL, props! { "fill" => "accent1+lumMod75" })?;
             Ok(())
         });

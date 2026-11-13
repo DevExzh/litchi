@@ -1,5 +1,5 @@
 //! Coalesced object-format property sets for explicit transactions and
-//! batches (record 0288).
+//! batches.
 //!
 //! Consecutive direct-path sets on one drawing, chart, image, database or
 //! formula snapshot are staged on one leaf `Edit` and published by one

@@ -1,10 +1,10 @@
 //! Word-processing element wrappers: [`Paragraph`], [`Run`], [`Table`],
 //! [`Row`], [`Cell`], [`CellMerge`] and [`DocumentElement`].
 //!
-//! Moved from the facade's `document` module (record 0003 §2.4). The
+//! Moved from the facade's `document` module. The
 //! [`DocumentView`](crate::DocumentView) family view returns them.
 //!
-//! **Scheduled for deletion in M1**, with the rest of [`crate::compat`].
+//! **Scheduled for deletion**, with the rest of [`crate::compat`].
 
 mod cell_merge;
 mod element;

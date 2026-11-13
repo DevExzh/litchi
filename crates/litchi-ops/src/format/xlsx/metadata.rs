@@ -1,6 +1,6 @@
-//! XLSX document metadata on the workbook root (record 0253).
+//! XLSX document metadata on the workbook root.
 //!
-//! A set on `/metadata`, or on `/` as OfficeCLI spells it (record 0338),
+//! A set on `/metadata`, or on `/` as OfficeCLI spells it,
 //! with OfficeCLI's document-property keys commits one leaf
 //! [`litchi_xlsx::metadata`] transaction. The handle's open-time metadata is
 //! replaced by the committed value, so reads of `/` observe it.
@@ -53,7 +53,7 @@ pub(super) fn commit(
 
 impl Xlsx {
     /// Set document properties on `/metadata`, or on the root `/`
-    /// (OfficeCLI's spelling, record 0338): the root sets nothing else, so a
+    /// (OfficeCLI's spelling): the root sets nothing else, so a
     /// key that is not a document property is `unsupported_property`.
     /// `None` for other targets and for an empty root set.
     pub(super) fn try_set_metadata(

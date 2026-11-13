@@ -1,7 +1,7 @@
 """Read-API oracle per format: Document, Presentation and Workbook families.
 
 Every assertion here is a stable fact of a real fixture under test-data/
-(counts, exact short strings, sheet names, run formatting). S8a must keep them
+(counts, exact short strings, sheet names, run formatting). They must stay
 green: the Python read API stays source-compatible (design §7) while the
 bindings move onto ``litchi::File``. ``ReprSnapshotTests`` is the one snapshot
 class: its strings may change, but only deliberately and on the record.
@@ -10,7 +10,7 @@ Formats the bindings accept:
   Document     docx, doc, rtf, odt, pages
   Presentation pptx, ppt, odp, key
   Workbook     xlsx, xlsb, xls, ods, numbers
-``.ppt`` and ``.xls`` are accepted since S8a (bug B1, see test_known_drift.py).
+``.ppt`` and ``.xls`` are accepted (bug B1, see test_known_drift.py).
 Opening from bytes is not offered by the bindings; only detection takes bytes
 (test_formats_and_values.py).
 """
@@ -80,7 +80,7 @@ class DocxReadTests(unittest.TestCase):
             assert_in_order(self, document.text(), paragraph_texts(document))
 
     def test_text_is_one_line_per_paragraph(self):
-        # S8a (bug B3): File::text() joins the paragraph texts with "\n", empty
+        # Bug B3: File::text() joins the paragraph texts with "\n", empty
         # and table-cell paragraphs included.
         self.assertEqual(
             L.Document.open(fixture(self.HYPERLINK)).text(),
@@ -273,7 +273,7 @@ class OdtReadTests(unittest.TestCase):
 
 
 class PagesReadTests(unittest.TestCase):
-    """Pages through ``Document`` (record 0003 R6; since record 0306 the class reads the Pages ``File``)."""
+    """Pages through ``Document`` (the class reads the Pages ``File``)."""
 
     BASIC = "iwork/pages/basic.pages"
     UNICODE = "iwork/pages/body-sections-unicode.pages"
@@ -358,7 +358,7 @@ class PptxReadTests(unittest.TestCase):
 
 
 class PptReadTests(unittest.TestCase):
-    """Legacy PowerPoint, accepted since S8a enabled the ``ppt`` feature (B1)."""
+    """Legacy PowerPoint, accepted since the ``ppt`` feature is enabled (B1)."""
 
     SHAPES = "ole/ppt/text_shapes.ppt"
     SAMPLE = "ole/ppt/SampleShow.ppt"
@@ -366,7 +366,7 @@ class PptReadTests(unittest.TestCase):
     def test_slides_and_text(self):
         presentation = L.Presentation.open(fixture(self.SHAPES))
         self.assertEqual(presentation.slide_count(), 1)
-        # The title placeholder's text lives in the slide list (record 0260).
+        # The title placeholder's text lives in the slide list.
         self.assertEqual(
             slide_texts(presentation),
             ["Title Placeholder\nText in a TextBox\nRectangle\nEllipse\nOctagon"],
@@ -409,7 +409,7 @@ class OdpReadTests(unittest.TestCase):
 
 
 class KeynoteReadTests(unittest.TestCase):
-    """Keynote through ``Presentation`` (record 0003 R6)."""
+    """Keynote through ``Presentation``."""
 
     BASIC = "iwork/keynote/basic.key"
     TABLE = "iwork/keynote/slide-table-read-native.key"
@@ -514,7 +514,7 @@ class XlsbReadTests(unittest.TestCase):
 
 
 class XlsReadTests(unittest.TestCase):
-    """Legacy Excel, accepted since S8a enabled the ``xls`` feature (B1)."""
+    """Legacy Excel, accepted since the ``xls`` feature is enabled (B1)."""
 
     SIMPLE = "ole/xls/Simple.xls"
     MULTI = "ole/xls/SimpleMultiCell.xls"
@@ -556,7 +556,7 @@ class OdsReadTests(unittest.TestCase):
 
 
 class NumbersReadTests(unittest.TestCase):
-    """Numbers through ``Workbook`` (record 0003 R6).
+    """Numbers through ``Workbook``.
 
     Unlike the other workbook formats, text() names each sheet and table and
     then lists one cell per line, with formula source instead of a value.
@@ -602,9 +602,9 @@ class NumbersReadTests(unittest.TestCase):
 class IworkPackageDirectoryTests(unittest.TestCase):
     """Apple's package-directory form of the three iWork formats.
 
-    Since S8a, ``litchi::open`` names the iWork format of a package directory
+    ``litchi::open`` names the iWork format of a package directory
     and the semantic readers accept one, so the openers read it like the
-    packaged file. Before S8a every opener refused a directory as an I/O
+    packaged file. Every opener used to refuse a directory as an I/O
     error. Path detection still reports None for a directory
     (test_formats_and_values).
     """
@@ -638,7 +638,7 @@ class IworkPackageDirectoryTests(unittest.TestCase):
 
 
 class SignedPackageReadTests(unittest.TestCase):
-    """Signed OOXML reads normally today (record 0003 R7: S8a wraps it in ``Signed``)."""
+    """Signed OOXML reads normally."""
 
     def test_signed_docx(self):
         document = L.Document.open(fixture("poi/test-data/xmldsign/hello-world-signed.docx"))
@@ -778,7 +778,7 @@ class HandleSemanticsTests(unittest.TestCase):
 class ReprSnapshotTests(unittest.TestCase):
     """``repr``/``str`` of handles (snapshot tier: may change only deliberately).
 
-    Previews are cut by character (bug B2 fixed in S8a); multibyte text is
+    Previews are cut by character (bug B2, fixed); multibyte text is
     covered by test_multibyte_previews_are_cut_by_character.
     """
 

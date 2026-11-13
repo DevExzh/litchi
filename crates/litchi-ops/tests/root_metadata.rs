@@ -1,5 +1,5 @@
 //! OfficeCLI's root-level metadata writes (`set / title=...`) route to the
-//! `/metadata` writer for DOCX, XLSX and PPTX (records 0338 and 0342).
+//! `/metadata` writer for DOCX, XLSX and PPTX.
 #![cfg(all(feature = "docx", feature = "xlsx", feature = "pptx"))]
 
 use litchi_core::{FileFormat, Metadata};
@@ -102,8 +102,7 @@ fn the_root_refuses_other_keys_by_name() {
     let error = docx.set("/", props! { "contentType" => "x" }).unwrap_err();
     assert_eq!(error.code(), Code::UnsupportedProperty);
     assert_eq!(error.property(), Some("content_type"));
-    // Every OOXML format writes application properties on the root too
-    // (DOCX: record 0342).
+    // Every OOXML format writes application properties on the root too.
     for format in [FileFormat::Docx, FileFormat::Xlsx, FileFormat::Pptx] {
         let file = create(format)
             .unwrap()
@@ -209,7 +208,7 @@ fn the_root_claims_set_for_its_document_property_keys() {
     }
 }
 
-/// OfficeCLI's `word/document-formatting.sh:28` (record 0342): DOCX
+/// OfficeCLI's `word/document-formatting.sh:28`: DOCX
 /// application properties and custom properties on the root, read back as
 /// `extended.*`; the core properties and the main document are untouched,
 /// and a transaction step replays and inverts them.

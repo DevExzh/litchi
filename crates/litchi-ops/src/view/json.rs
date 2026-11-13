@@ -1,4 +1,4 @@
-//! A view as OfficeCLI's JSON (record 0010 §6.1): what
+//! A view as OfficeCLI's JSON: what
 //! [`File::view_json`](crate::File::view_json) returns.
 
 // In a build without any adapter, `Json` is uninhabited; those lints are

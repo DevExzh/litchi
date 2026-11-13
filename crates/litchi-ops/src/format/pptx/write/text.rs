@@ -127,7 +127,7 @@ impl TextValues {
     }
 
     /// Whether a coalesced formatting run can stage these assignments and
-    /// tell their change from the reader's model (record 0333): run and
+    /// tell their change from the reader's model: run and
     /// paragraph character formatting, alignment and run text, but no
     /// fills, cell properties or geometry.
     pub(in crate::format::pptx) fn coalescible(&self) -> bool {
@@ -139,9 +139,9 @@ impl TextValues {
             && self.geometry.is_none()
     }
 
-    /// Whether a coalesced run can stage these table-cell assignments
-    /// (record 0346): [`Self::coalescible`]'s and the cell's fill, anchor and
-    /// insets, whose change the leaf reports (record 0348).
+    /// Whether a coalesced run can stage these table-cell assignments:
+    /// [`Self::coalescible`]'s and the cell's fill, anchor and
+    /// insets, whose change the leaf reports.
     pub(in crate::format::pptx) fn cell_coalescible(&self) -> bool {
         !self.is_empty() && self.shape_fill.is_none() && self.geometry.is_none()
     }
@@ -328,8 +328,8 @@ impl TextValues {
             Ok(owned)
         };
         match setter {
-            // Click actions are split off before text admission (record
-            // 0325) and written through the hyperlink verbs.
+            // Click actions are split off before text admission
+            // and written through the hyperlink verbs.
             TextSetter::Click(_) => {
                 return Err(crate::Error::new(
                     Code::InternalError,
@@ -559,7 +559,7 @@ fn rgb(color: &crate::value::Color) -> Result<Rgb> {
 }
 
 /// A table cell fill colour: opaque RGB, or a theme colour without
-/// transforms (record 0333).
+/// transforms.
 fn cell_fill(color: &crate::value::Color) -> Result<CellFill> {
     if let Base::Scheme(scheme) = color.base()
         && color.transforms().is_empty()
@@ -652,7 +652,7 @@ pub(super) fn admit<const N: usize, const A: usize>(
 }
 
 /// Admit `props` for `operation` through `table`: `set` or, for a new
-/// paragraph or run, `add` (record 0333). An empty payload is admitted.
+/// paragraph or run, `add`. An empty payload is admitted.
 pub(in crate::format::pptx) fn admit_for<const N: usize, const A: usize>(
     table: &Table<TextSetter, N, A>,
     props: &Props<'_>,
@@ -717,7 +717,7 @@ impl Pptx {
         }
         let per_target = values.charge();
         // `(notes page, slide, target)`: a notes body's text is edited in
-        // its notes part (record 0333).
+        // its notes part.
         let mut targets: Vec<(bool, usize, TextTarget)> = Vec::new();
         let mut seen = HashSet::new();
         let mut append = |node: crate::format::pptx::Node<'_>| -> Result<()> {
@@ -858,7 +858,7 @@ impl Pptx {
     /// Publish slide-grouped text edits and notes-page text edits through
     /// one native edit. Notes pages are edited on the eager package: a
     /// source-backed presentation with notes edits is materialized first,
-    /// as a notes text write is (record 0285).
+    /// as a notes text write is.
     pub(super) fn commit_story_text_edits(
         &self,
         groups: &[(usize, Vec<TextAssignment<'_>>)],
@@ -905,7 +905,7 @@ impl Pptx {
                     operations += edit.set_text_property_chunks(*slide, &chunks)?;
                 }
                 for (slide, edits) in notes {
-                    // One pass over the notes part (record 0348).
+                    // One pass over the notes part.
                     let chunks: Vec<&[TextAssignment<'_>]> = edits.chunks(capacity).collect();
                     operations += edit.set_notes_text_property_chunks(*slide, &chunks)?;
                 }

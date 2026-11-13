@@ -29,9 +29,8 @@ pub struct Applied {
     found: u32,
 }
 impl Applied {
-    /// The number of matches of a `set` whose properties name `find`
-    /// (record 0273); `None` for every other command. Zero matches are an
-    /// exact no-op.
+    /// The number of matches of a `set` whose properties name `find`;
+    /// `None` for every other command. Zero matches are an exact no-op.
     ///
     /// ```
     /// # #[cfg(feature = "xlsx")]
@@ -447,8 +446,7 @@ impl File {
                     Err(error) => results.push(ItemResult::Failed(error)),
                 }
             }
-            // A coalesced run reports some items' changes at its commit
-            // (record 0348).
+            // A coalesced run reports some items' changes at its commit.
             edit.flush_pending()?;
             for (index, changed) in edit.take_reported() {
                 if let Some(ItemResult::Applied(applied)) = results.get_mut(index) {
@@ -806,8 +804,7 @@ fn placement<'a>(item: &'a BatchItem<'_>, moving: bool) -> Result<Placement<'a>>
 }
 fn fields(item: &BatchItem<'_>, allowed: &[&str]) -> Result<()> {
     // Each field is tested in wire order and named only when present: a
-    // batch item pays one test per field, not a table of every field's name
-    // (record 0302).
+    // batch item pays one test per field, not a table of every field's name.
     macro_rules! refuse_unless_allowed {
         ($($name:literal => $present:expr),* $(,)?) => {
             $(
@@ -851,7 +848,7 @@ fn invalid(message: &'static str) -> Error {
 }
 fn pending(message: &'static str) -> Error {
     Error::new(Code::UnsupportedCapability, message)
-        .with_suggestion("see capabilities and the M2 batch command follow-ups")
+        .with_suggestion("see capabilities and the batch command follow-ups")
 }
 
 fn fatal(error: &Error) -> bool {
@@ -869,8 +866,7 @@ fn fatal(error: &Error) -> bool {
 // has operation-specific control semantics. Run addition and paragraph setters
 // use inline normalization; command run setters use the literal first text node.
 fn add_text_props<'a>(kind: &str, props: &'a Props<'a>) -> Result<std::borrow::Cow<'a, Props<'a>>> {
-    // A SmartArt's `text` is an outline: its line breaks separate nodes
-    // (record 0284).
+    // A SmartArt's `text` is an outline: its line breaks separate nodes.
     if kind.eq_ignore_ascii_case("smartart") {
         return Ok(std::borrow::Cow::Borrowed(props));
     }

@@ -1,4 +1,4 @@
-# Provenance of vendored PPTX fixtures (record 0252)
+# Provenance of vendored PPTX fixtures
 
 These files are copied unchanged from LibreOffice core
 (<https://git.libreoffice.org/core>), path `sd/qa/unit/data/pptx/`, at commit

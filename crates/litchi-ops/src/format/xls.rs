@@ -49,7 +49,7 @@ pub(crate) use write::WriteCommit;
 pub struct Xls(Arc<Opened<XlsState>>);
 
 /// The state a handle shares with its clones: the native package and the
-/// read caches of exactly that package (record 0315).
+/// read caches of exactly that package.
 ///
 /// Every write publishes a new package into a new state
 /// ([`Xls::with_package`]), so the caches never outlive the snapshot they
@@ -407,7 +407,7 @@ impl Xls {
             .unwrap_or(0)
     }
 
-    /// The handle's sheet-step cache (record 0315).
+    /// The handle's sheet-step cache.
     pub(super) fn sheet_step(&self) -> &nav::SheetStep {
         &self.0.sheet_step
     }
@@ -437,8 +437,8 @@ impl Xls {
     /// nests (a `View::text` that formats through further fenced reads)
     /// share this one check instead of each adding their own; inside an
     /// enclosing scope (a resolver or query step, or an outer `finish`),
-    /// whose check runs after the whole step, the operation runs alone
-    /// (record 0291). Every public read still ends in at least one check.
+    /// whose check runs after the whole step, the operation runs alone.
+    /// Every public read still ends in at least one check.
     pub(crate) fn finish<T>(&self, operation: impl FnOnce() -> Result<T>) -> Result<T> {
         let key = self.fence_key();
         if crate::path::fence::is_active(key) {
@@ -508,7 +508,7 @@ impl Xls {
     /// The retained editable package after signature admission (unsigned
     /// first when removal is authorized): its `cell_values()` read view and
     /// `edit()` stage the native cell-value engine.
-    #[cfg_attr(not(test), expect(dead_code, reason = "edit verbs arrive in M2"))]
+    #[cfg_attr(not(test), expect(dead_code, reason = "edit verbs arrive later"))]
     pub(crate) fn cell_values_editor(&self) -> Result<Package> {
         if self.0.signature() == Signature::Signed {
             return Err(signature::refusal(FileFormat::Xls));
@@ -962,8 +962,7 @@ mod tests {
         }
     }
 
-    /// A source that counts its version observations and can be changed
-    /// (record 0315).
+    /// A source that counts its version observations and can be changed.
     struct Changing {
         inner: litchi_core::OwnedSource,
         revision: std::sync::atomic::AtomicU64,
@@ -1042,7 +1041,7 @@ mod tests {
         paths
     }
 
-    /// Record 0315 (record 0310 G8): a cell `get` whose sheet step the
+    /// A cell `get` whose sheet step the
     /// handle cached gives exactly what the general resolver gives on a
     /// handle that never cached a step: the same node, text and error, on
     /// both owners, whatever step the cache holds.
@@ -1081,7 +1080,7 @@ mod tests {
         }
     }
 
-    /// Record 0315: the cached route reads the source exactly as the
+    /// The cached route reads the source exactly as the
     /// resolver does (the same observations per `get`), a source changed
     /// between two cached `get`s fails the second, and a write publishes a
     /// handle whose cache starts empty, so a renamed worksheet is no longer
@@ -1194,7 +1193,7 @@ mod tests {
         ));
     }
 
-    /// Record 0291: a read nested in another fenced read of the same handle
+    /// A read nested in another fenced read of the same handle
     /// (a sheet's `View::text`, which reads the sheet name through a
     /// fenced reader) shares the outer read's one check; every public read
     /// still checks once, and every query match once.
@@ -1219,14 +1218,14 @@ mod tests {
         // A `get` checks once after resolving.
         assert_eq!(observe(&|| drop(unified.get("/sheet[1]").unwrap())), 1);
         // Each match of a query, and its end, is checked.
-        // Each match of a query, and its end, is still checked (owner
-        // decision 2026-10-14), besides what the leaf observes.
+        // Each match of a query, and its end, is still checked, besides
+        // what the leaf observes.
         let sheets = unified.query("sheet").unwrap().count();
         assert!(sheets >= 1);
         assert!(observe(&|| assert_eq!(unified.query("sheet").unwrap().count(), sheets)) > sheets);
     }
 
-    /// Record 0291: nested reads under `View::text` share one check, and
+    /// Nested reads under `View::text` share one check, and
     /// a node read before a change still refuses the changed source.
     #[cfg(any(unix, windows))]
     #[test]

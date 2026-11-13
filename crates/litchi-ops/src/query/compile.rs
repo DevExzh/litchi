@@ -1,9 +1,8 @@
-//! Query compilation (record 0010 §5.2): one pass over a parsed [`Query`]
-//! that binds every element name, predicate key and literal to one format's
-//! tables.
+//! Query compilation: one pass over a parsed [`Query`] that binds every
+//! element name, predicate key and literal to one format's tables.
 //!
 //! - Element names go through the family vocabulary's alias table, ASCII
-//!   case-insensitively, exactly as path steps do (record 0010 §4.2);
+//!   case-insensitively, exactly as path steps do;
 //!   `title` and `textbox` narrow presentation shapes; a workbook also
 //!   accepts column letters (`B`) and A1 cells or ranges as element tests.
 //! - Each predicate key is looked up once per subject kind in the kind's
@@ -14,7 +13,7 @@
 //!   the Nth or last match; elsewhere they select among siblings of the
 //!   element's kind; on a number-indexed element (`row[3]`, `col[B]`) they
 //!   keep their path meaning.
-//! - Header-row predicates (`row[Salary>5000]`, record 0010 §5.4) are
+//! - Header-row predicates (`row[Salary>5000]`) are
 //!   classified into table columns and row properties here; the format
 //!   adapter binds the columns when the query runs.
 //!
@@ -550,7 +549,7 @@ impl<'q, 'f, N: Inspect<'f>> Compiler<'q, 'f, N> {
         }
         if let Some(canonical) = vocabulary.canonical(name) {
             if N::PLACEHOLDER_SHAPES && canonical == "placeholder" {
-                // Placeholders are walked as shapes (record 0290 F1).
+                // Placeholders are walked as shapes.
                 let shape = self.model("shape")?;
                 return Ok((bit_of(shape), Some(Structural::Placeholder), None));
             }
@@ -676,8 +675,7 @@ impl<'q, 'f, N: Inspect<'f>> Compiler<'q, 'f, N> {
     }
 
     /// Splits a worksheet row compound's filters into table columns and row
-    /// properties (record 0010 §5.4 rule 1, OfficeCLI
-    /// `ExcelHandler.Query.cs` 1716-1791).
+    /// properties (OfficeCLI `ExcelHandler.Query.cs` 1716-1791).
     fn row_filters(
         &mut self,
         filters: &[&Expr<'q>],
@@ -1258,12 +1256,12 @@ fn to_u8(value: usize) -> Result<u8> {
 }
 
 /// The transitive closure of the child lists of `elements`: what can occur
-/// below each kind, the walker's pruning table (record 0010 §5.3).
+/// below each kind, the walker's pruning table.
 ///
 /// A spec table is static, so the closure is computed once per table and
-/// kept for the process (record 0280: recomputing it was about a fifth of
-/// compiling a short selector). Tables are told apart by address; there is
-/// one per format adapter, so the cache stays a handful of entries.
+/// kept for the process (recomputing it was about a fifth of compiling a
+/// short selector). Tables are told apart by address; there is one per
+/// format adapter, so the cache stays a handful of entries.
 fn reach_table<K: ElementKind>(elements: &'static [ElementSpec<K>]) -> &'static [u128] {
     type Tables = std::sync::RwLock<Vec<(usize, &'static [u128])>>;
     static TABLES: Tables = std::sync::RwLock::new(Vec::new());

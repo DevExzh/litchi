@@ -1,4 +1,4 @@
-//! XLSB nodes and their unified workbook view (record 0010 R4d).
+//! XLSB nodes and their unified workbook view.
 //!
 //! The node layer keeps the XLSB leaf's positional catalog and immutable grid
 //! snapshots.  A cell node carries only a cheap grid handle and a checked
@@ -44,11 +44,11 @@ pub struct Node<'f> {
     item: Item,
     /// The position of the node's worksheet (0 for the workbook and a
     /// defined name). The path is written from it and the item on demand
-    /// (record 0267, as record 0262 did for XLSX).
+    /// (as in the XLSX adapter).
     sheet: u32,
 }
 
-// A walk moves every node it visits: keep it small (record 0267; 176 bytes
+// A walk moves every node it visits: keep it small (176 bytes
 // before, with its two path steps and label kept inline).
 const _: () = assert!(size_of::<Node<'static>>() <= 96);
 
@@ -57,7 +57,7 @@ const _: () = assert!(size_of::<Node<'static>>() <= 96);
 #[derive(Clone)]
 pub(super) enum Item {
     Workbook,
-    /// Boxed: a tab handle is large and sheets are few (record 0267).
+    /// Boxed: a tab handle is large and sheets are few.
     Sheet(Box<Sheet>),
     Cell(CellItem),
     Range(RangeItem),
@@ -66,9 +66,9 @@ pub(super) enum Item {
     Table(TableItem),
     NamedRange(usize),
     /// A worksheet feature: a note, hyperlink, picture, shape, conditional
-    /// format, validation, auto-filter or page break (record 0322).
+    /// format, validation, auto-filter or page break.
     Feature(Arc<super::features::Feature>),
-    /// A worksheet chart, its series and its axes, read-only (record 0322).
+    /// A worksheet chart, its series and its axes, read-only.
     Chart(Box<super::chart::ChartItem>),
     Series(Box<super::chart::ChartItem>),
     Axis(Box<super::chart::ChartItem>),
@@ -163,7 +163,7 @@ pub(super) struct TableItem {
 /// handle supplies source/version fences and local style resolution.
 ///
 /// One `Arc`, so listing a cell costs one reference-count increment instead
-/// of a tab-handle clone (record 0267).
+/// of a tab-handle clone.
 #[derive(Clone)]
 pub(super) struct Grid(Arc<GridInner>);
 
@@ -171,7 +171,7 @@ pub(super) struct GridInner {
     leaf: xlsb::sheet::Grid,
     handle: SheetHandle,
     cached_only: bool,
-    /// For a batch of the leaf's cell cursor (record 0267), `leaf` holds the
+    /// For a batch of the leaf's cell cursor, `leaf` holds the
     /// batch's cells only and this the worksheet's complete grid, read on
     /// first use by a read that needs more than a cell's own record (its
     /// merge).
@@ -1055,9 +1055,9 @@ pub(crate) enum Props<'a> {
     Range {
         merged: bool,
     },
-    /// A worksheet feature and its worksheet's name (record 0322).
+    /// A worksheet feature and its worksheet's name.
     Feature(&'a super::features::Feature, String),
-    /// A worksheet chart, series or axis (record 0322).
+    /// A worksheet chart, series or axis.
     Chart(&'a super::chart::ChartItem, Kind),
 }
 

@@ -340,11 +340,11 @@ fn observed_header_query(rows: u32) -> (usize, u64) {
     (matches, source.versions.load(Ordering::SeqCst) - before)
 }
 
-/// Record 0310: a header-row query probes each row of the bound block
+/// A header-row query probes each row of the bound block
 /// through the sheet's cached grid. Inside the query step those probes
 /// share the step's closing check instead of re-entering the leaf's fenced
 /// grid read, so each further matching row costs its one per-match check
-/// (owner decision 2026-10-14) and nothing more. A change between two
+/// and nothing more. A change between two
 /// pulls still fails the next pull.
 #[test]
 fn header_row_probes_share_the_step_check() {

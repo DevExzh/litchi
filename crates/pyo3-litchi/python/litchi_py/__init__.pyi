@@ -607,8 +607,8 @@ class _Support(TypedDict):
     code: NotRequired[str]
     """The error code a refusal raises, such as "unsupported_capability"."""
     followUp: NotRequired[str]
-    """What makes it available: a milestone ("M2"), a leaf request, or an
-    action."""
+    """What makes it available: an action, a cargo feature or the capability
+    that is missing."""
     reason: NotRequired[str]
 
 class _Capabilities(TypedDict):
@@ -653,7 +653,7 @@ class _Schema(TypedDict):
     setKeywords: NotRequired[Dict[str, Any]]
     """Present when the format has a reader: the find/replace keywords of
     ``set`` (``find``, ``replace``, ``matchCase``, ``wholeWord``,
-    ``regex``) and the ``support`` of the ``replace`` verb (record 0273)."""
+    ``regex``) and the ``support`` of the ``replace`` verb."""
 
 class _Metadata(TypedDict, total=False):
     """``File.metadata()``: the document properties that are set
@@ -705,7 +705,7 @@ _PropValue = Union[bool, int, float, str, List[str], None]
 _Props = Union[Mapping[str, _PropValue], Sequence[str]]
 
 class _PartInfo(TypedDict):
-    """One package part in ``File.parts()`` (stub-only type, record 0336)."""
+    """One package part in ``File.parts()`` (stub-only type)."""
 
     name: str
     """The part name, for example "/word/document.xml"."""
@@ -730,7 +730,7 @@ class _ValidationIssue(TypedDict):
     repair: Dict[str, str]
 
 class _Validation(TypedDict):
-    """``File.validate()``'s report (stub-only type, record 0336)."""
+    """``File.validate()``'s report (stub-only type)."""
 
     format: str
     valid: bool
@@ -754,7 +754,7 @@ class _ItemResult(TypedDict):
     path: NotRequired[str]
     """A successful add: the new element's canonical path."""
     matched: NotRequired[int]
-    """A successful set with ``find``: the number of matches (record 0273)."""
+    """A successful set with ``find``: the number of matches."""
     code: NotRequired[str]
     """A failed item (best-effort mode): the error code."""
     error: NotRequired[str]
@@ -1496,7 +1496,7 @@ class File:
 
     def dump(self, *, strict: bool = False) -> List[Dict[str, Any]]:
         """The document as an OfficeCLI v2 batch: item dicts that ``batch``
-        replays onto ``create(format)`` to rebuild it (record 0336).
+        replays onto ``create(format)`` to rebuild it.
 
         The first item is ``{"command": "meta", "dumpVersion": 2}``. Content
         the write verbs cannot rebuild is skipped, or with ``strict`` raises
@@ -1510,7 +1510,7 @@ class File:
         ...
 
     def parts(self) -> List[_PartInfo]:
-        """The package parts in name order (design §12, record 0336).
+        """The package parts in name order (design §12).
 
         Raises:
             UnsupportedError: (a ValueError) If the format has no package parts

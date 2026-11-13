@@ -1,5 +1,4 @@
-//! Formatting-aware find/replace: the `find=`/`replace=` properties of `set`
-//! (record 0273).
+//! Formatting-aware find/replace: the `find=`/`replace=` properties of `set`.
 //!
 //! OfficeCLI models find/replace as keywords of its `set` command rather
 //! than as a verb (`WordHandler.Set.cs`, `PowerPointHandler.Set.cs`,
@@ -25,7 +24,7 @@
 //! | `replace` | text, may be empty | the replacement; empty deletes each match |
 //! | `matchCase` | bool, default `true` | `false` compares characters by their simple lowercase mapping |
 //! | `wholeWord` | bool, default `false` | `true` keeps only matches not adjacent to a letter, digit or `_` |
-//! | `regex` | bool | `true` is refused: Litchi has no approved regular-expression engine (record 0010 Q3) |
+//! | `regex` | bool | `true` is refused: Litchi has no approved regular-expression engine |
 //! | anything else | run property | applied to the replacement text, or to the matched text without `replace` |
 //!
 //! Matching is leftmost and non-overlapping, scanning left to right, as
@@ -182,7 +181,7 @@ pub(crate) const KEYWORDS: [Keyword; 5] = [
 ];
 
 /// What makes `regex=true` available.
-const REGEX_FOLLOW_UP: &str = "record 0010 Q3: an owner-approved regular-expression dependency";
+const REGEX_FOLLOW_UP: &str = "an owner-approved regular-expression dependency";
 
 /// The longest accepted `find` or `replace` text, in bytes.
 pub(crate) const MAX_TEXT_BYTES: usize = 64 * 1024;
@@ -270,7 +269,7 @@ impl<'a> Spec<'a> {
             )
             .with_property(REGEX)
             .with_suggestion(
-                "search for literal text; Litchi has no approved regular-expression engine (record 0010 Q3)",
+                "search for literal text; Litchi has no approved regular-expression engine",
             ));
         }
         if pattern.is_empty() {
@@ -334,7 +333,7 @@ pub(crate) fn unsupported(file: &crate::File) -> Error {
         "find/replace is not integrated for this format",
     )
     .with_property(FIND)
-    .with_suggestion("see the format's capability report (record 0273)");
+    .with_suggestion("see the format's capability report");
     match file.format() {
         Some(format) => error.with_format(format),
         None => error,

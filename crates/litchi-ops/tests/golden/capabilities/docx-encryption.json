@@ -94,37 +94,37 @@
     "issues": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the issues view needs the validators `validate` adds"
     },
     "forms": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the forms view needs the validators `validate` adds"
     },
     "html": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     "svg": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     "screenshot": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     "pdf": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     }
   },
@@ -5330,7 +5330,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "L-DOCX-R6 (R4x)",
+        "followUp": "not supported yet",
         "reason": "the settings part has no node adapter yet"
       }
     },
@@ -5353,7 +5353,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "L-DOCX-R6 (R4x)",
+        "followUp": "not supported yet",
         "reason": "the theme part has no node adapter yet"
       }
     },
@@ -5521,7 +5521,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "R4x",
+        "followUp": "not supported yet",
         "reason": "legacy form fields have no located reader yet"
       }
     },
@@ -6424,7 +6424,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "R4x",
+        "followUp": "not supported yet",
         "reason": "embedded objects have no located reader yet"
       }
     },
@@ -6500,7 +6500,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "R4x",
+        "followUp": "not supported yet",
         "reason": "tracked revisions have no located reader yet"
       }
     },
@@ -6623,7 +6623,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "R4x",
+        "followUp": "not supported yet",
         "reason": "drawing shapes have no located reader yet"
       }
     },
@@ -7016,84 +7016,84 @@
       "subject": "element",
       "element": "settings",
       "code": "unsupported_capability",
-      "followUp": "L-DOCX-R6 (R4x)",
+      "followUp": "not supported yet",
       "reason": "the settings part has no node adapter yet"
     },
     {
       "subject": "element",
       "element": "theme",
       "code": "unsupported_capability",
-      "followUp": "L-DOCX-R6 (R4x)",
+      "followUp": "not supported yet",
       "reason": "the theme part has no node adapter yet"
     },
     {
       "subject": "element",
       "element": "formfield",
       "code": "unsupported_capability",
-      "followUp": "R4x",
+      "followUp": "not supported yet",
       "reason": "legacy form fields have no located reader yet"
     },
     {
       "subject": "element",
       "element": "ole",
       "code": "unsupported_capability",
-      "followUp": "R4x",
+      "followUp": "not supported yet",
       "reason": "embedded objects have no located reader yet"
     },
     {
       "subject": "element",
       "element": "revision",
       "code": "unsupported_capability",
-      "followUp": "R4x",
+      "followUp": "not supported yet",
       "reason": "tracked revisions have no located reader yet"
     },
     {
       "subject": "element",
       "element": "shape",
       "code": "unsupported_capability",
-      "followUp": "R4x",
+      "followUp": "not supported yet",
       "reason": "drawing shapes have no located reader yet"
     },
     {
       "subject": "element",
       "element": "bookmarkEnd",
       "code": "unsupported_capability",
-      "followUp": "0339-F2 (deferred-P1)",
-      "reason": "a bookmark is one node over its start and end markers (record 0319); a standalone end marker is not addressed or added on its own"
+      "followUp": "not supported yet",
+      "reason": "a bookmark is one node over its start and end markers; a standalone end marker is not addressed or added on its own"
     },
     {
       "subject": "element",
       "element": "permStart",
       "code": "unsupported_capability",
-      "followUp": "0339-F2 (deferred-P1)",
+      "followUp": "not supported yet",
       "reason": "editing-permission ranges (w:permStart, w:permEnd) are kept but not projected as nodes"
     },
     {
       "subject": "element",
       "element": "ptab",
       "code": "unsupported_capability",
-      "followUp": "0339-F2 (deferred-P1)",
+      "followUp": "not supported yet",
       "reason": "positional tabs (w:ptab) are kept in their runs but not projected as nodes"
     },
     {
       "subject": "element",
       "element": "fieldChar",
       "code": "unsupported_capability",
-      "followUp": "none: out of scope (record 0332)",
+      "followUp": "none: out of scope",
       "reason": "a complex field is one field node (begin, instruction, result and end); its field-character and instruction runs are not separate elements"
     },
     {
       "subject": "element",
       "element": "instrText",
       "code": "unsupported_capability",
-      "followUp": "none: out of scope (record 0332)",
+      "followUp": "none: out of scope",
       "reason": "a complex field is one field node (begin, instruction, result and end); its field-character and instruction runs are not separate elements"
     },
     {
       "subject": "element",
       "element": "diagram",
       "code": "unsupported_path",
-      "followUp": "none: out of scope (record 0332, design §10)",
+      "followUp": "none: out of scope",
       "reason": "OfficeCLI's diagram renders Mermaid text into shapes or a picture; rendering is outside the unified API, and SmartArt is the smartart element"
     },
     {
@@ -7101,7 +7101,7 @@
       "element": "sdt",
       "key": "type",
       "code": "unsupported_capability",
-      "followUp": "R4x",
+      "followUp": "not supported yet",
       "reason": "the leaf reads a content control's id, tag and alias only"
     },
     {
@@ -7109,7 +7109,7 @@
       "element": "sdt",
       "key": "lock",
       "code": "unsupported_capability",
-      "followUp": "R4x",
+      "followUp": "not supported yet",
       "reason": "the leaf reads a content control's id, tag and alias only"
     },
     {
@@ -7117,7 +7117,7 @@
       "element": "section",
       "key": "pageWidth",
       "code": "unsupported_capability",
-      "followUp": "R4x",
+      "followUp": "not supported yet",
       "reason": "section properties are read through the section inventory, which the node view does not wire yet"
     },
     {
@@ -7126,8 +7126,8 @@
       "element": "paragraph",
       "context": "wrapped-or-unproven-selection",
       "code": "unsupported_capability",
-      "followUp": "L-DOCX-W3",
-      "reason": "paragraphs in cells and content controls are edited through proven element paths (record 0251a); paragraphs in w:customXml wrappers, wrapped rows or cells, or markup-compatibility content selected outside runs have no proven raw position; alternate content inside runs keeps every position (record 0307)"
+      "followUp": "not supported yet",
+      "reason": "paragraphs in cells and content controls are edited through proven element paths; paragraphs in w:customXml wrappers, wrapped rows or cells, or markup-compatibility content selected outside runs have no proven raw position; alternate content inside runs keeps every position"
     },
     {
       "subject": "operation",
@@ -7135,8 +7135,8 @@
       "element": "run",
       "context": "wrapped-or-unproven-selection",
       "code": "unsupported_capability",
-      "followUp": "L-DOCX-W2",
-      "reason": "direct runs and direct runs of hyperlinks are edited (record 0251a); runs in tracked changes, smart tags, custom XML or other wrappers, and paragraphs with comment-reference runs, have no proven raw ordinal"
+      "followUp": "not supported yet",
+      "reason": "direct runs and direct runs of hyperlinks are edited; runs in tracked changes, smart tags, custom XML or other wrappers, and paragraphs with comment-reference runs, have no proven raw ordinal"
     },
     {
       "subject": "operation",
@@ -7144,7 +7144,7 @@
       "element": "paragraph/run",
       "context": "mixed-paragraph-run-fanout",
       "code": "unsupported_capability",
-      "followUp": "M2 (homogeneous mutation fanout)",
+      "followUp": "homogeneous mutation fanout",
       "reason": "one DOCX mutation admits one target kind, so a paragraph/run union is refused before staging rather than applying a descendant ordinal to the wrong leaf"
     },
     {
@@ -7153,7 +7153,7 @@
       "element": "paragraph/run",
       "context": "managed-transaction",
       "code": "unsupported_capability",
-      "followUp": "L-DOCX-W5",
+      "followUp": "not supported yet",
       "reason": "the formatting transaction has not proven edit admission and publication for execution-context-managed DOCX owners; the read projection remains available"
     },
     {
@@ -7162,7 +7162,7 @@
       "element": "paragraph/run",
       "context": "complex-leaf-content",
       "code": "unsupported_capability",
-      "followUp": "L-DOCX-W2 / record 0011 / record 0307 (text-box stories)",
+      "followUp": "text-box stories",
       "reason": "fields and other nested or unmodeled run content lack a proven raw ownership and address mapping for leaf edits; markup-compatibility alternate content in a run is one opaque object, so a text set over one whose branches hold text (a text box) is refused"
     },
     {
@@ -7171,7 +7171,7 @@
       "element": "paragraph/run",
       "context": "managed-transaction",
       "code": "unsupported_capability",
-      "followUp": "L-DOCX-W5",
+      "followUp": "not supported yet",
       "reason": "structural insertion uses the unmanaged DOCX transaction path; execution-context-managed owners refuse the leaf splice until managed admission is proven"
     },
     {
@@ -7180,8 +7180,8 @@
       "element": "paragraph",
       "context": "wrapped-or-unproven-parent",
       "code": "unsupported_capability",
-      "followUp": "L-DOCX-W3",
-      "reason": "paragraphs are added under the body, cells and block content controls (record 0251a); parents whose raw position is not proven are refused"
+      "followUp": "not supported yet",
+      "reason": "paragraphs are added under the body, cells and block content controls; parents whose raw position is not proven are refused"
     },
     {
       "subject": "operation",
@@ -7189,8 +7189,8 @@
       "element": "run",
       "context": "wrapped-or-unproven-parent",
       "code": "unsupported_capability",
-      "followUp": "L-DOCX-W2",
-      "reason": "runs are added beside the direct runs of any proven paragraph (record 0251a); insertion inside a hyperlink and under wrapped paragraphs is refused"
+      "followUp": "not supported yet",
+      "reason": "runs are added beside the direct runs of any proven paragraph; insertion inside a hyperlink and under wrapped paragraphs is refused"
     },
     {
       "subject": "operation",
@@ -7198,7 +7198,7 @@
       "element": "paragraph/run",
       "context": "managed-transaction",
       "code": "unsupported_capability",
-      "followUp": "L-DOCX-W5",
+      "followUp": "not supported yet",
       "reason": "structural removal uses the unmanaged DOCX transaction path; execution-context-managed owners refuse the leaf splice until managed admission is proven"
     },
     {
@@ -7207,8 +7207,8 @@
       "element": "paragraph/run",
       "context": "wrapped-or-unproven-selection",
       "code": "unsupported_capability",
-      "followUp": "L-DOCX-W2 / L-DOCX-W3",
-      "reason": "paragraphs, runs, hyperlinks, tables, rows, cells and content controls are removed through proven element paths (record 0251a); wrapped selections, the last paragraph of a cell, the last cell of a row and the last row of a table are refused"
+      "followUp": "not supported yet",
+      "reason": "paragraphs, runs, hyperlinks, tables, rows, cells and content controls are removed through proven element paths; wrapped selections, the last paragraph of a cell, the last cell of a row and the last row of a table are refused"
     },
     {
       "subject": "operation",
@@ -7216,7 +7216,7 @@
       "element": "paragraph/run",
       "context": "complex-leaf-content",
       "code": "unsupported_capability",
-      "followUp": "L-DOCX-W2 / record 0011",
+      "followUp": "not supported yet",
       "reason": "paragraph and run dependency scans refuse open ranges, field interiors, tracked changes and story references rather than dropping their relationships"
     },
     {
@@ -7225,7 +7225,7 @@
       "element": "paragraph/run",
       "context": "managed-transaction",
       "code": "unsupported_capability",
-      "followUp": "L-DOCX-W5",
+      "followUp": "not supported yet",
       "reason": "paragraph and direct-run movement use the unmanaged DOCX transaction path; execution-context-managed owners refuse the leaf splice until managed admission is proven"
     },
     {
@@ -7234,8 +7234,8 @@
       "element": "paragraph/run",
       "context": "wrapped-or-unproven-selection",
       "code": "unsupported_capability",
-      "followUp": "L-DOCX-W3",
-      "reason": "body paragraphs, direct runs, tables, rows and nested paragraphs move through proven anchors (record 0251a); nested runs and wrapped selections have no proven anchor"
+      "followUp": "not supported yet",
+      "reason": "body paragraphs, direct runs, tables, rows and nested paragraphs move through proven anchors; nested runs and wrapped selections have no proven anchor"
     },
     {
       "subject": "operation",
@@ -7243,7 +7243,7 @@
       "element": "paragraph/run",
       "context": "complex-leaf-content",
       "code": "unsupported_capability",
-      "followUp": "L-DOCX-W2 / record 0011",
+      "followUp": "not supported yet",
       "reason": "paragraph and direct-run movement preserves exact source fragments but refuses open ranges, field interiors, namespace changes, tracked changes and unmodeled dependencies"
     },
     {
@@ -7252,7 +7252,7 @@
       "element": "paragraph/run",
       "context": "managed-transaction",
       "code": "unsupported_capability",
-      "followUp": "L-DOCX-W5",
+      "followUp": "not supported yet",
       "reason": "paragraph and direct-run swapping compose unmanaged fragment moves; execution-context-managed owners refuse the leaf splice until managed admission is proven"
     },
     {
@@ -7261,7 +7261,7 @@
       "element": "paragraph/run",
       "context": "nested-or-unproven-selection",
       "code": "unsupported_capability",
-      "followUp": "L-DOCX-W3",
+      "followUp": "not supported yet",
       "reason": "only direct main-body paragraphs or direct runs can be swapped; nested and wrapped selections have no proven anchors"
     },
     {
@@ -7270,7 +7270,7 @@
       "element": "paragraph/run",
       "context": "complex-leaf-content",
       "code": "unsupported_capability",
-      "followUp": "L-DOCX-W2 / record 0011",
+      "followUp": "not supported yet",
       "reason": "paragraph and direct-run swapping preserves exact source fragments but refuses field interiors, namespace changes, tracked changes and unmodeled dependencies"
     },
     {
@@ -7297,7 +7297,7 @@
       "element": "document",
       "context": "text-paragraph-and-soft-breaks",
       "code": "unsupported_capability",
-      "followUp": "M2 (batch command and transfer families)",
+      "followUp": "batch command and transfer families",
       "reason": "full text-output parity remains incomplete; paragraph addition splits normalized LF into paragraphs with VT inline breaks; run setters update the first literal text node and mark the owning same-paragraph cached field dirty; run addition and paragraph setters normalize controls to inline breaks"
     },
     {
@@ -7306,7 +7306,7 @@
       "element": "document",
       "context": "read-and-extended-commands",
       "code": "unsupported_capability",
-      "followUp": "M2 (batch command and transfer families)",
+      "followUp": "batch command and transfer families",
       "reason": "get, query, view, raw, raw-set, add-part, validate and import are not integrated into batch item results"
     },
     {
@@ -7315,7 +7315,7 @@
       "element": "document",
       "context": "non-v2-dump-metadata",
       "code": "unsupported_capability",
-      "followUp": "M2 (batch command and transfer families)",
+      "followUp": "batch command and transfer families",
       "reason": "dumpVersion other than explicit v2 is refused for the whole batch; absent metadata uses current semantics"
     },
     {
@@ -7324,7 +7324,7 @@
       "element": "document",
       "context": "add-from",
       "code": "unsupported_capability",
-      "followUp": "M2 (batch command and transfer families)",
+      "followUp": "batch command and transfer families",
       "reason": "copying an add source requires typed transfer families not yet integrated into the command channel"
     },
     {
@@ -7333,7 +7333,7 @@
       "element": "document",
       "context": "move-properties",
       "code": "unsupported_capability",
-      "followUp": "M2 (batch command and transfer families)",
+      "followUp": "batch command and transfer families",
       "reason": "move-time property assignments are not integrated and are never silently dropped"
     },
     {
@@ -7342,7 +7342,7 @@
       "element": "document",
       "context": "move-parent-and-relative-anchor",
       "code": "unsupported_capability",
-      "followUp": "M2 (batch command and transfer families)",
+      "followUp": "batch command and transfer families",
       "reason": "move to a parent combined with before or after is not represented by the current placement model"
     },
     {
@@ -7351,7 +7351,7 @@
       "element": "document",
       "context": "unlocked-encrypted-owner",
       "code": "unsupported_capability",
-      "followUp": "M2 (DOCX encryption-profile-preserving native edits)",
+      "followUp": "DOCX encryption-profile-preserving native edits",
       "reason": "the DOCX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile"
     },
     {
@@ -7360,7 +7360,7 @@
       "element": "document",
       "context": "unlocked-encrypted-owner",
       "code": "unsupported_capability",
-      "followUp": "M2 (DOCX encryption-profile-preserving native edits)",
+      "followUp": "DOCX encryption-profile-preserving native edits",
       "reason": "the DOCX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile"
     },
     {
@@ -7369,7 +7369,7 @@
       "element": "document",
       "context": "unlocked-encrypted-owner",
       "code": "unsupported_capability",
-      "followUp": "M2 (DOCX encryption-profile-preserving native edits)",
+      "followUp": "DOCX encryption-profile-preserving native edits",
       "reason": "the DOCX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile"
     },
     {
@@ -7378,7 +7378,7 @@
       "element": "document",
       "context": "unlocked-encrypted-owner",
       "code": "unsupported_capability",
-      "followUp": "M2 (DOCX encryption-profile-preserving native edits)",
+      "followUp": "DOCX encryption-profile-preserving native edits",
       "reason": "the DOCX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile"
     },
     {
@@ -7387,7 +7387,7 @@
       "element": "document",
       "context": "unlocked-encrypted-owner",
       "code": "unsupported_capability",
-      "followUp": "M2 (DOCX encryption-profile-preserving native edits)",
+      "followUp": "DOCX encryption-profile-preserving native edits",
       "reason": "the DOCX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile"
     },
     {
@@ -7396,7 +7396,7 @@
       "element": "document",
       "context": "unlocked-encrypted-owner",
       "code": "unsupported_capability",
-      "followUp": "M2 (DOCX encryption-profile-preserving native edits)",
+      "followUp": "DOCX encryption-profile-preserving native edits",
       "reason": "the DOCX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile"
     },
     {
@@ -7405,7 +7405,7 @@
       "element": "document",
       "context": "unlocked-encrypted-owner",
       "code": "unsupported_capability",
-      "followUp": "M2 (DOCX encryption-profile-preserving native edits)",
+      "followUp": "DOCX encryption-profile-preserving native edits",
       "reason": "the DOCX leaf refuses edits of decrypted packages because its current edit publication cannot preserve the encryption profile"
     },
     {
@@ -7421,42 +7421,42 @@
       "subject": "view",
       "mode": "issues",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the issues view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "forms",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the forms view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "html",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "svg",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "screenshot",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "pdf",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     }
   ]

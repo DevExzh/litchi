@@ -1,6 +1,6 @@
 //! Handle for OpenDocument Spreadsheet (`.ods`, flat `.fods`) inputs.
 //!
-//! The handle keeps the leaf owner each open route builds (record 0277):
+//! The handle keeps the leaf owner each open route builds:
 //!
 //! - the immutable [`litchi_ods::Package`] with its parsed
 //!   [`litchi_ods::Workbook`] projection (byte and reader routes, fresh
@@ -104,7 +104,7 @@ const _: () = {
 };
 
 /// Typed ODF limit failures stay `Source::Odf`; every other failure keeps
-/// its common-core payload as `Source::Core`, exactly as before W3.
+/// its common-core payload as `Source::Core`.
 pub(crate) fn odf_error(error: litchi_odf_common::Error) -> Error {
     match error {
         litchi_odf_common::Error::Core(error) => core_error(error),
@@ -297,7 +297,7 @@ impl Ods {
     }
 
     /// The `content.xml` annotations are parsed from. A flat spreadsheet's
-    /// annotations are not projected (record 0277 gap F2).
+    /// annotations are not projected.
     pub(crate) fn content_xml(&self) -> Result<&str> {
         match self.owner() {
             OdsOwner::Eager { workbook, .. } => Ok(workbook.content_xml()),
@@ -308,7 +308,7 @@ impl Ods {
                 "flat ODS annotations are not projected into unified nodes",
             )
             .with_format(FileFormat::Ods)
-            .with_suggestion("follow-up: ODS adapter (record 0277 gap F2)")),
+            .with_suggestion("follow-up: ODS adapter")),
         }
     }
 
@@ -431,7 +431,7 @@ impl Ods {
                 Ok(package.get_or_init(|| materialized).clone())
             },
             // A flat spreadsheet's edits start from its packaged projection
-            // and republish into the flat bytes (record 0292).
+            // and republish into the flat bytes.
             OdsOwner::Flat(flat) => {
                 let flat_limits = litchi_odf_common::flat::Limits::from_options(flat.options());
                 let parts = litchi_odf_common::flat::Parts::split(flat.as_bytes(), &flat_limits)
@@ -443,7 +443,7 @@ impl Ods {
                     odf_error(error)
                         .caused_by_argument(Code::UnsupportedCapability)
                         .with_suggestion(
-                            "follow-up: 0292 flat ODF projection admission; the packaged reader refuses this flat document's parts",
+                            "follow-up: flat ODF projection admission; the packaged reader refuses this flat document's parts",
                         )
                 })
             },

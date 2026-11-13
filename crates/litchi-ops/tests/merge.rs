@@ -1,4 +1,4 @@
-//! Template merge through `File::merge` (record 0274): DOCX placeholders
+//! Template merge through `File::merge`: DOCX placeholders
 //! across runs, stories and `MERGEFIELD` fields, PPTX runs and XLSX cells;
 //! one atomic commit, exact no-ops, round trips, typed refusals and limits.
 #![cfg(all(
@@ -524,7 +524,7 @@ fn other_formats_report_the_gap() {
         assert_eq!(error.format(), Some(format));
         assert!(!Capabilities::of(format).verb(Verb::Merge).is_supported());
     }
-    // Record 0295: the workbook formats merge too; an empty template is an
+    // The workbook formats merge too; an empty template is an
     // exact no-op.
     for format in [FileFormat::Xlsb, FileFormat::Xls] {
         let file = litchi_ops::create(format).unwrap();
@@ -581,7 +581,7 @@ fn data_errors_are_typed() {
     assert_eq!(error.code(), Code::InvalidInput);
 }
 
-/// Record 0285 (0274 follow-ups F2, F3): table cells and speaker notes are
+/// Table cells and speaker notes are
 /// merged run by run through the text bodies find/replace reads.
 #[cfg(feature = "pptx")]
 #[test]

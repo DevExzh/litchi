@@ -1,4 +1,4 @@
-//! Errors of path resolution (record 0010 §4.4).
+//! Errors of path resolution.
 //!
 //! Every function here runs on the error path only: it may allocate, format
 //! and compute suggestions. Messages identify the problem and byte offset;
@@ -96,7 +96,7 @@ fn canonical_offset(path: &Path<'_>, step: usize) -> usize {
 
 /// The byte offset where step `index` starts in `text`, counting steps from
 /// byte `first`. Quoted names and bracketed predicates may contain `/`; the
-/// scan skips them with the grammar's quoting rules (record 0005).
+/// scan skips them with the grammar's quoting rules.
 fn step_start(text: &str, first: usize, index: usize) -> usize {
     let bytes = text.as_bytes();
     let mut at = first.min(bytes.len());

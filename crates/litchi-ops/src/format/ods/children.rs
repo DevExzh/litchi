@@ -1,4 +1,4 @@
-//! Lazy children of ODS workbook nodes (record 0277).
+//! Lazy children of ODS workbook nodes.
 //!
 //! A worksheet's walk lists its content columns, rows and cells, then its
 //! annotations and merge spans, each in document order; the node view lists
@@ -81,7 +81,7 @@ struct SheetItems<'f> {
     next: usize,
     /// The per-sheet ordinal of the next annotation.
     ordinal: usize,
-    /// The worksheet features still to list (record 0327).
+    /// The worksheet features still to list.
     features: Option<std::vec::IntoIter<super::features::Feature>>,
 }
 
@@ -230,9 +230,9 @@ impl<'f> Children<'f> {
                     .chain(super::features::KINDS)
                     .all(|kind| !kinds.contains(kind))
                 {
-                    // Only cells are wanted (record 0287): the sheet walk's
-                    // other phases would list nothing, so list the content
-                    // cells directly, in the same order.
+                    // Only cells are wanted: the sheet walk's other phases
+                    // would list nothing, so list the content cells
+                    // directly, in the same order.
                     return Ok(Self {
                         file,
                         state: State::Cells {

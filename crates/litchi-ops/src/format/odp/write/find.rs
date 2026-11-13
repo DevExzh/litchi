@@ -1,5 +1,5 @@
-//! ODP find/replace and template merge (record 0295) over the shared text
-//! surface (`crate::find::surface`).
+//! ODP find/replace and template merge over the shared text surface
+//! (`crate::find::surface`).
 //!
 //! The leaf scene lists every story: a drawing object's text (group members
 //! included), each table cell's text and each notes page's objects. A

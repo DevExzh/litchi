@@ -155,8 +155,8 @@ struct SourceIndex {
 
 impl SourceIndex {
     /// Admits the index `build` would make under `limits`, without building
-    /// it: the same charges, checked in the same order (record 0287 builds
-    /// the index only when a plan first reads it).
+    /// it: the same charges, checked in the same order (the index is built
+    /// only when a plan first reads it).
     fn admit(file: &Rtf, limits: &SemanticLimits) -> Result<()> {
         let paragraph_charge = file
             .0

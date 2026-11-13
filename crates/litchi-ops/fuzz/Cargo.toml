@@ -9,7 +9,7 @@ cargo-fuzz = true
 
 [features]
 # `batch_apply` executes decoded batches against blank DOCX, XLSX and PPTX
-# documents, so it needs those adapters (record 0334).
+# documents, so it needs those adapters.
 apply = ["litchi-ops/docx", "litchi-ops/xlsx", "litchi-ops/pptx"]
 
 [dependencies]

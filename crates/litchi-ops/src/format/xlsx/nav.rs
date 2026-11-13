@@ -1,5 +1,4 @@
-//! The XLSX adapter of path resolution and queries (record 0010 §4.1,
-//! §4.7, §5.3).
+//! The XLSX adapter of path resolution and queries.
 //!
 //! [`Nav`] is a copyable reference to one [`Xlsx`] handle. Resolution asks it
 //! for one child per path step and runs only that step's leaf read:
@@ -12,8 +11,8 @@
 //! | `/<sheet>/table[N]`, `table[@name=X]`, `/table[@name=X]` | the worksheet's table parts |
 //! | `/namedrange[N]`, `namedrange[NAME]`, `[@name=X]` | the defined names retained with the catalog |
 //!
-//! Every coordinate inside the grid resolves, a missing one included
-//! (record 0010 §4.7). Elements Litchi cannot read yet answer their spec
+//! Every coordinate inside the grid resolves, a missing one included.
+//! Elements Litchi cannot read yet answer their spec
 //! gap (`unsupported_capability`).
 
 use std::borrow::Cow;
@@ -59,8 +58,8 @@ impl<'f> Nav<'f> {
     fn sheet(self, select: Select<'_>) -> Result<Lookup<Node<'f>, GapSpec>> {
         let file = self.file;
         let handle = match select {
-            // The leaf's canonical key is the authority for sheet names
-            // (record 0010 §4.2); the vocabulary's `Caseless` rule defers to
+            // The leaf's canonical key is the authority for sheet names;
+            // the vocabulary's `Caseless` rule defers to
             // it.
             Select::Name { name, .. } => SheetHandle::named(file, name)?,
             Select::Ordinal(position) => SheetHandle::at(file, position.get())?,
@@ -377,7 +376,7 @@ impl<'f> Navigate<'f> for Nav<'f> {
     ) -> Result<Lookup<Node<'f>, GapSpec>> {
         self.file.0.owner.finish(|| {
             // The XLSX table, not the shared workbook one: XLSX reads the
-            // chart elements the shared table lists as gaps (record 0270).
+            // chart elements the shared table lists as gaps.
             if let Some(gap) = SPEC.elements[step.kind as usize].gap {
                 return Ok(Lookup::Gap(gap));
             }

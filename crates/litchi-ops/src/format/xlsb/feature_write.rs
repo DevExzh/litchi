@@ -1,7 +1,7 @@
-//! Add, set and remove of XLSB worksheet features (record 0322).
+//! Add, set and remove of XLSB worksheet features.
 //!
 //! Every verb admits its properties through the kind's registry table in
-//! `features` (the XLSX vocabulary of record 0320), builds the leaf value,
+//! `features` (the XLSX vocabulary), builds the leaf value,
 //! and publishes one leaf commit of the family that owns the feature:
 //!
 //! | Kind | Leaf transaction |

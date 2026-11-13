@@ -1082,8 +1082,8 @@ source-component edge, not physical author or author-storage removal.
 Two permanent Keynote fixtures were authored with Cmd-S, actually closed to the
 theme chooser, reopened from their exact paths without alerts, and closed:
 
-- [`media-comments-shared-removal-native.key`](media-comments-shared-removal-native.key) — 2 movies, 2 audio, 1 comment; removed clone `2653814`; SHA-256 `3dea8fded4216538b398942516f8fb9316d10fe40e1a0e1be54e020c59394c11`
-- [`media-comments-final-removal-native.key`](media-comments-final-removal-native.key) — 1 movie, 2 audio, 0 comments; removed original `2653286`; SHA-256 `c3c7c8952914263bb299df95f36a67be5fd46e7add6f37e90ab03e12810db5b7`
+- `media-comments-shared-removal-native.key` — 2 movies, 2 audio, 1 comment; removed clone `2653814`; SHA-256 `3dea8fded4216538b398942516f8fb9316d10fe40e1a0e1be54e020c59394c11`
+- `media-comments-final-removal-native.key` — 1 movie, 2 audio, 0 comments; removed original `2653286`; SHA-256 `c3c7c8952914263bb299df95f36a67be5fd46e7add6f37e90ab03e12810db5b7`
 
 The neutral metadata slice has 45 passing cases. Host-retirement gates remain
 under review and the existing APIs are preserved. Final verification and
@@ -1179,8 +1179,8 @@ Native focused transitions source `2653763` → duplicate `2653771` → removed
 The permanent native fixtures were Cmd-S saved, actually closed to the theme
 chooser, reopened from their exact paths without alerts, and closed again:
 
-- [`media-watermark-removal-native.key`](media-watermark-removal-native.key) — 2 movies, 2 audio, 1 comment retained after removal; SHA-256 `bbf08b74439a2ef2e47fc44041c3007605c2813527751430e793d93cdb4f868a`
-- [`media-watermark-reduplicate-native.key`](media-watermark-reduplicate-native.key) — 3 movies, 2 audio, 2 comments after redouble; SHA-256 `332071539d6c92820241a9547e27afe1649b315fdccecc27dc3a5cbb5d3e2b4a`
+- `media-watermark-removal-native.key` — 2 movies, 2 audio, 1 comment retained after removal; SHA-256 `bbf08b74439a2ef2e47fc44041c3007605c2813527751430e793d93cdb4f868a`
+- `media-watermark-reduplicate-native.key` — 3 movies, 2 audio, 2 comments after redouble; SHA-256 `332071539d6c92820241a9547e27afe1649b315fdccecc27dc3a5cbb5d3e2b4a`
 
 The removal candidate changed from SHA-256
 `41218101e5f56c1b154a9773744ea407e46e579f5a3f7859a0ea58c3b78859c5` to the
@@ -1511,7 +1511,7 @@ for source-order inventory, root comment CRUD, replies, copy-on-write, exact
 inverse, and malformed-graph refusal. This is a native source-oracle receipt;
 no focused candidate or native reply-authoring acceptance is claimed here.
 
-## Litchi-built multi-slide Keynote fixture (record 0298)
+## Litchi-built multi-slide Keynote fixture
 
 [`keynote/multi-slide.key`](keynote/multi-slide.key) (463,067 bytes, SHA-256
 `9f33d0ff0110fcb173fac2fe666eedcf830f5620fe1d7130159d35ac36aca616`) is a

@@ -1,4 +1,4 @@
-//! Lazily built parts of an iWork object tree (record 0305).
+//! Lazily built parts of an iWork object tree.
 //!
 //! The first read builds the eager tree: the root and the containers every
 //! read needs (Numbers sheets and tables; the Keynote root alone). The rest
@@ -15,7 +15,7 @@
 //!   leaf's sorted cell list and builds only that item;
 //! - the contents of a Keynote slide table or a Pages body table (the
 //!   table's own properties, its rows and cells) are built whole the first
-//!   time a read reaches the table's properties or children (record 0312).
+//!   time a read reaches the table's properties or children.
 //!   The tree holding the table lists a stand-in item with the table's kind,
 //!   ordinal, path and leaf positions; [`Iwork::item`] serves the stand-in's
 //!   reads from the built table. A Pages body table's contents are a part
@@ -57,7 +57,7 @@ pub(crate) enum Part {
 
 /// The contents of one table: the table item itself (the anchor, at
 /// [`ROOT`]), its rows and cells, built whole on the first read that needs
-/// them from the stand-in item the holding tree lists (record 0312).
+/// them from the stand-in item the holding tree lists.
 #[cfg(any(feature = "keynote", feature = "pages"))]
 pub(crate) struct Contents {
     /// The leaf's selector of the table: a Keynote table's position among
@@ -115,7 +115,7 @@ pub(crate) struct Whole {
     /// index here.
     full: OnceLock<Tree>,
     /// The contents of the slide's tables, the `k`-th held by the stand-in
-    /// whose part is `k + 1` (record 0312); set by the first build.
+    /// whose part is `k + 1`; set by the first build.
     tables: OnceLock<Box<[Contents]>>,
 }
 
@@ -263,8 +263,8 @@ impl Iwork {
     }
 
     /// The item at `at` as its tree holds it: a table's stand-in, not the
-    /// table (record 0312). Its kind, ordinal, path, leaf positions and
-    /// part are the element's; its properties and children may not be.
+    /// table. Its kind, ordinal, path, leaf positions and part are the
+    /// element's; its properties and children may not be.
     pub(crate) fn stand_in(&self, at: At) -> &Item {
         if at.is_chart() {
             return self.chart_item(at);
@@ -490,8 +490,7 @@ impl Iwork {
         {
             self.expand_all();
         }
-        // Keynote character runs join a slide's part under their paragraphs
-        // (record 0298).
+        // Keynote character runs join a slide's part under their paragraphs.
         #[cfg(feature = "keynote")]
         if at.part != 0
             && at.index & TABLE == 0

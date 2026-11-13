@@ -1,15 +1,15 @@
 //! Per-format handles held by the unified [`File`](crate::File) enum.
 //!
-//! Each handle is one `Arc` newtype over its format's state (record 0003 §2.2):
-//! cheap to clone, `Send + Sync`, retaining the read owner plus the shared
-//! source an editor can later be built from (§2.3). `crate::open` builds
-//! them; the read methods here are the per-format surface, including the
-//! format-specific reads the generic family views do not cover.
+//! Each handle is one `Arc` newtype over its format's state: cheap to clone,
+//! `Send + Sync`, retaining the read owner plus the shared source an editor can
+//! later be built from (§2.3). `crate::open` builds them; the read methods here
+//! are the per-format surface, including the format-specific reads the generic
+//! family views do not cover.
 //!
-//! The tier 1 and tier 2 handles also carry a signature disposition (record
-//! 0013): their state sits behind `signature::Opened`, so a signed file and
-//! the file [`Signed::unsign`](crate::Signed::unsign) returns share one
-//! state and differ only in what their editor builders may do.
+//! The tier 1 and tier 2 handles also carry a signature disposition: their
+//! state sits behind `signature::Opened`, so a signed file and the file
+//! [`Signed::unsign`](crate::Signed::unsign) returns share one state and
+//! differ only in what their editor builders may do.
 
 #[cfg(any(feature = "xlsx", feature = "xlsb"))]
 mod cell_text;

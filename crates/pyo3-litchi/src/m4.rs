@@ -1,5 +1,5 @@
-//! `File.import_csv`, `File.evaluate` and `File.recalculate` (record 0266):
-//! the Rust work runs with the GIL released; the results are built as dicts.
+//! `File.import_csv`, `File.evaluate` and `File.recalculate`: the Rust work
+//! runs with the GIL released; the results are built as dicts.
 
 use litchi::calc::{Options as CalcOptions, Origin, Status, Value};
 use litchi::import::{Encoding, Options};

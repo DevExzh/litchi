@@ -1,4 +1,4 @@
-//! Typed chart CRUD on slides (record 0270).
+//! Typed chart CRUD on slides.
 //!
 //! - `add(/slide[N], chart, {chartType, title, data, categories, legend,
 //!   catTitle, axisTitle, name, x, y, width, height})` builds an authored

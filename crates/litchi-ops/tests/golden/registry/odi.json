@@ -222,7 +222,7 @@
       "element": "frame",
       "context": "an ODI image holds exactly one frame",
       "code": "unsupported_capability",
-      "followUp": "0282 ODI single frame",
+      "followUp": "ODI single frame",
       "reason": "the ODI leaf admits exactly one image frame"
     },
     {
@@ -231,7 +231,7 @@
       "element": "frame",
       "context": "an ODI image holds exactly one frame",
       "code": "unsupported_capability",
-      "followUp": "0282 ODI single frame",
+      "followUp": "ODI single frame",
       "reason": "an image package without its frame is not an ODI image"
     },
     {
@@ -249,49 +249,49 @@
       "element": "frame",
       "context": "the `source` property (the image payload)",
       "code": "unsupported_capability",
-      "followUp": "0282 ODI image payload writes",
+      "followUp": "ODI image payload writes",
       "reason": "replacing the image payload needs a typed source value the unified registry does not have yet"
     },
     {
       "subject": "view",
       "mode": "issues",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the issues view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "forms",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the forms view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "html",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "svg",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "screenshot",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "pdf",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     }
   ],
@@ -300,7 +300,7 @@
     "support": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0295 follow-up: a find adapter over the format's text edits",
+      "followUp": "follow-up: a find adapter over the format's text edits",
       "reason": "find/replace is not integrated for this format"
     },
     "keywords": {
@@ -331,7 +331,7 @@
         "set": true,
         "writeGap": {
           "code": "unsupported_capability",
-          "followUp": "record 0010 Q3: an owner-approved regular-expression dependency",
+          "followUp": "an owner-approved regular-expression dependency",
           "reason": "Litchi has no approved regular-expression engine; `regex=true` and OfficeCLI's `r\"...\"` patterns are refused"
         }
       }

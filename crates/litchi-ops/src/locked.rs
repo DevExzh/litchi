@@ -1,6 +1,6 @@
 //! The [`Locked`] state of [`File`](crate::File): an encrypted input that
 //! is neither readable nor editable until it is unlocked (ADR 0006
-//! `Locked<T>`; record 0003 §2.6).
+//! `Locked<T>`).
 
 use std::fmt;
 use std::sync::Arc;
@@ -416,7 +416,7 @@ mod tests {
         assert_traits::<EncryptionKind>();
         assert_traits::<Locked>();
     };
-    // One pointer, so `File` stays a tag plus one pointer (record 0003 D2).
+    // One pointer, so `File` stays a tag plus one pointer.
     const _: () = assert!(size_of::<Locked>() == size_of::<usize>());
 
     fn locked(format: Option<FileFormat>, encryption: EncryptionKind) -> Locked {

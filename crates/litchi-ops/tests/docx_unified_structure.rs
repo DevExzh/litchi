@@ -672,7 +672,7 @@ fn invalid_indices_properties_overlaps_and_security_refuse_without_partial_edits
         original_bytes
     );
 
-    // Tables are removable through their element path (record 0251a).
+    // Tables are removable through their element path.
     let without_table = original
         .remove("/body/tbl[1]")
         .unwrap_or_else(|error| panic!("table removal: {error}"));

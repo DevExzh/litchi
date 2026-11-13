@@ -10,8 +10,8 @@ pub fn exercise(data: &[u8]) -> bool {
     let Ok(path) = PathArg::parse(text) else {
         return false;
     };
-    // The canonical spelling is a fixed point of `PathArg::parse` (record
-    // 0338 F2), and the core grammar reads it as the same path.
+    // The canonical spelling is a fixed point of `PathArg::parse`, and
+    // the core grammar reads it as the same path.
     let canonical = path.to_string();
     let again = PathArg::parse(&canonical).expect("canonical path");
     assert_eq!(again.path(), path.path());

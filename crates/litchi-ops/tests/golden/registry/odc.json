@@ -235,7 +235,7 @@
       "element": "chart",
       "context": "a chart outside the leaf's lossless typed definition surface",
       "code": "unsupported_capability",
-      "followUp": "0288 ODC lossless producer definitions",
+      "followUp": "ODC lossless producer definitions",
       "reason": "title, type, size, series and axis writes replace the chart through its typed definition; a producer chart the leaf cannot project losslessly is refused rather than rewritten"
     },
     {
@@ -244,7 +244,7 @@
       "element": "series",
       "context": "data points, data labels, regressions and series styles",
       "code": "unsupported_capability",
-      "followUp": "0288 ODC series detail writes",
+      "followUp": "ODC series detail writes",
       "reason": "the unified registry writes a series' ranges, label, class and axis; its data points, labels, regression curves and styles stay as authored"
     },
     {
@@ -253,7 +253,7 @@
       "element": "series",
       "context": "a chart outside the leaf's lossless typed definition surface",
       "code": "unsupported_capability",
-      "followUp": "0288 ODC lossless producer definitions",
+      "followUp": "ODC lossless producer definitions",
       "reason": "series and axes reorder, and the legend is added or removed, through the chart's typed definition; a producer chart the leaf cannot project losslessly is refused rather than rewritten"
     },
     {
@@ -271,49 +271,49 @@
       "element": "metadata",
       "context": "path-read",
       "code": "unsupported_capability",
-      "followUp": "0288 ODF object metadata node",
+      "followUp": "ODF object metadata node",
       "reason": "`set(\"/metadata\", ..)` writes meta.xml through the ODF metadata family; the path is set-only, and reads go through File::metadata()"
     },
     {
       "subject": "view",
       "mode": "issues",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the issues view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "forms",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the forms view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "html",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "svg",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "screenshot",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "pdf",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     }
   ],
@@ -322,7 +322,7 @@
     "support": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0295 follow-up: a find adapter over the format's text edits",
+      "followUp": "follow-up: a find adapter over the format's text edits",
       "reason": "find/replace is not integrated for this format"
     },
     "keywords": {
@@ -353,7 +353,7 @@
         "set": true,
         "writeGap": {
           "code": "unsupported_capability",
-          "followUp": "record 0010 Q3: an owner-approved regular-expression dependency",
+          "followUp": "an owner-approved regular-expression dependency",
           "reason": "Litchi has no approved regular-expression engine; `regex=true` and OfficeCLI's `r\"...\"` patterns are refused"
         }
       }

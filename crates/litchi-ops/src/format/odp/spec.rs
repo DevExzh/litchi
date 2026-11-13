@@ -48,23 +48,23 @@ pub enum Kind {
     Ole,
     /// A plugin (audio or video) frame.
     Media,
-    /// A video plugin frame (record 0328), addressed among media.
+    /// A video plugin frame, addressed among media.
     Video,
-    /// An audio plugin frame (record 0328), addressed among media.
+    /// An audio plugin frame, addressed among media.
     Audio,
     /// A paragraph of a text story.
     Paragraph,
     /// A run of a paragraph.
     Run,
-    /// A `text:line-break` of a paragraph (record 0328).
+    /// A `text:line-break` of a paragraph.
     LineBreak,
-    /// A shape's click action or a link run's target (record 0328).
+    /// A shape's click action or a link run's target.
     Hyperlink,
     /// A slide's speaker notes.
     Notes,
     /// A slide annotation.
     Comment,
-    /// A formula object frame (record 0328), addressed among objects.
+    /// A formula object frame, addressed among objects.
     Equation,
     /// A master page.
     SlideMaster,
@@ -76,11 +76,11 @@ pub enum Kind {
     NoteSlide,
     /// An animation (gap).
     Animation,
-    /// A chart series (record 0328).
+    /// A chart series.
     Series,
-    /// A chart axis (record 0328).
+    /// A chart axis.
     Axis,
-    /// A declared table column (record 0328).
+    /// A declared table column.
     Col,
 }
 
@@ -228,7 +228,7 @@ pub(crate) const SHAPE_PROPS: &[PropSpec] = &[
     length("height", LengthSpec::EXTENT),
     PropSpec::new("zorder", ValueType::Int),
     PropSpec::new("style", ValueType::Text),
-    // The formatting every run of the shape's text shares (record 0316).
+    // The formatting every run of the shape's text shares.
     PropSpec::new("bold", ValueType::Bool),
     PropSpec::new("italic", ValueType::Bool),
     PropSpec::new("underline", ValueType::Bool),
@@ -284,10 +284,9 @@ pub(crate) const CELL_PROPS: &[PropSpec] = &[
     PropSpec::new("font", ValueType::Text),
 ];
 
-/// The character properties of paragraphs and runs (record 0308), and of
-/// shapes, table cells and notes (record 0316): read through the node's
-/// style chain, common styles included, and written as derived automatic
-/// styles.
+/// The character properties of paragraphs and runs, and of shapes, table
+/// cells and notes: read through the node's style chain, common styles
+/// included, and written as derived automatic styles.
 pub(crate) const CHARACTER_KEYS: &[&str] =
     &["bold", "italic", "underline", "size", "color", "font"];
 
@@ -355,15 +354,14 @@ const fn writable(name: &'static str, ty: ValueType) -> PropSpec {
     spec
 }
 
-/// A hyperlink (record 0328): a shape's click action or a link run's
-/// target, as PPTX names them.
+/// A hyperlink: a shape's click action or a link run's target, as PPTX
+/// names them.
 pub(crate) const HYPERLINK_PROPS: &[PropSpec] = &[
     writable("link", ValueType::Text),
     writable("tooltip", ValueType::Text),
 ];
 
-/// A video or audio plugin frame (record 0328): the frame's keys, then the
-/// media.
+/// A video or audio plugin frame: the frame's keys, then the media.
 pub(crate) const MEDIA_PROPS: &[PropSpec] = &[
     PropSpec::new("name", ValueType::Text),
     raw("id", ValueType::Text),
@@ -380,8 +378,7 @@ pub(crate) const MEDIA_PROPS: &[PropSpec] = &[
     PropSpec::new("mute", ValueType::Bool),
 ];
 
-/// A formula object (record 0328): its StarMath (or MathML token) text and
-/// its frame.
+/// A formula object: its StarMath (or MathML token) text and its frame.
 pub(crate) const EQUATION_PROPS: &[PropSpec] = &[
     raw("id", ValueType::Text),
     PropSpec::new("formula", ValueType::Text),
@@ -392,10 +389,10 @@ pub(crate) const EQUATION_PROPS: &[PropSpec] = &[
     length("height", LengthSpec::EXTENT),
 ];
 
-/// A declared table column (record 0328).
+/// A declared table column.
 pub(crate) const COLUMN_PROPS: &[PropSpec] = &[length("width", LengthSpec::EXTENT)];
 
-/// A chart series (record 0328), with the ODC series keys.
+/// A chart series, with the ODC series keys.
 pub(crate) const SERIES_PROPS: &[PropSpec] = &[
     PropSpec::new("values", ValueType::Text),
     PropSpec::new("nameRef", ValueType::Text),
@@ -404,7 +401,7 @@ pub(crate) const SERIES_PROPS: &[PropSpec] = &[
     PropSpec::new("pointCount", ValueType::Int),
 ];
 
-/// A chart axis (record 0328): its PPTX role, then the ODC axis keys.
+/// A chart axis: its PPTX role, then the ODC axis keys.
 pub(crate) const AXIS_PROPS: &[PropSpec] = &[
     PropSpec::new("role", ValueType::Text),
     PropSpec::new("title", ValueType::Text),
@@ -492,21 +489,21 @@ const fn element_gap(
 
 static NOTES_MASTER_GAP: GapSpec = element_gap(
     "notesMaster",
-    "M6 ODP notes master",
+    "ODP notes master",
     "the master page's presentation:notes is not projected as a node",
 );
 static NOTE_SLIDE_GAP: GapSpec = element_gap(
     "noteSlide",
-    "M6 ODP notes pages",
+    "ODP notes pages",
     "speaker notes are exposed as /slide[N]/notes; the notes page's drawing objects are not nodes",
 );
 static ANIMATION_GAP: GapSpec = element_gap(
     "animation",
-    "M6 ODP animation nodes",
+    "ODP animation nodes",
     "the leaf keeps slide animation trees inert; they are not projected as nodes",
 );
 
-/// A PresentationML concept ODF has no counterpart of (record 0328).
+/// A PresentationML concept ODF has no counterpart of.
 const fn pptx_only(element: &'static str) -> GapSpec {
     GapSpec {
         subject: Subject::Element(element),
@@ -522,13 +519,13 @@ static SHAPE_FILL_GAP: GapSpec = GapSpec {
         key: "fill",
     },
     code: Code::UnsupportedCapability,
-    follow_up: "M6 ODP graphic styles",
+    follow_up: "ODP graphic styles",
     reason: "fill and line come from automatic graphic styles, which the adapter does not resolve",
 };
 static STATS_FONT_GAP: GapSpec = GapSpec {
     subject: Subject::View("stats.fonts"),
     code: Code::UnsupportedCapability,
-    follow_up: "M6 ODP text styles",
+    follow_up: "ODP text styles",
     reason: "font usage comes from text styles, which the stats view does not resolve",
 };
 
@@ -861,11 +858,11 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
         pptx_only("modernComment"),
         pptx_only("model3d"),
         pptx_only("zoom"),
-        // OfficeCLI's Mermaid `diagram` (record 0339).
+        // OfficeCLI's Mermaid `diagram`.
         GapSpec {
             subject: Subject::Element("diagram"),
             code: Code::UnsupportedPath,
-            follow_up: "none: out of scope (record 0332, design §10)",
+            follow_up: "none: out of scope",
             reason: "OfficeCLI's diagram renders Mermaid text into shapes or a picture; rendering is outside the unified API",
         },
     ],

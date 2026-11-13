@@ -1,4 +1,4 @@
-"""Python mirror of the record 0289 CRUD checklist (design §14 layer 3).
+"""Python mirror of the CRUD checklist (design §14 layer 3).
 
 ``crates/litchi-ops/tests/crud_matrix.rs`` exercises every claimed
 (format, element, verb) cell of the 21 claimed formats through the Rust
@@ -40,7 +40,7 @@ get cell's evidence) and must fail with a ``LitchiError``.
 A second test checks that the Python capability report claims exactly the
 cells the TSV calls ``supported``.
 
-A third test replays the per-format ADR 0008 rows of record 0341
+A third test replays the per-format ADR 0008 rows
 (``crud-adr0008.tsv``: atomic failure, patch inverse, composition). The
 atomic-failure row runs the same two-item batch on a file opened from a
 copy of the fixture and requires the refusal to carry the recorded code
@@ -50,7 +50,7 @@ threads from one File and requires both orders to hold both values and to
 give the same bytes (or, where the Rust row says the bytes differ, the same
 text and node views), and each edit's ``Commit.patch`` applied to the other
 edit's result to be refused with the recorded codes. The patch-inverse row
-(record 0347) requires ``Commit.patch`` to replay onto its source File
+requires ``Commit.patch`` to replay onto its source File
 (the commit's bytes), its ``inverse()`` to restore the exact source bytes,
 the patch on its own result to be refused with the recorded code, and a
 same-format byte-identical, separately opened copy to accept the patch
@@ -106,7 +106,7 @@ SEEDS = {
         ("add", "/", "section", {"name": "Appendix"}),
         ("set", "/section[2]", {"text": "Tail"}),
     ],
-    # Record 0309: character properties are written on runs of text boxes.
+    # Character properties are written on runs of text boxes.
     "keynote": [("add", "/slide[1]", "shape", {"text": "Box\nSecond"})],
 }
 

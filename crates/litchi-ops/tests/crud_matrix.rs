@@ -1,6 +1,6 @@
-//! The CRUD checklist of record 0289 (plan step 25, design §14 layer 2).
+//! The CRUD checklist (design §14 layer 2).
 //!
-//! For every claimed format (the iWork formats since record 0296), every
+//! For every claimed format, every
 //! element kind its capability report
 //! lists is crossed with the verbs `get`, `find`, `query`, `view`, `set`,
 //! `add`, `remove`, `move`, `swap`, `edit`, `batch`, `create` and `save`.
@@ -19,10 +19,9 @@
 //! Set `LITCHI_REPORT_DIR` to a scratch directory outside the repository to
 //! emit the optional checklist. Capability coverage is asserted directly. A
 //! claimed-supported cell that fails is a bug: [`KNOWN_FAILURES`] lists the
-//! ones still open, each with its cause (records 0290, 0298 and 0303 closed
-//! every one record 0289 found), and the test fails on any other.
+//! ones still open, each with its cause, and the test fails on any other.
 //!
-//! Record 0341 adds the ADR 0008 rows, one of each per format, built from
+//! The ADR 0008 rows, one of each per format, are built from
 //! the format's successful changing `set` cells: **atomic failure** (a
 //! batch whose item 1 fails is refused naming item 1 and leaves the
 //! snapshot, its file and refused save destinations byte-identical),
@@ -97,12 +96,12 @@ const SPECS: &[Spec] = &[
             "libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx",
             "ooxml/docx/comment.docx",
             "libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx",
-            // Record 0319: notes, headers and footers, and numbering.
+            // Notes, headers and footers, and numbering.
             "ooxml/docx/footnotes.docx",
             "ooxml/docx/endnotes.docx",
             "ooxml/docx/headerFooter.docx",
             "ooxml/docx/ComplexNumberedLists.docx",
-            // Record 0319: a bookmark, a text box and a watermark.
+            // A bookmark, a text box and a watermark.
             "libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx",
             "libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx",
             "libreoffice-core/sw/qa/extras/ooxmlexport/data/textWatermark.docx",
@@ -140,9 +139,9 @@ const SPECS: &[Spec] = &[
             "libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx",
             "libreoffice-core/sd/qa/unit/data/pptx/tdf169496_hidden_graphic.pptx",
             "ooxml/pptx/sample.pptx",
-            // Record 0294: a generated fixture (test-data/unified-ops/0294).
+            // A generated fixture (test-data/unified-ops/0294).
             "unified-ops/0294/modern-comments.pptx",
-            // Record 0321: Office Math in a markup-compatibility choice, and
+            // Office Math in a markup-compatibility choice, and
             // embedded audio and video (Apache POI, Apache-2.0).
             "libreoffice-core/oox/qa/unit/data/import-mce.pptx",
             "poi/test-data/slideshow/EmbeddedAudio.pptx",
@@ -158,7 +157,7 @@ const SPECS: &[Spec] = &[
             "libreoffice-core/sc/qa/unit/data/xlsb/shared_formula.xlsb",
             "libreoffice-core/sc/qa/unit/data/xlsb/tdf94627.xlsb",
             "poi/test-data/spreadsheet/testVarious.xlsb",
-            // Record 0294: a generated fixture (test-data/unified-ops/0294).
+            // A generated fixture (test-data/unified-ops/0294).
             "unified-ops/0294/table.xlsb",
         ],
     },
@@ -175,7 +174,7 @@ const SPECS: &[Spec] = &[
             "ole/doc/endingnote.doc",
             "ole/doc/commented-table.doc",
             "ole/doc/image-comment-at-char.doc",
-            // Record 0324: styles and lists, bookmarks, fields and a table of
+            // Styles and lists, bookmarks, fields and a table of
             // contents, sections, floating shapes, and (generated) body tab
             // stops and a text box.
             "ole/doc/Lists.doc",
@@ -195,7 +194,7 @@ const SPECS: &[Spec] = &[
             "ole/xls/WithExtendedStyles.xls",
             "libreoffice-core/sc/qa/unit/data/xls/formats.xls",
             "ole/xls/SimpleWithAutofilter.xls",
-            // Record 0327: notes, pictures, conditional formats, hyperlinks
+            // Notes, pictures, conditional formats, hyperlinks
             // and page breaks of producer workbooks (Apache POI, Apache-2.0).
             "ole/xls/SimpleWithComments.xls",
             "ole/xls/SimpleWithImages.xls",
@@ -216,18 +215,18 @@ const SPECS: &[Spec] = &[
             "poi/test-data/slideshow/headers_footers.ppt",
             "poi/test-data/slideshow/basic_test_ppt_file.ppt",
             "poi/test-data/slideshow/42485.ppt",
-            // Record 0294: a POI table deck, copied with provenance.
+            // A POI table deck, copied with provenance.
             "poi/test-data/slideshow/bug61881.ppt",
-            // Record 0294: a generated fixture (test-data/unified-ops/0294).
+            // A generated fixture (test-data/unified-ops/0294).
             "unified-ops/0294/connectors.ppt",
-            // Record 0323: comments, shape and text hyperlinks, a table and a
+            // Comments, shape and text hyperlinks, a table and a
             // Graph chart (generated); the round-trip theme, an OLE workbook
             // and a sound frame (Apache POI).
             "unified-ops/0294/elements.ppt",
             "poi/test-data/slideshow/headers_footers_2007.ppt",
             "poi/test-data/slideshow/testPPT_oleWorkbook.ppt",
             "poi/test-data/slideshow/sound.ppt",
-            // Record 0341: POI's sound frame rewritten to play a movie.
+            // POI's sound frame rewritten to play a movie.
             "unified-ops/0294/video.ppt",
         ],
     },
@@ -247,7 +246,7 @@ const SPECS: &[Spec] = &[
             "libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf",
             "libreoffice-core/sw/qa/extras/rtfexport/data/tdf167569.rtf",
             "libreoffice-core/sw/qa/extras/rtfexport/data/n192129.rtf",
-            // Record 0328: sections, bookmarks, fields, a table of contents,
+            // Sections, bookmarks, fields, a table of contents,
             // tab stops, a shape and a text box (hand-written).
             "unified-ops/0294/parts.rtf",
         ],
@@ -263,7 +262,7 @@ const SPECS: &[Spec] = &[
             "odf/corpus/writer-images-frames.odt",
             "odf/corpus/writer-table-of-contents.odt",
             "libreoffice-core/sw/qa/extras/layout/data/tdf124423.odt",
-            // Record 0328: headers and footers, numbering, fields, a table of
+            // Headers and footers, numbering, fields, a table of
             // contents, tab stops, shapes, equations and table columns
             // (generated, test-data/unified-ops/0294).
             "unified-ops/0294/parts.odt",
@@ -294,9 +293,9 @@ const SPECS: &[Spec] = &[
             "libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs.odp",
             "libreoffice-core/sd/qa/unit/data/odp/group_rotation.odp",
             "libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp",
-            // Record 0294: a generated fixture (test-data/unified-ops/0294).
+            // A generated fixture (test-data/unified-ops/0294).
             "unified-ops/0294/comments.odp",
-            // Record 0328: hyperlinks, line breaks, columns, video and audio,
+            // Hyperlinks, line breaks, columns, video and audio,
             // equations and chart series and axes (generated).
             "unified-ops/0294/parts.odp",
         ],
@@ -309,7 +308,7 @@ const SPECS: &[Spec] = &[
             "libreoffice-core/desktop/qa/data/BlankDrawDocument.odg",
             "libreoffice-core/svx/qa/unit/data/FontWork.odg",
             "libreoffice-core/desktop/qa/data/3page.odg",
-            // Record 0294: a generated fixture (test-data/unified-ops/0294).
+            // A generated fixture (test-data/unified-ops/0294).
             "unified-ops/0294/layers.odg",
         ],
     },
@@ -342,9 +341,9 @@ const SPECS: &[Spec] = &[
         name: "oth",
         extension: "oth",
         fixtures: &[
-            // Record 0294: a generated fixture (test-data/unified-ops/0294).
+            // A generated fixture (test-data/unified-ops/0294).
             "unified-ops/0294/frames.oth",
-            // Record 0328: the ODT parts fixture as a web template.
+            // The ODT parts fixture as a web template.
             "unified-ops/0294/parts.oth",
         ],
     },
@@ -355,9 +354,9 @@ const SPECS: &[Spec] = &[
         fixtures: &[
             "libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm",
             "libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm",
-            // Record 0294: a generated fixture (test-data/unified-ops/0294).
+            // A generated fixture (test-data/unified-ops/0294).
             "unified-ops/0294/frames.odm",
-            // Record 0328: the ODT parts fixture as a master document.
+            // The ODT parts fixture as a master document.
             "unified-ops/0294/parts.odm",
         ],
     },
@@ -370,8 +369,8 @@ const SPECS: &[Spec] = &[
             "libreoffice-core/starmath/qa/extras/data/tdf151842.odf",
         ],
     },
-    // Record 0296: the iWork formats. Record 0298 added the multi-slide
-    // Keynote deck (a slide's `remove` no longer meets the leaf's
+    // The iWork formats, with the multi-slide
+    // Keynote deck (a slide's `remove` does not meet the leaf's
     // last-slide refusal) and the decks holding pictures, movies, audio,
     // tables and charts.
     Spec {
@@ -381,12 +380,12 @@ const SPECS: &[Spec] = &[
         fixtures: &[
             "iwork/pages/body-sections-unicode.pages",
             "iwork/pages/basic.pages",
-            // Record 0299: body tables, cells and anchored paragraphs.
+            // Body tables, cells and anchored paragraphs.
             "iwork/pages/body-table-read-native.pages",
             "iwork/pages/body-table-visible.pages",
-            // Record 0309: a body table without formulas takes cell values.
+            // A body table without formulas takes cell values.
             "iwork/pages/body-table-name-focused.pages",
-            // Record 0404: a native chart-grid fixture exercises the chart
+            // A native chart-grid fixture exercises the chart
             // get/find/query/view/set checklist cells on a real chart node.
             "iwork/pages/chart-grid-authored-native.pages",
         ],
@@ -403,7 +402,7 @@ const SPECS: &[Spec] = &[
             "iwork/keynote/image-adjustments-native.key",
             "iwork/keynote/media-lifecycle-audio-remove-native.key",
             "iwork/keynote/media-lifecycle-remove-native.key",
-            // Record 0341: a line and a group (generated).
+            // A line and a group (generated).
             "unified-ops/0294/shapes.key",
         ],
     },
@@ -411,14 +410,14 @@ const SPECS: &[Spec] = &[
         format: FileFormat::Numbers,
         name: "numbers",
         extension: "numbers",
-        // Record 0297: a merged range and a two-sheet workbook join the
+        // A merged range and a two-sheet workbook join the
         // checklist, so `mergeCell` reads and sheet/table moves are pinned.
         fixtures: &[
             "iwork/numbers/basic.numbers",
             "iwork/numbers/cell-value-native.numbers",
             "iwork/numbers/table-merges-native.numbers",
             "iwork/numbers/table-relocation-native.numbers",
-            // Record 0404: a native chart-grid fixture exercises the chart
+            // A native chart-grid fixture exercises the chart
             // get/find/query/view/set checklist cells on a real chart node.
             "iwork/numbers/chart-grid-authored-native.numbers",
         ],
@@ -445,12 +444,12 @@ struct Recipe {
 
 const PNG: &str = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAYAAAB/qH1jAAAAEklEQVR4nGP4z8DwHxkzoAsAAA8hD/EEN8afAAAAAElFTkSuQmCC";
 
-/// Inert media payloads (record 0321): the leaf stores them undecoded.
+/// Inert media payloads: the leaf stores them undecoded.
 const MP4: &str = "data:video/mp4;base64,AAAAGGZ0eXBtcDQyAAAAAG1wNDJpc29t";
 const MP3: &str = "data:audio/mpeg;base64,SUQzAwAAAAAAAA==";
 
 const RECIPES: &[Recipe] = &[
-    // Record 0338: an added XLSX cell names its address and a value.
+    // An added XLSX cell names its address and a value.
     Recipe {
         format: "xlsx",
         element: "cell",
@@ -459,7 +458,7 @@ const RECIPES: &[Recipe] = &[
         props: &[("ref", "H8"), ("value", "added")],
         start: false,
     },
-    // Record 0324: a DOC hyperlink names exactly one of `url` and `anchor`.
+    // A DOC hyperlink names exactly one of `url` and `anchor`.
     Recipe {
         format: "doc",
         element: "hyperlink",
@@ -468,7 +467,7 @@ const RECIPES: &[Recipe] = &[
         props: &[("url", "http://example.com/"), ("text", "Litchi")],
         start: false,
     },
-    // Record 0323: a PPT comment needs its author; a hyperlink its target.
+    // A PPT comment needs its author; a hyperlink its target.
     Recipe {
         format: "ppt",
         element: "comment",
@@ -485,7 +484,7 @@ const RECIPES: &[Recipe] = &[
         props: &[("link", "https://example.test/added")],
         start: false,
     },
-    // Record 0297: a Numbers merged range needs an A1 `ref` of two cells or
+    // A Numbers merged range needs an A1 `ref` of two cells or
     // more inside the table's grid.
     Recipe {
         format: "numbers",
@@ -495,7 +494,7 @@ const RECIPES: &[Recipe] = &[
         props: &[("ref", "B2:C3")],
         start: false,
     },
-    // Record 0288: ODC axis/series add work on a chart Litchi made; the
+    // ODC axis/series add work on a chart Litchi made; the
     // odfdom fixtures hold content outside the leaf's lossless surface.
     Recipe {
         format: "odc",
@@ -513,7 +512,7 @@ const RECIPES: &[Recipe] = &[
         props: &[("values", "Sheet1.B1:B3")],
         start: false,
     },
-    // Record 0292: the legend is added through the typed definition of a
+    // The legend is added through the typed definition of a
     // chart Litchi made; a MathML token needs its tag and text together.
     Recipe {
         format: "odc",
@@ -571,7 +570,7 @@ const RECIPES: &[Recipe] = &[
         props: &[("chartType", "column"), ("data", "A:1,2;B:3,4")],
         start: false,
     },
-    // Record 0319: notes are anchored on a paragraph and need their text; a
+    // Notes are anchored on a paragraph and need their text; a
     // level is added to a definition by its ilvl.
     Recipe {
         format: "docx",
@@ -597,7 +596,7 @@ const RECIPES: &[Recipe] = &[
         props: &[("ilvl", "8"), ("format", "decimal"), ("lvlText", "%9.")],
         start: false,
     },
-    // Record 0325: bookmarks and fields go into a paragraph, a table of
+    // Bookmarks and fields go into a paragraph, a table of
     // contents under the body.
     Recipe {
         format: "docx",
@@ -623,7 +622,7 @@ const RECIPES: &[Recipe] = &[
         props: &[("levels", "1-3")],
         start: false,
     },
-    // Record 0295: DOCX SmartArt is added under a paragraph from an outline.
+    // DOCX SmartArt is added under a paragraph from an outline.
     Recipe {
         format: "docx",
         element: "smartart",
@@ -632,7 +631,7 @@ const RECIPES: &[Recipe] = &[
         props: &[("layout", "process"), ("text", "Plan\nBuild")],
         start: false,
     },
-    // Record 0335: a node joins the graphic the SmartArt cell added.
+    // A node joins the graphic the SmartArt cell added.
     Recipe {
         format: "docx",
         element: "node",
@@ -649,7 +648,7 @@ const RECIPES: &[Recipe] = &[
         props: &[("chartType", "column"), ("data", "A:1,2;B:3,4")],
         start: false,
     },
-    // Record 0320: worksheet features need their anchor (a cell, a range, a
+    // Worksheet features need their anchor (a cell, a range, a
     // row or column, an image).
     Recipe {
         format: "xlsx",
@@ -731,7 +730,7 @@ const RECIPES: &[Recipe] = &[
         props: &[("col", "4")],
         start: false,
     },
-    // Record 0322: the XLSB worksheet features take the XLSX recipes.
+    // The XLSB worksheet features take the XLSX recipes.
     Recipe {
         format: "xlsb",
         element: "comment",
@@ -812,7 +811,7 @@ const RECIPES: &[Recipe] = &[
         props: &[("col", "4")],
         start: false,
     },
-    // Record 0327: the XLS worksheet features take the XLSX recipes (a CF
+    // The XLS worksheet features take the XLSX recipes (a CF
     // fill is a palette color in BIFF8).
     Recipe {
         format: "xls",
@@ -934,7 +933,7 @@ const RECIPES: &[Recipe] = &[
         props: &[("text", "Learn")],
         start: false,
     },
-    // Record 0321: media is embedded with a poster image.
+    // Media is embedded with a poster image.
     Recipe {
         format: "pptx",
         element: "video",
@@ -959,7 +958,7 @@ const RECIPES: &[Recipe] = &[
         props: &[("src", MP4), ("poster", PNG)],
         start: false,
     },
-    // Record 0330: claims that agree with the registry. A picture needs
+    // Claims that agree with the registry. A picture needs
     // its image and a legacy comment its author, both on a producer's
     // slide; an XLSB defined name needs its name and a sheet-qualified
     // reference.
@@ -979,7 +978,7 @@ const RECIPES: &[Recipe] = &[
         props: &[("author", "Ada"), ("text", "Check")],
         start: false,
     },
-    // Record 0346: a modern comment needs its author and, with no clock,
+    // A modern comment needs its author and, with no clock,
     // its creation stamp.
     Recipe {
         format: "pptx",
@@ -1033,7 +1032,7 @@ const RECIPES: &[Recipe] = &[
         props: &[("text", "check"), ("author", "Reviewer")],
         start: false,
     },
-    // Record 0327: the ODS worksheet features take the XLSX recipes.
+    // The ODS worksheet features take the XLSX recipes.
     Recipe {
         format: "ods",
         element: "hyperlink",
@@ -1130,7 +1129,7 @@ const RECIPES: &[Recipe] = &[
         props: &[("from", "/slide[2]")],
         start: false,
     },
-    // Record 0329: a new table copies the deck's (document's) first table.
+    // A new table copies the deck's (document's) first table.
     Recipe {
         format: "keynote",
         element: "table",
@@ -1204,7 +1203,7 @@ const SEEDS: &[(&str, &[Step])] = &[
         ],
     ),
     ("ods", &[Step::Set("/Sheet1/A1:B2", &[("merge", "true")])]),
-    // Record 0404: seed a named, non-empty second section so the claimed
+    // Seed a named, non-empty second section so the claimed
     // section removal cell exercises a removable sibling, not the required
     // first section or an empty section that Pages correctly refuses.
     (
@@ -1215,18 +1214,15 @@ const SEEDS: &[(&str, &[Step])] = &[
             Step::Set("/section[2]", &[("text", "Tail")]),
         ],
     ),
-    // Record 0309: character properties are written on runs of text boxes.
+    // Character properties are written on runs of text boxes.
     (
         "keynote",
         &[Step::Add("/slide[1]", "shape", &[("text", "Box\nSecond")])],
     ),
 ];
 
-/// Claimed-supported cells that fail, with the cause record 0289 found:
-/// `(format, element, verb, cause)`. Each entry is a recorded bug. Record
-/// 0290 fixed F1, F2, F4, F6 and F7; record 0298 fixed F8 (Keynote slide
-/// removal, now exercised on the multi-slide deck); record 0303 fixed F3
-/// (PPTX OLE removal under markup compatibility).
+/// Claimed-supported cells that fail, with their cause:
+/// `(format, element, verb, cause)`. Each entry is a recorded bug.
 const KNOWN_FAILURES: &[(&str, &str, &str, &str)] = &[];
 
 fn test_data() -> PathBuf {
@@ -1334,8 +1330,7 @@ fn load_fixtures(spec: &Spec) -> Vec<Fixture> {
             label: "create()".to_owned(),
             file,
         }),
-        // The iWork leaves have no from-scratch builder yet (record 0296,
-        // `IWORK_API_REQUESTS.md` request 1): their checklist starts from
+        // The iWork leaves have no from-scratch builder yet: their checklist starts from
         // the pinned fixtures only.
         Err(error)
             if matches!(
@@ -1463,7 +1458,7 @@ fn instances(
         list.retain(|path| seen.insert(path.clone()));
         // Slide content before master and layout content; writes try
         // drawables before placeholders, whose runs keep their layout's
-        // styles in Keynote (record 0309).
+        // styles in Keynote.
         list.sort_by_key(|path| {
             (
                 path.contains("master") || path.contains("layout"),
@@ -1819,8 +1814,8 @@ fn element_claim(caps: &Capabilities, element: &Element, verb: &str) -> Claim {
         .properties()
         .find_map(|property| property.write_gap())
         .filter(|_| matches!(verb, "set" | "edit" | "batch"));
-    // An operation gap the report lists for this verb and element (record
-    // 0292: the object formats refuse at element level, not verb level).
+    // An operation gap the report lists for this verb and element (the
+    // object formats refuse at element level, not verb level).
     let object_format = matches!(
         caps.format(),
         Some(
@@ -1875,7 +1870,7 @@ struct Report {
     order: Vec<String>,
     cells: BTreeMap<(String, &'static str), Cell>,
     notes: Vec<String>,
-    /// The ADR 0008 rows, in [`ADR_ROWS`] order (record 0341).
+    /// The ADR 0008 rows, in [`ADR_ROWS`] order.
     adr: Vec<AdrObserved>,
 }
 
@@ -2196,7 +2191,7 @@ fn run_format(spec: &Spec) -> Report {
             Err(format!("reopened as {:?}", reopened.format()))
         }
     });
-    // A format without a creator (the iWork formats, record 0296) saves
+    // A format without a creator (the iWork formats) saves
     // its first pinned fixture.
     let base = created.clone().or_else(|error| {
         fixtures
@@ -2285,7 +2280,7 @@ fn run_format(spec: &Spec) -> Report {
     report
 }
 
-/// The ADR 0008 rows of the checklist (record 0341), in column order.
+/// The ADR 0008 rows of the checklist, in column order.
 const ADR_ROWS: [&str; 3] = ["atomic failure", "patch inverse", "composition"];
 
 /// ADR 0008 rows a format cannot support, with the reason:
@@ -2491,7 +2486,7 @@ fn adr_atomic(spec: &Spec, fixtures: &[Fixture], candidate: &Candidate) -> AdrOb
 /// Patch inverse: an edit's patch replays onto its source, its inverse
 /// restores the exact source bytes, the patch refuses another artifact
 /// (typed), and a separately opened, byte-identical copy of the source takes
-/// it (content identity, record 0362).
+/// it (content identity).
 fn adr_inverse(fixtures: &[Fixture], candidate: &Candidate) -> Result<AdrObserved, String> {
     let fixture = &fixtures[candidate.fixture];
     let before = guarded(|| fixture.file.to_bytes())?;
@@ -2525,7 +2520,7 @@ fn adr_inverse(fixtures: &[Fixture], candidate: &Candidate) -> Result<AdrObserve
             Err(error) => typed(error).map_err(|error| format!("stale apply: {error}"))?,
         };
         // A separately opened, byte-identical copy takes the patch: a patch
-        // applies by content identity in every format (record 0362).
+        // applies by content identity in every format.
         let foreign = guarded(|| open_bytes(before.clone()))?;
         let copy = match attempt(|| commit.patch().apply(&foreign)) {
             Ok(applied) if guarded(|| applied.to_bytes())? == after => "accepts (content-checked)",
@@ -2807,7 +2802,7 @@ fn clean(text: &str) -> String {
 #[allow(clippy::too_many_lines, reason = "renders the checklist and checks it")]
 fn crud_checklist_per_format() {
     let mut markdown = String::from(
-        "# CRUD checklist (record 0289, generated)\n\n\
+        "# CRUD checklist (generated)\n\n\
          Generated by `crates/litchi-ops/tests/crud_matrix.rs`; rewrite with\n\
          `LITCHI_REPORT_DIR=/path/to/scratch cargo test -p litchi-ops --all-features --test crud_matrix`.\n\n\
          Cells: `ok` claimed and exercised; `FAIL` claimed but failed (a bug);\n\
@@ -2819,7 +2814,7 @@ fn crud_checklist_per_format() {
          refusal for that element kind (not a failure), `no pair` no two siblings.\n\
          Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/\n\
          `add`/`remove`/`edit`/`batch` claims plus `create`/`save` per row.\n\n\
-         ADR 0008 rows (record 0341), one per format: `atomic failure` a\n\
+         ADR 0008 rows, one per format: `atomic failure` a\n\
          batch whose item 1 names nothing, after a valid set, is refused naming\n\
          item 1 and leaves the snapshot, its file on disk and two refused save\n\
          destinations byte-identical; `patch inverse` an edit's patch replays\n\

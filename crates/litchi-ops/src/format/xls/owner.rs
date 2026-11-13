@@ -169,7 +169,7 @@ impl<'f> SheetHandle<'f> {
     }
 
     /// The positional owner's cell cursor over this worksheet, with the
-    /// worksheet's index (record 0267); `None` for an eager owner, whose
+    /// worksheet's index; `None` for an eager owner, whose
     /// cells are already parsed ([`Self::eager_cells`]), and for a worksheet
     /// whose stored positions do not ascend (its sorted grid is not its
     /// stream order).

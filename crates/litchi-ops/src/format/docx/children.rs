@@ -1,16 +1,15 @@
-//! The children of a DOCX node, produced lazily in document order (record
-//! 0010 §4.5.1, §5.3).
+//! The children of a DOCX node, produced lazily in document order.
 //!
 //! | Parent | Children |
 //! |---|---|
-//! | `/` | `body` (its blocks are read when it is entered), the styles part, the headers, the footers, the numbering part, the footnotes and endnotes parts (record 0319), the comments part, then the SmartArt graphics (record 0295) |
-//! | a styles, numbering or notes part, a definition | its styles; its definitions, then its instances; its notes; its levels (record 0319) |
+//! | `/` | `body` (its blocks are read when it is entered), the styles part, the headers, the footers, the numbering part, the footnotes and endnotes parts, the comments part, then the SmartArt graphics |
+//! | a styles, numbering or notes part, a definition | its styles; its definitions, then its instances; its notes; its levels |
 //! | `body`, a cell, a content control | paragraphs, tables, content controls, display equations and (in the body) section breaks, in visible order; `w:customXml` wrappers flattened; `w:altChunk` anchors and unknown children skipped |
 //! | a table | rows |
 //! | a row | cells |
 //! | a paragraph | its addressable runs, then its direct hyperlinks, then its inline pictures, then its charts |
-//! | a chart | its series, then its axes (record 0335) |
-//! | a SmartArt graphic or node | its child nodes (record 0335) |
+//! | a chart | its series, then its axes |
+//! | a SmartArt graphic or node | its child nodes |
 //!
 //! The iterator owns what it reads (shared leaf values, an index cursor), so
 //! it borrows neither the adapter nor the parent node, and a walk that
@@ -39,25 +38,24 @@ pub(crate) struct Children<'f> {
 
 enum Source {
     Done,
-    /// The root's children: the body, then the part elements (record
-    /// 0319), then the comments part.
+    /// The root's children: the body, then the part elements, then the
+    /// comments part.
     Root,
     /// The root's styles, header, footer, numbering and notes parts, or the
-    /// children of one of them (record 0319).
+    /// children of one of them.
     Parts {
         children: Box<super::parts::Children>,
         /// Whether the comments part follows (the root's listing).
         root: bool,
     },
-    /// Marks of the parent, then the parent's other children (record 0319).
+    /// Marks of the parent, then the parent's other children.
     Marks {
         children: Box<super::marks::Children>,
         then: Box<Source>,
     },
     /// The root's comments part, when the document has one.
     CommentsRoot,
-    /// The root's SmartArt graphics, read when the first is needed
-    /// (record 0295).
+    /// The root's SmartArt graphics, read when the first is needed.
     SmartArtRoot,
     SmartArts {
         graphics: Arc<[Arc<super::smartart::SmartArtValue>]>,
@@ -105,7 +103,7 @@ enum Source {
         charts: Option<Box<Charted>>,
     },
     /// Children read in one go: a chart's series and axes, a graphic's
-    /// nodes (record 0335).
+    /// nodes.
     Built(vec::IntoIter<(Kind, Value, Step)>),
     /// A paragraph's charts, read when the first is needed.
     ChartList(Box<Charted>),
@@ -205,7 +203,7 @@ impl<'f> Children<'f> {
             _ => Source::Done,
         };
         // Tab stops, breaks and the document-wide marks come first when a
-        // query asks for them (record 0319).
+        // query asks for them.
         let source = match super::marks::Children::of(parent, kinds) {
             Some(marks) => Source::Marks {
                 children: Box::new(marks),
@@ -512,8 +510,8 @@ impl<'f> Iterator for Children<'f> {
         let owner = self.docx.owner();
         // Inside a resolver or query step for this owner, the step's
         // closing check fences the child: it observes a source changed
-        // before or during this read, and its error wins (record 0315; the
-        // walker still checks once per match, owner decision 2026-10-14).
+        // before or during this read, and its error wins (the walker still
+        // checks once per match).
         if crate::path::fence::is_active(owner.fence_key()) {
             let item = self.produce();
             if matches!(item, Some(Err(_))) {

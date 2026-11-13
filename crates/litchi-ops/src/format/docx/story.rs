@@ -1,5 +1,5 @@
-//! Paragraphs and runs of headers, footers, footnotes and endnotes
-//! (record 0325): `/header[N]/p[M]`, `/footer[N]/p[M]`, `/footnote[N]/p[M]`
+//! Paragraphs and runs of headers, footers, footnotes and endnotes:
+//! `/header[N]/p[M]`, `/footer[N]/p[M]`, `/footnote[N]/p[M]`
 //! and `/endnote[N]/p[M]`, with their runs.
 //!
 //! A story's paragraphs are read through the story's block index, as the
@@ -7,7 +7,7 @@
 //! main document's element-path verbs: the leaf's `Edit::edit_story` runs
 //! them on the story's content as a document body and splices the result
 //! back into the part. Unscoped queries stay in the main story, and the
-//! story nodes' views do not list their paragraphs (record 0319).
+//! story nodes' views do not list their paragraphs.
 
 use litchi_core::selector::Path;
 use litchi_core::{FileFormat, Position};

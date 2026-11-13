@@ -1,18 +1,17 @@
-//! The children of a PPTX node, in document order (record 0010 §2.5,
-//! §4.6, §5.3).
+//! The children of a PPTX node, in document order.
 //!
 //! One lazy iterator serves the node view and the query walker:
 //!
 //! | Parent | Children |
 //! |---|---|
 //! | presentation | slides, in catalog order |
-//! | slide | its shape tree's direct elements in z order, each kind with its own counter (D5); for queries, then its notes and comments |
+//! | slide | its shape tree's direct elements in z order, each kind with its own counter; for queries, then its notes and comments |
 //! | group | the group's direct elements, likewise |
 //! | shape | the paragraphs of its text body |
 //! | paragraph | its runs and line breaks (fields are not listed, as in OfficeCLI) |
 //! | table | its rows; a row, its cells |
-//! | chart | its series, then its axes (record 0270) |
-//! | smartart, node | its child nodes (record 0284) |
+//! | chart | its series, then its axes |
+//! | smartart, node | its child nodes |
 //!
 //! Each child is read when it is pulled, so a walk that stops early decodes
 //! no later sibling; a slide's scene is read when the iterator is built for
@@ -52,7 +51,7 @@ pub(crate) struct Children<'f> {
     file: &'f Pptx,
     kinds: KindSet<Kind>,
     state: State,
-    /// Children a query walk lists after the main axis (record 0321): the
+    /// Children a query walk lists after the main axis: the
     /// theme, table columns, hyperlinks, media and equations. The node view
     /// never lists them, so existing views keep their shape.
     extra: std::vec::IntoIter<Item>,
@@ -126,8 +125,8 @@ enum State {
         next: u32,
         end: u32,
     },
-    /// A chart's series, then its axes (record 0270); a SmartArt's or
-    /// node's child nodes (record 0284).
+    /// A chart's series, then its axes; a SmartArt's or
+    /// node's child nodes.
     Chart(std::vec::IntoIter<Item>),
 }
 
@@ -476,7 +475,7 @@ impl<'f> Children<'f> {
 }
 
 /// The next element of a shape tree whose kind is wanted, counting every
-/// element of each kind on the way (D5).
+/// element of each kind on the way.
 fn next_tree<'f>(
     file: &'f Pptx,
     kinds: KindSet<Kind>,

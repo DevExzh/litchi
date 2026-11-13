@@ -1,4 +1,4 @@
-//! XLSX typed nodes and their node view (record 0010 §2–§3, §4.7).
+//! XLSX typed nodes and their node view.
 //!
 //! A [`Node`] is one element of an open workbook: the workbook itself, a
 //! sheet, a cell, a range, a row, a column, a table or a defined name. It
@@ -16,9 +16,9 @@
 //!
 //! Nothing is retained beyond the node: the handle holds no worksheet,
 //! grid or parsed value for the unified layer, so the leaf's weighted
-//! caches stay the only retention policy (record 0010 §3.3).
+//! caches stay the only retention policy.
 //!
-//! A node is small, so a walk moves it cheaply (record 0262): its path is
+//! A node is small, so a walk moves it cheaply: its path is
 //! written from its coordinates when asked for, its A1 label the first time
 //! a preview needs it, and a cell read by `get` keeps the leaf's view boxed.
 //!
@@ -58,7 +58,7 @@ use crate::value::{Color, Length, Rgba, ThemeSlot};
 /// The text OfficeCLI shows for a coordinate with no record.
 pub(super) const MISSING_TEXT: &str = "(empty)";
 
-/// A node of an XLSX workbook (record 0010 §3.1).
+/// A node of an XLSX workbook.
 ///
 /// Get one from the unified `get`, `find`, `query` and `children` reads; it
 /// borrows the [`Xlsx`] handle it came from. The generic accessors live on
@@ -89,7 +89,7 @@ pub struct Node<'f> {
     sheet: u32,
 }
 
-// A walk moves every node it visits: keep it small (record 0262; 248 bytes
+// A walk moves every node it visits: keep it small (248 bytes
 // before, with its path steps and label kept inline).
 const _: () = assert!(size_of::<Node<'static>>() <= 96);
 
@@ -104,14 +104,14 @@ pub(super) enum Item {
     Column(ColumnItem),
     Table(TableItem),
     NamedRange(usize),
-    /// A worksheet chart, its series and its axes (record 0270).
+    /// A worksheet chart, its series and its axes.
     Chart(ChartItem),
     Series(ChartItem),
     Axis(ChartItem),
     /// A worksheet feature: a note, hyperlink, picture, shape, conditional
-    /// format, validation, auto-filter or page break (record 0320).
+    /// format, validation, auto-filter or page break.
     Feature(Arc<super::features::Feature>),
-    /// A rich-text run of a cell (record 0338).
+    /// A rich-text run of a cell.
     Run(RunItem),
 }
 
@@ -183,9 +183,9 @@ impl Sheet {
             // leaf route even when the snapshot is already pinned so its
             // source-version fence still applies to cached reads, except
             // inside a resolver or query step for this sheet's handle, whose
-            // closing check observes the same source after the step (record
-            // 0262; record 0310: a header-row query read the source seven
-            // times per probed row through this re-entry).
+            // closing check observes the same source after the step (a
+            // header-row query read the source seven times per probed row
+            // through this re-entry).
             if let SheetHandle::Source { sheet, .. } = &self.handle
                 && !crate::path::fence::is_active(self.fence)
             {
@@ -298,7 +298,7 @@ impl SheetHandle {
     }
 
     /// The sheet named `name`, matched with the leaf's canonical
-    /// case-insensitive key (record 0010 §4.2, decision D6).
+    /// case-insensitive key.
     pub(super) fn named(file: &Xlsx, name: &str) -> Result<Option<Self>> {
         Ok(match &file.0.owner {
             XlsxOwner::Source(workbook) => {
@@ -431,7 +431,7 @@ enum GridInner {
         sheet: xlsx::SourceWorksheet,
     },
     /// A leading part of a source-backed worksheet, which the leaf's cell
-    /// cursor parsed (record 0267). Its records are the complete grid's
+    /// cursor parsed. Its records are the complete grid's
     /// first records at the same positions; everything else (a coordinate's
     /// view, a range scan, rows, merges, formatting) reads the complete
     /// grid, materialized on first use.
@@ -761,8 +761,7 @@ impl<'f> Node<'f> {
         Self::in_sheet(file, sheet, item)
     }
 
-    /// The run at `index` of the cell `at` of the worksheet at `sheet`
-    /// (record 0338).
+    /// The run at `index` of the cell `at` of the worksheet at `sheet`.
     pub(super) fn new_run(
         file: &'f Xlsx,
         sheet: usize,
@@ -1317,7 +1316,7 @@ impl<'f> Project<'f> for Node<'f> {
             let count = match &self.item {
                 Item::Workbook => self.file.0.owner.len(),
                 // Counting a sheet's rows decodes its part: only when the view
-                // lists them anyway (M1-Δ1).
+                // lists them anyway.
                 Item::Sheet(_) if options.depth == 0 => return Ok(None),
                 Item::Cell(_)
                 | Item::Table(_)
@@ -1372,7 +1371,7 @@ pub(super) fn has_content(cell: &xlsx::Cell) -> bool {
 
 /// The text OfficeCLI shows for a stored record: the value as stored,
 /// booleans as `TRUE`/`FALSE`, a formula's cached value. Number formats are
-/// not applied (M1-Δ5).
+/// not applied.
 pub(super) fn display_text(cell: &xlsx::Cell) -> &str {
     match cell {
         xlsx::Cell::Value(value) => value_text(value),
@@ -1485,9 +1484,9 @@ pub(crate) enum Props<'a> {
     Chart(Arc<crate::format::chart::Summary>, Option<[u32; 4]>),
     Series(ChartItem),
     Axis(ChartItem),
-    /// A worksheet feature and its worksheet's name (record 0320).
+    /// A worksheet feature and its worksheet's name.
     Feature(&'a super::features::Feature, &'a str),
-    /// A rich-text run's font (record 0338).
+    /// A rich-text run's font.
     Run(Box<xlsx::style::stylesheet::font::Font>),
 }
 
@@ -1983,7 +1982,7 @@ fn rgb_color(value: xlsx::Rgb) -> Color {
     Color::rgba(value.red(), value.green(), value.blue(), value.alpha())
 }
 
-/// A run font color as a value: an RGB or theme base (record 0338).
+/// A run font color as a value: an RGB or theme base.
 pub(super) fn font_color_value(
     color: &xlsx::style::stylesheet::font::FontColor,
 ) -> Option<Value<'static>> {

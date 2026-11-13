@@ -1,4 +1,4 @@
-//! Unified ODT writes (record 0276): set, add, remove, move, swap,
+//! Unified ODT writes: set, add, remove, move, swap,
 //! metadata, create, save and coalesced batches over the leaf body edits.
 
 #![cfg(feature = "odt")]

@@ -1,9 +1,9 @@
 //! Handle for Excel binary workbook (`.xlsb`) inputs.
 //!
-//! [`Xlsb`] is one `Arc` over its state: the two-state owner of record 0003
-//! §2.3 (`Source` for the deferred, source-backed catalog with its
+//! [`Xlsb`] is one `Arc` over its state: the two-state owner
+//! (`Source` for the deferred, source-backed catalog with its
 //! per-worksheet materialization cache; `Eager` for the owning workbook), the
-//! core-properties metadata and its repairs read at open (§1.6), and the
+//! core-properties metadata and its repairs read at open, and the
 //! retention policy from [`OpenOptions`]. Cloning bumps one reference count.
 //!
 //! # Routes
@@ -28,8 +28,8 @@
 //! # Editing
 //!
 //! XLSB has no source-backed edit API. At the first edit the write kernel
-//! (M2) asks for the eager [`xlsb::Package`], which a source-backed handle
-//! materializes from the package indexed at open (L-XLSB-1). Every edit
+//! asks for the eager [`xlsb::Package`], which a source-backed handle
+//! materializes from the package indexed at open. Every edit
 //! family of the package commits a new package, which the handle adopts
 //! together with its already parsed read-only [`xlsb::Workbook`] projection.
 
@@ -118,11 +118,11 @@ struct XlsbState {
     /// releases nothing; it only refuses.
     retain_source: bool,
     /// The OPC read limits of the open, which an unsigned copy is opened
-    /// under (record 0013).
+    /// under.
     ooxml_limits: SourceLimits,
 }
 
-/// The two owner states of an XLSB handle (record 0003 §2.3).
+/// The two owner states of an XLSB handle.
 enum XlsbOwner {
     /// Deferred catalog over the retained positional source.
     Source(SourceWorkbook),
@@ -132,14 +132,14 @@ enum XlsbOwner {
     Eager(Box<xlsb::Package>),
 }
 
-/// The owning package the write kernel (M2) hands to an edit family.
+/// The owning package the write kernel hands to an edit family.
 pub(crate) enum XlsbEditor<'a> {
     /// The handle's own eager owner.
     Eager(&'a xlsb::Package),
-    /// Materialized from the source-backed catalog (L-XLSB-1). After
+    /// Materialized from the source-backed catalog. After
     /// [`Signed::unsign`](crate::Signed::unsign), either owner yields an
     /// owning copy whose signature the leaf removed explicitly
-    /// ([`xlsb::Package::unsign`], record 0013).
+    /// ([`xlsb::Package::unsign`]).
     Materialized(Box<xlsb::Package>),
 }
 
@@ -547,7 +547,7 @@ impl Xlsb {
         Self(self.0.removal_authorized())
     }
 
-    /// This handle's signature disposition (record 0013).
+    /// This handle's signature disposition.
     pub(crate) fn signature(&self) -> Signature {
         self.0.signature()
     }
@@ -663,15 +663,15 @@ impl Xlsb {
         }
     }
 
-    /// The eager workbook the write kernel (M2) edits, without detecting or
+    /// The eager workbook the write kernel edits, without detecting or
     /// indexing the input again. Cell-value transactions start from its owning
     /// [`xlsb::Package`] so the package boundary remains the publication owner.
     ///
     /// An eager handle lends its own workbook. A source-backed handle
     /// materializes one from the package indexed at open through the same
-    /// positional source (L-XLSB-1); the handle stays usable. After
+    /// positional source; the handle stays usable. After
     /// [`Signed::unsign`](crate::Signed::unsign) either owner yields an owning
-    /// copy whose signature the leaf removed explicitly (record 0013): opened
+    /// copy whose signature the leaf removed explicitly: opened
     /// over the exact input bytes, or copied from the eager owner's package,
     /// then `unsign`ed.
     ///

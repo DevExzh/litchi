@@ -1,4 +1,4 @@
-//! OpenDocument presentation semantic views (record 0010 §6).
+//! OpenDocument presentation semantic views.
 //!
 //! The views walk the scene index the navigator reads, in the four semantic
 //! modes shared by the presentation adapters. Character formatting lives

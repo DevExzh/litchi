@@ -15,7 +15,7 @@ use crate::Result;
 use crate::error::Error;
 use crate::pptx;
 
-/// Master and layout reads kept per handle (record 0280): the layout counts
+/// Master and layout reads kept per handle: the layout counts
 /// and the strict scenes of masters and layouts. A query from the root
 /// visits every master and layout, and the source-backed leaf re-reads the
 /// presentation part and the related part for each of them, which cost
@@ -124,7 +124,7 @@ impl Pptx {
                     };
                     let payload = part.payload.clone();
                     // A cached scene was read from this very payload, so the
-                    // part is read as a slide only on a miss (record 0326).
+                    // part is read as a slide only on a miss.
                     if let Some(scene) = payload.as_ref().and_then(|key| self.0.scenes.get(key)) {
                         return Ok(Some(scene));
                     }
@@ -438,8 +438,8 @@ impl Pptx {
         })
     }
 
-    /// The notes page of the selected slide as the navigator sees it
-    /// (record 0348): its shape scene, and whether it has notes text, which
+    /// The notes page of the selected slide as the navigator sees it:
+    /// its shape scene, and whether it has notes text, which
     /// [`Self::slide_notes`] requires before `/slide[N]/notes` resolves —
     /// read once.
     pub(super) fn slide_notes_view(&self, position: usize) -> Result<Option<(bool, Scene)>> {
@@ -470,7 +470,7 @@ impl Pptx {
     }
 
     /// The shape scene of the selected slide's notes page, when it has one
-    /// (record 0285: find reads its shapes' text bodies).
+    /// (find reads its shapes' text bodies).
     pub(super) fn slide_notes_scene(&self, position: usize) -> Result<Option<Scene>> {
         self.finish(|| match &self.0.owner {
             PptxOwner::Source(presentation) => {
@@ -496,8 +496,8 @@ impl Pptx {
     }
 
     /// The chart-space XML a slide relates through `relationship_id` (a
-    /// chart frame's payload), or `None` when the slide has no such chart
-    /// (record 0270). Only that chart part is read.
+    /// chart frame's payload), or `None` when the slide has no such chart.
+    /// Only that chart part is read.
     pub(super) fn slide_chart_xml(
         &self,
         position: usize,
@@ -532,7 +532,7 @@ impl Pptx {
 
     /// The data-model XML a slide relates through `relationship_id` (a
     /// SmartArt frame's `r:dm`), or `None` when the slide has no such
-    /// diagram (record 0284). Only that data part is read.
+    /// diagram. Only that data part is read.
     pub(super) fn slide_diagram_xml(
         &self,
         position: usize,

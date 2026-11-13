@@ -1,5 +1,5 @@
-//! Unified PPTX table-cell properties and run underline/strike (record
-//! 0333): theme and `none` fills (0330 F1), vertical anchor, insets, and
+//! Unified PPTX table-cell properties and run underline/strike:
+//! theme and `none` fills, vertical anchor, insets, and
 //! OfficeCLI's cell aliases, on both owners and after a byte round trip.
 #![cfg(feature = "pptx")]
 

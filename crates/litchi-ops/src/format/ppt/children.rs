@@ -23,12 +23,12 @@ pub(crate) struct Children<'f> {
     /// A query walk also visits a slide's notes after its shape tree; a view
     /// listing does not, as in the PPTX adapter.
     notes: Option<u32>,
-    /// Record-0323 elements a query walk lists after the main axis: a
+    /// Elements a query walk lists after the main axis: a
     /// slide's comments, a shape's hyperlink.
     extra: Option<Box<Extra<'f>>>,
 }
 
-/// The record-0323 elements of one query-walk step, or the error building
+/// The elements of one query-walk step, or the error building
 /// them, reported on the first pull.
 struct Extra<'f> {
     nodes: std::vec::IntoIter<Node<'f>>,
@@ -143,10 +143,10 @@ impl<'f> Children<'f> {
     /// children, then a slide's notes.
     pub(crate) fn walk(parent: &Node<'f>, kinds: KindSet<Kind>) -> Self {
         let mut children = Self::of(parent, kinds);
-        // Record-0323 elements (comments, rows and cells, hyperlinks, runs)
+        // Elements (comments, rows and cells, hyperlinks, runs)
         // are walked by a query that names them, never by a view or a `*`
         // walk, so existing views and query results keep their shape, as
-        // the PPTX walk keeps its record-0321 elements.
+        // in the PPTX walk.
         if Kind::ALL.iter().all(|kind| kinds.contains(*kind)) {
             if let Item::Slide(slide) = parent.item()
                 && kinds.contains(Kind::Notes)
@@ -475,7 +475,7 @@ impl<'f> Children<'f> {
         {
             return Ok(Some(Node::notes_node(self.file, slide, text)));
         }
-        // Then its record-0323 elements, one per pull.
+        // Then its elements, one per pull.
         let Some(extra) = self.extra.as_mut() else {
             return Ok(None);
         };

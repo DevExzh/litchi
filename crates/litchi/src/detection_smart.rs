@@ -1,10 +1,10 @@
 //! Smart format detection — opens files via the per-format crates to disambiguate.
 //!
-//! The coordinator lives in `litchi_ops::detect` (ADR 0033, M0a step S4).
-//! This module keeps the facade's detection API and paths unchanged and adds
-//! the iWork arms, which `litchi-ops` may not own because it must stay
-//! iWork-free (`tools/non_iwork_gate.py`). iWork is the last ZIP candidate:
-//! each function here calls the `_with_tail` form of its `litchi_ops::detect`
+//! The coordinator lives in `litchi_ops::detect` (ADR 0033). This module
+//! keeps the facade's detection API and paths unchanged and adds the iWork
+//! arms, which `litchi-ops` may not own because it must stay iWork-free
+//! (`tools/non_iwork_gate.py`). iWork is the last ZIP candidate: each
+//! function here calls the `_with_tail` form of its `litchi_ops::detect`
 //! counterpart with the facade's iWork tail, which runs only after OOXML and
 //! ODF have declined a ZIP input.
 

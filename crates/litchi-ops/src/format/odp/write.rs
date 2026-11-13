@@ -1,4 +1,4 @@
-//! Unified writes for OpenDocument presentations (record 0278).
+//! Unified writes for OpenDocument presentations.
 //!
 //! Targets resolve through the read navigator; properties are admitted by
 //! the ODP write registry; the complete call becomes one list of leaf
@@ -39,7 +39,7 @@ use crate::value::{Base, Color, Length, Scalar};
 pub(crate) enum Patch {
     /// A primary presentation transaction.
     Edit(litchi_odp::edit::Patch),
-    /// A `/metadata` commit of the metadata family (record 0288).
+    /// A `/metadata` commit of the metadata family.
     Metadata(litchi_odp::metadata::Patch),
 }
 
@@ -75,7 +75,7 @@ struct Values {
     text: Option<String>,
     name: Option<String>,
     geometry: [Option<String>; 4],
-    /// Character formatting (paragraphs and runs, record 0308).
+    /// Character formatting (paragraphs and runs).
     format: TextPropertyUpdate,
 }
 
@@ -134,7 +134,7 @@ pub(crate) fn set_with_limits<'p, 'v>(
     commit_changes(file, &plan.changes, limits)
 }
 
-/// The `link` and `tooltip` a hyperlink write assigns (record 0328).
+/// The `link` and `tooltip` a hyperlink write assigns.
 struct LinkValues {
     link: Option<String>,
     tooltip: Option<String>,
@@ -195,7 +195,7 @@ fn shape_click_change(
 }
 
 /// Plan hyperlink sets: a shape's click action, a link run's target and
-/// title (record 0328).
+/// title.
 fn plan_links(file: &Odp, nodes: &[Node<'_>], props: &Props<'_>) -> Result<Vec<Change>> {
     let values = link_values(props)?;
     let mut changes = Vec::new();
@@ -529,10 +529,10 @@ fn plan_node(node: &Node<'_>, values: Values, plan: &mut Plan) -> Result<()> {
     Ok(())
 }
 
-/// Character formatting of a whole story (a shape, table cell or notes,
-/// record 0316): every paragraph takes it through its paragraph style, and
-/// every run whose own style chain sets a different value takes it too, so
-/// each run reads the new value.
+/// Character formatting of a whole story (a shape, table cell or notes):
+/// every paragraph takes it through its paragraph style, and every run
+/// whose own style chain sets a different value takes it too, so each run
+/// reads the new value.
 fn format_story(
     node: &Node<'_>,
     story: &StoryRef,
@@ -591,7 +591,7 @@ fn overrides(own: &litchi_odp::scene::TextProperties, format: &TextPropertyUpdat
             .is_some_and(|(set, held)| set != held)
 }
 
-/// Set `/metadata` through the leaf metadata family (record 0288).
+/// Set `/metadata` through the leaf metadata family.
 fn set_metadata(file: &Odp, props: &Props<'_>, limits: &SemanticLimits) -> Result<WriteCommit> {
     let package = file.package()?;
     let mut edit = package.edit_metadata();

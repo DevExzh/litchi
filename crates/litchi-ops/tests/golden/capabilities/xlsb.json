@@ -88,37 +88,37 @@
     "issues": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the issues view needs the validators `validate` adds"
     },
     "forms": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the forms view needs the validators `validate` adds"
     },
     "html": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     "svg": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     "screenshot": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     "pdf": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     }
   },
@@ -1638,7 +1638,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended (R4x)",
+        "followUp": "not supported yet",
         "reason": "XLSB pivot tables are retained by the leaf but not projected into unified nodes yet"
       }
     },
@@ -1661,7 +1661,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended (R4x)",
+        "followUp": "not supported yet",
         "reason": "XLSB slicers are retained by the leaf but not projected into unified nodes yet"
       }
     },
@@ -1684,7 +1684,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended (R4x)",
+        "followUp": "not supported yet",
         "reason": "XLSB sparkline groups are retained by the leaf but not projected into unified nodes yet"
       }
     },
@@ -2193,7 +2193,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended (R4x)",
+        "followUp": "not supported yet",
         "reason": "XLSB merged ranges are retained by the leaf but are not listed as nodes yet"
       }
     },
@@ -2613,7 +2613,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended (R4x)",
+        "followUp": "not supported yet",
         "reason": "XLSB OLE objects are retained by the leaf but are not projected into nodes yet"
       }
     },
@@ -2736,7 +2736,7 @@
       "properties": {},
       "gap": {
         "code": "unsupported_capability",
-        "followUp": "M1-extended (R4x)",
+        "followUp": "not supported yet",
         "reason": "the XLSB cell model exposes a cell value, not a unified rich-text run node"
       }
     }
@@ -2746,49 +2746,49 @@
       "subject": "element",
       "element": "pivottable",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "XLSB pivot tables are retained by the leaf but not projected into unified nodes yet"
     },
     {
       "subject": "element",
       "element": "slicer",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "XLSB slicers are retained by the leaf but not projected into unified nodes yet"
     },
     {
       "subject": "element",
       "element": "sparkline",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "XLSB sparkline groups are retained by the leaf but not projected into unified nodes yet"
     },
     {
       "subject": "element",
       "element": "mergeCell",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "XLSB merged ranges are retained by the leaf but are not listed as nodes yet"
     },
     {
       "subject": "element",
       "element": "ole",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "XLSB OLE objects are retained by the leaf but are not projected into nodes yet"
     },
     {
       "subject": "element",
       "element": "run",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "the XLSB cell model exposes a cell value, not a unified rich-text run node"
     },
     {
       "subject": "element",
       "element": "detectedtable",
       "code": "unsupported_capability",
-      "followUp": "0339-F5 (deferred-P1): header-row table detection in queries",
+      "followUp": "header-row table detection in queries",
       "reason": "OfficeCLI's detectedtable is a header-row block found heuristically in unstructured cells and reported by table queries; Litchi's queries return declared tables only"
     },
     {
@@ -2797,7 +2797,7 @@
       "element": "namedrange",
       "context": "earlier-name",
       "code": "unsupported_capability",
-      "followUp": "XLSB defined-name index renumbering (record 0330)",
+      "followUp": "XLSB defined-name index renumbering",
       "reason": "only the workbook's last defined name can be removed; an earlier one would renumber every formula's name references"
     },
     {
@@ -2805,7 +2805,7 @@
       "element": "workbook",
       "key": "calc.mode",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "XLSB calculation properties are retained by the leaf but not projected into the workbook node"
     },
     {
@@ -2813,7 +2813,7 @@
       "element": "workbook",
       "key": "firstSheet",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "the XLSB workbook node does not expose the authored first-sheet setting yet"
     },
     {
@@ -2821,7 +2821,7 @@
       "element": "sheet",
       "key": "freeze",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "XLSB sheet views are retained by the leaf but freeze panes are not projected yet"
     },
     {
@@ -2829,7 +2829,7 @@
       "element": "sheet",
       "key": "zoom",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "XLSB sheet views are retained by the leaf but zoom is not projected yet"
     },
     {
@@ -2837,7 +2837,7 @@
       "element": "sheet",
       "key": "autoFilter",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "XLSB auto-filter metadata is retained by the leaf but not projected into a sheet node yet"
     },
     {
@@ -2845,7 +2845,7 @@
       "element": "sheet",
       "key": "tabColor",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "XLSB sheet tab color is not projected into the sheet node yet"
     },
     {
@@ -2853,7 +2853,7 @@
       "element": "sheet",
       "key": "protect",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "XLSB sheet protection metadata is retained by the leaf but not projected yet"
     },
     {
@@ -2861,7 +2861,7 @@
       "element": "sheet",
       "key": "printArea",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "XLSB print settings are not projected into the sheet node yet"
     },
     {
@@ -2869,15 +2869,15 @@
       "element": "cell",
       "key": "computedValue",
       "code": "unsupported_capability",
-      "followUp": "M4 follow-up: project computed values in cell views",
-      "reason": "node views do not evaluate; `File::evaluate` and `File::recalculate` compute formula results from the full grid (record 0266); the source cached-value fallback has no formula text"
+      "followUp": "follow-up: project computed values in cell views",
+      "reason": "node views do not evaluate; `File::evaluate` and `File::recalculate` compute formula results from the full grid; the source cached-value fallback has no formula text"
     },
     {
       "subject": "property",
       "element": "cell",
       "key": "superscript",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
+      "followUp": "not supported yet",
       "reason": "the XLSB node does not project font records into cell properties"
     },
     {
@@ -2885,7 +2885,7 @@
       "element": "cell",
       "key": "subscript",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
+      "followUp": "not supported yet",
       "reason": "the XLSB node does not project font records into cell properties"
     },
     {
@@ -2893,7 +2893,7 @@
       "element": "cell",
       "key": "font.outline",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
+      "followUp": "not supported yet",
       "reason": "the XLSB node does not project font records into cell properties"
     },
     {
@@ -2901,7 +2901,7 @@
       "element": "cell",
       "key": "font.shadow",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
+      "followUp": "not supported yet",
       "reason": "the XLSB node does not project font records into cell properties"
     },
     {
@@ -2909,7 +2909,7 @@
       "element": "cell",
       "key": "font.condense",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
+      "followUp": "not supported yet",
       "reason": "the XLSB node does not project font records into cell properties"
     },
     {
@@ -2917,7 +2917,7 @@
       "element": "cell",
       "key": "font.extend",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
+      "followUp": "not supported yet",
       "reason": "the XLSB node does not project font records into cell properties"
     },
     {
@@ -2925,7 +2925,7 @@
       "element": "cell",
       "key": "font.charset",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
+      "followUp": "not supported yet",
       "reason": "the XLSB node does not project font records into cell properties"
     },
     {
@@ -2933,7 +2933,7 @@
       "element": "cell",
       "key": "font.family",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
+      "followUp": "not supported yet",
       "reason": "the XLSB node does not project font records into cell properties"
     },
     {
@@ -2941,7 +2941,7 @@
       "element": "cell",
       "key": "alignment.relativeIndent",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
+      "followUp": "not supported yet",
       "reason": "the XLSB node does not project this alignment attribute into cell properties"
     },
     {
@@ -2949,7 +2949,7 @@
       "element": "cell",
       "key": "alignment.justifyLastLine",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
+      "followUp": "not supported yet",
       "reason": "the XLSB node does not project this alignment attribute into cell properties"
     },
     {
@@ -2957,7 +2957,7 @@
       "element": "cell",
       "key": "font.scheme",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
+      "followUp": "not supported yet",
       "reason": "the XLSB node does not project font records into cell properties"
     },
     {
@@ -2965,7 +2965,7 @@
       "element": "cell",
       "key": "fillPattern",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
+      "followUp": "not supported yet",
       "reason": "the XLSB node does not project fill records into cell properties"
     },
     {
@@ -2973,7 +2973,7 @@
       "element": "cell",
       "key": "fillBg",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
+      "followUp": "not supported yet",
       "reason": "the XLSB node does not project fill records into cell properties"
     },
     {
@@ -2981,7 +2981,7 @@
       "element": "cell",
       "key": "border.diagonal",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
+      "followUp": "not supported yet",
       "reason": "the XLSB node does not project border records into cell properties"
     },
     {
@@ -2989,7 +2989,7 @@
       "element": "cell",
       "key": "border.diagonal.color",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
+      "followUp": "not supported yet",
       "reason": "the XLSB node does not project border records into cell properties"
     },
     {
@@ -2997,7 +2997,7 @@
       "element": "cell",
       "key": "border.diagonalUp",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
+      "followUp": "not supported yet",
       "reason": "the XLSB node does not project border records into cell properties"
     },
     {
@@ -3005,7 +3005,7 @@
       "element": "cell",
       "key": "border.diagonalDown",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
+      "followUp": "not supported yet",
       "reason": "the XLSB node does not project border records into cell properties"
     },
     {
@@ -3013,7 +3013,7 @@
       "element": "cell",
       "key": "protection.locked",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
+      "followUp": "not supported yet",
       "reason": "the XLSB node does not project cell protection metadata"
     },
     {
@@ -3021,7 +3021,7 @@
       "element": "cell",
       "key": "protection.hidden",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
+      "followUp": "not supported yet",
       "reason": "the XLSB node does not project cell protection metadata"
     },
     {
@@ -3029,7 +3029,7 @@
       "element": "cell",
       "key": "quotePrefix",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
+      "followUp": "not supported yet",
       "reason": "the XLSB node does not project quote-prefix metadata into cell properties"
     },
     {
@@ -3037,7 +3037,7 @@
       "element": "cell",
       "key": "numFmtId",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
+      "followUp": "not supported yet",
       "reason": "native number-format IDs remain in the XLSB style table and are not admitted as unified properties"
     },
     {
@@ -3045,7 +3045,7 @@
       "element": "cell",
       "key": "link",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "XLSB hyperlink targets are retained by the leaf but not resolved into cell properties yet"
     },
     {
@@ -3053,7 +3053,7 @@
       "element": "cell",
       "key": "tooltip",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "XLSB hyperlink tooltips are not resolved into cell properties yet"
     },
     {
@@ -3061,7 +3061,7 @@
       "element": "cell",
       "key": "display",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "XLSB cells expose stored values, not a separately formatted display string"
     },
     {
@@ -3069,7 +3069,7 @@
       "element": "cell",
       "key": "phonetic",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "XLSB phonetic runs are retained by the leaf but not projected into cell properties yet"
     },
     {
@@ -3077,7 +3077,7 @@
       "element": "cell",
       "key": "richtext",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "the XLSB cell model exposes a flattened value and no unified rich-text run node"
     },
     {
@@ -3085,7 +3085,7 @@
       "element": "cell",
       "key": "alt",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "XLSB in-cell pictures are not read by the unified adapter"
     },
     {
@@ -3093,7 +3093,7 @@
       "element": "namedrange",
       "key": "comment",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
+      "followUp": "not supported yet",
       "reason": "the XLSB defined-name projection reads name, ref and scope; BrtName comments are not projected yet"
     },
     {
@@ -3101,7 +3101,7 @@
       "element": "namedrange",
       "key": "volatile",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
+      "followUp": "not supported yet",
       "reason": "the XLSB defined-name projection reads name, ref and scope; macro and volatile flags are not projected yet"
     },
     {
@@ -3109,7 +3109,7 @@
       "element": "namedrange",
       "key": "hidden",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
+      "followUp": "not supported yet",
       "reason": "the XLSB defined-name projection reads name, ref and scope; the hidden flag is not projected yet"
     },
     {
@@ -3117,7 +3117,7 @@
       "element": "column",
       "key": "numberformat",
       "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
+      "followUp": "not supported yet",
       "reason": "XLSB column styles are not projected into column nodes yet"
     },
     {
@@ -3126,7 +3126,7 @@
       "element": "workbook",
       "context": "template",
       "code": "unsupported_capability",
-      "followUp": "use Flavor::Document; M2 XLSB template creation",
+      "followUp": "use Flavor::Document; XLSB template creation",
       "reason": "the XLSB creator currently authors ordinary workbooks and refuses template requests"
     },
     {
@@ -3144,7 +3144,7 @@
       "element": "workbook",
       "context": "unrepresentable-initial-metadata",
       "code": "unsupported_capability",
-      "followUp": "CreateOptions::metadata (OOXML document properties, record 0253)",
+      "followUp": "CreateOptions::metadata (OOXML document properties)",
       "reason": "initial metadata is committed through the leaf metadata transaction; content_type, last_backup and codepage have no OOXML property part and are refused rather than dropped"
     },
     {
@@ -3154,7 +3154,7 @@
       "context": "path-read",
       "code": "unsupported_capability",
       "followUp": "File::metadata(); /metadata node reads with the shared metadata vocabulary",
-      "reason": "`set(\"/metadata\", ..)` writes the OOXML document properties (root-metadata keys and custom.<name>, record 0253); the path is set-only, and reads go through File::metadata() and the root node"
+      "reason": "`set(\"/metadata\", ..)` writes the OOXML document properties (root-metadata keys and custom.<name>); the path is set-only, and reads go through File::metadata() and the root node"
     },
     {
       "subject": "operation",
@@ -3162,7 +3162,7 @@
       "element": "workbook",
       "context": "non-sheet-elements",
       "code": "unsupported_element",
-      "followUp": "M2 XLSB structural add handlers for non-sheet elements",
+      "followUp": "XLSB structural add handlers for non-sheet elements",
       "reason": "XLSB structural addition creates complete workbook tabs; cells, ranges, rows, columns, tables and other nodes require their own native lifecycle owners"
     },
     {
@@ -3171,7 +3171,7 @@
       "element": "sheet",
       "context": "order-opaque-dependencies",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSB dependency-aware complete-catalog sheet insertion",
+      "followUp": "XLSB dependency-aware complete-catalog sheet insertion",
       "reason": "sheet insertion refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies, unmodeled title layouts and markup-compatibility title metadata until their dependencies have a native remapping contract"
     },
     {
@@ -3180,7 +3180,7 @@
       "element": "sheet",
       "context": "vba-dependency",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSB dependency-aware complete-catalog sheet insertion",
+      "followUp": "XLSB dependency-aware complete-catalog sheet insertion",
       "reason": "sheet insertion refuses workbooks with a VBA project dependency until native catalog identity remapping is available"
     },
     {
@@ -3189,7 +3189,7 @@
       "element": "sheet",
       "context": "calculation-chain-dependency",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSB calculation-chain-aware sheet insertion",
+      "followUp": "XLSB calculation-chain-aware sheet insertion",
       "reason": "sheet insertion refuses workbooks with a calculation-chain dependency until native sheet positions can be remapped safely"
     },
     {
@@ -3198,7 +3198,7 @@
       "element": "sheet",
       "context": "noncontiguous-3d-dependency",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSB 3-D dependency-aware sheet insertion",
+      "followUp": "XLSB 3-D dependency-aware sheet insertion",
       "reason": "sheet insertion refuses a position inside an internal 3-D reference range because it would broaden the range"
     },
     {
@@ -3207,7 +3207,7 @@
       "element": "workbook",
       "context": "non-sheet-elements",
       "code": "unsupported_element",
-      "followUp": "M2 XLSB non-cell removal handlers",
+      "followUp": "XLSB non-cell removal handlers",
       "reason": "XLSB removal deletes complete-catalog sheet tabs and stored cell records; workbook, row, column, table and other non-sheet structural elements require their own native lifecycle owners"
     },
     {
@@ -3216,7 +3216,7 @@
       "element": "sheet",
       "context": "order-opaque-dependencies",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSB dependency-aware complete-catalog sheet removal",
+      "followUp": "XLSB dependency-aware complete-catalog sheet removal",
       "reason": "sheet removal admits only the selected sheet root and exclusively owned binaryIndex parts; any other outgoing internal relationship, including chart, drawing, comments, tables or adjunct parts, is refused as unsupported until it has a typed dependency disposition, along with shared-workbook revisions, data-model parts, connections, slicers, timelines, pivot-cache and table formula dependencies, unmodeled workbook records, surviving worksheet FRT/AC records and formula groups, opaque volatile dependencies and markup-compatibility title metadata"
     },
     {
@@ -3225,7 +3225,7 @@
       "element": "sheet",
       "context": "removed-scoped-names",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSB dependency-aware scoped-name removal",
+      "followUp": "XLSB dependency-aware scoped-name removal",
       "reason": "sheet removal refuses workbook or sheet-scoped names that resolve into a removed tab until native name pruning and reference remapping are available"
     },
     {
@@ -3234,7 +3234,7 @@
       "element": "sheet",
       "context": "textual-references",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSB dependency-aware textual-reference removal",
+      "followUp": "XLSB dependency-aware textual-reference removal",
       "reason": "sheet removal refuses formula-like and textual dependency carriers that still reference a removed tab instead of leaving stale names or links"
     },
     {
@@ -3243,7 +3243,7 @@
       "element": "cell",
       "context": "formula-groups",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSB dependency-aware formula-group removal",
+      "followUp": "XLSB dependency-aware formula-group removal",
       "reason": "array, shared and data-table formula-group members require native group lifecycle support before removal"
     },
     {
@@ -3252,7 +3252,7 @@
       "element": "cell",
       "context": "calculation-chain",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSB calculation-chain-aware formula removal",
+      "followUp": "XLSB calculation-chain-aware formula removal",
       "reason": "stored formulas cannot be removed while an opaque calculation chain is present"
     },
     {
@@ -3261,7 +3261,7 @@
       "element": "cell",
       "context": "unmodeled-cell-records",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSB additional native cell-record families",
+      "followUp": "XLSB additional native cell-record families",
       "reason": "semantic removal refuses worksheets containing reserved cell-record families whose coordinate layout is not modeled"
     },
     {
@@ -3279,7 +3279,7 @@
       "element": "sheet",
       "context": "unmodeled-tab-views",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSB multi-window and additional tab-kind view mutation",
+      "followUp": "XLSB multi-window and additional tab-kind view mutation",
       "reason": "visibility changes refuse active-tab relocation across multiple workbook windows and selected-view changes on unmodeled dialog or macro tabs"
     },
     {
@@ -3288,7 +3288,7 @@
       "element": "sheet",
       "context": "sheet-name-markup-compatibility",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSB markup-compatibility-aware sheet-name dependency rewrites",
+      "followUp": "XLSB markup-compatibility-aware sheet-name dependency rewrites",
       "reason": "sheet-name edits refuse a recognized dependency inside an OOXML markup-compatibility alternative instead of selecting or discarding a branch"
     },
     {
@@ -3297,7 +3297,7 @@
       "element": "sheet",
       "context": "sheet-name-unmodeled-reference",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSB additional sheet-name reference carriers",
+      "followUp": "XLSB additional sheet-name reference carriers",
       "reason": "sheet-name edits refuse formula-like or name-like reference carriers outside the proven rewrite vocabulary so dependent names cannot be left stale"
     },
     {
@@ -3306,7 +3306,7 @@
       "element": "sheet",
       "context": "order-opaque-dependencies",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSB dependency-aware complete-catalog sheet ordering",
+      "followUp": "XLSB dependency-aware complete-catalog sheet ordering",
       "reason": "sheet ordering refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies, unmodeled title layouts and markup-compatibility title metadata until their historical or ordinal dependencies have a native remapping contract"
     },
     {
@@ -3315,7 +3315,7 @@
       "element": "sheet",
       "context": "order-opaque-dependencies",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSB dependency-aware complete-catalog sheet ordering",
+      "followUp": "XLSB dependency-aware complete-catalog sheet ordering",
       "reason": "sheet ordering refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies, unmodeled title layouts and markup-compatibility title metadata until their historical or ordinal dependencies have a native remapping contract"
     },
     {
@@ -3324,7 +3324,7 @@
       "element": "sheet",
       "context": "vba-dependency",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSB dependency-aware complete-catalog sheet ordering",
+      "followUp": "XLSB dependency-aware complete-catalog sheet ordering",
       "reason": "sheet ordering refuses workbooks with a VBA project dependency until native catalog identity remapping is available"
     },
     {
@@ -3333,7 +3333,7 @@
       "element": "sheet",
       "context": "vba-dependency",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSB dependency-aware complete-catalog sheet ordering",
+      "followUp": "XLSB dependency-aware complete-catalog sheet ordering",
       "reason": "sheet ordering refuses workbooks with a VBA project dependency until native catalog identity remapping is available"
     },
     {
@@ -3342,7 +3342,7 @@
       "element": "sheet",
       "context": "calculation-chain-dependency",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSB calculation-chain-aware sheet ordering",
+      "followUp": "XLSB calculation-chain-aware sheet ordering",
       "reason": "sheet ordering refuses workbooks with a calculation-chain dependency until native sheet positions can be remapped safely"
     },
     {
@@ -3351,7 +3351,7 @@
       "element": "sheet",
       "context": "calculation-chain-dependency",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSB calculation-chain-aware sheet ordering",
+      "followUp": "XLSB calculation-chain-aware sheet ordering",
       "reason": "sheet ordering refuses workbooks with a calculation-chain dependency until native sheet positions can be remapped safely"
     },
     {
@@ -3360,7 +3360,7 @@
       "element": "sheet",
       "context": "noncontiguous-3d-dependency",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSB 3-D dependency-aware sheet ordering",
+      "followUp": "XLSB 3-D dependency-aware sheet ordering",
       "reason": "sheet ordering refuses a permutation that would make an internal 3-D reference noncontiguous"
     },
     {
@@ -3369,49 +3369,49 @@
       "element": "sheet",
       "context": "noncontiguous-3d-dependency",
       "code": "unsupported_capability",
-      "followUp": "M2 XLSB 3-D dependency-aware sheet ordering",
+      "followUp": "XLSB 3-D dependency-aware sheet ordering",
       "reason": "sheet ordering refuses a permutation that would make an internal 3-D reference noncontiguous"
     },
     {
       "subject": "view",
       "mode": "issues",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the issues view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "forms",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the forms view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "html",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "svg",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "screenshot",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "pdf",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     }
   ]

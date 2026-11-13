@@ -1,8 +1,7 @@
-//! OfficeCLI-shaped textual and JSON views for ODS workbooks (record
-//! 0277), with the layout of the other workbook adapters: `text` lists each
-//! content row's cells, `annotated` each content cell with its type,
-//! `outline` each sheet's size and formula count, `stats` the cell type
-//! distribution.
+//! OfficeCLI-shaped textual and JSON views for ODS workbooks, with the
+//! layout of the other workbook adapters: `text` lists each content row's
+//! cells, `annotated` each content cell with its type, `outline` each
+//! sheet's size and formula count, `stats` the cell type distribution.
 
 use std::fmt;
 use std::ops::ControlFlow;

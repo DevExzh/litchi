@@ -1,5 +1,5 @@
-//! The DOC stylesheet and list tables under the DOCX vocabulary (record
-//! 0324): `/styles`, `/styles/<id or name>`, `/numbering`,
+//! The DOC stylesheet and list tables under the DOCX vocabulary:
+//! `/styles`, `/styles/<id or name>`, `/numbering`,
 //! `/numbering/abstractNum[N]`, `/numbering/num[N]` and
 //! `/numbering/abstractNum[N]/level[L]`, plus the paragraph and run keys
 //! that name a style or a list.

@@ -1,8 +1,8 @@
 #![no_main]
 
-//! Apple iWork packages through the unified `File` (record 0306): open under
-//! bounded options, then read the text, the outline and the stats, query
-//! every element, and check that a no-op publication is the input itself.
+//! Apple iWork packages through the unified `File`: open under bounded
+//! options, then read the text, the outline and the stats, query every
+//! element, and check that a no-op publication is the input itself.
 
 use std::hint::black_box;
 

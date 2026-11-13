@@ -1,4 +1,4 @@
-//! Unified ODM master documents (record 0282): reads, writes, save and
+//! Unified ODM master documents: reads, writes, save and
 //! create through the shared ODT adapter; the package keeps its master MIME
 //! type and its linked sections stay links.
 

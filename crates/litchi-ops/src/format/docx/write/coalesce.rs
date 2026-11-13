@@ -1,5 +1,5 @@
-//! Exact-markup formatting runs, and direct body-paragraph text sets
-//! (record 0355a). Structural operations are barriers.
+//! Exact-markup formatting runs, and direct body-paragraph text sets.
+//! Structural operations are barriers.
 //!
 //! A body paragraph's ordinal is stable across text replacement, so `text`
 //! on a direct `/body/p[N]` path shares the run's native edit, resolved
@@ -58,16 +58,16 @@ impl Docx {
         target: &TargetArg<'_>,
         props: &Props<'_>,
     ) -> Result<Option<Plan>> {
-        // A metadata set publishes through its own writer (record 0338).
+        // A metadata set publishes through its own writer.
         if target.path().is_none() || props.is_empty() || Self::is_metadata_set(target, props) {
             return Ok(None);
         }
         let result = (|| {
             let nodes = self.resolve_targets(target)?;
-            // Charts have their own setter outside the formatting surface
-            // (record 0283): the ordinary set path writes them (0289).
-            // So do the part elements (record 0319), and pictures,
-            // comments, SmartArt and chart series and axes (record 0335).
+            // Charts have their own setter outside the formatting surface:
+            // the ordinary set path writes them.
+            // So do the part elements, and pictures,
+            // comments, SmartArt and chart series and axes.
             if nodes.iter().any(|node| {
                 use crate::format::docx::Kind;
                 matches!(
@@ -129,9 +129,9 @@ fn plan(target: Target, props: &Props<'_>) -> Result<Option<Plan>> {
         if assignment
             .entry
             .prepare(Operation::Set, &assignment.value, |setter, _| {
-                // Lists stage numbering definitions: a barrier (0251e).
+                // Lists stage numbering definitions: a barrier.
                 // A hyperlink target changes a relationship, which only the
-                // owning package editor can do: a barrier (0289).
+                // owning package editor can do: a barrier.
                 Ok(setter.is_text()
                     || matches!(
                         setter,

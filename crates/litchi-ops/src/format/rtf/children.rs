@@ -14,8 +14,8 @@ use crate::path::navigate::KindSet;
 
 /// The parent whose children are walked, with the native cursor of the axis
 /// being walked. The hot main-story axes keep only what they read; any other
-/// parent is kept by value (record 0287: an RTF node is small enough to copy,
-/// which spares an allocation per walked container).
+/// parent is kept by value (an RTF node is small enough to copy, which spares
+/// an allocation per walked container).
 enum State<'f> {
     None,
     Body {
@@ -29,7 +29,7 @@ enum State<'f> {
         /// the position of its terminating mark.
         anchors: std::ops::Range<usize>,
         runs: litchi_rtf::text::Runs<'f>,
-        /// The paragraph's tab stops (record 0328).
+        /// The paragraph's tab stops.
         tabs: &'f [litchi_rtf::TabStop],
     },
     Other(Node<'f>),
@@ -112,7 +112,7 @@ impl<'f> Children<'f> {
             // Views list a story's paragraphs; the query walker does not
             // descend into header/footer stories.
             Kind::Header | Kind::Footer if self.view => &[Kind::Paragraph],
-            // Views list the structural kinds only (record 0328).
+            // Views list the structural kinds only.
             Kind::Document if self.view => &[
                 Kind::Body,
                 Kind::Header,

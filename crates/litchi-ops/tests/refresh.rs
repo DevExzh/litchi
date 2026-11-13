@@ -1,4 +1,4 @@
-//! Field and table-of-contents refresh (record 0279): DOCX tables of
+//! Field and table-of-contents refresh: DOCX tables of
 //! contents and computable fields, PPTX slide fields, and the exact no-op
 //! on documents a word processor left current. Every DOCX case runs on both
 //! owners.
@@ -123,7 +123,7 @@ fn a_changed_heading_rebuilds_the_table_and_keeps_page_numbers() {
             fixture("sw/qa/extras/ooxmlexport/data/multi-page-toc.docx"),
         );
         // Change the heading alone: a find over the body would also change
-        // the table's entry, a field result it searches (record 0285).
+        // the table's entry, a field result it searches.
         let file = file
             .set(
                 "/body/p[2]",

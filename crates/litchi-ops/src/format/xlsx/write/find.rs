@@ -1,11 +1,11 @@
-//! XLSX find/replace (record 0273): `set` with `find=` and `replace=`.
+//! XLSX find/replace: `set` with `find=` and `replace=`.
 //!
 //! As OfficeCLI's `ExcelHandler.FindAndReplace`, the workbook root searches
 //! every worksheet and a sheet its own cells; Litchi also accepts a cell, a
 //! range, a row or a column. Each stored text value is one search group.
 //! Formula cells and non-text values are not searched. A cell showing a
 //! formatted shared string is rewritten run by run as its own inline rich
-//! string, each run keeping its properties (record 0295); an inline rich
+//! string, each run keeping its properties; an inline rich
 //! string or an item with phonetic runs is refused when it would change. A
 //! match spanning runs collapses into the run where it starts. Every
 //! changed cell is staged in one native workbook edit.
@@ -127,7 +127,7 @@ impl Xlsx {
                         continue;
                     };
                     let content = if worksheet.has_rich_text(address).map_err(native_error)? {
-                        // Record 0295: rewrite the runs of the cell's
+                        // Rewrite the runs of the cell's
                         // shared string, each keeping its properties.
                         let Some(mut rich) = worksheet.rich_text(address).map_err(native_error)?
                         else {
@@ -211,7 +211,7 @@ impl Xlsx {
 /// The new text of a changed cell.
 pub(super) enum CellText {
     Plain(String),
-    /// The cell's rich runs with new texts (record 0295).
+    /// The cell's rich runs with new texts.
     Rich(xlsx::RichText),
 }
 
@@ -223,9 +223,7 @@ pub(super) fn rich_refusal() -> Error {
         "this XLSX rich-text cell cannot be rewritten run by run",
     )
     .with_property(crate::find::FIND)
-    .with_suggestion(
-        "an inline rich string or phonetic runs would be lost by a plain value (record 0295 follow-up)",
-    )
+    .with_suggestion("an inline rich string or phonetic runs would be lost by a plain value")
 }
 
 /// The worksheet areas the target nodes search.

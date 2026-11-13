@@ -1,4 +1,4 @@
-//! Decode counts (record 0010 §4.10, §9.2): what each read takes from the
+//! Decode counts: what each read takes from the
 //! package. A recording source maps every positional read to the archive
 //! member it starts in, and the leaf's semantic-cache diagnostics count the
 //! worksheet grids built.

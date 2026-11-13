@@ -1,6 +1,6 @@
 # `multi-slide.key` provenance
 
-A five-slide Keynote package **built by Litchi** (record 0298) from
+A five-slide Keynote package **built by Litchi** from
 [`basic.key`](basic.key) (SHA-256
 `3a3d07476b45b6e543bcfba75fe38a245434176dcb3565e34570b817708b9f42`, the
 repository's native single-slide fixture; see `../README.md`). No upstream

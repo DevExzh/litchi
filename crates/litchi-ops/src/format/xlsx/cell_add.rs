@@ -1,4 +1,4 @@
-//! `add` of an XLSX worksheet cell and of a rich-text run (record 0338).
+//! `add` of an XLSX worksheet cell and of a rich-text run.
 //!
 //! As OfficeCLI's `AddCell`, the parent picks the cell:
 //!

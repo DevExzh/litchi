@@ -2,8 +2,8 @@
 //!
 //! `litchi::eval::FormulaEvaluator` is generic over `WorkbookTrait`, which
 //! the `WorkbookView` of `File::workbook` implements by static dispatch, so
-//! the evaluator reads an opened workbook directly (M0a step S8c; these tests
-//! evaluated the boxed workbook of the facade's generic workbook opener).
+//! the evaluator reads an opened workbook directly (these tests evaluated the
+//! boxed workbook of the facade's generic workbook opener).
 
 #![cfg(all(feature = "eval", feature = "xlsx"))]
 

@@ -1,4 +1,4 @@
-//! Node addresses and their canonical path text (record 0010 §2.6).
+//! Node addresses and their canonical path text.
 //!
 //! A node keeps a compact address: [`PathStep`]s naming a kind or a sheet,
 //! each with at most one selector (a position or a stable identity), or a
@@ -24,9 +24,9 @@ use litchi_core::selector::{
 /// A `NodePath` borrows the steps its node stores, or carries up to four
 /// steps by value: a node whose address is short and cheap to spell out (a
 /// worksheet cell, a slide's shape) writes its steps on demand instead of
-/// storing them, which keeps it small to move (record 0262). `Display`
-/// writes the grammar's canonical text without allocating;
-/// [`NodePath::to_path`] builds the equal [`Path`] value.
+/// storing them, which keeps it small to move. `Display` writes the
+/// grammar's canonical text without allocating; [`NodePath::to_path`]
+/// builds the equal [`Path`] value.
 ///
 /// A path deeper than the grammar's step limit (64,
 /// `litchi_core::selector::limits::MAX_STEPS`) still renders, but does not
@@ -109,7 +109,7 @@ impl<'a> NodePath<'a> {
 
     /// The path of `len` steps from the root, each written by `step` from
     /// its index, carried by value; `None` for more than four steps. The
-    /// steps are written in place (record 0287), with no staging array.
+    /// steps are written in place, with no staging array.
     #[cfg_attr(
         not(any(feature = "doc", feature = "rtf", feature = "odt")),
         allow(

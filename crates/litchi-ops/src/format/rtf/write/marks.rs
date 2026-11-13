@@ -1,5 +1,5 @@
 //! Unified writes to RTF sections, bookmarks, fields, tables of contents
-//! and tab stops (record 0328).
+//! and tab stops.
 //!
 //! Each selected node names an entry of the native collections; the whole
 //! selection is staged as one native mark edit

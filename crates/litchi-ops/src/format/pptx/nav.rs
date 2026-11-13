@@ -1,5 +1,4 @@
-//! The PPTX adapter of path resolution and queries (record 0010 §4.1,
-//! §4.6, §5.3).
+//! The PPTX adapter of path resolution and queries.
 //!
 //! [`Nav`] is a copyable reference to one [`Pptx`] handle. Resolution asks
 //! it for one child per path step and runs only that step's leaf read:
@@ -7,7 +6,7 @@
 //! | Step | Leaf read |
 //! |---|---|
 //! | `/slide[N]`, `[last()]` | the catalog; nothing is decoded |
-//! | `/slide[N]/shape[K]`, `picture[K]`, `table[K]`, `chart[K]`, `group[K]`, `connector[K]`, `smartart[K]`, `ole[K]` | the slide's scene (the leaf memoizes it per slide payload); each kind counts the direct elements of its own kind (D5) |
+//! | `/slide[N]/shape[K]`, `picture[K]`, `table[K]`, `chart[K]`, `group[K]`, `connector[K]`, `smartart[K]`, `ole[K]` | the slide's scene (the leaf memoizes it per slide payload); each kind counts the direct elements of its own kind |
 //! | `…[@name=X]` (or an explicitly raw `…[@id=N]`) | the same scene; `@name` is caseless and ignores a `!!` morph prefix on either side, as OfficeCLI's `MatchesShapeName` |
 //! | `/slide[N]/placeholder[K]`, `placeholder[type]`, `placeholder[@type=T][@idx=I]` | the slide's direct `p:sp` with a `p:ph`; an ambiguous identity is refused |
 //! | `…/group[K]/…` | the group's direct elements |
@@ -370,7 +369,7 @@ impl<'f> Nav<'f> {
     }
 
     /// A paragraph of a table cell's text body, by path only: cell text
-    /// is not listed in views or unscoped queries (record 0333).
+    /// is not listed in views or unscoped queries.
     fn cell_paragraph(
         self,
         cell: &TableItem,
@@ -401,7 +400,7 @@ impl<'f> Nav<'f> {
     }
 
     /// A paragraph of a slide's speaker notes (the notes page's body
-    /// placeholder), by path only (record 0333).
+    /// placeholder), by path only.
     fn notes_paragraph(self, slide: u32, select: Select<'_>) -> Result<Lookup<Node<'f>, GapSpec>> {
         let Some(shape) = super::text_structure::notes_body(self.file, slide)? else {
             return Ok(Lookup::Missing);
@@ -583,7 +582,7 @@ impl<'f> Nav<'f> {
         })
     }
 
-    /// A SmartArt's or node's child node, by position (record 0284).
+    /// A SmartArt's or node's child node, by position.
     fn diagram_node(self, parent: &Item, select: Select<'_>) -> Result<Lookup<Node<'f>, GapSpec>> {
         let children = super::smartart::children(self.file, parent)?;
         Ok(match pick_index(children.len(), select) {
@@ -608,7 +607,7 @@ impl<'f> Nav<'f> {
         }
     }
 
-    /// The presentation theme, a singleton (record 0321).
+    /// The presentation theme, a singleton.
     fn theme(self, select: Select<'_>) -> Result<Lookup<Node<'f>, GapSpec>> {
         match pick_index(1, select) {
             Pick::Index(_) => {},

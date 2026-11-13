@@ -213,7 +213,7 @@ fn invalid_layout_values_are_typed_and_atomic() {
     assert_eq!(owner.to_bytes().unwrap(), bytes);
 }
 
-/// Record 0310: a layout write to a row or column named by its number
+/// A layout write to a row or column named by its number
 /// resolves the coordinates without materializing the worksheet grid. The
 /// published bytes are still exactly the native edit's on both owner
 /// routes, and `last()` selectors, which do read the grid, still resolve.

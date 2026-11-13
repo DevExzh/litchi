@@ -1,4 +1,4 @@
-//! Structural verbs beyond the direct body (record 0251a): paragraphs and
+//! Structural verbs beyond the direct body: paragraphs and
 //! runs inside cells, content controls and hyperlinks, and table, row and
 //! cell structure.
 //!
@@ -44,7 +44,7 @@ impl Docx {
                 let anchor = block_anchor(self, parent, &container, placement, None)?;
                 let (paragraph, list) = new_paragraph_with_list(node.props())?;
                 self.owner().check_source()?;
-                // A new list definition is a new part (record 0342).
+                // A new list definition is a new part.
                 let editor = if list.is_some() {
                     self.eager_editor(editor)?
                 } else {
@@ -69,7 +69,7 @@ impl Docx {
                 self.owner().check_source()?;
                 let mut edit = WorkEdit::from(editor)?;
                 let raw = edit.insert_table_at(&container, anchor, &table)?;
-                // `border.*` (record 0342): the new table's borders.
+                // `border.*`: the new table's borders.
                 if let Some(borders) = borders {
                     edit.format_table_at(&container.child(ElementStep::Table(raw)), |table| {
                         table.borders = Some(borders)
@@ -90,7 +90,7 @@ impl Docx {
                 let commit = edit.commit(self)?;
                 Ok((commit, path_with(parent, Some((Kind::Row, raw)))))
             },
-            // A single cell, after OfficeCLI's `AddCell` (record 0345).
+            // A single cell, after OfficeCLI's `AddCell`.
             (NewKind::Cell, Kind::Row) => {
                 let row = element_path(parent)?;
                 let Value::Row(value) = &parent.value else {
@@ -136,7 +136,7 @@ impl Docx {
                 let position = eager
                     .insert_hyperlink_at(&owner, direct, &target, &run)
                     .map_err(Error::from)?;
-                // The screen tip (record 0345), in the same transaction.
+                // The screen tip, in the same transaction.
                 if let Some(tooltip) = tooltip.as_deref() {
                     eager
                         .set_hyperlink_tooltip_at(
@@ -209,7 +209,7 @@ impl Docx {
                 let comment = new_comment(node.props())?;
                 // The comments before the edit, read on this (warm) handle:
                 // a reply names one of them (OfficeCLI refuses `parentId`
-                // without one, record 0345), and the leaf appends the new
+                // without one), and the leaf appends the new
                 // comment after them, so their count is its ordinal.
                 let existing = super::nav::comments(self)?;
                 if let Some(parent) = reply_parent(node.props())
@@ -290,7 +290,7 @@ impl Docx {
         if !nodes.is_empty() && nodes.iter().all(|node| node.element_kind() == Kind::Chart) {
             return self.remove_charts(editor, nodes);
         }
-        // Pictures, SmartArt graphics and their nodes (record 0335).
+        // Pictures, SmartArt graphics and their nodes.
         if !nodes.is_empty()
             && nodes
                 .iter()
@@ -305,11 +305,11 @@ impl Docx {
         {
             return self.remove_smartarts(editor, nodes);
         }
-        // Table grid columns (record 0345).
+        // Table grid columns.
         if !nodes.is_empty() && nodes.iter().all(|node| node.element_kind() == Kind::Column) {
             return self.remove_columns(editor, nodes);
         }
-        // Styles, numbering, headers, footers and notes (record 0319).
+        // Styles, numbering, headers, footers and notes.
         if !nodes.is_empty()
             && nodes
                 .iter()
@@ -317,7 +317,7 @@ impl Docx {
         {
             return self.remove_parts(editor, nodes);
         }
-        // Tab stops and breaks (record 0319).
+        // Tab stops and breaks.
         if !nodes.is_empty()
             && nodes
                 .iter()
@@ -707,7 +707,7 @@ pub(super) fn order_key(path: &ElementPath) -> Vec<(u8, usize)> {
 }
 
 /// A new table from the add properties: `rows`, `cols`, `data`, `style` and
-/// `colWidths`, and the borders `border.*` ask for (record 0342), which are
+/// `colWidths`, and the borders `border.*` ask for, which are
 /// written once the table is inserted.
 fn new_table(
     props: &Props<'_>,
@@ -804,8 +804,8 @@ fn new_table(
 }
 
 /// A new hyperlink's target, run and screen tip from its add properties:
-/// exactly one of `url` and `anchor`, its `text`, its `tooltip` (record
-/// 0345), and its run formatting. Without explicit formatting the run gets
+/// exactly one of `url` and `anchor`, its `text`, its `tooltip`,
+/// and its run formatting. Without explicit formatting the run gets
 /// OfficeCLI's fallback hyperlink look (color `0563C1`, single underline).
 fn new_hyperlink(
     props: &Props<'_>,
@@ -920,7 +920,7 @@ fn reply_parent(props: &Props<'_>) -> Option<u32> {
 
 /// A new comment from its add properties: `author` is required, `text`,
 /// `initials` and `date` are optional; `parentId`, `done`, `runStart` and
-/// `range` follow OfficeCLI's comment schema (record 0345).
+/// `range` follow OfficeCLI's comment schema.
 fn new_comment(props: &Props<'_>) -> Result<litchi_docx::document::NewComment> {
     use super::setters::Setter;
     let mut author = None::<String>;
@@ -1012,7 +1012,7 @@ fn new_comment(props: &Props<'_>) -> Result<litchi_docx::document::NewComment> {
 }
 
 impl Docx {
-    /// A `set` whose targets are comments (record 0335): `author`,
+    /// A `set` whose targets are comments: `author`,
     /// `initials`, `date` and `text`. `Err` hands the editor back for other
     /// targets.
     pub(super) fn try_set_comment(
@@ -1095,7 +1095,7 @@ impl Docx {
     }
 }
 
-/// A new cell from its add properties (record 0345): `text`, one
+/// A new cell from its add properties: `text`, one
 /// paragraph, and `width` (twips, `N%`, `auto`, `nil`, or a length).
 fn new_cell(props: &Props<'_>) -> Result<litchi_docx::document::NewCell> {
     use super::setters::Setter;

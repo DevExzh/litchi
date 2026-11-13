@@ -1,6 +1,6 @@
-//! Unified-read tests of the DOCX adapter (M1 step R4a): paths, the node
+//! Unified-read tests of the DOCX adapter: paths, the node
 //! view against OfficeCLI's `DocumentNode` shapes, queries, views, decode
-//! counts, the transaction ordinal of record 0010 §4.5.1, and a path round
+//! counts, the transaction ordinal, and a path round
 //! trip over the DOCX corpus.
 
 use std::fmt::Write as _;
@@ -350,9 +350,9 @@ fn misses_and_foreign_axes_have_their_codes() {
         ("/body/bogus[1]", Code::InvalidPath),
         ("/body/p[@style=Heading1]", Code::InvalidPath),
         ("/body/p[text~=x]", Code::InvalidPath),
-        // Pictures are read since record 0251d; the report has none.
+        // Pictures are read; the report has none.
         ("/body/p[1]/picture[1]", Code::PathNotFound),
-        // The report has no styles or numbering part (record 0319).
+        // The report has no styles or numbering part.
         ("/styles/Heading1", Code::PathNotFound),
         ("/numbering", Code::PathNotFound),
         ("/theme", Code::UnsupportedCapability),
@@ -370,7 +370,7 @@ fn misses_and_foreign_axes_have_their_codes() {
 }
 
 // ---------------------------------------------------------------------------
-// The transaction ordinal (record 0010 §4.5.1)
+// The transaction ordinal
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -492,7 +492,7 @@ fn the_root_lists_the_body_without_reading_it() {
     let view = json(&root, 1);
     // The root's own properties come from the core-properties part (absent
     // here); the body is listed without its blocks, so its `childCount` is
-    // omitted (M1-Δ1) and the main part is not read.
+    // omitted and the main part is not read.
     assert!(view.contains("\"path\": \"/body\""), "{view}");
     assert!(!view.contains("\"childCount\": 7"), "{view}");
     assert_eq!(cold_loads(&file), before, "listing the body reads no part");
@@ -604,7 +604,7 @@ fn query_diagnostics_and_refusals() {
             .code(),
         Code::UnsupportedPath
     );
-    // `styleName` is read since record 0319.
+    // `styleName` is read.
     let style_name = Query::parse("p[styleName=Title]").unwrap();
     assert!(
         Plan::compile(&style_name, FileFormat::Docx)
@@ -1034,7 +1034,7 @@ fn capabilities_match_live_paths_queries_and_views() {
     let file = report();
     let caps = file.capabilities();
     // The report has no comments part; comment paths are checked on a copy
-    // with one added (record 0251c).
+    // with one added.
     let commented = file
         .add(
             "/body/p[1]",
@@ -1044,7 +1044,7 @@ fn capabilities_match_live_paths_queries_and_views() {
         )
         .expect("add a comment")
         .into_file();
-    // Likewise for pictures (record 0251d).
+    // Likewise for pictures.
     let pictured = file
         .add(
             "/body/p[1]",
@@ -1055,7 +1055,7 @@ fn capabilities_match_live_paths_queries_and_views() {
         )
         .expect("add a picture")
         .into_file();
-    // And charts (record 0283).
+    // And charts.
     let charted = file
         .add(
             "/body/p[1]",
@@ -1063,7 +1063,7 @@ fn capabilities_match_live_paths_queries_and_views() {
         )
         .expect("add a chart")
         .into_file();
-    // And SmartArt (record 0295).
+    // And SmartArt.
     let smartart = file
         .add(
             "/body/p[1]",
@@ -1071,7 +1071,7 @@ fn capabilities_match_live_paths_queries_and_views() {
         )
         .expect("add a SmartArt graphic")
         .into_file();
-    // And the marks (record 0319): a tab stop, a break, a bookmark, a
+    // And the marks: a tab stop, a break, a bookmark, a
     // simple field, a table of contents and a text box in the main story,
     // and a watermark in a built document's header.
     let marked = crate::open_bytes(package(
@@ -1095,7 +1095,7 @@ fn capabilities_match_live_paths_queries_and_views() {
         crate::open_bytes(package.to_bytes().expect("bytes"))
             .expect("open the watermarked document")
     };
-    // And the part elements (record 0319).
+    // And the part elements.
     let parted = file
         .add("/styles", crate::NewNode::new("style").prop("id", "Accent"))
         .or_else(|_| file.add("/", crate::NewNode::new("style").prop("id", "Accent")))
@@ -1195,7 +1195,7 @@ fn capabilities_match_live_paths_queries_and_views() {
                     "/body/tbl[1]/tr[1]/tc[1]/tbl",
                     "/body/tbl[1]/tr[2]/tc[1]/tbl",
                 );
-            // Story paragraphs (record 0325) live in the parts fixture.
+            // Story paragraphs live in the parts fixture.
             let owner = if path.starts_with("/header") || path.starts_with("/footnote") {
                 file_for("header")
             } else {

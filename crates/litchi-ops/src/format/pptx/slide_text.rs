@@ -1,4 +1,4 @@
-//! Placeholder and speaker-notes additions (record 0346).
+//! Placeholder and speaker-notes additions.
 //!
 //! `add(/slide[N], placeholder, {phType, text})` appends a placeholder bound
 //! to the slide layout's slot by OfficeCLI's rules (the leaf's

@@ -1,4 +1,4 @@
-//! Record 0267: a query that can stop early (`first()`, `limit(n)`, or
+//! A query that can stop early (`first()`, `limit(n)`, or
 //! alternatives that each select their `[N]`th match) reads a cold
 //! worksheet through the leaf's cell cursor, which decodes only the leading
 //! cells. These tests hold the streamed walks to the full walk: on generated

@@ -24,7 +24,7 @@
 /// The variants are ordered from "not merged" to "covered by an earlier
 /// cell", and are produced identically for DOC, DOCX, RTF and ODF sources.
 ///
-/// **Scheduled for deletion in M1**, with the rest of [`crate::compat`].
+/// **Scheduled for deletion**, with the rest of [`crate::compat`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash)]
 #[non_exhaustive]
 pub enum CellMerge {
@@ -43,7 +43,7 @@ pub enum CellMerge {
 impl CellMerge {
     /// Whether the cell takes part in a merge on this axis at all.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     ///
     /// ```
     /// use litchi_ops::compat::word::CellMerge;
@@ -61,7 +61,7 @@ impl CellMerge {
     /// [`CellMerge::None`] and [`CellMerge::Start`]; use it to skip covered
     /// cells when reading text.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     ///
     /// ```
     /// use litchi_ops::compat::word::CellMerge;

@@ -50,19 +50,19 @@
     "merge": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "template merge for the ODF object formats and iWork (record 0295)",
+      "followUp": "template merge for the ODF object formats and iWork",
       "reason": "template merge fills word-processing, presentation and spreadsheet templates"
     },
     "replace": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0295 follow-up: a find adapter over the format's text edits",
+      "followUp": "follow-up: a find adapter over the format's text edits",
       "reason": "find/replace is not integrated for this format"
     },
     "refresh": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0295 follow-up: field refresh for PPT, RTF and the ODF object formats",
+      "followUp": "follow-up: field refresh for PPT, RTF and the ODF object formats",
       "reason": "this format has no field refresh adapter"
     },
     "save": {
@@ -74,31 +74,31 @@
     "dump": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0336 follow-up: dump plans for the remaining formats",
+      "followUp": "follow-up: dump plans for the remaining formats",
       "reason": "this format's write verbs cannot yet rebuild its node tree on a created document"
     },
     "raw": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0336: package parts exist in OOXML and packaged ODF only",
+      "followUp": "package parts exist in OOXML and packaged ODF only",
       "reason": "this format has no package parts"
     },
     "validate": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0336 follow-up: an iWork package validator from the iWork owners",
+      "followUp": "follow-up: an iWork package validator from the iWork owners",
       "reason": "iWork packages are validated by their owners on open; no report-producing validator exists"
     },
     "add-part": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0336: package parts exist in OOXML and packaged ODF only",
+      "followUp": "package parts exist in OOXML and packaged ODF only",
       "reason": "this format has no package parts"
     },
     "raw-set": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0336: package parts exist in OOXML and packaged ODF only",
+      "followUp": "package parts exist in OOXML and packaged ODF only",
       "reason": "this format has no package parts"
     }
   },
@@ -118,37 +118,37 @@
     "issues": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the issues view needs the validators `validate` adds"
     },
     "forms": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the forms view needs the validators `validate` adds"
     },
     "html": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     "svg": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     "screenshot": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     "pdf": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     }
   },
@@ -747,7 +747,7 @@
       "subject": "element",
       "element": "r",
       "code": "unsupported_capability",
-      "followUp": "record 0309 follow-up: Pages run elements",
+      "followUp": "follow-up: Pages run elements",
       "reason": "Pages body text has no run elements in the tree yet; character properties are written on a whole paragraph (`font.*` on `p`) through the leaf's section::text_style family, and Package::section_text_runs reads the runs"
     },
     {
@@ -756,7 +756,7 @@
       "element": "metadata",
       "context": "path-read",
       "code": "unsupported_capability",
-      "followUp": "record 0299 Pages metadata node",
+      "followUp": "Pages metadata node",
       "reason": "`set(\"/metadata\", ..)` writes the document properties through the leaf metadata family; the path is set-only, and reads go through File::metadata()"
     },
     {
@@ -765,7 +765,7 @@
       "element": "tc",
       "context": "cells in a formula graph",
       "code": "unsupported_capability",
-      "followUp": "record 0309 follow-ups",
+      "followUp": "not supported yet",
       "reason": "body-table cells take text, numbers, booleans and clears through table::values; a formula cell, or one a formula or chart reads, is refused so no calculation cache goes stale"
     },
     {
@@ -774,7 +774,7 @@
       "element": "tbl",
       "context": "a document without a body table",
       "code": "unsupported_capability",
-      "followUp": "record 0329 follow-up: a built-in table template",
+      "followUp": "follow-up: a built-in table template",
       "reason": "a new body table copies the structure (styles, header counts, storage layout) of the document's first body table; a document without one has none to copy"
     },
     {
@@ -783,8 +783,8 @@
       "element": "p",
       "context": "a paragraph that anchors a chart, image or footnote",
       "code": "unsupported_capability",
-      "followUp": "record 0301 follow-up: delete those anchored objects with their paragraph",
-      "reason": "a paragraph whose anchors are all body tables is removed with its tables (record 0301); removing one that anchors a chart, image or footnote, or moving any anchored paragraph, would delete or move an object the leaf has no transaction for here"
+      "followUp": "follow-up: delete those anchored objects with their paragraph",
+      "reason": "a paragraph whose anchors are all body tables is removed with its tables; removing one that anchors a chart, image or footnote, or moving any anchored paragraph, would delete or move an object the leaf has no transaction for here"
     },
     {
       "subject": "operation",
@@ -799,42 +799,42 @@
       "subject": "view",
       "mode": "issues",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the issues view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "forms",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the forms view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "html",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "svg",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "screenshot",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "pdf",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     }
   ]

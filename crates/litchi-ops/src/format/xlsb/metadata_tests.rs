@@ -1,4 +1,4 @@
-//! Source-backed metadata sets keep the handle source-backed (record 0261).
+//! Source-backed metadata sets keep the handle source-backed.
 
 use std::path::PathBuf;
 

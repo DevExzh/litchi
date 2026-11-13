@@ -1,4 +1,4 @@
-//! DOC field refresh (record 0295, record 0279 follow-up F1): the main
+//! DOC field refresh: the main
 //! story's fields computed as DOCX computes them (`DATE`, `TIME`, the
 //! document-property and statistics fields, `SEQ`), their cached results
 //! rewritten through the native field-result edit

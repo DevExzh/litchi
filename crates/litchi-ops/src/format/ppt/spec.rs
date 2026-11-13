@@ -292,7 +292,7 @@ const SHAPE_IDS: &[&str] = &["id", "name"];
 /// Speaker notes: the text of the notes page's body placeholder.
 const NOTES_PROPS: &[PropSpec] = &[PropSpec::new("text", ValueType::Text)];
 
-/// A slide comment (`Comment10Container`, record 0323), in the PPTX comment
+/// A slide comment (`Comment10Container`), in the PPTX comment
 /// vocabulary: the anchor is in master units, read as a length.
 pub(crate) const COMMENT_PROPS: &[PropSpec] = &[
     PropSpec::new("text", ValueType::Text),
@@ -304,11 +304,11 @@ pub(crate) const COMMENT_PROPS: &[PropSpec] = &[
     length("y", LengthSpec::POSITION),
 ];
 
-/// Run underline (record 0323): the binary format's `CFStyle` underline is
+/// Run underline: the binary format's `CFStyle` underline is
 /// single or none, printed as the PPTX `underline` tokens.
 pub(crate) static UNDERLINE: Tokens = Tokens::new("underline", &["single", "none"], &[("sng", 0)]);
 
-/// A text run (record 0323): one `StyleTextPropAtom` character run's piece
+/// A text run: one `StyleTextPropAtom` character run's piece
 /// of a paragraph, in the PPTX run vocabulary. `font.latin` is the
 /// `FontCollection` typeface; `color` reads an sRGB color only.
 pub(crate) const RUN_PROPS: &[PropSpec] = &[
@@ -320,7 +320,7 @@ pub(crate) const RUN_PROPS: &[PropSpec] = &[
     PropSpec::new("color", ValueType::Color(ColorContext::Drawing)),
 ];
 
-/// An OLE object frame (record 0323): a picture frame showing an embedded or
+/// An OLE object frame: a picture frame showing an embedded or
 /// linked object, with the object's `ProgID`.
 const OLE_PROPS: &[PropSpec] = &[
     raw("id", ValueType::Int),
@@ -333,7 +333,7 @@ const OLE_PROPS: &[PropSpec] = &[
     length("height", LengthSpec::EXTENT),
 ];
 
-/// A media frame (record 0323): a picture frame playing a movie (`video`) or
+/// A media frame: a picture frame playing a movie (`video`) or
 /// a sound (`audio`); `media` names both.
 const MEDIA_PROPS: &[PropSpec] = &[
     raw("id", ValueType::Int),
@@ -344,7 +344,7 @@ const MEDIA_PROPS: &[PropSpec] = &[
     length("height", LengthSpec::EXTENT),
 ];
 
-/// An embedded chart (record 0323): a Microsoft Graph or Excel chart object
+/// An embedded chart: a Microsoft Graph or Excel chart object
 /// shown by an OLE picture frame, read through its MS-OGRAPH chart. The
 /// frame keys are the picture's; `chartType` uses the PPTX chart names.
 const CHART_PROPS: &[PropSpec] = &[
@@ -358,7 +358,7 @@ const CHART_PROPS: &[PropSpec] = &[
     PropSpec::new("title", ValueType::Text),
 ];
 
-/// The presentation theme (record 0323): the `PowerPoint` 2007 theme part a
+/// The presentation theme: the `PowerPoint` 2007 theme part a
 /// `RoundTripThemeAtom` carries, read with the PPTX theme vocabulary.
 pub(crate) const THEME_PROPS: &[PropSpec] = &[
     PropSpec::new("dk1", ValueType::Color(ColorContext::Drawing)),
@@ -382,7 +382,7 @@ pub(crate) const THEME_PROPS: &[PropSpec] = &[
     PropSpec::new("name", ValueType::Text),
 ];
 
-/// A click hyperlink (record 0323), in the PPTX vocabulary: `link` is a URL,
+/// A click hyperlink, in the PPTX vocabulary: `link` is a URL,
 /// `slide[N]`, or `firstslide`, `lastslide`, `nextslide`, `previousslide`,
 /// `endshow`; `tooltip` is the screen tip.
 pub(crate) const HYPERLINK_PROPS: &[PropSpec] = &[
@@ -390,15 +390,15 @@ pub(crate) const HYPERLINK_PROPS: &[PropSpec] = &[
     PropSpec::new("tooltip", ValueType::Text),
 ];
 
-/// A table row (record 0323): a band of the table group's cell shapes; its
+/// A table row: a band of the table group's cell shapes; its
 /// height is the distance to the next row's top.
 const ROW_PROPS: &[PropSpec] = &[length("height", LengthSpec::EXTENT)];
 
-/// A table cell (record 0323): one cell shape; its text is the node's text
+/// A table cell: one cell shape; its text is the node's text
 /// member and `text` a write-only registry key, as for paragraphs.
 const CELL_PROPS: &[PropSpec] = &[];
 
-/// A table column (record 0323): its width.
+/// A table column: its width.
 const COLUMN_PROPS: &[PropSpec] = &[length("width", LengthSpec::EXTENT)];
 
 /// A paragraph of a shape's text body: the text between paragraph marks. Its
@@ -480,86 +480,86 @@ const fn property_gap(
 
 static SMARTART_GAP: GapSpec = element_gap(
     "smartart",
-    "0339-F3 (deferred-P1): PPT SmartArt and diagram groups",
+    "PPT SmartArt and diagram groups",
     "a legacy PPT file keeps SmartArt and PowerPoint 97 diagrams as drawn OfficeArt groups, which read as group and shape nodes; no semantic diagram model is projected",
 );
 static EQUATION_GAP: GapSpec = element_gap(
     "equation",
-    "0323-F6 PPT Equation Editor objects",
+    "PPT Equation Editor objects",
     "legacy PPT equations are Equation Editor OLE objects (Equation.3) whose MTEF payload the unified layer does not read as an equation element",
 );
 static ZOOM_GAP: GapSpec = element_gap(
     "zoom",
-    "wontfix: PPTX-only (record 0323)",
+    "wontfix: PPTX-only",
     "slide and section zoom are PowerPoint 2016 OOXML objects; the legacy binary format has no zoom record",
 );
 static MODEL3D_GAP: GapSpec = element_gap(
     "model3d",
-    "wontfix: PPTX-only (record 0323)",
+    "wontfix: PPTX-only",
     "3D models are PowerPoint 2019 OOXML objects; the legacy binary format has no 3D-model record",
 );
 static MASTER_GAP: GapSpec = element_gap(
     "slideMaster",
-    "0339-F4 (deferred-P1): PPT main and title masters as nodes",
+    "PPT main and title masters as nodes",
     "legacy PPT master records are not exposed as navigable nodes",
 );
 static LAYOUT_GAP: GapSpec = element_gap(
     "slideLayout",
-    "0339-F4 (deferred-P1): PPT layouts as nodes",
+    "PPT layouts as nodes",
     "a legacy PPT slide names a layout type in its slide atom (PowerPoint 2007 and later add one master per layout); there are no layout records to expose as navigable nodes yet",
 );
 static MODERN_COMMENT_GAP: GapSpec = element_gap(
     "modernComment",
-    "wontfix: PPTX-only (record 0323)",
+    "wontfix: PPTX-only",
     "modern threaded comments are a PowerPoint 2019 OOXML part; legacy PPT comments are Comment10Container records, read and written as comment elements",
 );
 static REPLY_GAP: GapSpec = element_gap(
     "reply",
-    "wontfix: PPTX-only (record 0323)",
+    "wontfix: PPTX-only",
     "threaded-comment replies are a PowerPoint 2019 OOXML part; legacy PPT comments have no replies",
 );
 static ANIMATION_GAP: GapSpec = element_gap(
     "animation",
-    "0323-F5 PPT animation nodes",
+    "PPT animation nodes",
     "the leaf animation codec reads the timing tree and the per-shape AnimationInfo atoms; they are not projected as per-shape nodes",
 );
 static SERIES_GAP: GapSpec = element_gap(
     "series",
-    "0323-F7 PPT chart series and axes",
+    "PPT chart series and axes",
     "the MS-OGRAPH chart model reads series, but the unified layer projects a chart node only (type, title, frame)",
 );
 static AXIS_GAP: GapSpec = element_gap(
     "axis",
-    "0323-F7 PPT chart series and axes",
+    "PPT chart series and axes",
     "the MS-OGRAPH chart model reads axes, but the unified layer projects a chart node only (type, title, frame)",
 );
 static NOTE_SLIDE_GAP: GapSpec = element_gap(
     "noteSlide",
-    "M1-extended",
+    "not supported yet",
     "legacy PPT notes slides are not exposed as navigable nodes",
 );
 static NOTES_MASTER_GAP: GapSpec = element_gap(
     "notesMaster",
-    "M1-extended",
+    "not supported yet",
     "legacy PPT notes masters are not exposed as navigable nodes",
 );
 
 static PICTURE_MEDIA_GAP: GapSpec = property_gap(
     "picture",
     "mediaType",
-    "M1-extended",
+    "not supported yet",
     "legacy PPT frame classification is exposed as frameKind",
 );
 static SHAPE_FILL_GAP: GapSpec = property_gap(
     "shape",
     "fill",
-    "M1-extended",
+    "not supported yet",
     "legacy PPT exposes only common geometry in the unified node view",
 );
 static STATS_CHART_GAP: GapSpec = GapSpec {
     subject: Subject::View("stats.charts"),
     code: Code::UnsupportedCapability,
-    follow_up: "M1-extended",
+    follow_up: "not supported yet",
     reason: "legacy PPT has no chart-part model from which the stats view can count charts",
 };
 
@@ -958,11 +958,11 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
         PICTURE_MEDIA_GAP,
         SHAPE_FILL_GAP,
         STATS_CHART_GAP,
-        // OfficeCLI's Mermaid `diagram` (record 0339).
+        // OfficeCLI's Mermaid `diagram`.
         GapSpec {
             subject: Subject::Element("diagram"),
             code: Code::UnsupportedPath,
-            follow_up: "none: out of scope (record 0332, design §10)",
+            follow_up: "none: out of scope",
             reason: "OfficeCLI's diagram renders Mermaid text into shapes or a picture; rendering is outside the unified API, and SmartArt is the smartart element",
         },
     ],
@@ -1115,14 +1115,14 @@ pub(super) const PARAGRAPH_WRITE_TABLE: crate::registry::Table<TextSetter, 1, 0>
     crate::registry::Table::new(text_write_entries(false), []);
 pub(crate) const PARAGRAPH_CAPABILITY_PROPS: &[PropSpec] = &PARAGRAPH_WRITE_TABLE.readable();
 
-/// The cell registry (record 0323): the write-only `text` key.
+/// The cell registry: the write-only `text` key.
 pub(super) const CELL_WRITE_TABLE: crate::registry::Table<TextSetter, 1, 0> =
     crate::registry::Table::new(text_write_entries(false), []);
 pub(crate) const CELL_CAPABILITY_PROPS: &[PropSpec] = &CELL_WRITE_TABLE.readable();
 
 const _: () = assert!(CELL_PROPS.is_empty());
 
-/// Comment assignments (record 0323), as the PPTX comment registry: `text`,
+/// Comment assignments, as the PPTX comment registry: `text`,
 /// `x` and `y` are settable; `author` (required), `initials` and `date` are
 /// given when the comment is added; `index` is assigned.
 #[derive(Clone, Copy)]
@@ -1182,7 +1182,7 @@ pub(super) const COMMENT_WRITE_TABLE: crate::registry::Table<
 > = crate::registry::Table::new(comment_write_entries(), []);
 pub(crate) const COMMENT_CAPABILITY_PROPS: &[PropSpec] = &COMMENT_WRITE_TABLE.readable();
 
-/// Hyperlink assignments (record 0323): `link` (alias `url`) and `tooltip`
+/// Hyperlink assignments: `link` (alias `url`) and `tooltip`
 /// on `add` and `set`, as the PPTX registry.
 #[derive(Clone, Copy)]
 pub(super) enum HyperlinkSetter {
@@ -1218,7 +1218,7 @@ pub(super) const HYPERLINK_WRITE_TABLE: crate::registry::Table<HyperlinkSetter, 
     );
 pub(crate) const HYPERLINK_CAPABILITY_PROPS: &[PropSpec] = &HYPERLINK_WRITE_TABLE.readable();
 
-/// Run assignments (record 0323): the write-only `text` key and the
+/// Run assignments: the write-only `text` key and the
 /// character formatting the binary `TextCFException` holds.
 #[derive(Clone, Copy)]
 pub(super) enum RunSetter {

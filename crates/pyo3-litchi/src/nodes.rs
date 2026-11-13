@@ -1,4 +1,4 @@
-//! Node views as Python dicts (record 0010 §2.1, §8.2).
+//! Node views as Python dicts.
 //!
 //! `File.get`, `File.find` and `File.query` return the generic node view of
 //! each node they reach: OfficeCLI's `DocumentNode` shape, as a `dict` with
@@ -372,8 +372,8 @@ impl<'py> Out<'py> {
             },
             Value::Text(text) => PyString::new(py, text).into_any(),
             Value::Token(token) => self.shared(token).into_any(),
-            // A list (the metadata keywords, record 0354): a list of str,
-            // as the JSON form writes an array.
+            // A list (the metadata keywords): a list of str, as the JSON form
+            // writes an array.
             Value::List(items) => PyList::new(py, items.iter())?.into_any(),
             // Lengths, colours and any later variant: the text the JSON form
             // writes, the value printed in its key's style.

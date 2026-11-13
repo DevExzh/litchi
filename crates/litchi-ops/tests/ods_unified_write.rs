@@ -1,4 +1,4 @@
-//! Unified writes of OpenDocument spreadsheets (record 0277): cells,
+//! Unified writes of OpenDocument spreadsheets: cells,
 //! ranges, merges, sheets, rows, named ranges, annotations, metadata,
 //! batches, creation and atomic save, each read back through the unified
 //! reads and the leaf.
@@ -342,7 +342,7 @@ fn metadata_is_set_through_meta_xml() {
     assert_eq!(metadata.title.as_deref(), Some("Budget"));
     assert_eq!(metadata.author.as_deref(), Some("Ada"));
     assert_eq!(json(&file, "/")["format"]["title"], "Budget");
-    // The metadata family (record 0288) also writes lastModifiedBy and
+    // The metadata family also writes lastModifiedBy and
     // language; producer-maintained dates stay refused.
     let file = file
         .set(
@@ -353,7 +353,7 @@ fn metadata_is_set_through_meta_xml() {
     let metadata = reopen(&file).metadata().must().unwrap();
     assert_eq!(metadata.last_modified_by.as_deref(), Some("Bea"));
     // `File::metadata()` does not report `dc:language` (the shared ODF
-    // conversion omits it; record 0288 gap): check the written part.
+    // conversion omits it): check the written part.
     let meta = litchi_odf_common::OwnedPackage::from_bytes(file.to_bytes().must())
         .unwrap()
         .get_file("meta.xml")
@@ -481,7 +481,7 @@ fn atomic_batches_leave_the_input_untouched_on_failure() {
 
 #[test]
 fn flat_spreadsheets_write_through_their_projection() {
-    // Record 0292: a flat spreadsheet edits its packaged projection and
+    // A flat spreadsheet edits its packaged projection and
     // republishes the edit into its flat bytes. A rich-text cell the leaf
     // would flatten is refused, as in a packaged spreadsheet.
     let source = std::fs::read(fixture("odf/ods/rich-text-hyperlinks.fods")).unwrap();

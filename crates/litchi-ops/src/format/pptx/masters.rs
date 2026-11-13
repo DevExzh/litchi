@@ -1,4 +1,4 @@
-//! Slide master and slide layout writes (record 0321).
+//! Slide master and slide layout writes.
 //!
 //! - `set /slidemaster[N] name=...` and `set /slidemaster[N]/slidelayout[M]
 //!   name=...` (or `/slidelayout[M]`) rename the master or layout

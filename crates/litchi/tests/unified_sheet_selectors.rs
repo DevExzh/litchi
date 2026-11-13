@@ -4,8 +4,8 @@
 //! `Data`), positions are zero-based, selecting is catalog-only, and cell
 //! reads keep the exact XLSX cell state and the typed XLSX error.
 //!
-//! M0a step S8c ported these tests from the facade workbook's sheet selector
-//! to `litchi::open` / `File::Xlsx(xlsx) => xlsx.sheet(..)`.
+//! These tests were ported from the facade workbook's sheet selector to
+//! `litchi::open` / `File::Xlsx(xlsx) => xlsx.sheet(..)`.
 
 #![cfg(feature = "xlsx")]
 #![allow(
@@ -175,7 +175,7 @@ fn public_selector_preserves_exact_owned_cell_semantics() {
     );
 
     // A coordinate or range the caller passed is the caller's error, not a
-    // corrupt file (M0a S9); the typed leaf is unchanged.
+    // corrupt file; the typed leaf is unchanged.
     let coordinate_error = selected.cell("A0").unwrap_err();
     assert!(matches!(
         xlsx_error(&coordinate_error),

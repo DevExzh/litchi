@@ -1,5 +1,5 @@
-//! Markdown of authored DOCX fixtures through `litchi::open` (M0a step S8c
-//! ported this test from the facade's `Document`).
+//! Markdown of authored DOCX fixtures through `litchi::open` (this test was
+//! ported from the facade's `Document`).
 
 #![cfg(all(feature = "docx", feature = "markdown"))]
 

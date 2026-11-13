@@ -6,7 +6,7 @@ use crate::Result;
 
 /// A text run of a paragraph.
 ///
-/// **Scheduled for deletion in M1**, with the rest of [`crate::compat`].
+/// **Scheduled for deletion**, with the rest of [`crate::compat`].
 #[derive(Debug, Clone)]
 #[allow(
     clippy::large_enum_variant,
@@ -31,7 +31,7 @@ pub enum Run {
 impl Run {
     /// The text content of the run.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     ///
     /// # Errors
     ///
@@ -52,7 +52,7 @@ impl Run {
 
     /// Whether the run is bold, when the run states it.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     ///
     /// # Errors
     ///
@@ -72,7 +72,7 @@ impl Run {
 
     /// Whether the run is italic, when the run states it.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     ///
     /// # Errors
     ///
@@ -97,7 +97,7 @@ impl Run {
     /// always states it, as it does bold and italic; ODT spans report `None`,
     /// since ODT formatting lives in styles.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     ///
     /// # Errors
     ///
@@ -117,7 +117,7 @@ impl Run {
 
     /// Whether the run is struck through, when the run states it.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     ///
     /// # Errors
     ///
@@ -138,7 +138,7 @@ impl Run {
     /// The run's vertical position (superscript or subscript), or `None`
     /// for the normal baseline.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     ///
     /// # Errors
     ///

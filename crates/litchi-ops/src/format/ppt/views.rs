@@ -1,4 +1,4 @@
-//! Legacy PPT semantic views (record 0010 §6).
+//! Legacy PPT semantic views.
 //!
 //! The binary PowerPoint leaf exposes a lazy slide and shape projection rather
 //! than a PresentationML scene.  These views therefore walk that projection

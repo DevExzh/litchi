@@ -1,4 +1,4 @@
-//! XLSX views (record 0010 §6): the text, annotated, outline and stats
+//! XLSX views: the text, annotated, outline and stats
 //! modes, with OfficeCLI's content and JSON shapes
 //! (`ExcelHandler.View.cs`).
 //!

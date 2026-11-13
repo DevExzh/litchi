@@ -1,6 +1,6 @@
-//! Capability support for the M4 verbs of record 0266: CSV/TSV import and
+//! Capability support for CSV/TSV import and
 //! formula evaluation, both worksheet operations of XLSX, XLSB and XLS; ODS
-//! imports since record 0295.
+//! imports as well.
 
 #[cfg(any(feature = "xlsx", feature = "xlsb", feature = "xls", feature = "ods"))]
 use super::RETAINED_SOURCE;
@@ -16,11 +16,11 @@ const NOT_A_WORKBOOK: Refusal = Refusal {
     reason: "this format has no worksheets",
 };
 
-/// Evaluation of an OpenDocument spreadsheet (records 0277 and 0295).
+/// Evaluation of an OpenDocument spreadsheet.
 #[cfg(feature = "ods")]
 const ODS_PENDING: Refusal = Refusal {
     code: Code::UnsupportedCapability,
-    follow_up: "record 0295 follow-up: OpenFormula translation for the litchi-eval engine",
+    follow_up: "follow-up: OpenFormula translation for the litchi-eval engine",
     reason: "ODS formulas are OpenFormula; the evaluation engine reads Excel syntax",
 };
 

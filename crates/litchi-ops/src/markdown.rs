@@ -1,12 +1,12 @@
 //! Markdown output: `ToMarkdown` for [`File`], its family views and the
-//! [`compat`](crate::compat) element wrappers (M0a step S7). The crate
-//! documentation's "Markdown" section describes what converts and how each
-//! refusal is typed.
+//! [`compat`](crate::compat) element wrappers. The crate documentation's
+//! "Markdown" section describes what converts and how each refusal is
+//! typed.
 //!
 //! The adapter moved here from the `litchi` facade, where it served the
-//! facade's format-family types (deleted in M0a step S9). `ToMarkdown` and
-//! `File` are both foreign to the facade, so the implementation must live
-//! next to `File`. The rendering is unchanged: the facade's Markdown corpus
+//! facade's format-family types (since deleted). `ToMarkdown` and `File`
+//! are both foreign to the facade, so the implementation must live next to
+//! `File`. The rendering is unchanged: the facade's Markdown corpus
 //! goldens, recorded from the deleted types, pin it. What changed is the
 //! error, which is the typed [`Error`] of this crate.
 
@@ -37,8 +37,8 @@ impl ToMarkdown for File {
     type Error = Error;
 
     /// Convert a document or presentation to Markdown (a Pages document or a
-    /// Keynote presentation included, record 0306); a [`File::Signed`]
-    /// converts the file it wraps.
+    /// Keynote presentation included); a [`File::Signed`] converts the file
+    /// it wraps.
     ///
     /// # Errors
     ///

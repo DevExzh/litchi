@@ -105,13 +105,13 @@ fn views_and_capabilities_agree_on_supported_read_surface() {
 #[test]
 fn native_substories_are_read_and_unprojected_concepts_stay_pending() {
     let file = fixture();
-    // Record 0275 projects header/footer stories; the main-story `p` axis
+    // Header/footer stories are projected; the main-story `p` axis
     // still excludes their paragraphs.
     assert_eq!(text(&file, "/header[1]"), "Not body");
     assert_eq!(text(&file, "/header[1]/p[1]"), "Not body");
     assert_eq!(file.query("header").unwrap().count(), 1);
     assert_eq!(file.query("p").unwrap().count(), 4);
-    // Record 0328 reads shapes as body children, not paragraph children;
+    // Shapes are read as body children, not paragraph children;
     // equations stay a capability gap.
     assert_eq!(
         file.get("/body/p[1]/shape[1]").unwrap_err().code(),

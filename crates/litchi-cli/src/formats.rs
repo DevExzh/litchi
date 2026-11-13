@@ -1,7 +1,7 @@
 //! Format names on the command line (`--type`, `--format`, file extensions).
 //!
 //! `litchi_core::FileFormat` has no public name or extension table, so the
-//! CLI keeps this one for argument parsing only (record 0256 follow-up F2).
+//! CLI keeps this one for argument parsing only.
 
 use litchi_core::FileFormat;
 use litchi_ops::{Code, Error, Result};

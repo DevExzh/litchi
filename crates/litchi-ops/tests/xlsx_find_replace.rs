@@ -1,5 +1,5 @@
-//! XLSX find/replace through `set` with `find=` and `replace=` (record
-//! 0273): the workbook searches every worksheet, a sheet, cell, range, row
+//! XLSX find/replace through `set` with `find=` and `replace=`:
+//! the workbook searches every worksheet, a sheet, cell, range, row
 //! or column its own cells; formulas and non-text values are not searched;
 //! zero matches are an exact no-op; rich-text cells and format properties
 //! are refused.
@@ -227,7 +227,7 @@ fn sheet_xml(file: &File) -> String {
     xml
 }
 
-/// Record 0295: a formatted shared string or an inline rich string is
+/// A formatted shared string or an inline rich string is
 /// rewritten run by run, each run keeping its properties.
 #[test]
 fn a_rich_text_cell_keeps_its_runs() {
@@ -276,7 +276,7 @@ fn a_rich_text_cell_keeps_its_runs() {
     );
 }
 
-/// Record 0295: merge fills a formatted shared string run by run.
+/// Merge fills a formatted shared string run by run.
 #[test]
 fn merge_keeps_rich_runs() {
     let file = litchi_ops::open_bytes(rich_package(false))

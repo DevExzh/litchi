@@ -39,7 +39,7 @@ pub(crate) enum Patch {
     Odb(litchi_odb::Patch),
     #[cfg(feature = "odf-formula")]
     Formula(litchi_odf_formula::Patch),
-    /// A `/metadata` commit of the leaf metadata family (record 0288).
+    /// A `/metadata` commit of the leaf metadata family.
     Metadata(MetadataPatch),
 }
 
@@ -436,7 +436,7 @@ pub(crate) fn set_groups(
     }
 }
 
-/// Set `/metadata` through the leaf metadata family (record 0288).
+/// Set `/metadata` through the leaf metadata family.
 fn set_metadata(file: &OdfTree, props: &Props<'_>, limits: &SemanticLimits) -> Result<Commit> {
     let format = file.format();
     match file.owner() {

@@ -1,5 +1,5 @@
-//! Formula evaluation through `File::evaluate` and `File::recalculate`
-//! (record 0266), against values the producing applications cached.
+//! Formula evaluation through `File::evaluate` and `File::recalculate`,
+//! against values the producing applications cached.
 #![cfg(all(
     feature = "xlsx",
     feature = "xlsb",

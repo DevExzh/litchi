@@ -68,7 +68,7 @@
     "raw": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0336: package parts exist in OOXML and packaged ODF only",
+      "followUp": "package parts exist in OOXML and packaged ODF only",
       "reason": "this format has no package parts"
     },
     "validate": {
@@ -77,13 +77,13 @@
     "add-part": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0336: package parts exist in OOXML and packaged ODF only",
+      "followUp": "package parts exist in OOXML and packaged ODF only",
       "reason": "this format has no package parts"
     },
     "raw-set": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0336: package parts exist in OOXML and packaged ODF only",
+      "followUp": "package parts exist in OOXML and packaged ODF only",
       "reason": "this format has no package parts"
     }
   },
@@ -103,37 +103,37 @@
     "issues": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the issues view needs the validators `validate` adds"
     },
     "forms": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the forms view needs the validators `validate` adds"
     },
     "html": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     "svg": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     "screenshot": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     "pdf": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     }
   },
@@ -2332,42 +2332,42 @@
       "subject": "element",
       "element": "equation",
       "code": "unsupported_capability",
-      "followUp": "record 0324 follow-up 4: DOC EQ fields and MTEF equation objects as `equation` nodes",
+      "followUp": "DOC EQ fields and MTEF equation objects as `equation` nodes",
       "reason": "this native DOC concept is not yet projected into generic paths and queries"
     },
     {
       "subject": "element",
       "element": "formfield",
       "code": "unsupported_capability",
-      "followUp": "record 0324 follow-up 3: DOC FORMTEXT, FORMCHECKBOX and FORMDROPDOWN nodes and writes",
+      "followUp": "DOC FORMTEXT, FORMCHECKBOX and FORMDROPDOWN nodes and writes",
       "reason": "this native DOC concept is not yet projected into generic paths and queries"
     },
     {
       "subject": "element",
       "element": "picture",
       "code": "unsupported_capability",
-      "followUp": "record 0324 follow-up 5: DOC inline and floating pictures as `picture` nodes",
+      "followUp": "DOC inline and floating pictures as `picture` nodes",
       "reason": "this native DOC concept is not yet projected into generic paths and queries"
     },
     {
       "subject": "element",
       "element": "ole",
       "code": "unsupported_capability",
-      "followUp": "record 0324 follow-up 5: DOC embedded objects as `ole` nodes",
+      "followUp": "DOC embedded objects as `ole` nodes",
       "reason": "this native DOC concept is not yet projected into generic paths and queries"
     },
     {
       "subject": "element",
       "element": "revision",
       "code": "unsupported_capability",
-      "followUp": "record 0324 follow-up 2: DOC revision nodes and accept/reject (P2)",
+      "followUp": "DOC revision nodes and accept/reject",
       "reason": "this native DOC concept is not yet projected into generic paths and queries"
     },
     {
       "subject": "element",
       "element": "watermark",
       "code": "unsupported_capability",
-      "followUp": "record 0324 follow-up 6: the DOC header WordArt watermark",
+      "followUp": "the DOC header WordArt watermark",
       "reason": "this native DOC concept is not yet projected into generic paths and queries"
     },
     {
@@ -2381,70 +2381,70 @@
       "subject": "element",
       "element": "chart",
       "code": "unsupported_capability",
-      "followUp": "record 0324 (deferred-P1): DOC charts as chart nodes",
+      "followUp": "DOC charts as chart nodes",
       "reason": "embedded charts are kept as objects; they are not projected as chart nodes"
     },
     {
       "subject": "element",
       "element": "series",
       "code": "unsupported_capability",
-      "followUp": "record 0324 (deferred-P1): DOC charts as chart nodes",
+      "followUp": "DOC charts as chart nodes",
       "reason": "chart series follow the chart gap"
     },
     {
       "subject": "element",
       "element": "axis",
       "code": "unsupported_capability",
-      "followUp": "record 0324 (deferred-P1): DOC charts as chart nodes",
+      "followUp": "DOC charts as chart nodes",
       "reason": "chart axes follow the chart gap"
     },
     {
       "subject": "element",
       "element": "bookmarkEnd",
       "code": "unsupported_capability",
-      "followUp": "record 0324 (deferred-P1)",
+      "followUp": "not supported yet",
       "reason": "a bookmark is one node over its start and end; a standalone end marker is not addressed on its own"
     },
     {
       "subject": "element",
       "element": "permStart",
       "code": "unsupported_capability",
-      "followUp": "record 0324 (deferred-P1)",
+      "followUp": "not supported yet",
       "reason": "DOC editing-permission ranges are not projected as nodes"
     },
     {
       "subject": "element",
       "element": "ptab",
       "code": "unsupported_capability",
-      "followUp": "record 0324 (deferred-P1)",
+      "followUp": "not supported yet",
       "reason": "positional tabs are not projected as nodes"
     },
     {
       "subject": "element",
       "element": "col",
       "code": "unsupported_capability",
-      "followUp": "record 0324 (deferred-P1)",
+      "followUp": "not supported yet",
       "reason": "table columns are not nodes; cell widths are read on each cell"
     },
     {
       "subject": "element",
       "element": "fieldChar",
       "code": "unsupported_capability",
-      "followUp": "none: out of scope (record 0332)",
+      "followUp": "none: out of scope",
       "reason": "a complex field is one field node; its field-character and instruction parts are not separate elements"
     },
     {
       "subject": "element",
       "element": "instrText",
       "code": "unsupported_capability",
-      "followUp": "none: out of scope (record 0332)",
+      "followUp": "none: out of scope",
       "reason": "a complex field is one field node; its field-character and instruction parts are not separate elements"
     },
     {
       "subject": "element",
       "element": "diagram",
       "code": "unsupported_path",
-      "followUp": "none: out of scope (record 0332, design §10)",
+      "followUp": "none: out of scope",
       "reason": "OfficeCLI's diagram renders Mermaid text into shapes or a picture; rendering is outside the unified API"
     },
     {
@@ -2471,7 +2471,7 @@
       "element": "document",
       "context": "unrepresentable-initial-metadata",
       "code": "unsupported_capability",
-      "followUp": "CreateOptions::metadata (OLE property sets, record 0254)",
+      "followUp": "CreateOptions::metadata (OLE property sets)",
       "reason": "initial metadata is written to the OLE property sets; identifier, hyperlink_base and unzoned timestamps have no property-set slot and are refused rather than dropped, as is metadata combined with CryptoAPI encryption"
     },
     {
@@ -2489,7 +2489,7 @@
       "element": "body",
       "context": "structural-edit",
       "code": "unsupported_capability",
-      "followUp": "M2 DOC structural body editing",
+      "followUp": "DOC structural body editing",
       "reason": "the DOC write adapter currently replaces existing ordinary paragraph text and does not add elements"
     },
     {
@@ -2498,7 +2498,7 @@
       "element": "body",
       "context": "structural-edit",
       "code": "unsupported_capability",
-      "followUp": "M2 DOC structural body editing",
+      "followUp": "DOC structural body editing",
       "reason": "the DOC write adapter currently replaces existing ordinary paragraph text and does not remove elements"
     },
     {
@@ -2507,7 +2507,7 @@
       "element": "body",
       "context": "structural-edit",
       "code": "unsupported_capability",
-      "followUp": "M2 DOC structural body editing",
+      "followUp": "DOC structural body editing",
       "reason": "the DOC write adapter currently replaces existing ordinary paragraph text and does not move elements"
     },
     {
@@ -2516,7 +2516,7 @@
       "element": "body",
       "context": "structural-edit",
       "code": "unsupported_capability",
-      "followUp": "M2 DOC structural body editing",
+      "followUp": "DOC structural body editing",
       "reason": "the DOC write adapter currently replaces existing ordinary paragraph text and does not reorder elements"
     },
     {
@@ -2525,49 +2525,49 @@
       "element": "body",
       "context": "non-text-command",
       "code": "unsupported_capability",
-      "followUp": "M2 DOC structural batch commands",
+      "followUp": "DOC structural batch commands",
       "reason": "DOC atomic batches currently admit paragraph text sets only; structural and read commands remain refused"
     },
     {
       "subject": "view",
       "mode": "issues",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the issues view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "forms",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the forms view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "html",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "svg",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "screenshot",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "pdf",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     }
   ]

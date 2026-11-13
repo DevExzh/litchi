@@ -59,7 +59,7 @@ fn assert_matches_leaf(odp: &Odp, leaf: &litchi_odp::Presentation, name: &str) {
         leaf.slide_count().expect("leaf slide count"),
         "{name}"
     );
-    // The handle projects the leaf's `meta.xml` (record 0278).
+    // The handle projects the leaf's `meta.xml`.
     assert_eq!(
         odp.metadata().expect("metadata"),
         Some(leaf.metadata().expect("leaf metadata")),

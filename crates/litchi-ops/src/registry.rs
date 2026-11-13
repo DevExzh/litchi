@@ -4,10 +4,13 @@
 //! permutations at compile time. Setter enums belong to the format handler;
 //! lookup and coercion introduce no dynamic dispatch or document model.
 
-// Write handlers attach in M2. Read tables already use the same declarations.
+// Write handlers are still landing. Read tables already use the same declarations.
 #![cfg_attr(
     not(test),
-    allow(dead_code, reason = "write admission is consumed as M2 handlers land")
+    allow(
+        dead_code,
+        reason = "write admission is consumed as write handlers land"
+    )
 )]
 
 use crate::error::{Code, Error, Result};

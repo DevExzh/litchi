@@ -1,5 +1,5 @@
-//! A 10,000-paragraph text fanout is one unified write (record 0251f).
-//! Record 0089 measured it as a typed refusal: the native composite
+//! A 10,000-paragraph text fanout is one unified write.
+//! It used to be a typed refusal: the native composite
 //! replacement and the edit's operation ledger stopped at 4,096.
 #![cfg(feature = "docx")]
 

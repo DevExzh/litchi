@@ -1,5 +1,4 @@
-//! Allocation evidence for the XLSX adapter (record 0010 §4.7, §5.3, §9.2,
-//! M1 step R4b).
+//! Allocation evidence for the XLSX adapter.
 //!
 //! On a warm handle, a query over a workbook visits its cells without
 //! allocating per cell: a cell node holds one reference-counted grid

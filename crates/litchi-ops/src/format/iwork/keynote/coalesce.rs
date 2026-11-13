@@ -1,4 +1,4 @@
-//! Batch coalescing of Keynote writes (record 0298).
+//! Batch coalescing of Keynote writes.
 //!
 //! Consecutive coalescible items of one `File::edit` or `batch` share one
 //! [`Run`]: text, paragraph, frame and visibility sets, and new text boxes,
@@ -62,7 +62,7 @@ fn evolving_slide(path: &str) -> Option<usize> {
 
 /// Whether `held` and `path` are equal, compared from the last step: a
 /// batch's distinct targets differ there, so a miss in the run's memo costs
-/// one step comparison per entry instead of a whole path (record 0340).
+/// one step comparison per entry instead of a whole path.
 fn same_path(held: &Path<'_>, path: &Path<'_>) -> bool {
     held.is_absolute() == path.is_absolute()
         && held.steps().len() == path.steps().len()
@@ -77,9 +77,8 @@ struct Parent {
     path: Path<'static>,
     at: At,
     /// The name of a positional `name[N]` step that resolved, under this
-    /// parent, to the paragraph the parent's N-th paragraph child is
-    /// (record 0340): later steps of that name and form take that child
-    /// directly.
+    /// parent, to the paragraph the parent's N-th paragraph child is:
+    /// later steps of that name and form take that child directly.
     paragraphs: Option<String>,
 }
 
@@ -88,12 +87,12 @@ struct Parent {
 pub(crate) struct Run {
     base: Iwork,
     pending: Pending,
-    /// Paths the run resolved against its base, with the item and its type
-    /// (record 0314): a batch often sets the same few elements again.
+    /// Paths the run resolved against its base, with the item and its type:
+    /// a batch often sets the same few elements again.
     resolved: Vec<(Path<'static>, At, &'static str)>,
     /// Parents of the paths the run resolved (all but the last step), with
-    /// their item (record 0340): a batch over one text's paragraphs resolves
-    /// only each path's last step.
+    /// their item: a batch over one text's paragraphs resolves only each
+    /// path's last step.
     parents: Vec<Parent>,
     /// New slides: source, destination among the evolving slides, item.
     slides: Vec<(SlideSource, usize, usize)>,
@@ -261,7 +260,7 @@ impl Run {
 
     /// Whether a set of `props` on tree item `node` must wait for the run to
     /// publish: joined to the run it would not publish what it publishes
-    /// after the run's items, one at a time (record 0314).
+    /// after the run's items, one at a time.
     pub(crate) fn requires_barrier(&mut self, node: At, props: &Props<'_>) -> bool {
         let Self { base, pending, .. } = self;
         let node = Node::new(base, node);

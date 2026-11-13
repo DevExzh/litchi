@@ -8,7 +8,7 @@ const UNMERGED_SPAN: usize = 1;
 
 /// A table of a word-processing document.
 ///
-/// **Scheduled for deletion in M1**, with the rest of [`crate::compat`].
+/// **Scheduled for deletion**, with the rest of [`crate::compat`].
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum Table {
@@ -29,7 +29,7 @@ pub enum Table {
 impl Table {
     /// The number of rows.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     ///
     /// # Errors
     ///
@@ -52,7 +52,7 @@ impl Table {
     /// This allocates and clones the whole row collection; prefer
     /// [`Self::row_count`] and [`Self::row_at`] to visit rows one by one.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     ///
     /// # Errors
     ///
@@ -90,7 +90,7 @@ impl Table {
 
     /// The row at zero-based `index`, or `None` past the last row.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     ///
     /// # Errors
     ///
@@ -129,7 +129,7 @@ impl Table {
 
 /// A row of a word-processing table.
 ///
-/// **Scheduled for deletion in M1**, with the rest of [`crate::compat`].
+/// **Scheduled for deletion**, with the rest of [`crate::compat`].
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum Row {
@@ -150,7 +150,7 @@ pub enum Row {
 impl Row {
     /// The number of cells in the row.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     ///
     /// # Errors
     ///
@@ -173,7 +173,7 @@ impl Row {
     /// This allocates and clones the whole cell collection; prefer
     /// [`Self::cell_count`] and [`Self::cell_at`] to visit cells one by one.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     ///
     /// # Errors
     ///
@@ -205,7 +205,7 @@ impl Row {
 
     /// The cell at zero-based `index`, or `None` past the last cell.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     ///
     /// # Errors
     ///
@@ -239,7 +239,7 @@ impl Row {
     /// RTF, which tag each covered cell with a role instead, are resolved by
     /// counting the continuation cells that follow the range's first cell.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     ///
     /// # Errors
     ///
@@ -276,7 +276,7 @@ impl Row {
 
 /// A cell of a word-processing table.
 ///
-/// **Scheduled for deletion in M1**, with the rest of [`crate::compat`].
+/// **Scheduled for deletion**, with the rest of [`crate::compat`].
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum Cell {
@@ -297,7 +297,7 @@ pub enum Cell {
 impl Cell {
     /// The text content of the cell.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     ///
     /// # Errors
     ///
@@ -326,7 +326,7 @@ impl Cell {
     /// [`Row::grid_span_at`] for a true count in every format, or
     /// [`Self::horizontal_merge`] for the portable merge signal.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     ///
     /// # Errors
     ///
@@ -355,7 +355,7 @@ impl Cell {
     /// walk the following rows. ODF stores `table:number-rows-spanned` and
     /// always yields `Some`.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     ///
     /// # Errors
     ///
@@ -377,7 +377,7 @@ impl Cell {
     /// The horizontal merge state of the cell, resolved for every format,
     /// including the role-based DOC and RTF encodings.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     ///
     /// # Errors
     ///
@@ -404,7 +404,7 @@ impl Cell {
 
     /// The vertical merge state of the cell, resolved for every format.
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     ///
     /// # Errors
     ///
@@ -433,7 +433,7 @@ impl Cell {
     /// which has no `w:vMerge` equivalent. Prefer the format-neutral
     /// [`Self::vertical_merge`].
     ///
-    /// Scheduled for deletion in M1.
+    /// Scheduled for deletion.
     ///
     /// # Errors
     ///

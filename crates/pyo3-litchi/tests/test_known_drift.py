@@ -5,22 +5,22 @@ The oracle recorded each item as a pair of tests:
   test_<id>_..._today       asserted what the bindings did then;
   test_<id>_..._intended    asserted the fix, marked @unittest.expectedFailure.
 
-S8a fixed every item: each ``_today``
+Every item is fixed: each ``_today``
 test is deleted and each ``_intended`` test is now an ordinary test. A new
 item is added the same way, as a pair.
 
-ID   Item                                                      Fixed in
-D1   Odb detected as FileFormat.Doc; FileFormat lacks Odb      S8a
-D2   Stub declares 14 of 21 formats                            S8a
-D3   Stub declares FileFormat(Enum); runtime is no Enum        S8a (stub base dropped)
-D4   Raised classes contradict the stub's "Raises:" sections   S8a (LitchiError families)
-D5   README documents a Workbook/Worksheet API that is absent  S8a (README fixed)
-F10  PPTX source change raises ValueError, others Exception    S8a (IoError for all)
-B1   .ppt and .xls are not recognised (features not enabled)   S8a
-B2   repr() panics when its preview splits a UTF-8 character   S8a
-B3   DOCX Document.text() drops paragraph boundaries           S8a (File::text keeps them)
-B4   Run.underline() is a placeholder that returns None        S8a
-B5   Handles panic when used from another thread               S8a
+ID   Item                                                      Fix
+D1   Odb detected as FileFormat.Doc; FileFormat lacks Odb      fixed
+D2   Stub declares 14 of 21 formats                            fixed
+D3   Stub declares FileFormat(Enum); runtime is no Enum        stub base dropped
+D4   Raised classes contradict the stub's "Raises:" sections   LitchiError families
+D5   README documents a Workbook/Worksheet API that is absent  README fixed
+F10  PPTX source change raises ValueError, others Exception    IoError for all
+B1   .ppt and .xls are not recognised (features not enabled)   fixed
+B2   repr() panics when its preview splits a UTF-8 character   fixed
+B3   DOCX Document.text() drops paragraph boundaries           File::text keeps them
+B4   Run.underline() is a placeholder that returns None        fixed
+B5   Handles panic when used from another thread               fixed
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ STUB = parse_stub()
 
 class D1OdbDetectedAsDoc(unittest.TestCase):
     """``From<litchi::FileFormat>`` (src/common.rs) sent unnamed variants to
-    Doc. S8a added ``FileFormat.Odb``; an unknown future format is an error."""
+    Doc. The fix added ``FileFormat.Odb``; an unknown future format is an error."""
 
     ODB = (
         "libreoffice-core/dbaccess/qa/unit/data/tdf132924.odb",
@@ -67,7 +67,7 @@ class D1OdbDetectedAsDoc(unittest.TestCase):
 
 
 class D2StubListsFourteenFormats(unittest.TestCase):
-    """The stub declared 14 of the 21 formats; S8a declares all of them."""
+    """The stub declared 14 of the 21 formats; the fix declares all of them."""
 
     def test_d2_stub_declares_every_runtime_format_intended(self):
         self.assertEqual(set(STUB.classes["FileFormat"].members), public_members(FF))
@@ -75,7 +75,7 @@ class D2StubListsFourteenFormats(unittest.TestCase):
 
 class D3StubDeclaresEnum(unittest.TestCase):
     """The stub said ``class FileFormat(Enum)``; the runtime is a plain pyo3
-    class. S8a dropped the base from the stub (the runtime is unchanged, so
+    class. The fix dropped the base from the stub (the runtime is unchanged, so
     ``str(v) == name`` still holds, see test_formats_and_values)."""
 
     def test_d3_stub_bases_hold_at_runtime_intended(self):
@@ -87,7 +87,7 @@ class D4RaisedClassesContradictStub(unittest.TestCase):
     """The stub's ``Raises:`` promised OSError for unreadable files and
     ValueError for invalid or unsupported formats, but Workbook raised a bare
     Exception for everything and the other openers for most format errors.
-    S8a maps every error code to a LitchiError family whose built-in base keeps
+    The fix maps every error code to a LitchiError family whose built-in base keeps
     those promises (IoError is an OSError; UnsupportedError, CorruptFileError
     and ProtectedError are ValueErrors)."""
 
@@ -133,7 +133,7 @@ class D4RaisedClassesContradictStub(unittest.TestCase):
 class D5ReadmeDocumentsMissingApi(unittest.TestCase):
     """README "API Reference" listed Workbook.worksheets(), worksheet_by_name()
     and Worksheet.name/row_count/column_count/cell_value/rows, none of which
-    exist. S8a removed them from the README."""
+    exist. The fix removed them from the README."""
 
     def _missing(self):
         return {ref for ref in readme_api_references() if not runtime_has(*ref)}
@@ -143,7 +143,7 @@ class D5ReadmeDocumentsMissingApi(unittest.TestCase):
 
 
 class F10PptxSourceChangeFlattened(unittest.TestCase):
-    """Record 0003 F10: PPTX ``check_source()`` failures went through
+    """F10: PPTX ``check_source()`` failures went through
     ``map_ooxml_error`` and surfaced as ValueError, other formats as a bare
     Exception. Through ``litchi::File`` every format reports ``io_error``,
     raised as IoError."""
@@ -166,7 +166,7 @@ class F10PptxSourceChangeFlattened(unittest.TestCase):
 class B1LegacyPptAndXlsNotEnabled(unittest.TestCase):
     """crates/pyo3-litchi/Cargo.toml enabled litchi's ``doc`` feature but not
     ``ppt`` or ``xls``, and OLE2 classification is gated per feature
-    (crates/litchi-ops/src/detect/ole2.rs). S8a enables ``legacy``."""
+    (crates/litchi-ops/src/detect/ole2.rs). The fix enables ``legacy``."""
 
     PPT = ("ole/ppt/text_shapes.ppt", "ole/ppt/SampleShow.ppt")
     XLS = ("ole/xls/Simple.xls", "ole/xls/SimpleMultiCell.xls")
@@ -185,7 +185,7 @@ class B1LegacyPptAndXlsNotEnabled(unittest.TestCase):
 class B2ReprPanicsOnMultibyteText(unittest.TestCase):
     """``__repr__`` previews sliced ``&text[..50]`` (Paragraph, Slide) or
     ``&text[..30]`` (Run, TableCell) by byte, which panicked when the cut fell
-    inside a character (an interpreter abort in release builds). S8a cuts at
+    inside a character (an interpreter abort in release builds). The fix cuts at
     50 or 30 characters. Still run in a subprocess, so a regression cannot
     abort the test run."""
 
@@ -213,7 +213,7 @@ class B2ReprPanicsOnMultibyteText(unittest.TestCase):
 
 class B3DocxTextDropsParagraphBoundaries(unittest.TestCase):
     """The DOCX text used ``extract_word_text``, which concatenates ``<w:t>``
-    text. S8a makes ``File::text()`` (and so ``Document.text()``) join the
+    text. The fix makes ``File::text()`` (and so ``Document.text()``) join the
     paragraph texts with \\n, as the other Document formats separate
     paragraphs (DOC ends each with \\r, RTF/ODT/Pages use \\n)."""
 
@@ -229,7 +229,7 @@ class B3DocxTextDropsParagraphBoundaries(unittest.TestCase):
 
 class B4UnderlineIsAPlaceholder(unittest.TestCase):
     """``Run.underline`` in src/document.rs returned ``None`` unconditionally.
-    S8a reads it through ``litchi::compat::word::Run::underline``."""
+    The fix reads it through ``litchi::compat::word::Run::underline``."""
 
     UNDERLINED = "libreoffice-core/sw/qa/extras/rtfimport/data/tdf108947.rtf"
 
@@ -245,7 +245,7 @@ class B4UnderlineIsAPlaceholder(unittest.TestCase):
 
 class B5HandlesPanicAcrossThreads(unittest.TestCase):
     """Every handle class was ``#[pyclass(unsendable)]``, so pyo3 panicked when
-    one was used from a thread other than its creator. S8a makes the classes
+    one was used from a thread other than its creator. The fix makes the classes
     ``frozen`` and thread-safe over the ``Send + Sync`` ``litchi::File``.
     Subprocess for the same reason as B2."""
 

@@ -1,12 +1,12 @@
 //! Static spec tables: one per format, read by the node view, path
-//! resolution, query compilation and `capabilities()` (record 0010 §7.2).
+//! resolution, query compilation and `capabilities()`.
 //!
 //! Each format declares one `static FormatSpec<Kind>` whose `ElementSpec`s sit
 //! at their kind's index. The node view's `format` member is produced from an
 //! element's `PropSpec` table; resolution normalizes step names through the
 //! alias lists; the query walker prunes with the child lists; and
 //! `capabilities()` reports the same entries, so the report cannot claim
-//! what the code does not do. M2 widens `PropSpec` into a registry entry
+//! what the code does not do. The write side widens `PropSpec` into a registry entry
 //! (constraints, coercion, typed setter) through its access flags, without
 //! changing these shapes.
 //!
@@ -36,25 +36,25 @@ use crate::value::ValueType;
 /// One readable property of an element kind: its key, value type and the
 /// verbs that read and write it.
 ///
-/// M1's `PropSpec` is the read-only subset of an M2 registry entry (record
-/// 0010 §7.3). The seam where the registry's write side attaches is
-/// [`PropSpec::access`]: M2 builds entries that also carry constraints,
+/// `PropSpec` is the read-only subset of a registry entry.
+/// The seam where the registry's write side attaches is
+/// [`PropSpec::access`]: the write side builds entries that also carry constraints,
 /// coercion and the typed setter, and turns the `set` and `add` flags on, so
 /// `capabilities()` reports them without changing its shape or this table's
 /// readers (resolution, the query compiler and the node view read `name`
 /// and `ty` only).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct PropSpec {
-    /// The OfficeCLI property name, which is also the key `set` accepts in
-    /// M2 (`bold`, `font.latin`, `x`, `cachedValue`).
+    /// The OfficeCLI property name, which is also the key `set` accepts
+    /// (`bold`, `font.latin`, `x`, `cachedValue`).
     pub(crate) name: &'static str,
     /// The value type: how a query literal or a `set` value for the key is
     /// coerced ([`ValueType::coerce`]) and how the key's value prints (a
     /// length in its [`LengthSpec`](crate::value::LengthSpec)'s style, so one
     /// [`Length`](crate::value::Length) prints the way OfficeCLI prints that
-    /// key; record 0010 §2.3).
+    /// key).
     pub(crate) ty: ValueType,
-    /// Which verbs read and write the key: [`Access::READ`] in M1.
+    /// Which verbs read and write the key.
     pub(crate) access: Access,
     /// Native metadata available only through explicit raw operations.
     pub(crate) raw: bool,
@@ -92,23 +92,23 @@ impl PropSpec {
 }
 
 /// Which verbs read and write a property: the `get`, `set` and `add` flags
-/// of OfficeCLI's help schema (record 0010 §7.1).
+/// of OfficeCLI's help schema.
 ///
-/// M1 reads only. M2's registry entries set `set` and `add` where the write
-/// kernel has a typed setter (record 0010 §7.3); `capabilities()` reports
-/// the flags as they are.
+/// Registry entries set `set` and `add` where the write
+/// kernel has a typed setter; `capabilities()` reports the flags as they
+/// are.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct Access {
     /// `get` and `query` read the key.
     pub(crate) get: bool,
-    /// `set` writes it (M2).
+    /// `set` writes it.
     pub(crate) set: bool,
-    /// `add` accepts it when it creates the element (M2).
+    /// `add` accepts it when it creates the element.
     pub(crate) add: bool,
 }
 
 impl Access {
-    /// Read only: every M1 property.
+    /// Read only.
     pub(crate) const READ: Self = Self {
         get: true,
         set: false,
@@ -125,7 +125,7 @@ pub(crate) struct ElementSpec<K: 'static> {
     /// The OfficeCLI `type` string (`paragraph`, `cell`, `slide`).
     pub(crate) name: &'static str,
     /// Every step or selector name for the kind, lowercase ASCII and sorted;
-    /// input is matched ASCII case-insensitively (record 0010 §4.2).
+    /// input is matched ASCII case-insensitively.
     pub(crate) aliases: &'static [&'static str],
     /// The kinds that may contain this one.
     pub(crate) parents: &'static [K],
@@ -225,8 +225,7 @@ impl fmt::Display for Subject {
 }
 
 /// An element, axis, property, operation context or view mode the format lacks
-/// or the leaf cannot answer yet, with the follow-up that closes it (record
-/// 0010 §4.4, §7.1).
+/// or the leaf cannot answer yet, with the follow-up that closes it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct GapSpec {
     /// What is missing.
@@ -236,13 +235,13 @@ pub(crate) struct GapSpec {
     /// [`Code::DocumentProtected`] when the operation would violate file
     /// protection.
     pub(crate) code: Code,
-    /// The leaf request or milestone that closes the gap (`L-DOCX-R4`, `M6`).
+    /// What closes the gap: the missing capability, or `not supported yet`.
     pub(crate) follow_up: &'static str,
     /// One sentence on why the gap exists.
     pub(crate) reason: &'static str,
 }
 
-/// Path resolution reports a gap through its follow-up (M1 step R2).
+/// Path resolution reports a gap through its follow-up.
 impl crate::path::navigate::GapInfo for GapSpec {
     fn follow_up(&self) -> &'static str {
         self.follow_up

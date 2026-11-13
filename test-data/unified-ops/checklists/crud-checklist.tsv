@@ -324,32 +324,32 @@ docx	level	edit	supported		ok tx.set
 docx	level	batch	supported		ok set item
 docx	level	create	supported		ok format
 docx	level	save	supported		ok format
-docx	settings	get	gap	L-DOCX-R6 (R4x)	unreached
-docx	settings	find	gap	L-DOCX-R6 (R4x)	unreached
-docx	settings	query	gap	L-DOCX-R6 (R4x)	unreached
-docx	settings	view	gap	L-DOCX-R6 (R4x)	unreached
-docx	settings	set	gap	L-DOCX-R6 (R4x)	unreached
-docx	settings	add	gap	L-DOCX-R6 (R4x)	-
-docx	settings	remove	gap	L-DOCX-R6 (R4x)	unreached
-docx	settings	move	gap	L-DOCX-R6 (R4x)	unreached
-docx	settings	swap	gap	L-DOCX-R6 (R4x)	unreached
-docx	settings	edit	gap	L-DOCX-R6 (R4x)	-
-docx	settings	batch	gap	L-DOCX-R6 (R4x)	-
-docx	settings	create	gap	L-DOCX-R6 (R4x)	ok format
-docx	settings	save	gap	L-DOCX-R6 (R4x)	ok format
-docx	theme	get	gap	L-DOCX-R6 (R4x)	unreached
-docx	theme	find	gap	L-DOCX-R6 (R4x)	unreached
-docx	theme	query	gap	L-DOCX-R6 (R4x)	unreached
-docx	theme	view	gap	L-DOCX-R6 (R4x)	unreached
-docx	theme	set	gap	L-DOCX-R6 (R4x)	unreached
-docx	theme	add	gap	L-DOCX-R6 (R4x)	-
-docx	theme	remove	gap	L-DOCX-R6 (R4x)	unreached
-docx	theme	move	gap	L-DOCX-R6 (R4x)	unreached
-docx	theme	swap	gap	L-DOCX-R6 (R4x)	unreached
-docx	theme	edit	gap	L-DOCX-R6 (R4x)	-
-docx	theme	batch	gap	L-DOCX-R6 (R4x)	-
-docx	theme	create	gap	L-DOCX-R6 (R4x)	ok format
-docx	theme	save	gap	L-DOCX-R6 (R4x)	ok format
+docx	settings	get	gap	not supported yet	unreached
+docx	settings	find	gap	not supported yet	unreached
+docx	settings	query	gap	not supported yet	unreached
+docx	settings	view	gap	not supported yet	unreached
+docx	settings	set	gap	not supported yet	unreached
+docx	settings	add	gap	not supported yet	-
+docx	settings	remove	gap	not supported yet	unreached
+docx	settings	move	gap	not supported yet	unreached
+docx	settings	swap	gap	not supported yet	unreached
+docx	settings	edit	gap	not supported yet	-
+docx	settings	batch	gap	not supported yet	-
+docx	settings	create	gap	not supported yet	ok format
+docx	settings	save	gap	not supported yet	ok format
+docx	theme	get	gap	not supported yet	unreached
+docx	theme	find	gap	not supported yet	unreached
+docx	theme	query	gap	not supported yet	unreached
+docx	theme	view	gap	not supported yet	unreached
+docx	theme	set	gap	not supported yet	unreached
+docx	theme	add	gap	not supported yet	-
+docx	theme	remove	gap	not supported yet	unreached
+docx	theme	move	gap	not supported yet	unreached
+docx	theme	swap	gap	not supported yet	unreached
+docx	theme	edit	gap	not supported yet	-
+docx	theme	batch	gap	not supported yet	-
+docx	theme	create	gap	not supported yet	ok format
+docx	theme	save	gap	not supported yet	ok format
 docx	bookmark	get	supported		ok 7 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx` /bookmark[1]
 docx	bookmark	find	supported		ok 7 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx` /bookmark[1]
 docx	bookmark	query	supported		ok matches in libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx
@@ -376,19 +376,19 @@ docx	field	edit	supported		ok tx.set
 docx	field	batch	supported		ok set item
 docx	field	create	supported		ok format
 docx	field	save	supported		ok format
-docx	formfield	get	gap	R4x	unreached
-docx	formfield	find	gap	R4x	unreached
-docx	formfield	query	gap	R4x	unreached
-docx	formfield	view	gap	R4x	unreached
-docx	formfield	set	gap	R4x	unreached
-docx	formfield	add	gap	R4x	-
-docx	formfield	remove	gap	R4x	unreached
-docx	formfield	move	gap	R4x	unreached
-docx	formfield	swap	gap	R4x	unreached
-docx	formfield	edit	gap	R4x	-
-docx	formfield	batch	gap	R4x	-
-docx	formfield	create	gap	R4x	ok format
-docx	formfield	save	gap	R4x	ok format
+docx	formfield	get	gap	not supported yet	unreached
+docx	formfield	find	gap	not supported yet	unreached
+docx	formfield	query	gap	not supported yet	unreached
+docx	formfield	view	gap	not supported yet	unreached
+docx	formfield	set	gap	not supported yet	unreached
+docx	formfield	add	gap	not supported yet	-
+docx	formfield	remove	gap	not supported yet	unreached
+docx	formfield	move	gap	not supported yet	unreached
+docx	formfield	swap	gap	not supported yet	unreached
+docx	formfield	edit	gap	not supported yet	-
+docx	formfield	batch	gap	not supported yet	-
+docx	formfield	create	gap	not supported yet	ok format
+docx	formfield	save	gap	not supported yet	ok format
 docx	picture	get	supported		ok 3 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /body/p[1]/picture[1]
 docx	picture	find	supported		ok 3 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /body/p[1]/picture[1]
 docx	picture	query	supported		ok matches in libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx
@@ -415,19 +415,19 @@ docx	chart	edit	supported		ok tx.set
 docx	chart	batch	supported		ok set item
 docx	chart	create	supported		ok format
 docx	chart	save	supported		ok format
-docx	ole	get	gap	R4x	unreached
-docx	ole	find	gap	R4x	unreached
-docx	ole	query	gap	R4x	unreached
-docx	ole	view	gap	R4x	unreached
-docx	ole	set	gap	R4x	unreached
-docx	ole	add	gap	R4x	-
-docx	ole	remove	gap	R4x	unreached
-docx	ole	move	gap	R4x	unreached
-docx	ole	swap	gap	R4x	unreached
-docx	ole	edit	gap	R4x	-
-docx	ole	batch	gap	R4x	-
-docx	ole	create	gap	R4x	ok format
-docx	ole	save	gap	R4x	ok format
+docx	ole	get	gap	not supported yet	unreached
+docx	ole	find	gap	not supported yet	unreached
+docx	ole	query	gap	not supported yet	unreached
+docx	ole	view	gap	not supported yet	unreached
+docx	ole	set	gap	not supported yet	unreached
+docx	ole	add	gap	not supported yet	-
+docx	ole	remove	gap	not supported yet	unreached
+docx	ole	move	gap	not supported yet	unreached
+docx	ole	swap	gap	not supported yet	unreached
+docx	ole	edit	gap	not supported yet	-
+docx	ole	batch	gap	not supported yet	-
+docx	ole	create	gap	not supported yet	ok format
+docx	ole	save	gap	not supported yet	ok format
 docx	toc	get	supported		ok 3 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx` /toc[1]
 docx	toc	find	supported		ok 3 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx` /toc[1]
 docx	toc	query	supported		ok matches in libreoffice-core/sw/qa/extras/ooxmlexport/data/custom-styles-TOC-comma.docx
@@ -441,19 +441,19 @@ docx	toc	edit	supported		ok tx.set
 docx	toc	batch	supported		ok set item
 docx	toc	create	supported		ok format
 docx	toc	save	supported		ok format
-docx	revision	get	gap	R4x	unreached
-docx	revision	find	gap	R4x	unreached
-docx	revision	query	gap	R4x	unreached
-docx	revision	view	gap	R4x	unreached
-docx	revision	set	gap	R4x	unreached
-docx	revision	add	gap	R4x	-
-docx	revision	remove	gap	R4x	unreached
-docx	revision	move	gap	R4x	unreached
-docx	revision	swap	gap	R4x	unreached
-docx	revision	edit	gap	R4x	-
-docx	revision	batch	gap	R4x	-
-docx	revision	create	gap	R4x	ok format
-docx	revision	save	gap	R4x	ok format
+docx	revision	get	gap	not supported yet	unreached
+docx	revision	find	gap	not supported yet	unreached
+docx	revision	query	gap	not supported yet	unreached
+docx	revision	view	gap	not supported yet	unreached
+docx	revision	set	gap	not supported yet	unreached
+docx	revision	add	gap	not supported yet	-
+docx	revision	remove	gap	not supported yet	unreached
+docx	revision	move	gap	not supported yet	unreached
+docx	revision	swap	gap	not supported yet	unreached
+docx	revision	edit	gap	not supported yet	-
+docx	revision	batch	gap	not supported yet	-
+docx	revision	create	gap	not supported yet	ok format
+docx	revision	save	gap	not supported yet	ok format
 docx	watermark	get	supported		ok 1 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/textWatermark.docx` /watermark
 docx	watermark	find	supported		ok 1 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/textWatermark.docx` /watermark
 docx	watermark	query	supported		ok matches in libreoffice-core/sw/qa/extras/ooxmlexport/data/textWatermark.docx
@@ -480,19 +480,19 @@ docx	textbox	edit	n/a	edit not offered for this element	-
 docx	textbox	batch	n/a	batch not offered for this element	-
 docx	textbox	create	supported		ok format
 docx	textbox	save	supported		ok format
-docx	shape	get	gap	R4x	unreached
-docx	shape	find	gap	R4x	unreached
-docx	shape	query	gap	R4x	unreached
-docx	shape	view	gap	R4x	unreached
-docx	shape	set	gap	R4x	unreached
-docx	shape	add	gap	R4x	-
-docx	shape	remove	gap	R4x	unreached
-docx	shape	move	gap	R4x	unreached
-docx	shape	swap	gap	R4x	unreached
-docx	shape	edit	gap	R4x	-
-docx	shape	batch	gap	R4x	-
-docx	shape	create	gap	R4x	ok format
-docx	shape	save	gap	R4x	ok format
+docx	shape	get	gap	not supported yet	unreached
+docx	shape	find	gap	not supported yet	unreached
+docx	shape	query	gap	not supported yet	unreached
+docx	shape	view	gap	not supported yet	unreached
+docx	shape	set	gap	not supported yet	unreached
+docx	shape	add	gap	not supported yet	-
+docx	shape	remove	gap	not supported yet	unreached
+docx	shape	move	gap	not supported yet	unreached
+docx	shape	swap	gap	not supported yet	unreached
+docx	shape	edit	gap	not supported yet	-
+docx	shape	batch	gap	not supported yet	-
+docx	shape	create	gap	not supported yet	ok format
+docx	shape	save	gap	not supported yet	ok format
 docx	break	get	supported		ok 2 instances, first `seed + add paragraph + add break` /body/p[1]/break[1]
 docx	break	find	supported		ok 2 instances, first `seed + add paragraph + add break` /body/p[1]/break[1]
 docx	break	query	supported		ok matches in seed + add paragraph + add break
@@ -740,45 +740,45 @@ xlsx	axis	edit	supported		ok tx.set
 xlsx	axis	batch	supported		ok set item
 xlsx	axis	create	supported		ok format
 xlsx	axis	save	supported		ok format
-xlsx	pivottable	get	gap	M1-extended (R4x)	unreached
-xlsx	pivottable	find	gap	M1-extended (R4x)	unreached
-xlsx	pivottable	query	gap	M1-extended (R4x)	unreached
-xlsx	pivottable	view	gap	M1-extended (R4x)	unreached
-xlsx	pivottable	set	gap	M1-extended (R4x)	unreached
-xlsx	pivottable	add	gap	M1-extended (R4x)	-
-xlsx	pivottable	remove	gap	M1-extended (R4x)	unreached
-xlsx	pivottable	move	gap	M1-extended (R4x)	unreached
-xlsx	pivottable	swap	gap	M1-extended (R4x)	unreached
-xlsx	pivottable	edit	gap	M1-extended (R4x)	-
-xlsx	pivottable	batch	gap	M1-extended (R4x)	-
-xlsx	pivottable	create	gap	M1-extended (R4x)	ok format
-xlsx	pivottable	save	gap	M1-extended (R4x)	ok format
-xlsx	slicer	get	gap	M1-extended (R4x)	unreached
-xlsx	slicer	find	gap	M1-extended (R4x)	unreached
-xlsx	slicer	query	gap	M1-extended (R4x)	unreached
-xlsx	slicer	view	gap	M1-extended (R4x)	unreached
-xlsx	slicer	set	gap	M1-extended (R4x)	unreached
-xlsx	slicer	add	gap	M1-extended (R4x)	-
-xlsx	slicer	remove	gap	M1-extended (R4x)	unreached
-xlsx	slicer	move	gap	M1-extended (R4x)	unreached
-xlsx	slicer	swap	gap	M1-extended (R4x)	unreached
-xlsx	slicer	edit	gap	M1-extended (R4x)	-
-xlsx	slicer	batch	gap	M1-extended (R4x)	-
-xlsx	slicer	create	gap	M1-extended (R4x)	ok format
-xlsx	slicer	save	gap	M1-extended (R4x)	ok format
-xlsx	sparkline	get	gap	M1-extended (R4x)	unreached
-xlsx	sparkline	find	gap	M1-extended (R4x)	unreached
-xlsx	sparkline	query	gap	M1-extended (R4x)	unreached
-xlsx	sparkline	view	gap	M1-extended (R4x)	unreached
-xlsx	sparkline	set	gap	M1-extended (R4x)	unreached
-xlsx	sparkline	add	gap	M1-extended (R4x)	-
-xlsx	sparkline	remove	gap	M1-extended (R4x)	unreached
-xlsx	sparkline	move	gap	M1-extended (R4x)	unreached
-xlsx	sparkline	swap	gap	M1-extended (R4x)	unreached
-xlsx	sparkline	edit	gap	M1-extended (R4x)	-
-xlsx	sparkline	batch	gap	M1-extended (R4x)	-
-xlsx	sparkline	create	gap	M1-extended (R4x)	ok format
-xlsx	sparkline	save	gap	M1-extended (R4x)	ok format
+xlsx	pivottable	get	gap	not supported yet	unreached
+xlsx	pivottable	find	gap	not supported yet	unreached
+xlsx	pivottable	query	gap	not supported yet	unreached
+xlsx	pivottable	view	gap	not supported yet	unreached
+xlsx	pivottable	set	gap	not supported yet	unreached
+xlsx	pivottable	add	gap	not supported yet	-
+xlsx	pivottable	remove	gap	not supported yet	unreached
+xlsx	pivottable	move	gap	not supported yet	unreached
+xlsx	pivottable	swap	gap	not supported yet	unreached
+xlsx	pivottable	edit	gap	not supported yet	-
+xlsx	pivottable	batch	gap	not supported yet	-
+xlsx	pivottable	create	gap	not supported yet	ok format
+xlsx	pivottable	save	gap	not supported yet	ok format
+xlsx	slicer	get	gap	not supported yet	unreached
+xlsx	slicer	find	gap	not supported yet	unreached
+xlsx	slicer	query	gap	not supported yet	unreached
+xlsx	slicer	view	gap	not supported yet	unreached
+xlsx	slicer	set	gap	not supported yet	unreached
+xlsx	slicer	add	gap	not supported yet	-
+xlsx	slicer	remove	gap	not supported yet	unreached
+xlsx	slicer	move	gap	not supported yet	unreached
+xlsx	slicer	swap	gap	not supported yet	unreached
+xlsx	slicer	edit	gap	not supported yet	-
+xlsx	slicer	batch	gap	not supported yet	-
+xlsx	slicer	create	gap	not supported yet	ok format
+xlsx	slicer	save	gap	not supported yet	ok format
+xlsx	sparkline	get	gap	not supported yet	unreached
+xlsx	sparkline	find	gap	not supported yet	unreached
+xlsx	sparkline	query	gap	not supported yet	unreached
+xlsx	sparkline	view	gap	not supported yet	unreached
+xlsx	sparkline	set	gap	not supported yet	unreached
+xlsx	sparkline	add	gap	not supported yet	-
+xlsx	sparkline	remove	gap	not supported yet	unreached
+xlsx	sparkline	move	gap	not supported yet	unreached
+xlsx	sparkline	swap	gap	not supported yet	unreached
+xlsx	sparkline	edit	gap	not supported yet	-
+xlsx	sparkline	batch	gap	not supported yet	-
+xlsx	sparkline	create	gap	not supported yet	ok format
+xlsx	sparkline	save	gap	not supported yet	ok format
 xlsx	dataValidation	get	supported		ok 2 instances, first `ooxml/xlsx/DataValidationListTooLong.xlsx` /sheet[1]/dataValidation[1]
 xlsx	dataValidation	find	supported		ok 2 instances, first `ooxml/xlsx/DataValidationListTooLong.xlsx` /sheet[1]/dataValidation[1]
 xlsx	dataValidation	query	supported		ok matches in ooxml/xlsx/DataValidationListTooLong.xlsx
@@ -831,19 +831,19 @@ xlsx	hyperlink	edit	supported		ok tx.set
 xlsx	hyperlink	batch	supported		ok set item
 xlsx	hyperlink	create	supported		ok format
 xlsx	hyperlink	save	supported		ok format
-xlsx	mergeCell	get	gap	M1-extended (R4x)	unreached
-xlsx	mergeCell	find	gap	M1-extended (R4x)	unreached
-xlsx	mergeCell	query	gap	M1-extended (R4x)	unreached
-xlsx	mergeCell	view	gap	M1-extended (R4x)	unreached
-xlsx	mergeCell	set	gap	M1-extended (R4x)	unreached
-xlsx	mergeCell	add	gap	M1-extended (R4x)	-
-xlsx	mergeCell	remove	gap	M1-extended (R4x)	unreached
-xlsx	mergeCell	move	gap	M1-extended (R4x)	unreached
-xlsx	mergeCell	swap	gap	M1-extended (R4x)	unreached
-xlsx	mergeCell	edit	gap	M1-extended (R4x)	-
-xlsx	mergeCell	batch	gap	M1-extended (R4x)	-
-xlsx	mergeCell	create	gap	M1-extended (R4x)	ok format
-xlsx	mergeCell	save	gap	M1-extended (R4x)	ok format
+xlsx	mergeCell	get	gap	not supported yet	unreached
+xlsx	mergeCell	find	gap	not supported yet	unreached
+xlsx	mergeCell	query	gap	not supported yet	unreached
+xlsx	mergeCell	view	gap	not supported yet	unreached
+xlsx	mergeCell	set	gap	not supported yet	unreached
+xlsx	mergeCell	add	gap	not supported yet	-
+xlsx	mergeCell	remove	gap	not supported yet	unreached
+xlsx	mergeCell	move	gap	not supported yet	unreached
+xlsx	mergeCell	swap	gap	not supported yet	unreached
+xlsx	mergeCell	edit	gap	not supported yet	-
+xlsx	mergeCell	batch	gap	not supported yet	-
+xlsx	mergeCell	create	gap	not supported yet	ok format
+xlsx	mergeCell	save	gap	not supported yet	ok format
 xlsx	picture	get	supported		ok 2 instances, first `create() + add picture` /sheet[1]/picture[1]
 xlsx	picture	find	supported		ok 2 instances, first `create() + add picture` /sheet[1]/picture[1]
 xlsx	picture	query	supported		ok matches in create() + add picture
@@ -870,19 +870,19 @@ xlsx	shape	edit	supported		ok tx.set
 xlsx	shape	batch	supported		ok set item
 xlsx	shape	create	supported		ok format
 xlsx	shape	save	supported		ok format
-xlsx	ole	get	gap	M1-extended (R4x)	unreached
-xlsx	ole	find	gap	M1-extended (R4x)	unreached
-xlsx	ole	query	gap	M1-extended (R4x)	unreached
-xlsx	ole	view	gap	M1-extended (R4x)	unreached
-xlsx	ole	set	gap	M1-extended (R4x)	unreached
-xlsx	ole	add	gap	M1-extended (R4x)	-
-xlsx	ole	remove	gap	M1-extended (R4x)	unreached
-xlsx	ole	move	gap	M1-extended (R4x)	unreached
-xlsx	ole	swap	gap	M1-extended (R4x)	unreached
-xlsx	ole	edit	gap	M1-extended (R4x)	-
-xlsx	ole	batch	gap	M1-extended (R4x)	-
-xlsx	ole	create	gap	M1-extended (R4x)	ok format
-xlsx	ole	save	gap	M1-extended (R4x)	ok format
+xlsx	ole	get	gap	not supported yet	unreached
+xlsx	ole	find	gap	not supported yet	unreached
+xlsx	ole	query	gap	not supported yet	unreached
+xlsx	ole	view	gap	not supported yet	unreached
+xlsx	ole	set	gap	not supported yet	unreached
+xlsx	ole	add	gap	not supported yet	-
+xlsx	ole	remove	gap	not supported yet	unreached
+xlsx	ole	move	gap	not supported yet	unreached
+xlsx	ole	swap	gap	not supported yet	unreached
+xlsx	ole	edit	gap	not supported yet	-
+xlsx	ole	batch	gap	not supported yet	-
+xlsx	ole	create	gap	not supported yet	ok format
+xlsx	ole	save	gap	not supported yet	ok format
 xlsx	rowbreak	get	supported		ok 1 instances, first `create() + add rowbreak` /sheet[1]/rowbreak[1]
 xlsx	rowbreak	find	supported		ok 1 instances, first `create() + add rowbreak` /sheet[1]/rowbreak[1]
 xlsx	rowbreak	query	supported		ok matches in create() + add rowbreak
@@ -1208,32 +1208,32 @@ pptx	equation	edit	n/a	edit not offered for this element	-
 pptx	equation	batch	n/a	batch not offered for this element	-
 pptx	equation	create	supported		ok format
 pptx	equation	save	supported		ok format
-pptx	zoom	get	gap	M1-extended	unreached
-pptx	zoom	find	gap	M1-extended	unreached
-pptx	zoom	query	gap	M1-extended	unreached
-pptx	zoom	view	gap	M1-extended	unreached
-pptx	zoom	set	gap	M1-extended	unreached
-pptx	zoom	add	gap	M1-extended	-
-pptx	zoom	remove	gap	M1-extended	unreached
-pptx	zoom	move	gap	M1-extended	unreached
-pptx	zoom	swap	gap	M1-extended	unreached
-pptx	zoom	edit	gap	M1-extended	-
-pptx	zoom	batch	gap	M1-extended	-
-pptx	zoom	create	gap	M1-extended	ok format
-pptx	zoom	save	gap	M1-extended	ok format
-pptx	model3d	get	gap	M1-extended	unreached
-pptx	model3d	find	gap	M1-extended	unreached
-pptx	model3d	query	gap	M1-extended	unreached
-pptx	model3d	view	gap	M1-extended	unreached
-pptx	model3d	set	gap	M1-extended	unreached
-pptx	model3d	add	gap	M1-extended	-
-pptx	model3d	remove	gap	M1-extended	unreached
-pptx	model3d	move	gap	M1-extended	unreached
-pptx	model3d	swap	gap	M1-extended	unreached
-pptx	model3d	edit	gap	M1-extended	-
-pptx	model3d	batch	gap	M1-extended	-
-pptx	model3d	create	gap	M1-extended	ok format
-pptx	model3d	save	gap	M1-extended	ok format
+pptx	zoom	get	gap	not supported yet	unreached
+pptx	zoom	find	gap	not supported yet	unreached
+pptx	zoom	query	gap	not supported yet	unreached
+pptx	zoom	view	gap	not supported yet	unreached
+pptx	zoom	set	gap	not supported yet	unreached
+pptx	zoom	add	gap	not supported yet	-
+pptx	zoom	remove	gap	not supported yet	unreached
+pptx	zoom	move	gap	not supported yet	unreached
+pptx	zoom	swap	gap	not supported yet	unreached
+pptx	zoom	edit	gap	not supported yet	-
+pptx	zoom	batch	gap	not supported yet	-
+pptx	zoom	create	gap	not supported yet	ok format
+pptx	zoom	save	gap	not supported yet	ok format
+pptx	model3d	get	gap	not supported yet	unreached
+pptx	model3d	find	gap	not supported yet	unreached
+pptx	model3d	query	gap	not supported yet	unreached
+pptx	model3d	view	gap	not supported yet	unreached
+pptx	model3d	set	gap	not supported yet	unreached
+pptx	model3d	add	gap	not supported yet	-
+pptx	model3d	remove	gap	not supported yet	unreached
+pptx	model3d	move	gap	not supported yet	unreached
+pptx	model3d	swap	gap	not supported yet	unreached
+pptx	model3d	edit	gap	not supported yet	-
+pptx	model3d	batch	gap	not supported yet	-
+pptx	model3d	create	gap	not supported yet	ok format
+pptx	model3d	save	gap	not supported yet	ok format
 pptx	slideMaster	get	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slidemaster[1]
 pptx	slideMaster	find	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slidemaster[1]
 pptx	slideMaster	query	supported		ok matches in create()
@@ -1312,19 +1312,19 @@ pptx	hyperlink	edit	supported		ok tx.set
 pptx	hyperlink	batch	supported		ok set item
 pptx	hyperlink	create	supported		ok format
 pptx	hyperlink	save	supported		ok format
-pptx	animation	get	gap	M1-extended	unreached
-pptx	animation	find	gap	M1-extended	unreached
-pptx	animation	query	gap	M1-extended	unreached
-pptx	animation	view	gap	M1-extended	unreached
-pptx	animation	set	gap	M1-extended	unreached
-pptx	animation	add	gap	M1-extended	-
-pptx	animation	remove	gap	M1-extended	unreached
-pptx	animation	move	gap	M1-extended	unreached
-pptx	animation	swap	gap	M1-extended	unreached
-pptx	animation	edit	gap	M1-extended	-
-pptx	animation	batch	gap	M1-extended	-
-pptx	animation	create	gap	M1-extended	ok format
-pptx	animation	save	gap	M1-extended	ok format
+pptx	animation	get	gap	not supported yet	unreached
+pptx	animation	find	gap	not supported yet	unreached
+pptx	animation	query	gap	not supported yet	unreached
+pptx	animation	view	gap	not supported yet	unreached
+pptx	animation	set	gap	not supported yet	unreached
+pptx	animation	add	gap	not supported yet	-
+pptx	animation	remove	gap	not supported yet	unreached
+pptx	animation	move	gap	not supported yet	unreached
+pptx	animation	swap	gap	not supported yet	unreached
+pptx	animation	edit	gap	not supported yet	-
+pptx	animation	batch	gap	not supported yet	-
+pptx	animation	create	gap	not supported yet	ok format
+pptx	animation	save	gap	not supported yet	ok format
 pptx	series	get	supported		ok 6 instances, first `ooxml/pptx/radar-chart.pptx` /slide[1]/chart[1]/series[1]
 pptx	series	find	supported		ok 6 instances, first `ooxml/pptx/radar-chart.pptx` /slide[1]/chart[1]/series[1]
 pptx	series	query	supported		ok matches in ooxml/pptx/radar-chart.pptx
@@ -1364,32 +1364,32 @@ pptx	col	edit	supported		ok tx.set
 pptx	col	batch	supported		ok set item
 pptx	col	create	supported		ok format
 pptx	col	save	supported		ok format
-pptx	noteSlide	get	gap	M1-extended	unreached
-pptx	noteSlide	find	gap	M1-extended	unreached
-pptx	noteSlide	query	gap	M1-extended	unreached
-pptx	noteSlide	view	gap	M1-extended	unreached
-pptx	noteSlide	set	gap	M1-extended	unreached
-pptx	noteSlide	add	gap	M1-extended	-
-pptx	noteSlide	remove	gap	M1-extended	unreached
-pptx	noteSlide	move	gap	M1-extended	unreached
-pptx	noteSlide	swap	gap	M1-extended	unreached
-pptx	noteSlide	edit	gap	M1-extended	-
-pptx	noteSlide	batch	gap	M1-extended	-
-pptx	noteSlide	create	gap	M1-extended	ok format
-pptx	noteSlide	save	gap	M1-extended	ok format
-pptx	notesMaster	get	gap	M1-extended	unreached
-pptx	notesMaster	find	gap	M1-extended	unreached
-pptx	notesMaster	query	gap	M1-extended	unreached
-pptx	notesMaster	view	gap	M1-extended	unreached
-pptx	notesMaster	set	gap	M1-extended	unreached
-pptx	notesMaster	add	gap	M1-extended	-
-pptx	notesMaster	remove	gap	M1-extended	unreached
-pptx	notesMaster	move	gap	M1-extended	unreached
-pptx	notesMaster	swap	gap	M1-extended	unreached
-pptx	notesMaster	edit	gap	M1-extended	-
-pptx	notesMaster	batch	gap	M1-extended	-
-pptx	notesMaster	create	gap	M1-extended	ok format
-pptx	notesMaster	save	gap	M1-extended	ok format
+pptx	noteSlide	get	gap	not supported yet	unreached
+pptx	noteSlide	find	gap	not supported yet	unreached
+pptx	noteSlide	query	gap	not supported yet	unreached
+pptx	noteSlide	view	gap	not supported yet	unreached
+pptx	noteSlide	set	gap	not supported yet	unreached
+pptx	noteSlide	add	gap	not supported yet	-
+pptx	noteSlide	remove	gap	not supported yet	unreached
+pptx	noteSlide	move	gap	not supported yet	unreached
+pptx	noteSlide	swap	gap	not supported yet	unreached
+pptx	noteSlide	edit	gap	not supported yet	-
+pptx	noteSlide	batch	gap	not supported yet	-
+pptx	noteSlide	create	gap	not supported yet	ok format
+pptx	noteSlide	save	gap	not supported yet	ok format
+pptx	notesMaster	get	gap	not supported yet	unreached
+pptx	notesMaster	find	gap	not supported yet	unreached
+pptx	notesMaster	query	gap	not supported yet	unreached
+pptx	notesMaster	view	gap	not supported yet	unreached
+pptx	notesMaster	set	gap	not supported yet	unreached
+pptx	notesMaster	add	gap	not supported yet	-
+pptx	notesMaster	remove	gap	not supported yet	unreached
+pptx	notesMaster	move	gap	not supported yet	unreached
+pptx	notesMaster	swap	gap	not supported yet	unreached
+pptx	notesMaster	edit	gap	not supported yet	-
+pptx	notesMaster	batch	gap	not supported yet	-
+pptx	notesMaster	create	gap	not supported yet	ok format
+pptx	notesMaster	save	gap	not supported yet	ok format
 pptx	node	get	supported		ok 8 instances, first `ooxml/pptx/smartart-composite-infer-right.pptx` /slide[1]/smartart[1]/node[1]
 pptx	node	find	supported		ok 8 instances, first `ooxml/pptx/smartart-composite-infer-right.pptx` /slide[1]/smartart[1]/node[1]
 pptx	node	query	supported		ok matches in ooxml/pptx/smartart-composite-infer-right.pptx
@@ -1559,45 +1559,45 @@ xlsb	axis	edit	n/a	edit not offered for this element	-
 xlsb	axis	batch	n/a	batch not offered for this element	-
 xlsb	axis	create	supported		ok format
 xlsb	axis	save	supported		ok format
-xlsb	pivottable	get	gap	M1-extended (R4x)	unreached
-xlsb	pivottable	find	gap	M1-extended (R4x)	unreached
-xlsb	pivottable	query	gap	M1-extended (R4x)	unreached
-xlsb	pivottable	view	gap	M1-extended (R4x)	unreached
-xlsb	pivottable	set	gap	M1-extended (R4x)	unreached
-xlsb	pivottable	add	gap	M1-extended (R4x)	-
-xlsb	pivottable	remove	gap	M1-extended (R4x)	unreached
-xlsb	pivottable	move	gap	M1-extended (R4x)	unreached
-xlsb	pivottable	swap	gap	M1-extended (R4x)	unreached
-xlsb	pivottable	edit	gap	M1-extended (R4x)	-
-xlsb	pivottable	batch	gap	M1-extended (R4x)	-
-xlsb	pivottable	create	gap	M1-extended (R4x)	ok format
-xlsb	pivottable	save	gap	M1-extended (R4x)	ok format
-xlsb	slicer	get	gap	M1-extended (R4x)	unreached
-xlsb	slicer	find	gap	M1-extended (R4x)	unreached
-xlsb	slicer	query	gap	M1-extended (R4x)	unreached
-xlsb	slicer	view	gap	M1-extended (R4x)	unreached
-xlsb	slicer	set	gap	M1-extended (R4x)	unreached
-xlsb	slicer	add	gap	M1-extended (R4x)	-
-xlsb	slicer	remove	gap	M1-extended (R4x)	unreached
-xlsb	slicer	move	gap	M1-extended (R4x)	unreached
-xlsb	slicer	swap	gap	M1-extended (R4x)	unreached
-xlsb	slicer	edit	gap	M1-extended (R4x)	-
-xlsb	slicer	batch	gap	M1-extended (R4x)	-
-xlsb	slicer	create	gap	M1-extended (R4x)	ok format
-xlsb	slicer	save	gap	M1-extended (R4x)	ok format
-xlsb	sparkline	get	gap	M1-extended (R4x)	unreached
-xlsb	sparkline	find	gap	M1-extended (R4x)	unreached
-xlsb	sparkline	query	gap	M1-extended (R4x)	unreached
-xlsb	sparkline	view	gap	M1-extended (R4x)	unreached
-xlsb	sparkline	set	gap	M1-extended (R4x)	unreached
-xlsb	sparkline	add	gap	M1-extended (R4x)	-
-xlsb	sparkline	remove	gap	M1-extended (R4x)	unreached
-xlsb	sparkline	move	gap	M1-extended (R4x)	unreached
-xlsb	sparkline	swap	gap	M1-extended (R4x)	unreached
-xlsb	sparkline	edit	gap	M1-extended (R4x)	-
-xlsb	sparkline	batch	gap	M1-extended (R4x)	-
-xlsb	sparkline	create	gap	M1-extended (R4x)	ok format
-xlsb	sparkline	save	gap	M1-extended (R4x)	ok format
+xlsb	pivottable	get	gap	not supported yet	unreached
+xlsb	pivottable	find	gap	not supported yet	unreached
+xlsb	pivottable	query	gap	not supported yet	unreached
+xlsb	pivottable	view	gap	not supported yet	unreached
+xlsb	pivottable	set	gap	not supported yet	unreached
+xlsb	pivottable	add	gap	not supported yet	-
+xlsb	pivottable	remove	gap	not supported yet	unreached
+xlsb	pivottable	move	gap	not supported yet	unreached
+xlsb	pivottable	swap	gap	not supported yet	unreached
+xlsb	pivottable	edit	gap	not supported yet	-
+xlsb	pivottable	batch	gap	not supported yet	-
+xlsb	pivottable	create	gap	not supported yet	ok format
+xlsb	pivottable	save	gap	not supported yet	ok format
+xlsb	slicer	get	gap	not supported yet	unreached
+xlsb	slicer	find	gap	not supported yet	unreached
+xlsb	slicer	query	gap	not supported yet	unreached
+xlsb	slicer	view	gap	not supported yet	unreached
+xlsb	slicer	set	gap	not supported yet	unreached
+xlsb	slicer	add	gap	not supported yet	-
+xlsb	slicer	remove	gap	not supported yet	unreached
+xlsb	slicer	move	gap	not supported yet	unreached
+xlsb	slicer	swap	gap	not supported yet	unreached
+xlsb	slicer	edit	gap	not supported yet	-
+xlsb	slicer	batch	gap	not supported yet	-
+xlsb	slicer	create	gap	not supported yet	ok format
+xlsb	slicer	save	gap	not supported yet	ok format
+xlsb	sparkline	get	gap	not supported yet	unreached
+xlsb	sparkline	find	gap	not supported yet	unreached
+xlsb	sparkline	query	gap	not supported yet	unreached
+xlsb	sparkline	view	gap	not supported yet	unreached
+xlsb	sparkline	set	gap	not supported yet	unreached
+xlsb	sparkline	add	gap	not supported yet	-
+xlsb	sparkline	remove	gap	not supported yet	unreached
+xlsb	sparkline	move	gap	not supported yet	unreached
+xlsb	sparkline	swap	gap	not supported yet	unreached
+xlsb	sparkline	edit	gap	not supported yet	-
+xlsb	sparkline	batch	gap	not supported yet	-
+xlsb	sparkline	create	gap	not supported yet	ok format
+xlsb	sparkline	save	gap	not supported yet	ok format
 xlsb	dataValidation	get	supported		ok 1 instances, first `create() + add dataValidation` /sheet[1]/dataValidation[1]
 xlsb	dataValidation	find	supported		ok 1 instances, first `create() + add dataValidation` /sheet[1]/dataValidation[1]
 xlsb	dataValidation	query	supported		ok matches in create() + add dataValidation
@@ -1650,19 +1650,19 @@ xlsb	hyperlink	edit	supported		ok tx.set
 xlsb	hyperlink	batch	supported		ok set item
 xlsb	hyperlink	create	supported		ok format
 xlsb	hyperlink	save	supported		ok format
-xlsb	mergeCell	get	gap	M1-extended (R4x)	unreached
-xlsb	mergeCell	find	gap	M1-extended (R4x)	unreached
-xlsb	mergeCell	query	gap	M1-extended (R4x)	unreached
-xlsb	mergeCell	view	gap	M1-extended (R4x)	unreached
-xlsb	mergeCell	set	gap	M1-extended (R4x)	unreached
-xlsb	mergeCell	add	gap	M1-extended (R4x)	-
-xlsb	mergeCell	remove	gap	M1-extended (R4x)	unreached
-xlsb	mergeCell	move	gap	M1-extended (R4x)	unreached
-xlsb	mergeCell	swap	gap	M1-extended (R4x)	unreached
-xlsb	mergeCell	edit	gap	M1-extended (R4x)	-
-xlsb	mergeCell	batch	gap	M1-extended (R4x)	-
-xlsb	mergeCell	create	gap	M1-extended (R4x)	ok format
-xlsb	mergeCell	save	gap	M1-extended (R4x)	ok format
+xlsb	mergeCell	get	gap	not supported yet	unreached
+xlsb	mergeCell	find	gap	not supported yet	unreached
+xlsb	mergeCell	query	gap	not supported yet	unreached
+xlsb	mergeCell	view	gap	not supported yet	unreached
+xlsb	mergeCell	set	gap	not supported yet	unreached
+xlsb	mergeCell	add	gap	not supported yet	-
+xlsb	mergeCell	remove	gap	not supported yet	unreached
+xlsb	mergeCell	move	gap	not supported yet	unreached
+xlsb	mergeCell	swap	gap	not supported yet	unreached
+xlsb	mergeCell	edit	gap	not supported yet	-
+xlsb	mergeCell	batch	gap	not supported yet	-
+xlsb	mergeCell	create	gap	not supported yet	ok format
+xlsb	mergeCell	save	gap	not supported yet	ok format
 xlsb	picture	get	supported		ok 2 instances, first `create() + add picture` /sheet[1]/picture[1]
 xlsb	picture	find	supported		ok 2 instances, first `create() + add picture` /sheet[1]/picture[1]
 xlsb	picture	query	supported		ok matches in create() + add picture
@@ -1689,19 +1689,19 @@ xlsb	shape	edit	supported		ok tx.set
 xlsb	shape	batch	supported		ok set item
 xlsb	shape	create	supported		ok format
 xlsb	shape	save	supported		ok format
-xlsb	ole	get	gap	M1-extended (R4x)	unreached
-xlsb	ole	find	gap	M1-extended (R4x)	unreached
-xlsb	ole	query	gap	M1-extended (R4x)	unreached
-xlsb	ole	view	gap	M1-extended (R4x)	unreached
-xlsb	ole	set	gap	M1-extended (R4x)	unreached
-xlsb	ole	add	gap	M1-extended (R4x)	-
-xlsb	ole	remove	gap	M1-extended (R4x)	unreached
-xlsb	ole	move	gap	M1-extended (R4x)	unreached
-xlsb	ole	swap	gap	M1-extended (R4x)	unreached
-xlsb	ole	edit	gap	M1-extended (R4x)	-
-xlsb	ole	batch	gap	M1-extended (R4x)	-
-xlsb	ole	create	gap	M1-extended (R4x)	ok format
-xlsb	ole	save	gap	M1-extended (R4x)	ok format
+xlsb	ole	get	gap	not supported yet	unreached
+xlsb	ole	find	gap	not supported yet	unreached
+xlsb	ole	query	gap	not supported yet	unreached
+xlsb	ole	view	gap	not supported yet	unreached
+xlsb	ole	set	gap	not supported yet	unreached
+xlsb	ole	add	gap	not supported yet	-
+xlsb	ole	remove	gap	not supported yet	unreached
+xlsb	ole	move	gap	not supported yet	unreached
+xlsb	ole	swap	gap	not supported yet	unreached
+xlsb	ole	edit	gap	not supported yet	-
+xlsb	ole	batch	gap	not supported yet	-
+xlsb	ole	create	gap	not supported yet	ok format
+xlsb	ole	save	gap	not supported yet	ok format
 xlsb	rowbreak	get	supported		ok 1 instances, first `create() + add rowbreak` /sheet[1]/rowbreak[1]
 xlsb	rowbreak	find	supported		ok 1 instances, first `create() + add rowbreak` /sheet[1]/rowbreak[1]
 xlsb	rowbreak	query	supported		ok matches in create() + add rowbreak
@@ -1728,19 +1728,19 @@ xlsb	colbreak	edit	supported		ok tx.set
 xlsb	colbreak	batch	supported		ok set item
 xlsb	colbreak	create	supported		ok format
 xlsb	colbreak	save	supported		ok format
-xlsb	run	get	gap	M1-extended (R4x)	unreached
-xlsb	run	find	gap	M1-extended (R4x)	unreached
-xlsb	run	query	gap	M1-extended (R4x)	unreached
-xlsb	run	view	gap	M1-extended (R4x)	unreached
-xlsb	run	set	gap	M1-extended (R4x)	unreached
-xlsb	run	add	gap	M1-extended (R4x)	-
-xlsb	run	remove	gap	M1-extended (R4x)	unreached
-xlsb	run	move	gap	M1-extended (R4x)	unreached
-xlsb	run	swap	gap	M1-extended (R4x)	unreached
-xlsb	run	edit	gap	M1-extended (R4x)	-
-xlsb	run	batch	gap	M1-extended (R4x)	-
-xlsb	run	create	gap	M1-extended (R4x)	ok format
-xlsb	run	save	gap	M1-extended (R4x)	ok format
+xlsb	run	get	gap	not supported yet	unreached
+xlsb	run	find	gap	not supported yet	unreached
+xlsb	run	query	gap	not supported yet	unreached
+xlsb	run	view	gap	not supported yet	unreached
+xlsb	run	set	gap	not supported yet	unreached
+xlsb	run	add	gap	not supported yet	-
+xlsb	run	remove	gap	not supported yet	unreached
+xlsb	run	move	gap	not supported yet	unreached
+xlsb	run	swap	gap	not supported yet	unreached
+xlsb	run	edit	gap	not supported yet	-
+xlsb	run	batch	gap	not supported yet	-
+xlsb	run	create	gap	not supported yet	ok format
+xlsb	run	save	gap	not supported yet	ok format
 doc	document	get	supported		ok 8 instances, first `ole/doc/documentProperties.doc` /
 doc	document	find	supported		ok 8 instances, first `ole/doc/documentProperties.doc` /
 doc	document	query	n/a	query not offered for this element	-
@@ -2170,19 +2170,19 @@ xls	column	edit	supported		ok tx.set
 xls	column	batch	supported		ok set item
 xls	column	create	supported		ok format
 xls	column	save	supported		ok format
-xls	table	get	gap	M1-extended (R6b)	unreached
-xls	table	find	gap	M1-extended (R6b)	unreached
-xls	table	query	gap	M1-extended (R6b)	unreached
-xls	table	view	gap	M1-extended (R6b)	unreached
-xls	table	set	gap	M1-extended (R6b)	unreached
-xls	table	add	gap	M1-extended (R6b)	-
-xls	table	remove	gap	M1-extended (R6b)	unreached
-xls	table	move	gap	M1-extended (R6b)	unreached
-xls	table	swap	gap	M1-extended (R6b)	unreached
-xls	table	edit	gap	M1-extended (R6b)	-
-xls	table	batch	gap	M1-extended (R6b)	-
-xls	table	create	gap	M1-extended (R6b)	ok format
-xls	table	save	gap	M1-extended (R6b)	ok format
+xls	table	get	gap	not supported yet	unreached
+xls	table	find	gap	not supported yet	unreached
+xls	table	query	gap	not supported yet	unreached
+xls	table	view	gap	not supported yet	unreached
+xls	table	set	gap	not supported yet	unreached
+xls	table	add	gap	not supported yet	-
+xls	table	remove	gap	not supported yet	unreached
+xls	table	move	gap	not supported yet	unreached
+xls	table	swap	gap	not supported yet	unreached
+xls	table	edit	gap	not supported yet	-
+xls	table	batch	gap	not supported yet	-
+xls	table	create	gap	not supported yet	ok format
+xls	table	save	gap	not supported yet	ok format
 xls	namedrange	get	supported		ok 2 instances, first `ole/xls/SimpleWithAutofilter.xls` /namedrange[1]
 xls	namedrange	find	supported		ok 2 instances, first `ole/xls/SimpleWithAutofilter.xls` /namedrange[1]
 xls	namedrange	query	supported		ok matches in ole/xls/SimpleWithAutofilter.xls
@@ -2209,84 +2209,84 @@ xls	comment	edit	supported		ok tx.set
 xls	comment	batch	supported		ok set item
 xls	comment	create	supported		ok format
 xls	comment	save	supported		ok format
-xls	chart	get	gap	M1-extended (R6b)	unreached
-xls	chart	find	gap	M1-extended (R6b)	unreached
-xls	chart	query	gap	M1-extended (R6b)	unreached
-xls	chart	view	gap	M1-extended (R6b)	unreached
-xls	chart	set	gap	M1-extended (R6b)	unreached
-xls	chart	add	gap	M1-extended (R6b)	-
-xls	chart	remove	gap	M1-extended (R6b)	unreached
-xls	chart	move	gap	M1-extended (R6b)	unreached
-xls	chart	swap	gap	M1-extended (R6b)	unreached
-xls	chart	edit	gap	M1-extended (R6b)	-
-xls	chart	batch	gap	M1-extended (R6b)	-
-xls	chart	create	gap	M1-extended (R6b)	ok format
-xls	chart	save	gap	M1-extended (R6b)	ok format
-xls	series	get	gap	M1-extended (R6b)	unreached
-xls	series	find	gap	M1-extended (R6b)	unreached
-xls	series	query	gap	M1-extended (R6b)	unreached
-xls	series	view	gap	M1-extended (R6b)	unreached
-xls	series	set	gap	M1-extended (R6b)	unreached
-xls	series	add	gap	M1-extended (R6b)	-
-xls	series	remove	gap	M1-extended (R6b)	unreached
-xls	series	move	gap	M1-extended (R6b)	unreached
-xls	series	swap	gap	M1-extended (R6b)	unreached
-xls	series	edit	gap	M1-extended (R6b)	-
-xls	series	batch	gap	M1-extended (R6b)	-
-xls	series	create	gap	M1-extended (R6b)	ok format
-xls	series	save	gap	M1-extended (R6b)	ok format
-xls	axis	get	gap	M1-extended (R6b)	unreached
-xls	axis	find	gap	M1-extended (R6b)	unreached
-xls	axis	query	gap	M1-extended (R6b)	unreached
-xls	axis	view	gap	M1-extended (R6b)	unreached
-xls	axis	set	gap	M1-extended (R6b)	unreached
-xls	axis	add	gap	M1-extended (R6b)	-
-xls	axis	remove	gap	M1-extended (R6b)	unreached
-xls	axis	move	gap	M1-extended (R6b)	unreached
-xls	axis	swap	gap	M1-extended (R6b)	unreached
-xls	axis	edit	gap	M1-extended (R6b)	-
-xls	axis	batch	gap	M1-extended (R6b)	-
-xls	axis	create	gap	M1-extended (R6b)	ok format
-xls	axis	save	gap	M1-extended (R6b)	ok format
-xls	pivottable	get	gap	M1-extended (R6b)	unreached
-xls	pivottable	find	gap	M1-extended (R6b)	unreached
-xls	pivottable	query	gap	M1-extended (R6b)	unreached
-xls	pivottable	view	gap	M1-extended (R6b)	unreached
-xls	pivottable	set	gap	M1-extended (R6b)	unreached
-xls	pivottable	add	gap	M1-extended (R6b)	-
-xls	pivottable	remove	gap	M1-extended (R6b)	unreached
-xls	pivottable	move	gap	M1-extended (R6b)	unreached
-xls	pivottable	swap	gap	M1-extended (R6b)	unreached
-xls	pivottable	edit	gap	M1-extended (R6b)	-
-xls	pivottable	batch	gap	M1-extended (R6b)	-
-xls	pivottable	create	gap	M1-extended (R6b)	ok format
-xls	pivottable	save	gap	M1-extended (R6b)	ok format
-xls	slicer	get	gap	M1-extended (R6b)	unreached
-xls	slicer	find	gap	M1-extended (R6b)	unreached
-xls	slicer	query	gap	M1-extended (R6b)	unreached
-xls	slicer	view	gap	M1-extended (R6b)	unreached
-xls	slicer	set	gap	M1-extended (R6b)	unreached
-xls	slicer	add	gap	M1-extended (R6b)	-
-xls	slicer	remove	gap	M1-extended (R6b)	unreached
-xls	slicer	move	gap	M1-extended (R6b)	unreached
-xls	slicer	swap	gap	M1-extended (R6b)	unreached
-xls	slicer	edit	gap	M1-extended (R6b)	-
-xls	slicer	batch	gap	M1-extended (R6b)	-
-xls	slicer	create	gap	M1-extended (R6b)	ok format
-xls	slicer	save	gap	M1-extended (R6b)	ok format
-xls	sparkline	get	gap	M1-extended (R6b)	unreached
-xls	sparkline	find	gap	M1-extended (R6b)	unreached
-xls	sparkline	query	gap	M1-extended (R6b)	unreached
-xls	sparkline	view	gap	M1-extended (R6b)	unreached
-xls	sparkline	set	gap	M1-extended (R6b)	unreached
-xls	sparkline	add	gap	M1-extended (R6b)	-
-xls	sparkline	remove	gap	M1-extended (R6b)	unreached
-xls	sparkline	move	gap	M1-extended (R6b)	unreached
-xls	sparkline	swap	gap	M1-extended (R6b)	unreached
-xls	sparkline	edit	gap	M1-extended (R6b)	-
-xls	sparkline	batch	gap	M1-extended (R6b)	-
-xls	sparkline	create	gap	M1-extended (R6b)	ok format
-xls	sparkline	save	gap	M1-extended (R6b)	ok format
+xls	chart	get	gap	not supported yet	unreached
+xls	chart	find	gap	not supported yet	unreached
+xls	chart	query	gap	not supported yet	unreached
+xls	chart	view	gap	not supported yet	unreached
+xls	chart	set	gap	not supported yet	unreached
+xls	chart	add	gap	not supported yet	-
+xls	chart	remove	gap	not supported yet	unreached
+xls	chart	move	gap	not supported yet	unreached
+xls	chart	swap	gap	not supported yet	unreached
+xls	chart	edit	gap	not supported yet	-
+xls	chart	batch	gap	not supported yet	-
+xls	chart	create	gap	not supported yet	ok format
+xls	chart	save	gap	not supported yet	ok format
+xls	series	get	gap	not supported yet	unreached
+xls	series	find	gap	not supported yet	unreached
+xls	series	query	gap	not supported yet	unreached
+xls	series	view	gap	not supported yet	unreached
+xls	series	set	gap	not supported yet	unreached
+xls	series	add	gap	not supported yet	-
+xls	series	remove	gap	not supported yet	unreached
+xls	series	move	gap	not supported yet	unreached
+xls	series	swap	gap	not supported yet	unreached
+xls	series	edit	gap	not supported yet	-
+xls	series	batch	gap	not supported yet	-
+xls	series	create	gap	not supported yet	ok format
+xls	series	save	gap	not supported yet	ok format
+xls	axis	get	gap	not supported yet	unreached
+xls	axis	find	gap	not supported yet	unreached
+xls	axis	query	gap	not supported yet	unreached
+xls	axis	view	gap	not supported yet	unreached
+xls	axis	set	gap	not supported yet	unreached
+xls	axis	add	gap	not supported yet	-
+xls	axis	remove	gap	not supported yet	unreached
+xls	axis	move	gap	not supported yet	unreached
+xls	axis	swap	gap	not supported yet	unreached
+xls	axis	edit	gap	not supported yet	-
+xls	axis	batch	gap	not supported yet	-
+xls	axis	create	gap	not supported yet	ok format
+xls	axis	save	gap	not supported yet	ok format
+xls	pivottable	get	gap	not supported yet	unreached
+xls	pivottable	find	gap	not supported yet	unreached
+xls	pivottable	query	gap	not supported yet	unreached
+xls	pivottable	view	gap	not supported yet	unreached
+xls	pivottable	set	gap	not supported yet	unreached
+xls	pivottable	add	gap	not supported yet	-
+xls	pivottable	remove	gap	not supported yet	unreached
+xls	pivottable	move	gap	not supported yet	unreached
+xls	pivottable	swap	gap	not supported yet	unreached
+xls	pivottable	edit	gap	not supported yet	-
+xls	pivottable	batch	gap	not supported yet	-
+xls	pivottable	create	gap	not supported yet	ok format
+xls	pivottable	save	gap	not supported yet	ok format
+xls	slicer	get	gap	not supported yet	unreached
+xls	slicer	find	gap	not supported yet	unreached
+xls	slicer	query	gap	not supported yet	unreached
+xls	slicer	view	gap	not supported yet	unreached
+xls	slicer	set	gap	not supported yet	unreached
+xls	slicer	add	gap	not supported yet	-
+xls	slicer	remove	gap	not supported yet	unreached
+xls	slicer	move	gap	not supported yet	unreached
+xls	slicer	swap	gap	not supported yet	unreached
+xls	slicer	edit	gap	not supported yet	-
+xls	slicer	batch	gap	not supported yet	-
+xls	slicer	create	gap	not supported yet	ok format
+xls	slicer	save	gap	not supported yet	ok format
+xls	sparkline	get	gap	not supported yet	unreached
+xls	sparkline	find	gap	not supported yet	unreached
+xls	sparkline	query	gap	not supported yet	unreached
+xls	sparkline	view	gap	not supported yet	unreached
+xls	sparkline	set	gap	not supported yet	unreached
+xls	sparkline	add	gap	not supported yet	-
+xls	sparkline	remove	gap	not supported yet	unreached
+xls	sparkline	move	gap	not supported yet	unreached
+xls	sparkline	swap	gap	not supported yet	unreached
+xls	sparkline	edit	gap	not supported yet	-
+xls	sparkline	batch	gap	not supported yet	-
+xls	sparkline	create	gap	not supported yet	ok format
+xls	sparkline	save	gap	not supported yet	ok format
 xls	dataValidation	get	supported		ok 1 instances, first `create() + add dataValidation` /sheet[1]/dataValidation[1]
 xls	dataValidation	find	supported		ok 1 instances, first `create() + add dataValidation` /sheet[1]/dataValidation[1]
 xls	dataValidation	query	supported		ok matches in create() + add dataValidation
@@ -2339,19 +2339,19 @@ xls	hyperlink	edit	supported		ok tx.set
 xls	hyperlink	batch	supported		ok set item
 xls	hyperlink	create	supported		ok format
 xls	hyperlink	save	supported		ok format
-xls	mergeCell	get	gap	M1-extended (R6b)	unreached
-xls	mergeCell	find	gap	M1-extended (R6b)	unreached
-xls	mergeCell	query	gap	M1-extended (R6b)	unreached
-xls	mergeCell	view	gap	M1-extended (R6b)	unreached
-xls	mergeCell	set	gap	M1-extended (R6b)	unreached
-xls	mergeCell	add	gap	M1-extended (R6b)	-
-xls	mergeCell	remove	gap	M1-extended (R6b)	unreached
-xls	mergeCell	move	gap	M1-extended (R6b)	unreached
-xls	mergeCell	swap	gap	M1-extended (R6b)	unreached
-xls	mergeCell	edit	gap	M1-extended (R6b)	-
-xls	mergeCell	batch	gap	M1-extended (R6b)	-
-xls	mergeCell	create	gap	M1-extended (R6b)	ok format
-xls	mergeCell	save	gap	M1-extended (R6b)	ok format
+xls	mergeCell	get	gap	not supported yet	unreached
+xls	mergeCell	find	gap	not supported yet	unreached
+xls	mergeCell	query	gap	not supported yet	unreached
+xls	mergeCell	view	gap	not supported yet	unreached
+xls	mergeCell	set	gap	not supported yet	unreached
+xls	mergeCell	add	gap	not supported yet	-
+xls	mergeCell	remove	gap	not supported yet	unreached
+xls	mergeCell	move	gap	not supported yet	unreached
+xls	mergeCell	swap	gap	not supported yet	unreached
+xls	mergeCell	edit	gap	not supported yet	-
+xls	mergeCell	batch	gap	not supported yet	-
+xls	mergeCell	create	gap	not supported yet	ok format
+xls	mergeCell	save	gap	not supported yet	ok format
 xls	picture	get	supported		ok 6 instances, first `ole/xls/SimpleWithImages.xls` /sheet[1]/picture[1]
 xls	picture	find	supported		ok 6 instances, first `ole/xls/SimpleWithImages.xls` /sheet[1]/picture[1]
 xls	picture	query	supported		ok matches in ole/xls/SimpleWithImages.xls
@@ -2378,19 +2378,19 @@ xls	shape	edit	supported		ok tx.set
 xls	shape	batch	supported		ok set item
 xls	shape	create	supported		ok format
 xls	shape	save	supported		ok format
-xls	ole	get	gap	M1-extended (R6b)	unreached
-xls	ole	find	gap	M1-extended (R6b)	unreached
-xls	ole	query	gap	M1-extended (R6b)	unreached
-xls	ole	view	gap	M1-extended (R6b)	unreached
-xls	ole	set	gap	M1-extended (R6b)	unreached
-xls	ole	add	gap	M1-extended (R6b)	-
-xls	ole	remove	gap	M1-extended (R6b)	unreached
-xls	ole	move	gap	M1-extended (R6b)	unreached
-xls	ole	swap	gap	M1-extended (R6b)	unreached
-xls	ole	edit	gap	M1-extended (R6b)	-
-xls	ole	batch	gap	M1-extended (R6b)	-
-xls	ole	create	gap	M1-extended (R6b)	ok format
-xls	ole	save	gap	M1-extended (R6b)	ok format
+xls	ole	get	gap	not supported yet	unreached
+xls	ole	find	gap	not supported yet	unreached
+xls	ole	query	gap	not supported yet	unreached
+xls	ole	view	gap	not supported yet	unreached
+xls	ole	set	gap	not supported yet	unreached
+xls	ole	add	gap	not supported yet	-
+xls	ole	remove	gap	not supported yet	unreached
+xls	ole	move	gap	not supported yet	unreached
+xls	ole	swap	gap	not supported yet	unreached
+xls	ole	edit	gap	not supported yet	-
+xls	ole	batch	gap	not supported yet	-
+xls	ole	create	gap	not supported yet	ok format
+xls	ole	save	gap	not supported yet	ok format
 xls	rowbreak	get	supported		ok 2 instances, first `ole/xls/SimpleWithPageBreaks.xls` /sheet[1]/rowbreak[1]
 xls	rowbreak	find	supported		ok 2 instances, first `ole/xls/SimpleWithPageBreaks.xls` /sheet[1]/rowbreak[1]
 xls	rowbreak	query	supported		ok matches in ole/xls/SimpleWithPageBreaks.xls
@@ -2417,19 +2417,19 @@ xls	colbreak	edit	supported		ok tx.set
 xls	colbreak	batch	supported		ok set item
 xls	colbreak	create	supported		ok format
 xls	colbreak	save	supported		ok format
-xls	run	get	gap	M1-extended (R6b)	unreached
-xls	run	find	gap	M1-extended (R6b)	unreached
-xls	run	query	gap	M1-extended (R6b)	unreached
-xls	run	view	gap	M1-extended (R6b)	unreached
-xls	run	set	gap	M1-extended (R6b)	unreached
-xls	run	add	gap	M1-extended (R6b)	-
-xls	run	remove	gap	M1-extended (R6b)	unreached
-xls	run	move	gap	M1-extended (R6b)	unreached
-xls	run	swap	gap	M1-extended (R6b)	unreached
-xls	run	edit	gap	M1-extended (R6b)	-
-xls	run	batch	gap	M1-extended (R6b)	-
-xls	run	create	gap	M1-extended (R6b)	ok format
-xls	run	save	gap	M1-extended (R6b)	ok format
+xls	run	get	gap	not supported yet	unreached
+xls	run	find	gap	not supported yet	unreached
+xls	run	query	gap	not supported yet	unreached
+xls	run	view	gap	not supported yet	unreached
+xls	run	set	gap	not supported yet	unreached
+xls	run	add	gap	not supported yet	-
+xls	run	remove	gap	not supported yet	unreached
+xls	run	move	gap	not supported yet	unreached
+xls	run	swap	gap	not supported yet	unreached
+xls	run	edit	gap	not supported yet	-
+xls	run	batch	gap	not supported yet	-
+xls	run	create	gap	not supported yet	ok format
+xls	run	save	gap	not supported yet	ok format
 ppt	presentation	get	supported		ok 8 instances, first `poi/test-data/slideshow/incorrect_slide_order.ppt` /
 ppt	presentation	find	supported		ok 8 instances, first `poi/test-data/slideshow/incorrect_slide_order.ppt` /
 ppt	presentation	query	n/a	query not offered for this element	-
@@ -2573,19 +2573,19 @@ ppt	connector	edit	n/a	edit not offered for this element	-
 ppt	connector	batch	n/a	batch not offered for this element	-
 ppt	connector	create	supported		ok format
 ppt	connector	save	supported		ok format
-ppt	smartart	get	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	unreached
-ppt	smartart	find	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	unreached
-ppt	smartart	query	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	unreached
-ppt	smartart	view	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	unreached
-ppt	smartart	set	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	unreached
-ppt	smartart	add	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	-
-ppt	smartart	remove	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	unreached
-ppt	smartart	move	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	unreached
-ppt	smartart	swap	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	unreached
-ppt	smartart	edit	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	-
-ppt	smartart	batch	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	-
-ppt	smartart	create	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	ok format
-ppt	smartart	save	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	ok format
+ppt	smartart	get	gap	PPT SmartArt and diagram groups	unreached
+ppt	smartart	find	gap	PPT SmartArt and diagram groups	unreached
+ppt	smartart	query	gap	PPT SmartArt and diagram groups	unreached
+ppt	smartart	view	gap	PPT SmartArt and diagram groups	unreached
+ppt	smartart	set	gap	PPT SmartArt and diagram groups	unreached
+ppt	smartart	add	gap	PPT SmartArt and diagram groups	-
+ppt	smartart	remove	gap	PPT SmartArt and diagram groups	unreached
+ppt	smartart	move	gap	PPT SmartArt and diagram groups	unreached
+ppt	smartart	swap	gap	PPT SmartArt and diagram groups	unreached
+ppt	smartart	edit	gap	PPT SmartArt and diagram groups	-
+ppt	smartart	batch	gap	PPT SmartArt and diagram groups	-
+ppt	smartart	create	gap	PPT SmartArt and diagram groups	ok format
+ppt	smartart	save	gap	PPT SmartArt and diagram groups	ok format
 ppt	ole	get	supported		ok 4 instances, first `unified-ops/0294/elements.ppt` /slide[1]/ole[1]
 ppt	ole	find	supported		ok 4 instances, first `unified-ops/0294/elements.ppt` /slide[1]/ole[1]
 ppt	ole	query	supported		ok matches in unified-ops/0294/elements.ppt
@@ -2703,71 +2703,71 @@ ppt	media	edit	n/a	edit not offered for this element	-
 ppt	media	batch	n/a	batch not offered for this element	-
 ppt	media	create	supported		ok format
 ppt	media	save	supported		ok format
-ppt	equation	get	gap	0323-F6 PPT Equation Editor objects	unreached
-ppt	equation	find	gap	0323-F6 PPT Equation Editor objects	unreached
-ppt	equation	query	gap	0323-F6 PPT Equation Editor objects	unreached
-ppt	equation	view	gap	0323-F6 PPT Equation Editor objects	unreached
-ppt	equation	set	gap	0323-F6 PPT Equation Editor objects	unreached
-ppt	equation	add	gap	0323-F6 PPT Equation Editor objects	-
-ppt	equation	remove	gap	0323-F6 PPT Equation Editor objects	unreached
-ppt	equation	move	gap	0323-F6 PPT Equation Editor objects	unreached
-ppt	equation	swap	gap	0323-F6 PPT Equation Editor objects	unreached
-ppt	equation	edit	gap	0323-F6 PPT Equation Editor objects	-
-ppt	equation	batch	gap	0323-F6 PPT Equation Editor objects	-
-ppt	equation	create	gap	0323-F6 PPT Equation Editor objects	ok format
-ppt	equation	save	gap	0323-F6 PPT Equation Editor objects	ok format
-ppt	zoom	get	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	zoom	find	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	zoom	query	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	zoom	view	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	zoom	set	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	zoom	add	gap	wontfix: PPTX-only (record 0323)	-
-ppt	zoom	remove	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	zoom	move	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	zoom	swap	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	zoom	edit	gap	wontfix: PPTX-only (record 0323)	-
-ppt	zoom	batch	gap	wontfix: PPTX-only (record 0323)	-
-ppt	zoom	create	gap	wontfix: PPTX-only (record 0323)	ok format
-ppt	zoom	save	gap	wontfix: PPTX-only (record 0323)	ok format
-ppt	model3d	get	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	model3d	find	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	model3d	query	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	model3d	view	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	model3d	set	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	model3d	add	gap	wontfix: PPTX-only (record 0323)	-
-ppt	model3d	remove	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	model3d	move	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	model3d	swap	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	model3d	edit	gap	wontfix: PPTX-only (record 0323)	-
-ppt	model3d	batch	gap	wontfix: PPTX-only (record 0323)	-
-ppt	model3d	create	gap	wontfix: PPTX-only (record 0323)	ok format
-ppt	model3d	save	gap	wontfix: PPTX-only (record 0323)	ok format
-ppt	slideMaster	get	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	unreached
-ppt	slideMaster	find	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	unreached
-ppt	slideMaster	query	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	unreached
-ppt	slideMaster	view	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	unreached
-ppt	slideMaster	set	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	unreached
-ppt	slideMaster	add	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	-
-ppt	slideMaster	remove	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	unreached
-ppt	slideMaster	move	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	unreached
-ppt	slideMaster	swap	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	unreached
-ppt	slideMaster	edit	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	-
-ppt	slideMaster	batch	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	-
-ppt	slideMaster	create	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	ok format
-ppt	slideMaster	save	gap	0339-F4 (deferred-P1): PPT main and title masters as nodes	ok format
-ppt	slideLayout	get	gap	0339-F4 (deferred-P1): PPT layouts as nodes	unreached
-ppt	slideLayout	find	gap	0339-F4 (deferred-P1): PPT layouts as nodes	unreached
-ppt	slideLayout	query	gap	0339-F4 (deferred-P1): PPT layouts as nodes	unreached
-ppt	slideLayout	view	gap	0339-F4 (deferred-P1): PPT layouts as nodes	unreached
-ppt	slideLayout	set	gap	0339-F4 (deferred-P1): PPT layouts as nodes	unreached
-ppt	slideLayout	add	gap	0339-F4 (deferred-P1): PPT layouts as nodes	-
-ppt	slideLayout	remove	gap	0339-F4 (deferred-P1): PPT layouts as nodes	unreached
-ppt	slideLayout	move	gap	0339-F4 (deferred-P1): PPT layouts as nodes	unreached
-ppt	slideLayout	swap	gap	0339-F4 (deferred-P1): PPT layouts as nodes	unreached
-ppt	slideLayout	edit	gap	0339-F4 (deferred-P1): PPT layouts as nodes	-
-ppt	slideLayout	batch	gap	0339-F4 (deferred-P1): PPT layouts as nodes	-
-ppt	slideLayout	create	gap	0339-F4 (deferred-P1): PPT layouts as nodes	ok format
-ppt	slideLayout	save	gap	0339-F4 (deferred-P1): PPT layouts as nodes	ok format
+ppt	equation	get	gap	PPT Equation Editor objects	unreached
+ppt	equation	find	gap	PPT Equation Editor objects	unreached
+ppt	equation	query	gap	PPT Equation Editor objects	unreached
+ppt	equation	view	gap	PPT Equation Editor objects	unreached
+ppt	equation	set	gap	PPT Equation Editor objects	unreached
+ppt	equation	add	gap	PPT Equation Editor objects	-
+ppt	equation	remove	gap	PPT Equation Editor objects	unreached
+ppt	equation	move	gap	PPT Equation Editor objects	unreached
+ppt	equation	swap	gap	PPT Equation Editor objects	unreached
+ppt	equation	edit	gap	PPT Equation Editor objects	-
+ppt	equation	batch	gap	PPT Equation Editor objects	-
+ppt	equation	create	gap	PPT Equation Editor objects	ok format
+ppt	equation	save	gap	PPT Equation Editor objects	ok format
+ppt	zoom	get	gap	wontfix: PPTX-only	unreached
+ppt	zoom	find	gap	wontfix: PPTX-only	unreached
+ppt	zoom	query	gap	wontfix: PPTX-only	unreached
+ppt	zoom	view	gap	wontfix: PPTX-only	unreached
+ppt	zoom	set	gap	wontfix: PPTX-only	unreached
+ppt	zoom	add	gap	wontfix: PPTX-only	-
+ppt	zoom	remove	gap	wontfix: PPTX-only	unreached
+ppt	zoom	move	gap	wontfix: PPTX-only	unreached
+ppt	zoom	swap	gap	wontfix: PPTX-only	unreached
+ppt	zoom	edit	gap	wontfix: PPTX-only	-
+ppt	zoom	batch	gap	wontfix: PPTX-only	-
+ppt	zoom	create	gap	wontfix: PPTX-only	ok format
+ppt	zoom	save	gap	wontfix: PPTX-only	ok format
+ppt	model3d	get	gap	wontfix: PPTX-only	unreached
+ppt	model3d	find	gap	wontfix: PPTX-only	unreached
+ppt	model3d	query	gap	wontfix: PPTX-only	unreached
+ppt	model3d	view	gap	wontfix: PPTX-only	unreached
+ppt	model3d	set	gap	wontfix: PPTX-only	unreached
+ppt	model3d	add	gap	wontfix: PPTX-only	-
+ppt	model3d	remove	gap	wontfix: PPTX-only	unreached
+ppt	model3d	move	gap	wontfix: PPTX-only	unreached
+ppt	model3d	swap	gap	wontfix: PPTX-only	unreached
+ppt	model3d	edit	gap	wontfix: PPTX-only	-
+ppt	model3d	batch	gap	wontfix: PPTX-only	-
+ppt	model3d	create	gap	wontfix: PPTX-only	ok format
+ppt	model3d	save	gap	wontfix: PPTX-only	ok format
+ppt	slideMaster	get	gap	PPT main and title masters as nodes	unreached
+ppt	slideMaster	find	gap	PPT main and title masters as nodes	unreached
+ppt	slideMaster	query	gap	PPT main and title masters as nodes	unreached
+ppt	slideMaster	view	gap	PPT main and title masters as nodes	unreached
+ppt	slideMaster	set	gap	PPT main and title masters as nodes	unreached
+ppt	slideMaster	add	gap	PPT main and title masters as nodes	-
+ppt	slideMaster	remove	gap	PPT main and title masters as nodes	unreached
+ppt	slideMaster	move	gap	PPT main and title masters as nodes	unreached
+ppt	slideMaster	swap	gap	PPT main and title masters as nodes	unreached
+ppt	slideMaster	edit	gap	PPT main and title masters as nodes	-
+ppt	slideMaster	batch	gap	PPT main and title masters as nodes	-
+ppt	slideMaster	create	gap	PPT main and title masters as nodes	ok format
+ppt	slideMaster	save	gap	PPT main and title masters as nodes	ok format
+ppt	slideLayout	get	gap	PPT layouts as nodes	unreached
+ppt	slideLayout	find	gap	PPT layouts as nodes	unreached
+ppt	slideLayout	query	gap	PPT layouts as nodes	unreached
+ppt	slideLayout	view	gap	PPT layouts as nodes	unreached
+ppt	slideLayout	set	gap	PPT layouts as nodes	unreached
+ppt	slideLayout	add	gap	PPT layouts as nodes	-
+ppt	slideLayout	remove	gap	PPT layouts as nodes	unreached
+ppt	slideLayout	move	gap	PPT layouts as nodes	unreached
+ppt	slideLayout	swap	gap	PPT layouts as nodes	unreached
+ppt	slideLayout	edit	gap	PPT layouts as nodes	-
+ppt	slideLayout	batch	gap	PPT layouts as nodes	-
+ppt	slideLayout	create	gap	PPT layouts as nodes	ok format
+ppt	slideLayout	save	gap	PPT layouts as nodes	ok format
 ppt	theme	get	supported		ok 2 instances, first `poi/test-data/slideshow/headers_footers_2007.ppt` /theme
 ppt	theme	find	supported		ok 2 instances, first `poi/test-data/slideshow/headers_footers_2007.ppt` /theme
 ppt	theme	query	supported		ok matches in poi/test-data/slideshow/headers_footers_2007.ppt
@@ -2781,32 +2781,32 @@ ppt	theme	edit	n/a	edit not offered for this element	-
 ppt	theme	batch	n/a	batch not offered for this element	-
 ppt	theme	create	supported		ok format
 ppt	theme	save	supported		ok format
-ppt	modernComment	get	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	modernComment	find	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	modernComment	query	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	modernComment	view	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	modernComment	set	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	modernComment	add	gap	wontfix: PPTX-only (record 0323)	-
-ppt	modernComment	remove	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	modernComment	move	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	modernComment	swap	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	modernComment	edit	gap	wontfix: PPTX-only (record 0323)	-
-ppt	modernComment	batch	gap	wontfix: PPTX-only (record 0323)	-
-ppt	modernComment	create	gap	wontfix: PPTX-only (record 0323)	ok format
-ppt	modernComment	save	gap	wontfix: PPTX-only (record 0323)	ok format
-ppt	reply	get	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	reply	find	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	reply	query	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	reply	view	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	reply	set	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	reply	add	gap	wontfix: PPTX-only (record 0323)	-
-ppt	reply	remove	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	reply	move	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	reply	swap	gap	wontfix: PPTX-only (record 0323)	unreached
-ppt	reply	edit	gap	wontfix: PPTX-only (record 0323)	-
-ppt	reply	batch	gap	wontfix: PPTX-only (record 0323)	-
-ppt	reply	create	gap	wontfix: PPTX-only (record 0323)	ok format
-ppt	reply	save	gap	wontfix: PPTX-only (record 0323)	ok format
+ppt	modernComment	get	gap	wontfix: PPTX-only	unreached
+ppt	modernComment	find	gap	wontfix: PPTX-only	unreached
+ppt	modernComment	query	gap	wontfix: PPTX-only	unreached
+ppt	modernComment	view	gap	wontfix: PPTX-only	unreached
+ppt	modernComment	set	gap	wontfix: PPTX-only	unreached
+ppt	modernComment	add	gap	wontfix: PPTX-only	-
+ppt	modernComment	remove	gap	wontfix: PPTX-only	unreached
+ppt	modernComment	move	gap	wontfix: PPTX-only	unreached
+ppt	modernComment	swap	gap	wontfix: PPTX-only	unreached
+ppt	modernComment	edit	gap	wontfix: PPTX-only	-
+ppt	modernComment	batch	gap	wontfix: PPTX-only	-
+ppt	modernComment	create	gap	wontfix: PPTX-only	ok format
+ppt	modernComment	save	gap	wontfix: PPTX-only	ok format
+ppt	reply	get	gap	wontfix: PPTX-only	unreached
+ppt	reply	find	gap	wontfix: PPTX-only	unreached
+ppt	reply	query	gap	wontfix: PPTX-only	unreached
+ppt	reply	view	gap	wontfix: PPTX-only	unreached
+ppt	reply	set	gap	wontfix: PPTX-only	unreached
+ppt	reply	add	gap	wontfix: PPTX-only	-
+ppt	reply	remove	gap	wontfix: PPTX-only	unreached
+ppt	reply	move	gap	wontfix: PPTX-only	unreached
+ppt	reply	swap	gap	wontfix: PPTX-only	unreached
+ppt	reply	edit	gap	wontfix: PPTX-only	-
+ppt	reply	batch	gap	wontfix: PPTX-only	-
+ppt	reply	create	gap	wontfix: PPTX-only	ok format
+ppt	reply	save	gap	wontfix: PPTX-only	ok format
 ppt	hyperlink	get	supported		ok 3 instances, first `unified-ops/0294/elements.ppt` /slide[1]/shape[1]/hyperlink
 ppt	hyperlink	find	supported		ok 3 instances, first `unified-ops/0294/elements.ppt` /slide[1]/shape[1]/hyperlink
 ppt	hyperlink	query	supported		ok matches in unified-ops/0294/elements.ppt
@@ -2820,45 +2820,45 @@ ppt	hyperlink	edit	supported		ok tx.set
 ppt	hyperlink	batch	supported		ok set item
 ppt	hyperlink	create	supported		ok format
 ppt	hyperlink	save	supported		ok format
-ppt	animation	get	gap	0323-F5 PPT animation nodes	unreached
-ppt	animation	find	gap	0323-F5 PPT animation nodes	unreached
-ppt	animation	query	gap	0323-F5 PPT animation nodes	unreached
-ppt	animation	view	gap	0323-F5 PPT animation nodes	unreached
-ppt	animation	set	gap	0323-F5 PPT animation nodes	unreached
-ppt	animation	add	gap	0323-F5 PPT animation nodes	-
-ppt	animation	remove	gap	0323-F5 PPT animation nodes	unreached
-ppt	animation	move	gap	0323-F5 PPT animation nodes	unreached
-ppt	animation	swap	gap	0323-F5 PPT animation nodes	unreached
-ppt	animation	edit	gap	0323-F5 PPT animation nodes	-
-ppt	animation	batch	gap	0323-F5 PPT animation nodes	-
-ppt	animation	create	gap	0323-F5 PPT animation nodes	ok format
-ppt	animation	save	gap	0323-F5 PPT animation nodes	ok format
-ppt	series	get	gap	0323-F7 PPT chart series and axes	unreached
-ppt	series	find	gap	0323-F7 PPT chart series and axes	unreached
-ppt	series	query	gap	0323-F7 PPT chart series and axes	unreached
-ppt	series	view	gap	0323-F7 PPT chart series and axes	unreached
-ppt	series	set	gap	0323-F7 PPT chart series and axes	unreached
-ppt	series	add	gap	0323-F7 PPT chart series and axes	-
-ppt	series	remove	gap	0323-F7 PPT chart series and axes	unreached
-ppt	series	move	gap	0323-F7 PPT chart series and axes	unreached
-ppt	series	swap	gap	0323-F7 PPT chart series and axes	unreached
-ppt	series	edit	gap	0323-F7 PPT chart series and axes	-
-ppt	series	batch	gap	0323-F7 PPT chart series and axes	-
-ppt	series	create	gap	0323-F7 PPT chart series and axes	ok format
-ppt	series	save	gap	0323-F7 PPT chart series and axes	ok format
-ppt	axis	get	gap	0323-F7 PPT chart series and axes	unreached
-ppt	axis	find	gap	0323-F7 PPT chart series and axes	unreached
-ppt	axis	query	gap	0323-F7 PPT chart series and axes	unreached
-ppt	axis	view	gap	0323-F7 PPT chart series and axes	unreached
-ppt	axis	set	gap	0323-F7 PPT chart series and axes	unreached
-ppt	axis	add	gap	0323-F7 PPT chart series and axes	-
-ppt	axis	remove	gap	0323-F7 PPT chart series and axes	unreached
-ppt	axis	move	gap	0323-F7 PPT chart series and axes	unreached
-ppt	axis	swap	gap	0323-F7 PPT chart series and axes	unreached
-ppt	axis	edit	gap	0323-F7 PPT chart series and axes	-
-ppt	axis	batch	gap	0323-F7 PPT chart series and axes	-
-ppt	axis	create	gap	0323-F7 PPT chart series and axes	ok format
-ppt	axis	save	gap	0323-F7 PPT chart series and axes	ok format
+ppt	animation	get	gap	PPT animation nodes	unreached
+ppt	animation	find	gap	PPT animation nodes	unreached
+ppt	animation	query	gap	PPT animation nodes	unreached
+ppt	animation	view	gap	PPT animation nodes	unreached
+ppt	animation	set	gap	PPT animation nodes	unreached
+ppt	animation	add	gap	PPT animation nodes	-
+ppt	animation	remove	gap	PPT animation nodes	unreached
+ppt	animation	move	gap	PPT animation nodes	unreached
+ppt	animation	swap	gap	PPT animation nodes	unreached
+ppt	animation	edit	gap	PPT animation nodes	-
+ppt	animation	batch	gap	PPT animation nodes	-
+ppt	animation	create	gap	PPT animation nodes	ok format
+ppt	animation	save	gap	PPT animation nodes	ok format
+ppt	series	get	gap	PPT chart series and axes	unreached
+ppt	series	find	gap	PPT chart series and axes	unreached
+ppt	series	query	gap	PPT chart series and axes	unreached
+ppt	series	view	gap	PPT chart series and axes	unreached
+ppt	series	set	gap	PPT chart series and axes	unreached
+ppt	series	add	gap	PPT chart series and axes	-
+ppt	series	remove	gap	PPT chart series and axes	unreached
+ppt	series	move	gap	PPT chart series and axes	unreached
+ppt	series	swap	gap	PPT chart series and axes	unreached
+ppt	series	edit	gap	PPT chart series and axes	-
+ppt	series	batch	gap	PPT chart series and axes	-
+ppt	series	create	gap	PPT chart series and axes	ok format
+ppt	series	save	gap	PPT chart series and axes	ok format
+ppt	axis	get	gap	PPT chart series and axes	unreached
+ppt	axis	find	gap	PPT chart series and axes	unreached
+ppt	axis	query	gap	PPT chart series and axes	unreached
+ppt	axis	view	gap	PPT chart series and axes	unreached
+ppt	axis	set	gap	PPT chart series and axes	unreached
+ppt	axis	add	gap	PPT chart series and axes	-
+ppt	axis	remove	gap	PPT chart series and axes	unreached
+ppt	axis	move	gap	PPT chart series and axes	unreached
+ppt	axis	swap	gap	PPT chart series and axes	unreached
+ppt	axis	edit	gap	PPT chart series and axes	-
+ppt	axis	batch	gap	PPT chart series and axes	-
+ppt	axis	create	gap	PPT chart series and axes	ok format
+ppt	axis	save	gap	PPT chart series and axes	ok format
 ppt	col	get	supported		ok 7 instances, first `poi/test-data/slideshow/bug61881.ppt` /slide[11]/table[1]/col[1]
 ppt	col	find	supported		ok 7 instances, first `poi/test-data/slideshow/bug61881.ppt` /slide[11]/table[1]/col[1]
 ppt	col	query	supported		ok matches in poi/test-data/slideshow/bug61881.ppt
@@ -2872,32 +2872,32 @@ ppt	col	edit	n/a	edit not offered for this element	-
 ppt	col	batch	n/a	batch not offered for this element	-
 ppt	col	create	supported		ok format
 ppt	col	save	supported		ok format
-ppt	noteSlide	get	gap	M1-extended	unreached
-ppt	noteSlide	find	gap	M1-extended	unreached
-ppt	noteSlide	query	gap	M1-extended	unreached
-ppt	noteSlide	view	gap	M1-extended	unreached
-ppt	noteSlide	set	gap	M1-extended	unreached
-ppt	noteSlide	add	gap	M1-extended	-
-ppt	noteSlide	remove	gap	M1-extended	unreached
-ppt	noteSlide	move	gap	M1-extended	unreached
-ppt	noteSlide	swap	gap	M1-extended	unreached
-ppt	noteSlide	edit	gap	M1-extended	-
-ppt	noteSlide	batch	gap	M1-extended	-
-ppt	noteSlide	create	gap	M1-extended	ok format
-ppt	noteSlide	save	gap	M1-extended	ok format
-ppt	notesMaster	get	gap	M1-extended	unreached
-ppt	notesMaster	find	gap	M1-extended	unreached
-ppt	notesMaster	query	gap	M1-extended	unreached
-ppt	notesMaster	view	gap	M1-extended	unreached
-ppt	notesMaster	set	gap	M1-extended	unreached
-ppt	notesMaster	add	gap	M1-extended	-
-ppt	notesMaster	remove	gap	M1-extended	unreached
-ppt	notesMaster	move	gap	M1-extended	unreached
-ppt	notesMaster	swap	gap	M1-extended	unreached
-ppt	notesMaster	edit	gap	M1-extended	-
-ppt	notesMaster	batch	gap	M1-extended	-
-ppt	notesMaster	create	gap	M1-extended	ok format
-ppt	notesMaster	save	gap	M1-extended	ok format
+ppt	noteSlide	get	gap	not supported yet	unreached
+ppt	noteSlide	find	gap	not supported yet	unreached
+ppt	noteSlide	query	gap	not supported yet	unreached
+ppt	noteSlide	view	gap	not supported yet	unreached
+ppt	noteSlide	set	gap	not supported yet	unreached
+ppt	noteSlide	add	gap	not supported yet	-
+ppt	noteSlide	remove	gap	not supported yet	unreached
+ppt	noteSlide	move	gap	not supported yet	unreached
+ppt	noteSlide	swap	gap	not supported yet	unreached
+ppt	noteSlide	edit	gap	not supported yet	-
+ppt	noteSlide	batch	gap	not supported yet	-
+ppt	noteSlide	create	gap	not supported yet	ok format
+ppt	noteSlide	save	gap	not supported yet	ok format
+ppt	notesMaster	get	gap	not supported yet	unreached
+ppt	notesMaster	find	gap	not supported yet	unreached
+ppt	notesMaster	query	gap	not supported yet	unreached
+ppt	notesMaster	view	gap	not supported yet	unreached
+ppt	notesMaster	set	gap	not supported yet	unreached
+ppt	notesMaster	add	gap	not supported yet	-
+ppt	notesMaster	remove	gap	not supported yet	unreached
+ppt	notesMaster	move	gap	not supported yet	unreached
+ppt	notesMaster	swap	gap	not supported yet	unreached
+ppt	notesMaster	edit	gap	not supported yet	-
+ppt	notesMaster	batch	gap	not supported yet	-
+ppt	notesMaster	create	gap	not supported yet	ok format
+ppt	notesMaster	save	gap	not supported yet	ok format
 rtf	document	get	supported		ok 8 instances, first `rtf/testDefaultEncodingParse.rtf` /
 rtf	document	find	supported		ok 8 instances, first `rtf/testDefaultEncodingParse.rtf` /
 rtf	document	query	n/a	query not offered for this element	-
@@ -3782,19 +3782,19 @@ ods	column	edit	n/a	edit not offered for this element	-
 ods	column	batch	n/a	batch not offered for this element	-
 ods	column	create	supported		ok format
 ods	column	save	supported		ok format
-ods	table	get	gap	ODS adapter follow-up (record 0277)	unreached
-ods	table	find	gap	ODS adapter follow-up (record 0277)	unreached
-ods	table	query	gap	ODS adapter follow-up (record 0277)	unreached
-ods	table	view	gap	ODS adapter follow-up (record 0277)	unreached
-ods	table	set	gap	ODS adapter follow-up (record 0277)	unreached
-ods	table	add	gap	ODS adapter follow-up (record 0277)	-
-ods	table	remove	gap	ODS adapter follow-up (record 0277)	unreached
-ods	table	move	gap	ODS adapter follow-up (record 0277)	unreached
-ods	table	swap	gap	ODS adapter follow-up (record 0277)	unreached
-ods	table	edit	gap	ODS adapter follow-up (record 0277)	-
-ods	table	batch	gap	ODS adapter follow-up (record 0277)	-
-ods	table	create	gap	ODS adapter follow-up (record 0277)	ok format
-ods	table	save	gap	ODS adapter follow-up (record 0277)	ok format
+ods	table	get	gap	ODS adapter follow-up	unreached
+ods	table	find	gap	ODS adapter follow-up	unreached
+ods	table	query	gap	ODS adapter follow-up	unreached
+ods	table	view	gap	ODS adapter follow-up	unreached
+ods	table	set	gap	ODS adapter follow-up	unreached
+ods	table	add	gap	ODS adapter follow-up	-
+ods	table	remove	gap	ODS adapter follow-up	unreached
+ods	table	move	gap	ODS adapter follow-up	unreached
+ods	table	swap	gap	ODS adapter follow-up	unreached
+ods	table	edit	gap	ODS adapter follow-up	-
+ods	table	batch	gap	ODS adapter follow-up	-
+ods	table	create	gap	ODS adapter follow-up	ok format
+ods	table	save	gap	ODS adapter follow-up	ok format
 ods	namedrange	get	supported		ok 3 instances, first `odfdo/tests/samples/simple_table_named_range.ods` /namedrange[1]
 ods	namedrange	find	supported		ok 3 instances, first `odfdo/tests/samples/simple_table_named_range.ods` /namedrange[1]
 ods	namedrange	query	supported		ok matches in odfdo/tests/samples/simple_table_named_range.ods
@@ -3821,58 +3821,58 @@ ods	comment	edit	supported		ok tx.set
 ods	comment	batch	supported		ok set item
 ods	comment	create	supported		ok format
 ods	comment	save	supported		ok format
-ods	chart	get	gap	ODS adapter follow-up (record 0277)	unreached
-ods	chart	find	gap	ODS adapter follow-up (record 0277)	unreached
-ods	chart	query	gap	ODS adapter follow-up (record 0277)	unreached
-ods	chart	view	gap	ODS adapter follow-up (record 0277)	unreached
-ods	chart	set	gap	ODS adapter follow-up (record 0277)	unreached
-ods	chart	add	gap	ODS adapter follow-up (record 0277)	-
-ods	chart	remove	gap	ODS adapter follow-up (record 0277)	unreached
-ods	chart	move	gap	ODS adapter follow-up (record 0277)	unreached
-ods	chart	swap	gap	ODS adapter follow-up (record 0277)	unreached
-ods	chart	edit	gap	ODS adapter follow-up (record 0277)	-
-ods	chart	batch	gap	ODS adapter follow-up (record 0277)	-
-ods	chart	create	gap	ODS adapter follow-up (record 0277)	ok format
-ods	chart	save	gap	ODS adapter follow-up (record 0277)	ok format
-ods	series	get	gap	ODS adapter follow-up (record 0277)	unreached
-ods	series	find	gap	ODS adapter follow-up (record 0277)	unreached
-ods	series	query	gap	ODS adapter follow-up (record 0277)	unreached
-ods	series	view	gap	ODS adapter follow-up (record 0277)	unreached
-ods	series	set	gap	ODS adapter follow-up (record 0277)	unreached
-ods	series	add	gap	ODS adapter follow-up (record 0277)	-
-ods	series	remove	gap	ODS adapter follow-up (record 0277)	unreached
-ods	series	move	gap	ODS adapter follow-up (record 0277)	unreached
-ods	series	swap	gap	ODS adapter follow-up (record 0277)	unreached
-ods	series	edit	gap	ODS adapter follow-up (record 0277)	-
-ods	series	batch	gap	ODS adapter follow-up (record 0277)	-
-ods	series	create	gap	ODS adapter follow-up (record 0277)	ok format
-ods	series	save	gap	ODS adapter follow-up (record 0277)	ok format
-ods	axis	get	gap	ODS adapter follow-up (record 0277)	unreached
-ods	axis	find	gap	ODS adapter follow-up (record 0277)	unreached
-ods	axis	query	gap	ODS adapter follow-up (record 0277)	unreached
-ods	axis	view	gap	ODS adapter follow-up (record 0277)	unreached
-ods	axis	set	gap	ODS adapter follow-up (record 0277)	unreached
-ods	axis	add	gap	ODS adapter follow-up (record 0277)	-
-ods	axis	remove	gap	ODS adapter follow-up (record 0277)	unreached
-ods	axis	move	gap	ODS adapter follow-up (record 0277)	unreached
-ods	axis	swap	gap	ODS adapter follow-up (record 0277)	unreached
-ods	axis	edit	gap	ODS adapter follow-up (record 0277)	-
-ods	axis	batch	gap	ODS adapter follow-up (record 0277)	-
-ods	axis	create	gap	ODS adapter follow-up (record 0277)	ok format
-ods	axis	save	gap	ODS adapter follow-up (record 0277)	ok format
-ods	pivottable	get	gap	ODS adapter follow-up (record 0277)	unreached
-ods	pivottable	find	gap	ODS adapter follow-up (record 0277)	unreached
-ods	pivottable	query	gap	ODS adapter follow-up (record 0277)	unreached
-ods	pivottable	view	gap	ODS adapter follow-up (record 0277)	unreached
-ods	pivottable	set	gap	ODS adapter follow-up (record 0277)	unreached
-ods	pivottable	add	gap	ODS adapter follow-up (record 0277)	-
-ods	pivottable	remove	gap	ODS adapter follow-up (record 0277)	unreached
-ods	pivottable	move	gap	ODS adapter follow-up (record 0277)	unreached
-ods	pivottable	swap	gap	ODS adapter follow-up (record 0277)	unreached
-ods	pivottable	edit	gap	ODS adapter follow-up (record 0277)	-
-ods	pivottable	batch	gap	ODS adapter follow-up (record 0277)	-
-ods	pivottable	create	gap	ODS adapter follow-up (record 0277)	ok format
-ods	pivottable	save	gap	ODS adapter follow-up (record 0277)	ok format
+ods	chart	get	gap	ODS adapter follow-up	unreached
+ods	chart	find	gap	ODS adapter follow-up	unreached
+ods	chart	query	gap	ODS adapter follow-up	unreached
+ods	chart	view	gap	ODS adapter follow-up	unreached
+ods	chart	set	gap	ODS adapter follow-up	unreached
+ods	chart	add	gap	ODS adapter follow-up	-
+ods	chart	remove	gap	ODS adapter follow-up	unreached
+ods	chart	move	gap	ODS adapter follow-up	unreached
+ods	chart	swap	gap	ODS adapter follow-up	unreached
+ods	chart	edit	gap	ODS adapter follow-up	-
+ods	chart	batch	gap	ODS adapter follow-up	-
+ods	chart	create	gap	ODS adapter follow-up	ok format
+ods	chart	save	gap	ODS adapter follow-up	ok format
+ods	series	get	gap	ODS adapter follow-up	unreached
+ods	series	find	gap	ODS adapter follow-up	unreached
+ods	series	query	gap	ODS adapter follow-up	unreached
+ods	series	view	gap	ODS adapter follow-up	unreached
+ods	series	set	gap	ODS adapter follow-up	unreached
+ods	series	add	gap	ODS adapter follow-up	-
+ods	series	remove	gap	ODS adapter follow-up	unreached
+ods	series	move	gap	ODS adapter follow-up	unreached
+ods	series	swap	gap	ODS adapter follow-up	unreached
+ods	series	edit	gap	ODS adapter follow-up	-
+ods	series	batch	gap	ODS adapter follow-up	-
+ods	series	create	gap	ODS adapter follow-up	ok format
+ods	series	save	gap	ODS adapter follow-up	ok format
+ods	axis	get	gap	ODS adapter follow-up	unreached
+ods	axis	find	gap	ODS adapter follow-up	unreached
+ods	axis	query	gap	ODS adapter follow-up	unreached
+ods	axis	view	gap	ODS adapter follow-up	unreached
+ods	axis	set	gap	ODS adapter follow-up	unreached
+ods	axis	add	gap	ODS adapter follow-up	-
+ods	axis	remove	gap	ODS adapter follow-up	unreached
+ods	axis	move	gap	ODS adapter follow-up	unreached
+ods	axis	swap	gap	ODS adapter follow-up	unreached
+ods	axis	edit	gap	ODS adapter follow-up	-
+ods	axis	batch	gap	ODS adapter follow-up	-
+ods	axis	create	gap	ODS adapter follow-up	ok format
+ods	axis	save	gap	ODS adapter follow-up	ok format
+ods	pivottable	get	gap	ODS adapter follow-up	unreached
+ods	pivottable	find	gap	ODS adapter follow-up	unreached
+ods	pivottable	query	gap	ODS adapter follow-up	unreached
+ods	pivottable	view	gap	ODS adapter follow-up	unreached
+ods	pivottable	set	gap	ODS adapter follow-up	unreached
+ods	pivottable	add	gap	ODS adapter follow-up	-
+ods	pivottable	remove	gap	ODS adapter follow-up	unreached
+ods	pivottable	move	gap	ODS adapter follow-up	unreached
+ods	pivottable	swap	gap	ODS adapter follow-up	unreached
+ods	pivottable	edit	gap	ODS adapter follow-up	-
+ods	pivottable	batch	gap	ODS adapter follow-up	-
+ods	pivottable	create	gap	ODS adapter follow-up	ok format
+ods	pivottable	save	gap	ODS adapter follow-up	ok format
 ods	slicer	get	gap	none: OpenDocument has no slicer element	unreached
 ods	slicer	find	gap	none: OpenDocument has no slicer element	unreached
 ods	slicer	query	gap	none: OpenDocument has no slicer element	unreached
@@ -3886,19 +3886,19 @@ ods	slicer	edit	gap	none: OpenDocument has no slicer element	-
 ods	slicer	batch	gap	none: OpenDocument has no slicer element	-
 ods	slicer	create	gap	none: OpenDocument has no slicer element	ok format
 ods	slicer	save	gap	none: OpenDocument has no slicer element	ok format
-ods	sparkline	get	gap	ODS adapter follow-up (record 0277)	unreached
-ods	sparkline	find	gap	ODS adapter follow-up (record 0277)	unreached
-ods	sparkline	query	gap	ODS adapter follow-up (record 0277)	unreached
-ods	sparkline	view	gap	ODS adapter follow-up (record 0277)	unreached
-ods	sparkline	set	gap	ODS adapter follow-up (record 0277)	unreached
-ods	sparkline	add	gap	ODS adapter follow-up (record 0277)	-
-ods	sparkline	remove	gap	ODS adapter follow-up (record 0277)	unreached
-ods	sparkline	move	gap	ODS adapter follow-up (record 0277)	unreached
-ods	sparkline	swap	gap	ODS adapter follow-up (record 0277)	unreached
-ods	sparkline	edit	gap	ODS adapter follow-up (record 0277)	-
-ods	sparkline	batch	gap	ODS adapter follow-up (record 0277)	-
-ods	sparkline	create	gap	ODS adapter follow-up (record 0277)	ok format
-ods	sparkline	save	gap	ODS adapter follow-up (record 0277)	ok format
+ods	sparkline	get	gap	ODS adapter follow-up	unreached
+ods	sparkline	find	gap	ODS adapter follow-up	unreached
+ods	sparkline	query	gap	ODS adapter follow-up	unreached
+ods	sparkline	view	gap	ODS adapter follow-up	unreached
+ods	sparkline	set	gap	ODS adapter follow-up	unreached
+ods	sparkline	add	gap	ODS adapter follow-up	-
+ods	sparkline	remove	gap	ODS adapter follow-up	unreached
+ods	sparkline	move	gap	ODS adapter follow-up	unreached
+ods	sparkline	swap	gap	ODS adapter follow-up	unreached
+ods	sparkline	edit	gap	ODS adapter follow-up	-
+ods	sparkline	batch	gap	ODS adapter follow-up	-
+ods	sparkline	create	gap	ODS adapter follow-up	ok format
+ods	sparkline	save	gap	ODS adapter follow-up	ok format
 ods	dataValidation	get	supported		ok 2 instances, first `odf/ods/grid-padding-package.ods` /sheet[1]/dataValidation[1]
 ods	dataValidation	find	supported		ok 2 instances, first `odf/ods/grid-padding-package.ods` /sheet[1]/dataValidation[1]
 ods	dataValidation	query	supported		ok matches in odf/ods/grid-padding-package.ods
@@ -3990,19 +3990,19 @@ ods	shape	edit	supported		ok tx.set
 ods	shape	batch	supported		ok set item
 ods	shape	create	supported		ok format
 ods	shape	save	supported		ok format
-ods	ole	get	gap	ODS adapter follow-up (record 0277)	unreached
-ods	ole	find	gap	ODS adapter follow-up (record 0277)	unreached
-ods	ole	query	gap	ODS adapter follow-up (record 0277)	unreached
-ods	ole	view	gap	ODS adapter follow-up (record 0277)	unreached
-ods	ole	set	gap	ODS adapter follow-up (record 0277)	unreached
-ods	ole	add	gap	ODS adapter follow-up (record 0277)	-
-ods	ole	remove	gap	ODS adapter follow-up (record 0277)	unreached
-ods	ole	move	gap	ODS adapter follow-up (record 0277)	unreached
-ods	ole	swap	gap	ODS adapter follow-up (record 0277)	unreached
-ods	ole	edit	gap	ODS adapter follow-up (record 0277)	-
-ods	ole	batch	gap	ODS adapter follow-up (record 0277)	-
-ods	ole	create	gap	ODS adapter follow-up (record 0277)	ok format
-ods	ole	save	gap	ODS adapter follow-up (record 0277)	ok format
+ods	ole	get	gap	ODS adapter follow-up	unreached
+ods	ole	find	gap	ODS adapter follow-up	unreached
+ods	ole	query	gap	ODS adapter follow-up	unreached
+ods	ole	view	gap	ODS adapter follow-up	unreached
+ods	ole	set	gap	ODS adapter follow-up	unreached
+ods	ole	add	gap	ODS adapter follow-up	-
+ods	ole	remove	gap	ODS adapter follow-up	unreached
+ods	ole	move	gap	ODS adapter follow-up	unreached
+ods	ole	swap	gap	ODS adapter follow-up	unreached
+ods	ole	edit	gap	ODS adapter follow-up	-
+ods	ole	batch	gap	ODS adapter follow-up	-
+ods	ole	create	gap	ODS adapter follow-up	ok format
+ods	ole	save	gap	ODS adapter follow-up	ok format
 ods	rowbreak	get	supported		ok 1 instances, first `odf/corpus/calc-two-sheets.ods + add rowbreak` /sheet[1]/rowbreak[1]
 ods	rowbreak	find	supported		ok 1 instances, first `odf/corpus/calc-two-sheets.ods + add rowbreak` /sheet[1]/rowbreak[1]
 ods	rowbreak	query	supported		ok matches in odf/corpus/calc-two-sheets.ods + add rowbreak
@@ -4029,19 +4029,19 @@ ods	colbreak	edit	supported		ok tx.set
 ods	colbreak	batch	supported		ok set item
 ods	colbreak	create	supported		ok format
 ods	colbreak	save	supported		ok format
-ods	run	get	gap	ODS adapter follow-up (record 0277)	unreached
-ods	run	find	gap	ODS adapter follow-up (record 0277)	unreached
-ods	run	query	gap	ODS adapter follow-up (record 0277)	unreached
-ods	run	view	gap	ODS adapter follow-up (record 0277)	unreached
-ods	run	set	gap	ODS adapter follow-up (record 0277)	unreached
-ods	run	add	gap	ODS adapter follow-up (record 0277)	-
-ods	run	remove	gap	ODS adapter follow-up (record 0277)	unreached
-ods	run	move	gap	ODS adapter follow-up (record 0277)	unreached
-ods	run	swap	gap	ODS adapter follow-up (record 0277)	unreached
-ods	run	edit	gap	ODS adapter follow-up (record 0277)	-
-ods	run	batch	gap	ODS adapter follow-up (record 0277)	-
-ods	run	create	gap	ODS adapter follow-up (record 0277)	ok format
-ods	run	save	gap	ODS adapter follow-up (record 0277)	ok format
+ods	run	get	gap	ODS adapter follow-up	unreached
+ods	run	find	gap	ODS adapter follow-up	unreached
+ods	run	query	gap	ODS adapter follow-up	unreached
+ods	run	view	gap	ODS adapter follow-up	unreached
+ods	run	set	gap	ODS adapter follow-up	unreached
+ods	run	add	gap	ODS adapter follow-up	-
+ods	run	remove	gap	ODS adapter follow-up	unreached
+ods	run	move	gap	ODS adapter follow-up	unreached
+ods	run	swap	gap	ODS adapter follow-up	unreached
+ods	run	edit	gap	ODS adapter follow-up	-
+ods	run	batch	gap	ODS adapter follow-up	-
+ods	run	create	gap	ODS adapter follow-up	ok format
+ods	run	save	gap	ODS adapter follow-up	ok format
 odp	presentation	get	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /
 odp	presentation	find	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /
 odp	presentation	query	n/a	query not offered for this element	-
@@ -4354,45 +4354,45 @@ odp	slideLayout	edit	n/a	edit not offered for this element	-
 odp	slideLayout	batch	n/a	batch not offered for this element	-
 odp	slideLayout	create	supported		ok format
 odp	slideLayout	save	supported		ok format
-odp	notesMaster	get	gap	M6 ODP notes master	unreached
-odp	notesMaster	find	gap	M6 ODP notes master	unreached
-odp	notesMaster	query	gap	M6 ODP notes master	unreached
-odp	notesMaster	view	gap	M6 ODP notes master	unreached
-odp	notesMaster	set	gap	M6 ODP notes master	unreached
-odp	notesMaster	add	gap	M6 ODP notes master	-
-odp	notesMaster	remove	gap	M6 ODP notes master	unreached
-odp	notesMaster	move	gap	M6 ODP notes master	unreached
-odp	notesMaster	swap	gap	M6 ODP notes master	unreached
-odp	notesMaster	edit	gap	M6 ODP notes master	-
-odp	notesMaster	batch	gap	M6 ODP notes master	-
-odp	notesMaster	create	gap	M6 ODP notes master	ok format
-odp	notesMaster	save	gap	M6 ODP notes master	ok format
-odp	noteSlide	get	gap	M6 ODP notes pages	unreached
-odp	noteSlide	find	gap	M6 ODP notes pages	unreached
-odp	noteSlide	query	gap	M6 ODP notes pages	unreached
-odp	noteSlide	view	gap	M6 ODP notes pages	unreached
-odp	noteSlide	set	gap	M6 ODP notes pages	unreached
-odp	noteSlide	add	gap	M6 ODP notes pages	-
-odp	noteSlide	remove	gap	M6 ODP notes pages	unreached
-odp	noteSlide	move	gap	M6 ODP notes pages	unreached
-odp	noteSlide	swap	gap	M6 ODP notes pages	unreached
-odp	noteSlide	edit	gap	M6 ODP notes pages	-
-odp	noteSlide	batch	gap	M6 ODP notes pages	-
-odp	noteSlide	create	gap	M6 ODP notes pages	ok format
-odp	noteSlide	save	gap	M6 ODP notes pages	ok format
-odp	animation	get	gap	M6 ODP animation nodes	unreached
-odp	animation	find	gap	M6 ODP animation nodes	unreached
-odp	animation	query	gap	M6 ODP animation nodes	unreached
-odp	animation	view	gap	M6 ODP animation nodes	unreached
-odp	animation	set	gap	M6 ODP animation nodes	unreached
-odp	animation	add	gap	M6 ODP animation nodes	-
-odp	animation	remove	gap	M6 ODP animation nodes	unreached
-odp	animation	move	gap	M6 ODP animation nodes	unreached
-odp	animation	swap	gap	M6 ODP animation nodes	unreached
-odp	animation	edit	gap	M6 ODP animation nodes	-
-odp	animation	batch	gap	M6 ODP animation nodes	-
-odp	animation	create	gap	M6 ODP animation nodes	ok format
-odp	animation	save	gap	M6 ODP animation nodes	ok format
+odp	notesMaster	get	gap	ODP notes master	unreached
+odp	notesMaster	find	gap	ODP notes master	unreached
+odp	notesMaster	query	gap	ODP notes master	unreached
+odp	notesMaster	view	gap	ODP notes master	unreached
+odp	notesMaster	set	gap	ODP notes master	unreached
+odp	notesMaster	add	gap	ODP notes master	-
+odp	notesMaster	remove	gap	ODP notes master	unreached
+odp	notesMaster	move	gap	ODP notes master	unreached
+odp	notesMaster	swap	gap	ODP notes master	unreached
+odp	notesMaster	edit	gap	ODP notes master	-
+odp	notesMaster	batch	gap	ODP notes master	-
+odp	notesMaster	create	gap	ODP notes master	ok format
+odp	notesMaster	save	gap	ODP notes master	ok format
+odp	noteSlide	get	gap	ODP notes pages	unreached
+odp	noteSlide	find	gap	ODP notes pages	unreached
+odp	noteSlide	query	gap	ODP notes pages	unreached
+odp	noteSlide	view	gap	ODP notes pages	unreached
+odp	noteSlide	set	gap	ODP notes pages	unreached
+odp	noteSlide	add	gap	ODP notes pages	-
+odp	noteSlide	remove	gap	ODP notes pages	unreached
+odp	noteSlide	move	gap	ODP notes pages	unreached
+odp	noteSlide	swap	gap	ODP notes pages	unreached
+odp	noteSlide	edit	gap	ODP notes pages	-
+odp	noteSlide	batch	gap	ODP notes pages	-
+odp	noteSlide	create	gap	ODP notes pages	ok format
+odp	noteSlide	save	gap	ODP notes pages	ok format
+odp	animation	get	gap	ODP animation nodes	unreached
+odp	animation	find	gap	ODP animation nodes	unreached
+odp	animation	query	gap	ODP animation nodes	unreached
+odp	animation	view	gap	ODP animation nodes	unreached
+odp	animation	set	gap	ODP animation nodes	unreached
+odp	animation	add	gap	ODP animation nodes	-
+odp	animation	remove	gap	ODP animation nodes	unreached
+odp	animation	move	gap	ODP animation nodes	unreached
+odp	animation	swap	gap	ODP animation nodes	unreached
+odp	animation	edit	gap	ODP animation nodes	-
+odp	animation	batch	gap	ODP animation nodes	-
+odp	animation	create	gap	ODP animation nodes	ok format
+odp	animation	save	gap	ODP animation nodes	ok format
 odp	series	get	supported		ok 2 instances, first `unified-ops/0294/parts.odp` /slide[1]/chart[1]/series[1]
 odp	series	find	supported		ok 2 instances, first `unified-ops/0294/parts.odp` /slide[1]/chart[1]/series[1]
 odp	series	query	supported		ok matches in unified-ops/0294/parts.odp
@@ -4554,8 +4554,8 @@ odi	frame	find	supported		ok 1 instances, first `create()` /frame[1]
 odi	frame	query	supported		ok matches in create()
 odi	frame	view	supported		ok 1 instances, first `create()` /frame[1]
 odi	frame	set	supported		ok `create()` /frame[1] {"name":"Litchi"}
-odi	frame	add	gap	0282 ODI single frame	-
-odi	frame	remove	gap	0282 ODI single frame	-
+odi	frame	add	gap	ODI single frame	-
+odi	frame	remove	gap	ODI single frame	-
 odi	frame	move	format-verb		unreached
 odi	frame	swap	format-verb		unreached
 odi	frame	edit	supported		ok tx.set
@@ -4593,7 +4593,7 @@ odb	table	find	supported		ok 3 instances, first `libreoffice-core/extras/source/
 odb	table	query	supported		ok matches in libreoffice-core/extras/source/database/biblio.odb
 odb	table	view	supported		ok 3 instances, first `libreoffice-core/extras/source/database/biblio.odb` /table[1]
 odb	table	set	supported		ok `libreoffice-core/extras/source/database/biblio.odb` /table[1] {"name":"Litchi"}
-odb	table	add	gap	0282 ODB typed table creation	-
+odb	table	add	gap	ODB typed table creation	-
 odb	table	remove	supported		ok `libreoffice-core/extras/source/database/biblio.odb` /table[1]
 odb	table	move	format-verb		ok `libreoffice-core/extras/source/database/biblio.odb` /table[1] /table[2]
 odb	table	swap	format-verb		ok `libreoffice-core/extras/source/database/biblio.odb` /table[1] /table[2]
@@ -4606,7 +4606,7 @@ odb	column	find	supported		ok 8 instances, first `libreoffice-core/extras/source
 odb	column	query	supported		ok matches in libreoffice-core/extras/source/database/biblio.odb
 odb	column	view	supported		ok 8 instances, first `libreoffice-core/extras/source/database/biblio.odb` /table[1]/column[1]
 odb	column	set	supported		ok `libreoffice-core/extras/source/database/biblio.odb` /table[1]/column[1] {"name":"Litchi"}
-odb	column	add	gap	0282 ODB typed column creation	-
+odb	column	add	gap	ODB typed column creation	-
 odb	column	remove	supported		ok `libreoffice-core/extras/source/database/biblio.odb` /table[1]/column[1]
 odb	column	move	format-verb		ok `libreoffice-core/extras/source/database/biblio.odb` /table[1]/column[1] /table[1]/column[2]
 odb	column	swap	format-verb		ok `libreoffice-core/extras/source/database/biblio.odb` /table[1]/column[1] /table[1]/column[2]

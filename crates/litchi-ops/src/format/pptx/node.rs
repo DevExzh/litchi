@@ -1,4 +1,4 @@
-//! PPTX typed nodes and their node view (record 0010 §2–§3, §4.6).
+//! PPTX typed nodes and their node view.
 //!
 //! A [`Node`] is one element of an open presentation: the presentation, a
 //! slide, a shape-tree element (shape, picture, table, chart, group,
@@ -14,7 +14,7 @@
 //! - a paragraph, run or line break shares its shape's parsed text body;
 //! - notes and comments keep their owned text and records.
 //!
-//! No node keeps a `SourceSlide` (record 0010 §3.3, risk 6): scenes and
+//! No node keeps a `SourceSlide`: scenes and
 //! handles hold no package, so dropping every node lets the handle build its
 //! editor. The handle itself caches nothing for the adapter; the leaf's
 //! weighted scene memo is the only retention policy.
@@ -64,7 +64,7 @@ use litchi_drawingml::diagram::edit::Outline;
 /// What a slide shows when it has no title placeholder (OfficeCLI).
 const UNTITLED: &str = "(untitled)";
 
-/// A node of a PPTX presentation (record 0010 §3.1).
+/// A node of a PPTX presentation.
 ///
 /// Get one from the unified `get`, `find`, `query` and `children` reads; it
 /// borrows the [`Pptx`] handle it came from. The generic accessors live on
@@ -84,7 +84,7 @@ pub struct Node<'f> {
     file: &'f Pptx,
     item: Item,
     /// The paths of an address of more than four steps, written on first
-    /// use; shorter paths are written on each request (record 0262).
+    /// use; shorter paths are written on each request.
     deep: OnceLock<Box<DeepPaths>>,
 }
 
@@ -110,22 +110,21 @@ pub(super) enum Item {
     Cell(TableItem),
     Series(ChartItem),
     Axis(ChartItem),
-    /// A SmartArt content node (record 0284).
+    /// A SmartArt content node.
     DiagramNode(DiagramItem),
     Notes(NotesItem),
     Comment(CommentItem),
     ModernComment(ModernCommentItem),
     Reply(ReplyItem),
-    /// The presentation theme (record 0321).
+    /// The presentation theme.
     Theme(super::theme::ThemeItem),
-    /// A table grid column (record 0321). Boxed, as are the other two
-    /// record 0321 elements, so the item stays as large as a text item and
-    /// every query that never names them moves no more bytes per node
-    /// (record 0326).
+    /// A table grid column. Boxed, as are hyperlinks and
+    /// equations, so the item stays as large as a text item and
+    /// every query that never names them moves no more bytes per node.
     Column(Box<super::columns::ColumnItem>),
-    /// A shape's or run's click action (record 0321).
+    /// A shape's or run's click action.
     Hyperlink(Box<super::links::LinkItem>),
-    /// An Office Math equation (record 0321).
+    /// An Office Math equation.
     Equation(Box<super::equations::EquationItem>),
 }
 
@@ -134,7 +133,7 @@ pub(super) enum Item {
 pub(super) struct SlideItem {
     pub(super) position: u32,
     /// Listed at the leaf level of a view: the node shows catalog data only
-    /// and decodes nothing (record 0010 M1-Δ1).
+    /// and decodes nothing.
     pub(super) listed: bool,
     scene: OnceLock<SharedScene>,
     facts: OnceLock<SlideFacts>,
@@ -311,7 +310,7 @@ pub(super) enum TreeContainer {
         position: u32,
     },
     /// The notes page of a slide: the container of the notes body shape a
-    /// notes paragraph or run belongs to (record 0333).
+    /// notes paragraph or run belongs to.
     Notes(u32),
 }
 
@@ -343,11 +342,10 @@ pub(super) struct TreeItem {
     pub(super) handle: Handle,
     pub(super) ordinal: u32,
     body: OnceLock<std::result::Result<Option<Arc<Body>>, Error>>,
-    /// A chart frame's chart part (record 0270) or a SmartArt frame's data
-    /// model (record 0284), read on first use. One cell for both, since a
+    /// A chart frame's chart part or a SmartArt frame's data
+    /// model, read on first use. One cell for both, since a
     /// frame is one kind or the other: every node of a query is moved
-    /// several times, and a second cell made each move 24 bytes longer
-    /// (record 0326).
+    /// several times, and a second cell made each move 24 bytes longer.
     frame: OnceLock<std::result::Result<Option<FramePart>, Error>>,
 }
 
@@ -356,7 +354,7 @@ pub(super) struct TreeItem {
 enum FramePart {
     Chart(Arc<Summary>),
     Diagram(Arc<Outline>),
-    /// A table frame's cell count per row (record 0333), so resolving a
+    /// A table frame's cell count per row, so resolving a
     /// row and then a cell reads the table once.
     Table(Arc<Vec<u32>>),
 }
@@ -533,7 +531,7 @@ impl TreeItem {
                 push_tree_tail(&mut out, &self.handle, self.kind, self.ordinal, canonical);
             },
             // A notes body is addressed through the notes node: its text
-            // nodes are `/slide[N]/notes/paragraph[K]` (record 0333).
+            // nodes are `/slide[N]/notes/paragraph[K]`.
             TreeContainer::Notes(slide) => {
                 out.push(steps::slide(slide));
                 out.push(PathStep::new("notes"));
@@ -595,7 +593,7 @@ pub(super) struct TextItem {
     /// The position among the paragraph's runs, or among its line breaks.
     pub(super) ordinal: u32,
     /// The table cell whose body holds the text; [`CellRef::NONE`] for a
-    /// shape's or notes page's text (record 0333). It fills the padding
+    /// shape's or notes page's text. It fills the padding
     /// after the three positions, so the item keeps its size.
     pub(super) cell: CellRef,
 }
@@ -658,7 +656,7 @@ pub(super) struct TableItem {
 }
 
 /// A series or axis of a chart: the chart frame, its chart summary and the
-/// position in the summary's series or axes (record 0270).
+/// position in the summary's series or axes.
 #[derive(Clone)]
 pub(super) struct ChartItem {
     pub(super) chart: TreeItem,
@@ -667,7 +665,7 @@ pub(super) struct ChartItem {
 }
 
 /// A content node of a SmartArt: the frame, its outline and the node's
-/// index in the outline's entries (record 0284).
+/// index in the outline's entries.
 #[derive(Clone)]
 pub(super) struct DiagramItem {
     pub(super) smartart: TreeItem,
@@ -1197,7 +1195,7 @@ impl<'f> Node<'f> {
     /// [`Self::format_member`] gives there. A shape-tree element other than
     /// a table reads only that key's inputs (its transform, alternative
     /// text or text body, each when the key needs it), so a geometry filter
-    /// does not decode the text body (record 0262); a read error of an input
+    /// does not decode the text body; a read error of an input
     /// the key does not use is not reported here, but by `format`.
     pub(super) fn prop_member(&self, index: usize) -> Result<Option<Value<'_>>> {
         let Item::Tree(tree) = &self.item else {
@@ -1508,7 +1506,7 @@ impl<'f> Project<'f> for Node<'f> {
 
     fn children(&self, options: &ViewOptions) -> ViewChildren<'_, 'f> {
         // A child listed at depth 0 is a leaf of this view: a slide there
-        // shows catalog data only (record 0010 M1-Δ1).
+        // shows catalog data only.
         let listing = Listing::View {
             leaves: options.depth <= 1,
         };
@@ -1550,7 +1548,7 @@ enum PropKind<'a> {
     Layout(&'a LayoutFacts),
     Shape(Box<TreeProps<'a>>),
     Frame(Box<TreeProps<'a>>),
-    /// A picture or a group (record 0325).
+    /// A picture or a group.
     LinkedFrame(Box<TreeProps<'a>>),
     SmartArt(Box<SmartArtProps<'a>>),
     DiagramNode(&'a DiagramItem),
@@ -1565,11 +1563,11 @@ enum PropKind<'a> {
     ),
     Notes(&'a str),
     Cell(litchi_pptx::table::CellProperties),
-    /// A table row's height (record 0333).
+    /// A table row's height.
     Row(Option<i64>),
     Comment(&'a Comment),
     ModernComment(&'a ModernComment),
-    /// A reply, its slide and its thread's position (record 0346).
+    /// A reply, its slide and its thread's position.
     Reply(&'a ModernReply, u32, u32),
     Theme(&'a litchi_drawingml::theme::Theme),
     Column(&'a super::columns::ColumnItem),
@@ -1589,7 +1587,7 @@ struct TreeProps<'a> {
     description: Option<Cow<'a, str>>,
     text: Option<text::Facts<'a>>,
     /// The click action of a shape, picture or group, when the caller
-    /// resolved it (record 0325).
+    /// resolved it.
     link: Option<Arc<litchi_pptx::hyperlinks::Link>>,
 }
 
@@ -2282,7 +2280,7 @@ fn reply_value(reply: &ModernReply, slide: u32, comment: u32, index: usize) -> O
             .map(|initials| Value::Text(Cow::Borrowed(initials))),
         Key::Created => Some(Value::Text(Cow::Borrowed(reply.created()))),
         Key::Status => Some(Value::Token(status_token(reply.status()))),
-        // The thread's path, as OfficeCLI's `parent` (record 0346).
+        // The thread's path, as OfficeCLI's `parent`.
         Key::Parent => Some(Value::Text(Cow::Owned(format!(
             "/slide[{}]/moderncomment[{}]",
             u64::from(slide) + 1,
@@ -2308,7 +2306,7 @@ impl fmt::Debug for Props<'_> {
     }
 }
 
-// Nodes cross threads (record 0010 §3.3).
+// Nodes cross threads.
 const _: () = {
     const fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<Node<'static>>();

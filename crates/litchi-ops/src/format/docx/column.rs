@@ -1,4 +1,4 @@
-//! Table grid columns (record 0345): `/body/tbl[N]/col[C]`.
+//! Table grid columns: `/body/tbl[N]/col[C]`.
 //!
 //! OfficeCLI's `column` is a virtual element synthesized from the table's
 //! `w:tblGrid` and the cell at each row's column slot. A column node is the
@@ -163,7 +163,7 @@ fn table_of<'f>(docx: &'f Docx, node: &Node<'_>) -> Result<(Node<'f>, Position)>
 }
 
 impl Docx {
-    /// `add(<table>, column, {width, text})` (record 0345).
+    /// `add(<table>, column, {width, text})`.
     pub(super) fn add_column(
         &self,
         editor: DocxEditor,
@@ -209,7 +209,7 @@ impl Docx {
         Ok((commit, path_with(parent, Some((Kind::Column, position)))))
     }
 
-    /// A `set` whose targets are table columns (record 0345): `width`.
+    /// A `set` whose targets are table columns: `width`.
     /// `Err` hands the editor back for other targets.
     pub(super) fn try_set_column(
         &self,
@@ -259,7 +259,7 @@ impl Docx {
         edit.commit(self).map(Ok)
     }
 
-    /// Remove table columns (record 0345), later columns of a table first
+    /// Remove table columns, later columns of a table first
     /// so no removal shifts another.
     pub(super) fn remove_columns(&self, editor: DocxEditor, nodes: &[Node<'_>]) -> Result<Commit> {
         let mut targets = Vec::with_capacity(nodes.len());

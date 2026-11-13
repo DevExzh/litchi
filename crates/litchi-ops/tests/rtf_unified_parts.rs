@@ -1,4 +1,4 @@
-//! Unified RTF parts (record 0328): sections, bookmarks, fields, tables of
+//! Unified RTF parts: sections, bookmarks, fields, tables of
 //! contents, tab stops, text boxes and shapes, read through the DOCX paths
 //! and property names, and written by native source splicing.
 

@@ -1,5 +1,4 @@
-//! Coalesced Numbers cell writes for batches and closure edits (record
-//! 0297).
+//! Coalesced Numbers cell writes for batches and closure edits.
 //!
 //! Consecutive direct `value`/`formula` assignments to distinct cells share
 //! one leaf cell transaction per table: the run plans each assignment
@@ -8,13 +7,13 @@
 //! a query, any other key or verb closes the run, so every operation still
 //! observes the result of the ones before it.
 //!
-//! A run publishes what its assignments publish one at a time (record
-//! 0314): a formula is published on its own (its new calculation objects
-//! take identities derived from the package it is written to, and the
-//! leaf's formula budget is checked against that package, so a change
-//! written before it in the same transaction would change both), and a run
-//! whose commit fails finds the assignment that fails first, so the error
-//! names the item a one-at-a-time application stops at.
+//! A run publishes what its assignments publish one at a time: a formula
+//! is published on its own (its new calculation objects take identities
+//! derived from the package it is written to, and the leaf's formula
+//! budget is checked against that package, so a change written before it
+//! in the same transaction would change both), and a run whose commit
+//! fails finds the assignment that fails first, so the error names the
+//! item a one-at-a-time application stops at.
 
 use std::collections::{BTreeMap, HashSet};
 use std::hash::{BuildHasherDefault, Hasher};
@@ -363,11 +362,11 @@ const fn cell_key(address: Address) -> (usize, usize, u64) {
     )
 }
 
-/// A multiply-rotate hasher for the integer keys of [`cell_key`] (record
-/// 0302): the default SipHash cost about a third of a coalesced cell's
-/// planning. The keys are coordinates inside the run's tables, so no
-/// collision resistance against chosen keys is needed beyond what an
-/// operation limit already bounds.
+/// A multiply-rotate hasher for the integer keys of [`cell_key`]: the
+/// default SipHash cost about a third of a coalesced cell's planning.
+/// The keys are coordinates inside the run's tables, so no collision
+/// resistance against chosen keys is needed beyond what an operation
+/// limit already bounds.
 #[derive(Default)]
 pub(crate) struct CellHasher(u64);
 

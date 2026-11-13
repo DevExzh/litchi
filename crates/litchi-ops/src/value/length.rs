@@ -71,7 +71,7 @@ pub enum LengthContext {
     FontSize,
     /// Nonnegative Word paragraph spacing: bare values are twips; pt/cm/in
     /// are converted and rounded ties-to-even to unsigned 32-bit twips.
-    /// Group separators are currently refused (record 0047).
+    /// Group separators are currently refused.
     WordSpacing,
 }
 
@@ -248,8 +248,8 @@ impl Length {
         }
     }
 
-    /// The length a typed value coerces to under `context` (record 0326):
-    /// the value [`Length::parse_in`] reads from this length's
+    /// The length a typed value coerces to under `context`: the value
+    /// [`Length::parse_in`] reads from this length's
     /// [`LengthStyle::Auto`] text, given without writing and reading the
     /// text when the read is certain to succeed with this exact value.
     /// `None` when the text decides: the read would refuse it (out of the
@@ -445,8 +445,8 @@ impl fmt::Display for LengthDisplay {
 }
 
 /// What query comparison reads from a length's canonical text, known without
-/// writing the text (`value::compare`, record 0262): OfficeCLI's
-/// `ExtractNumber`, `ExtractUnit` and `TryParseEmu` of the text.
+/// writing the text (`value::compare`): OfficeCLI's `ExtractNumber`,
+/// `ExtractUnit` and `TryParseEmu` of the text.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(super) struct DisplayFacts {
     /// The number before the unit suffix; `None` for the `<n>emu` form,

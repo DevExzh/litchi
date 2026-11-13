@@ -7,8 +7,8 @@
 //! `DocumentSummaryInformation` fields and `custom.<name>` for user-defined
 //! properties. `null` removes a property. `keywords` takes a list, or text
 //! split at `;` and `,`; PIDSI `KEYWORDS` holds the list joined with `, `,
-//! and a list equal to the stored one keeps the stored text (record 0354).
-//! The registry below is a static sorted table; lookup allocates nothing.
+//! and a list equal to the stored one keeps the stored text. The registry
+//! below is a static sorted table; lookup allocates nothing.
 //!
 //! Creation (`create_with(.., CreateOptions::metadata(..))`) uses the leaf
 //! builders' `set_metadata` instead, which keeps the root class identifier
@@ -295,7 +295,7 @@ pub(crate) fn metadata_error(error: &MetadataError, format: FileFormat) -> Error
 /// The patch a legacy write step retains: the format's primary patch, or a
 /// metadata transaction's exact-source patch. Both expose the endpoint bytes
 /// the generic history compares. (XLS keeps its own, with worksheet-feature
-/// patches; record 0327.)
+/// patches.)
 #[cfg(any(feature = "doc", feature = "ppt"))]
 pub(crate) enum StepPatch<P, M> {
     /// A primary content edit.

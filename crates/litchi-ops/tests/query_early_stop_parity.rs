@@ -1,5 +1,5 @@
-//! Record 0280: early-stop and full-query parity for the document, slide
-//! and ODF formats (record 0267's `query_early_stop.rs` covers the workbook
+//! Early-stop and full-query parity for the document, slide
+//! and ODF formats (`query_early_stop.rs` covers the workbook
 //! formats on generated sheets).
 //!
 //! For every fixture of each format in `test-data` (a bounded sample per

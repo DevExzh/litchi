@@ -1,5 +1,5 @@
 //! Element wrapper enums carried over from the `litchi` facade so the family
-//! views can return them (record 0003 §2.4).
+//! views can return them.
 //!
 //! These are the facade's `document::{Paragraph, Run, Table, Row, Cell,
 //! CellMerge, DocumentElement}` and `presentation::Slide` types, moved
@@ -8,7 +8,7 @@
 //! facade's Markdown adapter and the Python bindings consume them while the
 //! unified API grows its node view.
 //!
-//! **Every item in this module is scheduled for deletion in M1**, when the
+//! **Every item in this module is scheduled for deletion**, when the
 //! generic node view and the per-format ADR 0007 vocabulary replace these
 //! wrapper enums (design §16.1). New code should not build on them.
 

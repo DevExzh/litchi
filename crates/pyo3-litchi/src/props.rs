@@ -96,8 +96,7 @@ fn prop_value(key: &str, value: &Bound<'_, PyAny>) -> PyResult<PropValue<'static
     if let Ok(text) = value.cast::<PyString>() {
         return Ok(PropValue::from(text.to_cow()?.into_owned()));
     }
-    // A list or tuple of str: a list value (the metadata keywords, record
-    // 0354).
+    // A list or tuple of str: a list value (the metadata keywords).
     if value.is_instance_of::<PyList>() || value.is_instance_of::<PyTuple>() {
         let mut items = Vec::new();
         for item in value.try_iter()? {

@@ -1,4 +1,4 @@
-//! Shape and run hyperlinks as elements (record 0321).
+//! Shape and run hyperlinks as elements.
 //!
 //! `/slide[N]/shape[M]/hyperlink` is a shape's click action (its
 //! `p:cNvPr`'s, else its first run's, as OfficeCLI's `ReadShapeHyperlink`);
@@ -161,7 +161,7 @@ pub(super) fn of_shape(file: &Pptx, tree: &TreeItem) -> Result<Option<LinkItem>>
         }))
 }
 
-/// The click action of a picture or a group: its `p:cNvPr`'s (record 0325).
+/// The click action of a picture or a group: its `p:cNvPr`'s.
 pub(super) fn of_frame(file: &Pptx, tree: &TreeItem) -> Result<Option<LinkItem>> {
     if !matches!(tree.kind, Kind::Picture | Kind::Group) {
         return Ok(None);
@@ -181,7 +181,7 @@ pub(super) fn of_frame(file: &Pptx, tree: &TreeItem) -> Result<Option<LinkItem>>
 }
 
 /// The `link` (or, with `tooltip`, the `tooltip`) value of a click action,
-/// as a shape, run, picture or group property reads it (record 0325).
+/// as a shape, run, picture or group property reads it.
 pub(super) fn click_value(link: Option<&Link>, tooltip: bool) -> Option<Value<'static>> {
     let link = link?;
     if tooltip {
@@ -488,7 +488,7 @@ impl Pptx {
 }
 
 /// The `link` and `tooltip` of a shape, run, picture or group write, as
-/// given (record 0325); [`ClickInput::for_add`] and [`Pptx::try_set_click`]
+/// given; [`ClickInput::for_add`] and [`Pptx::try_set_click`]
 /// turn them into a click action.
 #[derive(Default)]
 pub(super) struct ClickInput {
@@ -553,8 +553,8 @@ fn is_click_key(key: &str) -> bool {
 }
 
 impl Pptx {
-    /// A `set` of `link` or `tooltip` on a shape, run, picture or group
-    /// (record 0325); `None` for other targets and payloads. The other
+    /// A `set` of `link` or `tooltip` on a shape, run, picture or group;
+    /// `None` for other targets and payloads. The other
     /// properties of the payload are set first, then the click action.
     ///
     /// - `link` replaces the click (`none` removes it) with the given

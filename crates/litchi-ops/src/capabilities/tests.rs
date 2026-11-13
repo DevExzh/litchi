@@ -103,8 +103,8 @@ fn every_format_has_one_answer_for_its_reads() {
         // Import is a worksheet verb with its own answer (`m4_verbs_...`);
         // merge is a template verb (`merge_is_a_template_verb`); refresh
         // has its own answer (`refresh_is_supported_where_fields_are_computed`);
-        // the raw-layer writes answer by package kind (record 0336,
-        // `raw::tests::raw_layer_verbs_answer_by_package`).
+        // the raw-layer writes answer by package kind
+        // (`raw::tests::raw_layer_verbs_answer_by_package`).
         for verb in Verb::ALL.into_iter().filter(|verb| {
             verb.is_edit()
                 && !matches!(
@@ -229,7 +229,7 @@ fn every_format_has_one_answer_for_its_reads() {
                         | Verb::Edit
                         | Verb::Batch
                 );
-            // OTH and ODM share the ODT adapter (record 0282).
+            // OTH and ODM share the ODT adapter.
             let text_family_edit = matches!(format, FileFormat::Oth | FileFormat::Odm)
                 && crate::read::Adapter::of(format).is_some()
                 && matches!(
@@ -243,8 +243,7 @@ fn every_format_has_one_answer_for_its_reads() {
                         | Verb::Batch
                 );
             // The object formats edit through their leaves; what a leaf
-            // lacks is an element-level gap, never a verb refusal (record
-            // 0292).
+            // lacks is an element-level gap, never a verb refusal.
             #[cfg(odf_objects)]
             let object_edit = crate::read::Adapter::of(format)
                 .and_then(crate::format::odf_tree::writes)
@@ -268,9 +267,9 @@ fn every_format_has_one_answer_for_its_reads() {
                     Verb::Set | Verb::Edit | Verb::Batch => true,
                     Verb::Add => !writes.addable.is_empty(),
                     Verb::Remove => !writes.removable.is_empty(),
-                    // Pages exchanges paragraphs (record 0299); Keynote
-                    // slides, paragraphs and drawables (record 0298);
-                    // Numbers sheets and tables (record 0347).
+                    // Pages exchanges paragraphs; Keynote slides,
+                    // paragraphs and drawables; Numbers sheets and
+                    // tables.
                     Verb::Move | Verb::Swap => !writes.movable.is_empty(),
                     _ => false,
                 });
@@ -331,7 +330,7 @@ fn every_format_has_one_answer_for_its_reads() {
                 } else {
                     get
                 },
-                "{format:?} {verb:?}: whole-format refusals precede M2"
+                "{format:?} {verb:?}: whole-format refusals come first"
             );
         }
 
@@ -350,7 +349,7 @@ fn every_format_has_one_answer_for_its_reads() {
                 || (format == FileFormat::Ods && cfg!(feature = "ods"))
                 || (format == FileFormat::Odt && cfg!(feature = "odt"))
                 || (format == FileFormat::Odp && cfg!(feature = "odp"))
-                // Record 0297: Numbers builds a blank workbook.
+                // Numbers builds a blank workbook.
                 || (format == FileFormat::Numbers && cfg!(feature = "numbers"))
                 || (matches!(
                     format,
@@ -366,15 +365,14 @@ fn every_format_has_one_answer_for_its_reads() {
                 format,
                 FileFormat::Pages | FileFormat::Keynote | FileFormat::Numbers
             ) && crate::read::Adapter::of(format).is_some();
-            // Pages (record 0299), Numbers (record 0297) and Keynote (record
-            // 0298) create their minimal documents.
+            // Pages, Numbers and Keynote create their minimal documents.
             let expected = if integrated || iwork {
                 Support::Supported
             } else if get.is_supported() {
                 match verb {
                     Verb::Save => SAVE_PENDING.support(),
                     Verb::Create => CREATE_PENDING.support(),
-                    _ => unreachable!("the W4 check only contains save/create"),
+                    _ => unreachable!("the check only contains save/create"),
                 }
             } else {
                 get
@@ -453,7 +451,7 @@ fn xls_adapter_advertises_writes_and_keeps_granular_gaps() {
         assert_eq!(
             capabilities.view(mode).code(),
             Some(Code::UnsupportedCapability),
-            "XLS {mode:?} remains an M1 view gap"
+            "XLS {mode:?} remains a view gap"
         );
     }
 
@@ -505,8 +503,8 @@ fn xls_adapter_advertises_writes_and_keeps_granular_gaps() {
 
 #[test]
 fn iwork_formats_without_their_feature_name_it() {
-    // Every claimed format has a `File` variant since record 0296; a build
-    // without a format's feature names the feature.
+    // Every claimed format has a `File` variant; a build without a
+    // format's feature names the feature.
     for (format, feature) in [
         (FileFormat::Pages, "enable the `pages` cargo feature"),
         (FileFormat::Keynote, "enable the `keynote` cargo feature"),
@@ -525,7 +523,7 @@ fn rtf_advertises_native_paragraph_structural_writes_and_keeps_closure_gaps() {
     assert!(capabilities.verb(Verb::Add).is_supported());
     assert!(capabilities.verb(Verb::Swap).is_supported());
 
-    // The body takes added paragraphs; it is not itself added (0289).
+    // The body takes added paragraphs; it is not itself added.
     let body = capabilities.element("body").expect("RTF body");
     assert!(!body.operations().add);
 
@@ -728,8 +726,8 @@ fn gap_subjects_are_unique() {
 #[test]
 fn doc_enumerates_its_unprojected_element_gaps() {
     let capabilities = Capabilities::of(FileFormat::Doc);
-    // Record 0324 projects styles, numbering, hyperlinks, bookmarks,
-    // fields, sections, tab stops, text boxes and shapes.
+    // DOC projects styles, numbering, hyperlinks, bookmarks, fields,
+    // sections, tab stops, text boxes and shapes.
     for element in ["equation", "formfield", "picture", "ole", "revision"] {
         assert!(
             capabilities
@@ -748,8 +746,7 @@ fn doc_enumerates_its_unprojected_element_gaps() {
     }
 }
 
-/// Records 0273 and 0295: find/replace answers for the formats with a find
-/// adapter.
+/// Find/replace answers for the formats with a find adapter.
 #[test]
 fn replace_is_supported_where_a_find_adapter_exists() {
     for format in [
@@ -780,7 +777,7 @@ fn replace_is_supported_where_a_find_adapter_exists() {
     }
 }
 
-/// Record 0266: import and evaluation answer for worksheets only.
+/// Import and evaluation answer for worksheets only.
 #[test]
 fn m4_verbs_are_worksheet_verbs() {
     for format in [FileFormat::Xlsx, FileFormat::Xlsb, FileFormat::Xls] {
@@ -810,8 +807,8 @@ fn m4_verbs_are_worksheet_verbs() {
     }
 }
 
-/// Records 0274 and 0295: merge answers for the text, presentation and
-/// workbook templates, not for the ODF object formats.
+/// Merge answers for the text, presentation and workbook templates, not
+/// for the ODF object formats.
 #[test]
 fn merge_is_a_template_verb() {
     for format in [

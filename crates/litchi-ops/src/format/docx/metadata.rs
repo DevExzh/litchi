@@ -1,11 +1,10 @@
-//! DOCX document properties on the root and `/metadata` (records 0338 and
-//! 0342).
+//! DOCX document properties on the root and `/metadata`.
 //!
 //! A set on `/` (OfficeCLI's `set / title=...`) or on `/metadata` with
 //! root-metadata keys commits one leaf [`litchi_docx::metadata`]
-//! transaction: the core properties (record 0251), the application keys
+//! transaction: the core properties, the application keys
 //! (`company`, `manager`, `template`, `application` and their `extended.*`
-//! spellings) and `custom.<name>` (record 0342). `contentType`, which no
+//! spellings) and `custom.<name>`. `contentType`, which no
 //! OOXML part stores, is refused with `unsupported_property`. As for XLSX
 //! and PPTX, a set never stamps `modified`.
 
@@ -64,7 +63,7 @@ impl Docx {
         Ok(if changed {
             self.adopt_eager_package(commit.into_package())
         } else {
-            // An equal value publishes nothing (record 0253's no-op rule).
+            // An equal value publishes nothing.
             self.clone()
         })
     }
@@ -78,8 +77,7 @@ impl Docx {
     /// [`Self::commit_metadata`] for a transaction, which keeps a
     /// main-document patch per step: a metadata step's is the handle's own
     /// editor committed empty (the main document is unchanged), and the
-    /// coordinator compares the endpoints' core properties to see the change
-    /// (record 0338).
+    /// coordinator compares the endpoints' core properties to see the change.
     pub(super) fn set_metadata(&self, props: &Props<'_>, snapshot_budget: usize) -> Result<Commit> {
         let file = self.commit_metadata(props)?;
         let editor = self.edit_with_snapshot_budget(snapshot_budget)?;

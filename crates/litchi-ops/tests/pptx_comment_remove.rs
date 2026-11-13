@@ -1,4 +1,4 @@
-//! Unified PPTX comment removal (record 0333): legacy comments, modern
+//! Unified PPTX comment removal: legacy comments, modern
 //! threaded comments and their replies, on both owners. Authors are kept;
 //! a slide's comment part goes with its last comment.
 #![cfg(feature = "pptx")]

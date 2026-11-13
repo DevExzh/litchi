@@ -55,8 +55,7 @@ struct DocState {
     reader: litchi_doc::Document,
     metadata: Metadata,
     source: DocSource,
-    /// The DOCX-style identifier of each style slot, derived on first use
-    /// (record 0324).
+    /// The DOCX-style identifier of each style slot, derived on first use.
     style_ids: std::sync::OnceLock<Box<[Box<str>]>>,
 }
 
@@ -207,7 +206,7 @@ impl Doc {
         Self(self.0.removal_authorized())
     }
 
-    /// This handle's signature disposition (record 0013).
+    /// This handle's signature disposition.
     pub(crate) fn signature(&self) -> Signature {
         self.0.signature()
     }
@@ -258,8 +257,8 @@ impl Doc {
     }
 
     /// The parsed reader, without the retained-source fence: the detached
-    /// in-memory projection whose values a resolved node's `format` reads
-    /// (record 0324). Every path resolution and query still goes through
+    /// in-memory projection whose values a resolved node's `format` reads.
+    /// Every path resolution and query still goes through
     /// [`Self::reader`], which fences the source.
     pub(crate) fn parsed(&self) -> &litchi_doc::Document {
         &self.0.reader
@@ -303,8 +302,7 @@ impl Doc {
         result
     }
 
-    /// The DOCX-style identifier of every style slot, by `istd` (record
-    /// 0324).
+    /// The DOCX-style identifier of every style slot, by `istd`.
     pub(crate) fn style_ids(&self) -> &[Box<str>] {
         self.0
             .style_ids
@@ -334,14 +332,14 @@ impl Doc {
         result
     }
 
-    /// Builds the source-backed main-story editor over the retained source
-    /// (L-DOC-1), without indexing the container again.
+    /// Builds the source-backed main-story editor over the retained source,
+    /// without indexing the container again.
     ///
     /// Returns `Ok(None)` when the source was released at open. The editor's
     /// open runs its FIB, CLX and fingerprint checks here, at the first
     /// edit. After [`Signed::unsign`](crate::Signed::unsign) the editor is
     /// built over a copy of the input whose signature storages the signature
-    /// leaf removed (`litchi_sign::cfb::Editor::clear`, record 0013), so a
+    /// leaf removed (`litchi_sign::cfb::Editor::clear`), so a
     /// commit from it carries no signature.
     ///
     /// # Errors
@@ -780,7 +778,7 @@ mod tests {
         let bytes = fixture("documentProperties.doc");
         let length = u64::try_from(bytes.len()).unwrap();
         let retained = open_bytes(bytes.clone(), &OpenOptions::default()).unwrap();
-        // Risk R5: retention keeps exactly the input alive, nothing more.
+        // Retention keeps exactly the input alive, nothing more.
         assert_eq!(retained.retained_source_len(), Some(length));
 
         let released = open_bytes(bytes, &OpenOptions::default().retain_source(false)).unwrap();

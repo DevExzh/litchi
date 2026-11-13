@@ -1,4 +1,4 @@
-//! Unified PPT element surface (record 0323): slide comments, table rows,
+//! Unified PPT element surface: slide comments, table rows,
 //! cells and columns, hyperlinks, runs, line breaks, the theme and charts.
 //!
 //! Every write is checked on the eager and the positional owner, read back

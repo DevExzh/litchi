@@ -423,8 +423,8 @@ fn selector_matches_names_case_insensitively_on_both_owner_states() {
             cells[..5]
         );
 
-        // A coordinate or range the caller passed is the caller's error
-        // (M0a S9), with the XLSX coordinate error as the typed leaf: a
+        // A coordinate or range the caller passed is the caller's error,
+        // with the XLSX coordinate error as the typed leaf: a
         // reference or bounds that name no cells are an invalid argument,
         // indices or bounds outside the grid are out of range.
         let coordinate = selected.cell("A0").unwrap_err();

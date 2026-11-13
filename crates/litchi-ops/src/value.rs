@@ -2,12 +2,11 @@
 //! vocabularies, their canonical text, and the typed comparison query
 //! predicates run on.
 //!
-//! The module is shared by query compilation (record 0010 §5.2) and the
-//! property registry (design §6): a query literal and a `set` value go
-//! through the same coercion, so what a property prints is what it accepts.
-//! The rules are OfficeCLI's (`EmuConverter`, `ParseHelpers`,
-//! `DrawingColorBuilder`, `AttributeFilter`), with the departures recorded in
-//! the unified-ops change record for this module.
+//! The module is shared by query compilation and the property registry
+//! (design §6): a query literal and a `set` value go through the same
+//! coercion, so what a property prints is what it accepts. The rules are
+//! OfficeCLI's (`EmuConverter`, `ParseHelpers`, `DrawingColorBuilder`,
+//! `AttributeFilter`), with some departures.
 //!
 //! | Value | Read with | Canonical text |
 //! |---|---|---|

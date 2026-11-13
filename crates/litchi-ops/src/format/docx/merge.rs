@@ -1,4 +1,4 @@
-//! DOCX template merge (record 0274): placeholders and `MERGEFIELD` fields
+//! DOCX template merge: placeholders and `MERGEFIELD` fields
 //! in every story, through the leaf's story substitution, in one native
 //! commit.
 

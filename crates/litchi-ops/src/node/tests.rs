@@ -1,5 +1,4 @@
-//! Unit tests of the node view against the fake format (record 0010 §2,
-//! §7.2, risk 12).
+//! Unit tests of the node view against the fake format.
 //!
 //! - Golden files under `tests/golden/node_view/` hold OfficeCLI-shaped
 //!   `DocumentNode` JSON, written by hand from OfficeCLI's node builders
@@ -43,9 +42,8 @@ const PARAGRAPH_TEXT: &str =
 /// `get /body/p[1] --depth 1` on a Word heading: OfficeCLI's `ParagraphToNode`
 /// (`WordHandler.Navigation.cs` 4000-4352: text, 50-character preview,
 /// style, run count, `paraId` then `pPr` keys) and the run builder
-/// (2427-2527). Paths use the `@paraId` identity form (1748-1778). The
-/// `style` member is the style id where OfficeCLI prints the display name
-/// (M1-Δ4).
+/// (2427-2527). Paths use the `@paraId` identity form (1748-1778). The `style`
+/// member is the style id where OfficeCLI prints the display name.
 fn word_paragraph() -> Element {
     Element::new(Kind::Paragraph, "/body/p[@paraId=1A2B3C4D]")
         .positional("/body/p[1]")
@@ -99,7 +97,7 @@ fn word_document() -> Document {
 /// (`PowerPointHandler.NodeBuilder.cs` 880-1026: type by flavour, preview,
 /// `name`, `alt`, `id`, `isTitle`, geometry through `FormatEmu`, fill with
 /// transform suffixes; paragraph count as `childCount`). Shapes are not
-/// expanded at depth 0 (M1-Δ6).
+/// expanded at depth 0.
 fn slide() -> Element {
     Element::new(Kind::Slide, "/slide[1]")
         .preview(Preview::Text(Cow::Borrowed("Q4 Report")))
@@ -153,7 +151,7 @@ fn presentation() -> Document {
 
 /// `get /` on a workbook: OfficeCLI's root (`ExcelHandler.Query.cs` 24-60)
 /// lists each sheet with its name as preview. Litchi omits each sheet's
-/// `childCount`, which would decode every sheet part (M1-Δ1).
+/// `childCount`, which would decode every sheet part.
 fn workbook() -> Document {
     let sheet = |path: &'static str, name: &'static str| {
         Element::new(Kind::Sheet, path)
@@ -360,7 +358,7 @@ fn serialize_trait_matches_serialize_into() {
 
 /// OfficeCLI's `DocumentNode` (`Core/DocumentNode.cs` 14-29) as a declarative
 /// serde struct, with `WhenWritingNull` as `skip_serializing_if`.
-/// `childCount` is optional here only for Litchi's M1-Δ1.
+/// `childCount` is optional here only for Litchi's deviation from OfficeCLI.
 #[derive(serde::Serialize)]
 struct OfficeNode {
     path: String,
@@ -591,8 +589,8 @@ fn depth_counts_child_levels() {
     assert_eq!(root.view().children().count(), 1);
 }
 
-/// Record 0010 risk 12: a deep tree serializes with an explicit depth of 64,
-/// on a thread with a small, fixed stack.
+/// A deep tree serializes with an explicit depth of 64, on a thread with a
+/// small, fixed stack.
 #[test]
 fn depth_64_tree_serializes_within_a_small_stack() {
     let worker = std::thread::Builder::new()
@@ -907,13 +905,12 @@ fn prop_values_keep_their_json_types() {
 // Values
 // ---------------------------------------------------------------------------
 
-/// R1's OfficeCLI vectors (`EmuConverter.FormatEmu`, `FormatEmuPtFirst`, and
-/// the `0.##pt` forms of spacing and line widths, `FormatLineWidth`), printed
-/// by the canonical [`Length`] renderer the node view now uses. The rows
-/// agree with R1's renderer except `i64::MAX`: above 2^50 EMU the canonical
-/// renderer replicates OfficeCLI's double re-read check, so the value has no
-/// exact centimetre or point form there (R1's exact integer arithmetic
-/// printed `726249766681478.41pt`).
+/// The node view's OfficeCLI vectors (`EmuConverter.FormatEmu`, `FormatEmuPtFirst`, and
+/// the `0.##pt` forms of spacing and line widths, `FormatLineWidth`), printed by the
+/// canonical [`Length`] renderer the node view now uses. The rows agree with the
+/// earlier renderer except `i64::MAX`: above 2^50 EMU the canonical renderer replicates
+/// OfficeCLI's double re-read check, so the value has no exact centimetre or point form
+/// there (the earlier exact integer arithmetic printed `726249766681478.41pt`).
 #[test]
 fn lengths_render_through_the_canonical_renderer() {
     let cases: &[(i64, &str, &str, &str)] = &[
@@ -994,13 +991,12 @@ fn a_keys_value_type_picks_the_length_rendering() {
     assert_eq!(length.to_string(), "1.27cm");
 }
 
-/// R1's colour vectors, printed by the canonical [`Color`] renderer. Two R1
-/// rules changed with the reconciliation: a transform value that is not a
-/// whole percentage prints OfficeCLI's raw `name=value` form, which reads
-/// back exactly, instead of a truncated percentage; and a colour prints every
-/// transform it holds, so a reader folds an sRGB base's `a:alpha` into the
-/// base's alpha channel (OfficeCLI's `#RRGGBBAA` readback) rather than
-/// keeping it as a transform.
+/// The node view's colour vectors, printed by the canonical [`Color`] renderer. Two earlier
+/// rules changed with the reconciliation: a transform value that is not a whole percentage
+/// prints OfficeCLI's raw `name=value` form, which reads back exactly, instead of a
+/// truncated percentage; and a colour prints every transform it holds, so a reader folds an
+/// sRGB base's `a:alpha` into the base's alpha channel (OfficeCLI's `#RRGGBBAA` readback)
+/// rather than keeping it as a transform.
 #[test]
 fn colors_render_through_the_canonical_renderer() {
     let cases: Vec<(Color, &str)> = vec![
@@ -1295,7 +1291,7 @@ fn the_fake_spec_table_is_consistent() {
     assert_eq!(error.message(), "the `chart` element is not supported yet");
     assert_eq!(
         error.suggestion(),
-        Some("the fake leaf has no chart reader (follow-up: L-FAKE-R1)")
+        Some("the fake leaf has no chart reader (follow-up: not supported yet)")
     );
     let axis = spec.gaps[0].error();
     assert_eq!(axis.code(), Code::UnsupportedPath);
@@ -1339,12 +1335,12 @@ fn spec_checks_reject_bad_tables() {
     };
     assert!(spec::gaps_valid(&[gap(
         Code::UnsupportedCapability,
-        "L-DOCX-R4",
+        "not supported yet",
         "no reader"
     )]));
     assert!(!spec::gaps_valid(&[gap(
         Code::NotFound,
-        "L-DOCX-R4",
+        "not supported yet",
         "no reader"
     )]));
     assert!(!spec::gaps_valid(&[gap(
@@ -1352,8 +1348,17 @@ fn spec_checks_reject_bad_tables() {
         "",
         "no reader"
     )]));
-    assert!(!spec::gaps_valid(&[gap(Code::UnsupportedPath, "M6", "")]));
-    let property = gap(Code::UnsupportedCapability, "L-DOCX-R4", "no reader").error();
+    assert!(!spec::gaps_valid(&[gap(
+        Code::UnsupportedPath,
+        "not supported yet",
+        ""
+    )]));
+    let property = gap(
+        Code::UnsupportedCapability,
+        "not supported yet",
+        "no reader",
+    )
+    .error();
     assert_eq!(
         property.message(),
         "the `color` property of `run` is not supported yet"
@@ -1361,7 +1366,7 @@ fn spec_checks_reject_bad_tables() {
     let view = GapSpec {
         subject: Subject::View("html"),
         code: Code::UnsupportedCapability,
-        follow_up: "M3",
+        follow_up: "not supported yet",
         reason: "rendering is out of scope",
     };
     assert_eq!(

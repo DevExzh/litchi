@@ -1,11 +1,11 @@
-//! OfficeCLI batch-payload ingress (record 0334): bounded JSON decoding into
-//! typed [`BatchItem`]s, then the typed lowering of their addressing fields.
+//! OfficeCLI batch-payload ingress: bounded JSON decoding into typed
+//! [`BatchItem`]s, then the typed lowering of their addressing fields.
 //!
 //! Every input either fails with a typed transport refusal or decodes to
 //! items that
 //! - carry a non-blank command (`BatchItem::validate`);
 //! - serialize to the canonical wire form, which decodes back to equal items
-//!   (numbers included, record 0338 F1) and serializes to the same bytes
+//!   (numbers included) and serializes to the same bytes
 //!   again;
 //! - stay equal after `into_owned`;
 //! - lower each path field through `PathArg::parse` and the selector through
@@ -110,8 +110,7 @@ fn check_item(item: &BatchItem<'_>) {
 fn lower_path(text: &str) {
     match PathArg::parse(text) {
         Ok(path) => {
-            // The canonical spelling is a fixed point of `PathArg::parse`
-            // (record 0338 F2).
+            // The canonical spelling is a fixed point of `PathArg::parse`.
             let canonical = path.to_string();
             let again = PathArg::parse(&canonical).expect("canonical path parses");
             assert_eq!(again.path(), path.path(), "canonical path reparses");
@@ -136,7 +135,7 @@ fn check_round_trip(items: &[BatchItem<'_>]) {
     let wire = serde_json::to_vec(items).expect("decoded items serialize");
     let again = batch::from_bytes(&wire, &batch::SourceLimits::default())
         .expect("canonical wire form decodes");
-    // Numbers too: `serde_json` parses correctly rounded (record 0338 F1).
+    // Numbers too: `serde_json` parses correctly rounded.
     assert!(again == items, "wire round trip changed the items");
     let rewire = serde_json::to_vec(&again).expect("round-tripped items serialize");
     let third = batch::from_bytes(&rewire, &batch::SourceLimits::default())

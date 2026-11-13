@@ -1,4 +1,4 @@
-//! No silent content loss on `text` sets (record 0304).
+//! No silent content loss on `text` sets.
 //!
 //! Setting the `text` of a container (paragraph, run, shape, cell, note)
 //! replaces its text. Content inside the container that is not text — a
@@ -647,9 +647,9 @@ mod doc {
         assert_eq!(text(&changed, "/body/p[5]"), "Shape:");
     }
 
-    /// Record 0304 F4: `FloatingPictures.doc` tags its style names as smart
+    /// `FloatingPictures.doc` tags its style names as smart
     /// tags whose ends lie inside paragraphs 5 onwards. The set is a typed
-    /// refusal naming the range, not a corrupt file (record 0308).
+    /// refusal naming the range, not a corrupt file.
     #[test]
     fn a_smart_tag_boundary_inside_the_paragraph_is_refused() {
         let file = open("ole/doc/FloatingPictures.doc");
@@ -795,7 +795,7 @@ mod odg {
     fn links_are_refused_and_plain_text_is_set() {
         let file = open("libreoffice-core/desktop/qa/data/3page.odg");
         // A text box the leaf cannot replace losslessly is an unsupported
-        // capability, as in the other formats (record 0308).
+        // capability, as in the other formats.
         let error = refused(&file, "/page[2]/shape[1]", "No link");
         assert_eq!(error.code(), Code::UnsupportedCapability, "{error}");
         let changed = file

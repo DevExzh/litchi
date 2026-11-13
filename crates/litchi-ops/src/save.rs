@@ -503,7 +503,7 @@ fn unsupported_save(format: Option<FileFormat>) -> Error {
         Code::UnsupportedCapability,
         "saving this format is not integrated yet",
     )
-    .with_suggestion("see the format capability report and M2 follow-up");
+    .with_suggestion("see the format capability report");
     format.map_or(error.clone(), |format| error.with_format(format))
 }
 
@@ -696,7 +696,7 @@ fn same_format(path: &Path, format: FileFormat) -> Result<()> {
                 "the destination extension names another format; a save keeps the document's own format",
             )
             .with_format(format)
-            .with_suggestion("conversion is explicit: use `export` (not in M2)"));
+            .with_suggestion("conversion is explicit: `export` is not supported yet"));
         }
     }
     Ok(())

@@ -1,4 +1,4 @@
-//! Media pictures (record 0321, L-PPTX-R11).
+//! Media pictures.
 //!
 //! A `p:pic` whose non-visual properties name an audio or video file is a
 //! media picture: `/slide[N]/video[M]`, `/slide[N]/audio[M]` and

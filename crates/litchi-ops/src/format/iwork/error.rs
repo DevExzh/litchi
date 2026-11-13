@@ -1,5 +1,5 @@
 //! The typed leaf errors of the iWork owners, kept whole behind one
-//! [`Source`](crate::error::Source) variant (record 0296).
+//! [`Source`](crate::error::Source) variant.
 
 use std::fmt;
 
@@ -30,20 +30,20 @@ pub enum LeafError {
     /// A Pages section-name transaction failed.
     #[cfg(feature = "pages")]
     PagesName(litchi_pages::section::name::Error),
-    /// A Pages character-style transaction failed (record 0309).
+    /// A Pages character-style transaction failed.
     #[cfg(feature = "pages")]
     PagesTextStyle(litchi_pages::section::text_style::Error),
-    /// A Pages body-chart point-size transaction failed (D7-A).
+    /// A Pages body-chart point-size transaction failed.
     #[cfg(feature = "pages")]
     PagesChartFont(litchi_pages::chart::font::Error),
     /// Reading a Pages body-chart inventory failed while resolving a
     /// canonical chart path.
     #[cfg(feature = "pages")]
     PagesChartArrangement(litchi_pages::chart::arrangement::Error),
-    /// A Pages body-table value transaction failed (record 0309).
+    /// A Pages body-table value transaction failed.
     #[cfg(feature = "pages")]
     PagesTableValues(litchi_pages::table::values::Error),
-    /// A Pages body-table cell comment transaction (D7).
+    /// A Pages body-table cell comment transaction.
     #[cfg(feature = "pages")]
     PagesTableComments(litchi_pages::table::comments::Error),
     /// A Pages header or footer text transaction failed.
@@ -58,16 +58,16 @@ pub enum LeafError {
     /// A Pages document-properties transaction failed.
     #[cfg(feature = "pages")]
     PagesMetadata(litchi_pages::metadata::Error),
-    /// Saving a Pages package directory failed (record 0301).
+    /// Saving a Pages package directory failed.
     #[cfg(feature = "pages")]
     PagesSave(litchi_pages::SaveError),
     /// A Pages body-table deletion failed.
     #[cfg(feature = "pages")]
     PagesTableDeletion(litchi_pages::table::deletion::Error),
-    /// A Pages body-table creation failed (record 0329).
+    /// A Pages body-table creation failed.
     #[cfg(feature = "pages")]
     PagesTableCreation(litchi_pages::table::creation::Error),
-    /// A Pages section add or remove failed (record 0312).
+    /// A Pages section add or remove failed.
     #[cfg(feature = "pages")]
     PagesSectionLifecycle(litchi_pages::section::lifecycle::Error),
     /// The Keynote package could not be read.
@@ -94,22 +94,22 @@ pub enum LeafError {
     /// A Keynote slide-drawable transaction failed.
     #[cfg(feature = "keynote")]
     KeynoteDrawables(litchi_keynote::slide::drawable::Error),
-    /// A Keynote slide-chart point-size transaction failed (D7-A).
+    /// A Keynote slide-chart point-size transaction failed.
     #[cfg(feature = "keynote")]
     KeynoteChartFont(litchi_keynote::chart::font::size::Error),
-    /// A Keynote slide-table cell comment transaction (D7).
+    /// A Keynote slide-table cell comment transaction.
     #[cfg(feature = "keynote")]
     KeynoteTableComments(litchi_keynote::slide::table::comments::Error),
-    /// A Keynote movie or audio removal failed (record 0309).
+    /// A Keynote movie or audio removal failed.
     #[cfg(feature = "keynote")]
     KeynoteMedia(litchi_keynote::slide::media::lifecycle::Error),
-    /// A Keynote placeholder visibility change failed (record 0309).
+    /// A Keynote placeholder visibility change failed.
     #[cfg(feature = "keynote")]
     KeynotePlaceholder(litchi_keynote::slide::placeholder::Error),
     /// A Keynote slide-creation transaction failed.
     #[cfg(feature = "keynote")]
     KeynoteCreation(litchi_keynote::slide::creation::Error),
-    /// Saving a Keynote package directory failed (record 0306).
+    /// Saving a Keynote package directory failed.
     #[cfg(feature = "keynote")]
     KeynoteSave(litchi_keynote::SaveError),
     /// The Numbers package could not be read.
@@ -129,14 +129,14 @@ pub enum LeafError {
     /// display formats, formula text, or a fresh workbook build.
     #[cfg(feature = "numbers")]
     NumbersEdit(super::numbers::EditError),
-    /// A Numbers sheet-chart point-size transaction failed (D7-A).
+    /// A Numbers sheet-chart point-size transaction failed.
     #[cfg(feature = "numbers")]
     NumbersChartFont(litchi_numbers::sheet::chart::font::Error),
     /// Reading a Numbers sheet's drawable inventory failed while resolving a
     /// canonical chart path.
     #[cfg(feature = "numbers")]
     NumbersDrawables(litchi_numbers::sheet::drawable::Error),
-    /// Saving a Numbers package directory failed (record 0306).
+    /// Saving a Numbers package directory failed.
     #[cfg(feature = "numbers")]
     NumbersSave(litchi_numbers::SaveError),
 }
@@ -427,16 +427,15 @@ impl LeafError {
     }
 }
 
-/// The code of a refused leaf edit: its kind alone decides (record 0351
-/// §2.4, record 0361), as for every other format.
+/// The code of a refused leaf edit: its kind alone decides, as for
+/// every other format.
 fn refused(kind: litchi_core::edit::RefusalKind) -> Code {
     crate::error::refusal_code(kind)
 }
 
 /// The code of a physical iWork archive failure: a resource ceiling is
-/// `limit_exceeded` (record 0306: source limits and package-directory
-/// captures report through it), I/O is `io_error`, the rest is a malformed
-/// package.
+/// `limit_exceeded` (source limits and package-directory captures report
+/// through it), I/O is `io_error`, the rest is a malformed package.
 fn archive_code(error: &litchi_iwa_archive::Error) -> Code {
     use litchi_iwa_archive::Error as E;
     match error {
@@ -908,9 +907,9 @@ mod tests {
         );
     }
 
-    /// Record 0361: an iWork refusal reports its kind's code; a final-element
-    /// removal keeps `invalid_argument` (the PPTX precedent); a patch for
-    /// another base is `invalid_input`.
+    /// An iWork refusal reports its kind's code; a final-element removal
+    /// keeps `invalid_argument` (the PPTX precedent); a patch for another
+    /// base is `invalid_input`.
     #[test]
     fn iwork_refusals_classify_by_kind() {
         #[cfg(feature = "pages")]

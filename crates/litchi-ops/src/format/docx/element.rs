@@ -1,4 +1,4 @@
-//! Physical element paths of DOCX nodes beyond the direct body (record 0251a).
+//! Physical element paths of DOCX nodes beyond the direct body.
 //!
 //! The read model addresses elements by their visible positions: blocks in a
 //! container's visible index (`w:customXml` flattened, display equations
@@ -104,7 +104,7 @@ pub(super) enum StoryKey {
 
 /// The story of a node under `/header[N]`, `/footer[N]`, `/footnote[N]`
 /// or `/endnote[N]`, and the node's element path inside the story's
-/// synthetic body (record 0325); `None` for any other node.
+/// synthetic body; `None` for any other node.
 pub(super) fn story_path(node: &Node<'_>) -> Result<Option<(StoryKey, ElementPath)>> {
     let steps = node.address.steps();
     let skip = usize::from(

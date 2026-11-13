@@ -374,7 +374,7 @@ impl File {
     /// lifecycle editor.
     /// Numbers swaps two sheets, or two tables of one sheet or of two
     /// sheets, as the two moves applied one at a time; its rows and columns
-    /// are refused (record 0347).
+    /// are refused.
     ///
     /// Both paths resolve against this snapshot. The returned handle owns the
     /// complete change; a failure leaves the original unchanged.
@@ -480,15 +480,14 @@ impl File {
     /// Default [`crate::transaction::SemanticLimits`] bound expanded targets
     /// and staged payloads. Use [`Self::edit_with_options`] to select those bounds.
     ///
-    /// A `find` property turns the call into a text search over the target's
-    /// subtree, as OfficeCLI's `set --find` (record 0273): `replace` gives
-    /// the replacement (empty deletes), `matchCase` (default `true`) and
-    /// `wholeWord` (default `false`) tune matching, and every other property
-    /// formats the replaced text (or, without `replace`, the matched text).
-    /// A match spanning runs takes the formatting of the run where it
-    /// starts; untouched runs keep their bytes. Zero matches are an exact
-    /// no-op. DOCX, PPTX, XLSX and RTF support it ([`crate::capabilities::Verb::Replace`]);
-    /// [`Self::apply`] reports the count as [`crate::Applied::matched`].
+    /// A `find` property turns the call into a text search over the target's subtree, as
+    /// OfficeCLI's `set --find`: `replace` gives the replacement (empty deletes),
+    /// `matchCase` (default `true`) and `wholeWord` (default `false`) tune matching, and
+    /// every other property formats the replaced text (or, without `replace`, the matched
+    /// text). A match spanning runs takes the formatting of the run where it starts;
+    /// untouched runs keep their bytes. Zero matches are an exact no-op. DOCX, PPTX, XLSX
+    /// and RTF support it ([`crate::capabilities::Verb::Replace`]); [`Self::apply`] reports
+    /// the count as [`crate::Applied::matched`].
     ///
     /// ```
     /// # #[cfg(feature = "docx")]
@@ -621,8 +620,8 @@ impl File {
         match self {
             // A retained DOC or PPT package publishes its exact compound-file
             // bytes; the leaf copies them once into a buffer of the known
-            // size, where the generic sink route below would copy every
-            // chunk a second time (record 0377).
+            // size, where the generic sink route below would copy every chunk
+            // a second time.
             #[cfg(feature = "doc")]
             Self::Doc(handle) => handle.to_bytes(),
             #[cfg(feature = "ppt")]
@@ -777,7 +776,7 @@ fn pending(file: &File, operation: &str) -> Error {
             format!("{operation} this format is not integrated yet"),
         ),
     )
-    .with_suggestion("see the format capability report and M2 follow-up")
+    .with_suggestion("see the format capability report")
 }
 
 #[cfg(any(

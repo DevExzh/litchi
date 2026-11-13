@@ -1,4 +1,4 @@
-//! Unified writes of the DOC marks of record 0324: hyperlinks (`set` of
+//! Unified writes of the DOC marks: hyperlinks (`set` of
 //! `url` and `text`, `add`, `remove`), bookmarks (`add`, `remove`, renaming
 //! through `set name`), tab stops (`set`, `add`, `remove`) and section page
 //! setup (`set`).

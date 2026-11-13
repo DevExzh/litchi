@@ -3,7 +3,7 @@
 //! A run owns one native `Edit`.  Direct paragraph paths are stable
 //! while their text is replaced or their characters toggled, so consecutive
 //! `set` calls can resolve once, stage in order, and publish one commit:
-//! `text` (variable width) and, since record 0359a, `bold` and `italic` on
+//! `text` (variable width) and `bold` and `italic` on
 //! the whole paragraph.  A paragraph takes one kind of change per run (a
 //! toggle after a text replacement of the same paragraph, or the reverse,
 //! closes the run first).  Queries and any other property remain barriers
@@ -85,7 +85,7 @@ impl Doc {
         }
         let path = target.path().expect("path checked above");
         let node = crate::path::resolve::get(&super::Nav::new(self), path)?;
-        // Run text and other nodes take the ordinary setter path (0289).
+        // Run text and other nodes take the ordinary setter path.
         let Some(position) = node.paragraph_position() else {
             return Ok(None);
         };

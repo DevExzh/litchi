@@ -8,7 +8,7 @@
 //! [`litchi::Error::detected`] naming the format), and keep the genuinely
 //! unrecognized case reporting no detected format.
 //!
-//! M0a step S8c ported these tests from the facade's format-family openers
+//! These tests were ported from the facade's format-family openers
 //! (document, presentation and workbook), which refused the same inputs with
 //! `UnexpectedFormat { detected }` and `NotOfficeFile`.
 

@@ -3,8 +3,8 @@
 //!
 //! These tests detect through the facade's detection functions, which add the
 //! iWork tail, so they stay in the facade. They open through `crate::open`
-//! and adopt through `crate::open_prepared` (M0a step S8c ported them from
-//! the format-family types' `open` and `from_prepared`).
+//! and adopt through `crate::open_prepared` (they were ported from the
+//! format-family types' `open` and `from_prepared`).
 
 use litchi_core::detection::FileFormat;
 

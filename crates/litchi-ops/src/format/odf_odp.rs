@@ -1,6 +1,6 @@
-//! ODF helpers of the ODP adapter (record 0278): the conversion of unified
+//! ODF helpers of the ODP adapter: the conversion of unified
 //! lengths to ODF length attributes. The `/metadata` set path moved to the
-//! shared `format::odf_metadata` (record 0288).
+//! shared `format::odf_metadata`.
 
 use crate::value::{Length, LengthStyle};
 

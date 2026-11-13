@@ -1,5 +1,5 @@
-//! DOCX charts, extended chart types and the chart `set` coverage of record
-//! 0283, through the unified API: round trips on every host, read-back of
+//! DOCX charts, extended chart types and the chart `set` coverage,
+//! through the unified API: round trips on every host, read-back of
 //! formatting keys, family changes, data replacement, frame geometry, axis
 //! ranges and series colors.
 #![cfg(all(feature = "pptx", feature = "xlsx", feature = "docx"))]

@@ -1,5 +1,5 @@
-//! `refresh` (record 0279): recompute a document's derived field results
-//! through `File::refresh` and save the file (in place by default, as
+//! `refresh`: recompute a document's derived field results through
+//! `File::refresh` and save the file (in place by default, as
 //! OfficeCLI's `refresh`).
 
 use std::io::Write;

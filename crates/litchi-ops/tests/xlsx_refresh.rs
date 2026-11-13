@@ -1,4 +1,4 @@
-//! Workbook refresh (record 0279): recalculation through the `eval`
+//! Workbook refresh: recalculation through the `eval`
 //! engine, and formula cache write-back that keeps the formula markup.
 #![cfg(all(feature = "xlsx", feature = "eval"))]
 
@@ -80,7 +80,7 @@ fn write_back_is_xlsx_only() {
     let _ = Code::UnsupportedCapability;
 }
 
-/// Record 0295: XLSB and XLS write stale results back as the formula
+/// XLSB and XLS write stale results back as the formula
 /// records' cached values, once.
 #[cfg(all(feature = "xlsb", feature = "xls"))]
 #[test]

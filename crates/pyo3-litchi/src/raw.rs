@@ -1,4 +1,4 @@
-//! The raw layer's Python arguments (record 0336).
+//! The raw layer's Python arguments.
 
 use litchi::raw::NewPart;
 

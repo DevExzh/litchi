@@ -1,10 +1,10 @@
-//! Writes of the DOCX part elements (record 0319): `set`, `add` and
+//! Writes of the DOCX part elements: `set`, `add` and
 //! `remove` of styles, numbering definitions, instances and levels,
 //! headers, footers, footnotes and endnotes.
 //!
 //! Every property is admitted through the element's registry before an
 //! editor is staged, so a refused write publishes nothing. The verbs stage
-//! the leaf's catalog edits on the owning package's editor (record 0251b),
+//! the leaf's catalog edits on the owning package's editor,
 //! so a source-backed handle is materialized once.
 
 use litchi_core::selector::{Path, Predicate, Step as PathStep};
@@ -909,7 +909,7 @@ impl Docx {
             return Err(refusal("numbering needs the owning package editor"));
         };
         // The schema puts every definition before the instances, and the
-        // leaf appends a new one after the last (record 0325): its ordinal
+        // leaf appends a new one after the last: its ordinal
         // is the handle's definition count, read without reparsing the
         // committed part.
         let ordinal = super::numbering(self)?.map_or(0, |catalog| catalog.abstract_nums().len());
@@ -930,7 +930,7 @@ impl Docx {
         let mut abstract_num_id = None;
         let mut overrides: Vec<(u8, i64)> = Vec::new();
         let mut continues = false;
-        // OfficeCLI's "Mode A" (record 0325): the definition the instance
+        // OfficeCLI's "Mode A": the definition the instance
         // creates when it names none.
         let mut template = false;
         let mut multi_level_type = None;
@@ -1065,7 +1065,7 @@ impl Docx {
     }
 
     /// Add a new definition and an instance of it in one edit (OfficeCLI's
-    /// `add num` "Mode A", record 0325).
+    /// `add num` "Mode A").
     fn add_templated_num(
         &self,
         editor: DocxEditor,
@@ -1589,7 +1589,7 @@ struct Seeds<'a, 'p, 'v> {
 }
 
 /// Apply the `level<N>.*` keys among `assignments` to the template levels
-/// of `definition` (OfficeCLI's `BuildAbstractNumElement`, record 0325):
+/// of `definition` (OfficeCLI's `BuildAbstractNumElement`):
 /// a level keeps its template value for every key it is not given, a bare
 /// level-0 key wins over its `level0.*` spelling, a `bullet` format without
 /// text takes the level's bullet character, and `indent` and `hanging`

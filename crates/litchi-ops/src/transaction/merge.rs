@@ -1,5 +1,5 @@
 //! [`File::merge`] and [`Edit::merge`]: one template merge is one mutation
-//! and at most one native commit (record 0274).
+//! and at most one native commit.
 
 use std::sync::Arc;
 
@@ -17,9 +17,9 @@ impl File {
     /// records.
     ///
     /// Supported for DOCX, PPTX, XLSX, XLSB, DOC, PPT, XLS, RTF, ODT, OTH,
-    /// ODM, ODS and ODP (records 0274 and 0295). A template without a matching
-    /// placeholder or field is an exact no-op: the returned file is the
-    /// template and its patch is a no-op.
+    /// ODM, ODS and ODP. A template without a matching placeholder or field is
+    /// an exact no-op: the returned file is the template and its patch is a
+    /// no-op.
     ///
     /// # Errors
     ///

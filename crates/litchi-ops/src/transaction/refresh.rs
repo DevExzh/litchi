@@ -1,5 +1,5 @@
 //! [`File::refresh`] and [`Edit::refresh`]: one field refresh is one
-//! mutation and at most one native commit (record 0279).
+//! mutation and at most one native commit.
 
 use std::sync::Arc;
 
@@ -270,9 +270,7 @@ fn unsupported(file: &File) -> crate::Error {
         Code::UnsupportedCapability,
         "this format has no field refresh adapter",
     )
-    .with_suggestion(
-        "refresh a DOCX, DOC, ODT, PPTX, ODP or workbook file (record 0295 follow-up)",
-    );
+    .with_suggestion("refresh a DOCX, DOC, ODT, PPTX, ODP or workbook file");
     match file.format() {
         Some(format) => error.with_format(format),
         None => error,

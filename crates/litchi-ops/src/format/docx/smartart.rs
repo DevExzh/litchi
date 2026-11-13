@@ -1,4 +1,4 @@
-//! SmartArt in Word documents (record 0295, record 0284 follow-up 0284a).
+//! SmartArt in Word documents.
 //!
 //! - SmartArt graphics are addressed document-wide in document order
 //!   (`/smartart[N]`, also `/body/smartart[N]`), as OfficeCLI addresses
@@ -8,19 +8,17 @@
 //!   outline (`text`: one node per line, one tab per level).
 //! - `add(/body/p[N], smartart, {layout, text, name, alt, width, height})`
 //!   builds an authored spec (`litchi_drawingml::diagram::authoring`, the
-//!   PPTX vocabulary of record 0284) and inserts it as an inline drawing
+//!   PPTX vocabulary) and inserts it as an inline drawing
 //!   through the leaf `Edit::insert_smartart_at`: the five diagram parts,
 //!   their relationships and the run, in one commit.
 //! - `set` of a graphic's `layout` and `text` (the whole outline), and
-//!   `remove` of the graphic with its five parts and their relationships
-//!   (record 0335).
+//!   `remove` of the graphic with its five parts and their relationships.
 //! - `/smartart[N]/node[K]` (nested: `.../node[K]/node[J]`) reads one
 //!   content node (`text`, `level`); `add` under a graphic or a node with
-//!   `text`, `set text` and `remove` (with its descendants), as on PPTX
-//!   (record 0284).
+//!   `text`, `set text` and `remove` (with its descendants), as on PPTX.
 //!
-//! The cached drawing stays consistent with the data model, by the rules
-//! of record 0284 §3: a graphic Litchi authored is regenerated whole; a
+//! The cached drawing stays consistent with the data model: a graphic
+//! Litchi authored is regenerated whole; a
 //! node text edit of any other graphic is made in place in the data model
 //! and in the drawing shapes that show exactly that node (else the drawing
 //! is removed so consumers lay the graphic out again); adding or removing
@@ -150,7 +148,7 @@ pub(crate) enum NodeSetter {
     Text,
 }
 
-/// A content node of a graphic (record 0335): its level is read; its text
+/// A content node of a graphic: its level is read; its text
 /// is the node's text, written by `add` and `set`, as on PPTX.
 pub(crate) const NODE_WRITE_TABLE: Table<NodeSetter, 2, 0> = Table::new(
     [
@@ -626,7 +624,7 @@ fn foreign_structure() -> Error {
     )
 }
 
-/// The parts after `change`, for a drawing of `extent` (record 0284 §3).
+/// The parts after `change`, for a drawing of `extent`.
 fn apply(parts: &SmartArtParts, change: Change, extent: (i64, i64)) -> Result<SmartArtParts> {
     let limits = Limits::default();
     let corrupt = |source: litchi_drawingml::Error| {
@@ -860,7 +858,7 @@ impl Docx {
         }
     }
 
-    /// `add(<smartart or node>, node, {text})` (record 0335).
+    /// `add(<smartart or node>, node, {text})`.
     pub(super) fn add_smartart_node(
         &self,
         editor: DocxEditor,
@@ -922,7 +920,7 @@ impl Docx {
         Ok((commit, node_path(smartart.ordinal, &steps)))
     }
 
-    /// Remove graphics (each with its parts) or one node (record 0335).
+    /// Remove graphics (each with its parts) or one node.
     pub(super) fn remove_smartarts(
         &self,
         editor: DocxEditor,

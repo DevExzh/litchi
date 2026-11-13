@@ -1,6 +1,6 @@
 """FileFormat values, detection functions, RGBColor and Length.
 
-Contract tier: keep these green. S8a fixed the FileFormat vocabulary drift
+Contract tier: keep these green. The bindings fixed the FileFormat vocabulary drift
 (Odb mapped to Doc, the 14-of-21 stub); test_known_drift.py keeps the fixed
 pairs' intended halves (D1, D2, D3).
 """
@@ -31,7 +31,7 @@ DETECTION_CASES = (
     ("ooxml/xlsb/sample.xlsb", "Xlsb"),
     ("odf/corpus/calc-two-sheets.ods", "Ods"),
     ("iwork/numbers/basic.numbers", "Numbers"),
-    # Legacy PowerPoint and Excel, accepted since S8a enabled them (B1).
+    # Legacy PowerPoint and Excel, accepted since the bindings enabled them (B1).
     ("ole/ppt/SampleShow.ppt", "Ppt"),
     ("ole/xls/Simple.xls", "Xls"),
     # Detected, but no Python opener reads them (test_errors.py).
@@ -50,7 +50,7 @@ DETECTION_CASES = (
 
 class FileFormatTests(unittest.TestCase):
     def test_runtime_variant_names(self):
-        # All 21 core variants (S8a added Odb; drift D1).
+        # All 21 core variants (Odb included; drift D1).
         names = {name for name in dir(FF) if not name.startswith("_")}
         self.assertEqual(names, set(RUNTIME_FORMAT_NAMES))
 

@@ -1,7 +1,7 @@
 //! Apple Pages documents (`.pages`): the body's paragraphs and tables, the
 //! sections with their headers and footers, and the body footnotes, read
 //! from `litchi_pages::Package` and written through its focused
-//! transactions (records 0296 and 0299).
+//! transactions.
 //!
 //! A paragraph is one line of its section's body text: Pages separates
 //! paragraphs with a newline in the section's text storage. The paragraph
@@ -16,10 +16,10 @@
 //!
 //! Tables are read from the leaf's body-table catalog and cell reader
 //! (`/body/tbl[N]/tr[R]/tc[C]`), built the first time a read reaches a
-//! table (record 0312); their cells write through `table::values` and the
+//! table; their cells write through `table::values` and the
 //! tables are removed through the deletion transaction. Sections are added
-//! and removed through `section::lifecycle` (record 0312). Section names,
-//! header and footer text, footnote text and the document properties
+//! and removed through `section::lifecycle`. Section names, header and
+//! footer text, footnote text and the document properties
 //! (`set("/metadata", ..)`) write through their leaf families.
 
 use std::collections::BTreeMap;
@@ -173,7 +173,7 @@ static GAPS: [GapSpec; 2] = [
     GapSpec {
         subject: Subject::Element("r"),
         code: Code::UnsupportedCapability,
-        follow_up: "record 0309 follow-up: Pages run elements",
+        follow_up: "follow-up: Pages run elements",
         reason: "Pages body text has no run elements in the tree yet; character properties are written on a whole paragraph (`font.*` on `p`) through the leaf's section::text_style family, and Package::section_text_runs reads the runs",
     },
     GapSpec {
@@ -183,7 +183,7 @@ static GAPS: [GapSpec; 2] = [
             context: "path-read",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "record 0299 Pages metadata node",
+        follow_up: "Pages metadata node",
         reason: "`set(\"/metadata\", ..)` writes the document properties through the leaf metadata family; the path is set-only, and reads go through File::metadata()",
     },
 ];
@@ -196,7 +196,7 @@ static OPERATION_GAPS: [GapSpec; 4] = [
             context: "cells in a formula graph",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "record 0309 follow-ups",
+        follow_up: "not supported yet",
         reason: "body-table cells take text, numbers, booleans and clears through table::values; a formula cell, or one a formula or chart reads, is refused so no calculation cache goes stale",
     },
     GapSpec {
@@ -206,7 +206,7 @@ static OPERATION_GAPS: [GapSpec; 4] = [
             context: "a document without a body table",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "record 0329 follow-up: a built-in table template",
+        follow_up: "follow-up: a built-in table template",
         reason: "a new body table copies the structure (styles, header counts, storage layout) of the document's first body table; a document without one has none to copy",
     },
     GapSpec {
@@ -216,8 +216,8 @@ static OPERATION_GAPS: [GapSpec; 4] = [
             context: "a paragraph that anchors a chart, image or footnote",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "record 0301 follow-up: delete those anchored objects with their paragraph",
-        reason: "a paragraph whose anchors are all body tables is removed with its tables (record 0301); removing one that anchors a chart, image or footnote, or moving any anchored paragraph, would delete or move an object the leaf has no transaction for here",
+        follow_up: "follow-up: delete those anchored objects with their paragraph",
+        reason: "a paragraph whose anchors are all body tables is removed with its tables; removing one that anchors a chart, image or footnote, or moving any anchored paragraph, would delete or move an object the leaf has no transaction for here",
     },
     GapSpec {
         subject: Subject::Operation {
@@ -407,7 +407,7 @@ pub(crate) enum Patch {
         )]
         litchi_pages::table::deletion::Patch,
     ),
-    /// A body-table creation (record 0329).
+    /// A body-table creation.
     TableCreation(litchi_pages::table::creation::Patch),
 }
 
@@ -620,10 +620,10 @@ fn build_with(package: &Package, regions: bool) -> (super::Tree, Box<[super::Par
     (tree.build(), parts.into_boxed_slice())
 }
 
-/// The body tables: a stand-in per table holding its name (record 0312);
-/// returns the parts holding their contents, one per table, which
-/// [`build_table`] builds the first time a read reaches a table's
-/// properties or children.
+/// The body tables: a stand-in per table holding its name; returns the
+/// parts holding their contents, one per table, which [`build_table`]
+/// builds the first time a read reaches a table's properties or
+/// children.
 fn build_tables(package: &Package, tree: &mut TreeBuilder<Kind>, body: u32) -> Vec<super::Part> {
     let Ok(catalog) = package.body_tables() else {
         return Vec::new();
@@ -725,10 +725,9 @@ fn value_type(value: &litchi_pages::table::read::Value) -> &'static str {
 
 /// Paragraph text sets waiting for one paragraph transaction per section:
 /// section → `(line, text)` in staging order (a list append is cheaper than
-/// a map insert per set, record 0302). [`Pending::flush`] stages every set
+/// a map insert per set). [`Pending::flush`] stages every set
 /// in that order, repeated lines included: the leaf publishes a run of sets
-/// as one splice only where that equals publishing them one at a time
-/// (record 0314).
+/// as one splice only where that equals publishing them one at a time.
 #[derive(Debug, Default)]
 struct Pending(BTreeMap<usize, Vec<(usize, String)>>);
 
@@ -830,10 +829,9 @@ fn commit_comments(
 /// A one-value set of a body-table cell named by the direct path
 /// `/body/tbl[N]/tr[R]/tc[C]` (`table` for `tbl`; each of the last three
 /// steps with one positional index, `body` with none), committed without
-/// reading the table (record 0312): the body lists the table's stand-in,
-/// and the leaf transaction checks the cell against the table. `None`
-/// sends any other target, and any failure, to the general route, which
-/// reports it.
+/// reading the table: the body lists the table's stand-in, and the leaf
+/// transaction checks the cell against the table. `None` sends any other
+/// target, and any failure, to the general route, which reports it.
 fn direct_cell(
     file: &Iwork,
     package: &Package,
@@ -1143,7 +1141,7 @@ pub(crate) fn set(
     )
 }
 
-/// Style one whole paragraph of a section (record 0309).
+/// Style one whole paragraph of a section.
 fn style_paragraph(
     chain: &mut Chain<Package>,
     section: usize,
@@ -1424,11 +1422,11 @@ pub(crate) fn add(
     add_at(file, package, section, line, &value, limits)
 }
 
-/// Add a section (record 0312): a section break and a new section copying
-/// the page masters, headers and footers of the section it follows. The
-/// placement names where it goes among the sections (the end by default);
-/// the first section always begins the body, so a new one cannot precede
-/// it. `name` is the only property: the new section starts empty.
+/// Add a section: a section break and a new section copying the page
+/// masters, headers and footers of the section it follows. The placement
+/// names where it goes among the sections (the end by default); the first
+/// section always begins the body, so a new one cannot precede it. `name`
+/// is the only property: the new section starts empty.
 fn add_section(
     file: &Iwork,
     package: &Package,
@@ -1535,11 +1533,10 @@ fn add_at(
     Ok((commit, path))
 }
 
-/// Add a body table (record 0329): a new empty paragraph at the placement
-/// (among the body's paragraphs; the end by default), then a table cloned
-/// from the document's first body table anchored in it, with `rows`,
-/// `cols` (or `columns`), `name` and `data` (rows separated by `;`, cells by
-/// `,`).
+/// Add a body table: a new empty paragraph at the placement (among the
+/// body's paragraphs; the end by default), then a table cloned from the
+/// document's first body table anchored in it, with `rows`, `cols` (or
+/// `columns`), `name` and `data` (rows separated by `;`, cells by `,`).
 fn add_table(
     file: &Iwork,
     package: &Package,
@@ -1727,9 +1724,9 @@ pub(crate) fn remove(
         }
     }
     bound(LimitKind::Operations, nodes.len(), limits.max_operations())?;
-    // A paragraph whose every anchor is a body table goes with its tables
-    // (record 0301); one that anchors anything else stays refused by the
-    // leaf paragraph transaction.
+    // A paragraph whose every anchor is a body table goes with its tables;
+    // one that anchors anything else stays refused by the leaf paragraph
+    // transaction.
     for (section, targets) in &lines {
         let mut anchored = None;
         for line in targets {
@@ -1803,8 +1800,8 @@ pub(crate) fn remove(
         let (next, patch) = commit.into_parts();
         push(&mut chain, next, Patch::Paragraphs(patch));
     }
-    // Sections last, from the last (record 0312): each removal keeps its
-    // text in the preceding section and the earlier sections' positions.
+    // Sections last, from the last: each removal keeps its text in the
+    // preceding section and the earlier sections' positions.
     sections.sort_unstable();
     sections.dedup();
     for section in sections.iter().rev() {
@@ -2042,11 +2039,11 @@ pub(crate) fn plan(
 }
 
 /// The `(section, line)` of the paragraph `/body/p[N]` names, from each
-/// section's paragraph count rather than the object tree (record 0302): a
-/// coalesced run of sets on a large document otherwise builds the whole
-/// tree, with a text copy and properties per paragraph, before its first
-/// set. `None` for any other spelling (it resolves through the tree);
-/// `Some(None)` when the document has fewer than N paragraphs.
+/// section's paragraph count rather than the object tree: a coalesced run
+/// of sets on a large document otherwise builds the whole tree, with a
+/// text copy and properties per paragraph, before its first set. `None`
+/// for any other spelling (it resolves through the tree); `Some(None)`
+/// when the document has fewer than N paragraphs.
 ///
 /// The tree lists each section's lines (its text split at `\n`) in section
 /// order under the body, ahead of the tables, so the N-th paragraph child

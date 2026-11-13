@@ -1,4 +1,4 @@
-//! The presentation theme (record 0321, L-PPTX-R4).
+//! The presentation theme.
 //!
 //! `/theme` reads the theme the presentation's colors and fonts come from
 //! (the presentation part's own theme, else the first slide master's, as

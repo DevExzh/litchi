@@ -1,4 +1,4 @@
-"""``File.dump`` and the raw layer (record 0336): ``parts``, ``raw``,
+"""``File.dump`` and the raw layer: ``parts``, ``raw``,
 ``add_part``, ``raw_set`` and ``validate``.
 
 Oracles: a dump replayed with ``batch`` onto ``create`` rebuilds the text and
@@ -59,7 +59,7 @@ class RawTests(unittest.TestCase):
             "/document", "//w:body", "prepend", "<w:p><w:r><w:t>Raw</w:t></w:r></w:p>"
         )
         self.assertEqual(commit.value, {"matched": 1})
-        # Raw edits are not transaction steps: no patch (record 0347).
+        # Raw edits are not transaction steps: no patch.
         self.assertIsNone(commit.patch)
         self.assertEqual(commit.file.text().strip(), "Raw")
         self.assertEqual(file.to_bytes(), before)

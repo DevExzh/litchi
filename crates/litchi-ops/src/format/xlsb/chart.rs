@@ -1,13 +1,13 @@
-//! XLSB worksheet charts, read-only (record 0322).
+//! XLSB worksheet charts, read-only.
 //!
 //! An XLSB worksheet's charts are DrawingML chart parts its drawing's
 //! graphic frames name, the same markup as XLSX's. `/Sheet1/chart[N]`,
 //! `/Sheet1/chart[N]/series[K]` and `/Sheet1/chart[N]/axis[@role=ROLE]`
 //! read them through the shared [`Summary`] projection with the XLSX read
-//! vocabulary of record 0270: `chartType`, `title`, `legend`, `categories`,
+//! vocabulary: `chartType`, `title`, `legend`, `categories`,
 //! `catTitle`, `seriesCount` and the anchor's cell geometry; a series'
 //! `name`, `values`, `categories` and `color`; an axis' `role`, `title`,
-//! `min` and `max`. Chart writes stay a gap (record 0322 follow-up).
+//! `min` and `max`. Chart writes stay a gap.
 
 use std::borrow::Cow;
 use std::sync::Arc;

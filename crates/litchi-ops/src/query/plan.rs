@@ -1,13 +1,13 @@
-//! The compiled query plan (record 0010 §5.2, §8.1) and its diagnostics.
+//! The compiled query plan and its diagnostics.
 //!
 //! A [`Plan`] is a selector bound to one format's element kinds and property
 //! tables. It holds no reference into the parsed [`Query`]: literals, keys
 //! and `:contains` texts borrow the query's text where it borrowed its input
 //! and own the rest, so a plan compiled from text outlives the parsed AST.
 //! Everything is stored in flat arenas indexed by `u32`, kinds as bits of a
-//! `u128` (record 0010 §4.1, at most 128 kinds per format), and each
-//! comparison as a lifetime-free compiled test, so evaluating a plan reads
-//! no selector text and allocates nothing.
+//! `u128` (at most 128 kinds per format), and each comparison as a
+//! lifetime-free compiled test, so evaluating a plan reads no selector text
+//! and allocates nothing.
 
 use std::borrow::Cow;
 use std::fmt;
@@ -19,7 +19,7 @@ use crate::error::{Code, Error, Result};
 use crate::value::compare::Compiled;
 
 /// A compiled, reusable query: parse and compile once, run it on any
-/// document of the same format (record 0010 §5.1, decision D9).
+/// document of the same format.
 ///
 /// Compilation resolves element names through the format's alias tables,
 /// binds each predicate key to the subject kinds' property tables and
@@ -66,14 +66,14 @@ pub struct Plan<'q> {
     pub(crate) expr_args: Vec<u32>,
     /// Leaf conditions.
     pub(crate) conds: Vec<CondPlan<'q>>,
-    /// Header-row predicates (record 0010 §5.4).
+    /// Header-row predicates.
     pub(crate) headers: Vec<HeaderPlan<'q>>,
     /// Bare row-property keys of row predicates, refused at run time when a
     /// table column has the same name.
     pub(crate) collisions: Vec<Cow<'q, str>>,
     /// For each kind ordinal, the kinds that can occur below it (the
     /// transitive closure of the spec's child lists): the pruning table,
-    /// computed once per spec table (record 0280).
+    /// computed once per spec table.
     pub(crate) reach: &'static [u128],
     /// The subject kinds of the top-level alternatives.
     pub(crate) wanted: u128,
@@ -90,8 +90,7 @@ pub struct Plan<'q> {
     /// matches only direct children of the scope or of a top-level
     /// container: the walk then enters nothing below them.
     pub(crate) shallow: bool,
-    /// The single-subject fast path of the walk, when the plan has one
-    /// (record 0315).
+    /// The single-subject fast path of the walk, when the plan has one.
     pub(crate) fast: Option<FastPlan>,
     /// Findings that do not stop the query.
     pub(crate) diagnostics: Vec<Diagnostic>,
@@ -107,12 +106,12 @@ impl<'q> Plan<'q> {
     /// header-row predicate; `unsupported_path` for an element or scope the
     /// format's family does not have; `unsupported_capability` for an
     /// element or property Litchi cannot read yet, a regular-expression
-    /// literal (record 0010 open question Q3), and every format whose
-    /// adapter has not registered query support yet.
+    /// literal, and every format whose adapter has not registered query
+    /// support yet.
     pub fn compile(query: &Query<'q>, format: FileFormat) -> Result<Self> {
         super::bounds::validate(query)?;
-        // Each format adapter (M1 steps R4-R7) adds an arm compiling for its
-        // `Inspect` implementation.
+        // Each format adapter adds an arm compiling for its `Inspect`
+        // implementation.
         match format {
             #[cfg(feature = "doc")]
             FileFormat::Doc => super::compile::compile::<crate::format::doc::Nav<'static>>(query),
@@ -130,7 +129,7 @@ impl<'q> Plan<'q> {
             FileFormat::Rtf => super::compile::compile::<crate::format::rtf::Nav<'static>>(query),
             #[cfg(feature = "odt")]
             FileFormat::Odt => super::compile::compile::<crate::format::odt::Nav<'static>>(query),
-            // OTH and ODM run the ODT adapter's plans (record 0282).
+            // OTH and ODM run the ODT adapter's plans.
             #[cfg(feature = "oth")]
             FileFormat::Oth => super::compile::compile::<crate::format::odt::Nav<'static>>(query),
             #[cfg(feature = "odm")]
@@ -164,9 +163,7 @@ impl<'q> Plan<'q> {
                     format!("querying {format:?} documents is not supported yet"),
                 )
                 .with_format(format)
-                .with_suggestion(
-                    "query support arrives with each format's adapter (record 0010, step R4)",
-                ))
+                .with_suggestion("query support arrives with each format's adapter"))
             },
         }
     }
@@ -187,9 +184,8 @@ impl<'q> Plan<'q> {
     }
 
     /// The compile-time findings that do not stop the query, in selector
-    /// order: unknown keys (which evaluate as absent), relational
-    /// comparisons with a non-numeric literal, and tests that can never hold
-    /// (record 0010 §5.1).
+    /// order: unknown keys (which evaluate as absent), relational comparisons
+    /// with a non-numeric literal, and tests that can never hold.
     #[must_use]
     pub fn diagnostics(&self) -> &[Diagnostic] {
         &self.diagnostics
@@ -236,9 +232,9 @@ pub(crate) struct Chain {
 /// shortcut test (`cell`, `cell[value>1000]`, `shape:contains(Revenue)`):
 /// its interest never changes, so which kinds match, which are entered and
 /// which are asked for are fixed for the whole walk, and computed once with
-/// the plan (record 0315). The walk's fast step makes the same reads, in
-/// the same order, as the general step: the kind test, the shortcut test,
-/// then the child test of a node it may enter.
+/// the plan. The walk's fast step makes the same reads, in the same order,
+/// as the general step: the kind test, the shortcut test, then the child
+/// test of a node it may enter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FastPlan {
     /// The subject's kinds among the wanted ones.
@@ -289,8 +285,8 @@ impl FastPlan {
     }
 }
 
-/// A cheaper test of a one-compound chain on a node of one of its kinds
-/// (record 0262); each gives the result of the full test.
+/// A cheaper test of a one-compound chain on a node of one of its kinds;
+/// each gives the result of the full test.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Shortcut {
     /// Test the chain in full.
@@ -477,7 +473,7 @@ pub(crate) enum Target {
     },
 }
 
-/// A header-row predicate (record 0010 §5.4).
+/// A header-row predicate.
 #[derive(Debug, Clone)]
 pub(crate) struct HeaderPlan<'q> {
     /// The distinct column keys, without `col.`/`column.`, and whether the
@@ -493,7 +489,7 @@ pub(crate) struct HeaderPlan<'q> {
     pub(crate) row_kind: u8,
 }
 
-/// A compile-time finding that does not stop the query (record 0010 §5.1).
+/// A compile-time finding that does not stop the query.
 ///
 /// OfficeCLI reports the same findings as warnings once a query has run
 /// (`AttributeFilter.ApplyWithWarnings`); Litchi reports them from the plan,

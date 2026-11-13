@@ -454,7 +454,7 @@ fn physical_shape_ordinal_maps_to_native_source_order_after_a_picture() {
     });
 }
 
-/// Record 0290 F4: a slide without slide-show information gains the atom
+/// A slide without slide-show information gains the atom
 /// when it is hidden; showing it is an exact no-op.
 #[test]
 fn absent_visibility_record_is_inserted_when_hidden() {

@@ -214,9 +214,9 @@ fn printed_doubles_parse_back_exactly() {
     }
 }
 
-/// `Decimal::from_ratio` rounds in 64 bits when the scaled numerator fits
-/// (record 0262): the result and its text are those of the 128-bit
-/// computation, kept here as the reference.
+/// `Decimal::from_ratio` rounds in 64 bits when the scaled numerator fits:
+/// the result and its text are those of the 128-bit computation, kept here
+/// as the reference.
 #[test]
 fn decimals_from_ratios_match_the_128_bit_reference() {
     fn reference(numerator: i64, denominator: i64, decimals: u8) -> String {

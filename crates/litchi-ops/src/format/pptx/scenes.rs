@@ -1,11 +1,11 @@
-//! The eager owner's slide-scene cache (record 0262).
+//! The eager owner's slide-scene cache.
 //!
 //! The source-backed owner reads slide scenes through the leaf's weighted
 //! scene memo; the eager owner has none, so before this cache every path
 //! that reached into a slide (`/slide[N]/shape[K]/...`) parsed the slide's
 //! XML into a scene again. A unified write resolves its target that way and
 //! then hands the native edit positions, so on a large slide the scene read
-//! was the whole unified overhead (record 0252: +17-22% at 100-10,000
+//! was the whole unified overhead (+17-22% at 100-10,000
 //! shapes).
 //!
 //! The cache is keyed by the identity of the slide part's payload

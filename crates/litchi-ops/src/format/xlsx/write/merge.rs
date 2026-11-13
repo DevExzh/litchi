@@ -1,8 +1,8 @@
-//! XLSX template merge (record 0274): placeholders in every text cell of
+//! XLSX template merge: placeholders in every text cell of
 //! every worksheet, staged in one native workbook edit. Formulas are never
 //! touched; a cell keeps its style. A cell showing a formatted shared
 //! string is filled run by run and keeps its runs' formatting as its own
-//! inline rich string (record 0295).
+//! inline rich string.
 
 use litchi_core::FileFormat;
 use litchi_xlsx::workbook::WorksheetKind;
@@ -47,7 +47,7 @@ pub(crate) fn merge(
                     && sheet.has_rich_text(address).map_err(native_error)?
                     && let Some(mut rich) = sheet.rich_text(address).map_err(native_error)?
                 {
-                    // Record 0295: fill the runs, each keeping its
+                    // Fill the runs, each keeping its
                     // properties, as the cell's own inline rich string.
                     let runs: Vec<Run<'_>> = rich
                         .runs()

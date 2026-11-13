@@ -1,4 +1,4 @@
-//! Path round trip over the XLSX corpus (record 0010 §2.6, §10.3): every
+//! Path round trip over the XLSX corpus: every
 //! node a depth-2 walk lists (sheets, named ranges, rows), and the first
 //! cells of the first rows, resolves from its canonical and positional
 //! paths back to itself.

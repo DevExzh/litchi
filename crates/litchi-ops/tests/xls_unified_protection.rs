@@ -1,4 +1,4 @@
-//! Every unified XLS P0 write refuses signed and encrypted workbooks with a
+//! Every unified XLS write refuses signed and encrypted workbooks with a
 //! typed error and leaves the owner unchanged.
 #![cfg(feature = "xls")]
 #![allow(

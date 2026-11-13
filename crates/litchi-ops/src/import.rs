@@ -1,4 +1,4 @@
-//! CSV and TSV import into a worksheet (design §13 P0, record 0266).
+//! CSV and TSV import into a worksheet (design §13).
 //!
 //! [`File::import`](crate::File::import) decodes delimited text, infers each
 //! field's type, and writes the fields into a worksheet of an XLSX, XLSB,
@@ -49,7 +49,7 @@
 //!    `yyyy-mm-dd hh:mm:ss` number format. Dates before the date system's
 //!    epoch stay text. XLS has no unified number-format write yet, so XLS
 //!    keeps dates as text ([`Summary::dates_as_text`]); ODS stores them as
-//!    native `date` cells (record 0295);
+//!    native `date` cells;
 //! 3. `TRUE` or `FALSE`, in any case;
 //! 4. text.
 //!
@@ -91,7 +91,7 @@ mod tests;
 pub(crate) const MAX_CELL_CHARS: usize = 32_767;
 
 /// Refuse a rewritten cell text longer than [`MAX_CELL_CHARS`] (find and
-/// merge, record 0295).
+/// merge).
 #[cfg(any(feature = "xlsb", feature = "xls", feature = "ods"))]
 pub(crate) fn check_cell_length(text: &str, format: litchi_core::FileFormat) -> Result<()> {
     if text.len() > MAX_CELL_CHARS && text.chars().count() > MAX_CELL_CHARS {

@@ -26,7 +26,7 @@ use crate::value::{Color, Length};
 const MAX_STEPS: usize = 6;
 
 /// A positional path of at most [`MAX_STEPS`] steps, stored compactly as
-/// kinds and positions (record 0287): a node no longer carries six full
+/// kinds and positions: a node no longer carries six full
 /// [`PathStep`]s (336 bytes) and writes them only when its path is read.
 #[derive(Clone, Copy)]
 pub(crate) struct Steps {
@@ -69,7 +69,7 @@ impl Steps {
 }
 
 /// The path step of `kind` at `position`: the collections are bare, and a
-/// style is its identifier (`/styles/Heading1`; record 0324).
+/// style is its identifier (`/styles/Heading1`).
 fn step_of(kind: Kind, position: Position, doc: &Doc) -> PathStep<'_> {
     match kind {
         Kind::Document => PathStep::new("document"),
@@ -157,7 +157,7 @@ pub(crate) enum Item<'f> {
     Shape(&'f litchi_doc::parts::spa::ShapeAnchor),
 }
 
-// Record 0287: nodes move through every query; keep this one no larger
+// Nodes move through every query; keep this one no larger
 // than it is (the unified node is as large as its largest format node).
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(size_of::<Node<'static>>() <= 144);

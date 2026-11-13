@@ -602,7 +602,7 @@ fn concurrent_first_reads_materialize_a_worksheet_once() {
     assert_eq!(reads.load(Ordering::SeqCst), single);
 }
 
-// --- Editor construction (L-XLSB-1) --------------------------------------
+// --- Editor construction --------------------------------------------------
 
 #[test]
 fn source_handles_materialize_the_eager_editor_from_the_same_package() {
@@ -655,7 +655,7 @@ fn clones_share_one_state() {
         .unwrap();
 }
 
-// --- Fence scopes (record 0310) ------------------------------------------
+// --- Fence scopes ------------------------------------------
 
 /// A source that counts its version observations and can be changed.
 struct Versioned {
@@ -717,10 +717,10 @@ fn observed_query(rows: u32, selector: &str) -> (usize, usize) {
     (matches, source.versions.load(Ordering::SeqCst) - before)
 }
 
-/// Record 0310: inside a query step the node reads the step makes (a cell's
+/// Inside a query step the node reads the step makes (a cell's
 /// value for `cell[value>N]`, its text) share the step's closing check, as
-/// the XLSX adapter's do. Every match is still checked (owner decision
-/// 2026-10-14): ten more cells cost ten more observations when each
+/// the XLSX adapter's do. Every match is still checked:
+/// ten more cells cost ten more observations when each
 /// matches, and none when none does. A change between two pulls still
 /// fails the next pull.
 #[test]

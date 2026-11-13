@@ -1,17 +1,16 @@
 //! The facade's unified entry point: `litchi::open` and `litchi::File`
-//! (ADR 0033, M0a step S7).
+//! (ADR 0033).
 //!
 //! The root names the `litchi-ops` API; `open` and `open_bytes` open Apple
-//! iWork packages as `File` variants (record 0296) and refuse an iWork
-//! package directory with its detected format and a suggestion; and the
-//! reads the facade's format-family
-//! types offered (tolerance reports, PPTX slide catalogs and sizes) come
-//! from the format handles with the same values.
+//! iWork packages as `File` variants and refuse an iWork package directory
+//! with its detected format and a suggestion; and the reads the facade's
+//! format-family types offered (tolerance reports, PPTX slide catalogs and
+//! sizes) come from the format handles with the same values.
 //!
-//! S7 compared those reads with the format-family types directly. M0a step
-//! S8c recorded the format-family types' values in `tests/golden/`, and
-//! these tests compare the handles with the recorded values. Step S9 deleted
-//! the format-family types, so the goldens are fixed reference data.
+//! Those reads were first compared with the format-family types directly.
+//! The format-family types' values were then recorded in `tests/golden/`,
+//! and these tests compare the handles with the recorded values. The
+//! format-family types are deleted, so the goldens are fixed reference data.
 
 #![cfg(litchi_unified)]
 #![allow(
@@ -188,8 +187,8 @@ fn iwork_packages_open_as_file_variants_on_every_route() {
 fn iwork_package_directories_open_as_their_single_file_form() {
     for (format, package, directory) in iwork_fixtures() {
         assert!(directory.is_dir(), "{}", directory.display());
-        // Records 0299 and 0306: a package directory opens as its
-        // single-file form and reads like the packaged fixture.
+        // A package directory opens as its single-file form and reads like the
+        // packaged fixture.
         let file = litchi::open(&directory).expect("a package directory opens");
         assert_eq!(file.format(), Some(format));
         assert_eq!(
@@ -219,7 +218,7 @@ fn input_no_format_claims_is_unrecognized() {
 
 /// A compound file whose host stream names a format this build lacks is
 /// reported with that format and the feature to enable, not read as a
-/// workbook (M0a step S6; the facade's `Workbook` fell back to XLS).
+/// workbook (the facade's `Workbook` fell back to XLS).
 #[cfg(all(feature = "xls", not(feature = "doc")))]
 #[test]
 fn a_disabled_format_is_reported_with_its_feature() {

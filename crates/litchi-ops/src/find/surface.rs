@@ -1,6 +1,6 @@
 //! Text surfaces: the adapter contract find/replace and template merge
 //! share for formats whose leaf rewrites whole runs, paragraphs or cells of
-//! plain text (record 0295).
+//! plain text.
 //!
 //! An adapter lists the searchable text of its scope as [`Run`]s, in
 //! document order: the text of one leaf unit its native editor can replace
@@ -183,7 +183,7 @@ pub(crate) fn find(
             )
             .with_property(super::FIND)
             .with_format(format)
-            .with_suggestion("narrow the find's target to text outside fields and nested markup (record 0295)"));
+            .with_suggestion("narrow the find's target to text outside fields and nested markup"));
         }
         changes.push(Change {
             run: rewrite.piece,

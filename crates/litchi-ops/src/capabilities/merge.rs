@@ -1,5 +1,5 @@
-//! Capability support for template merge (records 0274 and 0295): the
-//! OOXML, legacy, RTF, ODT/OTH/ODM, ODS and ODP templates.
+//! Capability support for template merge: the OOXML, legacy, RTF,
+//! ODT/OTH/ODM, ODS and ODP templates.
 
 #[cfg(any(
     feature = "docx",
@@ -35,7 +35,7 @@ use crate::read::Adapter;
 /// Merge on a format without a merge adapter.
 const NOT_A_TEMPLATE: Refusal = Refusal {
     code: Code::UnsupportedCapability,
-    follow_up: "template merge for the ODF object formats and iWork (record 0295)",
+    follow_up: "template merge for the ODF object formats and iWork",
     reason: "template merge fills word-processing, presentation and spreadsheet templates",
 };
 

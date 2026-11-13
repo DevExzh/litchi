@@ -1,7 +1,7 @@
 //! Generated fixtures for the CRUD checklist cells no producer file in the
-//! corpus reaches (record 0294).
+//! corpus reaches.
 //!
-//! Record 0289 left 70 claimed cells unreached because no file under
+//! 70 claimed cells were unreached because no file under
 //! `test-data/` (and no small LibreOffice, Apache POI or Tika file) holds the
 //! element. Each fixture here is built with Litchi's own writers: the leaf
 //! builders and edit transactions, and the ODF package writer of
@@ -156,7 +156,7 @@ fn ppt_connectors() -> Vec<u8> {
     bytes.into_inner()
 }
 
-/// Record 0323's element deck: a text box with a shape and a text
+/// The PPT element deck: a text box with a shape and a text
 /// hyperlink, a comment, a 2x2 table and a Microsoft Graph chart on the
 /// first slide, and a second slide the links can jump to.
 fn ppt_elements() -> Vec<u8> {
@@ -241,7 +241,7 @@ fn xlsb_table() -> Vec<u8> {
     bytes.into_inner()
 }
 
-/// Record 0324: a DOC body paragraph with two tab stops, a floating text
+/// A DOC body paragraph with two tab stops, a floating text
 /// box and a closing paragraph (the DOC `tab` and `textbox` cells, with a
 /// sibling pair of tab stops).
 fn doc_marks() -> Vec<u8> {
@@ -290,7 +290,7 @@ const ODT_XMLNS: &str = concat!(
 );
 
 /// A text document (of the ODT, OTH or ODM `mimetype`) with every part
-/// record 0328 reads: a common and an
+/// the adapter reads: a common and an
 /// automatic list style, a list, tab stops, text fields, a table of
 /// contents, a table with declared columns, a custom shape and a
 /// rectangle, a formula subdocument and an inline formula, and two master
@@ -359,7 +359,7 @@ const ODP_XMLNS: &str = concat!(
     r#"xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0""#
 );
 
-/// A two-slide presentation with every element record 0328 reads: a text
+/// A two-slide presentation with every element the adapter reads: a text
 /// hyperlink with a title, line breaks, shape click actions (a URL, the
 /// next page, a `draw:a` link), a table with declared columns, a video and
 /// an audio plugin, a formula subdocument and an inline formula, and a chart
@@ -460,7 +460,7 @@ fn odp_elements() -> Vec<u8> {
     writer.finish_to_bytes().unwrap()
 }
 
-/// A two-section RTF document with every part record 0328 reads: document
+/// A two-section RTF document with every part the adapter reads: document
 /// and section page setup, two bookmarks, `PAGE`, `NUMPAGES` and `TOC`
 /// fields, a paragraph with two tab stops, a rectangle shape and a text-box
 /// shape. The bytes are written here; the open test proves they parse.
@@ -492,7 +492,7 @@ fn rtf_parts() -> Vec<u8> {
     .to_vec()
 }
 
-/// Record 0341: a PPT movie frame. No corpus PPT plays a movie and the PPT
+/// A PPT movie frame. No corpus PPT plays a movie and the PPT
 /// writer has no media frames, so Apache POI's `sound.ppt` (Apache-2.0,
 /// `test-data/poi/test-data/slideshow/sound.ppt`) is rewritten in place: its
 /// one `ExWAVAudioEmbeddedContainer` (40 bytes: an `ExMediaAtom` for id 1
@@ -668,7 +668,7 @@ fn nested_references(message: &[u8], out: &mut Vec<u64>) {
     }
 }
 
-/// Record 0341: a Keynote slide holding a line and a group. The Keynote
+/// A Keynote slide holding a line and a group. The Keynote
 /// writer creates text boxes, preset shapes and images but no lines or
 /// groups, and no corpus deck holds either, so `iwork/keynote/basic.key`
 /// gets two rectangles and an image through the leaf's drawable edit, and

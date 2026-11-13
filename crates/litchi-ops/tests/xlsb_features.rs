@@ -1,7 +1,7 @@
-//! XLSB worksheet features through the unified API (record 0322): notes,
+//! XLSB worksheet features through the unified API: notes,
 //! hyperlinks, pictures, shapes, conditional formats, data validations, the
 //! auto-filter and page breaks, each added, read back on both owners, set,
-//! queried and removed, with the XLSX vocabulary of record 0320.
+//! queried and removed, with the XLSX vocabulary.
 #![cfg(feature = "xlsb")]
 
 use litchi_core::FileFormat;

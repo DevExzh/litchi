@@ -1,4 +1,4 @@
-//! Legacy OLE metadata through the unified layer (record 0254): initial
+//! Legacy OLE metadata through the unified layer: initial
 //! metadata at creation and the `/metadata` set path for DOC, XLS and PPT.
 #![cfg(all(feature = "doc", feature = "xls", feature = "ppt"))]
 #![allow(

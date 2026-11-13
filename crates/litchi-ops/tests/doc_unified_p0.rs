@@ -1,4 +1,4 @@
-//! DOC P0 surface through the unified API (record 0258): run, table,
+//! DOC surface through the unified API: run, table,
 //! header/footer, note and comment reads; run and paragraph formatting;
 //! paragraph add/remove/move/swap; exact no-ops, signature and encryption
 //! policies, and read-back after reopen.
@@ -188,7 +188,7 @@ fn reads_reach_runs_tables_headers_notes_and_comments() {
         file.get("/body/tbl[2]").unwrap_err().code(),
         Code::PathNotFound
     );
-    // Record 0324 projects hyperlinks: this paragraph has none.
+    // Hyperlinks are projected: this paragraph has none.
     assert_eq!(
         file.get("/body/p[2]/hyperlink[1]").unwrap_err().code(),
         Code::PathNotFound

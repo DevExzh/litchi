@@ -628,8 +628,8 @@ fn xlsb_capabilities_advertise_removal_for_cells_and_sheets() {
         .filter(|element| element.operations().remove)
         .map(|element| element.name())
         .collect::<Vec<_>>();
-    // Record 0322 adds the worksheet feature nodes; record 0330 claims the
-    // last defined name's removal (record 0261).
+    // The worksheet feature nodes are removable, and so is the last
+    // defined name.
     assert_eq!(
         removable,
         [

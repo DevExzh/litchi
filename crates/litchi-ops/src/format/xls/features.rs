@@ -1,8 +1,7 @@
-//! XLS worksheet features as unified nodes (record 0327): legacy notes
+//! XLS worksheet features as unified nodes: legacy notes
 //! (`comment`), hyperlinks, drawing pictures and shapes, conditional
 //! formats (`cf`), data validations, the auto-filter and manual page
-//! breaks, with the XLSX property vocabulary of record 0320 (as XLSB took it
-//! in record 0322).
+//! breaks, with the XLSX property vocabulary (as XLSB does).
 //!
 //! Every feature is a child of its worksheet, addressed by its position
 //! among the worksheet's features of its kind (`/Sheet1/comment[2]`,
@@ -467,7 +466,7 @@ const fn bar_gap(key: &'static str) -> GapSpec {
     xls_gap(
         "conditionalFormatting",
         key,
-        "record 0327 follow-up: XLS data-bar extensions",
+        "XLS data-bar extensions",
         "a BIFF8 CF12 data bar has a color, thresholds and lengths; negative and axis styling exist only in Office 2010 formats",
     )
 }
@@ -479,7 +478,7 @@ static DIRECTION_GAP: GapSpec = bar_gap("direction");
 static CRITERIA_GAP: GapSpec = xls_gap(
     "autofilter",
     "criteria0",
-    "record 0327 follow-up: XLS auto-filter column criteria",
+    "XLS auto-filter column criteria",
     "XLS auto-filter column criteria (AutoFilter/AutoFilter12 records) are kept but not authored; the filter range is",
 );
 
@@ -487,7 +486,7 @@ const fn effect_gap(element: &'static str, key: &'static str) -> GapSpec {
     xls_gap(
         element,
         key,
-        "record 0327 follow-up: XLS drawing effects, crops and gradient fills",
+        "XLS drawing effects, crops and gradient fills",
         "the XLS drawing editor authors solid fills, outlines, text, names and transforms; effects, crops, transparency and gradient fills are not authored",
     )
 }
@@ -496,7 +495,7 @@ const fn text_gap(key: &'static str) -> GapSpec {
     xls_gap(
         "shape",
         key,
-        "record 0327 follow-up: XLS shape text formatting",
+        "XLS shape text formatting",
         "a legacy shape's text runs name entries of the workbook font table, which the drawing editor does not author; text is written in the default font",
     )
 }
@@ -504,7 +503,7 @@ const fn text_gap(key: &'static str) -> GapSpec {
 static PICTURE_TITLE_GAP: GapSpec = xls_gap(
     "picture",
     "title",
-    "record 0327: wontfix (format)",
+    "wontfix (format)",
     "a legacy OfficeArt picture has a name and alternative text but no title",
 );
 static PICTURE_CROP_GAP: GapSpec = effect_gap("picture", "crop");

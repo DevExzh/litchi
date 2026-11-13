@@ -48,7 +48,7 @@ pub enum BatchMode {
 /// transactions) always refuse. Only the command channel
 /// ([`crate::File::apply_with`], [`crate::File::batch_with`]) can choose
 /// [`Unsupported::Warn`], OfficeCLI's "apply the rest and warn", so that
-/// OfficeCLI scripts replay (record 0015 Q2/Δ1, record 0269).
+/// OfficeCLI scripts replay.
 ///
 /// ```
 /// use litchi_ops::batch::Unsupported;
@@ -67,12 +67,12 @@ pub enum Unsupported {
     ///
     /// A command that fails after skipping reports the failure of the
     /// reduced command with the skipped properties attached
-    /// ([`OpsError::warnings`]; record 0271). The code stays the reduced
-    /// command's own, because that failure is real (the command, as it can
-    /// be applied, is incomplete or invalid), and the list says which
-    /// skipped keys it lost: an `add` whose data came only from skipped
-    /// keys fails with `missing_property` *and* names those keys, so the
-    /// caller is never told it omitted something it did supply.
+    /// ([`OpsError::warnings`]). The code stays the reduced command's own,
+    /// because that failure is real (the command, as it can be applied, is
+    /// incomplete or invalid), and the list says which skipped keys it
+    /// lost: an `add` whose data came only from skipped keys fails with
+    /// `missing_property` *and* names those keys, so the caller is never
+    /// told it omitted something it did supply.
     Warn,
 }
 

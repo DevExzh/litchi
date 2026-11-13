@@ -1,4 +1,4 @@
-//! XLSB P0 writes through the unified API (record 0261): cell formatting,
+//! XLSB writes through the unified API: cell formatting,
 //! formulas and merged ranges, with read-back, exact no-ops, signature and
 //! encryption policy, and transaction replay.
 #![cfg(feature = "xlsb")]

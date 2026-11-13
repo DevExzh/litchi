@@ -1725,7 +1725,7 @@
       "subject": "element",
       "element": "formfield",
       "code": "unsupported_capability",
-      "followUp": "record 0328 follow-up: RTF form fields (FORMTEXT, FORMCHECKBOX, FORMDROPDOWN) as formfield nodes and their writes",
+      "followUp": "follow-up: RTF form fields (FORMTEXT, FORMCHECKBOX, FORMDROPDOWN) as formfield nodes and their writes",
       "reason": "RTF form fields are read by the native model but not yet projected into generic paths and queries"
     },
     {
@@ -1739,14 +1739,14 @@
       "subject": "element",
       "element": "equation",
       "code": "unsupported_capability",
-      "followUp": "record 0328 follow-up: RTF EQ fields and math zones as equation nodes",
+      "followUp": "follow-up: RTF EQ fields and math zones as equation nodes",
       "reason": "RTF equation fields and math zones are read by the native model but not yet projected"
     },
     {
       "subject": "element",
       "element": "revision",
       "code": "unsupported_capability",
-      "followUp": "record 0328 follow-up: RTF revision nodes and accept/reject (P2)",
+      "followUp": "follow-up: RTF revision nodes and accept/reject",
       "reason": "RTF revision marks are read by the native model but not yet projected"
     },
     {
@@ -1760,77 +1760,77 @@
       "subject": "element",
       "element": "watermark",
       "code": "unsupported_capability",
-      "followUp": "record 0328 follow-up: the RTF header WordArt watermark",
+      "followUp": "follow-up: the RTF header WordArt watermark",
       "reason": "a watermark is a header shape the story reads do not project"
     },
     {
       "subject": "element",
       "element": "chart",
       "code": "unsupported_capability",
-      "followUp": "record 0328 (deferred-P1): RTF charts as chart nodes",
+      "followUp": "RTF charts as chart nodes",
       "reason": "embedded charts are kept as objects; they are not projected as chart nodes"
     },
     {
       "subject": "element",
       "element": "series",
       "code": "unsupported_capability",
-      "followUp": "record 0328 (deferred-P1): RTF charts as chart nodes",
+      "followUp": "RTF charts as chart nodes",
       "reason": "chart series follow the chart gap"
     },
     {
       "subject": "element",
       "element": "axis",
       "code": "unsupported_capability",
-      "followUp": "record 0328 (deferred-P1): RTF charts as chart nodes",
+      "followUp": "RTF charts as chart nodes",
       "reason": "chart axes follow the chart gap"
     },
     {
       "subject": "element",
       "element": "bookmarkEnd",
       "code": "unsupported_capability",
-      "followUp": "record 0328 (deferred-P1)",
+      "followUp": "not supported yet",
       "reason": "a bookmark is one node over its start and end; a standalone end marker is not addressed on its own"
     },
     {
       "subject": "element",
       "element": "permStart",
       "code": "unsupported_capability",
-      "followUp": "record 0328 (deferred-P1)",
+      "followUp": "not supported yet",
       "reason": "RTF editing-permission ranges are not projected as nodes"
     },
     {
       "subject": "element",
       "element": "ptab",
       "code": "unsupported_capability",
-      "followUp": "record 0328 (deferred-P1)",
+      "followUp": "not supported yet",
       "reason": "positional tabs are not projected as nodes"
     },
     {
       "subject": "element",
       "element": "col",
       "code": "unsupported_capability",
-      "followUp": "record 0328 (deferred-P1)",
+      "followUp": "not supported yet",
       "reason": "table columns are not nodes; cell widths are read on each cell"
     },
     {
       "subject": "element",
       "element": "fieldChar",
       "code": "unsupported_capability",
-      "followUp": "none: out of scope (record 0332)",
+      "followUp": "none: out of scope",
       "reason": "a complex field is one field node; its field-character and instruction parts are not separate elements"
     },
     {
       "subject": "element",
       "element": "instrText",
       "code": "unsupported_capability",
-      "followUp": "none: out of scope (record 0332)",
+      "followUp": "none: out of scope",
       "reason": "a complex field is one field node; its field-character and instruction parts are not separate elements"
     },
     {
       "subject": "element",
       "element": "diagram",
       "code": "unsupported_path",
-      "followUp": "none: out of scope (record 0332, design §10)",
+      "followUp": "none: out of scope",
       "reason": "OfficeCLI's diagram renders Mermaid text into shapes or a picture; rendering is outside the unified API"
     },
     {
@@ -1839,7 +1839,7 @@
       "element": "run",
       "context": "native-source-closure",
       "code": "unsupported_capability",
-      "followUp": "M6 RTF rich run preservation",
+      "followUp": "RTF rich run preservation",
       "reason": "changed run text/formatting requires an ordinary uncompressed body without dependent destinations, review content, inline line breaks or paragraph style/list references; run text containing paragraph/line-break controls, native mixed-operation composition and durable replay remain unsupported; opaque body syntax is preserved when outside changed source spans with projectable UTF-8 anchors"
     },
     {
@@ -1848,7 +1848,7 @@
       "element": "paragraph",
       "context": "native-source-closure",
       "code": "unsupported_capability",
-      "followUp": "M6 RTF rich paragraph preservation",
+      "followUp": "RTF rich paragraph preservation",
       "reason": "paragraph text, alignment and layout updates require the native editor to prove the source formatting and destination closure"
     },
     {
@@ -1857,7 +1857,7 @@
       "element": "paragraph",
       "context": "native-source-closure",
       "code": "unsupported_capability",
-      "followUp": "M6 RTF rich paragraph preservation",
+      "followUp": "RTF rich paragraph preservation",
       "reason": "paragraph removal requires the native editor to prove an ordinary literal body and retain every unselected source boundary"
     },
     {
@@ -1866,7 +1866,7 @@
       "element": "paragraph",
       "context": "native-source-closure",
       "code": "unsupported_capability",
-      "followUp": "M6 RTF rich paragraph preservation",
+      "followUp": "RTF rich paragraph preservation",
       "reason": "paragraph insertion requires the native editor to prove the ordinary literal body and preserve every unselected source boundary"
     },
     {
@@ -1875,7 +1875,7 @@
       "element": "body",
       "context": "native-source-closure",
       "code": "unsupported_capability",
-      "followUp": "M6 RTF rich paragraph preservation",
+      "followUp": "RTF rich paragraph preservation",
       "reason": "paragraph swapping requires the native editor to prove an ordinary plain body and preserve paragraph order and boundaries"
     },
     {
@@ -1884,7 +1884,7 @@
       "element": "run",
       "context": "native-source-closure",
       "code": "unsupported_capability",
-      "followUp": "M6 RTF rich run preservation",
+      "followUp": "RTF rich run preservation",
       "reason": "run removal preserves containing paragraphs through native empty text replacement; dependent destinations, compressed transport, inline line breaks, paragraph style/list references and opaque syntax overlapping changed source spans remain unsupported; opaque boundary anchors are projected through text edits"
     },
     {
@@ -1893,7 +1893,7 @@
       "element": "run",
       "context": "native-run-edit",
       "code": "unsupported_capability",
-      "followUp": "M6 RTF atomic native run edits",
+      "followUp": "RTF atomic native run edits",
       "reason": "run reordering requires an atomic native character-run editor that preserves paragraph boundaries and formatting controls"
     },
     {
@@ -1902,7 +1902,7 @@
       "element": "run",
       "context": "native-run-edit",
       "code": "unsupported_capability",
-      "followUp": "M6 RTF atomic native run edits",
+      "followUp": "RTF atomic native run edits",
       "reason": "run swapping requires an atomic native character-run editor that preserves paragraph boundaries and formatting controls"
     },
     {
@@ -1911,7 +1911,7 @@
       "element": "paragraph",
       "context": "style-application",
       "code": "unsupported_capability",
-      "followUp": "record 0275 follow-up: native RTF style application",
+      "followUp": "follow-up: native RTF style application",
       "reason": "paragraph `style`, `numId` and `numLevel` are read-only: applying a style or list requires emitting the referenced definition's properties with the handle"
     },
     {
@@ -1920,7 +1920,7 @@
       "element": "run",
       "context": "style-application",
       "code": "unsupported_capability",
-      "followUp": "record 0275 follow-up: native RTF style application",
+      "followUp": "follow-up: native RTF style application",
       "reason": "run `rStyle` is read-only: applying a character style requires emitting its formatting with the `\\cs` handle"
     },
     {
@@ -1929,7 +1929,7 @@
       "element": "paragraph",
       "context": "table-cell-paragraphs",
       "code": "unsupported_capability",
-      "followUp": "record 0275 follow-up: native RTF table structure editor",
+      "followUp": "follow-up: native RTF table structure editor",
       "reason": "table cells expose their flat text story; per-paragraph cell nodes (`tc/p`) are not projected"
     },
     {
@@ -1938,7 +1938,7 @@
       "element": "run",
       "context": "header-footer-runs",
       "code": "unsupported_capability",
-      "followUp": "M6 RTF rich run preservation",
+      "followUp": "RTF rich run preservation",
       "reason": "header/footer paragraphs expose text only; their character runs are not projected"
     },
     {
@@ -1947,7 +1947,7 @@
       "element": "cell",
       "context": "native-source-closure",
       "code": "unsupported_capability",
-      "followUp": "record 0275 follow-up: native RTF table structure editor",
+      "followUp": "follow-up: native RTF table structure editor",
       "reason": "cell text is spliced into the retained source; cells whose text range contains paragraph resets, destinations or unbalanced groups, nested-table cells, compressed or non-ASCII transports are refused, and cell properties other than `text` are read-only"
     },
     {
@@ -1956,7 +1956,7 @@
       "element": "table",
       "context": "native-table-structure",
       "code": "unsupported_capability",
-      "followUp": "record 0275 follow-up: native RTF table structure editor",
+      "followUp": "follow-up: native RTF table structure editor",
       "reason": "the native RTF editor cannot insert tables"
     },
     {
@@ -1965,7 +1965,7 @@
       "element": "table",
       "context": "native-table-structure",
       "code": "unsupported_capability",
-      "followUp": "record 0275 follow-up: native RTF table structure editor",
+      "followUp": "follow-up: native RTF table structure editor",
       "reason": "the native RTF editor cannot remove tables"
     },
     {
@@ -1974,7 +1974,7 @@
       "element": "table",
       "context": "native-table-structure",
       "code": "unsupported_capability",
-      "followUp": "record 0275 follow-up: native RTF table structure editor",
+      "followUp": "follow-up: native RTF table structure editor",
       "reason": "table and row properties are read-only"
     },
     {
@@ -1983,7 +1983,7 @@
       "element": "row",
       "context": "native-table-structure",
       "code": "unsupported_capability",
-      "followUp": "record 0275 follow-up: native RTF table structure editor",
+      "followUp": "follow-up: native RTF table structure editor",
       "reason": "the native RTF editor cannot insert or remove rows or cells"
     },
     {
@@ -1992,7 +1992,7 @@
       "element": "header",
       "context": "native-source-closure",
       "code": "unsupported_capability",
-      "followUp": "record 0275 follow-up: native RTF story lifecycle editor",
+      "followUp": "follow-up: native RTF story lifecycle editor",
       "reason": "header/footer text is spliced per paragraph; a multi-paragraph story is set through `/header[N]/p[M]`, and stories with drawings, fields or page-number events are refused"
     },
     {
@@ -2001,7 +2001,7 @@
       "element": "header",
       "context": "native-story-lifecycle",
       "code": "unsupported_capability",
-      "followUp": "record 0275 follow-up: native RTF story lifecycle editor",
+      "followUp": "follow-up: native RTF story lifecycle editor",
       "reason": "the native RTF editor cannot create or remove header/footer stories"
     },
     {
@@ -2010,7 +2010,7 @@
       "element": "footnote",
       "context": "native-source-closure",
       "code": "unsupported_capability",
-      "followUp": "record 0275 follow-up: native RTF story lifecycle editor",
+      "followUp": "follow-up: native RTF story lifecycle editor",
       "reason": "note text is spliced into the retained source; notes with drawings, fields or page breaks are refused"
     },
     {
@@ -2019,7 +2019,7 @@
       "element": "footnote",
       "context": "native-story-lifecycle",
       "code": "unsupported_capability",
-      "followUp": "record 0275 follow-up: native RTF story lifecycle editor",
+      "followUp": "follow-up: native RTF story lifecycle editor",
       "reason": "the native RTF editor cannot insert or remove footnotes or endnotes"
     },
     {
@@ -2028,7 +2028,7 @@
       "element": "comment",
       "context": "native-story-lifecycle",
       "code": "unsupported_capability",
-      "followUp": "record 0275 follow-up: native RTF story lifecycle editor",
+      "followUp": "follow-up: native RTF story lifecycle editor",
       "reason": "the native RTF editor cannot insert or remove comments"
     },
     {
@@ -2037,7 +2037,7 @@
       "element": "hyperlink",
       "context": "native-field-editor",
       "code": "unsupported_capability",
-      "followUp": "record 0275 follow-up: native RTF field instruction editor",
+      "followUp": "follow-up: native RTF field instruction editor",
       "reason": "hyperlink targets and results are read-only field metadata"
     },
     {
@@ -2046,7 +2046,7 @@
       "element": "hyperlink",
       "context": "native-field-editor",
       "code": "unsupported_capability",
-      "followUp": "record 0275 follow-up: native RTF field instruction editor",
+      "followUp": "follow-up: native RTF field instruction editor",
       "reason": "the native RTF editor cannot insert or remove hyperlink fields"
     },
     {
@@ -2055,7 +2055,7 @@
       "element": "picture",
       "context": "native-picture-insertion",
       "code": "unsupported_capability",
-      "followUp": "record 0275 follow-up: native RTF picture insertion",
+      "followUp": "follow-up: native RTF picture insertion",
       "reason": "the native RTF editor cannot insert `\\pict` groups; existing payloads can be replaced natively at equal size only"
     },
     {
@@ -2064,7 +2064,7 @@
       "element": "picture",
       "context": "native-picture-properties",
       "code": "unsupported_capability",
-      "followUp": "record 0275 follow-up: native RTF picture insertion",
+      "followUp": "follow-up: native RTF picture insertion",
       "reason": "picture extent and format are read-only"
     },
     {
@@ -2073,7 +2073,7 @@
       "element": "picture",
       "context": "native-source-closure",
       "code": "unsupported_capability",
-      "followUp": "record 0275 follow-up: native RTF picture insertion",
+      "followUp": "follow-up: native RTF picture insertion",
       "reason": "picture removal requires every picture to be a standalone hexadecimal PNG/JPEG body group (no fields, shapes, objects, wrappers or binary payloads) and at most 64 pictures per transaction"
     },
     {
@@ -2082,7 +2082,7 @@
       "element": "style",
       "context": "native-stylesheet-editor",
       "code": "unsupported_capability",
-      "followUp": "record 0275 follow-up: native RTF style application",
+      "followUp": "follow-up: native RTF style application",
       "reason": "stylesheet entries are read-only"
     },
     {
@@ -2091,7 +2091,7 @@
       "element": "style",
       "context": "native-stylesheet-editor",
       "code": "unsupported_capability",
-      "followUp": "record 0275 follow-up: native RTF style application",
+      "followUp": "follow-up: native RTF style application",
       "reason": "the native RTF editor cannot add or remove stylesheet entries"
     },
     {
@@ -2100,7 +2100,7 @@
       "element": "abstractNum",
       "context": "native-list-editor",
       "code": "unsupported_capability",
-      "followUp": "record 0275 follow-up: native RTF list editor",
+      "followUp": "follow-up: native RTF list editor",
       "reason": "list definitions, overrides and levels are read-only"
     },
     {
@@ -2109,7 +2109,7 @@
       "element": "abstractNum",
       "context": "native-list-editor",
       "code": "unsupported_capability",
-      "followUp": "record 0275 follow-up: native RTF list editor",
+      "followUp": "follow-up: native RTF list editor",
       "reason": "the native RTF editor cannot add or remove lists"
     },
     {
@@ -2118,7 +2118,7 @@
       "element": "body",
       "context": "table-order",
       "code": "unsupported_capability",
-      "followUp": "record 0275 follow-up: native RTF table structure editor",
+      "followUp": "follow-up: native RTF table structure editor",
       "reason": "the native model keeps tables apart from the paragraph flow, so `/body` lists paragraphs before tables rather than in source order"
     },
     {
@@ -2127,49 +2127,49 @@
       "element": "cell",
       "context": "nested-table-cells",
       "code": "unsupported_capability",
-      "followUp": "record 0275 follow-up: native RTF table structure editor",
+      "followUp": "follow-up: native RTF table structure editor",
       "reason": "nested-table cells are neither projected nor editable"
     },
     {
       "subject": "view",
       "mode": "issues",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the issues view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "forms",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the forms view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "html",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "svg",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "screenshot",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "pdf",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     }
   ],
@@ -2206,7 +2206,7 @@
         "set": true,
         "writeGap": {
           "code": "unsupported_capability",
-          "followUp": "record 0010 Q3: an owner-approved regular-expression dependency",
+          "followUp": "an owner-approved regular-expression dependency",
           "reason": "Litchi has no approved regular-expression engine; `regex=true` and OfficeCLI's `r\"...\"` patterns are refused"
         }
       }

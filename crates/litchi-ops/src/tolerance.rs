@@ -1,5 +1,5 @@
 //! Format-neutral access to the repairs a read performed, moved from the
-//! `litchi` facade's `tolerance` module (M0a step S6).
+//! `litchi` facade's `tolerance` module.
 //!
 //! Every format crate applies reference-compatible repairs to non-structural
 //! deviations and *records* each one in its own bounded `ToleranceReport`
@@ -74,8 +74,8 @@ pub enum ToleranceReport {
     /// OpenDocument Spreadsheet (`.ods`).
     #[cfg(feature = "ods")]
     Ods(litchi_odf_common::ToleranceReport),
-    /// An OpenDocument drawing, chart, image, database or formula (record
-    /// 0282), with the format it was read as.
+    /// An OpenDocument drawing, chart, image, database or formula, with
+    /// the format it was read as.
     #[cfg(odf_objects)]
     Object(FileFormat, litchi_odf_common::ToleranceReport),
     /// A format whose reader keeps no repair report: the Apple iWork

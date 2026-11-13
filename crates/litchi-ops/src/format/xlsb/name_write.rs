@@ -1,4 +1,4 @@
-//! Immutable XLSB defined-name writes (record 0261).
+//! Immutable XLSB defined-name writes.
 //!
 //! `add("/", namedrange, {name, ref, scope?})` sets a defined name that
 //! refers to a worksheet range (`Sheet1!$A$1:$B$5`), `set("/namedrange[N]",

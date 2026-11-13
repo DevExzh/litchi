@@ -1,4 +1,4 @@
-//! CSV/TSV import through `File::import` (record 0266): one atomic commit per
+//! CSV/TSV import through `File::import`: one atomic commit per
 //! import into XLSX, XLSB and XLS, exact no-ops, typed refusals and limits.
 #![cfg(all(feature = "xlsx", feature = "xlsb", feature = "xls", feature = "docx"))]
 

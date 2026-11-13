@@ -1,12 +1,12 @@
-//! Property assignments of `set` and `add` (record 0015 §2.1, §3.3): a
-//! [`Key`], a [`PropValue`], the owned list [`Props`], the conversion trait
-//! [`IntoProps`] and the [`props!`](crate::props!) macro.
+//! Property assignments of `set` and `add`: a [`Key`], a [`PropValue`], the
+//! owned list [`Props`], the conversion trait [`IntoProps`] and the
+//! [`props!`](crate::props!) macro.
 //!
 //! Nothing here looks a key up or coerces a value: the property registry
-//! does both when a verb stages the assignment (step W2). These types carry
-//! what the caller wrote, borrowing it where they can, so that building and
-//! reading an assignment list with static keys allocates nothing beyond the
-//! values the caller allocated itself.
+//! does both when a verb stages the assignment. These types carry what the
+//! caller wrote, borrowing it where they can, so that building and reading
+//! an assignment list with static keys allocates nothing beyond the values
+//! the caller allocated itself.
 
 use std::borrow::Cow;
 use std::fmt;
@@ -195,15 +195,15 @@ impl fmt::Display for Key<'_> {
 /// The value of one property assignment, as the caller gave it.
 ///
 /// The registry coerces it through the key's value type when the verb
-/// stages the assignment (record 0015 §3.3): text goes through the type's
+/// stages the assignment: text goes through the type's
 /// parser (`"12pt"`, `"1F4E79"`, `"true"`); a typed value of the key's own
 /// type is used as is; a typed value of another type is rendered to its
 /// canonical text ([`Display`](fmt::Display)) and coerced, so `12` for a
 /// length key means the key's bare-number unit, as the text `"12"` would.
 /// [`PropValue::Null`] clears the property where the property allows it.
 /// An invalid value is refused with `invalid_value`, naming the key;
-/// nothing is clamped or repaired (decision D4), and a non-finite number is
-/// invalid for every key.
+/// nothing is clamped or repaired, and a non-finite number is invalid for
+/// every key.
 ///
 /// `From` covers `bool`, Rust's integer and floating-point scalars, `&str`,
 /// `String`, [`Length`] and [`Color`]; an integer literal is an `i32`.  Wide
@@ -247,8 +247,8 @@ pub enum PropValue<'a> {
     /// A colour.
     Color(Color),
     /// A list of text items (a JSON array of strings, a Python list): the
-    /// metadata `keywords` (record 0354). A list key also takes text, which
-    /// the format splits at `;` and `,`.
+    /// metadata `keywords`. A list key also takes text, which the format
+    /// splits at `;` and `,`.
     List(Cow<'a, [String]>),
 }
 
@@ -358,8 +358,8 @@ impl fmt::Display for PropValue<'_> {
     }
 }
 
-/// The keyword list a `keywords` assignment names (record 0354): a list's
-/// items (whitespace-only items dropped), text split at `;` and `,`
+/// The keyword list a `keywords` assignment names: a list's items
+/// (whitespace-only items dropped), text split at `;` and `,`
 /// (`litchi_core::metadata::keywords::split`), and the empty list for
 /// `null`. `None` for any other kind of value.
 #[cfg_attr(
@@ -511,7 +511,7 @@ impl<'a> PropValue<'a> {
         }
         // A typed length is the value its text reads as; take it without the
         // text whenever that read is certain to succeed, so registry
-        // validation and errors stay the text route's (record 0326).
+        // validation and errors stay the text route's.
         if let (Self::Length(value), ValueType::Length(spec)) = (self, ty)
             && let Some(length) = value.coerced_in(spec.context)
         {
@@ -1222,8 +1222,7 @@ impl<'de> Visitor<'de> for ValueVisitor {
         formatter.write_str("a property value: a string, number, boolean, array of strings or null")
     }
 
-    /// An array of strings: a [`PropValue::List`] (the metadata keywords,
-    /// record 0354).
+    /// An array of strings: a [`PropValue::List`] (the metadata keywords).
     fn visit_seq<A: SeqAccess<'de>>(
         self,
         mut seq: A,
@@ -1401,9 +1400,9 @@ mod tests {
     use super::*;
     use crate::value::{Color, LengthContext, LengthSpec, LengthStyle};
 
-    /// Record 0326: a typed length coerces as the text it prints as, value
-    /// and error alike, in every length context, whether or not it takes the
-    /// direct route.
+    /// A typed length coerces as the text it prints as, value and error
+    /// alike, in every length context, whether or not it takes the direct
+    /// route.
     #[test]
     fn typed_lengths_coerce_as_their_text() {
         fn outcome(value: &PropValue<'_>, ty: ValueType) -> String {

@@ -266,7 +266,7 @@
       "element": "shape",
       "context": "a shape other than a text rectangle",
       "code": "unsupported_capability",
-      "followUp": "0282 ODG typed shape creation",
+      "followUp": "ODG typed shape creation",
       "reason": "the adapter adds text rectangles; other geometries need typed shape values"
     },
     {
@@ -275,7 +275,7 @@
       "element": "shape",
       "context": "a group member, or a shape whose identity a connector or link on its page names, into another page",
       "code": "unsupported_capability",
-      "followUp": "0292 ODG cross-page reference rewriting",
+      "followUp": "ODG cross-page reference rewriting",
       "reason": "a shape moves to another page with its bytes unchanged; group members move with their group, and an identity dependency that would cross pages is refused rather than left dangling"
     },
     {
@@ -284,7 +284,7 @@
       "element": "shape",
       "context": "two groups on different pages",
       "code": "unsupported_capability",
-      "followUp": "0292 ODG cross-page group swap",
+      "followUp": "ODG cross-page group swap",
       "reason": "a cross-page swap is two transfers addressed by position; two group subtrees shift each other's positions, so move them one at a time"
     },
     {
@@ -293,7 +293,7 @@
       "element": "page",
       "context": "a page another page's `draw:page-name` names",
       "code": "unsupported_capability",
-      "followUp": "0288 ODG reference rewriting",
+      "followUp": "ODG reference rewriting",
       "reason": "the leaf refuses removing a page a link or thumbnail references rather than leaving it dangling"
     },
     {
@@ -302,49 +302,49 @@
       "element": "metadata",
       "context": "path-read",
       "code": "unsupported_capability",
-      "followUp": "0288 ODF object metadata node",
+      "followUp": "ODF object metadata node",
       "reason": "`set(\"/metadata\", ..)` writes meta.xml through the ODF metadata family; the path is set-only, and reads go through File::metadata()"
     },
     {
       "subject": "view",
       "mode": "issues",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the issues view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "forms",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the forms view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "html",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "svg",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "screenshot",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "pdf",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     }
   ],
@@ -353,7 +353,7 @@
     "support": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0295 follow-up: a find adapter over the format's text edits",
+      "followUp": "follow-up: a find adapter over the format's text edits",
       "reason": "find/replace is not integrated for this format"
     },
     "keywords": {
@@ -384,7 +384,7 @@
         "set": true,
         "writeGap": {
           "code": "unsupported_capability",
-          "followUp": "record 0010 Q3: an owner-approved regular-expression dependency",
+          "followUp": "an owner-approved regular-expression dependency",
           "reason": "Litchi has no approved regular-expression engine; `regex=true` and OfficeCLI's `r\"...\"` patterns are refused"
         }
       }

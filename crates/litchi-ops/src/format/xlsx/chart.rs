@@ -1,4 +1,4 @@
-//! Typed worksheet chart CRUD (record 0270).
+//! Typed worksheet chart CRUD.
 //!
 //! - `add(/Sheet1, chart, {chartType, title, data | dataRange, categories,
 //!   legend, catTitle, axisTitle, name, x, y, width, height})` builds an
@@ -210,8 +210,7 @@ pub(crate) enum ChartSetter {
     Format(shared::FormatKey),
     /// `series{N}`, by its zero-based number.
     Numbered(u8),
-    /// `series{N}.name`, `.values` or `.color`, by the zero-based number
-    /// (record 0271).
+    /// `series{N}.name`, `.values` or `.color`, by the zero-based number.
     Dotted(u8, shared::SeriesField),
 }
 
@@ -677,8 +676,8 @@ impl Xlsx {
         let mut origin = [0_u32; 2];
         let mut span = [8_u32, 15];
         let mut assigned = shared::Assigned::default();
-        // `series{N}.values` given as a cell range, on any sheet (record
-        // 0338): the series number and the range's absolute reference.
+        // `series{N}.values` given as a cell range, on any sheet:
+        // the series number and the range's absolute reference.
         let mut references: Vec<(usize, String, &'static str)> = Vec::new();
         // Range-backed series are admitted before the native workbook is
         // promoted.  The promoted owner is then reused for every range read
@@ -986,7 +985,7 @@ impl Xlsx {
     }
 
     /// Read the values of a `series{N}.values` cell range (`Sheet1!B2:B13`,
-    /// `'My Data'!$C$1:$C$4` or `B2:B5` on the chart's sheet; record 0338):
+    /// `'My Data'!$C$1:$C$4` or `B2:B5` on the chart's sheet):
     /// the values as inline text the shared admission parses, and the
     /// range's absolute reference the chart refers to. The range is one row
     /// or one column; a cell without a number reads as 0, as `dataRange`.

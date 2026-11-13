@@ -717,8 +717,8 @@ fn formatting_flushes_before_native_operation_capacity_and_charges_one_snapshot_
     ]"#,
     );
     let file = open(true);
-    // One more than the native per-edit operation bound (65,536 since
-    // record 0251f), which is above the default batch bound.
+    // One more than the native per-edit operation bound (65,536),
+    // which is above the default batch bound.
     let wide = SemanticLimits::builder()
         .max_operations(65_537)
         .unwrap()
@@ -1688,7 +1688,7 @@ fn cached_run_command_skips_closed_nested_field_and_stops_at_end() {
     }
 }
 
-/// Record 0355a: `text` on direct body paragraphs joins the coalesced run.
+/// `text` on direct body paragraphs joins the coalesced run.
 /// A batch still equals its items applied one at a time, including run
 /// paths inside a paragraph whose text the run replaced (a barrier), a
 /// repeated paragraph, formatting between texts, both owners, both modes,

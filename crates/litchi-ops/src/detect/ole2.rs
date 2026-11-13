@@ -46,7 +46,7 @@ pub(crate) fn detect_ole2_format_from_reader<R: Read + Seek>(
     // These checks follow the OLE2 specification and known stream names
 
     // An encrypted OOXML package is no legacy document, even beside the
-    // stub `WordDocument` stream Word 2007 writes (record 0341).
+    // stub `WordDocument` stream Word 2007 writes.
     if ole_file.exists(&["EncryptionInfo"]) && ole_file.exists(&["EncryptedPackage"]) {
         return None;
     }

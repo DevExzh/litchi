@@ -1,5 +1,5 @@
-//! `dump`, `raw`, `raw-set`, `add-part` and `validate` (record 0336): one
-//! `litchi-ops` call each.
+//! `dump`, `raw`, `raw-set`, `add-part` and `validate`: one `litchi-ops` call
+//! each.
 
 use std::io::Write;
 use std::path::Path;
@@ -17,9 +17,7 @@ pub(crate) fn dump(args: &cli::Dump, json: bool, out: &mut impl Write) -> Result
     if args.path != "/" {
         return Err(
             Error::new(Code::UnsupportedPath, "dump covers the whole document only")
-                .with_suggestion(
-                    "dump `/` (the default); subtree dumps are a record 0336 follow-up",
-                ),
+                .with_suggestion("dump `/` (the default); subtree dumps are not supported yet"),
         );
     }
     let file = litchi_ops::open(&args.file)?;

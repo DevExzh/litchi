@@ -1,4 +1,4 @@
-//! Unified blank-slide insertion for legacy PowerPoint (record 0260).
+//! Unified blank-slide insertion for legacy PowerPoint.
 
 #![cfg(feature = "ppt")]
 

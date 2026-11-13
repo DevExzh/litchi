@@ -485,8 +485,8 @@ fn fanout_write_proofs_load_at_most_one_body_per_admission() {
     use crate::format::docx::nav::BODY_LOADS;
     for eager in [true, false] {
         let handle = open(eager);
-        // Paragraphs reuse the body index they were resolved from (record
-        // 0251f); runs read it once per admission.
+        // Paragraphs reuse the body index they were resolved from;
+        // runs read it once per admission.
         for (selector, loads_expected) in [("/body/p", 0), ("/body/p/r", 1)] {
             let query = crate::query::Query::parse(selector).unwrap();
             let target = query.into_target().unwrap();
@@ -525,7 +525,7 @@ fn find_main_story_admits_the_snapshot_budget_before_rewrite() {
     assert_eq!(error.code(), crate::Code::LimitExceeded);
 }
 
-/// The direct `/body/p[N]` text route of `File::set` (record 0305) publishes
+/// The direct `/body/p[N]` text route of `File::set` publishes
 /// exactly what the general route publishes, and fails exactly as it does:
 /// the first paragraphs and the last of every DOCX fixture, one past the
 /// last, values the text coercion accepts and refuses, and spellings and

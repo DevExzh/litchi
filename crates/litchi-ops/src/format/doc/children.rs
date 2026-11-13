@@ -54,7 +54,7 @@ impl<'f> Children<'f> {
     /// The children of `parent` of the kinds in `kinds` (and the containers
     /// that lead to them); `None` lists every child.
     /// Views (`kinds` is `None`) list the structural kinds only; the parts
-    /// and marks of record 0324 are listed when a query asks for them.
+    /// and marks are listed when a query asks for them.
     pub(super) fn filtered(parent: &Node<'f>, kinds: Option<KindSet<Kind>>) -> Self {
         let wants = |kind: Kind| kinds.map_or(kind.is_structural(), |kinds| kinds.contains(kind));
         let doc = parent.doc;

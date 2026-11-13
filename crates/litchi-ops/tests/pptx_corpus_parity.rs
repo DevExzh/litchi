@@ -1,4 +1,4 @@
-//! PPTX writes the OfficeCLI example corpus needed (record 0269): text-box
+//! PPTX writes the OfficeCLI example corpus needed: text-box
 //! formatting, fill and preset geometry on `add`, shape fill and geometry on
 //! `set`, OfficeCLI's shape aliases (`w`, `h`, `fontSize`, `preset`), and
 //! slide transitions on `set`. Each runs through both native owner
@@ -173,7 +173,7 @@ fn slide_transitions_set_and_clear() {
                 .set("/slide[1]", props! { "transition" => clear.clone() })
                 .unwrap();
             // The leaf clears the active branch of a markup-compatibility
-            // owner and keeps its fallback for older readers (record 0269).
+            // owner and keeps its fallback for older readers.
             let xml = slide_xml(&cleared);
             assert!(!xml.contains("morph"), "{xml}");
             assert!(

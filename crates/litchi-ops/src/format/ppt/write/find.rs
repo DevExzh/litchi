@@ -1,4 +1,4 @@
-//! PPT find/replace and template merge (record 0295) over the shared text
+//! PPT find/replace and template merge over the shared text
 //! surface (`crate::find::surface`).
 //!
 //! The binary text atom of a shape holds its paragraphs separated by

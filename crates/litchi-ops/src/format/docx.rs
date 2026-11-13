@@ -1,8 +1,8 @@
 //! Handle for Word OOXML (`.docx`) inputs.
 //!
-//! [`Docx`] is one `Arc` over its state: the two-state owner of record
-//! 0003 §2.3 (`Source` for the deferred, source-backed package; `Eager` for
-//! the owning package), the metadata and tolerance sidecars of §1.6, and the
+//! [`Docx`] is one `Arc` over its state: the two-state owner
+//! (`Source` for the deferred, source-backed package; `Eager` for
+//! the owning package), the metadata and tolerance sidecars, and the
 //! retention policy from [`OpenOptions`]. Cloning bumps one reference count.
 //!
 //! # Routes
@@ -19,7 +19,7 @@
 //! `SourceMode::Eager` reaches this handle through the eager detection
 //! route, so the owning package keeps the input's ZIP layout. Only
 //! `open_prepared` under `SourceMode::Eager` still converts a source-backed
-//! package with `to_owned_package()` (record 0008 A5), because its package
+//! package with `to_owned_package()`, because its package
 //! is already indexed.
 //!
 //! # Source freshness
@@ -46,15 +46,15 @@
 //! # Unified reads
 //!
 //! The handle's typed nodes ([`Node`], [`Kind`]) are what `File::get`,
-//! `File::find` and `File::query` return for a DOCX document (record 0010
-//! §4.5). Paths address the main story on the markup-compatibility-visible
-//! view (decision D4): `/body/p[N]` is the Nth direct body paragraph, with
+//! `File::find` and `File::query` return for a DOCX document.
+//! Paths address the main story on the markup-compatibility-visible
+//! view: `/body/p[N]` is the Nth direct body paragraph, with
 //! `w:customXml` wrappers flattened and display equations counted as
 //! `oMathPara[N]` instead; `/body/tbl[N]/tr[M]/tc[K]/p[J]`, `/body/sdt[N]`,
 //! `/body/p[N]/r[M]` (OfficeCLI's run set) and `/body/p[N]/hyperlink[M]`
 //! follow the same rules, and `p[@paraId=…]`/`sdt[@sdtId=…]` select by
 //! identity. A node keeps the leaf values it was read from and nothing
-//! else, so the leaf's memos stay the only caches (record 0010 §3.3).
+//! else, so the leaf's memos stay the only caches.
 
 use std::fmt;
 use std::path::Path;
@@ -70,7 +70,7 @@ use crate::error::{Code, Error, Result, Source};
 use crate::options::{OpenOptions, SourceMode};
 use crate::transaction::{Error as TransactionError, LimitKind};
 
-// The unified read adapter (M1 step R4a): element kinds and spec table,
+// The unified read adapter: element kinds and spec table,
 // typed nodes, path resolution and query access, the node view's members,
 // and the view modes.
 #[cfg(feature = "test-support")]
@@ -129,8 +129,8 @@ pub(crate) struct DocxState {
     /// Failures are not cached, and source fences guard every use.
     unsigned: OnceLock<litchi_docx::Package>,
     /// The owning package a source-backed owner materializes for the writes
-    /// that publish package-graph changes, built on the first such write
-    /// (record 0274). Source fences guard every use.
+    /// that publish package-graph changes, built on the first such write.
+    /// Source fences guard every use.
     promoted: OnceLock<litchi_docx::Package>,
     /// The eager owner's open-time report. A source-backed report keeps
     /// growing as deferred parts are read, so it is never cached.
@@ -144,20 +144,20 @@ pub(crate) struct DocxState {
     #[cfg(feature = "markdown")]
     markdown: OnceLock<Box<litchi_docx::Package>>,
     /// The OPC read limits of the open, which an unsigned copy is opened
-    /// under (record 0013).
+    /// under.
     ooxml_limits: SourceLimits,
     /// The eager owner's body block index, read on the first path step that
-    /// needs it (record 0286). The owning package never changes under a
+    /// needs it. The owning package never changes under a
     /// handle, so the index stays valid; a source-backed owner is not cached
     /// here, because its reads are fenced against the source.
     body: OnceLock<litchi_docx::Blocks>,
     /// The styles, numbering, story and notes parts the unified adapter has
-    /// read (record 0319), each on first use. A source-backed owner's reads
+    /// read, each on first use. A source-backed owner's reads
     /// through them are still fenced against the source.
     parts: parts::Cache,
 }
 
-/// What a DOCX write starts from (M2).
+/// What a DOCX write starts from.
 pub(crate) enum DocxEditor {
     /// An isolated main-document edit over the handle's own owner, whose
     /// commit publishes through that owner.
@@ -182,7 +182,7 @@ impl fmt::Debug for DocxEditor {
     }
 }
 
-/// The two owner states of a DOCX handle (record 0003 §2.3).
+/// The two owner states of a DOCX handle.
 #[allow(
     clippy::large_enum_variant,
     reason = "one owner per handle, inside its `Arc`; boxing the source owner would add an indirection to every read"
@@ -192,7 +192,7 @@ pub(crate) enum DocxOwner {
     Source(Box<source_backed::Package>),
     /// The owning package, validated by one text pass at open. Unboxed: the
     /// package is a few handles, and a commit adopts it without an
-    /// allocation (record 0305).
+    /// allocation.
     Eager(litchi_docx::Package),
 }
 
@@ -210,7 +210,7 @@ impl DocxOwner {
     /// [`crate::path::fence::Scope`] with [`Self::fence_key`]), whose bracket
     /// checks the source once after the whole step, the result passes
     /// through unchecked: the step's closing check observes a change made
-    /// before or during the read, and its error wins (records 0262, 0315).
+    /// before or during the read, and its error wins.
     pub(crate) fn finish<T>(&self, result: Result<T>) -> Result<T> {
         if crate::path::fence::is_active(self.fence_key()) {
             return normalize_transaction_limit(result);
@@ -472,7 +472,7 @@ impl Docx {
         self.0.body.get_or_init(|| blocks)
     }
 
-    /// The part elements this handle has read (record 0319).
+    /// The part elements this handle has read.
     pub(crate) fn parts(&self) -> &parts::Cache {
         &self.0.parts
     }
@@ -499,7 +499,7 @@ impl Docx {
         Self(self.0.removal_authorized())
     }
 
-    /// This handle's signature disposition (record 0013).
+    /// This handle's signature disposition.
     pub(crate) fn signature(&self) -> Signature {
         self.0.signature()
     }
@@ -599,7 +599,7 @@ impl Docx {
     }
 
     /// The application properties (`docProps/app.xml`) the root node reads
-    /// as `extended.*` (record 0342). `None` for an absent or invalid part
+    /// as `extended.*`. `None` for an absent or invalid part
     /// (a metadata edit reads the part strictly and reports it), and for a
     /// source owner with edited topology, whose physical archive no longer
     /// answers for it.
@@ -620,7 +620,7 @@ impl Docx {
     }
 
     /// The application- and custom-properties part bytes, which the
-    /// transaction change test compares (record 0342). `None` when they
+    /// transaction change test compares. `None` when they
     /// cannot be read: a source owner with edited topology, or an invalid
     /// property graph.
     pub(crate) fn property_part_bytes(&self) -> Result<Option<[Option<Vec<u8>>; 2]>> {
@@ -700,7 +700,7 @@ impl Docx {
     ///
     /// The inventory owns its values. It does not resolve relationship
     /// targets or compute effective inherited layout. `limits` bound the
-    /// scan (`litchi_docx::section::Limits::default()` for the defaults; record 0362).
+    /// scan (`litchi_docx::section::Limits::default()` for the defaults).
     ///
     /// # Errors
     ///
@@ -739,9 +739,9 @@ impl Docx {
     /// On an unsigned document, both owner states reach the leaf's
     /// `edit` directly, so no container is indexed again. After
     /// [`Signed::unsign`](crate::Signed::unsign) the editor is an owning copy
-    /// whose signature the leaf removed explicitly (record 0013): it is opened
+    /// whose signature the leaf removed explicitly: it is opened
     /// over the exact input bytes, or cloned from the eager owner's package,
-    /// and then `unsign`ed. Write verbs (M2) build on this.
+    /// and then `unsign`ed. Write verbs build on this.
     ///
     /// # Errors
     ///

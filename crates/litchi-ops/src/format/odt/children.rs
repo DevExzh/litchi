@@ -17,8 +17,8 @@ pub(crate) struct Children<'f> {
     /// Ordinals of the structural kinds; parts count their own.
     counters: [u32; Kind::STRUCTURAL],
     axis: Axis<'f>,
-    /// The parts of record 0328 listed after the structural children,
-    /// boxed so a structural listing stays as small as it was.
+    /// The parts listed after the structural children, boxed so a
+    /// structural listing stays as small as it was.
     tail: Option<Box<Tail<'f>>>,
 }
 
@@ -44,10 +44,10 @@ impl<'f> Children<'f> {
         Self::listing(parent, kinds, kinds)
     }
 
-    /// The children a node view lists: every structural child, and the
-    /// parts of a part (a numbering's definitions, a definition's levels),
-    /// never the parts of a structural parent (record 0328 keeps the views
-    /// of the root, the body, paragraphs and tables as they were).
+    /// The children a node view lists: every structural child, and the parts of a
+    /// part (a numbering's definitions, a definition's levels), never the parts of a
+    /// structural parent (the views of the root, the body, paragraphs and tables
+    /// list the structural kinds only).
     pub(super) fn view(parent: &Node<'f>) -> Result<Self> {
         let parts = if parent.kind.is_part() {
             KindSet::ALL

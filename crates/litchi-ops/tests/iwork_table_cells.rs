@@ -1,4 +1,4 @@
-//! Direct table-cell writes (record 0312): a one-value set of a Keynote
+//! Direct table-cell writes: a one-value set of a Keynote
 //! slide-table cell or a Pages body-table cell named by its canonical path
 //! (`/slide[N]/table[M]/tr[R]/tc[C]`, `/body/tbl[N]/tr[R]/tc[C]`) commits
 //! without reading the table. These tests check, on every corpus fixture

@@ -139,8 +139,8 @@ impl Tree {
 /// Builds a [`Tree`] in document order.
 pub(crate) struct TreeBuilder<K: 'static> {
     items: Vec<Item>,
-    /// Children pushed so far per (parent, kind ordinal) (record 0340: a
-    /// push counts in constant time).
+    /// Children pushed so far per (parent, kind ordinal) (a push counts
+    /// in constant time).
     counts: std::collections::HashMap<(u32, u8), usize>,
     elements: &'static [ElementSpec<K>],
     singletons: &'static [K],
@@ -313,7 +313,7 @@ pub(crate) fn length(value: Option<&str>) -> Option<Value<'static>> {
 
 /// An ODF length attribute value for `length`: the canonical unified
 /// spelling, or centimetres with six decimals when no two-decimal unit is
-/// exact (the spelling of the ODP adapter, record 0278).
+/// exact (the spelling of the ODP adapter).
 #[cfg(any(feature = "odg", feature = "odc", feature = "odi"))]
 pub(crate) fn odf_length(length: crate::value::Length) -> String {
     let display = length.display(crate::value::LengthStyle::Auto).to_string();

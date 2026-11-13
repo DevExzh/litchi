@@ -1,4 +1,4 @@
-//! End-to-end tests of the `litchi` binary (record 0256).
+//! End-to-end tests of the `litchi` binary.
 //!
 //! Each test runs the built binary over repository fixtures or files it
 //! creates, and checks two things: the `--json` output is exactly what the
@@ -111,7 +111,7 @@ const READS: &[(&str, &[&str], &str)] = &[
         &["/", "/slide[1]", "/slide[1]/shape[1]"],
         "shape",
     ),
-    // The remaining ODF formats (record 0282).
+    // The remaining ODF formats.
     (
         "libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm",
         &["/", "/body", "/body/p[1]"],
@@ -390,7 +390,7 @@ fn exit_statuses_follow_the_code_families() {
     let text = dir.path().join("plain.txt");
     std::fs::write(&text, "hello").expect("write");
     expect(5, ["get", arg(&text)]);
-    // Every iWork format creates since records 0297-0299: `x.key` is now
+    // Every iWork format creates: `x.key` is now
     // exit 0 (keynote_structure_from_the_command_line).
     // 6: I/O.
     expect(6, ["get", arg(&dir.path().join("missing.docx"))]);
@@ -477,7 +477,7 @@ fn create_writes_every_creatable_format_and_refuses_overwrite() {
     for format in [
         "docx", "xlsx", "pptx", "xlsb", "doc", "xls", "ppt", "rtf", "ods", "odt", "odp", "oth",
         "odm", "odg", "odc", "odi", "odb", "odf",
-        // Record 0297: Numbers builds a blank workbook.
+        // Numbers builds a blank workbook.
         "numbers",
     ] {
         let path = scratch(dir.path(), &format!("blank.{format}"), None);
@@ -640,7 +640,7 @@ fn spreadsheet_writes_save_in_place() {
     assert_eq!(text_of(&path, "/Sheet1/A1"), "3");
     expect(0, ["remove", file, "/Sheet1/A1"]);
 
-    // ODS (record 0277): a created workbook, and a LibreOffice one edited in
+    // ODS: a created workbook, and a LibreOffice one edited in
     // place.
     let path = scratch(dir.path(), "w.ods", None);
     let file = arg(&path);
@@ -750,7 +750,7 @@ fn presentation_writes_save_in_place() {
     expect(0, ["remove", file, "/slide[2]"]);
     expect(3, ["get", file, "/slide[2]"]);
 
-    // ODP (record 0278): a text box, a text set, a slide swap and move,
+    // ODP: a text box, a text set, a slide swap and move,
     // each saved in place through the leaf's atomic publication.
     let path = scratch(dir.path(), "w.odp", Some("odf/odp/tdf169979.odp"));
     let file = arg(&path);
@@ -784,7 +784,7 @@ fn presentation_writes_save_in_place() {
     expect(0, ["remove", file, "/slide[3]"]);
     expect(3, ["get", file, "/slide[3]"]);
 
-    // ODG (record 0282): on a fresh drawing, a page and a shape added, the
+    // ODG: on a fresh drawing, a page and a shape added, the
     // shape's text changed and the shape removed, each saved in place.
     let path = dir.path().join("w.odg");
     let file = arg(&path);
@@ -821,7 +821,7 @@ fn presentation_writes_save_in_place() {
     expect(0, ["remove", file, &added]);
     expect(3, ["get", file, &added]);
 
-    // ODG on a LibreOffice drawing (record 0288): structural writes are
+    // ODG on a LibreOffice drawing: structural writes are
     // exact-source splices; pages are inserted, moved and removed, and
     // `/metadata` is set through the metadata family.
     let path = scratch(
@@ -961,7 +961,7 @@ fn odt_writes_save_in_place() {
     assert!(reopened.text().expect("text").contains("Added"));
 }
 
-/// The iWork formats (record 0296): reads and the leaves' focused writes,
+/// The iWork formats: reads and the leaves' focused writes,
 /// saved in place, from the command line.
 #[test]
 fn iwork_writes_save_in_place() {
@@ -1019,7 +1019,7 @@ fn iwork_writes_save_in_place() {
     let query = expect(0, ["query", arg(&numbers), "cell", "--json"]).json();
     assert!(query.to_string().contains("CLI cell"), "{query}");
 
-    // Record 0306: a Keynote package directory edits in place and stays a
+    // A Keynote package directory edits in place and stays a
     // directory.
     let bundle = dir.path().join("bundle.key");
     copy_tree(&fixture("iwork/directory/keynote/basic.key"), &bundle);
@@ -1039,7 +1039,7 @@ fn iwork_writes_save_in_place() {
         "Bundle title"
     );
 
-    // Record 0297: a created workbook takes renames, values and merges.
+    // A created workbook takes renames, values and merges.
     let blank = scratch(dir.path(), "blank.numbers", None);
     let file = arg(&blank);
     expect(0, ["set", file, "/sheet[1]", "--prop", "name=Budget"]);
@@ -1064,7 +1064,7 @@ fn iwork_writes_save_in_place() {
     let merges = expect(0, ["query", file, "mergeCell", "--json"]).json();
     assert!(merges.to_string().contains("A2:B3"), "{merges}");
 
-    // Record 0301: sheets and tables are added and removed.
+    // Sheets and tables are added and removed.
     expect(
         0,
         ["add", file, "/", "--type", "sheet", "--prop", "name=Extra"],
@@ -1091,7 +1091,7 @@ fn iwork_writes_save_in_place() {
     let sheets = expect(0, ["query", file, "sheet", "--json"]).json();
     assert!(!sheets.to_string().contains("Extra"), "{sheets}");
 
-    // Record 0309: rows and columns are inserted and removed; cell text
+    // Rows and columns are inserted and removed; cell text
     // takes character properties; Pages table cells take values.
     let table = "/sheet[1]/table[1]";
     let rows = |file: &Path| {
@@ -1140,7 +1140,7 @@ fn iwork_writes_save_in_place() {
     );
     assert_eq!(text_of(&pages, "/body/tbl[1]/tr[1]/tc[1]"), "CLI cell");
 
-    // Pages creates its minimal document (record 0299).
+    // Pages creates its minimal document.
     let blank = dir.path().join("blank.pages");
     expect(0, ["create", arg(&blank)]);
     expect(
@@ -1156,7 +1156,7 @@ fn iwork_writes_save_in_place() {
     assert_eq!(text_of(&blank, "/body/p[1]"), "Created by the CLI");
 }
 
-/// Keynote structure from the command line (record 0298): slides are
+/// Keynote structure from the command line: slides are
 /// created, added (from a layout and as a copy), moved, swapped and removed;
 /// text boxes and paragraphs are added; a fresh presentation is created.
 #[test]
@@ -1231,7 +1231,7 @@ fn keynote_structure_from_the_command_line() {
         ],
     );
     assert_eq!(text_of(&deck, "/slide[1]/notes"), "Notes from the CLI");
-    // Record 0309: a run of a text box takes character properties; a
+    // A run of a text box takes character properties; a
     // removed title placeholder is hidden and `hidden=false` shows it.
     expect(
         0,
@@ -1394,7 +1394,7 @@ fn officecli_smoke_script_replays() {
 
 /// OfficeCLI's `add --from`, `set --find/--replace` and `remove --prop`
 /// reach the command channel, which refuses them with typed errors instead
-/// of a usage error (record 0265).
+/// of a usage error.
 #[test]
 fn officecli_option_spellings_reach_the_command_channel() {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -1435,7 +1435,7 @@ fn officecli_option_spellings_reach_the_command_channel() {
     );
 
     // `--find T` is `--prop find=T`; a find needs `replace` (or a format
-    // property), as OfficeCLI's does (record 0273).
+    // property), as OfficeCLI's does.
     let run = expect(
         4,
         ["set", arg(&path), "/body/p[1]", "--find", "fox", "--json"],
@@ -1481,7 +1481,7 @@ fn officecli_option_spellings_reach_the_command_channel() {
 }
 
 /// `set --find T --replace R` rewrites the matches and reports their count
-/// as OfficeCLI's `matched` (record 0273); zero matches write nothing.
+/// as OfficeCLI's `matched`; zero matches write nothing.
 #[test]
 fn find_and_replace_report_the_match_count() {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -1661,8 +1661,7 @@ fn unsupported_warn_applies_the_rest_and_exits_partial() {
 }
 
 /// A `--unsupported warn` command that still fails after skipping prints the
-/// skipped properties with its error, never the bare reduced failure
-/// (record 0271).
+/// skipped properties with its error, never the bare reduced failure.
 #[test]
 fn unsupported_warn_failures_name_the_skipped_properties() {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -1793,7 +1792,7 @@ fn unsupported_warn_failures_name_the_skipped_properties() {
     );
 }
 
-/// `import`, `evaluate` and `recalculate` (record 0266).
+/// `import`, `evaluate` and `recalculate`.
 #[test]
 fn import_evaluate_and_recalculate() {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -2000,7 +1999,7 @@ fn merge_fills_templates_per_record() {
         ],
     );
     assert!(run.stderr.contains("invalid_json"), "{}", run.stderr);
-    // Record 0295: an XLSB template merges; an ODF drawing has no merge.
+    // An XLSB template merges; an ODF drawing has no merge.
     let workbook = dir.path().join("book.xlsb");
     expect(0, ["create", arg(&workbook)]);
     let other = dir.path().join("other.xlsb");
@@ -2077,7 +2076,7 @@ fn refresh_saves_only_changed_documents() {
     assert!(run.stderr.contains("invalid_value"), "{}", run.stderr);
 }
 
-/// `dump`, `raw`, `raw-set`, `add-part` and `validate` (record 0336): the
+/// `dump`, `raw`, `raw-set`, `add-part` and `validate`: the
 /// dump replays through `batch`, the raw writes save in place, and the
 /// statuses follow the code families.
 #[test]

@@ -1,7 +1,7 @@
-//! Unified ODT parts (record 0328): master-page headers and footers, list
+//! Unified ODT parts: master-page headers and footers, list
 //! styles as numbering, body fields, tables of contents, tab stops, shapes,
 //! formula objects and table columns, read through the DOCX paths and
-//! property names of records 0319 and 0324.
+//! property names.
 
 #![cfg(feature = "odt")]
 

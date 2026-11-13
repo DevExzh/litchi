@@ -15,7 +15,7 @@ const GAP: GapSpec = GapSpec {
         key: "fill",
     },
     code: Code::UnsupportedCapability,
-    follow_up: "M2",
+    follow_up: "not supported yet",
     reason: "the leaf setter is pending",
 };
 const TABLE: Table<Setter, 5, 2> = Table::new(
@@ -151,7 +151,7 @@ fn errors_distinguish_unknown_read_only_and_leaf_gaps() {
         .prepare(Operation::Set, &"private".into(), |_, _| Ok(()))
         .unwrap_err();
     assert_eq!(error.code(), Code::UnsupportedCapability);
-    assert_eq!(error.suggestion(), Some("M2"));
+    assert_eq!(error.suggestion(), Some("not supported yet"));
 }
 
 #[test]

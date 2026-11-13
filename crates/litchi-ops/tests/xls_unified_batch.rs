@@ -316,7 +316,7 @@ fn distinct_direct_sets_and_removals_share_one_native_commit() {
             before
         );
 
-        // Record 0362: a separately opened copy of the base takes the patch;
+        // A separately opened copy of the base takes the patch;
         // other content is refused.
         let foreign = open_owner(&before, eager);
         assert_eq!(
@@ -785,7 +785,7 @@ fn stale_files_are_rejected_while_a_native_run_is_pending() {
     );
 }
 
-/// Record 0337: items inside a coalesced run add no source check of their
+/// Items inside a coalesced run add no source check of their
 /// own; the next item's resolution and leaf read still observe a source that
 /// changed after the run's first item, and nothing is published.
 #[test]

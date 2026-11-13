@@ -1,7 +1,6 @@
-//! Regressions for the claimed-supported cells record 0289's CRUD checklist
-//! left failing (F1, F2, F4, F6, F7) and the metadata `language` read-back
-//! record 0288 left open; record 0290 fixed each. Every test fails on the
-//! base build.
+//! Regressions for the claimed-supported cells the CRUD checklist
+//! left failing and the metadata `language` read-back. Every test failed
+//! before its fix.
 
 #[cfg(any(feature = "pptx", feature = "odp", feature = "rtf"))]
 fn fixture(relative: &str) -> Vec<u8> {
@@ -21,7 +20,7 @@ fn paths(file: &litchi_ops::File, selector: &str) -> Vec<String> {
         .collect()
 }
 
-/// F1: a bare `placeholder` selects the shapes with a placeholder binding
+/// A bare `placeholder` selects the shapes with a placeholder binding
 /// (PPTX) or presentation class (ODP), title placeholders included, at their
 /// `/shape[N]` addresses; `shape` still selects them too.
 #[cfg(any(feature = "pptx", feature = "odp"))]
@@ -62,7 +61,7 @@ fn odp_bare_placeholder_query_matches_presentation_class_shapes() {
     assert_placeholders_are_shapes(&file);
 }
 
-/// F2: a chart whose producer wrote negative `c:axId` values has a node
+/// A chart whose producer wrote negative `c:axId` values has a node
 /// view, and its axes read.
 #[cfg(feature = "pptx")]
 #[test]
@@ -73,7 +72,7 @@ fn pptx_chart_with_negative_axis_ids_has_a_node_view() {
     assert!(file.query("axis").unwrap().count() >= 2);
 }
 
-/// F4: `hidden` on a slide without slide-show information, from `create()`.
+/// `hidden` on a slide without slide-show information, from `create()`.
 #[cfg(feature = "ppt")]
 #[test]
 fn ppt_hidden_on_a_created_slide() {
@@ -105,7 +104,7 @@ fn ppt_hidden_on_a_created_slide() {
     assert_eq!(hidden(&back).as_deref(), Some("false"));
 }
 
-/// F7: LibreOffice `n192129.rtf` stores GIF data under `\pngblip`; removing
+/// LibreOffice `n192129.rtf` stores GIF data under `\pngblip`; removing
 /// the picture moves the group's bytes unchanged.
 #[cfg(feature = "rtf")]
 #[test]
@@ -121,7 +120,7 @@ fn rtf_picture_with_mismatched_payload_is_removed() {
     assert_eq!(output, format!("{}{}", &source[..start], &source[end..]));
 }
 
-/// F6 and the language read-back: every ODF format made by `create()`
+/// The language read-back: every ODF format made by `create()`
 /// takes a `/metadata` set (OTH and ODM packages have no `meta.xml` until
 /// then) and `File::metadata()` reports the written language.
 #[cfg(all(

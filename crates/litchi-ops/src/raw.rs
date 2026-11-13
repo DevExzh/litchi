@@ -1,7 +1,6 @@
-//! The raw escape layer (design §12; record 0015 W10/D19; record 0336):
-//! package parts read as bytes, a part added with its content type and
-//! relationship, an audited XPath-addressed XML edit, and a read-only
-//! structural validation.
+//! The raw escape layer (design §12): package parts read as bytes, a
+//! part added with its content type and relationship, an audited
+//! XPath-addressed XML edit, and a read-only structural validation.
 //!
 //! These operations are format-specific escape hatches, not part of the node
 //! view. They address *package parts*: an OPC part name (`/word/document.xml`)
@@ -23,8 +22,8 @@
 //! with the change and open the result as a new handle. Every XML payload a
 //! write introduces passes the package's publication audit
 //! (`litchi_opc::OpcPackage::try_replace_owned_xml_part_bytes` and
-//! `try_add_owned_xml_part_bytes`, records 0313 and 0317), and every member
-//! the write does not touch keeps its bytes.
+//! `try_add_owned_xml_part_bytes`), and every member the write does not
+//! touch keeps its bytes.
 //!
 //! ```
 //! # #[cfg(feature = "docx")]
@@ -663,7 +662,7 @@ pub(crate) fn no_raw_write(file: &File, operation: &str) -> OpsError {
             format!("{operation} this format is not supported"),
         )
         .with_suggestion(
-            "raw part writes cover OOXML (DOCX, XLSX, PPTX, XLSB); record 0336 follow-up for ODF",
+            "raw part writes cover OOXML (DOCX, XLSX, PPTX, XLSB); ODF is a follow-up",
         ),
     )
 }

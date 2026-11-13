@@ -1,4 +1,4 @@
-//! Lazy children of XLSB nodes (record 0010 §2.5, §4.7, §5.3).
+//! Lazy children of XLSB nodes.
 //!
 //! The adapter traverses the retained sparse worksheet grid directly. A
 //! cursor copies at most [`BATCH`] coordinates from one borrowed range scan,
@@ -52,8 +52,7 @@ enum State {
         cursor: Box<Cursor>,
     },
     /// A source-backed worksheet's cells through the leaf's cell cursor,
-    /// which decodes only as many cells as a walk that stops early reads
-    /// (record 0267).
+    /// which decodes only as many cells as a walk that stops early reads.
     Stream(Box<Stream>),
     Dense {
         sheet: usize,
@@ -61,12 +60,12 @@ enum State {
         rect: Rect,
         next: Option<Address>,
     },
-    /// A worksheet's features (record 0322).
+    /// A worksheet's features.
     Features {
         sheet: usize,
         items: std::vec::IntoIter<super::features::Feature>,
     },
-    /// A worksheet's charts, or a chart's series and axes (record 0322).
+    /// A worksheet's charts, or a chart's series and axes.
     Charts {
         sheet: usize,
         items: std::vec::IntoIter<(Kind, super::chart::ChartItem)>,
@@ -231,7 +230,7 @@ impl<'f> Children<'f> {
                         || kinds.contains(Kind::Row)
                         || kinds.contains(Kind::Table)) =>
             {
-                // A walk scoped to worksheet features lists them (record 0322).
+                // A walk scoped to worksheet features lists them.
                 let mut items = Vec::new();
                 for kind in super::features::KINDS {
                     if kinds.contains(kind) {

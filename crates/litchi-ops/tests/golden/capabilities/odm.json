@@ -65,7 +65,7 @@
     "dump": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0336 follow-up: dump plans for the remaining formats",
+      "followUp": "follow-up: dump plans for the remaining formats",
       "reason": "this format's write verbs cannot yet rebuild its node tree on a created document"
     },
     "raw": {
@@ -77,13 +77,13 @@
     "add-part": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0336 follow-up: raw ODF part writes through the ODF package publisher",
+      "followUp": "follow-up: raw ODF part writes through the ODF package publisher",
       "reason": "raw part writes cover OOXML (DOCX, XLSX, PPTX, XLSB)"
     },
     "raw-set": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0336 follow-up: raw ODF part writes through the ODF package publisher",
+      "followUp": "follow-up: raw ODF part writes through the ODF package publisher",
       "reason": "raw part writes cover OOXML (DOCX, XLSX, PPTX, XLSB)"
     }
   },
@@ -103,37 +103,37 @@
     "issues": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the issues view needs the validators `validate` adds"
     },
     "forms": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the forms view needs the validators `validate` adds"
     },
     "html": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     "svg": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     "screenshot": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     "pdf": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     }
   },
@@ -2641,49 +2641,49 @@
       "subject": "element",
       "element": "chart",
       "code": "unsupported_capability",
-      "followUp": "M6 ODT body index (record 0276)",
+      "followUp": "ODT body index",
       "reason": "the ODT body index does not model this element yet"
     },
     {
       "subject": "element",
       "element": "ole",
       "code": "unsupported_capability",
-      "followUp": "M6 ODT body index (record 0276)",
+      "followUp": "ODT body index",
       "reason": "the ODT body index does not model this element yet"
     },
     {
       "subject": "element",
       "element": "revision",
       "code": "unsupported_capability",
-      "followUp": "record 0328 follow-up: ODT tracked changes as revision nodes (P2)",
+      "followUp": "follow-up: ODT tracked changes as revision nodes",
       "reason": "the ODT body index skips text:tracked-changes"
     },
     {
       "subject": "element",
       "element": "break",
       "code": "unsupported_capability",
-      "followUp": "M6 ODT body index (record 0276)",
+      "followUp": "ODT body index",
       "reason": "the ODT body index does not model this element yet"
     },
     {
       "subject": "element",
       "element": "group",
       "code": "unsupported_capability",
-      "followUp": "M6 ODT body index (record 0276)",
+      "followUp": "ODT body index",
       "reason": "the ODT body index does not model this element yet"
     },
     {
       "subject": "element",
       "element": "formfield",
       "code": "unsupported_capability",
-      "followUp": "record 0328 follow-up: ODT form controls as formfield nodes and their writes",
+      "followUp": "follow-up: ODT form controls as formfield nodes and their writes",
       "reason": "the ODT body index skips office:forms and its controls"
     },
     {
       "subject": "element",
       "element": "settings",
       "code": "unsupported_capability",
-      "followUp": "M6 ODT body index (record 0276)",
+      "followUp": "ODT body index",
       "reason": "the ODT body index does not model this element yet"
     },
     {
@@ -2697,63 +2697,63 @@
       "subject": "element",
       "element": "watermark",
       "code": "unsupported_capability",
-      "followUp": "record 0328 follow-up: the ODT header text-art watermark",
+      "followUp": "follow-up: the ODT header text-art watermark",
       "reason": "a watermark is a header drawing shape the region reads do not project"
     },
     {
       "subject": "element",
       "element": "bookmarkEnd",
       "code": "unsupported_path",
-      "followUp": "none: not an OpenDocument text element (record 0339)",
+      "followUp": "none: not an OpenDocument text element",
       "reason": "a bookmark is one node over its start and end (text:bookmark-start, text:bookmark-end); a standalone end marker is not an element"
     },
     {
       "subject": "element",
       "element": "permStart",
       "code": "unsupported_path",
-      "followUp": "none: not an OpenDocument text element (record 0339)",
+      "followUp": "none: not an OpenDocument text element",
       "reason": "OpenDocument text has no editing-permission ranges"
     },
     {
       "subject": "element",
       "element": "ptab",
       "code": "unsupported_path",
-      "followUp": "none: not an OpenDocument text element (record 0339)",
+      "followUp": "none: not an OpenDocument text element",
       "reason": "OpenDocument text has no positional tabs"
     },
     {
       "subject": "element",
       "element": "fieldChar",
       "code": "unsupported_path",
-      "followUp": "none: not an OpenDocument text element (record 0339)",
+      "followUp": "none: not an OpenDocument text element",
       "reason": "an OpenDocument field is one element; there are no field-character runs"
     },
     {
       "subject": "element",
       "element": "instrText",
       "code": "unsupported_path",
-      "followUp": "none: not an OpenDocument text element (record 0339)",
+      "followUp": "none: not an OpenDocument text element",
       "reason": "an OpenDocument field is one element; there are no field-instruction runs"
     },
     {
       "subject": "element",
       "element": "series",
       "code": "unsupported_path",
-      "followUp": "M6 ODT body index (record 0276), with the chart gap",
+      "followUp": "ODT body index, with the chart gap",
       "reason": "chart series are not nodes: embedded charts are a gap of the ODT body index"
     },
     {
       "subject": "element",
       "element": "axis",
       "code": "unsupported_path",
-      "followUp": "M6 ODT body index (record 0276), with the chart gap",
+      "followUp": "ODT body index, with the chart gap",
       "reason": "chart axes are not nodes: embedded charts are a gap of the ODT body index"
     },
     {
       "subject": "element",
       "element": "diagram",
       "code": "unsupported_path",
-      "followUp": "none: out of scope (record 0332, design §10)",
+      "followUp": "none: out of scope",
       "reason": "OfficeCLI's diagram renders Mermaid text into shapes or a picture; rendering is outside the unified API"
     },
     {
@@ -2762,7 +2762,7 @@
       "element": "cell",
       "context": "table-grid",
       "code": "unsupported_capability",
-      "followUp": "M6 ODT table grid edits",
+      "followUp": "ODT table grid edits",
       "reason": "cells keep the table grid: remove or move the whole row, or set the cell's text"
     },
     {
@@ -2771,7 +2771,7 @@
       "element": "cell",
       "context": "table-grid",
       "code": "unsupported_capability",
-      "followUp": "M6 ODT table grid edits",
+      "followUp": "ODT table grid edits",
       "reason": "adding a cell would break the table grid; add a row, which spans the first row's columns"
     },
     {
@@ -2780,7 +2780,7 @@
       "element": "cell",
       "context": "table-grid",
       "code": "unsupported_capability",
-      "followUp": "M6 ODT table grid edits",
+      "followUp": "ODT table grid edits",
       "reason": "cells move only with their row"
     },
     {
@@ -2789,7 +2789,7 @@
       "element": "row",
       "context": "vertical-merge",
       "code": "unsupported_capability",
-      "followUp": "M6 ODT table grid edits",
+      "followUp": "ODT table grid edits",
       "reason": "a row holding vertically merged or covered cells cannot leave the table"
     },
     {
@@ -2798,7 +2798,7 @@
       "element": "picture",
       "context": "image-resources",
       "code": "unsupported_capability",
-      "followUp": "M6 ODT drawing and media edits",
+      "followUp": "ODT drawing and media edits",
       "reason": "adding an image needs a package media resource and a frame; frames and images are readable, settable (frame geometry) and removable"
     },
     {
@@ -2807,7 +2807,7 @@
       "element": "frame",
       "context": "drawing-resources",
       "code": "unsupported_capability",
-      "followUp": "M6 ODT drawing and media edits",
+      "followUp": "ODT drawing and media edits",
       "reason": "frames are created with their content (image or text box), which the body edits do not author yet"
     },
     {
@@ -2816,7 +2816,7 @@
       "element": "style",
       "context": "common-styles",
       "code": "unsupported_capability",
-      "followUp": "M6 ODT style definitions",
+      "followUp": "ODT style definitions",
       "reason": "common styles in styles.xml are read-only; paragraph and run formatting derives automatic styles instead"
     },
     {
@@ -2825,7 +2825,7 @@
       "element": "run",
       "context": "clear-formatting",
       "code": "unsupported_capability",
-      "followUp": "M6 ODT formatting removal",
+      "followUp": "ODT formatting removal",
       "reason": "a null value cannot remove a character or paragraph property; set the property's off value instead"
     },
     {
@@ -2834,7 +2834,7 @@
       "element": "cell",
       "context": "typed-values",
       "code": "unsupported_capability",
-      "followUp": "M6 ODT typed cell values",
+      "followUp": "ODT typed cell values",
       "reason": "cell text writes a string cell; numeric, date and formula cell values are not authored"
     },
     {
@@ -2843,7 +2843,7 @@
       "element": "document",
       "context": "signed-or-encrypted-package",
       "code": "unsupported_capability",
-      "followUp": "ADR 0034 ODF security vocabulary (record 0268 G5)",
+      "followUp": "ADR 0034 ODF security vocabulary",
       "reason": "the leaf preserves signed and encrypted packages only as exact no-ops; changed writes are refused"
     },
     {
@@ -2852,7 +2852,7 @@
       "element": "document",
       "context": "flat-odf-input",
       "code": "unsupported_capability",
-      "followUp": "0292 flat ODF package members",
+      "followUp": "flat ODF package members",
       "reason": "a single-XML .fodt is edited through the leaf's packaged projection and republished element by element; an edit that adds a package member (a picture, an embedded object) or changes a part's root has no flat form and is refused"
     },
     {
@@ -2868,42 +2868,42 @@
       "subject": "view",
       "mode": "issues",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the issues view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "forms",
       "code": "unsupported_capability",
-      "followUp": "M2 (validate)",
-      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+      "followUp": "validate",
+      "reason": "the forms view needs the validators `validate` adds"
     },
     {
       "subject": "view",
       "mode": "html",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "svg",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "screenshot",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     },
     {
       "subject": "view",
       "mode": "pdf",
       "code": "unsupported_capability",
-      "followUp": "design §10 (rendering is out of scope)",
+      "followUp": "rendering is out of scope",
       "reason": "visual rendering is outside the unified layer"
     }
   ]

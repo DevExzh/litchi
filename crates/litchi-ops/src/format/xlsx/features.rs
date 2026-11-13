@@ -1,4 +1,4 @@
-//! Worksheet features as unified nodes (record 0320): legacy notes
+//! Worksheet features as unified nodes: legacy notes
 //! (`comment`), hyperlinks, drawing pictures and shapes, conditional
 //! formats (`cf`), data validations, the auto-filter and manual page
 //! breaks.
@@ -457,7 +457,7 @@ pub(super) fn lookup<'f>(
 }
 
 /// [`lookup`] of a note: the notes are ordered row-major by their cells
-/// alone, and only the selected one is copied (record 0326). The order is
+/// alone, and only the selected one is copied. The order is
 /// [`list`]'s: its stable sort keeps equal cells in part order, as the
 /// part index does here.
 fn comment<'f>(
@@ -572,7 +572,7 @@ const fn x14_gap(element: &'static str, key: &'static str) -> GapSpec {
     GapSpec {
         subject: Subject::Property { element, key },
         code: Code::UnsupportedProperty,
-        follow_up: "record 0320 follow-up: Office 2010 conditional-format extensions",
+        follow_up: "Office 2010 conditional-format extensions",
         reason: "the core conditional-format writer refuses x14 extension rules, so data-bar negative and axis styling cannot be authored yet",
     }
 }
@@ -586,7 +586,7 @@ const fn effect_gap(element: &'static str, key: &'static str) -> GapSpec {
     GapSpec {
         subject: Subject::Property { element, key },
         code: Code::UnsupportedProperty,
-        follow_up: "record 0320 follow-up: drawing effects, crops and gradient fills",
+        follow_up: "drawing effects, crops and gradient fills",
         reason: "the drawing writer authors solid fills, outlines, text and transforms; effects, crops, transparency and gradient fills are not authored yet",
     }
 }
@@ -819,7 +819,7 @@ keyed!(PictureKey, PictureKey, PICTURE_TABLE, PICTURE_PROPS, PICTURE_KEYS, [
     entry(read("flip", TEXT), Access::SetAndAdd(PictureKey::Flip)) => Flip,
     entry(read("contentType", TEXT), Access::ReadOnly) => ContentType,
     entry(read("fileSize", INT), Access::ReadOnly) => FileSize,
-    // `set src` replaces the image (record 0338).
+    // `set src` replaces the image.
     entry(write_only("src", TEXT), Access::SetAndAdd(PictureKey::Src)) => Src,
     entry(write_only("anchor", TEXT), Access::Add(PictureKey::Anchor)) => Anchor,
     entry(write_only("flipH", BOOL), Access::SetAndAdd(PictureKey::FlipH)) => FlipH,

@@ -1,5 +1,5 @@
 //! The single-pass openers: [`open`], [`open_bytes`], [`open_prepared`] and
-//! their `_with` variants (record 0003 §2.5 and §2.7).
+//! their `_with` variants.
 //!
 //! Each call runs one detection pass and hands what detection built (the
 //! positional source, the OPC package, the compound file, the ODF package
@@ -47,15 +47,14 @@ const NEUTRAL_MAX_INPUT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 /// does not exist,
 /// [`Code::UnsupportedFormat`](crate::Code::UnsupportedFormat) with no
 /// [`detected`](Error::detected) format for an input that is not an Office
-/// file, or with the detected format when its cargo feature is off (an
-/// Apple iWork package or package directory included; a package directory
-/// opens as its single-file form and `save()` writes it back as a
-/// directory, record 0306), [`Code::LimitExceeded`](crate::Code::LimitExceeded)
-/// when the input exceeds a read limit, and the format's typed error when its
-/// container cannot be read. In a build with an OOXML format, a file named
-/// as an OOXML package (`.docx`, `.xlsx`, `.pptx`, `.xlsb` and their macro
-/// and template forms) whose content is neither a ZIP package nor an
-/// encrypted OOXML package is refused with
+/// file, or with the detected format when its cargo feature is off (an Apple
+/// iWork package or package directory included; a package directory opens as
+/// its single-file form and `save()` writes it back as a directory),
+/// [`Code::LimitExceeded`](crate::Code::LimitExceeded) when the input exceeds a
+/// read limit, and the format's typed error when its container cannot be read.
+/// In a build with an OOXML format, a file named as an OOXML package (`.docx`,
+/// `.xlsx`, `.pptx`, `.xlsb` and their macro and template forms) whose content
+/// is neither a ZIP package nor an encrypted OOXML package is refused with
 /// [`Code::CorruptFile`](crate::Code::CorruptFile), as the facade refused it.
 ///
 /// ```no_run
@@ -144,7 +143,7 @@ pub fn open_bytes_with(bytes: impl Into<Vec<u8>>, options: &OpenOptions) -> Resu
 /// with [`Error::iwork_unsupported`], with the format the tail reported.
 /// Apple iWork packages no longer need a tail: in a build with the `pages`,
 /// `keynote` or `numbers` feature, detection classifies them itself, as the
-/// last built-in ZIP candidate before the tail (record 0296).
+/// last built-in ZIP candidate before the tail.
 ///
 /// # Errors
 ///
@@ -179,9 +178,9 @@ pub fn open_with_tail<T: ZipTail>(
 /// Open the iWork package directory at `path` the file route refused: the
 /// file route reads one positional source, so an app-authored package
 /// directory fails there and is classified here, on the error path only. A
-/// Pages, Keynote or Numbers directory opens through its leaf (records 0299
-/// and 0306); a directory of a format whose feature is off is
-/// `unsupported_format` naming the feature.
+/// Pages, Keynote or Numbers directory opens through its leaf; a directory
+/// of a format whose feature is off is `unsupported_format` naming the
+/// feature.
 #[cfg_attr(
     not(feature = "iwork-adapter"),
     allow(

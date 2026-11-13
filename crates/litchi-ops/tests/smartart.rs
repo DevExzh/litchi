@@ -1,4 +1,4 @@
-//! Typed SmartArt CRUD through the unified API (record 0284): add, get, set
+//! Typed SmartArt CRUD through the unified API: add, get, set
 //! and remove of PPTX SmartArt graphics and their nodes, Litchi-authored and
 //! foreign, with round trips, no-ops, refusals and the capability report.
 #![cfg(feature = "pptx")]

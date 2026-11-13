@@ -132,8 +132,8 @@ fn enabled_formats() -> impl Iterator<Item = FileFormat> {
     .filter_map(|(format, enabled)| enabled.then_some(format))
 }
 
-/// An element's operation claims agree with its properties' flags (record
-/// 0330). Both come from the same spec tables, but through different
+/// An element's operation claims agree with its properties' flags.
+/// Both come from the same spec tables, but through different
 /// lists, so they can drift; this is the rule that keeps them together:
 ///
 /// 1. an element claims `set` exactly when at least one of its properties

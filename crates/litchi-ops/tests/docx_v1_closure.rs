@@ -1,4 +1,4 @@
-//! The DOCX v1-closure writes of record 0342 through the unified API:
+//! DOCX writes through the unified API:
 //! table borders (`set` and `add` of `border.*`), row height and flags, and
 //! `listStyle`/`start` on a new paragraph, following OfficeCLI's
 //! `word/tables.sh` and `word/paragraph-formatting.sh`. Each write is read

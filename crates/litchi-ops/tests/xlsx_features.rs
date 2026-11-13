@@ -1,4 +1,4 @@
-//! XLSX worksheet features through the unified API (record 0320): notes,
+//! XLSX worksheet features through the unified API: notes,
 //! hyperlinks, pictures, shapes, conditional formats, data validations, the
 //! auto-filter and page breaks, each added, read back on both owners, set,
 //! queried and removed.
@@ -105,7 +105,7 @@ fn notes_add_get_set_remove() {
 
 #[test]
 fn note_fonts_and_rich_runs() {
-    // Record 0325: `font.*` writes one formatted run, `runs` a rich note.
+    // `font.*` writes one formatted run, `runs` a rich note.
     let file = workbook()
         .add(
             "/Sheet1",

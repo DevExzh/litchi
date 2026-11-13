@@ -1,4 +1,4 @@
-"""The ``LitchiError`` exception hierarchy (S8a).
+"""The ``LitchiError`` exception hierarchy.
 
 Every error the bindings raise for a file is a ``LitchiError`` carrying the
 unified error's ``code``, ``message`` and ``suggestion``. Each family class
@@ -164,7 +164,7 @@ class RaisedErrorTests(unittest.TestCase):
 
     def test_formats_no_opener_reads_get_no_suggestion(self):
         # Odg is detected, but no family opener reads OpenDocument drawings
-        # (litchi_py.open holds them as File, record 0282).
+        # (litchi_py.open holds them as File).
         for opener in (L.Document, L.Presentation, L.Workbook):
             with self.subTest(opener=opener.__name__):
                 error = raised(opener, fixture("libreoffice-core/desktop/qa/data/BlankDrawDocument.odg"))
@@ -200,7 +200,7 @@ class RaisedErrorTests(unittest.TestCase):
         )
         # Legacy encryption of the other formats opens as File::Locked too,
         # among them PowerPoint's RC4 CryptoAPI, which a build without the
-        # `encryption` feature cannot decrypt (M0a S9; before, it was an
+        # `encryption` feature cannot decrypt (before, it was an
         # UnsupportedError).
         for opener, relative, name in (
             (L.Workbook, "ole/xls/password.xls", "Xls"),

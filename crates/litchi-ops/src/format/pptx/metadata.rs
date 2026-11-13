@@ -1,4 +1,4 @@
-//! PPTX document metadata on the presentation root (record 0253).
+//! PPTX document metadata on the presentation root.
 //!
 //! A set on `/` with OfficeCLI's document-property keys commits one leaf
 //! [`litchi_pptx::metadata`] transaction on the eager package. A
@@ -52,10 +52,10 @@ impl Pptx {
     /// The eager package an [`Editable`] commits metadata on. An unrevised
     /// source owner adopts its source graph without re-serializing; a
     /// revised one publishes its revision first. A source-backed handle
-    /// keeps that package once built (record 0262): the handle is
+    /// keeps that package once built: the handle is
     /// immutable, so every later metadata set on it commits on the same
     /// before state, and the leaf's source graph adoption, not the edit,
-    /// was most of a set's cost (record 0253 §7).
+    /// was most of a set's cost.
     fn metadata_owner(&self, source: &Editable) -> Result<Arc<pptx::Package>> {
         match source {
             Editable::Eager(package) => Ok(Arc::clone(package)),
@@ -82,7 +82,7 @@ impl Pptx {
 
 impl Pptx {
     /// Set document properties on `/metadata`, or on `/` when a property
-    /// is a metadata key (OfficeCLI's spelling, record 0338); `None` for
+    /// is a metadata key (OfficeCLI's spelling); `None` for
     /// other targets.
     pub(super) fn try_set_metadata(
         &self,

@@ -1,4 +1,4 @@
-//! Lazily built read indexes over the typed ODS worksheets (record 0277).
+//! Lazily built read indexes over the typed ODS worksheets.
 //!
 //! ODF stores a worksheet as physical row and cell *runs*
 //! (`table:number-rows-repeated`, `table:number-columns-repeated`), and
@@ -241,9 +241,9 @@ fn too_many() -> Error {
 }
 
 /// The logical end of each physical row run of one worksheet, so a
-/// coordinate finds its row by binary search instead of a scan (record
-/// 0287). Built only by callers that look up many coordinates of one
-/// snapshot (a coalesced batch); one direct lookup scans the runs.
+/// coordinate finds its row by binary search instead of a scan. Built
+/// only by callers that look up many coordinates of one snapshot (a
+/// coalesced batch); one direct lookup scans the runs.
 #[derive(Debug)]
 pub(crate) struct RowEnds(Box<[usize]>);
 
@@ -278,9 +278,9 @@ pub(crate) struct Cache {
     sheets: OnceLock<Box<[OnceLock<std::result::Result<SheetIndex, Error>>]>>,
     rows: OnceLock<Box<[OnceLock<RowEnds>]>>,
     annotations: OnceLock<std::result::Result<litchi_ods::annotations::Snapshot, Error>>,
-    /// Per-sheet worksheet features of `content.xml` (record 0327).
+    /// Per-sheet worksheet features of `content.xml`.
     features: OnceLock<Box<[OnceLock<FeatureSlot>]>>,
-    /// The named cell styles conditional formats apply (record 0327).
+    /// The named cell styles conditional formats apply.
     format_styles: OnceLock<std::result::Result<FormatStyles, Error>>,
 }
 

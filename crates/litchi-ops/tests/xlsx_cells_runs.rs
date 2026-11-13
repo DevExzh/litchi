@@ -1,4 +1,4 @@
-//! XLSX P0 residue (record 0338): the cell `type`, `add` of a cell, and
+//! XLSX cell writes: the cell `type`, `add` of a cell, and
 //! rich-text runs (`/<sheet>/<A1>/run[N]`), each read back on both owners.
 #![cfg(feature = "xlsx")]
 

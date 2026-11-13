@@ -1,5 +1,5 @@
 //! [`IntoQuery`]: the one way `query` takes a selector, as text, as a parsed
-//! [`Query`], or as a compiled [`Plan`] (record 0010 §8.1, decision D9).
+//! [`Query`], or as a compiled [`Plan`].
 
 use super::inspect::Inspect;
 use super::plan::Plan;
@@ -14,7 +14,7 @@ use litchi_core::selector::Query;
 /// [`Plan`] is used as is, so a selector run on many documents of one format
 /// is parsed and compiled once. A query the same thread runs repeatedly for
 /// one format is also compiled once: its plan is kept in a small per-thread
-/// cache from its second run on (record 0291).
+/// cache from its second run on.
 ///
 /// ```
 /// use litchi_ops::query::{IntoQuery, Query};
@@ -102,7 +102,7 @@ impl<'q> IntoQuery<'q> for QueryArg<'q> {
 }
 
 /// A borrowed selector runs without copying it: a parsed query is compiled
-/// from the reference and a compiled plan is used in place (record 0287).
+/// from the reference and a compiled plan is used in place.
 impl<'a, 'q: 'a> IntoQuery<'a> for &'a QueryArg<'q> {
     fn into_query(self) -> Result<QueryArg<'a>> {
         Ok(QueryArg {
@@ -191,8 +191,8 @@ impl<'q> QueryArg<'q> {
     }
 
     /// The plan to run on documents the adapter `N` reads: compiled now
-    /// unless the caller passed one, or taken from this thread's plan
-    /// cache when it compiled the same query for `N` recently (record 0291).
+    /// unless the caller passed one, or taken from this thread's plan cache
+    /// when it compiled the same query for `N` recently.
     pub(crate) fn into_plan<'f, N: Inspect<'f>>(self) -> Result<PlanRef<'q>> {
         match self.held {
             Held::Query(query) => super::cache::compile::<N>(&query, self.raw).map(PlanRef::from),

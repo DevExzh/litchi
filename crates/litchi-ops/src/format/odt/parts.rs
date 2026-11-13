@@ -1,14 +1,13 @@
-//! The ODT parts of record 0328: master-page headers and footers, list
-//! styles as numbering definitions, instances and levels, body text fields,
-//! tables of contents, tab stops, drawing shapes, formula objects and table
-//! columns.
+//! The ODT parts: master-page headers and footers, list styles as numbering
+//! definitions, instances and levels, body text fields, tables of contents,
+//! tab stops, drawing shapes, formula objects and table columns.
 //!
 //! Every part reads through the leaf part index
 //! ([`litchi_odt::body::Parts`]), built once per handle on the first part
 //! read, so the paths, queries and views of the structural kinds never pay
 //! for it. Parts are reached by path and by queries that name them; the
 //! views of the root, the body, paragraphs and tables list the structural
-//! kinds only (record 0324 kept DOC's views the same way).
+//! kinds only (DOC's views do the same).
 
 use std::borrow::Cow;
 use std::ops::Range;

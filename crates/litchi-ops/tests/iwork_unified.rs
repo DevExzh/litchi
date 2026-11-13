@@ -1,5 +1,5 @@
-//! Unified reads and writes of the Apple iWork formats (record 0296, owner
-//! decision D1): Pages documents, Keynote presentations and Numbers
+//! Unified reads and writes of the Apple iWork formats:
+//! Pages documents, Keynote presentations and Numbers
 //! workbooks open as `File::Pages`, `File::Keynote` and `File::Numbers`, read
 //! through the iWork object-tree adapter and write through the leaves'
 //! focused transactions.
@@ -152,15 +152,15 @@ mod pages {
 
     #[test]
     fn section_lifecycle_and_capabilities() {
-        // Record 0299: creation and paragraph structure are supported;
-        // record 0312: so is the section lifecycle (request 11).
+        // Creation and paragraph structure are supported;
+        // so is the section lifecycle.
         assert!(create(FileFormat::Pages).is_ok());
         let file = read("pages/basic.pages");
         let added = file
             .add("/", litchi_ops::NewNode::new("section"))
             .expect("add a section");
         assert_eq!(added.path.to_string(), "/section[2]");
-        // Record 0329: a body table copies the document's first one; this
+        // A body table copies the document's first one; this
         // document has none.
         let error = file
             .add(
@@ -325,7 +325,7 @@ mod numbers {
     }
 }
 
-/// Package directories and iWork open options (record 0306).
+/// Package directories and iWork open options.
 #[cfg(all(feature = "pages", feature = "keynote", feature = "numbers"))]
 mod directories {
     use std::collections::BTreeMap;
@@ -520,7 +520,7 @@ mod directories {
 }
 
 /// ADR 0034 §7: Keynote and Numbers metadata writes are a typed unsupported
-/// capability until their native acceptance gates pass (record 0343).
+/// capability until their native acceptance gates pass.
 #[cfg(all(feature = "keynote", feature = "numbers"))]
 mod iwork_metadata_write {
     use super::*;

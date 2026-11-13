@@ -1,5 +1,5 @@
-//! The children a query walk lists beyond each node's main axis (record
-//! 0321): the presentation theme, a table's grid columns, a shape's or run's
+//! The children a query walk lists beyond each node's main axis:
+//! the presentation theme, a table's grid columns, a shape's or run's
 //! hyperlink, a slide's media pictures and equations.
 //!
 //! The node view never lists these (`Children` with `Listing::View`), so a

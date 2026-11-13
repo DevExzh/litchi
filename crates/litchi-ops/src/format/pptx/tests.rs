@@ -102,7 +102,7 @@ fn every_route(name: &str) -> Vec<(&'static str, Pptx)> {
 // ---- leaf expectations (the computations the facade wraps) --------------
 //
 // `litchi::Presentation` cannot be called from here (no `litchi` dependency),
-// so the expectations repeat the facade's own leaf calls. During S5b a
+// so the expectations repeat the facade's own leaf calls. A
 // throwaway facade test confirmed that `Presentation::open` and
 // `Presentation::from_bytes` return exactly these values for `FIXTURES`.
 
@@ -154,7 +154,7 @@ fn expected(name: &str) -> Expected {
     )
     .expect("core properties")
     .unwrap_or_default();
-    // The application properties join the core ones (record 0253).
+    // The application properties join the core ones.
     let metadata =
         Some(crate::format::metadata::with_app_props(metadata, &opc)).filter(Metadata::has_data);
 
@@ -292,7 +292,7 @@ fn debug_names_the_owner_state() {
     );
 }
 
-// ---- TOCTOU guard (finding F10) -----------------------------------------
+// ---- TOCTOU guard -------------------------------------------------------
 
 fn assert_source_changed<T: std::fmt::Debug>(result: crate::Result<T>, operation: &str) {
     let error: Error = result.expect_err(operation);
@@ -390,7 +390,7 @@ fn cancellation_is_typed() {
     assert_eq!(handle.metadata().unwrap_err().code(), Code::Cancelled);
 }
 
-// ---- editor construction (L-PPTX-1) -------------------------------------
+// ---- editor construction -------------------------------------------------
 
 fn source_owner(handle: &Pptx) -> pptx::source::Package {
     match handle.editable().expect("editable native owner") {
@@ -830,8 +830,8 @@ fn handle_is_one_pointer_and_shares_state_on_clone() {
 
 #[test]
 fn query_items_stay_as_small_as_a_text_item() {
-    // Record 0326: every node a query yields is moved several times, so its
-    // size is paid per match. Record 0321's column, hyperlink and equation
+    // Every node a query yields is moved several times, so its size is
+    // paid per match. The column, hyperlink and equation
     // items are boxed, and a chart or SmartArt frame keeps one lazy part
     // cell: 144 bytes, against 176 before.
     use super::node::{Item, TextItem, TreeItem};
@@ -1096,7 +1096,7 @@ fn source_adoption_rejects_a_revision_from_an_independently_opened_owner() {
         Ok(_) => panic!("independently opened source owner was adopted"),
         Err(error) => error,
     };
-    // A revision of another base is the caller's input (record 0351).
+    // A revision of another base is the caller's input.
     assert_eq!(error.code(), Code::InvalidInput);
     assert!(matches!(
         error.leaf(),

@@ -1,12 +1,12 @@
-//! Test-only fake formats for the query walker (record 0010 §10.2, step R3).
+//! Test-only fake formats for the query walker.
 //!
 //! Three small formats, one per family vocabulary: a Word-like document, a
 //! presentation and a workbook. Each has a field-less kind enum that
-//! implements [`ElementKind`] over the family vocabulary (record 0010 §4.2)
-//! and an R1 spec table checked by `check_format_spec!` (record 0010 §7.2),
+//! implements [`ElementKind`] over the family vocabulary
+//! and a spec table checked by `check_format_spec!`,
 //! and its documents are trees of [`Item`]s built during a test's setup. The
 //! walker reaches them only through [`Navigate`] and [`Inspect`], so the
-//! tests exercise exactly the seam a real adapter implements (M1 step R4).
+//! tests exercise exactly the seam a real adapter implements.
 //!
 //! The workbook keeps rows and cells as sibling children of a worksheet, in
 //! row-major order, and lists its tables (ListObjects) beside the tree for
@@ -70,14 +70,14 @@ const SPACING: LengthSpec = LengthSpec::new(LengthContext::Extent, LengthStyle::
 static CHART_GAP: GapSpec = GapSpec {
     subject: Subject::Element("chart"),
     code: Code::UnsupportedCapability,
-    follow_up: "L-FAKE-R1",
+    follow_up: "not supported yet",
     reason: "the fake leaf has no chart reader",
 };
 
 static PIVOT_GAP: GapSpec = GapSpec {
     subject: Subject::Element("pivottable"),
     code: Code::UnsupportedCapability,
-    follow_up: "L-FAKE-R2",
+    follow_up: "not supported yet",
     reason: "the fake leaf has no pivot-table reader",
 };
 
@@ -347,7 +347,7 @@ pub(crate) static WORD_SPEC: FormatSpec<WordKind> = {
                 key: "highlight",
             },
             code: Code::UnsupportedCapability,
-            follow_up: "L-DOCX-R4",
+            follow_up: "not supported yet",
             reason: "the fake leaf has no highlight reader",
         }],
     }
@@ -479,7 +479,7 @@ pub(crate) static SLIDE_SPEC: FormatSpec<SlideKind> = {
                 key: "alt",
             },
             code: Code::UnsupportedCapability,
-            follow_up: "L-PPTX-R6",
+            follow_up: "not supported yet",
             reason: "the fake leaf does not keep a group's description",
         }],
     }

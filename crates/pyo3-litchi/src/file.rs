@@ -1,7 +1,6 @@
-//! The unified read surface (record 0010 §8.2, M1 step R9):
-//! `litchi_py.open` and `open_bytes` return a [`File`], an immutable handle
-//! over `litchi::File` with `get`, `find`, `query`, `view`,
-//! `capabilities`, `text` and `metadata`.
+//! The unified read surface: `litchi_py.open` and `open_bytes` return a
+//! [`File`], an immutable handle over `litchi::File` with `get`, `find`,
+//! `query`, `view`, `capabilities`, `text` and `metadata`.
 //!
 //! Every read releases the GIL for the Rust work (opening, resolving,
 //! walking, reading the node members, rendering a view) and holds it only
@@ -1079,7 +1078,7 @@ impl File {
     }
 
     /// The document as an OfficeCLI v2 batch: a list of item dicts that
-    /// ``batch`` replays onto ``create(format)`` to rebuild it (record 0336).
+    /// ``batch`` replays onto ``create(format)`` to rebuild it.
     ///
     /// The first item is ``{"command": "meta", "dumpVersion": 2}``. Content
     /// the write verbs cannot rebuild (pictures, charts, fields, comments,
@@ -1110,7 +1109,7 @@ impl File {
     }
 
     /// The package parts: a list of ``{"name", "contentType"}`` dicts in
-    /// name order (design §12, record 0336).
+    /// name order (design §12).
     ///
     /// Raises:
     ///     UnsupportedError: (a ValueError) If the format has no package
@@ -1123,7 +1122,7 @@ impl File {
     }
 
     /// One package part's bytes, as the File would publish them (OfficeCLI
-    /// ``raw``; record 0336).
+    /// ``raw``).
     ///
     /// Args:
     ///     part: A part name ("/word/document.xml") or alias ("/document",
@@ -1144,7 +1143,7 @@ impl File {
 
     /// Add a package part with its content type and a relationship from
     /// ``parent``; return a Commit whose ``value`` is ``{"part",
-    /// "relationshipId"}`` (OfficeCLI ``add-part``; record 0336).
+    /// "relationshipId"}`` (OfficeCLI ``add-part``).
     ///
     /// ``type`` is "chart", "header" or "footer" for an empty part of that
     /// kind; otherwise pass ``content_type``, ``relationship``, ``data``
@@ -1189,8 +1188,7 @@ impl File {
     }
 
     /// Edit one part's XML at every element ``xpath`` matches; return a
-    /// Commit whose ``value`` is ``{"matched": n}`` (OfficeCLI ``raw-set``;
-    /// record 0336).
+    /// Commit whose ``value`` is ``{"matched": n}`` (OfficeCLI ``raw-set``).
     ///
     /// The XPath is a location path of "/" and "//" steps with prefixed
     /// names or "*" and [n], [last()] or [@name='value'] predicates.
@@ -1233,8 +1231,8 @@ impl File {
         )
     }
 
-    /// Check the package structure read-only (OfficeCLI ``validate``;
-    /// record 0336): a dict with ``format``, ``valid`` (no error or fatal
+    /// Check the package structure read-only (OfficeCLI ``validate``):
+    /// a dict with ``format``, ``valid`` (no error or fatal
     /// finding), ``complete``, ``checks`` and ``issues`` (each with
     /// ``code``, ``severity``, ``message`` and ``locations``).
     ///

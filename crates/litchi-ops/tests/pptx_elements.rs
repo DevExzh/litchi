@@ -1,4 +1,4 @@
-//! PPTX element gaps closed for OfficeCLI tier-1 parity (record 0321): the
+//! PPTX element gaps closed for OfficeCLI tier-1 parity: the
 //! theme, table columns, hyperlinks, media, equations and slide masters and
 //! layouts through the unified `File` API, for source and eager owners,
 //! with round trips, exact no-ops and refusals that leave the input intact.
@@ -532,7 +532,7 @@ mod presentation;
 
 #[test]
 fn shape_run_picture_and_group_links_as_properties() {
-    // Record 0325: `link` and `tooltip` as properties (OfficeCLI's usual
+    // `link` and `tooltip` as properties (OfficeCLI's usual
     // write path), on add and set, read back on both owners.
     let file = two_slides()
         .add(

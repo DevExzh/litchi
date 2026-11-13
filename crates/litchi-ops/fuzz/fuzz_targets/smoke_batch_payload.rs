@@ -1,4 +1,4 @@
-//! Stable-toolchain smoke run of the batch-payload targets (record 0334).
+//! Stable-toolchain smoke run of the batch-payload targets.
 //!
 //! Replays every seed in `corpus/batch_payload/` plus deterministic
 //! mutations (every prefix and every single-bit flip) through

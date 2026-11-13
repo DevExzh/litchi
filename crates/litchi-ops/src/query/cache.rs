@@ -1,4 +1,4 @@
-//! A bounded per-thread cache of compiled plans (record 0291).
+//! A bounded per-thread cache of compiled plans.
 //!
 //! A selector passed to `query`, `set` or `remove` as text or as a parsed
 //! [`Query`] is compiled for the document's format on every call: about

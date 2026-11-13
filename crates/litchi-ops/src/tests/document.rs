@@ -4,7 +4,7 @@
 //! Each test keeps its facade semantics: the route a fixture takes, the
 //! owner it ends in, and the result or typed refusal it reports. Facade
 //! errors that were string-flattened are asserted through the typed code and
-//! leaf instead. The Markdown tests move with `ToMarkdown` (step S7).
+//! leaf instead. The Markdown tests move with `ToMarkdown`.
 
 #[cfg(any(feature = "docx", feature = "odt"))]
 use std::io::Cursor;
@@ -366,8 +366,8 @@ mod docx {
     }
 
     /// A budget-managed source-backed DOCX, built by the leaf as the facade
-    /// test built it: `open` never builds managed owners (record 0008 A1),
-    /// so the handle adopts one directly.
+    /// test built it: `open` never builds managed owners, so the handle
+    /// adopts one directly.
     fn managed(
         xml: &[u8],
         memory: u64,
@@ -1856,8 +1856,8 @@ mod odt {
 
     #[test]
     fn flat_odt_opens_through_its_read_projection() {
-        // Record 0292: flat ODT reads through the leaf's packaged projection
-        // and publishes its flat bytes.
+        // Flat ODT reads through the leaf's packaged projection and
+        // publishes its flat bytes.
         let file = crate::open_bytes(FLAT_ODT.to_vec()).expect("flat ODT opens");
         assert_eq!(file.format(), Some(litchi_core::FileFormat::Odt));
         assert_eq!(file.text().unwrap(), "Title\nHello flat text");

@@ -453,8 +453,8 @@ pub(crate) fn shape_plan(
 
 /// One direct `File::set` of a shape's text through a one-item run, so a
 /// single text assignment publishes through the same native chunked text
-/// edit a coalesced batch uses rather than the general one-shot writer
-/// (record 0377). `None` keeps the ordinary writer: any target or property
+/// edit a coalesced batch uses rather than the general one-shot writer.
+/// `None` keeps the ordinary writer: any target or property
 /// other than one changed `text` on an unsigned handle, and any admission or
 /// publication error, which the ordinary writer then reports with its own
 /// diagnostics.

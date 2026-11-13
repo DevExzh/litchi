@@ -1,5 +1,5 @@
-//! Capability support for text find/replace (record 0273): `set` with the
-//! `find=` and `replace=` properties.
+//! Capability support for text find/replace: `set` with the `find=` and
+//! `replace=` properties.
 
 #[cfg(any(
     feature = "docx",
@@ -21,7 +21,7 @@ use crate::read::Adapter;
 
 /// The follow-up of every format whose adapter has no find yet (the ODF
 /// object formats and iWork).
-const FOLLOW_UP: &str = "record 0295 follow-up: a find adapter over the format's text edits";
+const FOLLOW_UP: &str = "follow-up: a find adapter over the format's text edits";
 
 impl Capabilities {
     /// Whether `set` with `find=` is available.
@@ -36,7 +36,7 @@ impl Capabilities {
             Some(Adapter::Xlsx) => self.retained(),
             #[cfg(feature = "pptx")]
             Some(Adapter::Pptx) => self.retained(),
-            // Record 0295: the text-surface adapters.
+            // The text-surface adapters.
             #[cfg(feature = "doc")]
             Some(Adapter::Doc) => self.retained(),
             #[cfg(feature = "ppt")]

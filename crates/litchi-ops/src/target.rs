@@ -1,4 +1,4 @@
-//! [`IntoTarget`]: what `set` acts on (record 0015 §2.1): one
+//! [`IntoTarget`]: what `set` acts on: one
 //! element by path, or every element a selector matches.
 
 use litchi_core::selector::{Path, Query, Scope, limits};
@@ -242,9 +242,8 @@ fn mixed_union_scope() -> Error {
 ///
 /// `(`, `)` and whitespace outside brackets are query syntax only after the
 /// last top-level `/` (outside brackets and parentheses). One pass keeps
-/// whether such a byte follows the latest top-level slash seen so far
-/// (record 0291; it used to find the last slash in a separate pass first).
-/// The bytes that can make [`has_query_syntax`] answer `true`.
+/// whether such a byte follows the latest top-level slash seen so far. The
+/// bytes that can make [`has_query_syntax`] answer `true`.
 static QUERY_BYTES: [bool; 256] = {
     let mut table = [false; 256];
     let mut byte = 0;
@@ -260,8 +259,8 @@ static QUERY_BYTES: [bool; 256] = {
 
 fn has_query_syntax(text: &str) -> bool {
     // Only these bytes can make the answer `true` (brackets, slashes and
-    // the rest only change state); a plain path has none (record 0302). One
-    // table lookup per byte, folded without a branch (record 0326).
+    // the rest only change state); a plain path has none. One table lookup
+    // per byte, folded without a branch.
     if !text
         .bytes()
         .fold(false, |seen, byte| seen | QUERY_BYTES[usize::from(byte)])
@@ -481,7 +480,7 @@ impl<'p> IntoTarget<'p> for TargetArg<'p> {
 }
 
 /// A target parsed once runs again without parsing, classifying or
-/// copying it: the path or selector is borrowed (record 0291).
+/// copying it: the path or selector is borrowed.
 ///
 /// ```
 /// use litchi_ops::{IntoTarget, TargetArg};
@@ -631,7 +630,7 @@ mod tests {
         assert!(!format!("{error:?}").contains(secret));
     }
 
-    /// The two-pass classifier `has_query_syntax` replaced (record 0291).
+    /// The two-pass classifier `has_query_syntax` replaced.
     fn two_pass_query_syntax(text: &str) -> bool {
         let mut brackets = 0_usize;
         let mut quote: Option<u8> = None;

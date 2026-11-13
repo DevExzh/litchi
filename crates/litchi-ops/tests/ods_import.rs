@@ -1,4 +1,4 @@
-//! CSV/TSV import into ODS (record 0295, record 0266 follow-up F8): one
+//! CSV/TSV import into ODS: one
 //! leaf commit, native value types, an exact no-op for empty input, typed
 //! refusals and an inverse patch.
 #![cfg(feature = "ods")]

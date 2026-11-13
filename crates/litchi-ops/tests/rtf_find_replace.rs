@@ -1,5 +1,5 @@
-//! RTF find/replace through `set` with `find=` and `replace=` (record
-//! 0273): one native run-text replacement per changed run, each run keeping
+//! RTF find/replace through `set` with `find=` and `replace=`:
+//! one native run-text replacement per changed run, each run keeping
 //! its character formatting; a cross-run match collapses into the run where
 //! it starts.
 #![cfg(feature = "rtf")]

@@ -22,7 +22,7 @@ use crate::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
 use crate::value::Scalar;
 
 /// The patch an XLS write step retains: a primary edit, a metadata edit or
-/// a worksheet-feature edit (record 0327). Each exposes the exact package
+/// a worksheet-feature edit. Each exposes the exact package
 /// images the generic history compares.
 #[allow(
     clippy::large_enum_variant,
@@ -1203,7 +1203,7 @@ fn invalid_query() -> Error {
 /// coordinate is a barrier: the following command is re-resolved only after
 /// the preceding native edit has been published, which preserves insert,
 /// remove, and missing-cell semantics.
-/// CSV/TSV import through one native edit (record 0266).
+/// CSV/TSV import through one native edit.
 pub(crate) mod find;
 pub(crate) mod import;
 #[cfg(feature = "eval")]
@@ -1411,7 +1411,7 @@ pub(crate) mod coalesce {
         /// run's leaf edit) checks the source when it opens and around its
         /// commit, and each item's resolution and leaf `source_cell` read
         /// still observe the source, so a plan inside a run adds no check
-        /// of its own (record 0337: about five `fstat`s an item on a
+        /// of its own (about five `fstat`s an item on a
         /// file-backed owner).
         fn check_outside_run(&self, source: Option<&litchi_xls::Edit>) -> Result<()> {
             if source.is_some() {
@@ -1580,7 +1580,7 @@ pub(crate) mod coalesce {
                 return Err(snapshot_limit(observed, self.max_snapshot_bytes));
             }
             // Staging reads no source: the run checks it when it opens and
-            // around its commit (record 0337).
+            // around its commit.
             self.items
                 .try_reserve(1)
                 .map_err(|source| TransactionError::Allocation { source })?;

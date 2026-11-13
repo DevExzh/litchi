@@ -1,6 +1,6 @@
-//! `merge` (records 0274 and 0295): fill a template (DOCX, PPTX, XLSX,
-//! XLSB, DOC, PPT, XLS, RTF, ODT, OTH, ODM, ODS or ODP) from JSON or CSV
-//! data through `File::merge`, one output per record.
+//! `merge`: fill a template (DOCX, PPTX, XLSX, XLSB, DOC, PPT, XLS, RTF,
+//! ODT, OTH, ODM, ODS or ODP) from JSON or CSV data through
+//! `File::merge`, one output per record.
 
 use std::io::{Read as _, Write};
 use std::path::{Path, PathBuf};

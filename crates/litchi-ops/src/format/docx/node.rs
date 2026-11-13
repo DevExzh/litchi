@@ -1,12 +1,11 @@
-//! The DOCX node: one leaf value and its compact address (record 0010 §3,
-//! §2.6).
+//! The DOCX node: one leaf value and its compact address.
 //!
 //! A [`Node`] carries the leaf's own value for its element, moved in from
 //! the leaf's indexes: a paragraph, a run, a table row or cell, a hyperlink,
 //! or the entry of a block container's index (the body, a cell or a
 //! content control). Those values share the visible main-document payload
 //! and the block index through `Arc`s, so a node pins exactly what the
-//! leaf's memos hold and nothing else (§3.3).
+//! leaf's memos hold and nothing else.
 //!
 //! Addresses retain kind-specific positions. Canonical paths are positional;
 //! native identity selection is available only through explicit raw paths.
@@ -28,8 +27,8 @@ use crate::node::{NodePath, PathStep};
 /// A node of a DOCX document: an element of the main story, with its leaf
 /// value and its address.
 ///
-/// Reach one through `File::get`, `File::query` or a parent's children
-/// (record 0010 §8.1). The typed accessors return the `litchi_docx` values
+/// Reach one through `File::get`, `File::query` or a parent's children.
+/// The typed accessors return the `litchi_docx` values
 /// the node carries, so callers that need more than the node view read the
 /// leaf directly.
 ///
@@ -89,20 +88,20 @@ pub(super) enum Value {
     Comment(Arc<litchi_docx::comment::Comment>),
     /// A chart of a paragraph, with its paragraph.
     Chart(Arc<super::chart::ChartValue>),
-    /// A SmartArt graphic (record 0295).
+    /// A SmartArt graphic.
     SmartArt(Arc<super::smartart::SmartArtValue>),
     /// A series or an axis of a chart, by its position among the chart's
-    /// series or axes (record 0335); the node's kind says which.
+    /// series or axes; the node's kind says which.
     ChartChild(Arc<super::chart::ChartValue>, u32),
-    /// A content node of a SmartArt graphic (record 0335).
+    /// A content node of a SmartArt graphic.
     DiagramNode(Arc<super::smartart::DiagramNodeValue>),
-    /// A styles, numbering, story or note element (record 0319).
+    /// A styles, numbering, story or note element.
     Part(super::parts::PartValue),
     /// A tab stop, break, bookmark, field, table of contents, watermark or
-    /// text box (record 0319).
+    /// text box.
     Mark(Arc<super::marks::MarkValue>),
     /// A grid column: its table's container entry and its position in the
-    /// grid (record 0345).
+    /// grid.
     Column(Block, u32),
 }
 
@@ -332,7 +331,7 @@ impl<'f> Node<'f> {
 
     /// The block index entry of a paragraph, table, content control,
     /// equation or section node: its kind, its position in its container,
-    /// and the transaction address M2 edits it by.
+    /// and the transaction address it is edited by.
     ///
     /// # Errors
     /// Returns source revision and leaf block-read errors.
@@ -344,17 +343,17 @@ impl<'f> Node<'f> {
     }
 
     /// The position the document transaction addresses this block by, the
-    /// raw direct-child ordinal of record 0010 §4.5.1, for a paragraph,
+    /// raw direct-child ordinal, for a paragraph,
     /// table or content control of the main story.
     ///
     /// # Errors
     ///
     /// `unsupported_capability` when the element is not a block, sits
     /// inside a `w:customXml` wrapper, or when the raw and visible views of
-    /// its container are not proven to agree (record 0011): the position is
+    /// its container are not proven to agree: the position is
     /// refused rather than guessed. Blocks read from a cell or a content
     /// control carry no proof of their own; their positions are refused
-    /// until M2 checks them against the body index.
+    /// until they are checked against the body index.
     pub fn transaction_position(&self) -> Result<Position> {
         self.docx.owner().check_source()?;
         let block = self.own_block().ok_or_else(|| {
@@ -400,7 +399,7 @@ impl<'f> Node<'f> {
         Ok(blocks)
     }
 
-    /// The only DOCX selections for which the M2 editor has a proven raw
+    /// The only DOCX selections for which the editor has a proven raw
     /// transaction address.
     ///
     /// The visible navigator flattens custom XML and markup-compatibility
@@ -437,8 +436,7 @@ impl<'f> Node<'f> {
         }
         if cached.is_none() {
             // A direct body paragraph was resolved from the body index of
-            // this owner's generation; reuse it rather than reading it again
-            // (record 0251f).
+            // this owner's generation; reuse it rather than reading it again.
             *cached = Some(match (&self.value, steps) {
                 (Value::Paragraph { block, .. }, [_, _]) => block.container.clone(),
                 _ => super::nav::load_body(self.docx)?,

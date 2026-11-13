@@ -46,8 +46,8 @@ use litchi_opc::SourceLimits;
 use super::{Validation, with_format};
 use crate::{Code, Error as OpsError, File, Result};
 
-/// Why a validation could not produce a report (record 0336). Findings are
-/// never errors; they are in the [`Validation`] report.
+/// Why a validation could not produce a report. Findings are never errors;
+/// they are in the [`Validation`] report.
 ///
 /// `Display` is content-free: the leaf validators report only structural
 /// metadata.

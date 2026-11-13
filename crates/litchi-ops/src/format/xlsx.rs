@@ -1,9 +1,9 @@
 //! Handle for Excel OOXML (`.xlsx`) inputs.
 //!
-//! [`Xlsx`] is one `Arc` over its state: the two-state owner of record 0003
-//! §2.3 (`Source` for the deferred, source-backed catalog; `Eager` for the
+//! [`Xlsx`] is one `Arc` over its state: the two-state owner
+//! (`Source` for the deferred, source-backed catalog; `Eager` for the
 //! owning workbook snapshot), the core-properties metadata and its repairs
-//! read at open (§1.6), the lazily built worksheet-name list, and the
+//! read at open, the lazily built worksheet-name list, and the
 //! retention policy from [`OpenOptions`]. Cloning bumps one reference count.
 //!
 //! # Routes
@@ -147,7 +147,7 @@ struct XlsxState {
     unsigned_promotion: OnceLock<Mutex<Option<xlsx::Package>>>,
 }
 
-/// The two owner states of an XLSX handle (record 0003 §2.3).
+/// The two owner states of an XLSX handle.
 pub(crate) enum XlsxOwner {
     /// Deferred catalog over the retained positional source.
     Source(xlsx::SourceBackedWorkbook),
@@ -481,7 +481,7 @@ impl Xlsx {
         )))
     }
 
-    /// This handle's signature disposition (record 0013).
+    /// This handle's signature disposition.
     pub(crate) fn signature(&self) -> Signature {
         self.0.signature()
     }
@@ -605,7 +605,7 @@ impl Xlsx {
         })
     }
 
-    /// Build an immutable native workbook snapshot for the write kernel (M2).
+    /// Build an immutable native workbook snapshot for the write kernel.
     ///
     /// Source-backed handles promote through their already-indexed package and
     /// memoize only a successful native snapshot in the shared open state.

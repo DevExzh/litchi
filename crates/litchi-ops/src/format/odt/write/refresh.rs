@@ -1,10 +1,10 @@
-//! ODT (and OTH/ODM) field refresh (record 0295, record 0279 follow-up
-//! F1): the body's text fields computed where Litchi can (`text:date` and
-//! `text:time` with a clock, the document-property and stored-time fields
-//! from the metadata) and their displayed text rewritten through the leaf's
-//! field edit (`Edit::set_field_text`), all in one leaf commit. Page fields
-//! keep their text (`needs_layout`); fixed fields are `locked`; fields with
-//! an ODF data style, user and statistics fields are `unsupported`.
+//! ODT (and OTH/ODM) field refresh: the body's text fields computed where
+//! Litchi can (`text:date` and `text:time` with a clock, the
+//! document-property and stored-time fields from the metadata) and their
+//! displayed text rewritten through the leaf's field edit
+//! (`Edit::set_field_text`), all in one leaf commit. Page fields keep their
+//! text (`needs_layout`); fixed fields are `locked`; fields with an ODF
+//! data style, user and statistics fields are `unsupported`.
 
 use litchi_odt::body::text_fields;
 

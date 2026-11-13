@@ -1,4 +1,4 @@
-//! DOCX run-level markup compatibility (record 0307).
+//! DOCX run-level markup compatibility.
 //!
 //! Word writes drawings and text boxes as an `mc:AlternateContent` inside a
 //! run: a DrawingML `Choice` and a VML `Fallback`, each with its own copy of

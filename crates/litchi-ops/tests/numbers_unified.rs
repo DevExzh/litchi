@@ -1,4 +1,4 @@
-//! Unified Numbers coverage (record 0297): creation, renames, sheet and
+//! Unified Numbers coverage: creation, renames, sheet and
 //! table moves, formulas, display formats, comments, merged ranges, cell
 //! removal, batch coalescing into one leaf commit per table, and the typed
 //! gaps the leaf still has.
@@ -138,7 +138,7 @@ fn create_returns_a_deterministic_minimal_workbook() {
         Some("1")
     );
     // The blank's table owner carries the native table extents, so the
-    // created workbook authors formulas (record 0309).
+    // created workbook authors formulas.
     let formula = reopened
         .set("/sheet[1]/table[1]/B2", props! { "formula" => "A2*3" })
         .expect("a formula into the fresh workbook");
@@ -213,7 +213,7 @@ fn moves_sheets_and_relocates_tables() {
         prop(&reopened, "/sheet[2]/table[2]", "name").as_deref(),
         Some("Table 1")
     );
-    // Within one sheet (record 0301): the relocated table goes back first.
+    // Within one sheet: the relocated table goes back first.
     let reordered = relocated
         .edit(|tx| tx.move_to("/sheet[2]/table[2]", Placement::Start))
         .expect("in-sheet order");
@@ -532,7 +532,7 @@ fn sets_display_formats() {
     assert_eq!(error.code(), Code::InvalidValue);
 }
 
-/// Record 0318: cell comments are read, set, added and removed, on native
+/// Cell comments are read, set, added and removed, on native
 /// packages (their lists, tiles and authors in members of their own) and
 /// on a created workbook.
 #[test]
@@ -570,7 +570,7 @@ fn cell_comments_are_read_set_added_and_removed() {
         .remove(&format!("{commented}/comment"))
         .expect("remove the comment");
     assert_eq!(prop(&reopen(&removed), &commented, "comment"), None);
-    // Record 0329: an empty cell in a row its tile does not store takes a
+    // An empty cell in a row its tile does not store takes a
     // comment too.
     let basic = read("basic.numbers");
     let last = "/sheet[1]/table[1]/G22";
@@ -1089,7 +1089,7 @@ fn rows_and_columns_are_inserted_and_removed() {
     assert_eq!(error.code(), Code::UnsupportedCapability);
 }
 
-/// Record 0318: rows and columns of a table with formulas move the
+/// Rows and columns of a table with formulas move the
 /// formulas' references; removing a row a formula reads is refused.
 #[test]
 fn rows_and_columns_move_formula_references() {
@@ -1140,7 +1140,7 @@ fn rows_and_columns_move_formula_references() {
         .apply(edited.file())
         .expect("inverse");
     assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
-    // Record 0329: removing row 3, which the formula reads, shrinks its
+    // Removing row 3, which the formula reads, shrinks its
     // range and turns the reference to C3 into #REF!.
     let removed = file
         .remove("/sheet[1]/table[1]/row[3]")
@@ -1205,7 +1205,7 @@ fn cell_fonts_are_written() {
             .bold,
         Some(true)
     );
-    // An empty cell takes a style-only cell (record 0370).
+    // An empty cell takes a style-only cell.
     let styled_empty = file
         .set("/sheet[1]/table[1]/D4", props! { "font.bold" => true })
         .expect("empty cell");
@@ -1219,7 +1219,7 @@ fn cell_fonts_are_written() {
 }
 
 /// Three sheets; the first holds the tables `Table 1`, `B` and `C`, the
-/// second none, the third `Z` (record 0347).
+/// second none, the third `Z`.
 fn three_sheets() -> File {
     let mut file = create(FileFormat::Numbers).expect("create");
     for _ in 0..2 {
@@ -1243,8 +1243,7 @@ fn names(file: &File, paths: &[&str]) -> Vec<Option<String>> {
 }
 
 /// Sheets and tables swap atomically, each swap equals its two moves
-/// applied one at a time, and the patch inverts to the exact source bytes
-/// (record 0347).
+/// applied one at a time, and the patch inverts to the exact source bytes.
 #[test]
 fn swaps_sheets_and_tables() {
     let file = three_sheets();

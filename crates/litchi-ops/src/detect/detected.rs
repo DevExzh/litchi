@@ -9,7 +9,7 @@
 #![allow(
     trivial_casts,
     unused_qualifications,
-    reason = "moved verbatim from the facade (M0a S4), which does not inherit the workspace lints"
+    reason = "moved verbatim from the facade, which does not inherit the workspace lints"
 )]
 
 use super::SourceLimits;
@@ -356,7 +356,7 @@ fn detect_format_smart_without_ooxml<T: ZipTail>(
         let cursor = std::io::Cursor::new(bytes);
         if let Ok(ole_file) = litchi_cfb::OleFile::open(cursor, limits.cfb()) {
             // An encrypted OOXML package, even beside a stub `WordDocument`
-            // stream (record 0341).
+            // stream.
             if ole_file.exists(&["EncryptionInfo"]) && ole_file.exists(&["EncryptedPackage"]) {
                 return None;
             }
@@ -465,7 +465,7 @@ pub(crate) fn detect_ooxml_smart<T: ZipTail>(
         let cursor = std::io::Cursor::new(bytes);
         if let Ok(ole_file) = litchi_cfb::OleFile::open(cursor, source_limits.cfb()) {
             // An encrypted OOXML package, even beside a stub `WordDocument`
-            // stream (record 0341).
+            // stream.
             if ole_file.exists(&["EncryptionInfo"]) && ole_file.exists(&["EncryptedPackage"]) {
                 return None;
             }

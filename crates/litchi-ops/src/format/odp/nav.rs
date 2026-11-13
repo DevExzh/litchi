@@ -292,7 +292,7 @@ impl<'f> Nav<'f> {
             scene.object(&list).map_or(&[][..], Object::children)
         };
         // Video, audio and formula objects are addressed among the media
-        // and embedded objects they are (record 0328).
+        // and embedded objects they are.
         let semantic: Vec<Option<Kind>> =
             if matches!(kind, Kind::Video | Kind::Audio | Kind::Equation) {
                 let mut kinds = Vec::with_capacity(objects.len());
@@ -511,7 +511,7 @@ impl<'f> Inspect<'f> for Nav<'f> {
     fn kind(&self, node: &Node<'f>) -> Kind {
         // As in PPTX, a placeholder is a shape to selectors: `shape` matches
         // it, and a bare `placeholder` selects the shapes with a
-        // presentation class (record 0290 F1).
+        // presentation class.
         node.element()
     }
 

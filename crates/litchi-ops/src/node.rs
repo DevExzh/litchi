@@ -1,14 +1,14 @@
-//! Typed nodes and the generic node view (design §5; record 0010 §2–§3, §7.2).
+//! Typed nodes and the generic node view (design §5).
 //!
 //! The planned `get`, `find`, `query` and `children` APIs yield a [`Node`]: one flat,
-//! data-bearing enum with a variant per format, each wrapping that format's
-//! own node, which carries the leaf's ADR 0007 values (decision D2). Typed
-//! reads never build the generic view.
+//! data-bearing enum with a variant per format, each wrapping that format's own node,
+//! which carries the leaf's ADR 0007 values. Typed reads never build the generic
+//! view.
 //!
 //! On demand, any node projects into a [`View`]: OfficeCLI's eight-member
 //! `DocumentNode` (`path`, `type`, `text`, `preview`, `style`, `childCount`,
 //! `format`, `children`) with OfficeCLI's member order and omission rules
-//! (decision D1). The view is a borrowed projection, never a model:
+//! The view is a borrowed projection, never a model:
 //!
 //! - its `serde::Serialize` implementation streams straight into the
 //!   serializer, with no intermediate `DocumentNode`, no per-node map and no
@@ -136,7 +136,7 @@ pub mod raw {
 pub use serialize::SerializeError;
 pub use value::{Key, Value};
 pub(crate) use view::Project;
-// The query engine's fake format and the format adapters (R4-R7) read
+// The query engine's fake format and the format adapters read
 // properties through it.
 #[cfg(any(
     test,
@@ -162,7 +162,7 @@ pub use view::{
 };
 
 /// A typed node of an open document: one variant per format, each wrapping
-/// that format's node (record 0010 §3.1).
+/// that format's node.
 ///
 /// A node borrows the `File` it came from (`'f`). Its generic accessors
 /// dispatch with one `match`, statically; [`Node::view`] projects it into the
@@ -184,45 +184,44 @@ pub use view::{
     reason = "format nodes stay inline so spreadsheet traversal does not allocate a box per cell"
 )]
 pub enum Node<'f> {
-    /// A WordprocessingML node (DOCX adapter, step R4a).
+    /// A WordprocessingML node (DOCX adapter).
     #[cfg(feature = "docx")]
     Docx(crate::format::docx::Node<'f>),
-    /// A SpreadsheetML node (XLSX adapter, step R4b).
+    /// A SpreadsheetML node (XLSX adapter).
     #[cfg(feature = "xlsx")]
     Xlsx(crate::format::xlsx::Node<'f>),
-    /// A PresentationML node (PPTX adapter, step R4c).
+    /// A PresentationML node (PPTX adapter).
     #[cfg(feature = "pptx")]
     Pptx(crate::format::pptx::Node<'f>),
-    /// A BIFF12 workbook node (XLSB adapter, step R4d).
+    /// A BIFF12 workbook node (XLSB adapter).
     #[cfg(feature = "xlsb")]
     Xlsb(crate::format::xlsb::Node<'f>),
-    /// A legacy Word node (DOC adapter, step R6a).
+    /// A legacy Word node (DOC adapter).
     #[cfg(feature = "doc")]
     Doc(crate::format::doc::Node<'f>),
-    /// A legacy Excel node (XLS adapter, step R6b).
+    /// A legacy Excel node (XLS adapter).
     #[cfg(feature = "xls")]
     Xls(crate::format::xls::Node<'f>),
-    /// A legacy PowerPoint node (PPT adapter, step R6c).
+    /// A legacy PowerPoint node (PPT adapter).
     #[cfg(feature = "ppt")]
     Ppt(crate::format::ppt::Node<'f>),
-    /// A Rich Text Format node (tier-3 adapter, step R7).
+    /// A Rich Text Format node (tier-3 adapter).
     #[cfg(feature = "rtf")]
     Rtf(crate::format::rtf::Node<'f>),
-    /// An OpenDocument text node (tier-3 adapter, record 0276).
+    /// An OpenDocument text node (tier-3 adapter).
     #[cfg(feature = "odt")]
     Odt(crate::format::odt::Node<'f>),
-    /// An OpenDocument spreadsheet node (tier-3 adapter, record 0277).
+    /// An OpenDocument spreadsheet node (tier-3 adapter).
     #[cfg(feature = "ods")]
     Ods(crate::format::ods::Node<'f>),
-    /// An OpenDocument presentation node (tier-3 adapter, record 0278).
+    /// An OpenDocument presentation node (tier-3 adapter).
     #[cfg(feature = "odp")]
     Odp(crate::format::odp::Node<'f>),
     /// An OpenDocument drawing, chart, image, database or formula node
-    /// (object-tree adapter, record 0282).
+    /// (object-tree adapter).
     #[cfg(odf_objects)]
     Object(crate::format::odf_tree::Node<'f>),
-    /// An Apple Pages, Keynote or Numbers node (iWork object-tree adapter,
-    /// record 0296).
+    /// An Apple Pages, Keynote or Numbers node (iWork object-tree adapter).
     #[cfg(feature = "iwork-adapter")]
     Iwork(crate::format::iwork::Node<'f>),
     /// A node of the test-only fake format.
@@ -438,7 +437,7 @@ impl<'f> Node<'f> {
         }
     }
 
-    /// Borrow the typed iWork node (Pages, Keynote, Numbers; record 0296).
+    /// Borrow the typed iWork node (Pages, Keynote, Numbers).
     #[cfg(feature = "iwork-adapter")]
     #[must_use]
     pub fn as_iwork(&self) -> Option<&crate::format::iwork::Node<'f>> {
@@ -494,7 +493,7 @@ impl<'f> Project<'f> for Node<'f> {
 
 /// The payload of a [`Node`] variant whose format adapter has not landed
 /// yet. It is uninhabited, so the variant cannot occur; the adapter replaces
-/// it with the format's own node enum (record 0010 §3.1).
+/// it with the format's own node enum.
 pub struct Pending<'f, H> {
     never: Infallible,
     _file: PhantomData<&'f H>,

@@ -62,7 +62,7 @@ impl Pptx {
         node: NewNode<'_>,
         limits: &SemanticLimits,
     ) -> Result<(Commit, Path<'static>)> {
-        // The element kind first (record 0269, finding X2): a kind the deck
+        // The element kind first: a kind the deck
         // cannot add is `unsupported_element` whatever its parent; an
         // addable kind under the wrong parent is `unsupported_type`.
         if !ADDABLE
@@ -115,7 +115,7 @@ impl Pptx {
         {
             return self.add_modern_comment(parent, node, limits);
         }
-        // Placeholders and speaker notes (record 0346).
+        // Placeholders and speaker notes.
         if node.kind().eq_ignore_ascii_case("placeholder") || node.kind().eq_ignore_ascii_case("ph")
         {
             return self.add_placeholder(parent, node, limits);
@@ -141,8 +141,7 @@ impl Pptx {
         if node.kind().eq_ignore_ascii_case("shape") || node.kind().eq_ignore_ascii_case("textbox")
         {
             // `add_text_box` constructs its bounded native edit on every
-            // success path, which performs strict admission once (record
-            // 0281).
+            // success path, which performs strict admission once.
             let source = self.editable_owner()?;
             return self.add_text_box(parent, node, source, limits);
         }
@@ -160,7 +159,7 @@ impl Pptx {
         let mut layout = None;
         let mut name = None;
         let mut hidden = None;
-        // OfficeCLI's title and body shorthand (record 0346).
+        // OfficeCLI's title and body shorthand.
         let mut title = None;
         let mut body = None;
         let mut assigned = 0_u8;
@@ -277,7 +276,7 @@ impl Pptx {
         let source = self.editable_owner()?;
         // Placeholder text is staged by the eager editor: a source owner is
         // promoted for a slide added with `title` or `text`, as comment and
-        // notes writes promote it (record 0346).
+        // notes writes promote it.
         let shorthand = title.is_some() || body.is_some();
         let native_limit = native_snapshot_budget(limits);
         let (target, proof, after) = match &source {
@@ -337,7 +336,7 @@ impl Pptx {
         Ok((Commit::new(after, source, target, proof, 1), path))
     }
 }
-/// The modern comment kind and its aliases (record 0346).
+/// The modern comment kind and its aliases.
 const MODERN_KINDS: &[&str] = &[
     "moderncomment",
     "modern-comment",

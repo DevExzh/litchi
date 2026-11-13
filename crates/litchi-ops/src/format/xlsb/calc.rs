@@ -1,4 +1,4 @@
-//! The XLSB worksheet cells formula evaluation loads (record 0266).
+//! The XLSB worksheet cells formula evaluation loads.
 
 use litchi_core::FileFormat;
 use litchi_core::sheet::{Cell as _, CellValue};

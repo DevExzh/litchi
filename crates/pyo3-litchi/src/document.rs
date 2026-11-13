@@ -62,9 +62,9 @@ pub struct Document {
 impl Document {
     fn read(path: &std::path::Path) -> Result<Source, Failure> {
         match litchi::open(path) {
-            // `litchi::File` opens Pages packages and package directories
-            // (records 0296 and 0306), but its family views do not cover
-            // them; this reader projects the package the file retains.
+            // `litchi::File` opens Pages packages and package
+            // directories, but its family views do not cover them; this
+            // reader projects the package the file retains.
             Ok(file) if file.format() == Some(CoreFormat::Pages) => Ok(Source::Pages(file)),
             Ok(file) => match file.document() {
                 Ok(_) => Ok(Source::File(file)),

@@ -1,7 +1,7 @@
-//! Unified ODP elements (record 0328): shape and text hyperlinks, line
+//! Unified ODP elements: shape and text hyperlinks, line
 //! breaks, table columns, video and audio media, formula objects and chart
 //! series and axes, read and written through the PPTX paths and property
-//! names of record 0321.
+//! names.
 
 #![cfg(feature = "odp")]
 

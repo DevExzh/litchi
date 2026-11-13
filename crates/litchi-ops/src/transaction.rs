@@ -133,9 +133,9 @@ impl<T> fmt::Debug for Commit<T> {
 /// Applying a patch accepts its original input handle, a cheap clone, or a
 /// separately opened file of the same variant whose published bytes equal the
 /// patch's source. The exact-owner path is constant work; a reopened candidate
-/// is checked with a bounded-memory length-and-digest proof (record 0362m).
-/// A file whose bytes differ is refused in every format. Native owners, source
-/// guards, origin and policy sidecars are retained; applying reuses the
+/// is checked with a bounded-memory length-and-digest proof. A file whose
+/// bytes differ is refused in every format. Native owners, source guards,
+/// origin and policy sidecars are retained; applying reuses the
 /// already-validated endpoint without a ZIP round trip. Source freshness is
 /// checked in both directions.
 ///
@@ -171,7 +171,7 @@ enum Leaf {
     #[cfg(feature = "ppt")]
     Ppt(Box<crate::format::ppt::write::StepPatch>),
     // The two-endpoint variants are boxed whole, so `Leaf` stays one
-    // pointer wide in every feature combination (record 0304).
+    // pointer wide in every feature combination.
     #[cfg(feature = "pptx")]
     Pptx(Box<PptxLeaf>),
     #[cfg(feature = "docx")]
@@ -343,8 +343,7 @@ enum RunState {
     DocxFormatting(crate::format::docx::write::coalesce::Run),
     #[cfg(feature = "rtf")]
     Rtf(crate::format::rtf::write::coalesce::Run),
-    /// Direct RTF picture removals published as one native removal
-    /// (record 0280).
+    /// Direct RTF picture removals published as one native removal.
     #[cfg(feature = "rtf")]
     RtfPictures(crate::format::rtf::write::removal::PictureRun),
     #[cfg(feature = "odt")]
@@ -365,16 +364,16 @@ enum RunState {
     Odp(crate::format::odp::write::coalesce::Run),
     #[cfg(feature = "ods")]
     OdsCells(crate::format::ods::write::coalesce::Run),
-    /// Coalesced object-format sets (record 0288).
+    /// Coalesced object-format sets.
     #[cfg(odf_objects)]
     OdfTree(crate::format::odf_tree::coalesce::Run),
-    /// Coalesced Numbers cell values and formulas (record 0297).
+    /// Coalesced Numbers cell values and formulas.
     #[cfg(feature = "numbers")]
     NumbersCells(crate::format::iwork::numbers::coalesce::Run),
-    /// Coalesced Pages paragraph text sets (record 0299).
+    /// Coalesced Pages paragraph text sets.
     #[cfg(feature = "pages")]
     Pages(crate::format::iwork::pages::Run),
-    /// Coalesced Keynote sets, new drawables and new slides (record 0298).
+    /// Coalesced Keynote sets, new drawables and new slides.
     #[cfg(feature = "keynote")]
     Keynote(crate::format::iwork::keynote::Run),
 }
@@ -384,7 +383,7 @@ struct Published {
     /// The item index of the run's first command, for error attribution.
     first: Option<usize>,
     step: Step,
-    /// Item changes the run reported at its commit (record 0348).
+    /// Item changes the run reported at its commit.
     reported: Vec<(usize, bool)>,
 }
 
@@ -573,10 +572,10 @@ pub struct Edit {
     snapshot_bytes: usize,
     operations: usize,
     pending: RunState,
-    /// The match count of the last `find=` set (record 0273).
+    /// The match count of the last `find=` set.
     matched: Option<usize>,
     /// Coalesced items whose change a native run reported at its commit,
-    /// by item index (record 0348): their staging returned `false`.
+    /// by item index: their staging returned `false`.
     reported: Vec<(usize, bool)>,
 }
 impl fmt::Debug for Edit {
@@ -1592,8 +1591,8 @@ impl Edit {
 
     /// Stages a direct RTF picture removal (`/body/p[N]/picture[M]`) in the
     /// pending picture run, so consecutive removals publish one native
-    /// removal (record 0280). Any other target closes the run and takes the
-    /// ordinary path.
+    /// removal. Any other target closes the run and takes the ordinary
+    /// path.
     #[cfg(feature = "rtf")]
     fn coalesce_rtf_picture_removal(
         &mut self,
@@ -2063,8 +2062,8 @@ impl Edit {
             //
             // The exception is `text` alone on a direct body paragraph: its
             // ordinal is stable across text replacement, so it joins the
-            // run (record 0355a). A run that has replaced text closes
-            // before any target it cannot prove against its base.
+            // run. A run that has replaced text closes before any target it
+            // cannot prove against its base.
             let text = _props
                 .iter()
                 .any(|(key, _)| key.eq_ignore_ascii_case("text"));
@@ -2142,7 +2141,7 @@ impl Edit {
             self.operations += 1;
             return Ok(Some(changed));
         }
-        // A set closes pending picture removals (record 0280).
+        // A set closes pending picture removals.
         #[cfg(feature = "rtf")]
         if matches!(self.pending, RunState::RtfPictures(_)) {
             self.flush_pending()?;
@@ -2301,10 +2300,10 @@ impl Edit {
         #[cfg(feature = "keynote")]
         if let File::Keynote(handle) = self.current.clone() {
             // Direct text, paragraph, frame and visibility sets join one
-            // run: one slide-drawable commit plus one commit per text
-            // (record 0298). A run holding new slides publishes first.
+            // run: one slide-drawable commit plus one commit per text. A
+            // run holding new slides publishes first.
             let plan = match &mut self.pending {
-                // Record 0314: the run memoizes the paths it resolved.
+                // The run memoizes the paths it resolved.
                 RunState::Keynote(run) if run.accepts_sets() => run.plan_set(_target, _props),
                 RunState::Keynote(_) => None,
                 _ => crate::format::iwork::keynote::coalesce::plan_set(&handle, _target, _props),
@@ -2329,7 +2328,7 @@ impl Edit {
                 _ => false,
             };
             if barrier {
-                // Record 0314: publish the run, then plan on its result.
+                // Publish the run, then plan on its result.
                 self.flush_pending()?;
                 let File::Keynote(current) = self.current.clone() else {
                     return Err(pending());
@@ -3156,7 +3155,7 @@ impl Edit {
             self.flush_pending()?;
             Ok((value, changed(&self.steps[savepoint.steps..])?))
         });
-        // The isolated command's change is its steps' (record 0348).
+        // The isolated command's change is its steps'.
         self.reported.truncate(reported);
         let result = match self.failure.take() {
             Some(error) => Err(error),
@@ -3168,20 +3167,20 @@ impl Edit {
         result
     }
 
-    /// The match count of the last `find=` set, taken (record 0273).
+    /// The match count of the last `find=` set, taken.
     pub(crate) fn take_matched(&mut self) -> Option<usize> {
         self.matched.take()
     }
 
     /// The changes native runs reported at their commits, by item index,
-    /// taken (record 0348): the items' staging returned `false`. Flush the
-    /// pending run first to include it.
+    /// taken: the items' staging returned `false`. Flush the pending run
+    /// first to include it.
     pub(crate) fn take_reported(&mut self) -> Vec<(usize, bool)> {
         std::mem::take(&mut self.reported)
     }
 
-    /// A `set` whose properties name `find` (record 0273): one native commit
-    /// over the target's subtree, returning the match count.
+    /// A `set` whose properties name `find`: one native commit over the
+    /// target's subtree, returning the match count.
     fn find_replace(
         &mut self,
         target: &crate::TargetArg<'_>,
@@ -3277,8 +3276,8 @@ impl Edit {
     }
 
     /// Add to a Keynote presentation: a new slide, text box, shape or
-    /// picture joins the transaction's Keynote run (record 0298); anything
-    /// else publishes the run and runs alone.
+    /// picture joins the transaction's Keynote run; anything else
+    /// publishes the run and runs alone.
     #[cfg(feature = "keynote")]
     fn add_keynote<'p, 'n>(
         &mut self,
@@ -3377,7 +3376,7 @@ impl Edit {
     }
 
     /// [`Self::execute`] for one mutation that commits several native steps,
-    /// each on the previous one's result (XLS chunks, record 0295).
+    /// each on the previous one's result (XLS chunks).
     fn execute_steps<T>(
         &mut self,
         operation: impl FnOnce(&File) -> Result<(Vec<Step>, T)>,
@@ -3851,7 +3850,7 @@ fn changed(steps: &[Step]) -> Result<bool> {
         #[cfg(feature = "docx")]
         (Leaf::Docx(first_patch), Leaf::Docx(last_patch)) => {
             // A template merge can change only a header or other story
-            // part: a package-graph change is a change (record 0274).
+            // part: a package-graph change is a change.
             Ok(
                 first_patch.source().xml_bytes() != last_patch.target().xml_bytes()
                 || steps.iter().any(|step| match &step.leaf {
@@ -3864,8 +3863,7 @@ fn changed(steps: &[Step]) -> Result<bool> {
                     #[allow(unreachable_patterns)]
                     _ => false,
                 })
-                // A metadata step changes only the core-properties part
-                // (record 0338).
+                // A metadata step changes only the core-properties part.
                 || docx_metadata_changed(&first.before, &last.after)?,
             )
         },
@@ -3876,8 +3874,8 @@ fn changed(steps: &[Step]) -> Result<bool> {
     }
 }
 
-/// Whether two DOCX endpoints carry different core properties (record
-/// 0338), or different application or custom properties (record 0342).
+/// Whether two DOCX endpoints carry different core properties, or
+/// different application or custom properties.
 #[cfg(feature = "docx")]
 fn docx_metadata_changed(before: &File, after: &File) -> Result<bool> {
     match (before, after) {

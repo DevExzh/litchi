@@ -1,4 +1,4 @@
-//! Table grid columns (record 0321, L-PPTX-R8).
+//! Table grid columns.
 //!
 //! `/slide[N]/table[M]/col[C]` reads one `a:gridCol` (`width`). `add` under
 //! a table inserts a column (`width`, default the average of the existing

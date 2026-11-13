@@ -1,4 +1,4 @@
-//! Keynote writes over the leaf's focused transactions (record 0298).
+//! Keynote writes over the leaf's focused transactions.
 //!
 //! Every verb stages its changes in a [`Pending`] set first and publishes
 //! them in as few leaf commits as the families allow: one slide-drawable
@@ -86,7 +86,7 @@ impl Text {
     /// The place of the item holding this text in `file`'s tree.
     fn at(self, file: &Iwork) -> Option<super::super::At> {
         let slide = file.kids(super::super::At::ROOT).get(self.slide)?;
-        // The stand-ins: reading a table would decode it (record 0312).
+        // The stand-ins: reading a table would decode it.
         file.kids(slide).iter().find(|&child| {
             let item = file.stand_in(child);
             let leaf = item.leaf().map(|value| value as usize);
@@ -114,7 +114,7 @@ pub(super) enum Add {
         name: String,
         geometry: Geometry,
     },
-    /// A table cloned from the deck's first slide table (record 0329).
+    /// A table cloned from the deck's first slide table.
     Table { slide: usize, table: NewTable },
 }
 
@@ -152,7 +152,7 @@ pub(super) struct Pending {
     /// Slide visibility: slide → (hidden, item).
     hidden: BTreeMap<usize, (bool, usize)>,
     /// Character styles: (slide, drawable, first char, end char) → (style,
-    /// item) (record 0309).
+    /// item).
     styles: BTreeMap<(usize, usize, usize, usize), (Style, usize)>,
     /// Table cells: (slide, drawable, row, column) → (value, item).
     cells: BTreeMap<(usize, usize, u32, u32), (TableCellValue, usize)>,
@@ -168,7 +168,7 @@ pub(super) struct Pending {
     comments: BTreeMap<(usize, usize, u32, u32), (Option<String>, usize)>,
     /// Placeholder visibility: (slide, TITLE or BODY) → (hidden, item).
     visibility: BTreeMap<(usize, usize), (bool, usize)>,
-    /// What the sets of each staged text touched (record 0314).
+    /// What the sets of each staged text touched.
     groups: BTreeMap<Text, TextGroup>,
 }
 
@@ -178,14 +178,14 @@ enum Staged {
     /// A whole new text.
     Text(String),
     /// The base of the text's [`TextGroup`] with the paragraphs its sets
-    /// replaced (record 0340): a paragraph set costs its own paragraph, and
-    /// the text is joined once, when the run publishes.
+    /// replaced: a paragraph set costs its own paragraph, and the text is
+    /// joined once, when the run publishes.
     Paragraphs,
 }
 
 /// The sets one text received in a run: its text before them, the region
 /// they touched, and the largest region the leaf admitted for one combined
-/// splice (record 0314).
+/// splice.
 #[derive(Debug)]
 struct TextGroup {
     base: String,
@@ -348,7 +348,7 @@ fn leaf_admits(package: &Package, text: Text, hull: std::ops::Range<usize>) -> b
 /// paragraph as far as the leaf admits; `None` when it refuses `union`.
 ///
 /// The leaf's answer holds for every region within an admitted one, so one
-/// search per text group replaces a leaf call per set (record 0340).
+/// search per text group replaces a leaf call per set.
 fn widest_admitted(
     package: &Package,
     text: Text,
@@ -776,8 +776,8 @@ impl Pending {
     }
 
     /// Whether a set of `props` on `node` publishes, joined to the staged
-    /// changes, what it publishes after them on its own (record 0314):
-    /// `false` asks the caller to publish the staged changes first.
+    /// changes, what it publishes after them on its own: `false` asks the
+    /// caller to publish the staged changes first.
     ///
     /// A text that already holds a set takes another while one splice from
     /// its base text to the result is what the sets publish one at a time:
@@ -877,7 +877,7 @@ impl Pending {
 
     /// Stage one character property of a run of a text box, shape, title
     /// or body placeholder, or the speaker notes: the run's characters in
-    /// its text (records 0309, 0312, 0329).
+    /// its text.
     fn stage_run_style(
         &mut self,
         file: &Iwork,
@@ -899,7 +899,7 @@ impl Pending {
             return Err(unsupported());
         }
         // The text holding the run: a shape's, a placeholder's whose frame
-        // is the run's drawable, or the slide's notes (record 0329).
+        // is the run's drawable, or the slide's notes.
         let slide_at = file
             .kids(super::super::At::ROOT)
             .get(slide)
@@ -987,7 +987,7 @@ impl Pending {
         Ok(())
     }
 
-    /// Stage one slide-table cell value (record 0309).
+    /// Stage one slide-table cell value.
     fn stage_cell(
         &mut self,
         file: &Iwork,
@@ -1472,12 +1472,12 @@ fn table_cell_value(key: &str, value: &PropValue<'_>) -> Result<TableCellValue> 
 
 /// A one-value set of a slide-table cell named by the direct path
 /// `/slide[N]/table[M]/tr[R]/tc[C]` (exactly those step names, each with one
-/// positional index), committed without reading the table (record 0312):
-/// the slide's part locates the table's drawable through its stand-in, and
-/// the leaf writer checks the cell against the table. `None` sends any
-/// other target, and any failure, to the general route, which reports it
-/// (the leaf refuses a cell outside the table, `InvalidSpan`, so the
-/// general route reports the missing path).
+/// positional index), committed without reading the table: the slide's part
+/// locates the table's drawable through its stand-in, and the leaf writer
+/// checks the cell against the table. `None` sends any other target, and any
+/// failure, to the general route, which reports it (the leaf refuses a cell
+/// outside the table, `InvalidSpan`, so the general route reports the
+/// missing path).
 fn direct_cell(
     file: &Iwork,
     package: &Package,
@@ -1637,14 +1637,14 @@ fn add_gap(kind: &str) -> Error {
     )
     .with_suggestion(match kind {
         "tr" | "tc" | "row" | "cell" => {
-            "add a table with `rows`, `cols` and `data` (record 0329); row and column edits of slide tables are a follow-up"
+            "add a table with `rows`, `cols` and `data`; row and column edits of slide tables are a follow-up"
         },
-        "chart" => "follow-up: Keynote chart creation in the unified layer (record 0298)",
-        "video" | "audio" => "follow-up: wire slide::movie and slide::audio creation (record 0298)",
+        "chart" => "follow-up: Keynote chart creation in the unified layer",
+        "video" | "audio" => "follow-up: wire slide::movie and slide::audio creation",
         "run" | "r" => {
-            "add a paragraph, or set a paragraph's text (IWORK_API_REQUESTS.md request 10)"
+            "add a paragraph, or set a paragraph's text"
         },
-        _ => "follow-up: record 0298 (Keynote unified structure)",
+        _ => "follow-up: Keynote unified structure",
     })
 }
 
@@ -1775,7 +1775,7 @@ const DEFAULT_TABLE_FRAME: Geometry = Geometry::new(100.0, 100.0, 600.0, 200.0);
 
 /// Read a new table's request from `node`'s properties: the table keys
 /// (`rows`, `cols`, `name`, `data`) and the frame (`x`, `y`, `width`,
-/// `height`; record 0329).
+/// `height`).
 pub(super) fn table_request(slide: usize, node: &NewNode<'_>) -> Result<DrawableRequest> {
     let mut request = super::super::write::TableRequest::default();
     let mut geometry = DEFAULT_TABLE_FRAME;
@@ -2053,11 +2053,11 @@ fn removal_gap(node: &Node<'_>) -> Error {
     )
     .with_suggestion(match kind {
         "table" | "chart" | "group" => {
-            "the leaf's drawable removal refuses tables, charts and groups (record 0298 follow-up)"
+            "the leaf's drawable removal refuses tables, charts and groups"
         },
         "placeholder" => "set its text to empty instead",
         "notes" => "set the notes text to empty instead",
-        _ => "follow-up: record 0298 (Keynote unified structure)",
+        _ => "follow-up: Keynote unified structure",
     })
 }
 
@@ -2124,7 +2124,7 @@ pub(crate) fn remove(
         pending.flush(&mut chain).map_err(|(error, _)| error)?;
     }
     // Movies and audio, each slide's from its last, so the earlier source
-    // positions hold (record 0309).
+    // positions hold.
     media.sort_unstable();
     media.dedup();
     media.retain(|(slide, _)| !slides.contains(slide));
@@ -2422,7 +2422,7 @@ mod tests {
 
     /// A paragraph group reads, replaces and joins paragraphs like splitting
     /// and joining the whole text, and its hulls are the base's UTF-16
-    /// paragraph regions (record 0340).
+    /// paragraph regions.
     #[test]
     fn paragraph_groups_match_split_and_join() {
         let base = "one\n\u{e9}\u{1f600}x\n\nlast";

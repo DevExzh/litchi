@@ -3,7 +3,7 @@
 //! Each format opens one defect-carrying file through `litchi::open` (and
 //! `litchi::open_bytes` where the facade test covered both routes) and
 //! asserts the repair is listed, and one conformant file and asserts a clean
-//! report. M0a step S8c ported these tests from the facade's `Document`,
+//! report. These tests were ported from the facade's `Document`,
 //! `Presentation` and `Workbook` types; the fixtures and expected repairs
 //! are unchanged.
 
@@ -249,8 +249,8 @@ fn odt_repairs_are_reported_through_the_document_facade() {
     assert_clean(&open(&source).tolerance_report().expect("report"));
 }
 
-/// The Pages leaf keeps no repair report (records 0296 and 0306): a
-/// `File::Pages` reports an untracked report that names the format.
+/// The Pages leaf keeps no repair report: a `File::Pages` reports an untracked
+/// report that names the format.
 #[cfg(feature = "pages")]
 #[test]
 fn pages_reports_are_untracked() {

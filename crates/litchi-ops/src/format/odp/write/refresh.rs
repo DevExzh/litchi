@@ -1,11 +1,11 @@
-//! ODP field refresh (record 0295, record 0279 follow-up F1): the field
-//! runs of every slide's and notes page's stories. A page number is the
-//! slide's position (`text:select-page` previous or next shifting it, a
-//! `style:num-format` of `i`, `I`, `a` or `A` applied) and a page count the
-//! number of slides, as the PPTX `slidenum` field is computed; clock,
-//! stored-time and document-property fields are computed as in ODT. Every
-//! changed field is one leaf `SetFieldText` scene change of one commit.
-//! Master pages are not visited (their fields are placeholders).
+//! ODP field refresh: the field runs of every slide's and notes page's
+//! stories. A page number is the slide's position (`text:select-page`
+//! previous or next shifting it, a `style:num-format` of `i`, `I`, `a` or
+//! `A` applied) and a page count the number of slides, as the PPTX
+//! `slidenum` field is computed; clock, stored-time and document-property
+//! fields are computed as in ODT. Every changed field is one leaf
+//! `SetFieldText` scene change of one commit. Master pages are not visited
+//! (their fields are placeholders).
 
 use litchi_core::FileFormat;
 use litchi_odp::scene::{Change, Object, ObjectRef, RunKind, Scene, Scope, Story, StoryRef};

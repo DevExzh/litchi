@@ -1,4 +1,4 @@
-//! DOCX find/replace through `set` with `find=` (record 0273): cross-run
+//! DOCX find/replace through `set` with `find=`: cross-run
 //! matches collapse into the run where they start, format properties apply
 //! to exactly the replaced (or matched) text, the scope is the target's
 //! subtree, and zero matches are an exact no-op. Every case runs on both

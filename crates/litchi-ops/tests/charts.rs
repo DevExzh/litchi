@@ -1,4 +1,4 @@
-//! Typed chart CRUD through the unified API (record 0270): add, get, set and
+//! Typed chart CRUD through the unified API: add, get, set and
 //! remove of PPTX slide charts and XLSX worksheet charts, with their series
 //! and axes, round trips, no-ops, signatures, encryption, batches and the
 //! capability report.
@@ -515,7 +515,7 @@ fn chart_capabilities_report_the_registry() {
         assert!(title.add() && title.set() && title.get());
         let chart_type = chart.property("chartType").expect("chartType");
         assert!(chart_type.add() && chart_type.set() && chart_type.get());
-        // Formatting keys are read back and rebuilt on set (record 0283).
+        // Formatting keys are read back and rebuilt on set.
         let gap = chart.property("gapWidth").expect("gapWidth");
         assert!(gap.add() && gap.set() && gap.get());
         let split = chart.property("comboSplit").expect("comboSplit");
@@ -532,7 +532,7 @@ fn chart_capabilities_report_the_registry() {
     }
 }
 
-/// OfficeCLI's per-series add keys (record 0271), as the corpus writes them.
+/// OfficeCLI's per-series add keys, as the corpus writes them.
 fn dotted_chart(kind: &'static str) -> NewNode<'static> {
     NewNode::new("chart")
         .prop("chartType", kind)
@@ -673,7 +673,7 @@ fn dotted_series_refusals_leave_the_input_unchanged() {
                 "series1.color",
             ),
             // A range is refused on a slide, and on a worksheet for a
-            // scatter chart (record 0338 binds category charts to ranges).
+            // scatter chart (category charts bind to ranges).
             (
                 NewNode::new("chart")
                     .prop("chartType", "scatter")

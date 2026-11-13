@@ -1,5 +1,4 @@
-//! The signature disposition of the tier 1 and tier 2 handles (ADR 0006;
-//! unified-ops record 0013).
+//! The signature disposition of the tier 1 and tier 2 handles (ADR 0006).
 //!
 //! An open that finds a signature wraps the file in [`crate::Signed`] and
 //! marks its handle [`Signature::Signed`]: reads work, and every editor
@@ -248,9 +247,9 @@ pub(crate) fn refusal(format: FileFormat) -> Error {
 /// The exact bytes a source-backed OPC package was opened from.
 ///
 /// An editor that removes the signature starts from an owning package opened
-/// over these bytes (record 0009 D4: promote through the exact source), so
-/// every ZIP member the edit and the signature removal do not touch is
-/// published byte for byte.
+/// over these bytes (promote through the exact source), so every ZIP member
+/// the edit and the signature removal do not touch is published byte for
+/// byte.
 #[cfg(feature = "xlsb")]
 pub(crate) fn exact_source(package: &litchi_opc::SourceBackedPackage) -> Result<Vec<u8>> {
     let artifact = package.source_artifact();

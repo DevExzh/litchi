@@ -39,9 +39,8 @@ fn package_bytes(package: &Package) -> Result<Vec<u8>, Box<dyn std::error::Error
 /// Pages body text that the native reader projects into a rich-text storage
 /// reaches the facade reader as one paragraph.
 ///
-/// The unified `File` reads that storage (records 0296 and 0306; the
-/// facade's read-only `litchi::iwork::Document` that read it before is
-/// deleted).
+/// The unified `File` reads that storage (the facade's read-only
+/// `litchi::iwork::Document` that read it before is deleted).
 #[test]
 fn body_storage_reaches_facade_paragraphs() -> Result<(), Box<dyn std::error::Error>> {
     let path = fixture_path();
@@ -63,8 +62,8 @@ fn body_storage_reaches_facade_paragraphs() -> Result<(), Box<dyn std::error::Er
         .text();
     assert!(!expected.is_empty());
 
-    // `litchi::open` reads the same body through the unified `File`
-    // (record 0296): one paragraph per line of the section's text.
+    // `litchi::open` reads the same body through the unified `File`: one
+    // paragraph per line of the section's text.
     let file = litchi::open(&path)?;
     assert_eq!(file.format(), Some(litchi::FileFormat::Pages));
     let first_line = expected.split('\n').next().unwrap_or_default();

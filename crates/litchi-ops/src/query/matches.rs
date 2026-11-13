@@ -1,5 +1,4 @@
-//! [`Matches`]: the streaming result of [`File::query`](crate::File::query)
-//! (record 0010 §5.1, §8.1).
+//! [`Matches`]: the streaming result of [`File::query`](crate::File::query).
 
 // In a build without any adapter, `Matches` is uninhabited and its methods
 // are unreachable; those lints are allowed in such builds only. Each adapter
@@ -80,8 +79,8 @@ use crate::node::Node;
 /// ```
 pub struct Matches<'f, 'q> {
     inner: Inner<'f, 'q>,
-    /// The walk takes its plan's fast step (record 0315), decided once
-    /// here so the general route's code stays as it was.
+    /// The walk takes its plan's fast step, decided once here so the
+    /// general route's code stays as it was.
     fast: bool,
 }
 
@@ -398,7 +397,7 @@ impl<'f> Iterator for Matches<'f, '_> {
 }
 
 impl<'f> Matches<'f, '_> {
-    /// [`Iterator::next`] for a walk on its plan's fast step (record 0315).
+    /// [`Iterator::next`] for a walk on its plan's fast step.
     fn next_fast(&mut self) -> Option<Result<Node<'f>>> {
         match &mut self.inner {
             #[cfg(feature = "doc")]

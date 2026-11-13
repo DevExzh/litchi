@@ -173,10 +173,10 @@
 //! Pages, Keynote and Numbers packages open through [`open`] as
 //! `File::Pages`, `File::Keynote` and `File::Numbers` (the `pages`, `keynote`
 //! and `numbers` features): paths, queries, views, the leaves' focused writes
-//! and atomic saves, like every other format (record 0296). An app-authored
-//! package *directory* opens the same way, as its single-file form, and
-//! `save()` writes it back as a directory (record 0306). The `iwork` feature
-//! enables all three formats.
+//! and atomic saves, like every other format. An app-authored package
+//! *directory* opens the same way, as its single-file form, and `save()`
+//! writes it back as a directory. The `iwork` feature enables all three
+//! formats.
 //!
 //! # Unified operations
 //!
@@ -430,7 +430,7 @@ pub mod pages {
     /// The namespace holds types only; it has no reader of its own. Open a
     /// Pages file with [`crate::open`] (a `File::Pages`), or with
     /// [`crate::pages::Package`] and its `document()` projection for
-    /// format-specific work (record 0334).
+    /// format-specific work.
     pub mod semantic {
         pub use litchi_pages::{
             Body, Document, DocumentStats, Error, LimitKind, OpenOptions, PackageError, Position,
@@ -456,8 +456,7 @@ pub mod keynote {
     ///
     /// The namespace holds types only; it has no reader of its own. Open a
     /// Keynote file with [`crate::open`] (a `File::Keynote`), or with
-    /// [`crate::keynote::Presentation::open`] for format-specific work
-    /// (record 0334).
+    /// [`crate::keynote::Presentation::open`] for format-specific work.
     pub mod semantic {
         pub use litchi_keynote::presentation;
         pub use litchi_keynote::show::{Mode, Settings, Show, Size};
@@ -477,7 +476,7 @@ pub mod numbers {
     // publish any future package, generated, or physical helper module.
     // The package owner, its read-only `Workbook` projection, the ingress
     // profiles and the focused transaction modules keep their ADR 0034
-    // names (record 0297).
+    // names.
     pub use litchi_numbers::{
         AddressError, Area, At, Builder, Cell, ColumnDeletion, CoordinateError, Dimension,
         Dimensions, Error, Grid, GridBudget, Identity, InsertError, InsertResult, LimitKind,
@@ -503,8 +502,7 @@ pub mod numbers {
     ///
     /// The namespace holds types only; it has no reader of its own. Open a
     /// Numbers file with [`crate::open`] (a `File::Numbers`), or with
-    /// [`crate::numbers::Workbook::open`] for format-specific work (record
-    /// 0334).
+    /// [`crate::numbers::Workbook::open`] for format-specific work.
     pub mod semantic {
         /// Archive-free typed Numbers cell values.
         ///
@@ -601,7 +599,7 @@ pub mod eval {
 }
 
 /// Unified formula evaluation over [`File`]: `File::evaluate` and
-/// `File::recalculate` (record 0266).
+/// `File::recalculate`.
 #[cfg(all(
     feature = "eval",
     any(feature = "xls", feature = "xlsx", feature = "xlsb")
@@ -710,7 +708,7 @@ mod standalone_odf_facade_tests {
 mod format_features;
 
 /// The build script derives `cfg(litchi_unified)` from the format features
-/// in `Cargo.toml` (record 0334); these tests pin what it derives.
+/// in `Cargo.toml`; these tests pin what it derives.
 #[cfg(test)]
 mod format_feature_tests {
     use super::format_features::format_features;

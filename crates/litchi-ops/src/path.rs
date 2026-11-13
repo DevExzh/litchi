@@ -1,5 +1,5 @@
 //! Paths: the `litchi_core::selector` grammar, re-exported, and the
-//! resolution of a path against a document (record 0010 §4, M1 step R2).
+//! resolution of a path against a document.
 //!
 //! A path arrives as text or as a parsed [`Path`] through [`IntoPath`].
 //! Resolution walks it one step at a time through a format adapter:
@@ -44,13 +44,13 @@
 //! # Ok::<(), litchi_ops::Error>(())
 //! ```
 
-// The format adapters of M1 step R4 are the production callers of the
-// resolution core; until they land, only the test-only fake formats call it.
+// The format adapters are the production callers of the resolution core;
+// until they land, only the test-only fake formats call it.
 #![cfg_attr(
     not(test),
     allow(
         dead_code,
-        reason = "M1 step R4's format adapters call the resolution core; until then only the \
+        reason = "the format adapters call the resolution core; until they land only the \
                   test-only fake formats do"
     )
 )]

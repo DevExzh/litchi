@@ -1,5 +1,5 @@
 //! Paragraph and run `add` and `remove` in shape, table-cell and notes text
-//! bodies (record 0333).
+//! bodies.
 //!
 //! `add(parent, paragraph, {text, align, bold, italic, size, color, font,
 //! font.latin})` inserts a paragraph into a shape or placeholder, a table
@@ -12,7 +12,7 @@
 //!
 //! Slide bodies stage through the native slide edit of either owner; notes
 //! bodies live in the notes part, so a source owner is promoted to an eager
-//! package for them, as notes text writes are (record 0252).
+//! package for them, as notes text writes are.
 
 use std::sync::Arc;
 

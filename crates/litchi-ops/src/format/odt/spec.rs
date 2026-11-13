@@ -58,7 +58,7 @@ pub enum Kind {
     Style,
     /// The document properties (`/metadata`).
     Metadata,
-    /// A master-page header region (`/header[N]`, record 0328).
+    /// A master-page header region (`/header[N]`).
     Header,
     /// A master-page footer region (`/footer[N]`).
     Footer,
@@ -126,11 +126,11 @@ impl Kind {
         }
     }
 
-    /// Whether the kind is a part of record 0328 (headers and footers,
-    /// numbering, fields, tables of contents, tab stops, shapes, equations
-    /// and columns). Parts are reached by path and by queries that name
-    /// them; the generic views of the root, the body, paragraphs and tables
-    /// list the structural kinds only, as before.
+    /// Whether the kind is a part (headers and footers, numbering, fields,
+    /// tables of contents, tab stops, shapes, equations and columns). Parts
+    /// are reached by path and by queries that name them; the generic views
+    /// of the root, the body, paragraphs and tables list the structural
+    /// kinds only, as before.
     pub(crate) const fn is_part(self) -> bool {
         (self as u8) > (Self::Metadata as u8)
     }
@@ -549,7 +549,7 @@ pub(crate) const NUMBERING_PROPS: &[PropSpec] = &[
 ];
 
 /// A list style as a list definition. Its `id` is its index, a raw
-/// identity (record 0319 §3).
+/// identity.
 pub(crate) const ABSTRACT_NUM_PROPS: &[PropSpec] = &[
     raw("id", ValueType::Int),
     read("type", ValueType::Token(&MULTI_LEVEL_TYPE)),
@@ -675,7 +675,7 @@ const BLOCKS: &[Kind] = &[
     K::Section,
     K::Frame,
 ];
-/// The body's blocks and the parts listed under it (record 0328).
+/// The body's blocks and the parts listed under it.
 const BODY_CHILDREN: &[Kind] = &[
     K::Paragraph,
     K::Heading,
@@ -1103,7 +1103,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
         GapSpec {
             subject: Subject::Element("revision"),
             code: crate::Code::UnsupportedCapability,
-            follow_up: "record 0328 follow-up: ODT tracked changes as revision nodes (P2)",
+            follow_up: "follow-up: ODT tracked changes as revision nodes",
             reason: "the ODT body index skips text:tracked-changes",
         },
         read_gap("break"),
@@ -1111,7 +1111,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
         GapSpec {
             subject: Subject::Element("formfield"),
             code: crate::Code::UnsupportedCapability,
-            follow_up: "record 0328 follow-up: ODT form controls as formfield nodes and their writes",
+            follow_up: "follow-up: ODT form controls as formfield nodes and their writes",
             reason: "the ODT body index skips office:forms and its controls",
         },
         read_gap("settings"),
@@ -1124,57 +1124,57 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
         GapSpec {
             subject: Subject::Element("watermark"),
             code: crate::Code::UnsupportedCapability,
-            follow_up: "record 0328 follow-up: the ODT header text-art watermark",
+            follow_up: "follow-up: the ODT header text-art watermark",
             reason: "a watermark is a header drawing shape the region reads do not project",
         },
-        // OfficeCLI Word elements the navigator refuses as `ABSENT` (record
-        // 0339): typed gaps, so `capabilities()` lists them.
+        // OfficeCLI Word elements the navigator refuses as `ABSENT`: typed
+        // gaps, so `capabilities()` lists them.
         GapSpec {
             subject: Subject::Element("bookmarkEnd"),
             code: crate::Code::UnsupportedPath,
-            follow_up: "none: not an OpenDocument text element (record 0339)",
+            follow_up: "none: not an OpenDocument text element",
             reason: "a bookmark is one node over its start and end (text:bookmark-start, text:bookmark-end); a standalone end marker is not an element",
         },
         GapSpec {
             subject: Subject::Element("permStart"),
             code: crate::Code::UnsupportedPath,
-            follow_up: "none: not an OpenDocument text element (record 0339)",
+            follow_up: "none: not an OpenDocument text element",
             reason: "OpenDocument text has no editing-permission ranges",
         },
         GapSpec {
             subject: Subject::Element("ptab"),
             code: crate::Code::UnsupportedPath,
-            follow_up: "none: not an OpenDocument text element (record 0339)",
+            follow_up: "none: not an OpenDocument text element",
             reason: "OpenDocument text has no positional tabs",
         },
         GapSpec {
             subject: Subject::Element("fieldChar"),
             code: crate::Code::UnsupportedPath,
-            follow_up: "none: not an OpenDocument text element (record 0339)",
+            follow_up: "none: not an OpenDocument text element",
             reason: "an OpenDocument field is one element; there are no field-character runs",
         },
         GapSpec {
             subject: Subject::Element("instrText"),
             code: crate::Code::UnsupportedPath,
-            follow_up: "none: not an OpenDocument text element (record 0339)",
+            follow_up: "none: not an OpenDocument text element",
             reason: "an OpenDocument field is one element; there are no field-instruction runs",
         },
         GapSpec {
             subject: Subject::Element("series"),
             code: crate::Code::UnsupportedPath,
-            follow_up: "M6 ODT body index (record 0276), with the chart gap",
+            follow_up: "ODT body index, with the chart gap",
             reason: "chart series are not nodes: embedded charts are a gap of the ODT body index",
         },
         GapSpec {
             subject: Subject::Element("axis"),
             code: crate::Code::UnsupportedPath,
-            follow_up: "M6 ODT body index (record 0276), with the chart gap",
+            follow_up: "ODT body index, with the chart gap",
             reason: "chart axes are not nodes: embedded charts are a gap of the ODT body index",
         },
         GapSpec {
             subject: Subject::Element("diagram"),
             code: crate::Code::UnsupportedPath,
-            follow_up: "none: out of scope (record 0332, design §10)",
+            follow_up: "none: out of scope",
             reason: "OfficeCLI's diagram renders Mermaid text into shapes or a picture; rendering is outside the unified API",
         },
     ],
@@ -1194,7 +1194,7 @@ const fn read_gap(element: &'static str) -> GapSpec {
     GapSpec {
         subject: Subject::Element(element),
         code: crate::Code::UnsupportedCapability,
-        follow_up: "M6 ODT body index (record 0276)",
+        follow_up: "ODT body index",
         reason: "the ODT body index does not model this element yet",
     }
 }
@@ -1296,84 +1296,83 @@ const fn operation_gap(
     }
 }
 
-/// The write operations the ODT adapter refuses, with their follow-ups
-/// (record 0276 §gaps).
+/// The write operations the ODT adapter refuses, with their follow-ups.
 pub(crate) static WRITE_GAPS: [GapSpec; 12] = [
     operation_gap(
         "remove",
         "cell",
         "table-grid",
-        "M6 ODT table grid edits",
+        "ODT table grid edits",
         "cells keep the table grid: remove or move the whole row, or set the cell's text",
     ),
     operation_gap(
         "add",
         "cell",
         "table-grid",
-        "M6 ODT table grid edits",
+        "ODT table grid edits",
         "adding a cell would break the table grid; add a row, which spans the first row's columns",
     ),
     operation_gap(
         "move",
         "cell",
         "table-grid",
-        "M6 ODT table grid edits",
+        "ODT table grid edits",
         "cells move only with their row",
     ),
     operation_gap(
         "remove",
         "row",
         "vertical-merge",
-        "M6 ODT table grid edits",
+        "ODT table grid edits",
         "a row holding vertically merged or covered cells cannot leave the table",
     ),
     operation_gap(
         "add",
         "picture",
         "image-resources",
-        "M6 ODT drawing and media edits",
+        "ODT drawing and media edits",
         "adding an image needs a package media resource and a frame; frames and images are readable, settable (frame geometry) and removable",
     ),
     operation_gap(
         "add",
         "frame",
         "drawing-resources",
-        "M6 ODT drawing and media edits",
+        "ODT drawing and media edits",
         "frames are created with their content (image or text box), which the body edits do not author yet",
     ),
     operation_gap(
         "set",
         "style",
         "common-styles",
-        "M6 ODT style definitions",
+        "ODT style definitions",
         "common styles in styles.xml are read-only; paragraph and run formatting derives automatic styles instead",
     ),
     operation_gap(
         "set",
         "run",
         "clear-formatting",
-        "M6 ODT formatting removal",
+        "ODT formatting removal",
         "a null value cannot remove a character or paragraph property; set the property's off value instead",
     ),
     operation_gap(
         "set",
         "cell",
         "typed-values",
-        "M6 ODT typed cell values",
+        "ODT typed cell values",
         "cell text writes a string cell; numeric, date and formula cell values are not authored",
     ),
     operation_gap(
         "set",
         "document",
         "signed-or-encrypted-package",
-        "ADR 0034 ODF security vocabulary (record 0268 G5)",
+        "ADR 0034 ODF security vocabulary",
         "the leaf preserves signed and encrypted packages only as exact no-ops; changed writes are refused",
     ),
     operation_gap(
         "add",
         "document",
         "flat-odf-input",
-        "0292 flat ODF package members",
+        "flat ODF package members",
         "a single-XML .fodt is edited through the leaf's packaged projection and republished element by element; an edit that adds a package member (a picture, an embedded object) or changes a part's root has no flat form and is refused",
     ),
     operation_gap(

@@ -1,4 +1,4 @@
-//! Unified Pages reads and writes (record 0299): paragraphs (set, add,
+//! Unified Pages reads and writes: paragraphs (set, add,
 //! remove, move, swap), anchored objects, body tables, headers and footers,
 //! footnotes, section names, document properties, creation, package
 //! directories and coalesced batches, over the leaf's focused transactions.
@@ -198,8 +198,7 @@ fn anchored_objects_survive_paragraph_writes_and_go_with_their_paragraph() {
         prop(&reopened, "/", "tableCount"),
         prop(&file, "/", "tableCount")
     );
-    // A paragraph whose anchors are body tables goes with its tables
-    // (record 0301).
+    // A paragraph whose anchors are body tables goes with its tables.
     let tables: i64 = prop(&file, "/", "tableCount")
         .expect("table count")
         .parse()
@@ -218,7 +217,7 @@ fn anchored_objects_survive_paragraph_writes_and_go_with_their_paragraph() {
         prop(&reopened, "/", "paragraphCount"),
         Some((paragraphs - 1).to_string())
     );
-    // Every other paragraph of the 16 corpus files that 0296 refused now
+    // Every other paragraph of the 16 corpus files that used to be refused
     // takes a set (see `corpus_fidelity`); a plain one here.
     let first = file
         .set("/body/p[1]", props! { "text" => "Retitled" })
@@ -245,7 +244,7 @@ fn tables_read_cells_and_remove() {
         "the fixture holds text cells"
     );
     // The table takes part in a formula graph; a value write refreshes the
-    // formulas that read it (record 0376).
+    // formulas that read it.
     let written = file
         .set("/body/tbl[1]/tr[1]/tc[1]", props! { "text" => "x" })
         .expect("a value write into a formula table");
@@ -890,8 +889,8 @@ fn package_directories_open_save_in_place_and_save_as_single_files() {
     );
     assert!(path.is_file());
 
-    // `save()` writes a directory-opened package back as a directory
-    // (record 0301), and the bundle reopens to the same bytes.
+    // `save()` writes a directory-opened package back as a directory,
+    // and the bundle reopens to the same bytes.
     let bundle = directory.path().join("bundle.pages");
     copy_tree(&fixture("directory/pages/basic.pages"), &bundle);
     let file = open(&bundle).expect("open copy");
@@ -1044,7 +1043,7 @@ fn body_table_cells_take_values() {
 
 #[test]
 fn sections_are_added_and_removed() {
-    // Record 0312 (request 11): a section break and a copy of the page
+    // A section break and a copy of the page
     // masters, headers and footers of the section it follows.
     let file = read("pages/basic.pages");
     let litchi_ops::Added {

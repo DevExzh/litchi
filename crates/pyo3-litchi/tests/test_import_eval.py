@@ -1,4 +1,4 @@
-"""CSV/TSV import and formula evaluation (record 0266): ``File.import_csv``,
+"""CSV/TSV import and formula evaluation: ``File.import_csv``,
 ``File.evaluate`` and ``File.recalculate``.
 
 Oracles: read-back through the unified read API, immutability of the input
