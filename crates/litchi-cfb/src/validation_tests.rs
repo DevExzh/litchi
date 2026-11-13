@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "test assertions panic by design"
-)]
-
 use crate::{
     CfbValidationError, OleError, OleWriter, SharedOleFile, SharedOleFileLimits, validate_source,
 };

@@ -5011,11 +5011,6 @@ pub(crate) fn rebuild(record: &[u8], data: &[u8]) -> PackageResult<Vec<u8>> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::{Error, Position, Refusal, Snapshot, Target};
     use crate::raw::Reader;

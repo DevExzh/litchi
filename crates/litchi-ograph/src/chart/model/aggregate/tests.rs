@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic by design"
-)]
-
 use super::super::super::{Kind, RowCol, cache};
 use super::super::{Cache, Value};
 use super::validation::{cache_dimensions, dimensions_cover};

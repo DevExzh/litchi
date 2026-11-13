@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use super::*;
 
 const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";

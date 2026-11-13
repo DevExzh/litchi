@@ -1,5 +1,3 @@
-#![allow(clippy::unwrap_used, reason = "test assertions")]
-
 use litchi_pptx::{Package, ShapeTextReplacement, builder::Builder};
 
 #[test]

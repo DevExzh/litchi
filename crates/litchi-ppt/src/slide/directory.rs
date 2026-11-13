@@ -76,10 +76,6 @@ impl SlideDirectoryEntry {
 }
 
 /// Ordered logical presentation slides from the live `DocumentContainer`.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`SlideDirectory` is the established public API name re-exported as `slide::SlideDirectory`; renaming it would break downstream crates"
-)]
 #[derive(Debug, Clone)]
 pub struct SlideDirectory {
     document_persist_id: u32,
@@ -510,10 +506,6 @@ fn append_list_text(list_text: &mut String, record: &Record) {
         list_text.push('\n');
     }
     let text_start = list_text.len();
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "`RecordType` mirrors the full MS-PPT record-type enumeration; only the two character atoms take the direct path"
-    )]
     match record.record_type {
         RecordType::TextCharsAtom => {
             let units = record
@@ -694,11 +686,6 @@ fn read_u32(data: &[u8], offset: usize, name: &str) -> Result<u32> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
     use crate::raw::Reader;

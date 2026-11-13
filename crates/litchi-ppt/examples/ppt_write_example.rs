@@ -1,8 +1,3 @@
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example intentionally prints its results"
-)]
-
 //! Example demonstrating PPT file writing with the Litchi library
 //!
 //! NOTE: This example demonstrates the API but will not work until

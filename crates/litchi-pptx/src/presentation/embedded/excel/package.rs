@@ -229,11 +229,6 @@ fn escape(value: &str) -> String {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
     use litchi_opc::OpcPackage;

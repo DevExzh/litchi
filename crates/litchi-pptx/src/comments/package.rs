@@ -1198,11 +1198,6 @@ fn is_authors_relationship(value: &str) -> bool {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::super::codec::{
         measured_comment_authors_string_bytes, measured_slide_comments_string_bytes,

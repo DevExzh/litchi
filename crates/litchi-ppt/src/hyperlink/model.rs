@@ -80,10 +80,6 @@ impl Default for InteractionLimits {
 }
 
 /// Typed payload of an MS-PPT §2.6.10 `InteractiveInfoAtom`.
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "each bool maps directly to one flag bit of the sixteen-byte MS-PPT wire atom; the flat public layout is the established API"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct InteractiveInfoAtom {
     pub sound_id: u32,
@@ -108,10 +104,6 @@ pub struct MacroNameAtom {
 }
 
 /// One click or mouse-over action attached to a shape or text range.
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "the bools mirror the `InteractiveInfoAtom` wire flag bits one-to-one; merging them into two-variant enums would churn the established public API"
-)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Interaction {
     pub trigger: InteractionTrigger,

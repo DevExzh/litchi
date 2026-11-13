@@ -1,10 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::too_many_lines,
-    reason = "golden fixtures favor explicit inputs and panic-driven assertions"
-)]
-
 //! Byte-exact goldens for the fresh PPT writer's text and drawing paths.
 //!
 //! Every fixture below was written by the writer at `6d989cad63`, before

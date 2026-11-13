@@ -130,10 +130,6 @@ impl BindingName {
     /// # Panics
     ///
     /// Panics if the internally validated representation is corrupted.
-    #[allow(
-        clippy::expect_used,
-        reason = "the validated fixed-size ASCII representation is constructed internally"
-    )]
     #[must_use]
     pub fn as_str(&self) -> &str {
         std::str::from_utf8(&self.bytes[..usize::from(self.len)])
@@ -147,10 +143,6 @@ impl BindingName {
     }
 
     /// Return the number of bytes in the path component.
-    #[allow(
-        clippy::cast_lossless,
-        reason = "a const accessor cannot call From::from until primitive From impls are const"
-    )]
     #[must_use]
     pub const fn len(self) -> usize {
         self.len as usize
@@ -162,10 +154,6 @@ impl BindingName {
         self.len == 0
     }
 
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "internal callers only pass fixed binding-name lengths bounded by MAX_NAME_BYTES"
-    )]
     pub(super) fn from_bytes(bytes: [u8; super::validation::MAX_NAME_BYTES], len: usize) -> Self {
         Self {
             bytes,

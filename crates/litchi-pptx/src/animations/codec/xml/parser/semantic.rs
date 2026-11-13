@@ -128,10 +128,6 @@ impl TimingParser {
         }
     }
 
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "parser frame carries one slot per XML element field"
-    )]
     pub(super) fn start(
         &mut self,
         namespace: &ResolveResult<'_>,

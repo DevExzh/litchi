@@ -121,11 +121,6 @@ pub type Commit = litchi_core::edit::Commit<Package, Patch>;
 pub use litchi_core::edit::Diagnostics;
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "tests use concise assertions while exercising fallible patch application"
-)]
 mod tests {
     use super::Patch;
 

@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use super::{Kind, Rule, from_record, parse};
 use crate::{Error, Record, RecordKind};
 

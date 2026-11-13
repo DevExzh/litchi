@@ -182,10 +182,6 @@ impl TabStop {
 // =============================================================================
 
 /// Font style flags
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "each bool maps to an independent `TextCFException` style bit (MS-PPT 2.9.21); the bits are combined freely on disk, so a state machine would misrepresent the format"
-)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct FontStyle {
     /// Bold text
@@ -212,10 +208,6 @@ pub struct FontStyle {
 
 impl FontStyle {
     /// Create bold style
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "char_mask::BOLD is 0x0001 and always fits in u16; const fn cannot use u16::try_from"
-    )]
     #[must_use]
     pub const fn bold() -> Self {
         Self {
@@ -233,10 +225,6 @@ impl FontStyle {
     }
 
     /// Create italic style
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "char_mask::ITALIC is 0x0002 and always fits in u16; const fn cannot use u16::try_from"
-    )]
     #[must_use]
     pub const fn italic() -> Self {
         Self {
@@ -254,10 +242,6 @@ impl FontStyle {
     }
 
     /// Create bold and italic style
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "char_mask::BOLD | char_mask::ITALIC is 0x0003 and always fits in u16; const fn cannot use u16::try_from"
-    )]
     #[must_use]
     pub const fn bold_italic() -> Self {
         Self {
@@ -481,10 +465,6 @@ impl TextRun {
     }
 
     /// Set bold
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "char_mask::BOLD is 0x0001 and always fits in u16"
-    )]
     #[must_use]
     pub fn bold(mut self) -> Self {
         self.style.bold = true;
@@ -493,10 +473,6 @@ impl TextRun {
     }
 
     /// Explicitly set bold formatting, including false.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "char_mask::BOLD is 0x0001 and always fits in u16"
-    )]
     #[must_use]
     pub fn bold_value(mut self, enabled: bool) -> Self {
         self.style.bold = enabled;
@@ -505,10 +481,6 @@ impl TextRun {
     }
 
     /// Set italic
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "char_mask::ITALIC is 0x0002 and always fits in u16"
-    )]
     #[must_use]
     pub fn italic(mut self) -> Self {
         self.style.italic = true;
@@ -517,10 +489,6 @@ impl TextRun {
     }
 
     /// Explicitly set italic formatting, including false.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "char_mask::ITALIC is 0x0002 and always fits in u16"
-    )]
     #[must_use]
     pub fn italic_value(mut self, enabled: bool) -> Self {
         self.style.italic = enabled;
@@ -529,10 +497,6 @@ impl TextRun {
     }
 
     /// Set underline
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "char_mask::UNDERLINE is 0x0004 and always fits in u16"
-    )]
     #[must_use]
     pub fn underline(mut self) -> Self {
         self.style.underline = true;
@@ -541,10 +505,6 @@ impl TextRun {
     }
 
     /// Explicitly set underline formatting, including false.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "char_mask::UNDERLINE is 0x0004 and always fits in u16"
-    )]
     #[must_use]
     pub fn underline_value(mut self, enabled: bool) -> Self {
         self.style.underline = enabled;
@@ -553,10 +513,6 @@ impl TextRun {
     }
 
     /// Set shadow formatting.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "char_mask::SHADOW is 0x0010 and always fits in u16"
-    )]
     #[must_use]
     pub fn shadow(mut self) -> Self {
         self.style.shadow = true;
@@ -565,10 +521,6 @@ impl TextRun {
     }
 
     /// Explicitly set shadow formatting, including false.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "char_mask::SHADOW is 0x0010 and always fits in u16"
-    )]
     #[must_use]
     pub fn shadow_value(mut self, enabled: bool) -> Self {
         self.style.shadow = enabled;
@@ -577,10 +529,6 @@ impl TextRun {
     }
 
     /// Set embossed/relief formatting.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "char_mask::EMBOSS is 0x0200 and always fits in u16"
-    )]
     #[must_use]
     pub fn embossed(mut self) -> Self {
         self.style.emboss = true;
@@ -589,10 +537,6 @@ impl TextRun {
     }
 
     /// Explicitly set embossed formatting, including false.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "char_mask::EMBOSS is 0x0200 and always fits in u16"
-    )]
     #[must_use]
     pub fn embossed_value(mut self, enabled: bool) -> Self {
         self.style.emboss = enabled;
@@ -601,10 +545,6 @@ impl TextRun {
     }
 
     /// Mark the run as originating from double-byte input.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "char_mask::FE_HINT is 0x0020 and always fits in u16"
-    )]
     #[must_use]
     pub fn fe_hint(mut self, enabled: bool) -> Self {
         self.style.fe_hint = enabled;
@@ -613,10 +553,6 @@ impl TextRun {
     }
 
     /// Set Kumimoji formatting for vertical text.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "char_mask::KUMI is 0x0080 and always fits in u16"
-    )]
     #[must_use]
     pub fn kumi(mut self, enabled: bool) -> Self {
         self.style.kumi = enabled;
@@ -625,10 +561,6 @@ impl TextRun {
     }
 
     /// Set the de facto legacy strikethrough bit used by `PowerPoint` and POI.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "char_mask::LEGACY_STRIKETHROUGH is 0x0100 and always fits in u16"
-    )]
     #[must_use]
     pub fn strikethrough(mut self, enabled: bool) -> Self {
         self.style.strikethrough = enabled;
@@ -1209,10 +1141,6 @@ impl FontEntity {
     /// Panics if the font face name contains a NUL character, is empty or
     /// longer than 32 UTF-16 code units, or if reserved `font_type` bits are
     /// set; see [`Self::try_build`] for the exact error conditions.
-    #[allow(
-        clippy::expect_used,
-        reason = "this is the documented panicking compatibility wrapper over try_build(); changing its signature would break the public API"
-    )]
     #[must_use]
     pub fn build(&self) -> Vec<u8> {
         self.try_build()

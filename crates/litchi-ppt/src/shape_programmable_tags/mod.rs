@@ -9,10 +9,6 @@ mod model;
 #[cfg(test)]
 mod tests;
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`ShapeProgrammableTagsEntry` is the established public entry type name; renaming it would break downstream crates"
-)]
 pub use model::{
     PresentationShapeProgrammableTagsEntry, ShapeBinaryTag, ShapeBinaryTagPayload,
     ShapeBinaryTagVersion, ShapeProgrammableTag, ShapeProgrammableTagLimits, ShapeProgrammableTags,

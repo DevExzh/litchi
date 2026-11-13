@@ -6,10 +6,6 @@ use crate::animation::sound::{BuiltinSound, SoundType};
 
 /// Sound information for slide transition.
 #[derive(Debug, Clone, PartialEq)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`TransitionSound` is the established public API name, paralleling the animation sound types; renaming it would break downstream crates"
-)]
 pub struct TransitionSound {
     /// Sound type and data
     pub sound_type: SoundType,
@@ -119,11 +115,6 @@ impl TransitionSound {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

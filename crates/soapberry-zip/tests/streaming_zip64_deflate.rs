@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    reason = "The streaming ZIP64 fixtures use fixed, bounded test buffers."
-)]
-
 //! Public streaming ZIP64 Deflate coverage.
 //!
 //! The ordinary cases below retain only small archives.  The ignored case is

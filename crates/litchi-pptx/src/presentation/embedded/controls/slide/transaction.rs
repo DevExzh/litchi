@@ -51,10 +51,6 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "snapshot constructor mirrors the persisted part fields"
-    )]
     pub(crate) fn from_parts(
         slide_index: usize,
         control_index: usize,

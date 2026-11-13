@@ -12,10 +12,6 @@ pub(crate) const fn facet_for_style(style: Style) -> Facet {
     }
 }
 
-#[allow(
-    clippy::expect_used,
-    reason = "callers preflight the prepared-font ordinal before staging, so the lookup cannot fail"
-)]
 pub(crate) fn stage_facet(
     collection: &mut FontCollection,
     index: u16,
@@ -51,10 +47,6 @@ pub(crate) fn restore_encoded(
     litchi_fonts::embedding::powerpoint::restore(font, encoded, limits)
 }
 
-#[allow(
-    clippy::expect_used,
-    reason = "the facet was staged into this collection by `stage_facet` immediately before rollback, so the owner and facet lookups cannot fail"
-)]
 pub(crate) fn restore_staged(
     font: &mut litchi_fonts::Prepared,
     candidate: &mut FontCollections,
@@ -85,11 +77,6 @@ pub(crate) fn restore_staged(
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::super::{EotIntent, EotLimits, Facet, PackageLimits, PreparedFont, Scope, Snapshot};
     use crate::Builder;

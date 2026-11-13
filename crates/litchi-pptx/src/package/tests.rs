@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 //! Regression tests for the `PresentationML` package facade.
 
 use litchi_opc::PackURI;

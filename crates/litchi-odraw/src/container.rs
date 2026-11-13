@@ -338,11 +338,6 @@ impl<'data> TryFrom<Record<'data>> for Container<'data> {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        reason = "test assertions panic on failure by design"
-    )]
     use super::*;
 
     fn atom(kind: u16, body: &[u8]) -> Vec<u8> {

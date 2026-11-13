@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use super::model::*;
 use super::placeholder::Limits as PlaceholderTypeExtensionLimits;
 use super::{PLACEHOLDER_TYPE_EXTENSION_URI, PlaceholderTypeExtension};

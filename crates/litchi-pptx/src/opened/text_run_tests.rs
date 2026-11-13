@@ -6,12 +6,6 @@
 //! enclosing element's span; `set_shape_text` then sliced the slide with a
 //! reversed range and panicked (`panic = "abort"` in release).
 
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "focused regression tests use panic-on-fixture-failure assertions"
-)]
-
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use litchi_opc::PackURI;

@@ -225,8 +225,6 @@ pub(crate) fn reject_protected_shared_container(
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::unwrap_used, reason = "test assertions panic by design")]
-
     use super::*;
     use litchi_cfb::{OleFile, OleWriter, SharedOleFile};
     use litchi_core::SourceVersion;

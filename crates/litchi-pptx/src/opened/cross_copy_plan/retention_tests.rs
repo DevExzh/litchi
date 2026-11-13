@@ -11,11 +11,6 @@
 //! They also pin the budget itself: a candidate above the ceiling falls back
 //! to the rebuild rather than refusing, and the tighter of the two snapshots'
 //! ceilings binds.
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "retention tests use panic-on-fixture-failure assertions"
-)]
 
 use std::sync::Arc;
 

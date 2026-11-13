@@ -4,13 +4,6 @@
 //! deviation and must open by default with the repair recorded; the same
 //! file without the deviation must open with a clean report.
 
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    reason = "test assertions panic on failure by design"
-)]
-
 use std::io::Cursor;
 use std::sync::Arc;
 

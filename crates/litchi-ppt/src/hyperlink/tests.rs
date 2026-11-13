@@ -27,11 +27,6 @@ fn interaction_to_record(value: &Interaction) -> crate::package::Result<Record> 
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod interaction_protocol_tests {
     use super::*;
 
@@ -224,11 +219,6 @@ mod interaction_protocol_tests {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod hyperlink_tests {
     use super::*;
 

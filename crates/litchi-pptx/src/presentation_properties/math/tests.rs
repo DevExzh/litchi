@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use super::{BinaryBreak, BinarySubtractionBreak, Properties};
 use crate::presentation_properties::{Extension, OpaqueExtension};
 

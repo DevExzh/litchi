@@ -29,10 +29,6 @@ pub fn write_interactive_info_with_sound(sound_ref: u32) -> Vec<u8> {
     atom_data.extend(&0u8.to_le_bytes()); // unknown2
     atom_data.extend(&0u8.to_le_bytes()); // unknown3
 
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the InteractiveInfoAtom payload above is a fixed 16 bytes"
-    )]
     let atom_header = create_record_header(
         RecordType::InteractiveInfoAtom,
         0x00,
@@ -45,10 +41,6 @@ pub fn write_interactive_info_with_sound(sound_ref: u32) -> Vec<u8> {
     children.extend(atom_data);
 
     // InteractiveInfo container wrapping the atom
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the children are a fixed 8-byte header plus the 16-byte atom"
-    )]
     let header = create_record_header(RecordType::InteractiveInfo, 0x0F, 0, children.len() as u32);
     data.extend(header);
     data.extend(children);

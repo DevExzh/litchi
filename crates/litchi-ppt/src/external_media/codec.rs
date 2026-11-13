@@ -492,10 +492,6 @@ impl Collection {
         let mut objects = Vec::new();
         let mut unknown_records = Vec::new();
         for child in &children[1..] {
-            #[allow(
-                clippy::wildcard_enum_match_arm,
-                reason = "every other `RecordType` variant is retained verbatim as an opaque record"
-            )]
             let parsed_object = match child.record_type {
                 RecordType::ExternalAviMovie | RecordType::ExternalMciMovie => {
                     Some(Object::Movie(Movie::parse(child, &limits)?))

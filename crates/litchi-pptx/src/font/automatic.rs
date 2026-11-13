@@ -126,11 +126,6 @@ fn pitch(value: litchi_fonts::Pitch) -> Pitch {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
     use litchi_fonts::{Charset as FontCharset, FontProperties, License, Panose, Signature};

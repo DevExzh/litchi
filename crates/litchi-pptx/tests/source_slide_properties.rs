@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "integration fixtures intentionally panic on malformed setup"
-)]
-
 //! Native slide-root name and visibility edits preserve source package bytes.
 
 use std::collections::BTreeMap;

@@ -9,10 +9,6 @@ use crate::records::record::ParseBudget;
 use std::sync::{Arc, OnceLock};
 
 /// Parser for PPT binary format that extracts document structure and content.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`RecordParser` is the established public API name re-exported from the crate root; renaming it would break downstream crates"
-)]
 pub struct RecordParser {
     /// All parsed records
     records: Vec<Record>,
@@ -302,11 +298,6 @@ impl Default for RecordParser {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

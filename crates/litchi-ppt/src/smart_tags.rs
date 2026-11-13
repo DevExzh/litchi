@@ -185,11 +185,6 @@ fn parse_store(record: &Record, ansi: Ansi, source_limits: &SourceLimits) -> Res
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

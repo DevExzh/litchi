@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 //! Tests for `TextSIExceptionAtom` defaults and `OutlineTextRefAtom` references
 //! against real `PowerPoint` fixtures.
 

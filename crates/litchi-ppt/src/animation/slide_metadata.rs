@@ -140,10 +140,6 @@ impl Flags {
 
     /// Converts the atom into the generic record representation.
     #[must_use]
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "`FLAGS_PAYLOAD_LEN` is a compile-time 4-byte constant, so it always fits in `u32`"
-    )]
     pub fn to_record(&self) -> Record {
         let data = self.to_payload().to_vec();
         Record {
@@ -251,10 +247,6 @@ impl SlideTime {
 
     /// Converts the atom into the generic record representation.
     #[must_use]
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "`TIME_PAYLOAD_LEN` is a compile-time 8-byte constant, so it always fits in `u32`"
-    )]
     pub fn to_record(self) -> Record {
         let data = self.to_payload().to_vec();
         Record {
@@ -292,10 +284,6 @@ impl SlideAnimationExtension {
     }
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "callers pass only the fixed 4- or 8-byte payload constants, so `payload_len` always fits in `u32`"
-)]
 fn validate_record<'a>(
     record: &'a Record,
     expected_type: RecordType,
@@ -330,10 +318,6 @@ fn validate_record<'a>(
     Ok(&record.data)
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "callers pass only the fixed 4- or 8-byte payload constants, so `payload_len` always fits in `u32`"
-)]
 fn validate_bytes<'a>(
     bytes: &'a [u8],
     expected_type: RecordType,
@@ -384,10 +368,6 @@ fn validate_bytes<'a>(
     Ok(&bytes[HEADER_LEN..expected_len])
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "callers pass only the fixed 4- or 8-byte atom payloads, so the payload length always fits in `u32`"
-)]
 fn serialize_atom(record_type: RecordType, payload: &[u8]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(HEADER_LEN + payload.len());
     bytes.extend_from_slice(&0u16.to_le_bytes());
@@ -398,11 +378,6 @@ fn serialize_atom(record_type: RecordType, payload: &[u8]) -> Vec<u8> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

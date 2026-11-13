@@ -2633,11 +2633,6 @@ fn encode_name_utf16le(name: &str) -> [u8; 64] {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        reason = "test assertions panic on failure by design"
-    )]
     use super::*;
     use crate::OleFileLimits;
     use crate::consts::MAGIC;

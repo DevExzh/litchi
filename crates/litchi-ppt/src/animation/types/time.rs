@@ -785,10 +785,6 @@ pub struct TimeAnimateBehavior {
 
 /// Calculation mode and use flags from a `TimeAnimateBehaviorAtom`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "the bool fields mirror the independent `f*Used` flag bits of the fixed MS-PPT `TimeAnimateBehaviorAtom` layout, so they cannot be merged into enums without losing the bit-level mapping"
-)]
 pub struct TimeAnimateBehaviorAtom {
     /// Explicit interpolation mode, or `None` for linear interpolation.
     pub calculation_mode: Option<TimeAnimateCalculationMode>,

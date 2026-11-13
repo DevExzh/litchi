@@ -385,10 +385,6 @@ impl<'a> IntoIterator for &'a ToleranceReport {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

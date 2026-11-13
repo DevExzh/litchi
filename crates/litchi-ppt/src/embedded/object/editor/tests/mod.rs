@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 //! Focused unit coverage for mapping and nested-record rewriting.
 
 mod limits;

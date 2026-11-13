@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    reason = "The reusable Deflate regression corpus is fixed and bounded."
-)]
-
 //! Differential coverage for the owned streaming Deflate transport.
 //!
 //! Owned (authored) Deflate entries follow a staged protocol: the member is

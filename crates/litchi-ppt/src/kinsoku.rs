@@ -7,10 +7,6 @@ use crate::consts::RecordType;
 
 /// Language whose East Asian line-breaking behavior is being queried.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`KinsokuLanguage` is the established public API name; renaming it would break downstream crates"
-)]
 pub enum KinsokuLanguage {
     /// Korean.
     Korean,
@@ -24,10 +20,6 @@ pub enum KinsokuLanguage {
 
 /// Line-breaking level stored by `PowerPoint`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`KinsokuLevel` is the established public API name; renaming it would break downstream crates"
-)]
 pub enum KinsokuLevel {
     /// Use standard line-breaking settings.
     Standard,
@@ -85,10 +77,6 @@ impl BaseKinsokuSettings {
 
 /// Per-language settings introduced by `PowerPoint` 9.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`KinsokuSettings9` is the established public API name; renaming it would break downstream crates"
-)]
 pub struct KinsokuSettings9 {
     /// Korean line-breaking level.
     pub korean: KinsokuLevel,
@@ -380,11 +368,6 @@ fn collect_records<'a>(record: &'a Record, record_type: RecordType, records: &mu
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

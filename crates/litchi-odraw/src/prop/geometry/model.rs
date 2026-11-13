@@ -15,10 +15,6 @@ pub enum Coordinate {
 
 impl Coordinate {
     /// Decodes the coordinate marker defined by `[MS-ODRAW]` section 2.3.6.7.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the range guard bounds the difference to 0..=0x7F; const fn cannot use u8::try_from"
-    )]
     #[must_use]
     pub const fn from_raw(raw: i32) -> Self {
         let bits = raw.cast_unsigned();

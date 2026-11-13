@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "test fixture construction and assertions panic on failure by design"
-)]
-
 mod in_place;
 use in_place::InPlace as _;
 

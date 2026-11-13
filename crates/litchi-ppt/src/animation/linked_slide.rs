@@ -292,10 +292,6 @@ impl SlideAnimationExtension {
     }
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "`PAYLOAD_LEN` is a compile-time 8-byte constant, so it always fits in `u32`"
-)]
 fn validate_record<'a>(
     record: &'a Record,
     expected_type: RecordType,
@@ -328,10 +324,6 @@ fn validate_record<'a>(
     Ok(&record.data)
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "`PAYLOAD_LEN` is a compile-time 8-byte constant, so it always fits in `u32`"
-)]
 fn validate_bytes<'a>(
     bytes: &'a [u8],
     expected_type: RecordType,
@@ -374,10 +366,6 @@ fn validate_bytes<'a>(
     Ok(&bytes[HEADER_LEN..expected_len])
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "callers pass only the fixed eight-byte atom payloads, so the payload length always fits in `u32`"
-)]
 fn serialize_atom(record_type: RecordType, payload: &[u8]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(HEADER_LEN + payload.len());
     bytes.extend_from_slice(&0u16.to_le_bytes());
@@ -387,10 +375,6 @@ fn serialize_atom(record_type: RecordType, payload: &[u8]) -> Vec<u8> {
     bytes
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "`PAYLOAD_LEN` is a compile-time 8-byte constant, so it always fits in `u32`"
-)]
 fn generic_record(record_type: RecordType, data: Vec<u8>) -> Record {
     Record {
         record_type,
@@ -404,11 +388,6 @@ fn generic_record(record_type: RecordType, data: Vec<u8>) -> Record {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
     use crate::animation::{Flags, parse_slide_animation_extension};

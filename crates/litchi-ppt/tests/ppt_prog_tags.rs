@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 //! Fixture-level integration tests for typed document/slide programmable tags
 //! (MS-PPT 2.4.23 and 2.5.19-2.5.22) reachable through `Presentation`, `Slide`,
 //! `SpeakerNotes`, and the main-master accessor.

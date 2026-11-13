@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "integration tests use panic-on-failure extraction"
-)]
-
 //! A changed opened-presentation commit refuses a signed package (ADR 0006).
 //! Removing the signature is explicit (`Package::unsign`), and an exact no-op
 //! keeps the source bytes, signature included.

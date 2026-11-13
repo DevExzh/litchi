@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use litchi_pptx::shape::{LookupError, Scene};
 
 const LOCAL_SHAPE_XML: &[u8] =

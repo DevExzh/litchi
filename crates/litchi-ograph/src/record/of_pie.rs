@@ -199,7 +199,6 @@ const fn invalid(field: &'static str, value: u64) -> Error {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::unwrap_used, reason = "test assertions panic by design")]
     use super::*;
     use litchi_biff::{Limits, Records};
 

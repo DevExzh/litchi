@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "document-structure edit tests use panic-driven assertions"
-)]
-
 //! Master reordering, custom table-style placement and `fNonOutlineData`
 //! through the primary edit.
 

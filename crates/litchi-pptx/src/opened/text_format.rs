@@ -187,10 +187,6 @@ pub enum ShapeFill {
 /// Each field is `None` to leave the property as it is, `Some(None)` to
 /// remove the local property, and `Some(Some(value))` to set it.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-#[allow(
-    clippy::option_option,
-    reason = "omission, removal and replacement are distinct assignments"
-)]
 pub struct TextProperties<'a> {
     text: Option<&'a str>,
     bold: Option<Option<bool>>,
@@ -209,10 +205,6 @@ pub struct TextProperties<'a> {
     geometry: Option<Preset>,
 }
 
-#[allow(
-    clippy::option_option,
-    reason = "omission, removal and replacement are distinct assignments"
-)]
 impl<'a> TextProperties<'a> {
     /// Replace the target's text. A run keeps its run properties; a
     /// paragraph, shape or cell keeps its first paragraph's properties and

@@ -17,11 +17,6 @@
 //! plan and by durable patch in both directions, and size-limit refusals end to
 //! end: durable patches read under limits that admit the patch but not the
 //! source or destination archive, and planning under the same limits.
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "golden-transcript tests use panic-on-fixture-failure assertions"
-)]
 
 use std::fmt::Write as _;
 

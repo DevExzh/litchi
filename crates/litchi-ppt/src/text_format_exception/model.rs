@@ -134,10 +134,6 @@ impl TextCFException {
 
 /// `BulletFlags` bullet-property validity bits (MS-PPT 2.9.22).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "each bool mirrors one independent validity bit of the MS-PPT `BulletFlags` bitfield; they are spec flags, not a state machine"
-)]
 pub struct BulletFlags {
     pub(super) has_bullet: bool,
     pub(super) bullet_has_font: bool,

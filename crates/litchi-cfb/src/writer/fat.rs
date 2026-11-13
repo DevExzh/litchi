@@ -473,11 +473,6 @@ fn filled_sector(size: usize, resource: &'static str) -> Result<Vec<u8>, OleErro
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        reason = "test assertions panic on failure by design"
-    )]
     use super::*;
 
     #[test]

@@ -57,10 +57,6 @@ pub struct PhotoAlbumSettings {
 
 /// Metadata and privacy settings stored in the `___PPT10` document extension.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`DocumentProperties10` is the established public API name; renaming it would break downstream crates"
-)]
 pub struct DocumentProperties10 {
     /// Optional copyright notice.
     pub copyright: Option<String>,
@@ -83,10 +79,6 @@ pub struct DocumentProperties10 {
 
 /// Document-level settings stored in the `___PPT12` extension.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`DocumentProperties12` is the established public API name; renaming it would break downstream crates"
-)]
 pub struct DocumentProperties12 {
     /// Whether pictures are automatically compressed when the presentation is saved.
     ///
@@ -368,11 +360,6 @@ fn parse_photo_album(record: &Record) -> Result<PhotoAlbumSettings> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
     use crate::raw::Reader;

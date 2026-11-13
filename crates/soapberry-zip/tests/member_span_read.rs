@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    reason = "The fixtures below use fixed, bounded test buffers."
-)]
-
 //! One bounded positional read per indexed member first-read.
 //!
 //! `IndexedArchive::read`/`read_entry` used to cost two or three positional

@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "theme tests use panic-driven assertions"
-)]
-
 //! The `PowerPoint` 2007 theme of a legacy presentation.
 
 use litchi_ppt::Package;

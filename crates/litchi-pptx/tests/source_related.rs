@@ -4,12 +4,6 @@
 //! snapshots.  The fixture is assembled and serialized in memory so the
 //! source path still opens a real ZIP package and validates the OPC graph.
 
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "integration assertions intentionally panic on malformed fixtures"
-)]
-
 use std::io::{self, Cursor};
 use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::Arc;

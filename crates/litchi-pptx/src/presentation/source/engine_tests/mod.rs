@@ -2,13 +2,6 @@
 //! the `source::Package` families run on (moved from the crate's integration
 //! tests when the routes became crate-private).
 
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    reason = "test assertions panic on failure by design"
-)]
-
 mod cross_copy;
 mod edit;
 mod slide_removal;

@@ -6,11 +6,6 @@
 //! surplus attribute. The limit is independent of the document-wide attribute
 //! budget, does not count an XML declaration's pseudo-attributes, and a
 //! replacement audit returns the verdict of the two complete audits.
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "each test states one fixed expected verdict"
-)]
 
 use std::io::Cursor;
 

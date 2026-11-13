@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "durable-patch, undo/redo, join and three-way tests use panic-driven assertions"
-)]
-
 //! Durable patches, undo/redo, joins and three-way planning of the primary
 //! PPT edit.
 //!

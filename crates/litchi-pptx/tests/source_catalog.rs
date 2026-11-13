@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "the in-memory package fixtures and assertions intentionally panic"
-)]
-
 //! Source-backed presentation master/layout catalog projections.
 
 mod in_place;

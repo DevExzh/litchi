@@ -370,11 +370,6 @@ fn validate_limit(kind: SourceLimitKind, value: usize, maximum: usize) -> Result
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod limit_tests {
     use super::{Error, OpenOptions, SourceLimitKind, SourceLimits};
     use std::error::Error as _;

@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 //! Focused round-trip and malformed-input coverage for document comparison.
 
 use super::*;

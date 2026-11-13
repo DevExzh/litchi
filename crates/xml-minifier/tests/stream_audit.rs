@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "focused audit tests fail at the unexpected result"
-)]
-
 use std::io::{self, BufRead, Read};
 
 use xml_minifier::audit::{self, Error, Kind, Limits, Report, Resource, StreamError};

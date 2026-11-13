@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic by design"
-)]
-
 use super::super::super::{Cache, Context, Model, Rect, RowCol, Series, Value};
 use crate::Error;
 use crate::chart::cache;

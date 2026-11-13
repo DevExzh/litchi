@@ -332,10 +332,6 @@ pub(super) struct SerializedHeaderFooters {
 impl WritableSlide {
     /// Number of `OfficeArt` shapes in this slide's drawing, including the
     /// group patriarch, the background shape, and every table group/cell.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "in-memory shape and chart counts cannot approach u32::MAX on supported targets"
-    )]
     pub(super) fn escher_shape_count(&self) -> u32 {
         let table_shapes: u32 = self.tables.iter().map(|t| t.table.shape_count()).sum();
         2 + self.shapes.len() as u32 + table_shapes + self.charts.len() as u32

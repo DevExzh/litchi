@@ -218,11 +218,6 @@ impl Table {
 
     /// Number of `OfficeArt` shapes this table occupies in its drawing:
     /// one group shape plus one shape per cell.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "rows and columns are each capped at MAX_TABLE_DIMENSION (1000) \
-                  by Table::new, so the product is at most 1_000_000 and fits in u32"
-    )]
     pub(crate) fn shape_count(&self) -> u32 {
         1 + (self.rows * self.columns) as u32
     }
@@ -240,21 +235,11 @@ pub(crate) struct PositionedTable {
 }
 
 /// Convert EMUs to PPT master units (576 per inch) without sign loss.
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "the input is an i32 EMU value, so the scaled result is bounded by \
-              roughly i32::MAX * 576 / 914400 (about 1.4M) and always fits in i32"
-)]
 fn emu_to_master_i32(emu: i32) -> i32 {
     ((i64::from(emu) * PPT_MASTER_UNITS_PER_INCH) / EMUS_PER_INCH) as i32
 }
 
 /// Convert EMUs to whole points.
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "the input is an i32 EMU value, so the scaled result is bounded by \
-              roughly i32::MAX * 72 / 914400 (about 170k) and always fits in i32"
-)]
 fn emu_to_pt_i32(emu: i32) -> i32 {
     (i64::from(emu) * 72 / EMUS_PER_INCH) as i32
 }
@@ -415,12 +400,6 @@ fn build_table_properties(row_heights_emu: &[i32]) -> Result<Vec<u8>, Error> {
         row_data.extend_from_slice(&emu_to_master_i32(*height).to_le_bytes());
     }
 
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "row_data is a 6-byte header plus 4 bytes per row, and \
-                  rows fits in u16 by the check above, so the length is \
-                  at most about 262 KiB and always fits in u32"
-    )]
     let properties = [
         EscherProperty::new(PROP_GROUP_TABLE_PROPERTIES, 1),
         EscherProperty::new(
@@ -429,11 +408,6 @@ fn build_table_properties(row_heights_emu: &[i32]) -> Result<Vec<u8>, Error> {
         ),
     ];
 
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the properties array above always contains exactly two \
-                  entries, so its length fits in u16"
-    )]
     let mut opt = EscherBuilder::new(
         header_version::OPT,
         properties.len() as u16,

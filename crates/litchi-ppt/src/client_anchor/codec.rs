@@ -53,10 +53,6 @@ impl Data {
     /// Panics only if writing to the in-memory buffer fails, which `Write for
     /// Vec<u8>` documents as impossible.
     #[must_use]
-    #[allow(
-        clippy::expect_used,
-        reason = "`Write for Vec<u8>` is documented as infallible, so the result is always `Ok`"
-    )]
     pub fn to_bytes(self) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(self.encoded_len());
         self.write_to(&mut bytes)
@@ -140,10 +136,6 @@ impl Anchor {
     /// Panics only if writing to the in-memory buffer fails, which `Write for
     /// Vec<u8>` documents as impossible.
     #[must_use]
-    #[allow(
-        clippy::expect_used,
-        reason = "`Write for Vec<u8>` is documented as infallible, so the result is always `Ok`"
-    )]
     pub fn to_bytes(self) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(self.encoded_len());
         self.write_to(&mut bytes)
@@ -159,10 +151,6 @@ impl Anchor {
     pub fn write_to<W: Write>(self, writer: &mut W) -> io::Result<()> {
         writer.write_all(&0u16.to_le_bytes())?;
         writer.write_all(&RECORD_TYPE.to_le_bytes())?;
-        #[allow(
-            clippy::cast_possible_truncation,
-            reason = "the anchor payload is exactly `SMALL_RECT_LEN` or `RECT_LEN` bytes, so its length always fits in `u32`"
-        )]
         let payload_len = self.data().encoded_len() as u32;
         writer.write_all(&payload_len.to_le_bytes())?;
         self.data().write_to(writer)

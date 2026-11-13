@@ -112,10 +112,6 @@ impl SlideComment {
 }
 
 /// Convert points to PPT master units (576 units per inch, 72 points per inch).
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "comment offsets in points are small layout values, so `pt * 576 / 72` (i.e. `pt * 8`) always fits i32"
-)]
 fn pt_to_master(pt: i32) -> i32 {
     (i64::from(pt) * 576 / 72) as i32
 }
@@ -213,10 +209,6 @@ fn build_comment_container(comment: &SlideComment, index: i32) -> Result<Vec<u8>
 /// # Errors
 ///
 /// Returns an error if serialization fails or the underlying writer reports an error.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`build_slide_comments` is the established public API name; renaming it would break downstream crates"
-)]
 pub fn build_slide_comments(comments: &[SlideComment]) -> Result<Vec<u8>, Error> {
     if comments.is_empty() {
         return Ok(Vec::new());
@@ -236,11 +228,6 @@ pub fn build_slide_comments(comments: &[SlideComment]) -> Result<Vec<u8>, Error>
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

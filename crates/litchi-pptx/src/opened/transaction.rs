@@ -4054,12 +4054,6 @@ impl Commit {
 
 #[cfg(test)]
 mod compaction_tests {
-    #![allow(
-        clippy::expect_used,
-        clippy::unwrap_used,
-        reason = "focused compaction tests use panic-on-fixture-failure assertions"
-    )]
-
     use std::sync::Arc;
 
     use super::{COMPACTION_SCENE_READS, compact_changed_slides};

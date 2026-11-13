@@ -1,12 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::shadow_reuse,
-    clippy::shadow_unrelated,
-    clippy::cast_possible_truncation,
-    reason = "fixtures use checked, small literals"
-)]
-
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_ole_common::object::{Limits as ObjectLimits, Target, Targets, discover};
 use litchi_ole_common::ole_streams::{

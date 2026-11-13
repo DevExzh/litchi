@@ -86,10 +86,6 @@ fn build_dgg_container(
         container.add_data(nonempty_blob);
     }
 
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "`DGG_DEFAULT_PROPERTIES` is a fixed eight-element array"
-    )]
     let mut opt = EscherBuilder::new(
         header_version::OPT,
         DGG_DEFAULT_PROPERTIES.len() as u16,
@@ -204,10 +200,6 @@ fn append_dg_container_children(
         .saturating_add(u32::try_from(charts.len()).unwrap_or(u32::MAX))
         .saturating_add(2);
 
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the `DG` instance field carries the low 12 bits of the drawing id; `EscherHeader::new` masks it"
-    )]
     let mut dg = EscherBuilder::new(header_version::DG, drawing_id as u16, record_type::DG);
     dg.add_data(EscherDgData::with_spid_base(total_shapes, spid_base).as_bytes());
     output.extend_from_slice(&dg.build()?);
@@ -263,10 +255,6 @@ fn append_dg_container_children(
         EscherBuilder::new(header_version::SP, shape_type::RECTANGLE, record_type::SP);
     background_shape.add_data(Sp::background(bg_spid).as_bytes());
     background_container.add_data(&background_shape.build()?);
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "`BG_SHAPE_PROPERTIES` is a fixed eight-element array"
-    )]
     let mut opt = EscherBuilder::new(
         header_version::OPT,
         BG_SHAPE_PROPERTIES.len() as u16,

@@ -16,10 +16,6 @@ use crate::records::Record;
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-#[allow(
-    clippy::wildcard_enum_match_arm,
-    reason = "`RecordType` spans the full MS-PPT record ID space; every child other than the three build containers is rejected uniformly"
-)]
 pub fn parse_build_list(record: &Record) -> Result<BuildList> {
     if record.record_type != RecordType::BuildList {
         return Err(Error::InvalidFormat(format!(

@@ -44,10 +44,6 @@ pub(crate) fn parse(bytes: &[u8], limits: Limits) -> Result<Record> {
     Ok(record)
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "the timestamp payload is exactly 32 bytes and the container payload is bounded to 64 MiB by `encode_children`, so both lengths fit in u32"
-)]
 pub(crate) fn encode_sync(value: &Synchronization) -> Result<Record> {
     let server = atom(0, value.server_slide_id().wire()?);
     let url = atom(1, value.slide_library_url().wire()?);
@@ -81,10 +77,6 @@ struct Encoder {
     records: usize,
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "wire payloads are validated to at most MAX_TEXT_BYTES (16 KiB), well below u32::MAX"
-)]
 fn atom(instance: u16, data: Vec<u8>) -> Record {
     Record {
         record_type: RecordType::CString,

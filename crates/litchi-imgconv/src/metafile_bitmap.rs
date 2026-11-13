@@ -1,14 +1,5 @@
 //! Normalized, checked bitmap operations shared by EMF and WMF renderers.
 
-#![allow(
-    clippy::missing_errors_doc,
-    reason = "fallible public APIs uniformly report malformed records, limits, or unsupported rendering"
-)]
-#![allow(
-    clippy::module_name_repetitions,
-    reason = "public names remain unambiguous when imported beside EMF and WMF record types"
-)]
-
 use std::{
     fmt::Write as _,
     io::{Cursor, Seek, SeekFrom, Write},

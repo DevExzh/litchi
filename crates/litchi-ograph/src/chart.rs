@@ -508,11 +508,6 @@ fn chart_error<T>(offset: usize, reason: &'static str) -> Result<T> {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        reason = "test assertions panic by design"
-    )]
     use super::*;
     use litchi_biff::{Encoder, Kind as RecordKind, Record as OwnedRecord, Records};
 

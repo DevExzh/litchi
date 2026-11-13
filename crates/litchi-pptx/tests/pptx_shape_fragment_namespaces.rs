@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 //! The namespace contract of a shape span sliced out of a processed scene.
 //!
 //! The markup-compatibility codec declares each namespace once, where XML

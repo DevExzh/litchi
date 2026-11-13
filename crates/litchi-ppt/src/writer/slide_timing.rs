@@ -107,10 +107,6 @@ impl SlideTiming {
 /// # Errors
 ///
 /// Returns an error if serialization fails or the underlying writer reports an error.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`build_slide_timing` is the established public API name; renaming it would break downstream crates"
-)]
 pub fn build_slide_timing(timing: &SlideTiming) -> Result<Vec<u8>, Error> {
     let mut data = Vec::with_capacity(16);
 
@@ -151,11 +147,6 @@ pub fn build_slide_timing(timing: &SlideTiming) -> Result<Vec<u8>, Error> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

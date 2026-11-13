@@ -719,11 +719,6 @@ fn require_bytes(data: &[u8], offset: usize, size: usize, field: &str) -> Result
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

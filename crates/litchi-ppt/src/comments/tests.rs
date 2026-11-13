@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use super::{Authors, Catalog, parse_slide_comments};
 use crate::SourceLimits;
 use crate::consts::RecordType;

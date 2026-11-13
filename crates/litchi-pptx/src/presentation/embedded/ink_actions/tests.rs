@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "bounded fixture assertions panic on failure by design"
-)]
-
 use super::{Limits, apply_patch, load_snapshot};
 use crate::Error;
 use litchi_drawingml::ink::actions::builder::ActionSelector;

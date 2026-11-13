@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use super::package::is_notes_slide_rel;
 use super::*;
 use crate::package::replay_index::ReplayIndex;

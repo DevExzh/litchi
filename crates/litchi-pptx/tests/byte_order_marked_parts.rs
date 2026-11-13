@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "differential assertions intentionally panic on fixture failures"
-)]
-
 //! A part that begins with a UTF-8 byte-order mark reads, edits and saves
 //! exactly like the same part without one.
 //!

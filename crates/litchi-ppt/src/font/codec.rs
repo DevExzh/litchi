@@ -93,10 +93,6 @@ impl FontCollections {
         let mut international = None;
         let mut embedding_flags = None;
         for record in records.unwrap_or_default() {
-            #[allow(
-                clippy::wildcard_enum_match_arm,
-                reason = "`RecordType` has hundreds of variants; every record other than `FontCollection10` and `FontEmbedFlags10Atom` is intentionally ignored here"
-            )]
             match record.record_type {
                 RecordType::FontCollection10 if international.is_some() => {
                     return Err(Error::Corrupted(
@@ -484,10 +480,6 @@ impl FontCollection {
         if !owner_already_accounted {
             session.account_existing(record, logical_depth)?;
         }
-        #[allow(
-            clippy::wildcard_enum_match_arm,
-            reason = "`RecordType` has hundreds of variants; every record other than `FontCollection` and `FontCollection10` is rejected here"
-        )]
         let scope = match record.record_type {
             RecordType::FontCollection => Scope::Base,
             RecordType::FontCollection10 => Scope::International,
@@ -557,10 +549,6 @@ impl FontCollection {
                     maximum: limits.records.max_record_bytes,
                 });
             }
-            #[allow(
-                clippy::wildcard_enum_match_arm,
-                reason = "`RecordType` has hundreds of variants; every record other than `FontEntityAtom` and `FontEmbeddedData` is intentionally rejected here"
-            )]
             match child.record_type {
                 RecordType::FontEntityAtom => {
                     if let Some(font) = current.take() {
@@ -580,10 +568,6 @@ impl FontCollection {
                             "embedded font has an invalid header".into(),
                         ));
                     }
-                    #[allow(
-                        clippy::cast_possible_truncation,
-                        reason = "`child.instance` is checked to be at most 3 immediately above"
-                    )]
                     let style = child.instance as u8;
                     if font
                         .embedded_fonts
@@ -1357,10 +1341,6 @@ fn append_leaf_record(
     Ok(())
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "`atom` callers pass fixed tiny payloads (4 or 68 bytes), far below the u32 length field range"
-)]
 fn atom(kind: RecordType, instance: u16, data: Vec<u8>) -> Record {
     Record {
         record_type: kind,

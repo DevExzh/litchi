@@ -19,12 +19,6 @@
 //!   refusal is a typed error;
 //! * every hit re-derived in test and debug builds.
 
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "focused memo tests use panic-on-fixture-failure assertions"
-)]
-
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 

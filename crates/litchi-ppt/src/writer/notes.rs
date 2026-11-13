@@ -50,10 +50,6 @@ use super::text_format::Paragraph;
 // =============================================================================
 
 /// `NotesAtom` structure (8 bytes)
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`NotesAtom` is the established public API name matching the MS-PPT record name"
-)]
 #[derive(Debug, Clone, Copy, IntoBytes, Immutable, KnownLayout)]
 #[repr(C, packed)]
 pub struct NotesAtom {
@@ -66,10 +62,6 @@ pub struct NotesAtom {
 }
 
 /// Notes flags
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`notes_flags` mirrors the flag field of `NotesAtom`; renaming it would break downstream crates"
-)]
 pub mod notes_flags {
     /// Follow master objects
     pub const FOLLOW_MASTER_OBJECTS: u16 = 0x0001;
@@ -99,10 +91,6 @@ impl NotesAtom {
 // =============================================================================
 
 /// Placeholder types used in notes pages
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`NotesPlaceholderType` is the established public API name; renaming it would break downstream crates"
-)]
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NotesPlaceholderType {
@@ -125,14 +113,6 @@ pub enum NotesPlaceholderType {
 // =============================================================================
 
 /// Complete notes page definition
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`NotesPage` is the established public API name; renaming it would break downstream crates"
-)]
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "the four bools map one-to-one to independent header/footer/slide-number/date visibility flags of the notes page format"
-)]
 #[derive(Debug, Clone)]
 pub struct NotesPage {
     /// Persist ID (assigned during save)
@@ -249,17 +229,9 @@ impl NotesPage {
 // =============================================================================
 
 /// Error type for notes operations
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`NotesError` is the established public API name; renaming it would break downstream crates"
-)]
 pub type NotesError = std::io::Error;
 
 /// Builder for Notes container record
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`NotesContainerBuilder` is the established public API name; renaming it would break downstream crates"
-)]
 pub struct NotesContainerBuilder {
     notes: NotesPage,
     drawing_id: u32,
@@ -277,10 +249,6 @@ impl NotesContainerBuilder {
     /// # Errors
     ///
     /// Returns an error if serialization fails or the underlying writer reports an error.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "Notes container children are small in-memory records whose total size is bounded far below u32::MAX"
-    )]
     pub fn build(&self) -> Result<Vec<u8>, NotesError> {
         let mut container = Vec::new();
         let mut children = Vec::new();
@@ -312,10 +280,6 @@ impl NotesContainerBuilder {
     }
 
     /// Build `NotesAtom` record
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "`NotesAtom::SIZE` is the constant 8, which always fits u32"
-    )]
     fn build_notes_atom(&self) -> Result<Vec<u8>, NotesError> {
         let mut record = Vec::new();
         let atom = NotesAtom::new(self.notes.slide_id_ref);
@@ -403,10 +367,6 @@ impl NotesContainerBuilder {
             reason = "builder mirrors POI's PPDrawing structure and is retained for pending notes-writing support"
         )
     )]
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the background shape uses a fixed 8-entry property table and small in-memory records, so counts and sizes always fit u16/u32"
-    )]
     fn build_background_shape(spid: u32) -> Result<Vec<u8>, NotesError> {
         let mut sp_container = Vec::new();
         let mut sp_children = Vec::new();
@@ -486,10 +446,6 @@ impl NotesContainerBuilder {
 // =============================================================================
 
 /// Collection of notes pages for a presentation
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`NotesCollection` is the established public API name; renaming it would break downstream crates"
-)]
 #[derive(Debug, Default)]
 pub struct NotesCollection {
     notes: Vec<NotesPage>,
@@ -548,10 +504,6 @@ impl NotesCollection {
     /// # Errors
     ///
     /// Returns an error if serialization fails or the underlying writer reports an error.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "each child is a fixed-size `SlidePersistAtom`, so the total size is bounded far below u32::MAX"
-    )]
     pub fn build_slide_list_with_text(
         &self,
         persist_ids: &[(u32, u32)],
@@ -653,11 +605,6 @@ fn build_slide_persist_atom(persist_id_ref: u32, identifier: u32) -> Result<Vec<
 // =============================================================================
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

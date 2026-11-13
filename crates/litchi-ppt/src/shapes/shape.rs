@@ -75,10 +75,6 @@ impl std::error::Error for MutationError {}
 
 /// Types of shapes in `PowerPoint` presentations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`ShapeType` is the established public API name; renaming it would break downstream crates"
-)]
 pub enum ShapeType {
     /// Text box shape
     TextBox,
@@ -142,10 +138,6 @@ impl fmt::Display for ShapeType {
 
 /// Common properties shared by all shape types.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`ShapeProperties` is the established public API name; renaming it would break downstream crates"
-)]
 pub struct ShapeProperties {
     /// Shape ID
     pub id: u32,
@@ -322,10 +314,6 @@ pub trait Shape: std::any::Any {
 /// Child shapes own their payloads with a `'static` lifetime,
 /// while `raw_data` can be borrowed with lifetime `'a`.
 #[derive(Clone)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`ShapeContainer` is the established public API name; renaming it would break downstream crates"
-)]
 pub struct ShapeContainer<'a> {
     /// Shape properties
     pub(crate) properties: ShapeProperties,
@@ -826,11 +814,6 @@ where
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod persistence_tests {
     use super::{Mutation, MutationError, Shape, ShapeContainer, ShapeEnum, ShapeProperties};
 

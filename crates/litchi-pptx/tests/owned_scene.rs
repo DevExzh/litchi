@@ -1,4 +1,3 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, reason = "test assertions")]
 use litchi_pptx::{
     Package,
     shape::{Scene, owned},

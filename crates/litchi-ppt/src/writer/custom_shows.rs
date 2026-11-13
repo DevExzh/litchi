@@ -106,11 +106,6 @@ fn checked_named_show(show: &CustomShow) -> Result<NamedShow, Error> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
     use crate::consts::RecordType;

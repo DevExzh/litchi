@@ -127,10 +127,6 @@ impl TextCFRun {
 /// A parsed `StyleTextPropAtom` record (MS-PPT 2.9.44) with the
 /// paragraph-level and character-level formatting runs of the corresponding
 /// text.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`StyleTextPropAtom` is the established public API name mirroring the MS-PPT record; renaming it would break downstream crates"
-)]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct StyleTextPropAtom {
     paragraph_runs: Vec<TextPFRun>,
@@ -221,10 +217,6 @@ impl StyleTextPropAtom {
     }
 
     /// Serialize the complete `StyleTextPropAtom`, including its header.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the runs are parsed from a PPT record payload whose length is a u32, so the re-serialized payload length always fits u32"
-    )]
     #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut payload = Vec::new();
@@ -448,11 +440,6 @@ fn require_bytes(data: &[u8], offset: usize, needed: usize, field: &str) -> Resu
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
     use crate::slide_show_settings::ColorIndexKind;

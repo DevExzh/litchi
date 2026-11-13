@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use super::package::{apply_commit, apply_patch};
 use super::{
     Anchor, BlackWhiteMode, Limits, Payload, Relationship, Snapshot, Target, TargetMode,

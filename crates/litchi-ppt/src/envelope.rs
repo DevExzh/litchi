@@ -14,10 +14,6 @@ const ENVELOPE_ALLOWED_FLAGS: u32 = 0x13;
 /// This is inert metadata. It does not send mail, invoke a mail client, or
 /// interpret an `EnvelopeData9Atom` payload.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`EnvelopeSettings` is the established public API name; renaming it would break downstream crates"
-)]
 pub struct EnvelopeSettings {
     pub has_envelope: bool,
     pub visible: bool,
@@ -124,11 +120,6 @@ impl EnvelopeSettings {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

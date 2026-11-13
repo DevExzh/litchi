@@ -768,11 +768,6 @@ fn read_u32(data: &[u8], offset: usize, label: &str) -> Result<u32> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

@@ -959,10 +959,6 @@ fn structural_text_parent(node: &Node) -> bool {
     )
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "node start threads one slot per parsed tag-node field"
-)]
 fn start_node(
     reader: &NsReader<&[u8]>,
     xml: &[u8],
@@ -1048,10 +1044,6 @@ fn start_node(
     }
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "node finish threads one slot per parsed tag-node field"
-)]
 fn finish_node(
     xml: &[u8],
     node: Node,

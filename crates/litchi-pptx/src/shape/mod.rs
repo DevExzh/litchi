@@ -55,11 +55,6 @@ pub fn read(xml: &[u8], limits: Limits) -> crate::Result<Scene<'_>> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

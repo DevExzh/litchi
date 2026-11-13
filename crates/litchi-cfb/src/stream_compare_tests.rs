@@ -11,13 +11,6 @@
 //! a contiguous mini stream to one comparison, and a failed load to no
 //! cached result.
 
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    reason = "test assertions panic on failure by design"
-)]
-
 use std::cell::Cell;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};

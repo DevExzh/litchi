@@ -805,10 +805,6 @@ fn scan_processed_xml_with_limits(
     Ok(scan)
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "element inspector threads one slot per notes-element field"
-)]
 fn inspect_element(
     resolver: &NamespaceResolver,
     element: &BytesStart<'_>,
@@ -1576,10 +1572,6 @@ mod tests {
         }
     }
 
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "verbatim oracle of the pre-change element inspector"
-    )]
     fn inspect_element_oracle(
         reader: &NsReader<&[u8]>,
         element: &BytesStart<'_>,

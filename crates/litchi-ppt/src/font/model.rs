@@ -216,10 +216,6 @@ impl EmbeddedFont {
 }
 
 /// Font attributes from one `FontEntityAtom`.
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "each bool mirrors one MS-PPT `FontEntityAtom` flag bit; merging them would obscure the format projection"
-)]
 #[derive(Debug, Clone)]
 pub struct Font {
     /// Stable zero-based ordinal used by `FontIndexRef`/`FontIndexRef10`.

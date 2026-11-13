@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "validation fixtures intentionally panic on construction failure"
-)]
-
 use litchi_cfb::OleWriter;
 use litchi_core::{OwnedSource, ReadAt, SourceVersion};
 use litchi_ppt::{

@@ -1127,7 +1127,6 @@ impl Prepared {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::unwrap_used, reason = "test assertions")]
     use super::*;
 
     fn image(body: &str, present: bool) -> Image {

@@ -120,11 +120,6 @@ fn same_palette(left: &Palette, right: &Palette) -> bool {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use litchi_drawingml::theme::{Color, Face, FontSet, Slot};
 

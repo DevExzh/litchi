@@ -4,15 +4,6 @@
 //!
 //! `cargo test -p xml-minifier --test ooxml_assets update -- --ignored`
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "asset declaration macros intentionally precede the registry function"
-)]
-#![allow(
-    clippy::unwrap_used,
-    reason = "development parity tests fail immediately on invalid static paths or file IO"
-)]
-
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};

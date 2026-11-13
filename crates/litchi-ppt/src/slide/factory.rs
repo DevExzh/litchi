@@ -16,10 +16,6 @@ use std::sync::Arc;
 /// - Zero-copy: Borrows from original document data
 /// - Lazy evaluation: Slides created on-demand via iterator
 /// - Minimal allocations: Direct slice access
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`SlideFactory` is the established public API name re-exported as `slide::SlideFactory`; renaming it would break downstream crates"
-)]
 pub struct SlideFactory<'doc> {
     /// Where the per-slide re-parse reads the document stream, and takes each
     /// record's payload bytes from
@@ -288,11 +284,6 @@ impl<'doc> SlideData<'doc> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "hyperlink edit tests use panic-driven assertions"
-)]
-
 //! Shape click hyperlinks through the canonical primary edit.
 
 use litchi_ppt::Package;

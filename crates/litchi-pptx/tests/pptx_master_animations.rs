@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use litchi_pptx::animations::{Effect, Limits, Sequence};
 
 const LAYOUT_XML: &[u8] =

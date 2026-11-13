@@ -1,11 +1,6 @@
 //! `VerifiedSource` exists only for bytes that passed `verify_source`, and
 //! covers exactly the audited allocation: the same address and length, under
 //! the same limits.
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "each test states one fixed expected verdict"
-)]
 
 use std::sync::Arc;
 

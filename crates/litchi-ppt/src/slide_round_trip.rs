@@ -158,10 +158,6 @@ pub struct ContentMasterReference {
 }
 
 /// `PowerPoint` 12 round-trip metadata stored directly in a slide container.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`SlideRoundTripMetadata12` is the established public API name for slide-level `PowerPoint` 12 round-trip metadata; renaming it would break downstream crates"
-)]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SlideRoundTripMetadata12 {
     /// Validated embedded `PowerPoint` 12 theme or theme-override package.
@@ -187,10 +183,6 @@ impl SlideRoundTripMetadata12 {
     pub fn parse(root: &Record) -> Result<Self> {
         let mut metadata = Self::default();
         for record in &root.children {
-            #[allow(
-                clippy::wildcard_enum_match_arm,
-                reason = "`RecordType` mirrors the full MS-PPT record-type enumeration; records other than the six round-trip atoms are intentionally ignored"
-            )]
             match record.record_type {
                 RecordType::RoundTripTheme12Atom => {
                     if metadata.theme_package.is_some() {
@@ -787,11 +779,6 @@ fn validate_atom(
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
     use litchi_opc::constants::relationship_type;

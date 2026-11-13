@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "comment edit tests use panic-driven assertions"
-)]
-
 //! Slide comments through the canonical primary edit.
 
 use litchi_ppt::comments::{CommentChange, DateTime, NewComment};

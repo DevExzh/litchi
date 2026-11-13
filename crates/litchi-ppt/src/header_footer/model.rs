@@ -104,12 +104,6 @@ pub enum HeaderFooterScope {
 }
 
 /// Display options stored by `HeadersFootersAtom`.
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "each bool maps one-to-one to an independent flag bit of the MS-PPT \
-              `HeadersFootersAtom` bitfield; grouping them into enums would misrepresent \
-              the on-disk layout and churn the public API"
-)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct HeaderFooterOptions {
     /// Locale-dependent datetime format identifier.

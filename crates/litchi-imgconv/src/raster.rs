@@ -9,10 +9,6 @@ use resvg::{tiny_skia, usvg};
 
 /// Resource ceilings applied before SVG rasterization allocates its pixel buffer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(
-    clippy::struct_field_names,
-    reason = "the max prefix makes each independently configurable resource ceiling explicit"
-)]
 pub(crate) struct RasterLimits {
     /// Maximum target or embedded-raster height.
     pub(crate) max_height: u32,
@@ -84,10 +80,6 @@ impl Write for LimitedWriter {
 /// accepted only when their encoded bytes and dimensions satisfy `limits`.
 /// JPEG rendering makes `background` opaque before drawing, so transparency is
 /// composited instead of being silently discarded by the encoder.
-#[allow(
-    clippy::cast_precision_loss,
-    reason = "tiny-skia transforms use f32 and validated raster dimensions are at most u32"
-)]
 pub(crate) fn rasterize_svg(
     svg: &str,
     width: u32,

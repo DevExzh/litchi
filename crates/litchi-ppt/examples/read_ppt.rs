@@ -1,8 +1,3 @@
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example intentionally prints its results"
-)]
-
 //! Read a legacy `PowerPoint` `.ppt` file and print slide text.
 //!
 //! Run with:

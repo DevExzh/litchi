@@ -945,11 +945,6 @@ fn malformed_geometry_xml() -> Error {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "geometry codec tests use compact fixtures"
-)]
 mod tests {
     use super::*;
 

@@ -1,8 +1,3 @@
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example intentionally prints its results"
-)]
-
 //! Example demonstrating PPT slide transitions
 //!
 //! This example creates a PPT file showcasing various slide transition effects

@@ -139,10 +139,6 @@ impl RecordEdit {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    #[allow(
-        clippy::needless_pass_by_value,
-        reason = "taking the `Synchronization` by value is the established transaction API shape; changing it to a reference would churn callers in the sibling test module"
-    )]
     pub(crate) fn set(&mut self, value: Synchronization) -> Result<()> {
         let replacement = codec::encode_sync(&value)?;
         let existing = validation::sync_index(&self.root)?;

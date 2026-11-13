@@ -59,11 +59,6 @@ impl TextRunExtractor {
     }
 
     /// Process a single PPT record.
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "`RecordType` mirrors the full MS-PPT record-type enumeration; every record other \
-                  than the three text atoms is handled uniformly by recursing into child records"
-    )]
     fn process_record(&mut self, record: &Record, report: &mut ToleranceReport) -> Result<()> {
         match record.record_type {
             RecordType::TextCharsAtom => {

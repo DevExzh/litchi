@@ -1,8 +1,3 @@
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example intentionally prints its results"
-)]
-
 //! Open a `.pptx` presentation and print its slide count plus per-slide name
 //! (which corresponds to the slide title when one is set) and text content.
 //!

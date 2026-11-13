@@ -49,10 +49,6 @@ pub(super) fn create_record_header_raw(
 pub(super) fn serialize_raw_record(record: &crate::records::Record) -> Vec<u8> {
     let mut data = Vec::new();
 
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "raw record payloads are parsed from a 32-bit record length, so the length always fits in u32"
-    )]
     let header = create_record_header_raw(
         record.record_type_raw,
         record.version,

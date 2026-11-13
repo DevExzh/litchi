@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 //! Plumbing for the leniency carrier: every open path produces a handle whose
 //! tolerance report exists, and a conformant fixture leaves it empty.
 

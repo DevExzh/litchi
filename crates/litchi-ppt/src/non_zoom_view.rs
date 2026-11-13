@@ -16,10 +16,6 @@ const MAX_CONTAINER_DATA: usize = ATOM_TOTAL_LEN;
 
 /// The presentation view represented by an outline/sorter view container.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`NonZoomViewKind` is the established public API name; renaming it would break downstream crates"
-)]
 pub enum NonZoomViewKind {
     Outline,
     Sorter,
@@ -143,10 +139,6 @@ impl NoZoomViewInfo {
         )
     }
 
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the atom data length is the fixed constant 52, always representable as u32"
-    )]
     fn write_atom(&self, bytes: &mut Vec<u8>) -> Result<()> {
         validate_scale(self.x_scale, self.y_scale)?;
         bytes.extend_from_slice(&0u16.to_le_bytes());
@@ -285,10 +277,6 @@ impl OutlineSorterViewInfo {
     /// # Errors
     ///
     /// Returns an error if serialization fails or the underlying writer reports an error.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the container payload is empty or the fixed 60-byte atom, always representable as u32"
-    )]
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         let (_, record_type) = self.kind.record_type();
         let data_len = if self.view_info.is_some() {
@@ -324,10 +312,6 @@ impl OutlineSorterViewInformation {
         self.sorter.as_ref()
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "only the outline and sorter view containers are collected; every other record type is skipped"
-    )]
     pub(crate) fn parse_records(records: &[Record]) -> Result<Self> {
         let mut information = Self::default();
         for record in records {
@@ -398,11 +382,6 @@ fn validate_scale(x: Ratio, y: Ratio) -> Result<()> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

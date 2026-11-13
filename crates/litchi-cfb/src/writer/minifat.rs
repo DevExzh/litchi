@@ -292,11 +292,6 @@ fn checked_end(start: u32, count: u32) -> Result<u32, OleError> {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        reason = "test assertions panic on failure by design"
-    )]
     use super::*;
 
     #[test]

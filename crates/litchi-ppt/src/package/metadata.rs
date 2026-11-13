@@ -410,10 +410,6 @@ fn reopen(base: &Package, bytes: &[u8]) -> Result<Package> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    reason = "the lazy-entry regression is a direct state assertion"
-)]
 mod tests {
     use super::{Edit, Package};
 

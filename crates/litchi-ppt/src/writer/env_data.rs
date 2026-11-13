@@ -2,11 +2,6 @@
 //!
 //! Structured types for Environment child atoms based on MS-PPT specification.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "items are deliberately grouped by MS-PPT specification section rather than by item kind"
-)]
-
 // =============================================================================
 // SrKinsokuAtom (MS-PPT 2.9.26)
 // =============================================================================
@@ -250,11 +245,6 @@ impl VBAInfoAtom {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

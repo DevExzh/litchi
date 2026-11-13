@@ -8,11 +8,6 @@
 //! unmodified owned source is sealed from the digest bound to its archive, and
 //! that the facade keeps a capture's memo only as re-projected onto the
 //! allocations its own graph holds.
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "memo-path tests use panic-on-fixture-failure assertions"
-)]
 
 use std::sync::Arc;
 

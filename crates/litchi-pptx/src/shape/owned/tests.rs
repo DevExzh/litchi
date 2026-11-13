@@ -1,4 +1,3 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, reason = "test assertions")]
 use super::*;
 const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
 fn tree(body: &str) -> Vec<u8> {

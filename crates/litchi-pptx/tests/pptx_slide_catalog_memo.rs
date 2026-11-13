@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 //! The eager slide catalog is parsed at most once per borrowed
 //! [`litchi_pptx::presentation::Presentation`]. These tests lock the two
 //! properties that make the memo value-identical: repeating any catalog query

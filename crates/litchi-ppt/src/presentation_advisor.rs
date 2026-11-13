@@ -49,10 +49,6 @@ impl AdvisorRule {
 
 /// Compact Presentation Advisor suppression settings.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`PresentationAdvisorSettings` is the established public API name; renaming it would break downstream crates"
-)]
 pub struct PresentationAdvisorSettings {
     disabled_mask: u16,
 }
@@ -154,11 +150,6 @@ impl PresentationAdvisorSettings {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use litchi_ppt::writer::build_sound_collection;
 use litchi_ppt::{Record, raw::Reader, sound_collection::Collection};
 use std::collections::HashSet;

@@ -3,11 +3,6 @@
 //! These cases deliberately exercise more than one replacement window in one
 //! call.  The complete source/replacement audits remain the oracle: a window
 //! parser may prove success, but it must never publish a different refusal.
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "the fixed fixtures state the expected audit outcome"
-)]
 
 use core::ops::Range;
 

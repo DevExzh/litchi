@@ -12,10 +12,6 @@ const DOCUMENT_ATOM_PAYLOAD: usize = 40;
 const PERSIST_ATOM_PAYLOAD: usize = 20;
 
 /// Validate one complete document tree and build its typed structural view.
-#[allow(
-    clippy::wildcard_enum_match_arm,
-    reason = "`RecordType` has hundreds of variants; only the document-structure members are meaningful here"
-)]
 pub(super) fn validate_document(document: &Record, limits: Limits) -> Result<DocumentStructure> {
     let validated_limits = limits.validate()?;
     validate_budget(document, 0, &mut 0usize, validated_limits)?;

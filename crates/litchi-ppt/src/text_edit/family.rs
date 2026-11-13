@@ -495,9 +495,4 @@ fn signed_fingerprint(package: &Package) -> Result<ArtifactFingerprint> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests;

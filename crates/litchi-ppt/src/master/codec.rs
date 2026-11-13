@@ -87,12 +87,6 @@ pub fn parse<'a>(
                 identity.persist().id()
             ))
         })?;
-        #[allow(
-            clippy::wildcard_enum_match_arm,
-            reason = "`RecordType` mirrors the full MS-PPT record-type enumeration; only \
-                      MainMaster and Slide are valid master persist targets and every other \
-                      record type is rejected uniformly"
-        )]
         let kind = match source.record_type {
             RecordType::MainMaster => super::model::Kind::Main,
             RecordType::Slide => super::model::Kind::Title,

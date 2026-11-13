@@ -11,10 +11,6 @@ use crate::consts::RecordType;
 use crate::package::SourceLimits;
 
 /// Resource limits for text-range interaction parsing and authoring.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`TextInteractionLimits` is the established public API name; renaming it would break downstream crates"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TextInteractionLimits {
     /// Limits for each paired `InteractiveInfo` record.
@@ -367,10 +363,6 @@ pub(crate) fn text_units_from_records<'a>(
 ) -> Result<u32> {
     let mut text_units = None;
     for record in records {
-        #[allow(
-            clippy::wildcard_enum_match_arm,
-            reason = "`RecordType` mirrors the full MS-PPT record-type enumeration; records that are not character atoms are skipped"
-        )]
         let units = match record.record_type {
             RecordType::TextCharsAtom => {
                 if record.version != 0
@@ -405,10 +397,6 @@ pub(crate) fn text_units_from_records<'a>(
 fn exact_text_from_records<'a>(records: impl IntoIterator<Item = &'a Record>) -> Result<String> {
     let mut text = None;
     for record in records {
-        #[allow(
-            clippy::wildcard_enum_match_arm,
-            reason = "`RecordType` mirrors the full MS-PPT record-type enumeration; records that are not character atoms are skipped"
-        )]
         let value = match record.record_type {
             RecordType::TextCharsAtom => {
                 if record.data.len() % 2 != 0 {
@@ -484,11 +472,6 @@ fn corrupted<T>(message: impl Into<String>) -> Result<T> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
     use crate::{InteractionAction, InteractionLinkTarget};

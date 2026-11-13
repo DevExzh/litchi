@@ -12,10 +12,6 @@ const ENTRY_BYTES: usize = 44;
 const VARIANT_BYTES: usize = 34;
 const USED_HEADER_FLAGS: u16 = 0x0017;
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`RecolorLimits` is the established public API name for the recolor parsing limits; renaming it would break downstream crates"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RecolorLimits {
     pub max_record_bytes: usize,
@@ -112,10 +108,6 @@ impl TryFrom<u16> for WmfHatchStyle {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`RecolorBitmapType` is the established public API name mirroring the MS-PPT recolor bitmap-type field; renaming it would break downstream crates"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u16)]
 pub enum RecolorBitmapType {
@@ -138,10 +130,6 @@ impl TryFrom<u16> for RecolorBitmapType {
 }
 
 /// Conditional `lbHatch` representation. Non-hatched brushes retain its ignored value.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`RecolorHatch` is the established public API name for the recolor brush hatch field; renaming it would break downstream crates"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RecolorHatch {
     Hatched(WmfHatchStyle),
@@ -149,10 +137,6 @@ pub enum RecolorHatch {
 }
 
 /// Conditional pattern representation. Non-pattern brushes retain ignored bytes.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`RecolorPattern` is the established public API name for the recolor brush pattern field; renaming it would break downstream crates"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RecolorPattern {
     Pattern {
@@ -165,10 +149,6 @@ pub enum RecolorPattern {
     },
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`RecolorBrush` is the established public API name for the recolor brush structure; renaming it would break downstream crates"
-)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RecolorBrush {
     pub style: WmfBrushStyle,
@@ -179,10 +159,6 @@ pub struct RecolorBrush {
     pub pattern: RecolorPattern,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`RecolorSource` is the established public API name for the recolor source variant; renaming it would break downstream crates"
-)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RecolorSource {
     Color {
@@ -193,10 +169,6 @@ pub enum RecolorSource {
     Brush(RecolorBrush),
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`RecolorEntry` is the established public API name mirroring the MS-PPT `RecolorEntryStruct`; renaming it would break downstream crates"
-)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RecolorEntry {
     pub do_recolor: bool,
@@ -209,14 +181,6 @@ pub struct RecolorEntry {
     pub source: RecolorSource,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`RecolorInfo` is the established public API name mirroring the MS-PPT `RecolorInfoAtom` record; renaming it would break downstream crates"
-)]
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "each bool maps one-to-one to an independent flag bit of the MS-PPT `RecolorInfoAtom` header bitfield; grouping them into enums would misrepresent the on-disk layout and churn the public API"
-)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RecolorInfo {
     pub should_recolor: bool,
@@ -589,11 +553,6 @@ fn corrupted<T>(message: &str) -> Result<T> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

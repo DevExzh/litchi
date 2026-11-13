@@ -49,10 +49,6 @@ mod sequential;
 mod tests;
 
 // Re-export public types
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`OleWriter` is the established public API name; renaming it would break downstream crates"
-)]
 pub use core::{OleWriter, StorageMoveLimits};
 pub use sequential::{
     SequentialOleWriter, SequentialWriteError, SequentialWriteProgress, SequentialWriteReport,

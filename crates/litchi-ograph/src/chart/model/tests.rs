@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic by design"
-)]
-
 use super::super::{Kind, Ref, Stream, axis, cache, format, group};
 use super::{
     Ai, Binding, Cache, Context, Count, DataKind, GraphFamily, Group, GroupId, Link, Model, Order,

@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use litchi_core::edit::RefusalKind;
 use litchi_ppt::Package;
 use litchi_ppt::animation::{self, ExtendedTimeNode, Scope, TimeNodeAtom, TimeNodeKind};

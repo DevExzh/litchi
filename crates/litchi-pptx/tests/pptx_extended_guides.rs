@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use litchi_pptx::Error;
 use litchi_pptx::presentation_properties::metadata::guides::{
     ColorKind, Guides, Limits, Orientation,

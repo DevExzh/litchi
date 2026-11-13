@@ -74,10 +74,6 @@ pub enum CurrentRecipient {
 
 /// The typed document-level routing-slip record.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "each bool mirrors one independent flag bit of the MS-PPT `RoutingSlip` record; they are spec flags, not a state machine"
-)]
 pub struct Slip {
     pub originator: Address,
     pub recipients: Vec<Address>,

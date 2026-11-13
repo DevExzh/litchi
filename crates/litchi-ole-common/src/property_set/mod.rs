@@ -21,19 +21,8 @@ pub mod summary_properties;
 pub mod user_defined;
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::shadow_reuse,
-    clippy::shadow_unrelated,
-    reason = "tests use concise assertions while exercising fallible malformed-input paths"
-)]
 mod tests;
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    reason = "tests use concise assertions while exercising malformed-input repairs"
-)]
 mod tolerance_tests;
 
 pub use alternate_stream::{
@@ -44,10 +33,6 @@ pub use binding::{
     Binding, BindingName, GLOBAL_INFO_FMTID, IMAGE_CONTENTS_FMTID, IMAGE_INFO_FMTID,
     PROPERTY_BAG_FMTID,
 };
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "the public extension-trait name distinguishes property-set readers from other readers"
-)]
 pub use codec::{Edit, PropertySetReader, SharedPropertySetReader};
 pub use model::{
     Array, CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, Dimension, DocParts, Guid, HeadingPair,

@@ -1,9 +1,3 @@
-#![allow(
-    clippy::print_stdout,
-    clippy::print_stderr,
-    reason = "this command-line example intentionally prints its results"
-)]
-
 use litchi_cfb::OleFile;
 use litchi_ppt::Record;
 use litchi_ppt::RecordType;

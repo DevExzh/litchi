@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "integration assertions intentionally panic on an invalid fixture or result"
-)]
-
 use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::Arc;
 

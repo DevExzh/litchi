@@ -2172,12 +2172,6 @@ impl<'a> SlideMasterPart<'a> {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::expect_used,
-        clippy::unwrap_used,
-        reason = "focused low-level part tests use literal XML fixtures"
-    )]
-
     use super::{SlideLayoutPart, SlideMasterPart, SlidePart, semantic_text_from_part};
     use crate::Error;
     use litchi_opc::PackURI;

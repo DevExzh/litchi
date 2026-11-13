@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "the corpus fixture and assertions intentionally panic"
-)]
-
 //! Removing a whole `p:graphicFrame` whose `a:graphicData` encloses an
 //! `mc:AlternateContent` (an embedded OLE object), on the source bytes.
 //!

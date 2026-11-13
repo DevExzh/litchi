@@ -1,11 +1,5 @@
 //! Focused PresentationML shape text-body ownership and namespace tests.
 
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use litchi_pptx::shape::{Scene, raw};
 
 const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";

@@ -47,14 +47,6 @@ impl Limits {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::shadow_reuse,
-    clippy::shadow_unrelated,
-    clippy::cast_possible_truncation,
-    reason = "tests use concise assertions and checked fixture-sized literals"
-)]
 mod tests;
 
 pub use model::{Kind, Link, Moniker, Times};

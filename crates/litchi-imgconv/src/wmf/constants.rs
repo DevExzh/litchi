@@ -5,7 +5,6 @@
 //! rewritten by producers.  [`record::canonical`] deals with those records.
 
 /// WMF record function codes.
-#[allow(dead_code)]
 pub mod record {
     pub const EOF: u16 = 0x0000;
     pub const SAVE_DC: u16 = 0x001e;
@@ -174,7 +173,6 @@ pub mod record {
 }
 
 /// PenStyle flags.
-#[allow(dead_code)]
 pub mod pen {
     pub const PS_STYLE_MASK: u16 = 0x000f;
     pub const PS_SOLID: u16 = 0;
@@ -196,7 +194,6 @@ pub mod pen {
 }
 
 /// BrushStyle and HatchStyle values.
-#[allow(dead_code)]
 pub mod brush {
     pub const BS_SOLID: u16 = 0;
     pub const BS_NULL: u16 = 1;
@@ -216,13 +213,11 @@ pub mod brush {
     pub const HS_DIAGCROSS: u16 = 5;
 }
 
-#[allow(dead_code)]
 pub mod fill_mode {
     pub const ALTERNATE: u16 = 1;
     pub const WINDING: u16 = 2;
 }
 
-#[allow(dead_code)]
 pub mod text_align {
     pub const TA_NOUPDATECP: u16 = 0;
     pub const TA_UPDATECP: u16 = 1;
@@ -237,7 +232,6 @@ pub mod text_align {
     pub const VERTICAL_MASK: u16 = 24;
 }
 
-#[allow(dead_code)]
 pub mod ext_text_out {
     pub const ETO_OPAQUE: u16 = 0x0002;
     pub const ETO_CLIPPED: u16 = 0x0004;
@@ -246,7 +240,6 @@ pub mod ext_text_out {
     pub const ETO_PDY: u16 = 0x2000;
 }
 
-#[allow(dead_code)]
 pub mod font_weight {
     pub const FW_DONTCARE: u16 = 0;
     pub const FW_THIN: u16 = 100;
@@ -260,13 +253,11 @@ pub mod font_weight {
     pub const FW_HEAVY: u16 = 900;
 }
 
-#[allow(dead_code)]
 pub mod bk_mode {
     pub const TRANSPARENT: u16 = 1;
     pub const OPAQUE: u16 = 2;
 }
 
-#[allow(dead_code)]
 pub mod map_mode {
     pub const MM_TEXT: u16 = 1;
     pub const MM_LOMETRIC: u16 = 2;
@@ -278,14 +269,12 @@ pub mod map_mode {
     pub const MM_ANISOTROPIC: u16 = 8;
 }
 
-#[allow(dead_code)]
 pub mod layout {
     pub const LTR: u16 = 0x0000;
     pub const RTL: u16 = 0x0001;
     pub const BITMAP_ORIENTATION_PRESERVED: u16 = 0x0008;
 }
 
-#[allow(dead_code)]
 pub mod stock {
     pub const FLAG: u16 = 0x8000;
     pub const WHITE_BRUSH: u16 = 0;
@@ -308,7 +297,6 @@ pub mod stock {
 }
 
 /// Frequently occurring ternary raster operations.
-#[allow(dead_code)]
 pub mod rop3 {
     pub const BLACKNESS: u32 = 0x0000_0042;
     pub const DSTINVERT: u32 = 0x0055_0009;

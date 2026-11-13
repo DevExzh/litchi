@@ -1,11 +1,5 @@
 //! Eager per-slide notes snapshots and source parity.
 
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "fixture construction and assertions intentionally panic"
-)]
-
 use std::io::Cursor;
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};

@@ -16,10 +16,6 @@ use litchi_odraw::image::Id as ImageId;
 /// embedded OLE objects, and media previews. The client-data records distinguish
 /// the three cases.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`PictureFrameKind` is the established public API name; renaming it would break downstream crates"
-)]
 pub enum PictureFrameKind {
     /// An ordinary embedded or linked image.
     #[default]
@@ -57,10 +53,6 @@ pub enum PictureFrameKind {
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 #[derive(Debug, Clone)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`PictureShape` is the established public API name; renaming it would break downstream crates"
-)]
 pub struct PictureShape {
     /// Shape properties
     pub(crate) properties: ShapeProperties,
@@ -431,11 +423,6 @@ pub fn extract_blip_id(container: &Container<'_>) -> litchi_odraw::Result<Option
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

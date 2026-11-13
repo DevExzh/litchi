@@ -1,11 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::panic,
-    clippy::unwrap_used,
-    reason = "These integration tests use small, deterministic fault-injection fixtures."
-)]
-
 //! Public PPTX coverage for the explicit metadata scratch writer.
 //!
 //! The byte comparisons in this file are differential checks against the

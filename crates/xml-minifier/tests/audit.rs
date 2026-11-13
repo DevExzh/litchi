@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "focused tests fail at the unexpected audit result"
-)]
-
 use xml_minifier::audit::{self, Kind, Limits, Resource, package};
 
 fn limits_for(input: &[u8]) -> Limits {

@@ -1,5 +1,4 @@
 //! Native durable metadata preservation regressions.
-#![allow(clippy::unwrap_used, clippy::expect_used, reason = "test assertions")]
 #[test]
 fn durable_forward_and_inverse_preserve_exact_metadata() {
     use super::{Patch, apply};

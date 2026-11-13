@@ -101,10 +101,6 @@ fn may_contain_processing_instruction(xml: &[u8]) -> bool {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::without_processing_instructions;
 

@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    reason = "The directory-spool tests use small deterministic fixtures."
-)]
-
 //! Differential and failure coverage for the explicit central-directory spool.
 //!
 //! These tests deliberately keep the spool in a caller-owned `Read + Write +

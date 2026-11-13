@@ -1,12 +1,6 @@
 //! Every opt-in save-durability level publishes exactly the bytes of the
 //! default `save`, through the same atomic replacement.
 
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use litchi_core::Durability;
 use litchi_pptx::Package;
 

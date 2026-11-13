@@ -360,12 +360,6 @@ fn empty(out: &mut Vec<u8>, local: &str) {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

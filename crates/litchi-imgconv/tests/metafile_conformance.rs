@@ -339,10 +339,6 @@ fn bundled_metafile_corpus_never_panics_or_returns_an_empty_svg() {
 }
 
 #[test]
-#[allow(
-    clippy::print_stdout,
-    reason = "The corpus category totals are intentional test evidence."
-)]
 fn all_bundled_metafiles_are_bounded_and_panic_safe() {
     let paths = discover_metafiles();
     let discovered = paths.len();

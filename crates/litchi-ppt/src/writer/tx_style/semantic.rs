@@ -312,10 +312,6 @@ impl IndentedLevelEntry {
 }
 
 /// Full style level (Title, Body, Notes, Other).
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "the four `has_*` flags mirror the independent field-presence bits serialized into the `TxMasterStyleAtom`; merging them would obscure which optional fields are emitted"
-)]
 #[derive(Debug, Clone)]
 pub struct FullStyleLevel {
     // Paragraph formatting

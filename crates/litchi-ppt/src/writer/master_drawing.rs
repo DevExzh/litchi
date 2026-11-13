@@ -152,10 +152,6 @@ impl MasterPPDrawingBuilder {
     }
 
     /// Build `EscherOpt` record with properties
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "Escher property tables in this builder hold at most a dozen entries, so `len * 6` is bounded far below u32::MAX"
-    )]
     fn build_escher_opt(&mut self, instance: u16, props: &[(u16, u32)]) {
         let length = (props.len() * 6) as u32;
         self.write_escher_header(0x03, instance, escher_rt::OPT, length);
@@ -189,10 +185,6 @@ impl MasterPPDrawingBuilder {
     }
 
     /// Build `RoundTrip` text records for a placeholder
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "placeholder text is a fixed short master string, so its byte length always fits u32"
-    )]
     fn build_roundtrip_text(&mut self, text: &[u8], text_spec_value: u8, style_level_count: u32) {
         // RoundTripProgIdCString (empty)
         self.write_ppt_header(ppt_record_type::ROUND_TRIP_PROGID, 4);
@@ -228,10 +220,6 @@ impl MasterPPDrawingBuilder {
     }
 
     /// Build the group patriarch `SpContainer`
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the patriarch container holds two small fixed Escher records, so its length always fits u32"
-    )]
     fn build_group_patriarch(&mut self) -> usize {
         let start = self.data.len();
         // SpContainer header (will be patched)
@@ -253,10 +241,6 @@ impl MasterPPDrawingBuilder {
     }
 
     /// Build background `SpContainer` (outside `SpgrContainer`, per POI)
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the background container holds a fixed 8-entry property table and one shape record, so its length and property count always fit u32/u16"
-    )]
     fn build_background_sp_container(&mut self) {
         let start = self.data.len();
         // SpContainer header (will be patched)
@@ -290,10 +274,6 @@ impl MasterPPDrawingBuilder {
     }
 
     /// Build a placeholder `SpContainer`
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "placeholder containers hold a small fixed set of Escher records, so their lengths and property counts always fit u32/u16"
-    )]
     fn build_placeholder_container(
         &mut self,
         spid: u32,
@@ -353,10 +333,6 @@ impl MasterPPDrawingBuilder {
     }
 
     /// Build the complete master `PPDrawing`
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the whole master PPDrawing is a fixed ~1.3 KB structure, so every container length always fits u32"
-    )]
     #[must_use]
     pub fn build(mut self) -> Vec<u8> {
         // PPDrawing record header (will be patched)
@@ -497,11 +473,6 @@ pub fn build_master_ppdrawing() -> Vec<u8> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

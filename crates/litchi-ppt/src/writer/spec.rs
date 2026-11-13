@@ -3,11 +3,6 @@
 //! Reference: [MS-PPT] PowerPoint 97-2003 Binary File Format (.ppt)
 //! <https://docs.microsoft.com/en-us/openspecs/office_file_formats/ms-ppt>
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "items are deliberately grouped by MS-PPT specification section rather than by item kind"
-)]
-
 // =============================================================================
 // Slide Layout Types (MS-PPT 2.13.25 SlideLayoutType)
 // =============================================================================
@@ -562,11 +557,6 @@ pub mod color_schemes {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

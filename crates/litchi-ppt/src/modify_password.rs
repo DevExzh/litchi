@@ -103,10 +103,6 @@ impl ModifyPassword {
     }
 
     /// Encode a canonical `ModifyPasswordAtom` record without a terminator.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the password is validated to at most 510 bytes, always representable as u32"
-    )]
     pub fn to_record(&self) -> Record {
         let data: Vec<u8> = self
             .value
@@ -164,11 +160,6 @@ const fn is_forbidden_printable_unit(unit: u16) -> bool {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

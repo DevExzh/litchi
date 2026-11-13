@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use litchi_ppt::writer::text_format::{Paragraph, TextRun};
 use litchi_ppt::writer::{Builder, Hyperlink};
 use litchi_ppt::{

@@ -36,10 +36,6 @@ impl EscherBuilder {
     }
 
     /// Appends a wire payload to the record.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "record payloads assembled by this writer are bounded well below the 4 GiB `OfficeArt` length field"
-    )]
     pub(crate) fn add_data(&mut self, data: &[u8]) {
         self.data.extend_from_slice(data);
         self.header.length = self.data.len() as u32;

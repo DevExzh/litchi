@@ -11,10 +11,6 @@ use std::collections::HashMap;
 ///
 /// Uses efficient iteration over 4-byte chunks for high-performance parsing.
 #[derive(Debug, Clone)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`PersistPtrHolder` is the established public API name re-exported from the crate root; renaming it would break downstream crates"
-)]
 pub struct PersistPtrHolder {
     /// Map from persist ID (slide ID) to byte offset in the document stream
     slide_locations: HashMap<u32, u32>,
@@ -187,11 +183,6 @@ impl PersistPtrHolder {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

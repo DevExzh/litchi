@@ -112,10 +112,6 @@ impl<'a> WString<'a> {
     }
 
     /// Serialize the length byte and UTF-16LE payload deterministically.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "WString construction validates the one-byte, 255-unit wire limit"
-    )]
     #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut output = Vec::with_capacity(1 + self.encoded_len());

@@ -12,13 +12,6 @@
 //! stream; `framing …;` precedes the parser result when the substream
 //! framing check also refuses the edited bytes.
 
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    reason = "test assertions panic by design"
-)]
-
 use super::super::super::model::{
     Ai, Binding, Cache, Context, Count, Label, Legend, Link, Model, Owner, Role, RowCol, Series,
     Source, Value,

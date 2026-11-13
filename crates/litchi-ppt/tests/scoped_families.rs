@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "scoped-family contract tests use panic-driven assertions"
-)]
-
 //! The contract of every scoped PPT family: `Package::edit_x` stages,
 //! `Edit::commit` publishes a new package with an exact patch and diagnostics,
 //! an exact no-op publishes the source unchanged, `Package::apply_x` replays a

@@ -11,10 +11,6 @@ pub(crate) fn build_shape_properties(shape: &UserShapeData) -> Vec<Property> {
     if let Some(rotation) = shape.rotation {
         props.push(Property::new(prop_id::ROTATION, rotation.cast_unsigned()));
     }
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "shape validation caps adjustment values at 10 entries"
-    )]
     for (index, &value) in shape.adjust_values.iter().enumerate() {
         props.push(Property::new(
             prop_id::ADJUST_VALUE + index as u16,

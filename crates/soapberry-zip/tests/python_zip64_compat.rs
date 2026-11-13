@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    reason = "the checked-in interoperability fixtures are bounded and deterministic"
-)]
-
 //! Public compatibility gates for descriptor-bearing archives emitted by
 //! Python's standard-library `zipfile` writer.
 //!

@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::too_many_lines,
-    reason = "canonical signed-policy tests use panic-driven assertions"
-)]
-
 //! Contract tests for signed-source behavior at the canonical PPT edit root.
 //!
 //! A signature marker is deliberately opaque here.  The test fixture copies

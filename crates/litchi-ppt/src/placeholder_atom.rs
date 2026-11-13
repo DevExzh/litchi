@@ -514,10 +514,6 @@ fn split_records(data: &[u8], max_records: usize) -> Result<Vec<Vec<u8>>> {
     Ok(records)
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "placeholder payloads are validated against `PlaceholderLimits`, far below the u32 record-length range"
-)]
 fn encode_record(version: u16, instance: u16, kind: u16, data: &[u8]) -> Vec<u8> {
     let mut output = Vec::with_capacity(8usize.saturating_add(data.len()));
     output.extend_from_slice(&((instance << 4) | version).to_le_bytes());
@@ -540,11 +536,6 @@ fn corrupted<T>(message: impl Into<String>) -> Result<T> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

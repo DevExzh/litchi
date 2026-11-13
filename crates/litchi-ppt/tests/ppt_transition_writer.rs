@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 //! Round-trip tests for slide transitions authored with the create-side
 //! writer: a transition set via `Builder::set_slide_transition` must be emitted
 //! as an `SSSlideInfoAtom` (MS-PPT 2.6.6) and read back by the crate's own

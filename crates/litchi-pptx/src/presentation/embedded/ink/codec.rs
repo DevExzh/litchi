@@ -376,11 +376,6 @@ pub(crate) fn root_namespaces(xml: &[u8]) -> Result<(&'static str, &'static str)
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "codec boundary assertions"
-)]
 mod tests {
     use super::*;
     fn slide(content: &str) -> String {

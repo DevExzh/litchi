@@ -12,10 +12,6 @@ use super::spec::{
 use std::collections::HashMap;
 
 /// Persist reference - maps ID to offset
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`PersistRef` is the established public API name; renaming it would break downstream crates"
-)]
 #[derive(Debug, Clone)]
 pub struct PersistRef {
     /// Persist ID
@@ -25,10 +21,6 @@ pub struct PersistRef {
 }
 
 /// `PersistPtr` directory builder
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`PersistPtrBuilder` is the established public API name; renaming it would break downstream crates"
-)]
 #[derive(Debug)]
 pub struct PersistPtrBuilder {
     /// Map of persist ID to offset
@@ -71,10 +63,6 @@ impl PersistPtrBuilder {
     /// - For each contiguous run of persist IDs, write a 4-byte info word:
     ///   lower 20 bits = base persist ID, upper 12 bits = count of following offsets
     /// - Then write `count` u32 little-endian offsets, one per ID in the run
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "a run of contiguous persist IDs cannot exceed the number of allocated references, which is bounded far below u32::MAX for any real presentation"
-    )]
     #[must_use]
     pub fn generate_payload(&self) -> Vec<u8> {
         let mut payload = Vec::new();
@@ -121,10 +109,6 @@ impl PersistPtrBuilder {
     /// # Panics
     ///
     /// Panics if internal invariants are violated.
-    #[allow(
-        clippy::expect_used,
-        reason = "`RecordBuilder::build` only fails when writing the header to its in-memory `Vec`, which cannot fail; changing this infallible public API to return `Result` would break callers"
-    )]
     #[must_use]
     pub fn generate_full_record(&self) -> Vec<u8> {
         let payload = self.generate_payload();
@@ -140,10 +124,6 @@ impl PersistPtrBuilder {
     /// # Panics
     ///
     /// Panics if internal invariants are violated.
-    #[allow(
-        clippy::expect_used,
-        reason = "`RecordBuilder::build` only fails when writing the header to its in-memory `Vec`, which cannot fail; changing this infallible public API to return `Result` would break callers"
-    )]
     #[must_use]
     pub fn generate_incremental_record(&self) -> Vec<u8> {
         let payload = self.generate_payload();
@@ -233,10 +213,6 @@ impl UserEditAtom {
     /// # Panics
     ///
     /// Panics if internal invariants are violated.
-    #[allow(
-        clippy::expect_used,
-        reason = "`RecordBuilder::build` only fails when writing the header to its in-memory `Vec`, which cannot fail; changing this infallible public API to return `Result` would break callers"
-    )]
     #[must_use]
     pub fn generate_record(&self) -> Vec<u8> {
         let mut data = Vec::with_capacity(if self.encryption_session_persist_id.is_some() {
@@ -263,11 +239,6 @@ impl UserEditAtom {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

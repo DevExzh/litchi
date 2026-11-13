@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 //! Independent vectors for the embedded-font structures in MS-PPT 2.9.8-2.9.12
 //! and 2.11.5.
 //!

@@ -456,10 +456,6 @@ fn read_at(xml: &[u8], owner: Owner, root_range: Option<&Range<usize>>) -> Resul
     })
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "bounded XML scanner passes its small typed output slots explicitly"
-)]
 fn classify(
     namespace: NamespaceKind,
     element: &BytesStart<'_>,
@@ -531,10 +527,6 @@ fn classify(
     Ok(Kind::Other)
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "bounded XML scanner publishes three explicit structural slots"
-)]
 fn finish(
     frame: &Frame,
     close_start: usize,

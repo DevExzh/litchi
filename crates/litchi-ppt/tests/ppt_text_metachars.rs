@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 //! Tests for header/footer metacharacter atoms (MS-PPT 2.9.47-2.9.52)
 //! against real `PowerPoint` fixtures.
 

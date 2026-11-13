@@ -157,10 +157,6 @@ impl ParagraphBuildType {
 
 /// Exact paragraph-specific build atom fields.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "the bool fields mirror the independent flag bits of the fixed MS-PPT `ParagraphBuildAtom` layout, so they cannot be merged into enums without losing the bit-level mapping"
-)]
 pub struct ParagraphBuildAtom {
     pub build_type: ParagraphBuildType,
     pub build_level: u32,

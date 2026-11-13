@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 //! Legacy and modern comment CRUD through the package comment families.
 
 use litchi_opc::part::BlobPart;

@@ -135,10 +135,6 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    #[allow(
-        clippy::needless_pass_by_value,
-        reason = "taking the record by value is the established public API; the snapshot stores a normalized re-parse, so the argument is only borrowed internally"
-    )]
     pub(crate) fn from_record_with_limits(root: Record, limits: Limits) -> Result<Self> {
         let validated = limits.validate()?;
         validation::validate_document(&root, validated)?;

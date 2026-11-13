@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "integration assertions intentionally panic on malformed fixtures"
-)]
-
 use std::io::Cursor;
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};

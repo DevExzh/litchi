@@ -8,12 +8,6 @@
 //! (`poi-scratchpad/src/test/java/org/apache/poi/hslf/...`), the test names the
 //! POI assertion it agrees with.
 
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use litchi_ppt::shapes::PlaceholderType;
 use litchi_ppt::{Package, Presentation};
 use std::path::PathBuf;

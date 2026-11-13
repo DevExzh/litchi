@@ -35,11 +35,6 @@ pub use reader::{Limits, read};
 pub use writer::{write, write_to};
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
     use crate::{Error, TransitionDefect};

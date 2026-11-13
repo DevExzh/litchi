@@ -10,10 +10,6 @@ mod model;
 #[cfg(test)]
 mod tests;
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`NormalViewSetInfo` is the established public type name matching the MS-PPT record name; renaming it would break downstream crates"
-)]
 pub use model::{
     NormalViewSet, NormalViewSetInfo, NormalViewSetPayload, NotesTextViewInfo, ViewBarState,
 };

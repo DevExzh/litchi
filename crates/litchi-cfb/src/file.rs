@@ -4877,11 +4877,6 @@ mod mini_stream_end_tests;
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        reason = "test assertions panic on failure by design"
-    )]
     use super::*;
     use crate::writer::OleWriter;
     use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};

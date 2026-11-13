@@ -164,10 +164,6 @@ impl NotesIndex {
 }
 
 /// A notes page associated with a presentation slide.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`SpeakerNotes` is the established public API name re-exported as `slide::SpeakerNotes`; renaming it would break downstream crates"
-)]
 pub struct SpeakerNotes {
     notes_id: u32,
     persist_id: u32,
@@ -500,11 +496,6 @@ fn read_u32(data: &[u8], offset: usize, field: &str) -> Result<u32> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
     use crate::raw::Reader;

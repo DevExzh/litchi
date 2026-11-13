@@ -181,11 +181,6 @@ fn same_component(left: &str, right: &str) -> bool {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "tests use concise assertions while exercising fallible validation paths"
-)]
 mod tests {
     use super::{CfbPath, path_identity_hash, same_component};
 

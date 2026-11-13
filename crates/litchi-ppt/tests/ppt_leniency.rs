@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "fixture assertions panic on construction failure by design"
-)]
-
 //! Leniency acceptance tests for the litchi-ppt findings of
 //! `docs/LENIENCY_AUDIT.md`.
 //!

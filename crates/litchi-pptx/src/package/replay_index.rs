@@ -927,11 +927,6 @@ fn remove_theme_user(
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "persistent-map assertions use panic-on-failure test helpers"
-)]
 mod tests {
     use super::*;
     use std::collections::HashMap as StdHashMap;

@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use litchi_cfb::writer::{OleWriter, StorageMoveLimits};
 use litchi_cfb::{DirectoryEntry, OleFile};
 use std::io::Cursor;

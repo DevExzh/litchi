@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use super::codec::text_from_ppt_records;
 use super::{Container, RecordKind, anchor, parse, parse_drawing, text_from_drawing};
 

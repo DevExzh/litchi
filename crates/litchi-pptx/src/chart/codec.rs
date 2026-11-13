@@ -900,11 +900,6 @@ pub fn write_graphic_frame(shape_id: u32, chart_rel_id: &str, chart: &Chart) -> 
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
     use litchi_opc::{packuri::PackURI, part::BlobPart};

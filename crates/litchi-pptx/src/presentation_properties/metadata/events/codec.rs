@@ -449,10 +449,6 @@ fn scan_slide_show_events(
     Ok(events)
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "element classifier threads one slot per event-element field"
-)]
 fn classify_element(
     namespace: &ResolveResult<'_>,
     element: &BytesStart<'_>,
@@ -1630,11 +1626,6 @@ fn is_xml_space(byte: u8) -> bool {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

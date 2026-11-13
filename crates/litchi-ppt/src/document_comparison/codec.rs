@@ -302,10 +302,6 @@ impl SlideCreationEntry {
     }
 
     /// Serialize the fixed-size entry payload.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the low 32 bits of the FILETIME are intentionally written to the final payload word"
-    )]
     fn payload(self) -> [u8; ENTRY_PAYLOAD_SIZE] {
         let mut payload = [0; ENTRY_PAYLOAD_SIZE];
         payload[..4].copy_from_slice(&self.slide_id_ref.to_le_bytes());
@@ -441,10 +437,6 @@ pub(crate) fn write_review(root: &mut Record, review: &Review, limits: Limits) -
     Ok(())
 }
 
-#[allow(
-    clippy::wildcard_enum_match_arm,
-    reason = "`RecordType` has hundreds of variants; every record type not owned by the review payload is deliberately retained as an opaque `Unknown` entry"
-)]
 fn parse_payload(data: &[u8], limits: Limits) -> Result<Review> {
     if data.len() > limits.max_bytes {
         return Err(Error::InvalidFormat(
@@ -770,10 +762,6 @@ fn encode_record(version: u16, instance: u16, kind: RecordType, payload: &[u8]) 
     encode_record_raw(version, instance, kind.as_u16(), payload)
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "payloads are bounded to the 16 MiB snapshot byte limit enforced by callers, well below u32::MAX"
-)]
 fn encode_record_raw(version: u16, instance: u16, record_type: u16, payload: &[u8]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(RECORD_HEADER_SIZE + payload.len());
     bytes.extend_from_slice(&((instance << 4) | (version & 0xF)).to_le_bytes());

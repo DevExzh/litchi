@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "focused writer tests use panic-on-failure assertions"
-)]
-
 use litchi_cfb::writer::{
     OleWriter, SequentialOleWriter, SequentialWriteError, SequentialWriteProgress,
     SequentialWriterLimits, SequentialWriterOptions,
@@ -691,7 +685,6 @@ impl io::Read for RepeatReader {
     }
 }
 
-#[allow(dead_code)]
 fn _ole_error_is_not_silenced(error: OleError) -> String {
     error.to_string()
 }

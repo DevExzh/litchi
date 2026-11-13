@@ -1,8 +1,3 @@
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example intentionally prints its results"
-)]
-
 //! Example demonstrating PPT animations with various effects
 //!
 //! This example creates a PPT file with multiple slides showcasing different

@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "integration assertions"
-)]
 //! Source-native text-box creation preserves immutable revisions and durable proofs.
 use litchi_core::{OwnedSource, Position};
 use litchi_pptx::{

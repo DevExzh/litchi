@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "the in-memory package fixtures and assertions intentionally panic"
-)]
-
 //! Source-backed presentation-section projections.
 
 use std::io::{self, Cursor};

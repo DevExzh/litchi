@@ -513,10 +513,6 @@ pub fn legacy_build_tx_master_style_center_title() -> Vec<u8> {
 }
 
 /// Build half body text master style (instance=7)
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "the loop index is bounded to 0..=4 by the 5-element HALF_BODY_FONT_SIZES array, so `i + 1` always fits in u16"
-)]
 #[must_use]
 pub fn legacy_build_tx_master_style_half_body() -> Vec<u8> {
     let mut data = Vec::with_capacity(64);
@@ -540,10 +536,6 @@ pub fn legacy_build_tx_master_style_half_body() -> Vec<u8> {
 }
 
 /// Build quarter body text master style (instance=8)
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "the loop index is bounded to 0..=4 by the 5-element QUARTER_BODY_FONT_SIZES array, so `i + 1` always fits in u16"
-)]
 #[must_use]
 pub fn legacy_build_tx_master_style_quarter_body() -> Vec<u8> {
     let mut data = Vec::with_capacity(64);
@@ -570,10 +562,6 @@ pub fn legacy_build_tx_master_style_quarter_body() -> Vec<u8> {
 // Spec-conformant builders
 // =============================================================================
 
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "every caller passes at most 5 font sizes, so both the level count and the level index always fit in u16"
-)]
 fn build_spec_master_style(
     text_type: u16,
     font_sizes: &[u16],

@@ -68,10 +68,6 @@ pub enum WebOutput {
 
 /// Strictly typed `HTMLDocInfo9Atom` settings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "fields mirror the independent `HTMLDocInfo9Atom` flag bits one-to-one"
-)]
 pub struct HtmlDocumentSettings {
     pub encoding: CodePage,
     pub frame_colors: WebFrameColors,
@@ -220,14 +216,6 @@ impl HtmlDocumentSettings {
 /// them, even when [`Self::use_slide_range`] is false. `load_in_browser` is
 /// exposed as inert intent only; this library never launches a browser.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`HtmlPublishSettings` is the established public API name; renaming it would break downstream crates"
-)]
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "fields mirror the independent `HTMLPublishInfoAtom` flag bits one-to-one"
-)]
 pub struct HtmlPublishSettings {
     pub file_name: String,
     pub named_show: Option<String>,
@@ -519,11 +507,6 @@ fn record_bytes(version: u16, instance: u16, record_type: u16, data: &[u8]) -> R
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

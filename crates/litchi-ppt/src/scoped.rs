@@ -948,10 +948,6 @@ pub(crate) use family;
 /// with one stream), the shape a signed deck has, for the families'
 /// signed-package tests.
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    reason = "a test fixture builder panics on failure by design"
-)]
 pub(crate) fn signed(package: &Package) -> Package {
     use litchi_cfb::{OleFile, OleWriter};
 
@@ -977,10 +973,6 @@ pub(crate) fn signed(package: &Package) -> Package {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    reason = "a test fixture builder panics on failure by design"
-)]
 fn signature_package(package: &Package, marker: &str) -> Package {
     use litchi_cfb::{OleFile, OleWriter};
 
@@ -1004,20 +996,11 @@ fn signature_package(package: &Package, marker: &str) -> Package {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    reason = "CFB fixture mutation is bounded by the writer output"
-)]
 fn cfb_read_u32(bytes: &[u8], offset: usize) -> u32 {
     u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap())
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::indexing_slicing,
-    reason = "CFB fixture mutation is bounded by the writer output"
-)]
 fn cfb_directory_offsets(bytes: &[u8]) -> Vec<usize> {
     let sector_shift = u16::from_le_bytes(bytes[0x1e..0x20].try_into().unwrap());
     let sector_size = 1usize << sector_shift;
@@ -1035,11 +1018,6 @@ fn cfb_directory_offsets(bytes: &[u8]) -> Vec<usize> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    reason = "CFB fixture mutation is bounded by the writer output"
-)]
 fn cfb_entry_name(bytes: &[u8], offset: usize) -> String {
     let name_len = usize::from(u16::from_le_bytes(
         bytes[offset + 64..offset + 66].try_into().unwrap(),
@@ -1052,11 +1030,6 @@ fn cfb_entry_name(bytes: &[u8], offset: usize) -> String {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    reason = "CFB fixture mutation is bounded by the writer output"
-)]
 fn rename_cfb_root(bytes: &mut [u8], name: &str) {
     let offset = *cfb_directory_offsets(bytes).first().unwrap();
     let mut encoded = name.encode_utf16().collect::<Vec<_>>();
@@ -1071,11 +1044,6 @@ fn rename_cfb_root(bytes: &mut [u8], name: &str) {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    reason = "CFB fixture mutation is bounded by the writer output"
-)]
 fn detach_cfb_leaf(bytes: &mut [u8], name: &str) {
     let offsets = cfb_directory_offsets(bytes);
     let (sid, offset) = offsets
@@ -1107,11 +1075,6 @@ fn detach_cfb_leaf(bytes: &mut [u8], name: &str) {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::indexing_slicing,
-    reason = "byte-patch unit tests use panic-driven assertions"
-)]
 mod tests {
     use super::{BLOCK, Base, BlockDigests, BytePatch, Endpoint};
     use crate::package::{Error, OpenOptions, Package, SourceLimits};

@@ -103,10 +103,6 @@ impl DocumentDimensions {
 
 /// A validated `DocumentAtom` (MS-PPT 2.4.2).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "fields mirror the independent `DocumentAtom` wire-format flags one-to-one"
-)]
 pub struct DocumentAtom {
     /// Dimensions of the presentation slides in master units.
     pub slide_size: DocumentDimensions,
@@ -138,11 +134,6 @@ impl DocumentAtom {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    #[allow(
-        clippy::too_many_arguments,
-        clippy::fn_params_excessive_bools,
-        reason = "constructor parameters mirror the atom wire fields one-to-one"
-    )]
     pub fn new(
         slide_size: DocumentDimensions,
         notes_size: DocumentDimensions,
@@ -179,10 +170,6 @@ impl DocumentAtom {
     ///
     /// Returns an error if the record header is malformed, the payload has the
     /// wrong size, or any field violates its MS-PPT constraints.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the document-atom payload length is the fixed constant 40, always representable as u32"
-    )]
     pub fn parse(record: &Record) -> Result<Self> {
         if record.version != DOCUMENT_ATOM_VERSION
             || record.instance != 0
@@ -235,10 +222,6 @@ impl DocumentAtom {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the document-atom payload length is the fixed constant 40, always representable as u32"
-    )]
     pub fn to_record_bytes(&self) -> Result<[u8; 8 + DOCUMENT_ATOM_PAYLOAD_LEN]> {
         self.validate()?;
         let mut bytes = [0u8; 8 + DOCUMENT_ATOM_PAYLOAD_LEN];
@@ -312,11 +295,6 @@ fn read_u16(data: &[u8], offset: usize) -> u16 {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

@@ -50,10 +50,6 @@ impl Snapshot {
         super::package::load_snapshot(package, slide_index, slide, limits)
     }
 
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "snapshot constructor mirrors the persisted part fields"
-    )]
     pub(crate) fn from_parts(
         slide_index: usize,
         slide_part_name: PackURI,

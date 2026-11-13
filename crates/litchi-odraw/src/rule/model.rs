@@ -30,10 +30,6 @@ impl Kind {
 
 /// The fixed-layout `OfficeArtFConnectorRule` record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[allow(
-    clippy::struct_field_names,
-    reason = "fields mirror the [MS-ODRAW] OfficeArtFConnectorRule layout (spidA/spidB/spidC) and the public accessors"
-)]
 pub struct Connector {
     rule_id: u32,
     start_shape_id: u32,

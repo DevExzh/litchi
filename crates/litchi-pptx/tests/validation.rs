@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "validation fixtures intentionally panic on construction failure"
-)]
-
 use std::sync::Arc;
 
 use litchi_core::{CheckStatus, EvidenceValue, OwnedSource, ReadAt, ValidationLimits};

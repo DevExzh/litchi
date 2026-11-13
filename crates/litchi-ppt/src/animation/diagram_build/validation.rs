@@ -9,10 +9,6 @@ pub(super) const BUILD_PAYLOAD_LEN: usize = 16;
 pub(super) const ATOM_PAYLOAD_LEN: usize = 4;
 pub(super) const CONTAINER_PAYLOAD_LEN: usize = 36;
 
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "callers pass only the fixed 4- or 16-byte payload constants, so `payload_len` always fits in `u32`"
-)]
 pub(super) fn validate_atom(
     record: &Record,
     expected: RecordType,
@@ -40,10 +36,6 @@ pub(super) fn validate_atom(
     Ok(())
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "`CONTAINER_PAYLOAD_LEN` is a compile-time 36-byte constant, so it always fits in `u32`"
-)]
 pub(super) fn validate_container(record: &Record) -> Result<()> {
     if record.record_type != RecordType::DiagramBuild
         || record.record_type_raw != RecordType::DiagramBuild.as_u16()
@@ -106,10 +98,6 @@ pub(super) fn encode_record(record: &Record) -> Vec<u8> {
     bytes
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "callers pass only the fixed 4- or 36-byte payload constants, so `payload_len` always fits in `u32`"
-)]
 pub(super) fn encode_header(
     version: u16,
     instance: u16,

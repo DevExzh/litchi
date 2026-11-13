@@ -1,8 +1,3 @@
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example intentionally prints its results"
-)]
-
 //! Comprehensive example demonstrating both animations and transitions
 //!
 //! This example creates a complete presentation showcasing the combination

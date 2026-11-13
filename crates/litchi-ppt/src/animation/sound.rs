@@ -4,10 +4,6 @@
 
 /// Built-in `PowerPoint` sound types.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`BuiltinSound` is the established public API name; renaming it would break downstream crates"
-)]
 pub enum BuiltinSound {
     Applause,
     Arrow,
@@ -172,10 +168,6 @@ impl BuiltinSound {
 
 /// Sound type for animations.
 #[derive(Debug, Clone, PartialEq)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`SoundType` is the established public API name; renaming it would break downstream crates"
-)]
 pub enum SoundType {
     /// Built-in `PowerPoint` sound
     Builtin(BuiltinSound),
@@ -187,10 +179,6 @@ pub enum SoundType {
 
 /// Sound information for animation.
 #[derive(Debug, Clone, PartialEq)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`AnimationSound` is the established public API name; renaming it would break downstream crates"
-)]
 pub struct AnimationSound {
     /// Sound type and data
     pub sound_type: SoundType,
@@ -300,11 +288,6 @@ impl AnimationSound {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

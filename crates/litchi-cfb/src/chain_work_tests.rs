@@ -12,12 +12,6 @@
 //!   the tables plus eight words per chain sector: the work per stream does
 //!   not grow with the stream count.
 
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use super::*;
 use crate::writer::OleWriter;
 use std::io::Cursor;

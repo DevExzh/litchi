@@ -576,10 +576,6 @@ impl LineStyleConfig {
     }
 
     /// Default line (1pt black)
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "`EMUS_PER_PT` is the constant 12_700, which always fits u32"
-    )]
     #[must_use]
     pub fn default_line() -> Self {
         Self {
@@ -930,11 +926,6 @@ impl ShapeStyle {
 // =============================================================================
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

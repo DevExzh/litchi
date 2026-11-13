@@ -137,20 +137,12 @@ impl RecordBuilder {
     }
 
     /// Write data to the record
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "record payloads are assembled in memory and bounded far below the u32 length field of the on-disk format"
-    )]
     pub fn write_data(&mut self, data: &[u8]) {
         self.data.extend_from_slice(data);
         self.header.length = self.data.len() as u32;
     }
 
     /// Write a child record
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "record payloads are assembled in memory and bounded far below the u32 length field of the on-disk format"
-    )]
     pub fn write_child(&mut self, child: &[u8]) {
         self.data.extend_from_slice(child);
         self.header.length = self.data.len() as u32;
@@ -238,10 +230,6 @@ impl InPlaceRecord {
     /// # Errors
     ///
     /// Returns an error if the header cannot be serialized.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the length keeps RecordBuilder's truncating 32-bit conversion; a stream that large is still refused by the writers' later stream-offset checks"
-    )]
     fn finish(mut self, output: &mut [u8]) -> Result<(), Error> {
         let body_start = self.start + 8;
         self.header.length = output.len().saturating_sub(body_start) as u32;

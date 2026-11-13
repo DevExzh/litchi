@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "integration tests use panic-on-failure extraction"
-)]
-
 //! The package-level edit families refuse a signed package (ADR 0006). A
 //! changed edit is refused with `SignedSourceRequiresExplicitPolicy` (or the
 //! format-owned `Error::Signed` for the shared VBA owner) and leaves the
@@ -357,10 +351,6 @@ fn modern_comment(id: &str, author_id: &str, title: &str) -> ModernComment {
     }
 }
 
-#[allow(
-    clippy::too_many_lines,
-    reason = "one table row per package-level family keeps the families comparable"
-)]
 fn families() -> Vec<Family> {
     let mut families = vec![
         Family {

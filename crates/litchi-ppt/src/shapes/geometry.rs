@@ -16,10 +16,6 @@ use litchi_odraw::prop::{Array, Id, Props};
 /// In Escher format, geometry is defined by left, top, right, bottom coordinates
 /// in master units (typically 1/576 inch).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`GeometryRect` is the established public API name; renaming it would break downstream crates"
-)]
 pub struct GeometryRect {
     /// Left coordinate
     pub left: i32,
@@ -363,11 +359,6 @@ pub fn extract_segment_info<'data>(props: &Props<'data>) -> Option<&'data [u8]> 
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

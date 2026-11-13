@@ -315,11 +315,6 @@ fn read_stream(bytes: &[u8], binding: Binding) -> Result<Option<Stream>> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
     use litchi_cfb::{OleFile, OleWriter};

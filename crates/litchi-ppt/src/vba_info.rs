@@ -369,11 +369,6 @@ fn read_vba_info_u32(data: &[u8], offset: usize, field: &str) -> Result<u32> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

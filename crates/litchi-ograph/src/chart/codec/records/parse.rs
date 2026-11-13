@@ -2041,7 +2041,6 @@ fn add_raw(
 
 #[cfg(test)]
 mod radar_tests {
-    #![allow(clippy::unwrap_used, reason = "test assertions panic by design")]
     use super::*;
     use litchi_biff::{Encoder, Records};
 

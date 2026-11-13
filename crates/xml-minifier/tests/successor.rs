@@ -5,11 +5,6 @@
 //! Every test compares the verdict with the complete audit, including the
 //! error and its offset; debug builds also re-derive every splice proof from
 //! a complete audit inside the library.
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "each test states one fixed expected verdict"
-)]
 
 use core::ops::Range;
 use std::sync::Arc;

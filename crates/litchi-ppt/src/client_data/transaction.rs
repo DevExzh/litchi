@@ -137,10 +137,6 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    #[allow(
-        clippy::needless_pass_by_value,
-        reason = "the capture API takes ownership of the semantic value by convention, matching `from_client_data`"
-    )]
     pub(crate) fn from_client_data_with_limits(
         value: ClientData,
         limits: ClientDataLimits,

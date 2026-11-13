@@ -79,10 +79,6 @@ impl MotionPath {
 
 /// Motion path type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`MotionPathType` is the established public API name; renaming it would break downstream crates"
-)]
 pub enum MotionPathType {
     /// Custom path
     Custom,
@@ -181,10 +177,6 @@ pub enum PathEditMode {
 }
 
 /// Helper functions to create common motion paths.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`MotionPathBuilder` is the established public API name; renaming it would break downstream crates"
-)]
 pub struct MotionPathBuilder;
 
 impl MotionPathBuilder {
@@ -227,10 +219,6 @@ impl MotionPathBuilder {
 
     /// Create a zigzag path.
     #[must_use]
-    #[allow(
-        clippy::cast_precision_loss,
-        reason = "segment indices are small path-element counts, far below the 2^53 `f64` mantissa limit"
-    )]
     pub fn zigzag(width: f64, height: f64, segments: usize) -> MotionPath {
         let mut commands = vec![PathCommand::MoveTo { x: 0.0, y: 0.0 }];
         let segment_width = width / (segments as f64);
@@ -270,12 +258,6 @@ impl MotionPathBuilder {
 
     /// Create a spiral path.
     #[must_use]
-    #[allow(
-        clippy::cast_precision_loss,
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "step counts are `turns * 36` path-element counts: small, non-negative, and far below the 2^53 `f64` mantissa limit; float-to-int saturation matches the intended clamping"
-    )]
     pub fn spiral(radius: f64, turns: f64, clockwise: bool) -> MotionPath {
         let mut commands = vec![PathCommand::MoveTo { x: 0.0, y: 0.0 }];
         let steps = (turns * 36.0) as usize; // 36 steps per turn
@@ -299,11 +281,6 @@ impl MotionPathBuilder {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

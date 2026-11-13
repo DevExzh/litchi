@@ -30,12 +30,6 @@
 //! normal API. The tests use the output hook only for Arc identity and
 //! resource assertions; semantic bytes are checked through public APIs.
 
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "focused retention tests use panic-on-fixture-failure assertions"
-)]
-
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 

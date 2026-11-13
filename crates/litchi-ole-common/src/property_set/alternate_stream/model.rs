@@ -137,10 +137,6 @@ impl NonSimpleAlternateStreamName {
         Self {
             binding,
             bytes,
-            #[allow(
-                clippy::cast_possible_truncation,
-                reason = "the fixed prefix and BindingName are bounded by MAX_NAME_BYTES"
-            )]
             len: len as u8,
         }
     }
@@ -178,10 +174,6 @@ impl NonSimpleAlternateStreamName {
     /// Returns the canonical filesystem alternate-stream filename.
     ///
     /// This is not a CFB path component.
-    #[allow(
-        clippy::expect_used,
-        reason = "the fixed representation contains only ASCII plus the valid 0x05 prefix"
-    )]
     #[must_use]
     pub fn as_str(&self) -> &str {
         std::str::from_utf8(&self.bytes[..usize::from(self.len)])

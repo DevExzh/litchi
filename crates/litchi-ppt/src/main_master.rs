@@ -13,11 +13,6 @@ const PRESENTATIONML_NAMESPACE: &[u8] =
     b"http://schemas.openxmlformats.org/presentationml/2006/main";
 
 /// Position of a `PowerPoint` 12 main-master text-style package in the container schema.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "the `MainMaster` prefix is the established public API naming for this \
-              module's types; renaming it would break downstream crates"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MainMasterTextStylesSource {
     /// Optional direct field before the main master's drawing.
@@ -36,11 +31,6 @@ pub struct ContentMasterInfo {
 }
 
 /// Embedded text styles associated with a `PowerPoint` 12 main master.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "the `MainMaster` prefix is the established public API naming for this \
-              module's types; renaming it would break downstream crates"
-)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MainMasterTextStyles {
     /// Schema position from which this package was read.
@@ -50,11 +40,6 @@ pub struct MainMasterTextStyles {
 }
 
 /// `PowerPoint` 12 round-trip metadata stored on one main master slide.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "the `MainMaster` prefix is the established public API naming for this \
-              module's types; renaming it would break downstream crates"
-)]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct MainMasterMetadata12 {
     /// Original `PresentationML` slide-master identifier.
@@ -96,12 +81,6 @@ impl MainMasterMetadata12 {
                 seen_drawing = true;
                 continue;
             }
-            #[allow(
-                clippy::wildcard_enum_match_arm,
-                reason = "`RecordType` mirrors the full MS-PPT record-type enumeration; only \
-                          the round-trip metadata atoms are interpreted and every other record \
-                          is ignored"
-            )]
             match record.record_type {
                 RecordType::RoundTripOArtTextStyles12Atom => {
                     let (source, seen) = if seen_drawing {
@@ -252,11 +231,6 @@ fn read_u32(record: &Record) -> u32 {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
     use crate::raw::Reader;

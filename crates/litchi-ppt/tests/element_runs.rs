@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "run edit tests use panic-driven assertions"
-)]
-
 //! Character runs and text hyperlinks through the canonical primary edit.
 
 use litchi_ppt::Package;

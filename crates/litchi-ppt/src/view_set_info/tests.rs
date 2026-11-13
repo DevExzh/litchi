@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use super::codec::{NORMAL_VIEW_SET_INFO_ATOM_TYPE, NORMAL_VIEW_SET_INFO_TYPE};
 use super::*;
 use crate::consts::RecordType;

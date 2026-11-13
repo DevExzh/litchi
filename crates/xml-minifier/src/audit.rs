@@ -5,11 +5,6 @@
 //! and whitespace-only nodes containing CR, LF, or tab outside an inherited
 //! `xml:space="preserve"` scope, are classified as structural formatting.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "semantic API types precede their streaming implementation and package submodule"
-)]
-
 use core::{fmt, mem::size_of, ops::Range};
 use quick_xml::Reader;
 use quick_xml::XmlVersion;

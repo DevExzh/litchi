@@ -11,11 +11,6 @@ mod package;
 #[cfg(test)]
 mod tests;
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "the `HeaderFooter` prefix is the established public API naming for this \
-              module's types; renaming them would break downstream crates"
-)]
 pub use model::{
     DateTimeFormatId, HeaderFooter, HeaderFooterDisplayText, HeaderFooterOptions,
     HeaderFooterParent, HeaderFooterParentOrdinal, HeaderFooterScope, HeaderFooters,

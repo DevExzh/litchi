@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use crate::consts::{DIRENTRY_SIZE, NOSTREAM};
 use crate::file::OleFile;
 use crate::writer::DirectoryBuilder;

@@ -1230,10 +1230,6 @@ fn ensure_source_version(package: &Package, expected: SourceVersion) -> Result<(
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    reason = "the lazy-entry regression is a direct state assertion"
-)]
 mod tests {
     use super::{Edit, EditOptions, Package};
 

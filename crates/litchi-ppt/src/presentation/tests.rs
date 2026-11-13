@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use super::model::{Presentation, PresentationData};
 use crate::Error;
 use crate::consts::RecordType;

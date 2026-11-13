@@ -1210,11 +1210,6 @@ fn ensure_serialized_record(record: &[u8], limits: &SourceLimits, context: &str)
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

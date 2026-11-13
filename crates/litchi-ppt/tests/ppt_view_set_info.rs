@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 //! Tests for `NormalViewSetInfo9` and `NotesTextViewInfo9` view preferences
 //! against real `PowerPoint` fixtures.
 

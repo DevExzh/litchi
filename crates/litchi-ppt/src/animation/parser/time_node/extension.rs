@@ -35,10 +35,6 @@ pub fn parse_slide_animation_extension(data: &[u8]) -> Result<SlideAnimationExte
         {
             linked_shape_array_closed = true;
         }
-        #[allow(
-            clippy::wildcard_enum_match_arm,
-            reason = "`RecordType` spans the full MS-PPT record ID space; records outside the ___PPT10 extension set are skipped"
-        )]
         match record.record_type {
             RecordType::LinkedSlide10Atom => {
                 if extension.linked_slide.is_some() {

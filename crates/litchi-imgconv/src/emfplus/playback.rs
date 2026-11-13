@@ -1406,10 +1406,6 @@ impl PlaybackEngine {
             );
         }
     }
-    #[allow(
-        clippy::unused_self,
-        reason = "kept as an engine invariant helper at every call site"
-    )]
     fn require(&self, record: EmfPlusRecord<'_>, length: usize) -> Result<()> {
         if record.data.len() != length {
             return Err(Error::ParseError(format!(
@@ -1421,10 +1417,6 @@ impl PlaybackEngine {
         }
         Ok(())
     }
-    #[allow(
-        clippy::unused_self,
-        reason = "kept as an engine invariant helper at every call site"
-    )]
     fn require_at(&self, record: EmfPlusRecord<'_>, start: usize, length: usize) -> Result<()> {
         let end = start
             .checked_add(length)

@@ -56,10 +56,6 @@ pub fn write_transition(transition: &TransitionInfo) -> Result<Vec<u8>> {
     // unused (3 bytes)
     data.extend(&[0u8, 0u8, 0u8]);
 
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the SSSlideInfoAtom payload built above is always 16 bytes, so its length fits in `u32`"
-    )]
     let header = create_record_header(RecordType::SSSlideInfoAtom, 0x00, 0, data.len() as u32);
 
     let mut result = Vec::new();
@@ -136,10 +132,6 @@ pub(super) const fn encode_transition_direction(
 ) -> Option<u8> {
     // Each nested match is intentionally a compact whitelist for one wire
     // effect; all remaining enum directions are unrepresentable for it.
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "nested matches whitelist the exact directions permitted by each MS-PPT effect"
-    )]
     match transition_type {
         TransitionType::Cut => match direction {
             TransitionDirection::ThroughBlack => Some(1),
@@ -312,11 +304,6 @@ fn create_record_header(
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

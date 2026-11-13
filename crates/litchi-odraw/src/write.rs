@@ -807,11 +807,6 @@ pub(crate) fn invalid_input(message: &'static str) -> io::Error {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        reason = "test assertions panic on failure by design"
-    )]
     use super::*;
     use crate::{Record, RecordKind};
     use std::mem::size_of;

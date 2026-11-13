@@ -9,11 +9,6 @@
 //! byte, and a changed edit of a signed package is refused with
 //! [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy).
 
-#![allow(
-    clippy::missing_errors_doc,
-    reason = "each verb documents the raw operation it stages"
-)]
-
 use super::super::custom_show::Show;
 use super::super::sections::Section;
 use super::Draft;

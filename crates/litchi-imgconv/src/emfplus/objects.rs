@@ -5,14 +5,6 @@
 //! object table can consequently outlive the source comment buffer without
 //! retaining an entire metafile in memory.
 
-#![allow(
-    clippy::missing_errors_doc,
-    clippy::module_name_repetitions,
-    clippy::struct_excessive_bools,
-    clippy::too_many_lines,
-    reason = "The EMF+ names are specification terms and the wire decoder is necessarily centralised."
-)]
-
 use std::convert::TryFrom;
 
 use litchi_core::error::{Error, Result};
@@ -1097,10 +1089,6 @@ impl<'a> Cursor<'a> {
             label,
         )
     }
-    #[allow(
-        clippy::unused_self,
-        reason = "kept as a cursor operation for uniform bounded allocation calls"
-    )]
     fn reserve<T>(&self, value: &mut Vec<T>, count: usize, label: &'static str) -> Result<()> {
         value
             .try_reserve(count)

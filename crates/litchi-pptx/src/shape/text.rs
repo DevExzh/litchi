@@ -411,11 +411,6 @@ fn emit_drawingml_range(
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
     use litchi_ooxml_common::xml::extract_omml_formulas;

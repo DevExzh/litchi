@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use super::codec::decode;
 use super::model::{Chart, Frame, Graph, Info, Kind};
 use super::package::{classify, collect_frames, program_base};

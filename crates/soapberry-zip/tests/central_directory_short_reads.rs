@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    reason = "Small generated ZIP fixtures and explicit bounded reader splits."
-)]
-
 use soapberry_zip::{ErrorKind, ReaderAt, ZipArchive, ZipLocator, office::StreamingArchiveWriter};
 use std::io;
 

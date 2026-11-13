@@ -20,11 +20,6 @@ pub struct TextMasterStyleLevel {
 }
 
 /// Parsed text defaults from a `TxMasterStyleAtom`.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`TextMasterStyle` is the established public API name for the `TxMasterStyleAtom` \
-              model; renaming it would break downstream crates"
-)]
 #[derive(Debug, Clone)]
 pub struct TextMasterStyle {
     /// `TextTypeEnum` value from the record instance.
@@ -136,11 +131,6 @@ impl TextMasterStyle {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

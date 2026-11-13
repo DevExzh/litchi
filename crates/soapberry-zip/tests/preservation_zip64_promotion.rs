@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    reason = "The ZIP64 integration fixtures are fixed, bounded metadata probes."
-)]
-
 //! Public preservation coverage for generated members whose local offsets
 //! cross the ZIP32 offset sentinel.  The source and output images are sparse:
 //! the large stored member is represented as a zero run, while every framing

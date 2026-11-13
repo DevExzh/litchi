@@ -215,10 +215,6 @@ impl TextSIException {
     }
 
     /// Serialize the structure without any record header.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the smart-tag index count originates from a u32 on-disk field, so it always fits u32"
-    )]
     pub(crate) fn to_bytes(&self) -> Vec<u8> {
         let mut mask = 0u32;
         if self.spelling.is_some() {
@@ -294,10 +290,6 @@ impl TextSIRun {
 }
 
 /// Parsed payload of a `TextSpecialInfoAtom` (MS-PPT 2.9.54).
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`TextSpecialInfoRuns` is the established public API name mirroring the MS-PPT `TextSpecialInfoAtom` payload; renaming it would break downstream crates"
-)]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TextSpecialInfoRuns {
     runs: Vec<TextSIRun>,
@@ -500,10 +492,6 @@ impl TextSpecialInfoRuns {
     }
 
     /// Serialize the complete record, including its header.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the runs are parsed from a PPT record payload whose length is a u32, so the re-serialized payload length always fits u32"
-    )]
     #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut payload = Vec::new();
@@ -606,10 +594,6 @@ impl MasterTextPropLevels {
     }
 
     /// Serialize the complete record, including its header.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "each run serializes to 6 bytes and the runs are parsed from a PPT record payload whose length is a u32, so the total always fits u32"
-    )]
     #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         let payload_len = self.runs.len() * MASTER_TEXT_PROP_RUN_LEN;
@@ -650,11 +634,6 @@ fn require_bytes(data: &[u8], offset: usize, needed: usize, field: &str) -> Resu
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

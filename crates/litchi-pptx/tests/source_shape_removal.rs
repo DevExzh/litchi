@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "the in-memory fixtures intentionally panic on malformed test setup"
-)]
-
 //! Shape removal across the eager and source-backed primary APIs.
 
 use std::collections::BTreeMap;

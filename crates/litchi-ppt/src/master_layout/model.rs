@@ -223,11 +223,6 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    #[allow(
-        clippy::needless_pass_by_value,
-        reason = "callers hand over ownership of the parsed record tree; taking it by \
-                  reference would churn the established public API and its callers"
-    )]
     pub(crate) fn from_record_with_limits(
         context: Context,
         root: Record,

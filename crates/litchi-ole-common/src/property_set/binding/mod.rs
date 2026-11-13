@@ -11,13 +11,6 @@ mod model;
 mod validation;
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::shadow_reuse,
-    clippy::shadow_unrelated,
-    reason = "tests use concise assertions while exercising fallible malformed-input paths"
-)]
 mod tests;
 
 pub use model::{

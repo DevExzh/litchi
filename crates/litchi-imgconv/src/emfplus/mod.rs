@@ -4,11 +4,6 @@
 //! and rendering can be layered on top without duplicating the security-sensitive
 //! size, offset, and continuation checks implemented here.
 
-#![allow(
-    clippy::missing_errors_doc,
-    reason = "all fallible public APIs reject malformed input or configured resource limits"
-)]
-
 mod comment;
 pub mod objects;
 mod parser;

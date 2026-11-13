@@ -1,8 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
 //! Directory state bits and FILETIMEs under the reuse sector-layout policy.
 //!
 //! A reused layout emits the adopted source's directory image. Directory

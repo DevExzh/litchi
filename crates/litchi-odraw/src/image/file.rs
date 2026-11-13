@@ -548,11 +548,6 @@ fn collect<'data>(
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        reason = "test assertions panic on failure by design"
-    )]
     use super::*;
 
     fn png_blip(data: &[u8]) -> Vec<u8> {

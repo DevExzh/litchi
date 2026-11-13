@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "focused boundary tests use panic-on-failure assertions"
-)]
-
 //! End-to-end version-4 range-lock tests.
 //!
 //! The CFB files exercised here are larger than two GiB on the wire, but the

@@ -3,12 +3,6 @@
 /// Text formatting properties for a text run.
 ///
 /// Based on Apache POI's `TextPropCollection` and `CharacterPropertyBags`.
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "each bool mirrors a distinct `CFStyle` bit flag from MS-PPT (bold, italic, \
-              underline, shadow, embossed); collapsing them into enums would obscure the \
-              one-to-one mapping with the on-disk bit field"
-)]
 #[derive(Debug, Clone, Default)]
 pub struct TextRunFormatting {
     /// Original `CFMasks` value.

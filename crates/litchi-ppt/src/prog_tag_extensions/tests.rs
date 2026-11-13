@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use super::codec::{
     ATOM_VERSION, BROADCAST_DOC_INFO_9, COMMENT_10, CONTAINER_VERSION, COPYRIGHT_INSTANCE,
     ENVELOPE_DATA_9_ATOM, ENVELOPE_FLAGS_9_ATOM, HTML_DOC_INFO_9_ATOM, HTML_PUBLISH_INFO_9,

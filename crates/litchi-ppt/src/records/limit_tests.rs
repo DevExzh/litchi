@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 //! Source limits enforced by the bounded record parser (moved from the
 //! embedded-font vectors when `Record::parse` became
 //! crate-private).

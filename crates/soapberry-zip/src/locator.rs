@@ -1353,9 +1353,7 @@ impl EndOfCentralDirectoryRecord {
 #[derive(Debug, Clone)]
 pub(crate) struct EndOfCentralDirectoryRecordFixed {
     pub(crate) signature: u32,
-    #[allow(dead_code)]
     pub(crate) disk_number: u16,
-    #[allow(dead_code)]
     pub(crate) eocd_disk: u16,
     pub(crate) num_entries: u16,
     pub(crate) total_entries: u16,
@@ -1410,7 +1408,6 @@ impl EndOfCentralDirectoryRecordFixed {
 ///
 /// 4.3.15
 #[derive(Debug)]
-#[allow(dead_code)]
 struct Zip64EndOfCentralDirectoryLocatorRecord {
     /// zip64 end of central dir locator signature
     pub signature: u32,

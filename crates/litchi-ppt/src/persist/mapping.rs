@@ -11,10 +11,6 @@ use std::collections::HashMap;
 ///
 /// Efficiently merges multiple `PersistPtrHolder` records with later entries overriding earlier ones.
 #[derive(Debug, Clone, Default)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`PersistMapping` is the established public API name re-exported from the crate root; renaming it would break downstream crates"
-)]
 pub struct PersistMapping {
     /// Consolidated mapping from persist ID to byte offset
     mappings: HashMap<u32, u32>,
@@ -157,11 +153,6 @@ impl PersistMapping {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

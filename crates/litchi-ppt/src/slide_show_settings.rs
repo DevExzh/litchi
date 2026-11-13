@@ -74,10 +74,6 @@ impl ColorIndex {
 }
 
 /// The nine defined `SlideShowDocInfoAtom` flags.
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "each bool maps one-to-one to an independent flag bit of the MS-PPT `SlideShowDocInfoAtom` bitfield; grouping them into enums would misrepresent the on-disk layout and churn the public API"
-)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct SlideShowFlags {
     pub auto_advance: bool,
@@ -346,11 +342,6 @@ fn corrupted<T>(message: impl Into<String>) -> Result<T> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

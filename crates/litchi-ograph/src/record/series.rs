@@ -183,11 +183,6 @@ const fn set(flags: u16, mask: u16, enabled: bool) -> u16 {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        reason = "test assertions panic by design"
-    )]
     use super::*;
 
     #[test]

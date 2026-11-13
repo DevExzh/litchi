@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 //! `PowerPoint` 2002 build-list round trips and validation.
 use super::super::*;
 use super::support::*;

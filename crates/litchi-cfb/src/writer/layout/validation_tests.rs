@@ -9,13 +9,6 @@
 //! accepted by both, so the in-place comparison neither misses a defect nor
 //! refuses more than the readback did.
 
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    reason = "test assertions panic on failure by design"
-)]
-
 use super::super::OleWriter;
 use super::super::core::plan_validation_declines;
 use super::*;

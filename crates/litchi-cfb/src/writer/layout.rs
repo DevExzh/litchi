@@ -1017,10 +1017,6 @@ impl ReusePlan {
     /// A stream payload slice that is the very slice of `expected` it is
     /// compared with is equal without being read. Once a mismatch is known,
     /// the rest of the range is still walked for its errors but not compared.
-    #[allow(
-        clippy::too_many_lines,
-        reason = "one walk mirrors `read_at` case for case; splitting it would separate each case from the bounds it shares"
-    )]
     fn examine_at(
         &self,
         streams: &[StreamInput<'_>],
@@ -1414,10 +1410,6 @@ impl SectorPool {
 /// gate that the model does not satisfy is reported as
 /// [`Outcome::Declined`] rather than as an error, because the from-scratch
 /// serialization is always available.
-#[allow(
-    clippy::too_many_lines,
-    reason = "the planner is one allocation pass over the source; splitting it would hide the ordering the invariants depend on"
-)]
 pub(super) fn plan_reuse(
     source: &SourceLayout,
     model: &ModelInputs<'_>,

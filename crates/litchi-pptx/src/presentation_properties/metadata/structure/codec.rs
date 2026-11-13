@@ -697,10 +697,6 @@ struct Attribute {
     value: String,
 }
 
-#[allow(
-    clippy::type_complexity,
-    reason = "raw-show tuple mirrors the persisted XML structure"
-)]
 pub(super) fn parse_core(xml: &[u8], limits: Limits) -> Result<(Vec<(u32, String)>, Vec<RawShow>)> {
     if xml.len() > limits.max_output_bytes() {
         return Err(limit(
@@ -1761,11 +1757,6 @@ fn limit(kind: crate::opened::CodecLimitKind, observed: usize, maximum: usize) -
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

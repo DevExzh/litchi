@@ -1,8 +1,3 @@
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example intentionally prints its results"
-)]
-
 //! Demonstration of new animation features including sounds, after-effects, and more effects.
 //!
 //! This example showcases:

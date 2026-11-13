@@ -32,10 +32,6 @@ pub(crate) use validation::is_isolatable_shape_error;
 /// The object owns parsed record state and uses one-time cells for expensive
 /// projections.  Shape conversion and text extraction therefore remain
 /// demand-driven with no repeated allocation after the first access.
-#[allow(
-    clippy::struct_field_names,
-    reason = "the `slide_id`, `slide_list_text`, and `slide_number` fields mirror the MS-PPT `SlidePersistAtom` terminology; they are private and renaming them would churn sibling modules without changing the public API"
-)]
 pub struct Slide<'doc> {
     /// Slide persist ID.
     persist_id: u32,

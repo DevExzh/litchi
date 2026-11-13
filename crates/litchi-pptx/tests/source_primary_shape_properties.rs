@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "integration assertions"
-)]
 //! Source-native shape-property batches preserve exact package revisions.
 
 use litchi_core::{OwnedSource, Position};

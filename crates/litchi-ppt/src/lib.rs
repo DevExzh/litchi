@@ -55,10 +55,6 @@
 // quick-xml's checked attribute iteration is quadratic on hostile tags; read
 // attributes through `BytesStartExt` (workspace `clippy.toml`).
 #![cfg_attr(not(test), deny(clippy::disallowed_methods))]
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "modules and re-exports are grouped by functional area rather than by item kind"
-)]
 
 mod binary_tag_edit;
 mod consts;

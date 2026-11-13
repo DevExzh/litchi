@@ -1,4 +1,3 @@
-#![allow(missing_docs)]
 // quick-xml's checked attribute iteration is quadratic on hostile tags; read
 // attributes through `omml::xml_attributes` (workspace `clippy.toml`).
 #![cfg_attr(not(test), deny(clippy::disallowed_methods))]

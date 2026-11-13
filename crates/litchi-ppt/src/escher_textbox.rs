@@ -13,10 +13,6 @@ use crate::consts::RecordType;
 ///
 /// Based on POI's `EscherTextboxWrapper`. Parses child records from the textbox data.
 #[derive(Debug, Clone)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`EscherTextboxWrapper` mirrors the Apache POI class name and is the established public API name"
-)]
 pub struct EscherTextboxWrapper {
     /// The raw Escher textbox data
     data: Vec<u8>,
@@ -352,11 +348,6 @@ impl EscherTextboxWrapper {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

@@ -115,10 +115,6 @@ pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Change) -> Result<Sn
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "public API consumes the commit to signal it has been applied"
-)]
 pub(crate) fn apply_commit(package: &mut OpcPackage, commit: Prepared) -> Result<Snapshot> {
     apply_patch(package, commit.patch())
 }

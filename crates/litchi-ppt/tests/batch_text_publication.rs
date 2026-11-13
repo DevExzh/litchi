@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::too_many_lines,
-    clippy::unwrap_used,
-    reason = "canonical integration assertions use panic-driven test fixtures"
-)]
-
 //! Integration coverage for grouped native shape-text publication.
 //!
 //! The fixture deliberately crosses the native 256-item boundary while

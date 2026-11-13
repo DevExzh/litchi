@@ -1,8 +1,3 @@
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example intentionally prints its results"
-)]
-
 //! Comprehensive PPT file writer test
 //!
 //! This example demonstrates all features available in the PPT writer.

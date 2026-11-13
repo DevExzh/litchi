@@ -658,10 +658,6 @@ impl Builder {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "parameters mirror the shape's distinct placement and style properties"
-    )]
     pub fn add_freeform(
         &mut self,
         slide: usize,
@@ -679,10 +675,6 @@ impl Builder {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "parameters mirror the shape's distinct placement and style properties"
-    )]
     pub fn add_styled_freeform(
         &mut self,
         slide: usize,
@@ -911,10 +903,6 @@ impl Builder {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "parameters mirror the shape's distinct placement and style properties"
-    )]
     pub fn add_styled_shape(
         &mut self,
         slide: usize,
@@ -1116,10 +1104,6 @@ impl Builder {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "parameters mirror the shape's distinct placement and style properties"
-    )]
     pub fn add_picture_as(
         &mut self,
         slide: usize,
@@ -1883,10 +1867,6 @@ impl Default for Builder {
 
 fn default_font_collections() -> FontCollections {
     let mut base = FontCollection::new(FontScope::Base);
-    #[allow(
-        clippy::expect_used,
-        reason = "the built-in Arial font satisfies every collection invariant and a fresh collection has capacity"
-    )]
     base.try_push(FontEntity::arial().into())
         .expect("the built-in Arial font is valid");
     FontCollections {

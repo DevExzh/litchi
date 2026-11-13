@@ -24,12 +24,6 @@ pub fn inventory(root: &Record) -> Result<Inventory> {
     Ok(Inventory::new(entries))
 }
 
-#[allow(
-    clippy::wildcard_enum_match_arm,
-    reason = "`RecordType` mirrors the full MS-PPT record-type enumeration; only MainMaster, \
-              Handout, Notes, and Slide can be master records and every other record type \
-              yields no master context"
-)]
 fn classify(record: &Record) -> Result<Option<Context>> {
     match record.record_type {
         RecordType::MainMaster => Ok(Some(Context::Main)),

@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "integration tests use concise assertions on fixture-sized CFB files"
-)]
-
 //! Object target paths compare CFB names exactly as `litchi-cfb` does.
 //!
 //! `[MS-CFB]` 2.6.4 compares names as UTF-16 code points under a simple

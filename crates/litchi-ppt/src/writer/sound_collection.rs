@@ -17,10 +17,6 @@ use crate::consts::RecordType;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// Resource limits for sound collection authoring.
-#[allow(
-    clippy::struct_field_names,
-    reason = "the shared `max_` prefix documents that every field is a resource bound; renaming would churn sibling modules that reference these fields"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct SoundCollectionLimits {
     pub max_sounds: usize,
@@ -231,12 +227,6 @@ fn get_builtin_sound_freq(id: u32) -> f64 {
 ///
 /// Each built-in sound gets a unique frequency so they are distinguishable.
 /// Duration: ~0.15 seconds (1200 samples at 8000 Hz).
-#[allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_precision_loss,
-    clippy::cast_sign_loss,
-    reason = "sample indices stay below 1200 (exactly representable as f64), and samples are clamped to 0.0..=255.0 so the float-to-u8 truncation toward zero is the intended PCM quantization"
-)]
 fn generate_wav_tone(freq: f64) -> Vec<u8> {
     const SAMPLE_RATE: u32 = 8000;
     const NUM_SAMPLES: usize = 1200; // 0.15 seconds
@@ -348,10 +338,6 @@ fn build_sound_container(
 /// # Errors
 ///
 /// Returns an error if serialization fails or the underlying writer reports an error.
-#[allow(
-    clippy::implicit_hasher,
-    reason = "the public API intentionally accepts `HashSet` with the default hasher; generalizing over hashers would complicate the established signature for no practical benefit"
-)]
 pub fn build_sound_collection(
     sound_ids: &HashSet<u32>,
 ) -> Result<(Vec<u8>, HashMap<u32, u32>), Error> {
@@ -408,11 +394,6 @@ fn invalid_error(message: impl Into<String>) -> Error {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

@@ -139,11 +139,6 @@ fn map_common(error: litchi_ooxml_common::Error) -> Error {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
     use litchi_opc::Part;

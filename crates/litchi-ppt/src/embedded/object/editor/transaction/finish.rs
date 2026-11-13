@@ -259,10 +259,6 @@ fn persist_directory_record_len(mappings: &BTreeMap<u32, u32>) -> Result<usize> 
         .ok_or_else(|| Error::ResourceLimit("PowerPoint persist directory size overflows".into()))
 }
 
-#[allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the bounded cursor is grouped directly with its trait implementations"
-)]
 struct BoundedCursor {
     inner: Cursor<Vec<u8>>,
     maximum: usize,
@@ -328,11 +324,6 @@ impl Seek for BoundedCursor {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod bounded_cursor_tests {
     use super::BoundedCursor;
     use std::io::{Seek, SeekFrom, Write};
@@ -348,12 +339,6 @@ mod bounded_cursor_tests {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::too_many_lines,
-    reason = "these tests compare the complete old and candidate finish paths"
-)]
 mod candidate_finish_tests {
     use super::super::super::{Editor, Result};
     use super::{

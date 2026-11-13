@@ -504,7 +504,6 @@ fn area_bytes(value: format::Area) -> [u8; 16] {
 
 #[cfg(test)]
 mod radar_tests {
-    #![allow(clippy::unwrap_used, reason = "test assertions panic by design")]
     use super::*;
     use litchi_biff::Records;
 
@@ -529,7 +528,6 @@ mod radar_tests {
 
 #[cfg(test)]
 mod of_pie_tests {
-    #![allow(clippy::unwrap_used, reason = "test assertions panic by design")]
     use super::*;
     use crate::record::of_pie;
     use litchi_biff::Records;

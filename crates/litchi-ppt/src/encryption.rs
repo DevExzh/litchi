@@ -796,11 +796,6 @@ fn checked_slice_mut<'a>(
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
     use crate::{OpenOptions, raw::Reader};

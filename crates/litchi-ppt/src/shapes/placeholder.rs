@@ -8,10 +8,6 @@ use crate::odraw::ShapeExt as _;
 
 /// Placeholder size options (quarter, half, full).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`PlaceholderSize` is the established public API name; renaming it would break downstream crates"
-)]
 pub enum PlaceholderSize {
     /// Quarter size placeholder
     Quarter,
@@ -33,10 +29,6 @@ impl From<crate::AtomPlaceholderSize> for PlaceholderSize {
 
 /// Types of placeholders in `PowerPoint` presentations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`PlaceholderType` is the established public API name; renaming it would break downstream crates"
-)]
 pub enum PlaceholderType {
     /// No placeholder shape
     None,
@@ -449,11 +441,6 @@ where
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::super::shape::ShapeType;
     use super::*;

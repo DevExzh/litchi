@@ -283,11 +283,6 @@ impl ExactCache {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::indexing_slicing,
-    clippy::single_range_in_vec_init,
-    reason = "digest unit tests use panic-driven assertions and block-span literals"
-)]
 mod tests {
     use super::{BLOCK, BlockDigests, BlockSpan, ExactCache, Recipe, union};
     use std::sync::Arc;

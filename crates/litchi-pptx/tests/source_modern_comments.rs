@@ -5,12 +5,6 @@
 //! exercise the source owner's relationship locality as well as the detached
 //! semantic projection.
 
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "the in-memory OPC fixture and assertions intentionally panic"
-)]
-
 use std::io::{self, Cursor};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};

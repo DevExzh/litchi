@@ -444,11 +444,6 @@ fn invalid(message: impl Into<String>) -> Error {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
     use crate::presentation_properties::metadata::color_map::{Role, Slot, Value};

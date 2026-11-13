@@ -5,11 +5,6 @@
 //! deliberately strict: only the CORE, INFO, V4, and V5 headers described by
 //! MS-WMF are accepted.
 
-#![allow(
-    clippy::missing_errors_doc,
-    reason = "all public fallible APIs report malformed input, resource limits, or codec failure"
-)]
-
 use std::io::{Cursor, Seek, SeekFrom, Write};
 
 use image::{DynamicImage, ImageFormat, ImageReader};
@@ -21,10 +16,6 @@ const BITMAP_V4_HEADER: u32 = 108;
 const BITMAP_V5_HEADER: u32 = 124;
 
 /// Explicit resource ceilings applied before allocation or codec dispatch.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "DibLimits is clearer at public call sites than the ambiguous name Limits"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DibLimits {
     /// Maximum combined bitmap-info and bitmap-bits input length.
@@ -147,10 +138,6 @@ impl ColorUsage {
 }
 
 /// Validated, allocation-free DIB metadata.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "DibInfo distinguishes validated DIB metadata from container record metadata"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DibInfo {
     pub header: HeaderKind,
@@ -269,10 +256,6 @@ impl<'a> Dib<'a> {
         if bitmap_info.len() < layout.bitmap_info_len {
             return Err(parse("DIB bitmap info or color table is truncated"));
         }
-        #[allow(
-            clippy::collapsible_if,
-            reason = "nested form remains compatible with direct rustfmt file invocation"
-        )]
         if let Some((_, end)) = layout.profile_range {
             if end > bitmap_info.len() {
                 return Err(parse("V5 color profile extends past bitmap info"));
@@ -889,10 +872,6 @@ fn limit_u64(resource: &str, maximum: u64) -> Error {
     ))
 }
 
-#[allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the bounded writer is grouped directly with its trait implementations"
-)]
 struct BoundedCursor {
     inner: Cursor<Vec<u8>>,
     maximum: u64,

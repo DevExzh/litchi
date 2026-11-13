@@ -1,11 +1,6 @@
 //! `verify_source_replacement` returns exactly what auditing the original and
 //! then the replacement with `verify_source` returns, and proves a local
 //! edit by scanning only the replaced element.
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "each test states one fixed expected verdict"
-)]
 
 use core::ops::Range;
 

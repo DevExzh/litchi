@@ -313,10 +313,6 @@ impl TextCFException {
 
     /// Serialize the complete `TextCFExceptionAtom`, including its header.
     #[must_use]
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "a `TextCFException` payload contains only fixed-size fields, so its length is bounded far below `u32::MAX`"
-    )]
     pub fn to_bytes(&self) -> Vec<u8> {
         let payload = self.to_payload();
         let mut data = Vec::with_capacity(8 + payload.len());
@@ -543,10 +539,6 @@ impl TextPFException {
     }
 
     /// Serialize the structure without any record header or reserved field.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the tab-stop count is parsed from a `u16` length field and `TextPFException` fields are crate-private, so it cannot exceed `u16::MAX`"
-    )]
     pub(crate) fn to_payload(&self) -> Vec<u8> {
         let mut data = Vec::with_capacity(16);
         data.extend_from_slice(&self.masks.to_le_bytes());
@@ -641,10 +633,6 @@ impl TextPFException {
 
     /// Serialize the complete `TextPFExceptionAtom`, including its header.
     #[must_use]
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "a `TextPFException` payload holds at most `u16::MAX` four-byte tab stops plus fixed-size fields, so its length is bounded far below `u32::MAX`"
-    )]
     pub fn to_bytes(&self) -> Vec<u8> {
         let payload = self.to_payload();
         let mut data = Vec::with_capacity(8 + 2 + payload.len());

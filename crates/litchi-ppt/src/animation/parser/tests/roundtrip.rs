@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 //! Animation-info round trips and default-state invariants.
 use super::super::*;
 use super::support::*;

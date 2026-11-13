@@ -11,11 +11,6 @@ use crate::package::{Error, Result};
 
 /// Map a high-level animation effect to PPT97 fly method and direction codes.
 /// Based on `LibreOffice` ppt97animations.cxx mapping.
-#[allow(
-    clippy::match_same_arms,
-    clippy::wildcard_enum_match_arm,
-    reason = "the arms mirror the effect categories of the ppt97animations.cxx mapping; identical codes are deliberate per-category defaults and each wildcard arm encodes the documented fallback direction for that effect"
-)]
 pub(super) fn map_effect_to_ppt97(effect: AnimationEffect, direction: EffectDirection) -> (u8, u8) {
     use AnimationEffect::{
         Appear, Ascend, Blinds, BlindsOut, BoldFlash, Bounce, Box, BoxOut, ChangeFillColor,
@@ -252,10 +247,6 @@ fn write_diagram_build(build: &DiagramBuild) -> Result<Vec<u8>> {
     wrap_record(RecordType::DiagramBuild, 0x0F, 0, children)
 }
 
-#[allow(
-    clippy::trivially_copy_pass_by_ref,
-    reason = "callers validate a borrowed field of the build struct; taking the build type by reference keeps the validator consistent with the other reference-taking validators in this module"
-)]
 pub(super) fn validate_paragraph_levels(
     build_type: &crate::animation::types::ParagraphBuildType,
     levels: &[ParagraphBuildLevel],

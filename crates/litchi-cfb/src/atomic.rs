@@ -203,12 +203,6 @@ impl Error for RefuseCleanupCommitted {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::expect_used,
-        clippy::unwrap_used,
-        reason = "focused atomic publication tests use panic-on-failure assertions"
-    )]
-
     use super::*;
     use std::fs;
     use std::io::{self, Write};

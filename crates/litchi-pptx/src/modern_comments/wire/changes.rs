@@ -444,12 +444,6 @@ fn locate_commands(xml: &[u8]) -> Result<Vec<(usize, usize, Changes)>> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 //! Shared and specialized animation behavior round trips and validation.
 use super::super::*;
 use crate::animation::types::{is_valid_time_set_value, time_set_attribute_value_type};

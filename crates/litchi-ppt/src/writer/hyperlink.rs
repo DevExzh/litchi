@@ -39,10 +39,6 @@ use zerocopy_derive::{Immutable, IntoBytes, KnownLayout};
 // =============================================================================
 
 /// Action type for hyperlinks (per POI `InteractiveInfoAtom`)
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`HyperlinkAction` is the established public API name; renaming it would break downstream crates"
-)]
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum HyperlinkAction {
@@ -239,10 +235,6 @@ pub struct ExHyperlinkAtom {
 // =============================================================================
 
 /// Hyperlink target types
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`HyperlinkTarget` is the established public API name; renaming it would break downstream crates"
-)]
 #[derive(Debug, Clone)]
 pub enum HyperlinkTarget {
     /// URL (external web link)
@@ -400,10 +392,6 @@ impl Hyperlink {
 // =============================================================================
 
 /// Collection of hyperlinks for a presentation
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`HyperlinkCollection` is the established public API name; renaming it would break downstream crates"
-)]
 #[derive(Debug, Default)]
 pub struct HyperlinkCollection {
     hyperlinks: Vec<Hyperlink>,
@@ -475,10 +463,6 @@ impl HyperlinkCollection {
     /// # Errors
     ///
     /// Returns an error if serialization fails or the underlying writer reports an error.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "`ExObjList` children are small in-memory hyperlink records whose total size is bounded far below u32::MAX"
-    )]
     pub fn build_ex_obj_list(&self) -> Result<Vec<u8>, std::io::Error> {
         if self.hyperlinks.is_empty() {
             return Ok(Vec::new());
@@ -517,10 +501,6 @@ impl HyperlinkCollection {
 
     /// Build `ExHyperlink` container for a single hyperlink
     /// Per POI `ExHyperlink`: contains `ExHyperlinkAtom` + 2 `CStrings` (title, URL)
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "`ExHyperlink` children are small in-memory records whose total size is bounded far below u32::MAX"
-    )]
     fn build_ex_hyperlink(hyperlink: &Hyperlink) -> Result<Vec<u8>, std::io::Error> {
         let mut container = Vec::new();
         let mut children = Vec::new();
@@ -590,10 +570,6 @@ impl HyperlinkCollection {
 // =============================================================================
 
 /// Hyperlink attached to a shape (for mouse click or hover)
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`ShapeHyperlink` is the established public API name; renaming it would break downstream crates"
-)]
 #[derive(Debug, Clone)]
 pub struct ShapeHyperlink {
     /// Hyperlink reference ID
@@ -724,10 +700,6 @@ fn build_cstring(instance: u16, text: &str) -> Vec<u8> {
 
 /// Build a `CString` record (UTF-16LE string) with raw options value
 /// Per POI `CString`: first 2 bytes are options (version + instance << 4)
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "hyperlink strings are short display texts or URLs whose UTF-16 byte length is bounded far below u32::MAX"
-)]
 fn build_cstring_with_options(options: u16, text: &str) -> Vec<u8> {
     let mut record = Vec::new();
 
@@ -753,11 +725,6 @@ fn build_cstring_with_options(options: u16, text: &str) -> Vec<u8> {
 // =============================================================================
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

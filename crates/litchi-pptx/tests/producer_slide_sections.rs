@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "the corpus fixtures and assertions intentionally panic"
-)]
-
 //! Source-backed slide removal and order changes keep the `PowerPoint` 2010
 //! section list (`p14:sectionLst`) consistent.
 //!

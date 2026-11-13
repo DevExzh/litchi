@@ -267,10 +267,6 @@ impl LegacyTextBuildSubEffect {
 
 /// Exact 28-byte payload of an `[MS-PPT]` `AnimationInfoAtom`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "the bool fields mirror the independent flag bits of the fixed MS-PPT `AnimationInfoAtom` layout, so they cannot be merged into enums without losing the bit-level mapping"
-)]
 pub struct LegacyAnimationAtom {
     pub dim_color: u32,
     pub reverse: bool,

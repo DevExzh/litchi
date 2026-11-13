@@ -145,7 +145,6 @@ impl<'a> ExtraInfo<'a> {
     ///
     /// Returns an error if either merge value is not supported by the shared
     /// toolbar model.
-    #[allow(clippy::too_many_arguments, reason = "matches the wire fields")]
     pub fn new(
         help_file: WString<'a>,
         help_context: i32,

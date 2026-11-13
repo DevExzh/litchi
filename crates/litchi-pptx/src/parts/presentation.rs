@@ -1179,10 +1179,6 @@ fn foreign_slide_list_content(tolerance: Option<&mut ToleranceReport>, what: &st
     }
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "the slide-list scan threads its uniqueness sets and repair sink"
-)]
 fn append_slide_reference(
     references: &mut Vec<SlideReference>,
     slide_ids: &mut HashSet<u32>,
@@ -1288,12 +1284,6 @@ fn append_slide_reference(
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::expect_used,
-        clippy::unwrap_used,
-        reason = "focused low-level part tests use literal XML fixtures"
-    )]
-
     use super::PresentationPart;
     use crate::Error;
     use litchi_opc::PackURI;

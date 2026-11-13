@@ -113,10 +113,6 @@ pub(crate) fn metachars_from_records<'a>(
             }
             continue;
         }
-        #[allow(
-            clippy::wildcard_enum_match_arm,
-            reason = "`RecordType` mirrors the full MS-PPT record-type enumeration; records that are not metacharacter atoms are skipped"
-        )]
         let metachar = match record.record_type {
             RecordType::SlideNumberMCAtom
             | RecordType::GenericDateMCAtom
@@ -128,10 +124,6 @@ pub(crate) fn metachars_from_records<'a>(
                         record.record_type
                     )));
                 }
-                #[allow(
-                    clippy::wildcard_enum_match_arm,
-                    reason = "the enclosing match arm restricts `record.record_type` to the four position-only metachar atoms, so the fallback arm is exactly `FooterMCAtom`"
-                )]
                 let kind = match record.record_type {
                     RecordType::SlideNumberMCAtom => MetacharKind::SlideNumber,
                     RecordType::GenericDateMCAtom => MetacharKind::GenericDate,
@@ -189,11 +181,6 @@ pub(crate) fn metachars_from_records<'a>(
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
     use crate::consts::RecordType;

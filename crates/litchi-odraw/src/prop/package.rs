@@ -153,10 +153,6 @@ impl<'data> Props<'data> {
 
     #[inline]
     #[must_use]
-    #[allow(
-        clippy::cast_precision_loss,
-        reason = "16.16 fixed-point decoding to f32 is the intended semantics; rendering values do not require full i32 precision"
-    )]
     pub fn get_rotation_degrees(&self, id: Id) -> Option<f32> {
         self.get_int(id)
             .map(|fixed_point| (fixed_point as f32) / 65536.0)
@@ -164,10 +160,6 @@ impl<'data> Props<'data> {
 
     #[inline]
     #[must_use]
-    #[allow(
-        clippy::cast_precision_loss,
-        reason = "16.16 fixed-point decoding to f32 is the intended semantics; the result is clamped to 0.0..=1.0 anyway"
-    )]
     pub fn get_opacity(&self, id: Id) -> Option<f32> {
         self.get_int(id).map(|fixed_point| {
             let opacity = (fixed_point as f32) / 65536.0;

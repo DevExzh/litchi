@@ -35,10 +35,6 @@ impl TextProp {
 }
 
 /// Text property collection type.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`TextPropType` is the established public API name; renaming it would break downstream crates"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TextPropType {
     /// Paragraph properties
@@ -59,10 +55,6 @@ pub struct TextTabStop {
 /// Collection of text properties for a run of characters.
 ///
 /// Based on Apache POI's `TextPropCollection`.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`TextPropCollection` is the established public API name; renaming it would break downstream crates"
-)]
 #[derive(Debug, Clone)]
 pub struct TextPropCollection {
     /// Number of characters this styling applies to
@@ -609,11 +601,6 @@ pub fn extract_char_flags(flags: i32) -> (bool, bool, bool) {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

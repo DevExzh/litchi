@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use super::codec::semantic_xml_eq;
 use super::model::{Conformance, Def, Id, List, Parts};
 use super::validation::{load, present, put, remove};

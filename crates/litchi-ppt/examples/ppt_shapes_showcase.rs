@@ -1,8 +1,3 @@
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example intentionally prints its results"
-)]
-
 //! Comprehensive PPT shapes showcase
 //!
 //! This example demonstrates creating a `PowerPoint` presentation with various

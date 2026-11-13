@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_pptx::presentation_properties::metadata::events::{Draft, EXTENSION_URI, Kind, Trigger};
 use litchi_pptx::time::Offset;

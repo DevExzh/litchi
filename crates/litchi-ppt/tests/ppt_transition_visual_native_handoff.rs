@@ -1,8 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    reason = "test and explicitly invoked handoff assertions panic on failure by design"
-)]
-
 //! Exact public-API contract for an external same-format PPT resave.
 //!
 //! The mutation replaces only the canonical visual transition fields. Ignored

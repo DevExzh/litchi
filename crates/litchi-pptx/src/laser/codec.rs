@@ -321,10 +321,6 @@ fn scan_slide_laser_traces(
     Ok(traces)
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "element classifier threads one slot per laser-element field"
-)]
 fn classify_element(
     namespace: &ResolveResult<'_>,
     element: &BytesStart<'_>,
@@ -815,11 +811,6 @@ impl std::fmt::Write for LimitedXml<'_> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

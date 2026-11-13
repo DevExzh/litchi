@@ -311,10 +311,6 @@ pub(super) fn parse_processed_comment_list(bytes: &[u8]) -> Result<List> {
     Ok(value)
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "parser frame carries one slot per comment child element"
-)]
 fn child_frame(
     comments: &mut Vec<Comment>,
     reply_count: &mut usize,

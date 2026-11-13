@@ -3,12 +3,6 @@
 //! These tests verify that the OLE writer can create valid OLE2 files
 //! that can be read back by the OLE reader.
 
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use super::super::file::OleFile;
 use super::core::OleWriter;
 use crate::OleFileLimits;

@@ -1,4 +1,3 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, reason = "test assertions")]
 use litchi_core::Position;
 use litchi_pptx::shape::{Scene, Shape, owned, raw};
 use litchi_pptx::{Package, ShapePropertiesReplacement, builder::Builder, opened::Patch};

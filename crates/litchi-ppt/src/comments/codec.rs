@@ -43,10 +43,6 @@ pub(crate) fn parse_slide_comments(
     Ok(comments)
 }
 
-#[allow(
-    clippy::wildcard_enum_match_arm,
-    reason = "`RecordType` has hundreds of variants; any type other than the two author children is rejected by the fallback arm"
-)]
 fn parse_author(record: &Record, limits: &SourceLimits) -> Result<Author> {
     if record.record_type != RecordType::CommentIndex10
         || record.version != 0x0f

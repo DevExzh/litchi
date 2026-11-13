@@ -42,10 +42,6 @@ pub(crate) fn create_dg_container_with_group(
     let shape_count = validate_group(group)?;
     let mut drawing = EscherBuilder::new(header_version::CONTAINER, 0, record_type::DG_CONTAINER);
 
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the `DG` instance field carries the low 12 bits of the drawing id; `EscherHeader::new` masks it"
-    )]
     let mut dg = EscherBuilder::new(header_version::DG, drawing_id as u16, record_type::DG);
     dg.add_data(EscherDgData::new(shape_count, drawing_id).as_bytes());
     drawing.add_data(&dg.build()?);

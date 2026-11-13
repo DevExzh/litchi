@@ -9,10 +9,6 @@ use crate::consts::RecordType;
 ///
 /// MS-PPT stores these flags on main, title, handout, and notes masters. They are defaults for
 /// new slides rather than the resolved visibility of placeholders on an existing slide.
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "each bool maps one-to-one to an independent MS-PPT header/footer inclusion flag; grouping them into enums would misrepresent the on-disk layout and churn the public API"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HeaderFooterDefaults {
     /// Include a date placeholder in the footer of new slides.
@@ -121,11 +117,6 @@ impl SlideExtension {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

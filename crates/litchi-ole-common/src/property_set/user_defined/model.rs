@@ -402,10 +402,6 @@ impl<'a> Edit<'a> {
     ///
     /// Returns an error if the value cannot be encoded within the configured
     /// limits or the section cannot accept the replacement.
-    #[allow(
-        clippy::needless_pass_by_value,
-        reason = "the public edit API intentionally accepts temporary validated values by value"
-    )]
     pub fn set_link_base(&mut self, value: LinkBase) -> Result<(), Error> {
         let encoded_value = Value::Blob(codec::encode_link_base(&value, self.limits)?);
         self.set_named(LINK_BASE, encoded_value)
@@ -422,10 +418,6 @@ impl<'a> Edit<'a> {
     ///
     /// Returns an error if the value cannot be encoded within the configured
     /// limits or the section cannot accept the replacement.
-    #[allow(
-        clippy::needless_pass_by_value,
-        reason = "the public edit API intentionally accepts temporary validated values by value"
-    )]
     pub fn set_hyperlinks(&mut self, value: Hyperlinks) -> Result<(), Error> {
         let encoded_value = Value::Blob(codec::encode_hyperlinks(&value, self.limits)?);
         self.set_named(HYPERLINKS, encoded_value)

@@ -40,10 +40,6 @@ impl SchemeColor {
 
 /// Which role an `RT_ColorSchemeAtom` record plays in its container.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`ColorSchemeAtomKind` is the established public API name; renaming it would break downstream crates"
-)]
 pub enum ColorSchemeAtomKind {
     /// `SlideSchemeColorSchemeAtom`: the color scheme used by one slide
     /// (MS-PPT 2.5.14).
@@ -115,10 +111,6 @@ impl ColorScheme {
 /// A validated `SlideSchemeColorSchemeAtom` or
 /// `SchemeListElementColorSchemeAtom` record.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`ColorSchemeAtom` is the established public API name; renaming it would break downstream crates"
-)]
 pub struct ColorSchemeAtom {
     pub kind: ColorSchemeAtomKind,
     pub scheme: ColorScheme,
@@ -146,10 +138,6 @@ impl ColorSchemeAtom {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the color-scheme payload length is the fixed constant 32, always representable as u32"
-    )]
     pub fn parse(record: &Record) -> Result<Self> {
         if record.version != 0
             || record.record_type_raw != COLOR_SCHEME_ATOM_TYPE
@@ -218,10 +206,6 @@ impl ColorSchemeAtom {
 
     /// Serialize this atom as canonical `RT_ColorSchemeAtom` record bytes.
     #[must_use]
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the color-scheme payload length is the fixed constant 32, always representable as u32"
-    )]
     pub fn to_record_bytes(&self) -> [u8; 8 + COLOR_SCHEME_PAYLOAD_LEN] {
         let mut bytes = [0u8; 8 + COLOR_SCHEME_PAYLOAD_LEN];
         bytes[0..2].copy_from_slice(&(self.kind.instance() << 4).to_le_bytes());
@@ -242,11 +226,6 @@ fn corrupted<T>(message: impl Into<String>) -> Result<T> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
     use crate::consts::RecordType;

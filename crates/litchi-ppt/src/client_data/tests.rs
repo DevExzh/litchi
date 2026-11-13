@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use super::codec::{OFFICE_ART_CLIENT_DATA_RECORD_TYPE, encode_record};
 use super::model::{ClientData, ClientDataChild, ClientDataChildKind, ClientDataLimits};
 

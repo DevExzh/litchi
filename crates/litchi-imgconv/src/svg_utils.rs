@@ -55,7 +55,6 @@ pub fn write_num(buf: &mut String, n: f64) {
 /// **Note**: This function is kept for backward compatibility.
 /// For better performance, prefer using `write_num` directly which writes
 /// to an existing buffer without allocating a new String.
-#[allow(dead_code)]
 #[inline]
 pub fn fmt_num(n: f64) -> String {
     let mut s = String::with_capacity(16);

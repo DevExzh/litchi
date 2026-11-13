@@ -845,10 +845,6 @@ pub(crate) fn powerpoint12_shape_metadata(
         let (record, consumed) = crate::records::Record::parse_strict(client_data.data(), offset)?;
         offset = advance(offset, consumed, "OfficeArt client-data")?;
         let record_type = u32::from(record.record_type.as_u16());
-        #[allow(
-            clippy::wildcard_enum_match_arm,
-            reason = "`RecordType` spans the full MS-PPT record ID space; only the four round-trip atoms carry shape metadata, every other record is skipped"
-        )]
         match record.record_type {
             RecordType::RoundTripHFPlaceholder12Atom => {
                 if metadata.header_footer.is_some() {

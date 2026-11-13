@@ -21,13 +21,6 @@
 //! crafted layouts (the least root size that holds every byte of every mini
 //! stream), not from the validation code.
 
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    reason = "test assertions panic on failure by design"
-)]
-
 use super::*;
 use crate::writer::{OleWriter, SectorLayoutFallback};
 use crate::{OleFileLimits, SharedOleFile, SharedOleFileLimits};

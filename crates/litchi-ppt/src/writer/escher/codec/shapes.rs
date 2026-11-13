@@ -126,10 +126,6 @@ fn append_shape_container_children(
     if let Some(geometry) = &shape.freeform_geometry {
         let rect = geometry.coordinate_space();
         let (vertices, segments) = geometry.encode_arrays()?;
-        #[allow(
-            clippy::cast_possible_truncation,
-            reason = "`encode_arrays` validates the vertex and segment counts to fit in `u16`"
-        )]
         properties.extend([
             (
                 Property::new(prop_id::GEOM_LEFT, rect.left.cast_unsigned()),
@@ -162,10 +158,6 @@ fn append_shape_container_children(
         ]);
     }
     properties.sort_by_key(|(property, _)| property.raw_id() & 0x3FFF);
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "a shape property table holds at most a few dozen `OfficeArt` properties"
-    )]
     let mut opt = EscherBuilder::new(
         header_version::OPT,
         properties.len() as u16,

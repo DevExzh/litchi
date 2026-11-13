@@ -8133,11 +8133,6 @@ fn take_length_prefixed<'a>(bytes: &'a [u8], offset: &mut usize, limit: usize) -
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
     use litchi_cfb::OleError;

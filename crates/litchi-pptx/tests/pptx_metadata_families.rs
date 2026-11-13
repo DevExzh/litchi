@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 //! The presentation-metadata and comment-collaboration edit families: each
 //! commit publishes a new package with a reversible patch, the source package
 //! never changes, and an unchanged edit publishes the source bytes.

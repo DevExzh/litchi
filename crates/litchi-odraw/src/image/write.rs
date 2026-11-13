@@ -138,11 +138,6 @@ pub(crate) fn invalid(error: impl Into<String>) -> io::Error {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        reason = "test assertions panic on failure by design"
-    )]
     use super::super::builder::{BlipBuilder, StoreBuilder};
     use super::*;
     use crate::image::{Blip, Compression, Context, Delay, JpegFlavor, Kind, Point, Rect, Store};

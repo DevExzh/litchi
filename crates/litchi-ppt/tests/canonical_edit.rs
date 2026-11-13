@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::too_many_lines,
-    reason = "canonical API contract tests use panic-driven assertions"
-)]
-
 //! Contract tests for the immutable, source-checked PPT edit root.
 //!
 //! These tests deliberately exercise the public `package::edit` family rather

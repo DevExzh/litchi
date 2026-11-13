@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "shape-text closure tests use panic-driven assertions"
-)]
-
 //! Length-changing shape text on `PowerPoint`-authored decks.
 //!
 //! `PowerPoint` writes a `TextSpecialInfoAtom` and a `TextRulerAtom` beside

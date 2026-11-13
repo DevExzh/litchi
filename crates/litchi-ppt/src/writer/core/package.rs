@@ -1,10 +1,5 @@
 //! PPT OLE2 package and stream assembly.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the stream-builder helpers stay ahead of the `Builder` save pipeline that consumes them"
-)]
-
 use super::super::escher::{UserShapeData, append_dg_container_with_charts, create_dgg_container};
 use super::super::master_drawing::build_master_ppdrawing;
 use super::super::notes::{NotesContainerBuilder, NotesPage};
@@ -149,10 +144,6 @@ fn build_summary_information_stream() -> Vec<u8> {
     section.extend_from_slice(&0u16.to_le_bytes());
     section.extend_from_slice(&(1252i16).to_le_bytes());
     section.extend_from_slice(&0i16.to_le_bytes());
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the section built above holds only a few fixed-size fields"
-    )]
     let size = section.len() as u32;
     section[0..4].copy_from_slice(&size.to_le_bytes());
     s.extend_from_slice(&section);
@@ -176,10 +167,6 @@ fn build_document_summary_information_stream() -> Vec<u8> {
     let mut section = Vec::new();
     section.extend_from_slice(&0u32.to_le_bytes());
     section.extend_from_slice(&0u32.to_le_bytes());
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the section built above holds only a few fixed-size fields"
-    )]
     let size = section.len() as u32;
     section[0..4].copy_from_slice(&size.to_le_bytes());
     s.extend_from_slice(&section);
@@ -752,11 +739,6 @@ impl Builder {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod font_plan_tests {
     use super::*;
 

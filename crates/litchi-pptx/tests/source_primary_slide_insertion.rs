@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "integration assertions"
-)]
 //! Source-native insertion composes with immutable reads and durable topology patches.
 use litchi_core::{OwnedSource, Position};
 use litchi_pptx::{

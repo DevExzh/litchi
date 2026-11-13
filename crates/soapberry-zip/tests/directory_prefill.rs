@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    reason = "bounded, deterministic generated ZIP fixtures and explicit index arithmetic"
-)]
-
 //! One bounded read of the head of the central directory serves both the
 //! locator's first-central-record probe and the index's central-directory
 //! scan.

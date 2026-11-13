@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "integration fixtures and assertions intentionally panic"
-)]
-
 //! Primary source-owner integration coverage for dependency-free slide removal.
 //!
 //! These tests exercise removal through the immutable source facade. They keep

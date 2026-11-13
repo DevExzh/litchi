@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "revision cache tests use panic-on-fixture-failure assertions"
-)]
-
 use super::{
     candidate_physical_revision, physical_package_fingerprint, remember_physical_revision,
     snapshot_physical_revision,

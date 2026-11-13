@@ -196,11 +196,6 @@ impl ShapeBuilder {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        reason = "test assertions panic on failure by design"
-    )]
     use super::*;
     use crate::{Record, RecordKind};
 

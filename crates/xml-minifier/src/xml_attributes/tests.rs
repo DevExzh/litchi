@@ -28,7 +28,6 @@ fn owned(item: Result<quick_xml::events::attributes::Attribute<'_>, AttrError>) 
 
 /// quick-xml's checked iterator, up to and including its first error: what a
 /// reader that stops at the first error sees.
-#[allow(clippy::disallowed_methods)]
 fn quick_xml_until_error(tag: &BytesStart<'_>) -> Vec<Item> {
     let mut items = Vec::new();
     for item in tag.attributes() {
@@ -318,7 +317,6 @@ fn nothing_is_yielded_after_the_first_error() {
 }
 
 #[test]
-#[allow(clippy::disallowed_methods)]
 fn unchecked_attributes_are_quick_xml_without_its_check() {
     let tag = tag("e a=\"1\" a=\"2\" b=x c=\"3\" d");
     let mut expected = tag.attributes();

@@ -1,15 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::shadow_reuse,
-    clippy::shadow_unrelated,
-    clippy::cast_possible_truncation,
-    clippy::drop_non_drop,
-    clippy::default_trait_access,
-    clippy::bool_assert_comparison,
-    reason = "integration tests use concise assertions and checked fixture-sized literals"
-)]
-
 use litchi_cfb::{
     OleFile, OleWriter, OverlayLimits, SameLengthStreamOverlay, SectorLayoutPolicy, SharedOleFile,
 };

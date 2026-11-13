@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "the in-memory fixtures and assertions intentionally panic"
-)]
-
 //! Source-backed, dependency-free whole-slide removal.
 //!
 //! The fixture is authored by the native builder so each slide has the normal

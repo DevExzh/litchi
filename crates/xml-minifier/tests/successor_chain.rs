@@ -5,11 +5,6 @@
 //! compares each verdict with the complete audit, error and offset included;
 //! debug builds also compare every derived index with the index a recording
 //! audit of the replacement makes, inside the library.
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "each test states one fixed expected verdict"
-)]
 
 use core::ops::Range;
 use std::sync::Arc;

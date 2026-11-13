@@ -193,10 +193,6 @@ impl<'a> Table<'a> {
     ///
     /// Returns the errors of [`Self::rows`], [`Row::cells`],
     /// [`Cell::properties`] and [`Cell::text_body`].
-    #[allow(
-        clippy::type_complexity,
-        reason = "rows of (properties, body) pairs, the shape the callers index"
-    )]
     pub fn cell_contents(
         self,
     ) -> Result<Vec<Vec<(CellProperties, Option<litchi_drawingml::text::body::Body>)>>> {
@@ -2102,11 +2098,6 @@ fn contains(haystack: &[u8], needle: &[u8]) -> bool {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

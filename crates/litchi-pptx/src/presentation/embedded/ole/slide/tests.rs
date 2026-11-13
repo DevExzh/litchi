@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use super::super::model::{Frame, Kind, Mode, Target};
 use super::package::apply_patch;
 use super::{Definition, Snapshot};

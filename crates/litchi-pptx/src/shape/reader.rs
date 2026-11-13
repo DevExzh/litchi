@@ -852,10 +852,6 @@ impl<'a> Scanner<'a> {
         Ok(())
     }
 
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "element handler threads one slot per shape-reader field"
-    )]
     fn start_element(
         &mut self,
         namespace: &ResolveResult<'_>,

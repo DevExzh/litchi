@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "speaker-notes edit tests use panic-driven assertions"
-)]
-
 //! Speaker-notes text through the canonical primary edit.
 
 use litchi_ppt::package::edit::{Error, Position};

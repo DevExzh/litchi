@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "integration tests use concise assertions for checked fixtures"
-)]
-
 use litchi_cfb::{OleError, OleFile, OleWriter};
 use litchi_ole_common::object::{Edit, Limits, MAX_STREAM_REMOVALS, OpenOptions, Package, Targets};
 use std::io::Cursor;

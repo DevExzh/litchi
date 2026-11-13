@@ -84,11 +84,6 @@ pub fn parse_cstring(data: &[u8]) -> Result<String> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

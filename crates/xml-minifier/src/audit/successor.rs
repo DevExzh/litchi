@@ -272,10 +272,6 @@ impl BoundaryIndex {
     /// and this index's boundaries from the run's end on, moved past the
     /// window. `after_window` holds the counters charged up to the window's
     /// end. `None` when the result exceeds a bound.
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "one splice's geometry, each piece named"
-    )]
     fn spliced(
         &self,
         replacement_len: usize,

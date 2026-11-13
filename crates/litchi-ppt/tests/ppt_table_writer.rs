@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 //! Integration tests for PPT table authoring: tables written by `Builder`
 //! must round-trip through the table extraction APIs after save/reopen.
 

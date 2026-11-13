@@ -573,7 +573,6 @@ impl<'a> ChainCursor<'a> {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn map_splice<F>(
     source: &SourceSnapshot,
     selection: &StreamSelection,

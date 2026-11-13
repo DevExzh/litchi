@@ -2,12 +2,6 @@
 //! each caller-chosen [`Durability`] makes exactly its synchronizations while
 //! keeping the bytes, the checks and the typed errors.
 
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "focused publication tests use panic-on-failure assertions"
-)]
-
 use crate::writer::testing::CountingSteps;
 use crate::writer::{PublishFailure, PublishSteps, TemporaryIdentity, publish_staged};
 use crate::{

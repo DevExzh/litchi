@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use super::*;
 use crate::animation::diagram_build::{self, Atom, Build as BuildAtom, BuildType, Container, Kind};
 use crate::consts::RecordType;

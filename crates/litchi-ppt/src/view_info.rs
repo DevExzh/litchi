@@ -102,10 +102,6 @@ impl ViewOrigin {
 }
 
 /// `ZoomViewInfoAtom`, including ignored bytes retained for exact identity.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`ZoomViewInfo` is the established public API name mirroring the MS-PPT `ZoomViewInfoAtom` record; renaming it would break downstream crates"
-)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ZoomViewInfo {
     x_scale: Ratio,
@@ -324,10 +320,6 @@ impl Guide {
 }
 
 /// Complete slide or notes `SlideViewInfoContainer`.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`SlideViewInfo` is the established public API name mirroring the MS-PPT `SlideViewInfoContainer` record; renaming it would break downstream crates"
-)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SlideViewInfo {
     kind: ViewKind,
@@ -585,11 +577,6 @@ fn record_bytes(version: u16, instance: u16, record_type: u16, data: &[u8]) -> R
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

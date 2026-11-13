@@ -671,11 +671,6 @@ fn encode_utf16(text: &str, order: Utf16Order) -> Vec<u8> {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::expect_used,
-        reason = "test assertions panic on failure by design"
-    )]
-
     use super::*;
 
     #[test]

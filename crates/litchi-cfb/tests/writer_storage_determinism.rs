@@ -1,8 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
 //! `OleWriter::write_to` must serialize explicitly created storages in an order
 //! derived from the document, never from the process's hash seed.
 //!

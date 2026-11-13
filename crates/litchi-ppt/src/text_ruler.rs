@@ -8,10 +8,6 @@ use super::text_prop::TextTabStop;
 use crate::consts::RecordType;
 
 /// Margin and first-line indent overrides for one paragraph level.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`TextRulerLevel` is the established public API name; renaming it would break downstream crates"
-)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TextRulerLevel {
     /// Left margin in `PowerPoint` master units.
@@ -141,10 +137,6 @@ impl TextRuler {
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`parse_default_text_ruler` is the established public entry point of this module; renaming it would break downstream crates"
-)]
 pub fn parse_default_text_ruler(root: &Record) -> Result<Option<TextRuler>> {
     let mut records = Vec::new();
     collect_default_rulers(root, &mut records);
@@ -202,11 +194,6 @@ fn require_bytes(data: &[u8], offset: usize, size: usize, field: &str) -> Result
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

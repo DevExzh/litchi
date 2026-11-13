@@ -1,6 +1,5 @@
 //! P14 section membership follows slides that are inserted, moved, swapped or
 //! reordered through the primary edits.
-#![allow(clippy::unwrap_used, clippy::expect_used, reason = "test assertions")]
 use std::sync::Arc;
 
 use litchi_core::{OwnedSource, Position};

@@ -235,11 +235,6 @@ fn parse_sound_action(sound_id: u32) -> SoundAction {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

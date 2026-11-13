@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 //! Time-node containers, properties, conditions, modifiers, and extensions.
 use super::super::*;
 use super::support::*;

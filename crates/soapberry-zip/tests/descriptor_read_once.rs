@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    reason = "The fixtures below use fixed, bounded test buffers."
-)]
-
 //! One data-descriptor read per verified entry read.
 //!
 //! `Read::read_to_end` must observe one `Ok(0)` after a member's payload is

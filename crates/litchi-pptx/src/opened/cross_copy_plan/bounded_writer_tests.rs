@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "bounded writer tests use panic-on-fixture-failure assertions"
-)]
-
 use std::io::{self, Write};
 
 use sha2::{Digest, Sha256};

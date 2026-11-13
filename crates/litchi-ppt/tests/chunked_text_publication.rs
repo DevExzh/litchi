@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::too_many_lines,
-    clippy::unwrap_used,
-    reason = "canonical integration assertions use panic-driven test fixtures"
-)]
-
 //! Integration coverage for the canonical aggregate PPT shape-text API.
 //!
 //! The aggregate API accepts bounded replacement chunks and emits one native

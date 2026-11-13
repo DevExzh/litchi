@@ -17,11 +17,6 @@
 //! [`OleFile::open`]: litchi_cfb::OleFile::open
 //! [`Metadata`]: litchi_ole_common::property_set::Metadata
 
-#![allow(
-    clippy::print_stdout,
-    reason = "the example is an interactive CFB inspector whose purpose is to print its report"
-)]
-
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;

@@ -816,10 +816,6 @@ impl SvgBuilder {
         Ok(SvgId(format!("emfplus-{kind}-{}", self.next_id)))
     }
 
-    #[allow(
-        clippy::needless_pass_by_value,
-        reason = "the completed element is consumed as one bounded emission unit"
-    )]
     fn push_body(&mut self, element: String) -> Result<()> {
         if self.elements >= self.limits.max_elements {
             return Err(limit("element count"));
@@ -834,10 +830,6 @@ impl SvgBuilder {
         Ok(())
     }
 
-    #[allow(
-        clippy::needless_pass_by_value,
-        reason = "the completed definition is consumed as one bounded emission unit"
-    )]
     fn push_definition(&mut self, definition: String) -> Result<()> {
         self.ensure_space(definition.len())?;
         checked_push(
@@ -1286,10 +1278,6 @@ fn allocation(source: std::collections::TryReserveError) -> Error {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    reason = "unit tests use unwrap for concise assertions"
-)]
 mod tests {
     use super::{
         SvgBuilder, SvgColor, SvgCompositingMode, SvgImage, SvgImageSource, SvgLimits, SvgPaint,

@@ -403,11 +403,6 @@ pub(super) fn parse(xml: &str, limits: Limits) -> Result<Master> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "codec boundary assertions"
-)]
 mod tests {
     use super::*;
 

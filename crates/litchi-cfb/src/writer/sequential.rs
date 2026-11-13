@@ -2339,12 +2339,6 @@ fn sector_ids(
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::expect_used,
-        clippy::unwrap_used,
-        reason = "focused sequential-writer tests use panic-on-failure assertions"
-    )]
-
     use super::*;
     use crate::consts::TWO_GIB_BYTES;
     use std::mem::size_of;

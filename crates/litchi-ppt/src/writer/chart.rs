@@ -67,10 +67,6 @@ const MAX_STRING_UNITS: usize = 255;
 pub(crate) const MAX_CHART_OBJECTS: usize = 512;
 
 /// Requested native-chart family.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`ChartKind` is the established public API name; renaming it would break downstream crates"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ChartKind {
     /// Clustered column chart (BIFF `Bar` group).
@@ -83,10 +79,6 @@ pub enum ChartKind {
 }
 
 /// One requested data series: an optional name and its values.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`ChartSeries` is the established public API name; renaming it would break downstream crates"
-)]
 #[derive(Debug)]
 pub struct ChartSeries {
     /// Series name shown in the legend.
@@ -529,11 +521,6 @@ pub(crate) fn build_chart_sp_container(
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

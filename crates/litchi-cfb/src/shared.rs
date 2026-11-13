@@ -2658,10 +2658,6 @@ impl SharedOleFile {
         )
     }
 
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "one reader with an explicit resumable chain position"
-    )]
     fn read_minifat_range_hinted(
         &self,
         sid: u32,
@@ -4097,12 +4093,6 @@ impl Seek for ReadAtCursor {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::expect_used,
-        clippy::unwrap_used,
-        reason = "test assertions panic by design"
-    )]
-
     use super::*;
     use crate::directory_name::directory_name_data;
     use crate::{OleWriter, SharedOleBulkError};

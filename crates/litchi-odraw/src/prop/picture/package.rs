@@ -118,10 +118,6 @@ struct Policy {
     properties: u16,
 }
 impl Policy {
-    #[allow(
-        clippy::expect_used,
-        reason = "public Limits constructors enforce the wire maxima"
-    )]
     fn from_limits(limits: Limits) -> Self {
         Self {
             bytes: u32::try_from(limits.property_bytes_value()).expect("validated wire byte limit"),
@@ -204,10 +200,6 @@ impl<'data> EntryRef<'data> {
             complex: entry.complex.as_deref(),
         }
     }
-    #[allow(
-        clippy::expect_used,
-        reason = "only admitted UTF-16 payloads reach this encoder"
-    )]
     fn with_name(self, name: Option<&'data [u8]>) -> Self {
         Self {
             opid: (self.opid & !0x8000) | if name.is_some() { 0x8000 } else { 0 },
@@ -418,10 +410,6 @@ impl<'data> State<'data> {
                 .map(|entry| entry.value.cast_unsigned())
         })
     }
-    #[allow(
-        clippy::expect_used,
-        reason = "commit validates record extent before constructing a deferred state"
-    )]
     fn header(&self) -> Header {
         let mut header = self.base().header();
         if let Some(name) = self.name_override() {
@@ -924,7 +912,6 @@ impl<E, F: FnMut(&[u8]) -> std::result::Result<(), E>> Output<F> {
 
 #[cfg(test)]
 mod storage_tests {
-    #![allow(clippy::expect_used, reason = "test assertions panic on failure")]
     use super::*;
     #[test]
     fn large_opaque_payload_is_shared_and_publication_stays_deferred() {

@@ -619,10 +619,6 @@ impl Shape {
     }
 
     /// Build the Escher properties for this shape
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "float-to-int truncation toward zero is the intended 1/65536-degree fixed-point conversion, and adjust-value indices are bounded by the small `adjust_values` list"
-    )]
     #[must_use]
     pub fn build_escher_properties(&self) -> Vec<(u16, u32)> {
         let mut props = self.style.build_properties();
@@ -765,11 +761,6 @@ impl ShapeCollection {
 // =============================================================================
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

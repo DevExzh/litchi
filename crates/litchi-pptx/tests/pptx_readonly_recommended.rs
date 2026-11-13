@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "test fixtures and assertions panic on failure by design"
-)]
-
 use std::fmt::Write as _;
 
 mod in_place;

@@ -127,10 +127,6 @@ pub(super) fn build_writer_sound_collection(
     builder.build().map_err(sound_collection_error)
 }
 
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "used as a `map_err` function pointer, which receives the io error by value"
-)]
 pub(super) fn sound_collection_error(error: std::io::Error) -> WriteError {
     WriteError::InvalidData(error.to_string())
 }
@@ -394,10 +390,6 @@ fn shape_rotation_to_fixed(degrees: f32) -> Option<i32> {
     if !degrees.is_finite() || degrees.abs() <= 0.001 {
         return None;
     }
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the value is reduced modulo 360 and scaled by 65536, bounding it well inside i32"
-    )]
     let fixed = ((f64::from(degrees) % 360.0) * 65536.0).round() as i32;
     Some(fixed)
 }

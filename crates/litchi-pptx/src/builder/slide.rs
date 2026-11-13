@@ -13,10 +13,6 @@ use litchi_fonts::{CollectGlyphs, GlyphMap};
 
 /// Mutable slide state owned by [`Presentation`](super::Presentation).
 #[derive(Debug, Clone)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`Slide` is the established public API name; renaming it would break downstream crates"
-)]
 pub struct Slide {
     pub(crate) slide_id: u32,
     pub(crate) title: Option<String>,
@@ -177,10 +173,6 @@ impl Slide {
     /// # Panics
     ///
     /// Never panics; the returned shape was just pushed onto the shape list.
-    #[allow(
-        clippy::expect_used,
-        reason = "the shape list cannot be empty immediately after pushing a shape"
-    )]
     pub fn add_text_box(
         &mut self,
         text: &str,
@@ -263,10 +255,6 @@ impl Slide {
             .set_designer_properties_with_limits(properties, limits)
     }
 
-    #[allow(
-        clippy::expect_used,
-        reason = "the shape list cannot be empty immediately after pushing a shape"
-    )]
     fn push_rectangle(
         &mut self,
         x: i64,
@@ -344,10 +332,6 @@ impl Slide {
             .set_designer_properties_with_limits(properties, limits)
     }
 
-    #[allow(
-        clippy::expect_used,
-        reason = "the shape list cannot be empty immediately after pushing a shape"
-    )]
     fn push_ellipse(
         &mut self,
         x: i64,

@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 //! An `ActiveX` control snapshot's public revision, and whether its patch is
 //! accepted, must be functions of the package and not of a hash seed.
 //!

@@ -1,8 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "focused writer tests use panic-on-failure assertions"
-)]
 //! Regression coverage for fresh mixed MiniFAT/FAT emission.
 //!
 //! The allocator reserves regular stream sectors before the regular-sector

@@ -7,12 +7,6 @@
 //! this integration test so it cannot become an undocumented production
 //! authoring profile.
 
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "integration fixtures and assertions panic on failure by design"
-)]
-
 use crate::Package;
 use crate::presentation::embedded::ink_actions;
 use litchi_drawingml::ink::actions::{

@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure"
-)]
-
 use litchi_cfb::{OleError, OleFile};
 use litchi_core::{ReadAt, SourceVersion};
 use litchi_ppt::{

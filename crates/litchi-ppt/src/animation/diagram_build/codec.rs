@@ -83,10 +83,6 @@ impl Build {
 
     /// Convert to the generic PPT record representation.
     #[must_use]
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "`BUILD_PAYLOAD_LEN` is a compile-time 16-byte constant, so it always fits in `u32`"
-    )]
     pub fn to_record(self) -> Record {
         let data = self.to_payload().to_vec();
         Record {
@@ -163,10 +159,6 @@ impl Atom {
 
     /// Convert to the generic PPT record representation.
     #[must_use]
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "`ATOM_PAYLOAD_LEN` is a compile-time 4-byte constant, so it always fits in `u32`"
-    )]
     pub fn to_record(self) -> Record {
         let data = self.to_payload().to_vec();
         Record {
@@ -265,10 +257,6 @@ impl Container {
 
     /// Convert to the generic PPT record representation.
     #[must_use]
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "`CONTAINER_PAYLOAD_LEN` is a compile-time 36-byte constant, so it always fits in `u32`"
-    )]
     pub fn to_record(self) -> Record {
         let build = self.build().to_record();
         let atom = self.atom().to_record();

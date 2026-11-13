@@ -219,11 +219,6 @@ impl RecordEdit {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    #[allow(
-        clippy::needless_pass_by_value,
-        reason = "callers hand over the authored `Styles` package; taking it by reference would \
-                  churn the established public API and its callers"
-    )]
     pub(crate) fn set_notes_styles(&mut self, styles: notes_styles::Styles) -> RecordResult<()> {
         let replacement = notes_styles::codec::encode(&styles)?;
         let existing = notes_styles::validation::styles_index(self.context(), self.inner.record())?;

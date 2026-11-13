@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use super::Presentation;
 use crate::shape::designer::{
     DrawingProperties, Limits, PROPERTIES_EXTENSION_URI, TAGS_EXTENSION_URI, Tag, Tags,

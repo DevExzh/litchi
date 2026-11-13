@@ -3092,7 +3092,6 @@ pub(crate) struct Zip64EndOfCentralDirectoryRecord {
     pub signature: u32,
 
     /// size of zip64 end of central directory record
-    #[allow(dead_code)]
     pub size: u64,
 
     /// version made by
@@ -3104,18 +3103,15 @@ pub(crate) struct Zip64EndOfCentralDirectoryRecord {
     pub version_needed: u16,
 
     /// number of this disk
-    #[allow(dead_code)]
     pub disk_number: u32,
 
     /// number of the disk with the start of the central directory
-    #[allow(dead_code)]
     pub cd_disk: u32,
 
     /// total number of entries in the central directory on this disk
     pub num_entries: u64,
 
     /// total number of entries in the central directory
-    #[allow(dead_code)]
     pub total_entries: u64,
 
     /// size of the central directory

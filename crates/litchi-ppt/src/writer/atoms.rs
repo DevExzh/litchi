@@ -19,14 +19,6 @@ use super::records::{RecordBuilder, record_type};
 /// # Panics
 ///
 /// Panics if internal invariants are violated.
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "`emu * 576 / 914_400` is at most about 2.7 million for any `u32` EMU value, so it always fits `u32`"
-)]
-#[allow(
-    clippy::expect_used,
-    reason = "`RecordBuilder::build` only fails when writing the header to its in-memory `Vec`, which cannot fail; changing this infallible public API to return `Result` would break callers"
-)]
 #[must_use]
 pub fn build_document_atom(slide_width_emu: u32, slide_height_emu: u32) -> Vec<u8> {
     // Convert EMU to master units (576 units per inch, 914400 EMUs per inch)
@@ -86,10 +78,6 @@ pub fn build_document_atom(slide_width_emu: u32, slide_height_emu: u32) -> Vec<u
 /// # Panics
 ///
 /// Panics if internal invariants are violated.
-#[allow(
-    clippy::expect_used,
-    reason = "`RecordBuilder::build` only fails when writing the header to its in-memory `Vec`, which cannot fail; changing this infallible public API to return `Result` would break callers"
-)]
 #[must_use]
 pub fn build_slide_atom(master_id_ref: u32, notes_id_ref: u32) -> Vec<u8> {
     let mut data = Vec::with_capacity(24);
@@ -129,10 +117,6 @@ pub fn build_slide_atom(master_id_ref: u32, notes_id_ref: u32) -> Vec<u8> {
 /// # Panics
 ///
 /// Panics if internal invariants are violated.
-#[allow(
-    clippy::expect_used,
-    reason = "`RecordBuilder::build` only fails when writing the header to its in-memory `Vec`, which cannot fail; changing this infallible public API to return `Result` would break callers"
-)]
 #[must_use]
 pub fn build_slide_persist_atom(persist_id_ref: u32, slide_id: u32, has_shapes: bool) -> Vec<u8> {
     let mut data = Vec::with_capacity(20);
@@ -165,10 +149,6 @@ pub fn build_slide_persist_atom(persist_id_ref: u32, slide_id: u32, has_shapes: 
 /// # Panics
 ///
 /// Panics if internal invariants are violated.
-#[allow(
-    clippy::expect_used,
-    reason = "`RecordBuilder::build` only fails when writing the header to its in-memory `Vec`, which cannot fail; changing this infallible public API to return `Result` would break callers"
-)]
 #[must_use]
 pub fn build_color_scheme_atom(instance: u16, colors: &[u32; 8]) -> Vec<u8> {
     let mut data = Vec::with_capacity(32);
@@ -201,10 +181,6 @@ pub fn default_color_scheme() -> [u32; 8] {
 /// # Panics
 ///
 /// Panics if internal invariants are violated.
-#[allow(
-    clippy::expect_used,
-    reason = "`RecordBuilder::build` only fails when writing the header to its in-memory `Vec`, which cannot fail; changing this infallible public API to return `Result` would break callers"
-)]
 #[must_use]
 pub fn build_end_document_atom() -> Vec<u8> {
     let builder = RecordBuilder::new(0x00, 0, record_type::END_DOCUMENT);
@@ -212,11 +188,6 @@ pub fn build_end_document_atom() -> Vec<u8> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

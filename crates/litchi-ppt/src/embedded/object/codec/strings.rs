@@ -6,10 +6,6 @@ use crate::consts::RecordType;
 use crate::package::{Error, Result, SourceLimits};
 use crate::records::Record;
 
-#[allow(
-    clippy::type_complexity,
-    reason = "the tuple mirrors the record children grouping; a named type would obscure the parse flow"
-)]
 pub(crate) fn parse_optional_ole_children(
     children: &[Record],
     limits: &SourceLimits,

@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "integration assertions"
-)]
-
 //! Public regression coverage for chunked shape edits.
 
 use litchi_core::{OwnedSource, Position};

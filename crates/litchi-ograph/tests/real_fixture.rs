@@ -1,10 +1,5 @@
 //! MS-OGRAPH chart discovery over real legacy Excel workbooks.
 
-#![allow(
-    clippy::expect_used,
-    reason = "fixture validity is an integration-test precondition"
-)]
-
 use litchi_cfb::OleFile;
 use litchi_ograph::chart::{Context, Kind, Model, Refs};
 use std::io::Cursor;

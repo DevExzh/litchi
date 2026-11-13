@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "contract assertions"
-)]
-
 use litchi_core::Position;
 use litchi_ppt::{Builder, OpenOptions, Package, SourceLimits};
 

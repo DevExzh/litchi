@@ -12,11 +12,6 @@
 //! destinations holding caller-defined parts); the typed refusals; source
 //! freshness and foreignness; and the refusal of genuine `LPCP0003` patches by
 //! name.
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "media-transfer tests use panic-on-fixture-failure assertions"
-)]
 
 use sha2::{Digest, Sha256};
 use soapberry_zip::ZipArchive;

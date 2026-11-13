@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "table edit tests use panic-driven assertions"
-)]
-
 //! Table-cell text through the canonical primary edit.
 
 use litchi_ppt::Package;

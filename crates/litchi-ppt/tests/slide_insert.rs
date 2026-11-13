@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "blank-slide insertion tests use panic-driven assertions"
-)]
-
 //! Blank-slide insertion through the canonical primary edit.
 
 use litchi_ppt::package::edit::Position;

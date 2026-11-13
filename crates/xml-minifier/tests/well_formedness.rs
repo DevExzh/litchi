@@ -3,11 +3,6 @@
 //! checks accepted, each as `Error::Malformed` at its offset, and still accepts
 //! every well-formed spelling. The authored and default policies keep their
 //! tokenizer-level verdicts, which fragment audits rely on.
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "each test states one fixed expected verdict"
-)]
 
 use xml_minifier::audit::{self, Error, Limits, ReplacementError};
 

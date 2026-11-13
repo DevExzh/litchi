@@ -1,12 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::shadow_reuse,
-    clippy::shadow_unrelated,
-    clippy::cast_possible_truncation,
-    reason = "integration tests use concise assertions and checked fixture-sized literals"
-)]
-
 use litchi_cfb::OleWriter;
 use litchi_ole_common::object::{Edit, Limits, OpenOptions, Package, Target, Targets};
 use litchi_ole_common::ole_streams::{

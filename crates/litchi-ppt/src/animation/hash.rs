@@ -10,10 +10,6 @@ const RECORD_LEN: usize = HEADER_LEN + PAYLOAD_LEN;
 
 /// Resource limit for parsing a `HashCode10Atom` record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`Hash10Limits` is the established public API name for the `HashCode10Atom` limits; renaming it would break downstream crates"
-)]
 pub struct Hash10Limits {
     /// Maximum accepted complete record size.
     pub max_record_bytes: usize,
@@ -29,10 +25,6 @@ impl Default for Hash10Limits {
 
 /// Exact MS-PPT §2.8.3 `HashCode10Atom` value.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`Hash10` is the established public API name for the `HashCode10Atom` value; renaming it would break downstream crates"
-)]
 pub struct Hash10 {
     hash: u32,
 }
@@ -56,10 +48,6 @@ impl Hash10 {
     ///
     /// Returns an error if the record type, header fields, or payload length
     /// do not match the fixed `HashCode10Atom` layout.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "`PAYLOAD_LEN` is a compile-time 4-byte constant, so it always fits in `u32`"
-    )]
     pub fn parse_record(record: &Record) -> Result<Self> {
         if record.record_type != RecordType::HashCode10Atom
             || record.record_type_raw != RecordType::HashCode10Atom.as_u16()
@@ -125,10 +113,6 @@ impl Hash10 {
 
     /// Serialize the complete normative record.
     #[must_use]
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "`PAYLOAD_LEN` is a compile-time 4-byte constant, so it always fits in `u32`"
-    )]
     pub fn to_bytes(self) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(RECORD_LEN);
         bytes.extend_from_slice(&0u16.to_le_bytes());
@@ -140,10 +124,6 @@ impl Hash10 {
 
     /// Convert to the generic `PowerPoint` record representation.
     #[must_use]
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "`PAYLOAD_LEN` is a compile-time 4-byte constant, so it always fits in `u32`"
-    )]
     pub fn to_record(self) -> Record {
         Record {
             record_type: RecordType::HashCode10Atom,
@@ -162,11 +142,6 @@ fn corrupted<T>(message: impl Into<String>) -> Result<T> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
     use crate::animation::SlideAnimationExtension;

@@ -125,11 +125,6 @@ fn encode_time_node_property(property: &TimeNodeProperty) -> (u16, Vec<u8>) {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

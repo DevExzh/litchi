@@ -5,12 +5,6 @@ use crate::slide_sync::SystemTime;
 
 /// Fixed `BroadcastDocInfoAtom` values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "each bool maps one-to-one to an independent flag bit of the MS-PPT \
-              `BroadcastDocInfoAtom` bitfield; grouping them into enums would misrepresent \
-              the on-disk layout and churn the public API"
-)]
 pub struct BroadcastProperties {
     pub send_audio: bool,
     pub send_video: bool,

@@ -16,11 +16,4 @@ pub use model::{Element, ElementKind, Limits, Snapshot};
 pub use transaction::{Commit, Diagnostics, Edit, Patch, Revision, update};
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::shadow_reuse,
-    clippy::shadow_unrelated,
-    reason = "tests exercise fallible malformed CFB and transaction paths"
-)]
 mod tests;
