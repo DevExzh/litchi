@@ -14,6 +14,50 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
+/// The last child group a `pc226:cmChg` accepted:
+///
+/// ```text
+/// Start --chgData--> Metadata --cmMkLst--> MonikersOrReplies --extLst--> Extensions
+/// Start --cmMkLst--> MonikersOrReplies
+/// Start | Metadata | MonikersOrReplies --cmRplyChg--> MonikersOrReplies
+/// Start | Metadata --extLst--> Extensions
+/// ```
+///
+/// `chgData` is accepted in `Start` only. `cmMkLst` and `extLst` are
+/// accepted at most once and are refused once the stage has reached or
+/// passed their own group. `cmRplyChg` is repeatable and is refused only in
+/// `Extensions`. A `cmRplyChg` that arrives before `cmMkLst` is accepted and
+/// moves to `MonikersOrReplies`, so a later `cmMkLst` is refused as out of
+/// order; without one the element fails after its last child because
+/// `cmMkLst` is required.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum CommentChangeStage {
+    Start,
+    Metadata,
+    MonikersOrReplies,
+    Extensions,
+}
+
+/// The last child a `pc226:cmRplyChg` accepted, in schema order:
+///
+/// ```text
+/// Start --chgData--> Metadata --cmRplyMkLst--> Monikers --extLst--> Extensions
+/// Start --cmRplyMkLst--> Monikers
+/// Start | Metadata --extLst--> Extensions
+/// ```
+///
+/// `chgData` is accepted in `Start` only. `cmRplyMkLst` and `extLst` are
+/// accepted at most once and are refused once the stage has reached or
+/// passed them. `cmRplyMkLst` is required, which is checked after the last
+/// child.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum ReplyChangeStage {
+    Start,
+    Metadata,
+    Monikers,
+    Extensions,
+}
+
 pub(super) fn parse_comment_changes(xml: &[u8]) -> Result<Changes> {
     let scan = scan(xml, "comment change")?;
     if scan.root.namespace != PC226 || scan.root.local != "cmChg" {
@@ -28,38 +72,38 @@ pub(super) fn parse_comment_changes(xml: &[u8]) -> Result<Changes> {
     let mut monikers = None;
     let mut replies = Vec::new();
     let mut extension = None;
-    let mut order = 0u8;
+    let mut stage = CommentChangeStage::Start;
     for child in &scan.children {
         if child.namespace == AC && child.local == "chgData" {
-            if order != 0 || metadata.is_some() {
+            if stage != CommentChangeStage::Start {
                 return Err(invalid(
                     "comment change chgData is duplicated or out of order",
                 ));
             }
             metadata = Some(parse_metadata(child)?);
-            order = 1;
+            stage = CommentChangeStage::Metadata;
         } else if child.namespace == PC2 && child.local == "cmMkLst" {
-            if order > 1 || monikers.is_some() {
+            if stage >= CommentChangeStage::MonikersOrReplies {
                 return Err(invalid(
                     "comment change cmMkLst is duplicated or out of order",
                 ));
             }
             monikers = Some(parse_monikers(&child.xml)?);
-            order = 2;
+            stage = CommentChangeStage::MonikersOrReplies;
         } else if child.namespace == PC226 && child.local == "cmRplyChg" {
-            if order > 2 {
+            if stage >= CommentChangeStage::Extensions {
                 return Err(invalid("comment reply change is out of order"));
             }
             replies.push(parse_reply_changes(child)?);
-            order = 2;
+            stage = CommentChangeStage::MonikersOrReplies;
         } else if child.namespace == P && child.local == "extLst" {
-            if order > 2 || extension.is_some() {
+            if stage >= CommentChangeStage::Extensions {
                 return Err(invalid(
                     "comment change extLst is duplicated or out of order",
                 ));
             }
             extension = Some(OpaqueXml::new(child.xml.clone())?);
-            order = 3;
+            stage = CommentChangeStage::Extensions;
         } else {
             return Err(invalid("unexpected comment change child"));
         }
@@ -86,30 +130,30 @@ fn parse_reply_changes(fragment: &Fragment) -> Result<Replies> {
     let mut metadata = None;
     let mut monikers = None;
     let mut extension = None;
-    let mut order = 0u8;
+    let mut stage = ReplyChangeStage::Start;
     for child in &scan.children {
         if child.namespace == AC && child.local == "chgData" {
-            if order != 0 || metadata.is_some() {
+            if stage != ReplyChangeStage::Start {
                 return Err(invalid(
                     "reply change chgData is duplicated or out of order",
                 ));
             }
             metadata = Some(parse_metadata(child)?);
-            order = 1;
+            stage = ReplyChangeStage::Metadata;
         } else if child.namespace == PC2 && child.local == "cmRplyMkLst" {
-            if order > 1 || monikers.is_some() {
+            if stage >= ReplyChangeStage::Monikers {
                 return Err(invalid(
                     "reply change moniker list is duplicated or out of order",
                 ));
             }
             monikers = Some(parse_monikers(&child.xml)?);
-            order = 2;
+            stage = ReplyChangeStage::Monikers;
         } else if child.namespace == P && child.local == "extLst" {
-            if order > 2 || extension.is_some() {
+            if stage >= ReplyChangeStage::Extensions {
                 return Err(invalid("reply change extLst is duplicated or out of order"));
             }
             extension = Some(OpaqueXml::new(child.xml.clone())?);
-            order = 3;
+            stage = ReplyChangeStage::Extensions;
         } else {
             return Err(invalid("unexpected comment reply change child"));
         }

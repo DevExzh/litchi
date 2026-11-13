@@ -61,6 +61,30 @@ fn parse_history(
     Ok(value)
 }
 
+/// The last child a `p228:event` accepted, in schema order:
+///
+/// ```text
+/// Start --atrbtn--> Attribution --anchr--> Anchor --action--> Action --extLst--> Extensions
+/// Start --anchr--> Anchor
+/// Start | Attribution --action--> Action
+/// Start | Attribution | Anchor --extLst--> Extensions
+/// ```
+///
+/// An action is any `p228` child other than `atrbtn` and `anchr`. `atrbtn`
+/// is accepted in `Start` only; `anchr`, the action and `extLst` are each
+/// accepted at most once and are refused once the stage has reached or
+/// passed them. A child that arrives before `atrbtn` is accepted, so a later
+/// `atrbtn` is refused as out of order; without one the event fails after
+/// its last child because `atrbtn` is required.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum EventStage {
+    Start,
+    Attribution,
+    Anchor,
+    Action,
+    Extensions,
+}
+
 fn parse_event(
     fragment: &Fragment,
     context: &[super::super::model::NamespaceDeclaration],
@@ -76,33 +100,33 @@ fn parse_event(
     let mut anchor = None;
     let mut action = None;
     let mut extension = None;
-    let mut order = 0u8;
+    let mut stage = EventStage::Start;
     let event_scan = scan_with_context(&fragment.xml, "task history event", context)?;
     for child in &event_scan.children {
         if child.namespace == P228 && child.local == "atrbtn" {
-            if order != 0 || attributed_by.is_some() {
+            if stage != EventStage::Start {
                 return Err(invalid("task event atrbtn is duplicated or out of order"));
             }
             attributed_by = Some(parse_user(child)?);
-            order = 1;
+            stage = EventStage::Attribution;
         } else if child.namespace == P228 && child.local == "anchr" {
-            if order > 1 || anchor.is_some() {
+            if stage >= EventStage::Anchor {
                 return Err(invalid("task event anchr is duplicated or out of order"));
             }
             anchor = Some(parse_anchor(child, &event_scan.namespaces)?);
-            order = 1;
+            stage = EventStage::Anchor;
         } else if child.namespace == P && child.local == "extLst" {
-            if order > 2 || extension.is_some() {
+            if stage >= EventStage::Extensions {
                 return Err(invalid("task event extLst is duplicated or out of order"));
             }
             extension = Some(OpaqueXml::new(child.xml.clone())?);
-            order = 3;
+            stage = EventStage::Extensions;
         } else if child.namespace == P228 {
-            if action.is_some() || order == 3 {
+            if stage >= EventStage::Action {
                 return Err(invalid("task event action is duplicated or out of order"));
             }
             action = Some(parse_action(child)?);
-            order = 2;
+            stage = EventStage::Action;
         } else {
             return Err(invalid("unexpected task history event child"));
         }

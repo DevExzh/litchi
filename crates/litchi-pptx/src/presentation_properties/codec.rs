@@ -856,6 +856,26 @@ fn parse_print(n: &Node) -> Result<Print> {
     v.extension_xml = single_ext(n)?;
     Ok(v)
 }
+/// The last child group a `p:showPr` accepted, in schema order:
+///
+/// ```text
+/// Start --present|browse|kiosk--> Mode --sldAll|sldRg|custShow--> Selection
+///       --penClr--> PenColor --extLst--> Extensions
+/// ```
+///
+/// Every child group is optional and accepted at most once, so each later
+/// stage may also be entered directly from any earlier one. A show mode is
+/// accepted in `Start` only; a slide selection, `penClr` and `extLst` are
+/// refused once the stage has reached or passed their own group.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum ShowStage {
+    Start,
+    Mode,
+    Selection,
+    PenColor,
+    Extensions,
+}
+
 fn parse_show(n: &Node) -> Result<Show> {
     let mut v = Show {
         loop_show: bool_opt(n, "loop")?,
@@ -873,29 +893,29 @@ fn parse_show(n: &Node) -> Result<Show> {
             ("", "useTimings"),
         ],
     )?;
-    let mut stage = 0;
-    let mut has_extensions = false;
+    let mut stage = ShowStage::Start;
     for c in children(n)? {
         expect_p(c)?;
         match c.local.as_str() {
             "present" | "browse" | "kiosk" => {
-                if stage > 0 || v.mode.is_some() {
+                if stage != ShowStage::Start {
                     return Err(invalid("invalid show mode order"));
                 }
+                stage = ShowStage::Mode;
                 v.mode = Some(parse_mode(c)?);
             },
             "sldAll" | "sldRg" | "custShow" => {
-                if stage > 1 || v.slides.is_some() {
+                if stage >= ShowStage::Selection {
                     return Err(invalid("invalid show selection order"));
                 }
-                stage = 1;
+                stage = ShowStage::Selection;
                 v.slides = Some(parse_selection(c)?);
             },
             "penClr" => {
-                if stage > 2 || v.pen_color.is_some() {
+                if stage >= ShowStage::PenColor {
                     return Err(invalid("invalid penClr order"));
                 }
-                stage = 2;
+                stage = ShowStage::PenColor;
                 no_attrs(c)?;
                 let colors = children(c)?;
                 if colors.len() != 1 {
@@ -904,11 +924,10 @@ fn parse_show(n: &Node) -> Result<Show> {
                 v.pen_color = Some(parse_color(colors[0])?);
             },
             "extLst" => {
-                if has_extensions {
+                if stage >= ShowStage::Extensions {
                     return Err(invalid("duplicate show extLst"));
                 }
-                has_extensions = true;
-                stage = 3;
+                stage = ShowStage::Extensions;
                 v.extensions = parse_show_extensions(c)?;
             },
             _ => return Err(invalid("unexpected showPr child")),

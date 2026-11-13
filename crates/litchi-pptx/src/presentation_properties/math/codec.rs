@@ -25,6 +25,25 @@ enum Kind {
     BinarySubtractionBreak,
 }
 
+/// The last element the `a14:m` payload accepted, in schema order:
+///
+/// ```text
+/// Start --mathPr--> MathProperties --brkBin--> BinaryBreak --brkBinSub--> BinarySubtractionBreak
+/// MathProperties --brkBinSub--> BinarySubtractionBreak
+/// ```
+///
+/// `mathPr` is accepted once, in `Start` only; a second one is a duplicate
+/// in every later stage. `brkBin` and `brkBinSub` are both optional and
+/// accepted at most once: each is refused once the stage has reached or
+/// passed it, which covers both a duplicate and `brkBin` after `brkBinSub`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum MathStage {
+    Start,
+    MathProperties,
+    BinaryBreak,
+    BinarySubtractionBreak,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum ResolvedNamespace {
     Unbound,
@@ -52,7 +71,7 @@ pub(crate) fn parse(xml: &[u8], limits: Limits) -> Result<Properties> {
     let mut root_seen = false;
     let mut root_closed = false;
     let mut nodes = 0usize;
-    let mut child_stage = 0u8;
+    let mut stage = MathStage::Start;
     let mut value = Properties::new();
 
     loop {
@@ -94,7 +113,7 @@ pub(crate) fn parse(xml: &[u8], limits: Limits) -> Result<Properties> {
                     &element,
                     &reader,
                     &mut root_seen,
-                    &mut child_stage,
+                    &mut stage,
                     &mut value,
                     stack.len(),
                 )?;
@@ -123,7 +142,7 @@ pub(crate) fn parse(xml: &[u8], limits: Limits) -> Result<Properties> {
                     &element,
                     &reader,
                     &mut root_seen,
-                    &mut child_stage,
+                    &mut stage,
                     &mut value,
                     stack.len(),
                 )?;
@@ -205,7 +224,7 @@ fn start_kind(
     element: &BytesStart<'_>,
     reader: &NsReader<&[u8]>,
     root_seen: &mut bool,
-    child_stage: &mut u8,
+    stage: &mut MathStage,
     value: &mut Properties,
     depth: usize,
 ) -> Result<Kind> {
@@ -223,31 +242,31 @@ fn start_kind(
             if !is_omml_name(namespace, local.as_ref(), b"mathPr") {
                 return Err(invalid("a14:m must contain m:mathPr"));
             }
-            if *child_stage != 0 {
+            if *stage != MathStage::Start {
                 return Err(invalid("a14:m contains duplicate mathPr"));
             }
             no_attributes(element, reader, "m:mathPr")?;
-            *child_stage = 1;
+            *stage = MathStage::MathProperties;
             Ok(Kind::MathProperties)
         },
         2 => {
             if is_omml_name(namespace, local.as_ref(), b"brkBin") {
-                if *child_stage > 2 || value.binary_break.is_some() {
+                if *stage >= MathStage::BinaryBreak {
                     return Err(invalid("invalid brkBin order or duplicate"));
                 }
                 value.binary_break = Some(BinaryBreak::from_wire(&required_value(
                     element, reader, "m:brkBin",
                 )?)?);
-                *child_stage = 2;
+                *stage = MathStage::BinaryBreak;
                 Ok(Kind::BinaryBreak)
             } else if is_omml_name(namespace, local.as_ref(), b"brkBinSub") {
-                if *child_stage > 3 || value.binary_subtraction_break.is_some() {
+                if *stage >= MathStage::BinarySubtractionBreak {
                     return Err(invalid("invalid brkBinSub order or duplicate"));
                 }
                 value.binary_subtraction_break = Some(BinarySubtractionBreak::from_wire(
                     &required_value(element, reader, "m:brkBinSub")?,
                 )?);
-                *child_stage = 3;
+                *stage = MathStage::BinarySubtractionBreak;
                 Ok(Kind::BinarySubtractionBreak)
             } else {
                 Err(invalid("mathPr contains an unsupported child"))
