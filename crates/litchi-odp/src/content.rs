@@ -4115,3 +4115,120 @@ fn resolved_namespace<'a>(resolved: &'a ResolveResult<'a>) -> Option<&'a [u8]> {
         ResolveResult::Unbound | ResolveResult::Unknown(_) => None,
     }
 }
+
+#[cfg(test)]
+mod envelope_matrix_tests {
+    use super::*;
+
+    /// Runs `run` over the XML envelope orderings built around one root element
+    /// and compares each `label => outcome` line with the frozen expectation.
+    fn assert_envelope_matrix(
+        open: &str,
+        close: &str,
+        empty: &str,
+        expected: &[&str],
+        run: impl Fn(&str) -> String,
+    ) {
+        const DECL: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+        let doc = format!("{open}{close}");
+        let rows = [
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECL.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", doc.clone()),
+            ("declaration then root", format!("{DECL}{doc}")),
+            ("declaration, whitespace, root", format!("{DECL}\n{doc}")),
+            ("root then whitespace", format!("{doc}\n ")),
+            ("root then comment", format!("{doc}<!--c-->")),
+            ("root then PI", format!("{doc}<?pi x?>")),
+            ("root then text", format!("{doc}text")),
+            ("root then second root", format!("{doc}{doc}")),
+            (
+                "root then foreign start",
+                format!("{doc}<foreign></foreign>"),
+            ),
+            ("root then foreign empty", format!("{doc}<foreign/>")),
+            (
+                "empty-element root then second root",
+                format!("{empty}{doc}"),
+            ),
+            ("empty-element root then text", format!("{empty}text")),
+            ("declaration after root", format!("{doc}{DECL}")),
+            ("two declarations", format!("{DECL}{DECL}{doc}")),
+            ("comment before declaration", format!("<!--c-->{DECL}{doc}")),
+            ("comment before root", format!("<!--c-->{doc}")),
+            ("PI before root", format!("<?pi x?>{doc}")),
+            ("text before root", format!("text{doc}")),
+            ("whitespace before declaration", format!(" {DECL}{doc}")),
+            ("unterminated root", open.to_owned()),
+            ("stray end tag", format!("{doc}</stray>")),
+            ("DOCTYPE", format!("{DECL}<!DOCTYPE r>{doc}")),
+            ("DOCTYPE after root", format!("{doc}<!DOCTYPE r>")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{doc}")),
+            ("CDATA after root", format!("{doc}<![CDATA[x]]>")),
+            ("entity reference before root", format!("&amp;{doc}")),
+            ("entity reference after root", format!("{doc}&amp;")),
+        ];
+        let actual: Vec<String> = rows
+            .iter()
+            .map(|(label, xml)| format!("{label} => {}", run(xml)))
+            .collect();
+        let listing: Vec<String> = actual.iter().map(|line| format!("{line:?},")).collect();
+        assert!(
+            actual
+                .iter()
+                .map(String::as_str)
+                .eq(expected.iter().copied()),
+            "actual envelope matrix:\n{}",
+            listing.join("\n")
+        );
+    }
+
+    #[test]
+    fn text_box_fragment_envelope_matrix() {
+        let root = "draw:frame xmlns:draw=\"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0\" draw:name=\"n\"";
+        assert_envelope_matrix(
+            &format!("<{root}><draw:text-box></draw:text-box>"),
+            "</draw:frame>",
+            &format!("<{root}/>"),
+            &[
+                "empty input => InvalidFormat(\"ODP text-box replacement is not a canonical direct text box\")",
+                "whitespace only => InvalidFormat(\"ODP text-box replacement is not a canonical direct text box\")",
+                "declaration only => InvalidFormat(\"ODP text-box replacement is not a canonical direct text box\")",
+                "empty-element root => InvalidFormat(\"ODP text-box replacement frame cannot be empty\")",
+                "start and end root => Ok(processing_instruction=false)",
+                "declaration then root => Ok(processing_instruction=false)",
+                "declaration, whitespace, root => Ok(processing_instruction=false)",
+                "root then whitespace => Ok(processing_instruction=false)",
+                "root then comment => Ok(processing_instruction=false)",
+                "root then PI => Ok(processing_instruction=true)",
+                "root then text => InvalidFormat(\"ODP text-box replacement has text outside its root\")",
+                "root then second root => InvalidFormat(\"ODP text-box replacement must be one named draw:frame\")",
+                "root then foreign start => InvalidFormat(\"ODP text-box replacement must be one named draw:frame\")",
+                "root then foreign empty => InvalidFormat(\"ODP text-box replacement frame cannot be empty\")",
+                "empty-element root then second root => InvalidFormat(\"ODP text-box replacement frame cannot be empty\")",
+                "empty-element root then text => InvalidFormat(\"ODP text-box replacement frame cannot be empty\")",
+                "declaration after root => Ok(processing_instruction=false)",
+                "two declarations => Ok(processing_instruction=false)",
+                "comment before declaration => Ok(processing_instruction=false)",
+                "comment before root => Ok(processing_instruction=false)",
+                "PI before root => Ok(processing_instruction=true)",
+                "text before root => InvalidFormat(\"ODP text-box replacement has text outside its root\")",
+                "whitespace before declaration => Ok(processing_instruction=false)",
+                "unterminated root => InvalidFormat(\"ODP text-box replacement is not a canonical direct text box\")",
+                "stray end tag => InvalidFormat(\"invalid ODP text-box replacement XML: ill-formed document: close tag `</stray>` does not match any open tag\")",
+                "DOCTYPE => InvalidFormat(\"DTDs are not allowed in ODP text-box models\")",
+                "DOCTYPE after root => InvalidFormat(\"DTDs are not allowed in ODP text-box models\")",
+                "top-level CDATA => InvalidFormat(\"ODP text-box replacement has CDATA outside its root\")",
+                "CDATA after root => InvalidFormat(\"ODP text-box replacement has CDATA outside its root\")",
+                "entity reference before root => Ok(processing_instruction=false)",
+                "entity reference after root => Ok(processing_instruction=false)",
+            ],
+            |xml| match validate_canonical_text_box_fragment(xml, "n") {
+                Ok(value) => format!("Ok(processing_instruction={value})"),
+                Err(error) => format!("{error:?}"),
+            },
+        );
+    }
+}

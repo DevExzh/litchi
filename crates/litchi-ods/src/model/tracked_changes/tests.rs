@@ -328,3 +328,128 @@ fn parses_libreoffice_change_tracking_fixtures() {
             .is_empty()
     );
 }
+
+/// Runs `run` over the XML envelope orderings built around one root element
+/// and compares each `label => outcome` line with the frozen expectation.
+fn assert_envelope_matrix(
+    open: &str,
+    close: &str,
+    empty: &str,
+    expected: &[&str],
+    run: impl Fn(&str) -> String,
+) {
+    const DECL: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+    let doc = format!("{open}{close}");
+    let rows = [
+        ("empty input", String::new()),
+        ("whitespace only", " \n".to_owned()),
+        ("declaration only", DECL.to_owned()),
+        ("empty-element root", empty.to_owned()),
+        ("start and end root", doc.clone()),
+        ("declaration then root", format!("{DECL}{doc}")),
+        ("declaration, whitespace, root", format!("{DECL}\n{doc}")),
+        ("root then whitespace", format!("{doc}\n ")),
+        ("root then comment", format!("{doc}<!--c-->")),
+        ("root then PI", format!("{doc}<?pi x?>")),
+        ("root then text", format!("{doc}text")),
+        ("root then second root", format!("{doc}{doc}")),
+        (
+            "root then foreign start",
+            format!("{doc}<foreign></foreign>"),
+        ),
+        ("root then foreign empty", format!("{doc}<foreign/>")),
+        (
+            "empty-element root then second root",
+            format!("{empty}{doc}"),
+        ),
+        ("empty-element root then text", format!("{empty}text")),
+        ("declaration after root", format!("{doc}{DECL}")),
+        ("two declarations", format!("{DECL}{DECL}{doc}")),
+        ("comment before declaration", format!("<!--c-->{DECL}{doc}")),
+        ("comment before root", format!("<!--c-->{doc}")),
+        ("PI before root", format!("<?pi x?>{doc}")),
+        ("text before root", format!("text{doc}")),
+        ("whitespace before declaration", format!(" {DECL}{doc}")),
+        ("unterminated root", open.to_owned()),
+        ("stray end tag", format!("{doc}</stray>")),
+        ("DOCTYPE", format!("{DECL}<!DOCTYPE r>{doc}")),
+        ("DOCTYPE after root", format!("{doc}<!DOCTYPE r>")),
+        ("top-level CDATA", format!("<![CDATA[x]]>{doc}")),
+        ("CDATA after root", format!("{doc}<![CDATA[x]]>")),
+        ("entity reference before root", format!("&amp;{doc}")),
+        ("entity reference after root", format!("{doc}&amp;")),
+    ];
+    let actual: Vec<String> = rows
+        .iter()
+        .map(|(label, xml)| format!("{label} => {}", run(xml)))
+        .collect();
+    let listing: Vec<String> = actual.iter().map(|line| format!("{line:?},")).collect();
+    assert!(
+        actual
+            .iter()
+            .map(String::as_str)
+            .eq(expected.iter().copied()),
+        "actual envelope matrix:\n{}",
+        listing.join("\n")
+    );
+}
+
+const MATRIX_ROOT: &str = concat!(
+    "office:document-content ",
+    "xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" ",
+    "xmlns:table=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\"",
+);
+const MATRIX_BODY: &str = "<office:body><office:spreadsheet></office:spreadsheet></office:body>";
+const MATRIX_CLOSE: &str = "</office:document-content>";
+
+#[test]
+fn tracked_changes_source_envelope_matrix() {
+    assert_envelope_matrix(
+        &format!("<{MATRIX_ROOT}>{MATRIX_BODY}"),
+        MATRIX_CLOSE,
+        &format!("<{MATRIX_ROOT}/>"),
+        &[
+            "empty input => InvalidFormat(\"incomplete ODS content.xml document\")",
+            "whitespace only => InvalidFormat(\"incomplete ODS content.xml document\")",
+            "declaration only => InvalidFormat(\"incomplete ODS content.xml document\")",
+            "empty-element root => InvalidFormat(\"ODS content.xml has no direct office:body\")",
+            "start and end root => Ok(spreadsheet=164..205, owner=false, records=0)",
+            "declaration then root => Ok(spreadsheet=202..243, owner=false, records=0)",
+            "declaration, whitespace, root => Ok(spreadsheet=203..244, owner=false, records=0)",
+            "root then whitespace => Ok(spreadsheet=164..205, owner=false, records=0)",
+            "root then comment => Ok(spreadsheet=164..205, owner=false, records=0)",
+            "root then PI => Ok(spreadsheet=164..205, owner=false, records=0)",
+            "root then text => InvalidFormat(\"character data outside the ODS root element\")",
+            "root then second root => InvalidFormat(\"ODS content.xml has more than one root element\")",
+            "root then foreign start => InvalidFormat(\"ODS content.xml has more than one root element\")",
+            "root then foreign empty => InvalidFormat(\"ODS content.xml has more than one root element\")",
+            "empty-element root then second root => InvalidFormat(\"ODS content.xml has more than one root element\")",
+            "empty-element root then text => InvalidFormat(\"character data outside the ODS root element\")",
+            "declaration after root => InvalidFormat(\"misplaced or duplicate XML declaration\")",
+            "two declarations => InvalidFormat(\"misplaced or duplicate XML declaration\")",
+            "comment before declaration => Ok(spreadsheet=210..251, owner=false, records=0)",
+            "comment before root => Ok(spreadsheet=172..213, owner=false, records=0)",
+            "PI before root => Ok(spreadsheet=172..213, owner=false, records=0)",
+            "text before root => InvalidFormat(\"character data outside the ODS root element\")",
+            "whitespace before declaration => Ok(spreadsheet=203..244, owner=false, records=0)",
+            "unterminated root => InvalidFormat(\"incomplete ODS content.xml document\")",
+            "stray end tag => InvalidFormat(\"invalid spreadsheet tracked-change XML: ill-formed document: close tag `</stray>` does not match any open tag\")",
+            "DOCTYPE => InvalidFormat(\"DTDs are prohibited in ODS tracked-change XML\")",
+            "DOCTYPE after root => InvalidFormat(\"DTDs are prohibited in ODS tracked-change XML\")",
+            "top-level CDATA => InvalidFormat(\"CDATA outside the ODS root element\")",
+            "CDATA after root => InvalidFormat(\"CDATA outside the ODS root element\")",
+            "entity reference before root => InvalidFormat(\"entity reference outside the ODS root element\")",
+            "entity reference after root => InvalidFormat(\"entity reference outside the ODS root element\")",
+        ],
+        |xml| match inspect_tracked_changes_source(xml, &Limits::default()) {
+            Ok(value) => format!(
+                "Ok(spreadsheet={}..{}, owner={}, records={})",
+                value.spreadsheet.whole.start,
+                value.spreadsheet.whole.end,
+                value.owner.is_some(),
+                value.records.len()
+            ),
+            Err(error) => format!("{error:?}"),
+        },
+    );
+}

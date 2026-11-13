@@ -4641,4 +4641,178 @@ mod tests {
             Snapshot::parse_with_context("<t:detective/>", Limits::server(), &context).is_err()
         );
     }
+
+    /// Runs `run` over the XML envelope orderings built around one root element
+    /// and compares each `label => outcome` line with the frozen expectation.
+    fn assert_envelope_matrix(
+        open: &str,
+        close: &str,
+        empty: &str,
+        expected: &[&str],
+        run: impl Fn(&str) -> String,
+    ) {
+        const DECL: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+        let doc = format!("{open}{close}");
+        let rows = [
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECL.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", doc.clone()),
+            ("declaration then root", format!("{DECL}{doc}")),
+            ("declaration, whitespace, root", format!("{DECL}\n{doc}")),
+            ("root then whitespace", format!("{doc}\n ")),
+            ("root then comment", format!("{doc}<!--c-->")),
+            ("root then PI", format!("{doc}<?pi x?>")),
+            ("root then text", format!("{doc}text")),
+            ("root then second root", format!("{doc}{doc}")),
+            (
+                "root then foreign start",
+                format!("{doc}<foreign></foreign>"),
+            ),
+            ("root then foreign empty", format!("{doc}<foreign/>")),
+            (
+                "empty-element root then second root",
+                format!("{empty}{doc}"),
+            ),
+            ("empty-element root then text", format!("{empty}text")),
+            ("declaration after root", format!("{doc}{DECL}")),
+            ("two declarations", format!("{DECL}{DECL}{doc}")),
+            ("comment before declaration", format!("<!--c-->{DECL}{doc}")),
+            ("comment before root", format!("<!--c-->{doc}")),
+            ("PI before root", format!("<?pi x?>{doc}")),
+            ("text before root", format!("text{doc}")),
+            ("whitespace before declaration", format!(" {DECL}{doc}")),
+            ("unterminated root", open.to_owned()),
+            ("stray end tag", format!("{doc}</stray>")),
+            ("DOCTYPE", format!("{DECL}<!DOCTYPE r>{doc}")),
+            ("DOCTYPE after root", format!("{doc}<!DOCTYPE r>")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{doc}")),
+            ("CDATA after root", format!("{doc}<![CDATA[x]]>")),
+            ("entity reference before root", format!("&amp;{doc}")),
+            ("entity reference after root", format!("{doc}&amp;")),
+        ];
+        let actual: Vec<String> = rows
+            .iter()
+            .map(|(label, xml)| format!("{label} => {}", run(xml)))
+            .collect();
+        let listing: Vec<String> = actual.iter().map(|line| format!("{line:?},")).collect();
+        assert!(
+            actual
+                .iter()
+                .map(String::as_str)
+                .eq(expected.iter().copied()),
+            "actual envelope matrix:\n{}",
+            listing.join("\n")
+        );
+    }
+
+    const MATRIX_TABLE: &str = "xmlns:t=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\"";
+
+    #[test]
+    fn detective_owner_envelope_matrix() {
+        assert_envelope_matrix(
+            &format!(
+                "<t:detective {MATRIX_TABLE}><t:operation t:name=\"trace-errors\" t:index=\"7\"/>"
+            ),
+            "</t:detective>",
+            &format!("<t:detective {MATRIX_TABLE}/>"),
+            &[
+                "empty input => InvalidFormat(\"ODS detective source has no table:detective root\")",
+                "whitespace only => InvalidFormat(\"ODS detective source has no table:detective root\")",
+                "declaration only => InvalidFormat(\"ODS detective source has no table:detective root\")",
+                "empty-element root => Ok(operations=0, highlighted=0)",
+                "start and end root => Ok(operations=1, highlighted=0)",
+                "declaration then root => Ok(operations=1, highlighted=0)",
+                "declaration, whitespace, root => Ok(operations=1, highlighted=0)",
+                "root then whitespace => Ok(operations=1, highlighted=0)",
+                "root then comment => Ok(operations=1, highlighted=0)",
+                "root then PI => Ok(operations=1, highlighted=0)",
+                "root then text => InvalidFormat(\"ODS detective source has trailing content\")",
+                "root then second root => InvalidFormat(\"ODS detective owner contains an unsupported child\")",
+                "root then foreign start => InvalidFormat(\"ODS detective owner contains an unsupported child\")",
+                "root then foreign empty => InvalidFormat(\"ODS detective owner contains an unsupported child\")",
+                "empty-element root then second root => InvalidFormat(\"ODS detective owner contains an unsupported child\")",
+                "empty-element root then text => InvalidFormat(\"ODS detective source has trailing content\")",
+                "declaration after root => Ok(operations=1, highlighted=0)",
+                "two declarations => Ok(operations=1, highlighted=0)",
+                "comment before declaration => Ok(operations=1, highlighted=0)",
+                "comment before root => Ok(operations=1, highlighted=0)",
+                "PI before root => Ok(operations=1, highlighted=0)",
+                "text before root => Ok(operations=1, highlighted=0)",
+                "whitespace before declaration => Ok(operations=1, highlighted=0)",
+                "unterminated root => InvalidFormat(\"unterminated ODS table:detective owner\")",
+                "stray end tag => InvalidFormat(\"invalid ODS detective XML: ill-formed document: close tag `</stray>` does not match any open tag\")",
+                "DOCTYPE => Ok(operations=1, highlighted=0)",
+                "DOCTYPE after root => InvalidFormat(\"ODS detective owner contains unsupported XML content\")",
+                "top-level CDATA => Ok(operations=1, highlighted=0)",
+                "CDATA after root => InvalidFormat(\"ODS detective source has trailing content\")",
+                "entity reference before root => Ok(operations=1, highlighted=0)",
+                "entity reference after root => InvalidFormat(\"ODS detective owner contains unsupported XML content\")",
+            ],
+            |xml| match parse_detective(xml, Limits::server(), &context()) {
+                Ok(value) => format!(
+                    "Ok(operations={}, highlighted={})",
+                    value.operations().len(),
+                    value.highlighted_ranges().len()
+                ),
+                Err(error) => format!("{error:?}"),
+            },
+        );
+    }
+
+    #[test]
+    fn detective_source_envelope_matrix() {
+        let root = format!(
+            "o:document-content xmlns:o=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" {MATRIX_TABLE}"
+        );
+        assert_envelope_matrix(
+            &format!(
+                "<{root}><o:body><o:spreadsheet><t:table t:name=\"S\"><t:table-row><t:table-cell><t:detective/></t:table-cell></t:table-row></t:table></o:spreadsheet></o:body>"
+            ),
+            "</o:document-content>",
+            &format!("<{root}/>"),
+            &[
+                "empty input => InvalidFormat(\"ODS detective source has no complete XML root\")",
+                "whitespace only => InvalidFormat(\"ODS detective source has no complete XML root\")",
+                "declaration only => InvalidFormat(\"ODS detective source has no complete XML root\")",
+                "empty-element root => Ok(owners=0, cells=0)",
+                "start and end root => Ok(owners=1, cells=1)",
+                "declaration then root => Ok(owners=1, cells=1)",
+                "declaration, whitespace, root => Ok(owners=1, cells=1)",
+                "root then whitespace => Ok(owners=1, cells=1)",
+                "root then comment => Ok(owners=1, cells=1)",
+                "root then PI => Ok(owners=1, cells=1)",
+                "root then text => Ok(owners=1, cells=1)",
+                "root then second root => InvalidFormat(\"ODS detective source has multiple XML roots\")",
+                "root then foreign start => InvalidFormat(\"ODS detective source has multiple XML roots\")",
+                "root then foreign empty => InvalidFormat(\"ODS detective source has multiple XML roots\")",
+                "empty-element root then second root => InvalidFormat(\"ODS detective source has multiple XML roots\")",
+                "empty-element root then text => Ok(owners=0, cells=0)",
+                "declaration after root => Ok(owners=1, cells=1)",
+                "two declarations => Ok(owners=1, cells=1)",
+                "comment before declaration => Ok(owners=1, cells=1)",
+                "comment before root => Ok(owners=1, cells=1)",
+                "PI before root => Ok(owners=1, cells=1)",
+                "text before root => Ok(owners=1, cells=1)",
+                "whitespace before declaration => Ok(owners=1, cells=1)",
+                "unterminated root => InvalidFormat(\"ODS detective source contains unclosed XML elements\")",
+                "stray end tag => InvalidFormat(\"invalid ODS detective XML: ill-formed document: close tag `</stray>` does not match any open tag\")",
+                "DOCTYPE => Ok(owners=1, cells=1)",
+                "DOCTYPE after root => Ok(owners=1, cells=1)",
+                "top-level CDATA => Ok(owners=1, cells=1)",
+                "CDATA after root => Ok(owners=1, cells=1)",
+                "entity reference before root => Ok(owners=1, cells=1)",
+                "entity reference after root => Ok(owners=1, cells=1)",
+            ],
+            |xml| match Snapshot::parse_with_context(xml, Limits::server(), &context()) {
+                Ok(value) => format!(
+                    "Ok(owners={}, cells={})",
+                    value.owners().len(),
+                    value.cells().len()
+                ),
+                Err(error) => format!("{error:?}"),
+            },
+        );
+    }
 }

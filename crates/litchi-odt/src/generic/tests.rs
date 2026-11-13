@@ -510,3 +510,120 @@ fn flat_document_save_replaces_a_windows_destination_atomically() {
         document.as_bytes()
     );
 }
+
+/// Runs `run` over the XML envelope orderings built around one root element
+/// and compares each `label => outcome` line with the frozen expectation.
+fn assert_envelope_matrix(
+    open: &str,
+    close: &str,
+    empty: &str,
+    expected: &[&str],
+    run: impl Fn(&str) -> String,
+) {
+    const DECL: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+    let doc = format!("{open}{close}");
+    let rows = [
+        ("empty input", String::new()),
+        ("whitespace only", " \n".to_owned()),
+        ("declaration only", DECL.to_owned()),
+        ("empty-element root", empty.to_owned()),
+        ("start and end root", doc.clone()),
+        ("declaration then root", format!("{DECL}{doc}")),
+        ("declaration, whitespace, root", format!("{DECL}\n{doc}")),
+        ("root then whitespace", format!("{doc}\n ")),
+        ("root then comment", format!("{doc}<!--c-->")),
+        ("root then PI", format!("{doc}<?pi x?>")),
+        ("root then text", format!("{doc}text")),
+        ("root then second root", format!("{doc}{doc}")),
+        (
+            "root then foreign start",
+            format!("{doc}<foreign></foreign>"),
+        ),
+        ("root then foreign empty", format!("{doc}<foreign/>")),
+        (
+            "empty-element root then second root",
+            format!("{empty}{doc}"),
+        ),
+        ("empty-element root then text", format!("{empty}text")),
+        ("declaration after root", format!("{doc}{DECL}")),
+        ("two declarations", format!("{DECL}{DECL}{doc}")),
+        ("comment before declaration", format!("<!--c-->{DECL}{doc}")),
+        ("comment before root", format!("<!--c-->{doc}")),
+        ("PI before root", format!("<?pi x?>{doc}")),
+        ("text before root", format!("text{doc}")),
+        ("whitespace before declaration", format!(" {DECL}{doc}")),
+        ("unterminated root", open.to_owned()),
+        ("stray end tag", format!("{doc}</stray>")),
+        ("DOCTYPE", format!("{DECL}<!DOCTYPE r>{doc}")),
+        ("DOCTYPE after root", format!("{doc}<!DOCTYPE r>")),
+        ("top-level CDATA", format!("<![CDATA[x]]>{doc}")),
+        ("CDATA after root", format!("{doc}<![CDATA[x]]>")),
+        ("entity reference before root", format!("&amp;{doc}")),
+        ("entity reference after root", format!("{doc}&amp;")),
+    ];
+    let actual: Vec<String> = rows
+        .iter()
+        .map(|(label, xml)| format!("{label} => {}", run(xml)))
+        .collect();
+    let listing: Vec<String> = actual.iter().map(|line| format!("{line:?},")).collect();
+    assert!(
+        actual
+            .iter()
+            .map(String::as_str)
+            .eq(expected.iter().copied()),
+        "actual envelope matrix:\n{}",
+        listing.join("\n")
+    );
+}
+
+#[test]
+fn flat_document_envelope_matrix() {
+    let root = "office:document xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\"";
+    assert_envelope_matrix(
+        &format!("<{root}><office:body><office:text></office:text></office:body>"),
+        "</office:document>",
+        &format!("<{root}/>"),
+        &[
+            "empty input => InvalidFormat(\"flat OpenDocument is missing its complete family-specific body\")",
+            "whitespace only => InvalidFormat(\"flat OpenDocument is missing its complete family-specific body\")",
+            "declaration only => InvalidFormat(\"flat OpenDocument is missing its complete family-specific body\")",
+            "empty-element root => InvalidFormat(\"flat OpenDocument root cannot be empty\")",
+            "start and end root => Ok(())",
+            "declaration then root => Ok(())",
+            "declaration, whitespace, root => Ok(())",
+            "root then whitespace => Ok(())",
+            "root then comment => Ok(())",
+            "root then PI => Ok(())",
+            "root then text => InvalidFormat(\"text is not allowed outside the flat OpenDocument root\")",
+            "root then second root => InvalidFormat(\"flat OpenDocument must contain one office:document root\")",
+            "root then foreign start => InvalidFormat(\"flat OpenDocument must contain one office:document root\")",
+            "root then foreign empty => InvalidFormat(\"flat OpenDocument root cannot be empty\")",
+            "empty-element root then second root => InvalidFormat(\"flat OpenDocument root cannot be empty\")",
+            "empty-element root then text => InvalidFormat(\"flat OpenDocument root cannot be empty\")",
+            "declaration after root => Ok(())",
+            "two declarations => Ok(())",
+            "comment before declaration => Ok(())",
+            "comment before root => Ok(())",
+            "PI before root => Ok(())",
+            "text before root => InvalidFormat(\"text is not allowed outside the flat OpenDocument root\")",
+            "whitespace before declaration => Ok(())",
+            "unterminated root => InvalidFormat(\"flat OpenDocument is missing its complete family-specific body\")",
+            "stray end tag => InvalidFormat(\"invalid flat OpenDocument XML: XML parsing error: ill-formed document: close tag `</stray>` does not match any open tag\")",
+            "DOCTYPE => Ok(())",
+            "DOCTYPE after root => Ok(())",
+            "top-level CDATA => InvalidFormat(\"content is not allowed outside the flat OpenDocument root\")",
+            "CDATA after root => InvalidFormat(\"content is not allowed outside the flat OpenDocument root\")",
+            "entity reference before root => InvalidFormat(\"content is not allowed outside the flat OpenDocument root\")",
+            "entity reference after root => InvalidFormat(\"content is not allowed outside the flat OpenDocument root\")",
+        ],
+        |xml| match super::codec::validate_flat_document_with_context(
+            xml,
+            Family::Text,
+            &flat_test_context(1 << 20).1,
+            crate::core::XmlStreamLimits::owner_default_value(),
+        ) {
+            Ok(value) => format!("Ok({value:?})"),
+            Err(error) => format!("{error:?}"),
+        },
+    );
+}

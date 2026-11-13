@@ -886,3 +886,126 @@ fn office_attribute(
 fn invalid(message: impl Into<String>) -> CoreError {
     CoreError::InvalidFormat(message.into())
 }
+
+#[cfg(test)]
+mod envelope_matrix_tests {
+    use super::*;
+
+    /// Runs `run` over the XML envelope orderings built around one root element
+    /// and compares each `label => outcome` line with the frozen expectation.
+    fn assert_envelope_matrix(
+        open: &str,
+        close: &str,
+        empty: &str,
+        expected: &[&str],
+        run: impl Fn(&str) -> String,
+    ) {
+        const DECL: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+        let doc = format!("{open}{close}");
+        let rows = [
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECL.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", doc.clone()),
+            ("declaration then root", format!("{DECL}{doc}")),
+            ("declaration, whitespace, root", format!("{DECL}\n{doc}")),
+            ("root then whitespace", format!("{doc}\n ")),
+            ("root then comment", format!("{doc}<!--c-->")),
+            ("root then PI", format!("{doc}<?pi x?>")),
+            ("root then text", format!("{doc}text")),
+            ("root then second root", format!("{doc}{doc}")),
+            (
+                "root then foreign start",
+                format!("{doc}<foreign></foreign>"),
+            ),
+            ("root then foreign empty", format!("{doc}<foreign/>")),
+            (
+                "empty-element root then second root",
+                format!("{empty}{doc}"),
+            ),
+            ("empty-element root then text", format!("{empty}text")),
+            ("declaration after root", format!("{doc}{DECL}")),
+            ("two declarations", format!("{DECL}{DECL}{doc}")),
+            ("comment before declaration", format!("<!--c-->{DECL}{doc}")),
+            ("comment before root", format!("<!--c-->{doc}")),
+            ("PI before root", format!("<?pi x?>{doc}")),
+            ("text before root", format!("text{doc}")),
+            ("whitespace before declaration", format!(" {DECL}{doc}")),
+            ("unterminated root", open.to_owned()),
+            ("stray end tag", format!("{doc}</stray>")),
+            ("DOCTYPE", format!("{DECL}<!DOCTYPE r>{doc}")),
+            ("DOCTYPE after root", format!("{doc}<!DOCTYPE r>")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{doc}")),
+            ("CDATA after root", format!("{doc}<![CDATA[x]]>")),
+            ("entity reference before root", format!("&amp;{doc}")),
+            ("entity reference after root", format!("{doc}&amp;")),
+        ];
+        let actual: Vec<String> = rows
+            .iter()
+            .map(|(label, xml)| format!("{label} => {}", run(xml)))
+            .collect();
+        let listing: Vec<String> = actual.iter().map(|line| format!("{line:?},")).collect();
+        assert!(
+            actual
+                .iter()
+                .map(String::as_str)
+                .eq(expected.iter().copied()),
+            "actual envelope matrix:\n{}",
+            listing.join("\n")
+        );
+    }
+
+    #[test]
+    fn flat_validation_envelope_matrix() {
+        let root = concat!(
+            "office:document ",
+            "xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" ",
+            "office:mimetype=\"application/vnd.oasis.opendocument.spreadsheet\"",
+        );
+        assert_envelope_matrix(
+            &format!(
+                "<{root}><office:body><office:spreadsheet></office:spreadsheet></office:body>"
+            ),
+            "</office:document>",
+            &format!("<{root}/>"),
+            &[
+                "empty input => InvalidFormat(\"flat ODS input is not XML\")",
+                "whitespace only => InvalidFormat(\"flat ODS XML is structurally incomplete\")",
+                "declaration only => InvalidFormat(\"flat ODS XML is structurally incomplete\")",
+                "empty-element root => InvalidFormat(\"flat ODS XML exceeds a structural limit\")",
+                "start and end root => Ok",
+                "declaration then root => Ok",
+                "declaration, whitespace, root => Ok",
+                "root then whitespace => Ok",
+                "root then comment => Ok",
+                "root then PI => Ok",
+                "root then text => InvalidFormat(\"flat ODS XML has trailing text after its root\")",
+                "root then second root => InvalidFormat(\"flat ODS root must be one office:document\")",
+                "root then foreign start => InvalidFormat(\"flat ODS root must be one office:document\")",
+                "root then foreign empty => InvalidFormat(\"flat ODS XML exceeds a structural limit\")",
+                "empty-element root then second root => InvalidFormat(\"flat ODS XML exceeds a structural limit\")",
+                "empty-element root then text => InvalidFormat(\"flat ODS XML exceeds a structural limit\")",
+                "declaration after root => InvalidFormat(\"flat ODS XML has markup outside its root\")",
+                "two declarations => Ok",
+                "comment before declaration => Ok",
+                "comment before root => Ok",
+                "PI before root => Ok",
+                "text before root => InvalidFormat(\"flat ODS XML has text before its root\")",
+                "whitespace before declaration => Ok",
+                "unterminated root => InvalidFormat(\"flat ODS XML is structurally incomplete\")",
+                "stray end tag => InvalidFormat(\"invalid flat ODS XML: ill-formed document: close tag `</stray>` does not match any open tag\")",
+                "DOCTYPE => InvalidFormat(\"flat ODS XML document types are not accepted\")",
+                "DOCTYPE after root => InvalidFormat(\"flat ODS XML document types are not accepted\")",
+                "top-level CDATA => InvalidFormat(\"flat ODS XML has CDATA outside its root\")",
+                "CDATA after root => InvalidFormat(\"flat ODS XML has CDATA outside its root\")",
+                "entity reference before root => InvalidFormat(\"flat ODS XML contains an unsupported entity\")",
+                "entity reference after root => InvalidFormat(\"flat ODS XML contains an unsupported entity\")",
+            ],
+            |xml| match validate_flat_xml(xml) {
+                Ok(()) => "Ok".to_owned(),
+                Err(error) => format!("{error:?}"),
+            },
+        );
+    }
+}

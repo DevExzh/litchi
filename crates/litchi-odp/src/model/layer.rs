@@ -1293,4 +1293,123 @@ mod tests {
         assert!(validate_odf_ncname("º", "test").is_err());
         assert!(validate_odf_ncname("name·1", "test").is_ok());
     }
+
+    /// Runs `run` over the XML envelope orderings built around one root element
+    /// and compares each `label => outcome` line with the frozen expectation.
+    fn assert_envelope_matrix(
+        open: &str,
+        close: &str,
+        empty: &str,
+        expected: &[&str],
+        run: impl Fn(&str) -> String,
+    ) {
+        const DECL: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+        let doc = format!("{open}{close}");
+        let rows = [
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECL.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", doc.clone()),
+            ("declaration then root", format!("{DECL}{doc}")),
+            ("declaration, whitespace, root", format!("{DECL}\n{doc}")),
+            ("root then whitespace", format!("{doc}\n ")),
+            ("root then comment", format!("{doc}<!--c-->")),
+            ("root then PI", format!("{doc}<?pi x?>")),
+            ("root then text", format!("{doc}text")),
+            ("root then second root", format!("{doc}{doc}")),
+            (
+                "root then foreign start",
+                format!("{doc}<foreign></foreign>"),
+            ),
+            ("root then foreign empty", format!("{doc}<foreign/>")),
+            (
+                "empty-element root then second root",
+                format!("{empty}{doc}"),
+            ),
+            ("empty-element root then text", format!("{empty}text")),
+            ("declaration after root", format!("{doc}{DECL}")),
+            ("two declarations", format!("{DECL}{DECL}{doc}")),
+            ("comment before declaration", format!("<!--c-->{DECL}{doc}")),
+            ("comment before root", format!("<!--c-->{doc}")),
+            ("PI before root", format!("<?pi x?>{doc}")),
+            ("text before root", format!("text{doc}")),
+            ("whitespace before declaration", format!(" {DECL}{doc}")),
+            ("unterminated root", open.to_owned()),
+            ("stray end tag", format!("{doc}</stray>")),
+            ("DOCTYPE", format!("{DECL}<!DOCTYPE r>{doc}")),
+            ("DOCTYPE after root", format!("{doc}<!DOCTYPE r>")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{doc}")),
+            ("CDATA after root", format!("{doc}<![CDATA[x]]>")),
+            ("entity reference before root", format!("&amp;{doc}")),
+            ("entity reference after root", format!("{doc}&amp;")),
+        ];
+        let actual: Vec<String> = rows
+            .iter()
+            .map(|(label, xml)| format!("{label} => {}", run(xml)))
+            .collect();
+        let listing: Vec<String> = actual.iter().map(|line| format!("{line:?},")).collect();
+        assert!(
+            actual
+                .iter()
+                .map(String::as_str)
+                .eq(expected.iter().copied()),
+            "actual envelope matrix:\n{}",
+            listing.join("\n")
+        );
+    }
+
+    #[test]
+    fn layer_scan_envelope_matrix() {
+        let root = "office:document-content xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:draw=\"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0\" xmlns:presentation=\"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0\"";
+        assert_envelope_matrix(
+            &format!(
+                "<{root}><office:body><office:presentation><draw:page draw:name=\"p\"></draw:page></office:presentation></office:body>"
+            ),
+            "</office:document-content>",
+            &format!("<{root}/>"),
+            &[
+                "empty input => InvalidFormat(\"ODP layer XML has no root element\")",
+                "whitespace only => InvalidFormat(\"ODP layer XML has no root element\")",
+                "declaration only => InvalidFormat(\"ODP layer XML has no root element\")",
+                "empty-element root => Ok(sets=0, references=0, parents=0)",
+                "start and end root => Ok(sets=0, references=0, parents=1)",
+                "declaration then root => Ok(sets=0, references=0, parents=1)",
+                "declaration, whitespace, root => Ok(sets=0, references=0, parents=1)",
+                "root then whitespace => Ok(sets=0, references=0, parents=1)",
+                "root then comment => Ok(sets=0, references=0, parents=1)",
+                "root then PI => Ok(sets=0, references=0, parents=1)",
+                "root then text => InvalidFormat(\"ODP layer XML has non-whitespace content outside its root\")",
+                "root then second root => InvalidFormat(\"ODP layer XML has more than one root element\")",
+                "root then foreign start => InvalidFormat(\"ODP layer XML has more than one root element\")",
+                "root then foreign empty => InvalidFormat(\"ODP layer XML has more than one root element\")",
+                "empty-element root then second root => InvalidFormat(\"ODP layer XML has more than one root element\")",
+                "empty-element root then text => InvalidFormat(\"ODP layer XML has non-whitespace content outside its root\")",
+                "declaration after root => InvalidFormat(\"ODP XML declaration is outside the document prologue\")",
+                "two declarations => InvalidFormat(\"ODP XML declaration is outside the document prologue\")",
+                "comment before declaration => InvalidFormat(\"ODP XML declaration is outside the document prologue\")",
+                "comment before root => Ok(sets=0, references=0, parents=1)",
+                "PI before root => Ok(sets=0, references=0, parents=1)",
+                "text before root => InvalidFormat(\"ODP layer XML has non-whitespace content outside its root\")",
+                "whitespace before declaration => InvalidFormat(\"ODP XML declaration is outside the document prologue\")",
+                "unterminated root => InvalidFormat(\"ODP layer XML has unterminated elements\")",
+                "stray end tag => InvalidFormat(\"invalid ODP layer XML in content.xml: ill-formed document: close tag `</stray>` does not match any open tag\")",
+                "DOCTYPE => InvalidFormat(\"ODP layer XML doctype is prohibited\")",
+                "DOCTYPE after root => InvalidFormat(\"ODP layer XML doctype is prohibited\")",
+                "top-level CDATA => InvalidFormat(\"ODP layer XML has non-whitespace content outside its root\")",
+                "CDATA after root => InvalidFormat(\"ODP layer XML has non-whitespace content outside its root\")",
+                "entity reference before root => InvalidFormat(\"ODP layer XML has non-whitespace content outside its root\")",
+                "entity reference after root => InvalidFormat(\"ODP layer XML has non-whitespace content outside its root\")",
+            ],
+            |xml| match scan(xml, "content.xml") {
+                Ok(value) => format!(
+                    "Ok(sets={}, references={}, parents={})",
+                    value.sets.len(),
+                    value.references.len(),
+                    value.parents.len()
+                ),
+                Err(error) => format!("{error:?}"),
+            },
+        );
+    }
 }

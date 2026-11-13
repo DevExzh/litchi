@@ -2045,3 +2045,126 @@ fn escape_attribute(value: &str) -> String {
 fn invalid_error(message: impl Into<String>) -> CoreError {
     CoreError::InvalidFormat(message.into())
 }
+
+#[cfg(test)]
+mod envelope_matrix_tests {
+    use super::*;
+
+    /// Runs `run` over the XML envelope orderings built around one root element
+    /// and compares each `label => outcome` line with the frozen expectation.
+    fn assert_envelope_matrix(
+        open: &str,
+        close: &str,
+        empty: &str,
+        expected: &[&str],
+        run: impl Fn(&str) -> String,
+    ) {
+        const DECL: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+        let doc = format!("{open}{close}");
+        let rows = [
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECL.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", doc.clone()),
+            ("declaration then root", format!("{DECL}{doc}")),
+            ("declaration, whitespace, root", format!("{DECL}\n{doc}")),
+            ("root then whitespace", format!("{doc}\n ")),
+            ("root then comment", format!("{doc}<!--c-->")),
+            ("root then PI", format!("{doc}<?pi x?>")),
+            ("root then text", format!("{doc}text")),
+            ("root then second root", format!("{doc}{doc}")),
+            (
+                "root then foreign start",
+                format!("{doc}<foreign></foreign>"),
+            ),
+            ("root then foreign empty", format!("{doc}<foreign/>")),
+            (
+                "empty-element root then second root",
+                format!("{empty}{doc}"),
+            ),
+            ("empty-element root then text", format!("{empty}text")),
+            ("declaration after root", format!("{doc}{DECL}")),
+            ("two declarations", format!("{DECL}{DECL}{doc}")),
+            ("comment before declaration", format!("<!--c-->{DECL}{doc}")),
+            ("comment before root", format!("<!--c-->{doc}")),
+            ("PI before root", format!("<?pi x?>{doc}")),
+            ("text before root", format!("text{doc}")),
+            ("whitespace before declaration", format!(" {DECL}{doc}")),
+            ("unterminated root", open.to_owned()),
+            ("stray end tag", format!("{doc}</stray>")),
+            ("DOCTYPE", format!("{DECL}<!DOCTYPE r>{doc}")),
+            ("DOCTYPE after root", format!("{doc}<!DOCTYPE r>")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{doc}")),
+            ("CDATA after root", format!("{doc}<![CDATA[x]]>")),
+            ("entity reference before root", format!("&amp;{doc}")),
+            ("entity reference after root", format!("{doc}&amp;")),
+        ];
+        let actual: Vec<String> = rows
+            .iter()
+            .map(|(label, xml)| format!("{label} => {}", run(xml)))
+            .collect();
+        let listing: Vec<String> = actual.iter().map(|line| format!("{line:?},")).collect();
+        assert!(
+            actual
+                .iter()
+                .map(String::as_str)
+                .eq(expected.iter().copied()),
+            "actual envelope matrix:\n{}",
+            listing.join("\n")
+        );
+    }
+
+    #[test]
+    fn chart_content_envelope_matrix() {
+        let root = "office:document-content xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:chart=\"urn:oasis:names:tc:opendocument:xmlns:chart:1.0\"";
+        assert_envelope_matrix(
+            &format!(
+                "<{root}><office:body><office:chart><chart:chart chart:class=\"chart:bar\"><chart:plot-area></chart:plot-area></chart:chart></office:chart></office:body>"
+            ),
+            "</office:document-content>",
+            &format!("<{root}/>"),
+            &[
+                "empty input => InvalidFormat(\"flat ODC structure is incomplete\")",
+                "whitespace only => InvalidFormat(\"flat ODC structure is incomplete\")",
+                "declaration only => InvalidFormat(\"flat ODC structure is incomplete\")",
+                "empty-element root => InvalidFormat(\"flat ODC required structure cannot be empty\")",
+                "start and end root => Ok(axes=0)",
+                "declaration then root => Ok(axes=0)",
+                "declaration, whitespace, root => Ok(axes=0)",
+                "root then whitespace => Ok(axes=0)",
+                "root then comment => Ok(axes=0)",
+                "root then PI => Ok(axes=0)",
+                "root then text => InvalidFormat(\"text is not allowed outside the chart content root\")",
+                "root then second root => InvalidFormat(\"ODC requires one expected office document root\")",
+                "root then foreign start => InvalidFormat(\"ODC requires one expected office document root\")",
+                "root then foreign empty => InvalidFormat(\"flat ODC required structure cannot be empty\")",
+                "empty-element root then second root => InvalidFormat(\"flat ODC required structure cannot be empty\")",
+                "empty-element root then text => InvalidFormat(\"flat ODC required structure cannot be empty\")",
+                "declaration after root => Ok(axes=0)",
+                "two declarations => Ok(axes=0)",
+                "comment before declaration => Ok(axes=0)",
+                "comment before root => Ok(axes=0)",
+                "PI before root => Ok(axes=0)",
+                "text before root => InvalidFormat(\"text is not allowed outside the chart content root\")",
+                "whitespace before declaration => Ok(axes=0)",
+                "unterminated root => InvalidFormat(\"flat ODC structure is incomplete\")",
+                "stray end tag => InvalidFormat(\"invalid ODC XML: ill-formed document: close tag `</stray>` does not match any open tag\")",
+                "DOCTYPE => InvalidFormat(\"DOCTYPE is not allowed in ODC\")",
+                "DOCTYPE after root => InvalidFormat(\"DOCTYPE is not allowed in ODC\")",
+                "top-level CDATA => InvalidFormat(\"content is not allowed outside the chart content root\")",
+                "CDATA after root => InvalidFormat(\"content is not allowed outside the chart content root\")",
+                "entity reference before root => InvalidFormat(\"content is not allowed outside the chart content root\")",
+                "entity reference after root => InvalidFormat(\"content is not allowed outside the chart content root\")",
+            ],
+            |xml| match parse(
+                xml.as_bytes().to_vec(),
+                RootKind::Content,
+                crate::Limits::default(),
+            ) {
+                Ok(value) => format!("Ok(axes={})", value.axes.len()),
+                Err(error) => format!("{error:?}"),
+            },
+        );
+    }
+}

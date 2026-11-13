@@ -2730,4 +2730,128 @@ mod tests {
         assert_eq!(ids.id(b"alias", &namespace).unwrap(), first);
         assert_eq!(ids.namespace_content_lookups(), 2);
     }
+
+    /// Runs `run` over the XML envelope orderings built around one root element
+    /// and compares each `label => outcome` line with the frozen expectation.
+    fn assert_envelope_matrix(
+        open: &str,
+        close: &str,
+        empty: &str,
+        expected: &[&str],
+        run: impl Fn(&str) -> String,
+    ) {
+        const DECL: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+        let doc = format!("{open}{close}");
+        let rows = [
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECL.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", doc.clone()),
+            ("declaration then root", format!("{DECL}{doc}")),
+            ("declaration, whitespace, root", format!("{DECL}\n{doc}")),
+            ("root then whitespace", format!("{doc}\n ")),
+            ("root then comment", format!("{doc}<!--c-->")),
+            ("root then PI", format!("{doc}<?pi x?>")),
+            ("root then text", format!("{doc}text")),
+            ("root then second root", format!("{doc}{doc}")),
+            (
+                "root then foreign start",
+                format!("{doc}<foreign></foreign>"),
+            ),
+            ("root then foreign empty", format!("{doc}<foreign/>")),
+            (
+                "empty-element root then second root",
+                format!("{empty}{doc}"),
+            ),
+            ("empty-element root then text", format!("{empty}text")),
+            ("declaration after root", format!("{doc}{DECL}")),
+            ("two declarations", format!("{DECL}{DECL}{doc}")),
+            ("comment before declaration", format!("<!--c-->{DECL}{doc}")),
+            ("comment before root", format!("<!--c-->{doc}")),
+            ("PI before root", format!("<?pi x?>{doc}")),
+            ("text before root", format!("text{doc}")),
+            ("whitespace before declaration", format!(" {DECL}{doc}")),
+            ("unterminated root", open.to_owned()),
+            ("stray end tag", format!("{doc}</stray>")),
+            ("DOCTYPE", format!("{DECL}<!DOCTYPE r>{doc}")),
+            ("DOCTYPE after root", format!("{doc}<!DOCTYPE r>")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{doc}")),
+            ("CDATA after root", format!("{doc}<![CDATA[x]]>")),
+            ("entity reference before root", format!("&amp;{doc}")),
+            ("entity reference after root", format!("{doc}&amp;")),
+        ];
+        let actual: Vec<String> = rows
+            .iter()
+            .map(|(label, xml)| format!("{label} => {}", run(xml)))
+            .collect();
+        let listing: Vec<String> = actual.iter().map(|line| format!("{line:?},")).collect();
+        assert!(
+            actual
+                .iter()
+                .map(String::as_str)
+                .eq(expected.iter().copied()),
+            "actual envelope matrix:\n{}",
+            listing.join("\n")
+        );
+    }
+
+    const MATRIX_ROOT: &str = concat!(
+        "office:document-content ",
+        "xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" ",
+        "xmlns:table=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\"",
+    );
+    const MATRIX_BODY: &str =
+        "<office:body><office:spreadsheet></office:spreadsheet></office:body>";
+    const MATRIX_CLOSE: &str = "</office:document-content>";
+
+    #[test]
+    fn content_validation_envelope_matrix() {
+        assert_envelope_matrix(
+            &format!("<{MATRIX_ROOT}>{MATRIX_BODY}"),
+            MATRIX_CLOSE,
+            &format!("<{MATRIX_ROOT}/>"),
+            &[
+                "empty input => InvalidStructure(\"ODS content-validation XML lacks a complete document-content envelope\")",
+                "whitespace only => InvalidStructure(\"ODS content-validation XML lacks a complete document-content envelope\")",
+                "declaration only => InvalidStructure(\"ODS content-validation XML lacks a complete document-content envelope\")",
+                "empty-element root => InvalidStructure(\"ODS content-validation XML lacks a complete document-content envelope\")",
+                "start and end root => Ok(definitions=0, sheets=0)",
+                "declaration then root => Ok(definitions=0, sheets=0)",
+                "declaration, whitespace, root => Ok(definitions=0, sheets=0)",
+                "root then whitespace => Ok(definitions=0, sheets=0)",
+                "root then comment => Ok(definitions=0, sheets=0)",
+                "root then PI => Ok(definitions=0, sheets=0)",
+                "root then text => InvalidStructure(\"ODS content-validation XML has text outside its root\")",
+                "root then second root => InvalidStructure(\"multiple or nested office:document-content roots\")",
+                "root then foreign start => InvalidStructure(\"content occurs outside the canonical document root\")",
+                "root then foreign empty => InvalidStructure(\"content occurs outside the canonical document root\")",
+                "empty-element root then second root => InvalidStructure(\"multiple or nested office:document-content roots\")",
+                "empty-element root then text => InvalidStructure(\"ODS content-validation XML has text outside its root\")",
+                "declaration after root => Ok(definitions=0, sheets=0)",
+                "two declarations => Ok(definitions=0, sheets=0)",
+                "comment before declaration => Ok(definitions=0, sheets=0)",
+                "comment before root => Ok(definitions=0, sheets=0)",
+                "PI before root => Ok(definitions=0, sheets=0)",
+                "text before root => InvalidStructure(\"ODS content-validation XML has text outside its root\")",
+                "whitespace before declaration => Ok(definitions=0, sheets=0)",
+                "unterminated root => InvalidStructure(\"ODS content-validation XML lacks a complete document-content envelope\")",
+                "stray end tag => InvalidXml(\"invalid ODS content-validation XML: ill-formed document: close tag `</stray>` does not match any open tag\")",
+                "DOCTYPE => InvalidStructure(\"ODS content-validation inspection rejects DTDs and entity references\")",
+                "DOCTYPE after root => InvalidStructure(\"ODS content-validation inspection rejects DTDs and entity references\")",
+                "top-level CDATA => Ok(definitions=0, sheets=0)",
+                "CDATA after root => Ok(definitions=0, sheets=0)",
+                "entity reference before root => InvalidStructure(\"ODS content-validation inspection rejects DTDs and entity references\")",
+                "entity reference after root => InvalidStructure(\"ODS content-validation inspection rejects DTDs and entity references\")",
+            ],
+            |xml| match super::Snapshot::parse(xml) {
+                Ok(value) => format!(
+                    "Ok(definitions={}, sheets={})",
+                    value.definitions().len(),
+                    value.sheets().len()
+                ),
+                Err(error) => format!("{error:?}"),
+            },
+        );
+    }
 }

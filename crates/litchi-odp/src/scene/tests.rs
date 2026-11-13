@@ -993,3 +993,123 @@ fn link_click_and_line_break_changes_splice_their_markup() {
     .unwrap();
     assert!(noop.is_empty());
 }
+
+/// Runs `run` over the XML envelope orderings built around one root element
+/// and compares each `label => outcome` line with the frozen expectation.
+fn assert_envelope_matrix(
+    open: &str,
+    close: &str,
+    empty: &str,
+    expected: &[&str],
+    run: impl Fn(&str) -> String,
+) {
+    const DECL: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+    let doc = format!("{open}{close}");
+    let rows = [
+        ("empty input", String::new()),
+        ("whitespace only", " \n".to_owned()),
+        ("declaration only", DECL.to_owned()),
+        ("empty-element root", empty.to_owned()),
+        ("start and end root", doc.clone()),
+        ("declaration then root", format!("{DECL}{doc}")),
+        ("declaration, whitespace, root", format!("{DECL}\n{doc}")),
+        ("root then whitespace", format!("{doc}\n ")),
+        ("root then comment", format!("{doc}<!--c-->")),
+        ("root then PI", format!("{doc}<?pi x?>")),
+        ("root then text", format!("{doc}text")),
+        ("root then second root", format!("{doc}{doc}")),
+        (
+            "root then foreign start",
+            format!("{doc}<foreign></foreign>"),
+        ),
+        ("root then foreign empty", format!("{doc}<foreign/>")),
+        (
+            "empty-element root then second root",
+            format!("{empty}{doc}"),
+        ),
+        ("empty-element root then text", format!("{empty}text")),
+        ("declaration after root", format!("{doc}{DECL}")),
+        ("two declarations", format!("{DECL}{DECL}{doc}")),
+        ("comment before declaration", format!("<!--c-->{DECL}{doc}")),
+        ("comment before root", format!("<!--c-->{doc}")),
+        ("PI before root", format!("<?pi x?>{doc}")),
+        ("text before root", format!("text{doc}")),
+        ("whitespace before declaration", format!(" {DECL}{doc}")),
+        ("unterminated root", open.to_owned()),
+        ("stray end tag", format!("{doc}</stray>")),
+        ("DOCTYPE", format!("{DECL}<!DOCTYPE r>{doc}")),
+        ("DOCTYPE after root", format!("{doc}<!DOCTYPE r>")),
+        ("top-level CDATA", format!("<![CDATA[x]]>{doc}")),
+        ("CDATA after root", format!("{doc}<![CDATA[x]]>")),
+        ("entity reference before root", format!("&amp;{doc}")),
+        ("entity reference after root", format!("{doc}&amp;")),
+    ];
+    let actual: Vec<String> = rows
+        .iter()
+        .map(|(label, xml)| format!("{label} => {}", run(xml)))
+        .collect();
+    let listing: Vec<String> = actual.iter().map(|line| format!("{line:?},")).collect();
+    assert!(
+        actual
+            .iter()
+            .map(String::as_str)
+            .eq(expected.iter().copied()),
+        "actual envelope matrix:\n{}",
+        listing.join("\n")
+    );
+}
+
+#[test]
+fn scene_scan_envelope_matrix() {
+    let root = "office:document-content xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:draw=\"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0\" xmlns:presentation=\"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0\"";
+    assert_envelope_matrix(
+        &format!(
+            "<{root}><office:body><office:presentation><draw:page draw:name=\"p\"></draw:page></office:presentation></office:body>"
+        ),
+        "</office:document-content>",
+        &format!("<{root}/>"),
+        &[
+            "empty input => Ok(pages=0, draw_prefix=None, body_end=None, len=0)",
+            "whitespace only => Ok(pages=0, draw_prefix=None, body_end=None, len=2)",
+            "declaration only => Ok(pages=0, draw_prefix=None, body_end=None, len=38)",
+            "empty-element root => Ok(pages=0, draw_prefix=Some(\"draw\"), body_end=None, len=229)",
+            "start and end root => Ok(pages=1, draw_prefix=Some(\"draw\"), body_end=Some(299), len=361)",
+            "declaration then root => Ok(pages=1, draw_prefix=Some(\"draw\"), body_end=Some(337), len=399)",
+            "declaration, whitespace, root => Ok(pages=1, draw_prefix=Some(\"draw\"), body_end=Some(338), len=400)",
+            "root then whitespace => Ok(pages=1, draw_prefix=Some(\"draw\"), body_end=Some(299), len=363)",
+            "root then comment => Ok(pages=1, draw_prefix=Some(\"draw\"), body_end=Some(299), len=369)",
+            "root then PI => Ok(pages=1, draw_prefix=Some(\"draw\"), body_end=Some(299), len=369)",
+            "root then text => Ok(pages=1, draw_prefix=Some(\"draw\"), body_end=Some(299), len=365)",
+            "root then second root => Ok(pages=2, draw_prefix=Some(\"draw\"), body_end=Some(660), len=722)",
+            "root then foreign start => Ok(pages=1, draw_prefix=Some(\"draw\"), body_end=Some(299), len=380)",
+            "root then foreign empty => Ok(pages=1, draw_prefix=Some(\"draw\"), body_end=Some(299), len=371)",
+            "empty-element root then second root => Ok(pages=1, draw_prefix=Some(\"draw\"), body_end=Some(528), len=590)",
+            "empty-element root then text => Ok(pages=0, draw_prefix=Some(\"draw\"), body_end=None, len=233)",
+            "declaration after root => Ok(pages=1, draw_prefix=Some(\"draw\"), body_end=Some(299), len=399)",
+            "two declarations => Ok(pages=1, draw_prefix=Some(\"draw\"), body_end=Some(375), len=437)",
+            "comment before declaration => Ok(pages=1, draw_prefix=Some(\"draw\"), body_end=Some(345), len=407)",
+            "comment before root => Ok(pages=1, draw_prefix=Some(\"draw\"), body_end=Some(307), len=369)",
+            "PI before root => Ok(pages=1, draw_prefix=Some(\"draw\"), body_end=Some(307), len=369)",
+            "text before root => Ok(pages=1, draw_prefix=Some(\"draw\"), body_end=Some(303), len=365)",
+            "whitespace before declaration => Ok(pages=1, draw_prefix=Some(\"draw\"), body_end=Some(338), len=400)",
+            "unterminated root => InvalidFormat(\"ODP content ends inside an element\")",
+            "stray end tag => InvalidFormat(\"invalid ODP content XML: ill-formed document: close tag `</stray>` does not match any open tag\")",
+            "DOCTYPE => Ok(pages=1, draw_prefix=Some(\"draw\"), body_end=Some(349), len=411)",
+            "DOCTYPE after root => Ok(pages=1, draw_prefix=Some(\"draw\"), body_end=Some(299), len=373)",
+            "top-level CDATA => Ok(pages=1, draw_prefix=Some(\"draw\"), body_end=Some(312), len=374)",
+            "CDATA after root => Ok(pages=1, draw_prefix=Some(\"draw\"), body_end=Some(299), len=374)",
+            "entity reference before root => Ok(pages=1, draw_prefix=Some(\"draw\"), body_end=Some(304), len=366)",
+            "entity reference after root => Ok(pages=1, draw_prefix=Some(\"draw\"), body_end=Some(299), len=366)",
+        ],
+        |xml| match scan::scan(xml) {
+            Ok(value) => format!(
+                "Ok(pages={}, draw_prefix={:?}, body_end={:?}, len={})",
+                value.pages.len(),
+                value.prefixes.draw,
+                value.body_end,
+                value.len
+            ),
+            Err(error) => format!("{error:?}"),
+        },
+    );
+}

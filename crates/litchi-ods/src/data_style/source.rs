@@ -3890,4 +3890,122 @@ mod tests {
         assert!(scan(malformed.as_bytes(), Owner::ContentAutomatic).is_err());
         Ok(())
     }
+
+    /// Runs `run` over the XML envelope orderings built around one root element
+    /// and compares each `label => outcome` line with the frozen expectation.
+    fn assert_envelope_matrix(
+        open: &str,
+        close: &str,
+        empty: &str,
+        expected: &[&str],
+        run: impl Fn(&str) -> String,
+    ) {
+        const DECL: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+        let doc = format!("{open}{close}");
+        let rows = [
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECL.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", doc.clone()),
+            ("declaration then root", format!("{DECL}{doc}")),
+            ("declaration, whitespace, root", format!("{DECL}\n{doc}")),
+            ("root then whitespace", format!("{doc}\n ")),
+            ("root then comment", format!("{doc}<!--c-->")),
+            ("root then PI", format!("{doc}<?pi x?>")),
+            ("root then text", format!("{doc}text")),
+            ("root then second root", format!("{doc}{doc}")),
+            (
+                "root then foreign start",
+                format!("{doc}<foreign></foreign>"),
+            ),
+            ("root then foreign empty", format!("{doc}<foreign/>")),
+            (
+                "empty-element root then second root",
+                format!("{empty}{doc}"),
+            ),
+            ("empty-element root then text", format!("{empty}text")),
+            ("declaration after root", format!("{doc}{DECL}")),
+            ("two declarations", format!("{DECL}{DECL}{doc}")),
+            ("comment before declaration", format!("<!--c-->{DECL}{doc}")),
+            ("comment before root", format!("<!--c-->{doc}")),
+            ("PI before root", format!("<?pi x?>{doc}")),
+            ("text before root", format!("text{doc}")),
+            ("whitespace before declaration", format!(" {DECL}{doc}")),
+            ("unterminated root", open.to_owned()),
+            ("stray end tag", format!("{doc}</stray>")),
+            ("DOCTYPE", format!("{DECL}<!DOCTYPE r>{doc}")),
+            ("DOCTYPE after root", format!("{doc}<!DOCTYPE r>")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{doc}")),
+            ("CDATA after root", format!("{doc}<![CDATA[x]]>")),
+            ("entity reference before root", format!("&amp;{doc}")),
+            ("entity reference after root", format!("{doc}&amp;")),
+        ];
+        let actual: Vec<String> = rows
+            .iter()
+            .map(|(label, xml)| format!("{label} => {}", run(xml)))
+            .collect();
+        let listing: Vec<String> = actual.iter().map(|line| format!("{line:?},")).collect();
+        assert!(
+            actual
+                .iter()
+                .map(String::as_str)
+                .eq(expected.iter().copied()),
+            "actual envelope matrix:\n{}",
+            listing.join("\n")
+        );
+    }
+
+    #[test]
+    fn data_style_owner_envelope_matrix() {
+        let root = format!("office:document-content xmlns:office=\"{OFFICE_NS}\"");
+        assert_envelope_matrix(
+            &format!(
+                "<{root}><office:automatic-styles/><office:body><office:spreadsheet/></office:body>"
+            ),
+            "</office:document-content>",
+            &format!("<{root}/>"),
+            &[
+                "empty input => InvalidFormat(\"ODS data-style owner XML root is incomplete\")",
+                "whitespace only => InvalidFormat(\"ODS data-style owner XML root is incomplete\")",
+                "declaration only => InvalidFormat(\"ODS data-style owner XML root is incomplete\")",
+                "empty-element root => Ok(entries=0, owner=None)",
+                "start and end root => Ok(entries=0, owner=Some(89..115))",
+                "declaration then root => Ok(entries=0, owner=Some(127..153))",
+                "declaration, whitespace, root => Ok(entries=0, owner=Some(128..154))",
+                "root then whitespace => Ok(entries=0, owner=Some(89..115))",
+                "root then comment => Ok(entries=0, owner=Some(89..115))",
+                "root then PI => Ok(entries=0, owner=Some(89..115))",
+                "root then text => InvalidFormat(\"ODS data-style owner has non-whitespace text outside its root\")",
+                "root then second root => InvalidFormat(\"ODS data-style owner has multiple document roots\")",
+                "root then foreign start => InvalidFormat(\"ODS data-style owner has multiple document roots\")",
+                "root then foreign empty => InvalidFormat(\"ODS data-style owner has multiple document roots\")",
+                "empty-element root then second root => InvalidFormat(\"ODS data-style owner has multiple document roots\")",
+                "empty-element root then text => InvalidFormat(\"ODS data-style owner has non-whitespace text outside its root\")",
+                "declaration after root => InvalidFormat(\"ODS data-style XML declaration is out of order\")",
+                "two declarations => InvalidFormat(\"ODS data-style XML declaration is out of order\")",
+                "comment before declaration => InvalidFormat(\"ODS data-style XML declaration is out of order\")",
+                "comment before root => Ok(entries=0, owner=Some(97..123))",
+                "PI before root => Ok(entries=0, owner=Some(97..123))",
+                "text before root => InvalidFormat(\"ODS data-style owner has non-whitespace text outside its root\")",
+                "whitespace before declaration => InvalidFormat(\"ODS data-style XML declaration is out of order\")",
+                "unterminated root => InvalidFormat(\"ODS data-style owner XML root is incomplete\")",
+                "stray end tag => InvalidFormat(\"ODS data-style XML parsing error: XML parsing error: ill-formed document: close tag `</stray>` does not match any open tag\")",
+                "DOCTYPE => InvalidFormat(\"ODS data-style document type declarations are unsupported\")",
+                "DOCTYPE after root => InvalidFormat(\"ODS data-style document type declarations are unsupported\")",
+                "top-level CDATA => InvalidFormat(\"ODS data-style owner has CDATA outside its root\")",
+                "CDATA after root => InvalidFormat(\"ODS data-style owner has CDATA outside its root\")",
+                "entity reference before root => InvalidFormat(\"ODS data-style owner has a reference outside its root\")",
+                "entity reference after root => InvalidFormat(\"ODS data-style owner has a reference outside its root\")",
+            ],
+            |xml| match scan(xml.as_bytes(), Owner::ContentAutomatic) {
+                Ok(value) => format!(
+                    "Ok(entries={}, owner={:?})",
+                    value.entries.len(),
+                    value.owner_range
+                ),
+                Err(error) => format!("{error:?}"),
+            },
+        );
+    }
 }
