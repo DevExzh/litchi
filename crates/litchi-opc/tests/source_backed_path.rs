@@ -1,4 +1,9 @@
 #![cfg(any(unix, windows))]
+#![allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "focused filesystem-source assertions"
+)]
 
 //! Filesystem-backed source tests for the lazy OPC catalog ingress.
 

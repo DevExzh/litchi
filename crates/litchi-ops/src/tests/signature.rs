@@ -244,6 +244,10 @@ fn signed_compound_file(plain: Vec<u8>) -> Vec<u8> {
 
 /// The file every route opens `input` as, with the temporary files the path
 /// routes read kept alive alongside.
+#[allow(
+    clippy::type_complexity,
+    reason = "a test helper returning labelled files and their backing files"
+)]
 fn routes(input: &Input) -> (Vec<(&'static str, File)>, Vec<tempfile::NamedTempFile>) {
     let eager = OpenOptions::new().source_mode(SourceMode::Eager);
     let mut files = vec![

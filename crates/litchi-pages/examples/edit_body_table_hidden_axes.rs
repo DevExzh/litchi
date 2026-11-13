@@ -8,6 +8,11 @@
 //! no owner can still be read as having no hidden axes, but this example will
 //! refuse a non-empty request instead of synthesizing a Pages-internal graph.
 
+#![allow(
+    clippy::print_stdout,
+    reason = "this command-line example reports its committed semantic change"
+)]
+
 use std::error::Error;
 use std::ffi::OsString;
 use std::fs;

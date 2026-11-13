@@ -1,5 +1,10 @@
 //! Immutable ingress for legacy directory-backed iWork bundles.
 
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "filesystem acquisition helpers stay beside the state they validate"
+)]
+
 use std::{fmt, fs, io::Read, path::Path, sync::Arc};
 
 #[cfg(all(not(unix), not(windows)))]

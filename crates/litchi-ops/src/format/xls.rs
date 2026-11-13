@@ -619,6 +619,11 @@ impl<'a> Iterator for Worksheets<'a> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::expect_used,
+        clippy::unwrap_used,
+        reason = "test assertions panic by design"
+    )]
 
     use super::*;
     use crate::Code;

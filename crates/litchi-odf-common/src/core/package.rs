@@ -54,6 +54,10 @@ pub fn is_signature_owner_path(path: &str) -> bool {
 /// An ODF package (ZIP file containing XML documents).
 ///
 /// Uses soapberry-zip for efficient lazy decompression.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`Package` is the established public ODF archive reader name."
+)]
 pub struct Package<'data> {
     archive: Archive<'data>,
     manifest: Arc<super::manifest::Manifest>,
@@ -67,6 +71,10 @@ pub struct Package<'data> {
 
 /// Owned version of [`Package`] that owns the data buffer.
 #[derive(Clone)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "`OwnedPackage` distinguishes the owning public archive handle."
+)]
 pub struct OwnedPackage {
     data: Arc<Vec<u8>>,
     index: PreparedArchive,
@@ -2456,6 +2464,10 @@ impl package::PackageLookup for SourceBackedPackage {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    reason = "Test fixtures use infallible ZIP setup operations so assertions can focus on package behavior."
+)]
 mod tests {
     use super::*;
     use crate::core::{PackageWriter, Profile};

@@ -5769,6 +5769,10 @@ impl PartData {
     /// [`Self::as_bytes`] or clone the [`PartData`] handle instead. The
     /// compatibility [`Self::into_arc`] helper is available for unmanaged
     /// payloads.
+    #[allow(
+        clippy::wrong_self_convention,
+        reason = "this compatibility API borrows PartData while sharing its immutable allocation"
+    )]
     pub fn into_arc(&self) -> Result<Arc<Vec<u8>>> {
         if self.payload.reservation.is_some() {
             return Err(OpcError::ManagedPartDataArcEscape);

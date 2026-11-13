@@ -734,6 +734,11 @@ fn sync_parent(_parent: &Path) -> io::Result<()> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::expect_used,
+        clippy::unwrap_used,
+        reason = "test assertions panic on failure by design"
+    )]
 
     use super::*;
 

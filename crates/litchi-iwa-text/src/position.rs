@@ -45,6 +45,10 @@ impl std::error::Error for Error {}
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// A UTF-16 code-unit boundary in an iWork text storage.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "TextPosition names the semantic value represented by this position module."
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct TextPosition(u32);
 

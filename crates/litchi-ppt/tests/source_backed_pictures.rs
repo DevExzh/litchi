@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "fixture assertions panic on construction failure by design"
+)]
+
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_core::{ReadAt, SourceVersion};
 use litchi_ppt::writer::{Builder, PictureKind};

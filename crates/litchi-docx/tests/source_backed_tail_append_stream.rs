@@ -1,3 +1,10 @@
+#![allow(
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    reason = "focused stream fixtures make invalid test data construction explicit"
+)]
+
 //! Public-boundary coverage for replayable source-backed DOCX paragraph streams.
 //!
 //! These tests intentionally construct a small OPC package instead of using

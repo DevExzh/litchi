@@ -324,6 +324,11 @@ fn resource_limit_error(
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::expect_used,
+        clippy::unwrap_used,
+        reason = "test assertions panic on failure by design"
+    )]
 
     use super::*;
     use litchi_core::{Budget, CancellationSource, ExecutionLimits, Limits as BudgetLimits};

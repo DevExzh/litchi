@@ -2,6 +2,13 @@
 //! `Signed` states, and the facade's in-source document, presentation and
 //! workbook tests, ported onto `File` with the same semantics.
 
+#![allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    clippy::panic,
+    reason = "test assertions panic by design"
+)]
+
 #[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
 mod document;
 #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]

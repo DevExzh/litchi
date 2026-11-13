@@ -2,6 +2,12 @@
 //! typed caller-selected limits, deterministic fresh creation and exact no-op
 //! publication.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "integration-test assertions panic on failure by design"
+)]
+
 use litchi_odc::{
     AxisSpec, AxisUpdate, Builder, ChartClass, Definition, Error, LimitKind, OpenOptions, Package,
     SemanticLimitKind, SemanticLimits, SeriesSpec, SourceLimitKind, SourceLimits, chart::Dimension,

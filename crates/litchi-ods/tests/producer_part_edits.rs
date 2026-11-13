@@ -7,6 +7,12 @@
 //! made an ordinary edit fail before; these tests pin the closures and the
 //! byte preservation around them.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "integration-test assertions panic on failure by design"
+)]
+
 use std::io::Read;
 
 use litchi_ods::model::names::{Definition, Range, Scope};

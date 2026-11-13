@@ -9303,6 +9303,11 @@ mod tests {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
 mod picture_fragment_tests {
     use crate::Error;
     use crate::shape::{Scene, Shape};
