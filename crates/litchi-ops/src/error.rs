@@ -2780,6 +2780,9 @@ macro_rules! ole_metadata_classify {
                     Self::Package(error) => error.classify(),
                     Self::Metadata(error) => error.classify(),
                     Self::Property(_) => Class::of(Code::InvalidValue),
+                    // A typed property-set refusal of the source streams
+                    // keeps the classification of the shared OLE layer.
+                    Self::Object(error) => error.classify(),
                     Self::$protected => {
                         Class::suggest(Code::DocumentProtected, ENCRYPTED_METADATA_SUGGESTION)
                     },

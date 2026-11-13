@@ -63,23 +63,22 @@ impl Doc {
         let (package, patch, snapshot_bytes) =
             if !changed && self.signature() == super::Signature::Signed {
                 // The writable probe is an unsigned private package. Rebuild
-                // an identity metadata patch over the retained signed owner
-                // so replay and the facade have the same physical base.
+                // an identity patch over the retained signed owner so replay
+                // and the facade have the same physical base. The property-set
+                // editor refuses a signed container before it can prove a
+                // no-op, so the identity comes from an empty body edit, as it
+                // does for a signed body no-op.
                 let original = self.original_package_for_noop()?;
-                self.preflight_snapshot_bytes(
-                    limits.max_snapshot_bytes(),
-                    size_of::<litchi_doc::package::metadata::Edit>(),
-                )?;
-                let (package, patch) = original.edit_metadata()?.commit()?.into_parts();
-                let canonical_snapshot_bytes =
-                    ole_metadata::snapshot_bytes(patch.before_bytes(), patch.after_bytes());
+                self.preflight_snapshot_bytes(limits.max_snapshot_bytes(), 0)?;
+                let (package, patch) = original.edit()?.commit()?.into_parts();
+                let canonical_snapshot_bytes = super::patch_snapshot_bytes(&patch);
                 (
                     package,
-                    patch,
+                    StepPatch::Primary(patch),
                     staged_snapshot_bytes.max(canonical_snapshot_bytes),
                 )
             } else {
-                (package, patch, staged_snapshot_bytes)
+                (package, StepPatch::Metadata(patch), staged_snapshot_bytes)
             };
         if snapshot_bytes > limits.max_snapshot_bytes() {
             return Err(TransactionError::Limit {
@@ -97,7 +96,7 @@ impl Doc {
             } else {
                 self.clone()
             },
-            patch: StepPatch::Metadata(patch),
+            patch,
             operations,
             snapshot_bytes,
         })

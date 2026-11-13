@@ -26,6 +26,10 @@ pub(super) fn create(metadata: &Metadata) -> Result<Package> {
     Ok(builder.build()?)
 }
 
+fn native_edit_error(error: litchi_ppt::package::edit::Error) -> Error {
+    Error::from(error).with_format(FileFormat::Ppt)
+}
+
 impl Ppt {
     /// Apply `props` to the presentation properties through one native metadata
     /// transaction.
@@ -61,21 +65,29 @@ impl Ppt {
             if !changed && self.signature() == super::Signature::Signed {
                 // Re-root a signed no-op on the original signed package; the
                 // writable probe above intentionally edits an unsigned copy.
+                // The property-set editor refuses a signed container before
+                // it can prove a no-op, so the identity comes from an empty
+                // native edit, as it does for a signed slide no-op.
                 let original = self.original_package_for_noop()?;
-                self.preflight_snapshot_bytes(
-                    limits.max_snapshot_bytes(),
-                    size_of::<litchi_ppt::package::metadata::Edit>(),
-                )?;
-                let (package, patch) = original.edit_metadata()?.commit()?.into_parts();
-                let canonical_snapshot_bytes =
-                    ole_metadata::snapshot_bytes(patch.before_bytes(), patch.after_bytes());
+                self.preflight_snapshot_bytes(limits.max_snapshot_bytes(), 0)?;
+                let (package, patch) = original
+                    .edit()
+                    .map_err(native_edit_error)?
+                    .commit()
+                    .map_err(native_edit_error)?
+                    .into_parts();
+                let canonical_snapshot_bytes = patch
+                    .before()
+                    .len()
+                    .saturating_add(patch.after().len())
+                    .saturating_add(size_of::<litchi_ppt::Patch>());
                 (
                     package,
-                    patch,
+                    StepPatch::Primary(patch),
                     staged_snapshot_bytes.max(canonical_snapshot_bytes),
                 )
             } else {
-                (package, patch, staged_snapshot_bytes)
+                (package, StepPatch::Metadata(patch), staged_snapshot_bytes)
             };
         if snapshot_bytes > limits.max_snapshot_bytes() {
             return Err(TransactionError::Limit {
@@ -93,7 +105,7 @@ impl Ppt {
             } else {
                 self.clone()
             },
-            patch: StepPatch::Metadata(patch),
+            patch,
             operations,
             snapshot_bytes,
         })
