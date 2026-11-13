@@ -1,6 +1,6 @@
 //! Built-in function metadata used by the formula-text compiler.
 
-use super::super::function_table::BUILTIN_FUNCTIONS;
+use crate::formula::function_table::BUILTIN_FUNCTIONS;
 
 #[derive(Debug, Clone, Copy)]
 pub(super) struct BuiltinFunction {

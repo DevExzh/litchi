@@ -19,6 +19,9 @@
 #![cfg_attr(not(test), deny(clippy::disallowed_methods))]
 
 pub mod audit;
-mod xml_attributes;
+// Bounded attribute iteration, shared with `litchi-opc`, which re-exports it
+// as `litchi_opc::xml_attributes`. Not part of this crate's documented API.
+#[doc(hidden)]
+pub mod xml_attributes;
 
 pub use xml_minifier_macros::{minified_xml, minified_xml_format, minified_xml_str};

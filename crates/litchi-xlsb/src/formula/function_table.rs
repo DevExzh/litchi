@@ -8,7 +8,7 @@
 //! not provide macro execution facilities.
 
 /// Sorted `(Ftab index, name, minimum arguments, maximum arguments)` entries.
-pub(super) const BUILTIN_FUNCTIONS: &[(u16, &str, u8, u8)] = &[
+pub(crate) const BUILTIN_FUNCTIONS: &[(u16, &str, u8, u8)] = &[
     (0, "COUNT", 1, 255),
     (1, "IF", 2, 3),
     (2, "ISNA", 1, 1),

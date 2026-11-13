@@ -7,7 +7,7 @@
 use thiserror::Error;
 
 mod codec;
-mod function_table;
+pub(crate) mod function_table;
 mod model;
 
 /// Maximum size of an XLSB cell formula token stream.

@@ -473,7 +473,7 @@ fn quick_xml_checks_the_first_names_and_this_iterator_the_rest() {
     assert_eq!(QUICK_XML_LINEAR_NAMES, 32);
 }
 
-/// The crates that may not depend on `litchi-opc` keep copies of its
+/// The crates that may not depend on `xml-minifier` keep copies of this
 /// `xml_attributes` module, and each compiles this file as its tests. Their
 /// code must be the canonical code: only the module docs, the visibility of
 /// the two public items and the path of this test module may differ.
@@ -488,19 +488,14 @@ fn every_copy_of_the_module_is_the_canonical_code() {
                 "pub struct CheckedAttributes",
             )
             .replace(
-                "#[path = \"../../litchi-opc/src/xml_attributes/tests.rs\"]\n",
+                "#[path = \"../../xml-minifier/src/xml_attributes/tests.rs\"]\n",
                 "",
             )
     }
     let crates = concat!(env!("CARGO_MANIFEST_DIR"), "/..");
-    let canonical = std::fs::read_to_string(format!("{crates}/litchi-opc/src/xml_attributes.rs"))
+    let canonical = std::fs::read_to_string(format!("{crates}/xml-minifier/src/xml_attributes.rs"))
         .expect("canonical module");
-    for copy in [
-        "litchi-ole-common",
-        "litchi-sign",
-        "litchi-xldm",
-        "xml-minifier",
-    ] {
+    for copy in ["litchi-ole-common", "litchi-sign", "litchi-xldm"] {
         let text = std::fs::read_to_string(format!("{crates}/{copy}/src/xml_attributes.rs"))
             .expect("module copy");
         assert!(code(&text) == code(&canonical), "{copy} is out of step");

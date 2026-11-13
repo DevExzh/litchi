@@ -23,8 +23,6 @@
 //! - [MS-XLS] Section 2.5.198 - Ptg (for token details, largely compatible)
 
 mod error;
-#[path = "../function_table.rs"]
-mod function_table;
 mod parser;
 mod semantic;
 mod validation;
@@ -498,15 +496,16 @@ mod tests {
 
     #[test]
     fn builtin_function_table_is_sorted_unique_and_non_macro() {
-        assert_eq!(function_table::BUILTIN_FUNCTIONS.len(), 363);
+        assert_eq!(crate::formula::function_table::BUILTIN_FUNCTIONS.len(), 363);
         assert!(
-            function_table::BUILTIN_FUNCTIONS
+            crate::formula::function_table::BUILTIN_FUNCTIONS
                 .windows(2)
                 .all(|entries| entries[0].0 < entries[1].0)
         );
 
         let mut names = std::collections::HashSet::new();
-        for &(index, name, min_args, max_args) in function_table::BUILTIN_FUNCTIONS {
+        for &(index, name, min_args, max_args) in crate::formula::function_table::BUILTIN_FUNCTIONS
+        {
             assert!(min_args <= max_args, "invalid arity for {name}");
             assert!(
                 names.insert(name.to_ascii_uppercase()),
