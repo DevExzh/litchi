@@ -2320,6 +2320,133 @@ mod tests {
         payload
     }
 
+    fn point(x: i32, y: i32) -> Vec<u8> {
+        let mut out = Vec::new();
+        sdword(&mut out, x);
+        sdword(&mut out, y);
+        out
+    }
+
+    fn clip_rect(left: i32, top: i32, right: i32, bottom: i32) -> Vec<u8> {
+        let mut out = Vec::new();
+        for value in [left, top, right, bottom] {
+            sdword(&mut out, value);
+        }
+        record(EmrType::IntersectClipRect, &out)
+    }
+
+    fn clear_clip() -> Vec<u8> {
+        let mut out = Vec::new();
+        dword(&mut out, 0); // no region data
+        dword(&mut out, 5); // RGN_COPY
+        record(EmrType::ExtSelectClipRgn, &out)
+    }
+
+    fn line_to(x: i32, y: i32) -> Vec<u8> {
+        record(EmrType::LineTo, &point(x, y))
+    }
+
+    /// The stroked elements of a converted classic EMF (every `<line` and
+    /// every `<path` with a stroke, so not the clip definitions), in document
+    /// order.
+    fn line_elements(records: Vec<Vec<u8>>) -> Vec<String> {
+        let bytes = classic_emf(records);
+        let parser = EmfParser::new(&bytes, &crate::Limits::default()).unwrap();
+        let svg = EmfSvgConverter::new(&parser).convert().unwrap();
+        let mut found = Vec::new();
+        let mut rest = svg.as_str();
+        while let Some(start) = rest.find('<') {
+            let tail = &rest[start..];
+            let end = tail.find('>').unwrap() + 1;
+            let element = &tail[..end];
+            if element.starts_with("<line ")
+                || (element.starts_with("<path ") && element.contains(" stroke=\""))
+            {
+                found.push(element.to_string());
+            }
+            rest = &tail[end..];
+        }
+        found
+    }
+
+    #[test]
+    fn unclipped_line_runs_keep_their_serialized_form() {
+        let elements = line_elements(vec![
+            record(EmrType::MoveToEx, &point(10, 20)),
+            line_to(30, 20),
+            line_to(30, 40),
+            line_to(10, 40),
+            record(EmrType::MoveToEx, &point(50, 50)),
+            line_to(60, 60),
+            record(EmrType::MoveToEx, &point(70, 70)),
+            line_to(80, 70),
+            line_to(80, 80),
+        ]);
+        assert_eq!(
+            elements,
+            [
+                r#"<path d="M10 20L30 20L30 40L10 40" fill="none" stroke="black" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10"/>"#,
+                r#"<line x1="50" y1="50" x2="60" y2="60" stroke="black" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10"/>"#,
+                r#"<line x1="70" y1="70" x2="80" y2="70" stroke="black" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10"/>"#,
+                r#"<line x1="80" y1="70" x2="80" y2="80" stroke="black" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10"/>"#,
+            ]
+        );
+    }
+
+    #[test]
+    fn unclipped_line_run_longer_than_the_buffer_threshold_keeps_its_split() {
+        let mut records = vec![record(EmrType::MoveToEx, &point(0, 0))];
+        for step in 1..=12 {
+            records.push(line_to(step * 5, (step % 2) * 5));
+        }
+        let elements = line_elements(records);
+        assert_eq!(
+            elements,
+            [
+                r#"<path d="M0 0L5 5L10 0L15 5L20 0L25 5L30 0L35 5L40 0L45 5L50 0" fill="none" stroke="black" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10"/>"#,
+                r#"<line x1="50" y1="0" x2="55" y2="5" stroke="black" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10"/>"#,
+                r#"<line x1="55" y1="5" x2="60" y2="0" stroke="black" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10"/>"#,
+            ]
+        );
+    }
+
+    #[test]
+    fn clipped_line_keeps_its_clip() {
+        let elements = line_elements(vec![
+            clip_rect(0, 0, 50, 50),
+            record(EmrType::MoveToEx, &point(10, 20)),
+            line_to(80, 90),
+        ]);
+        assert_eq!(
+            elements,
+            [
+                r#"<line x1="10" y1="20" x2="80" y2="90" stroke="black" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" clip-path="url(#emf-clip-0)"/>"#
+            ]
+        );
+    }
+
+    #[test]
+    fn line_runs_do_not_merge_across_clip_regions() {
+        let elements = line_elements(vec![
+            clip_rect(0, 0, 50, 50),
+            record(EmrType::MoveToEx, &point(10, 20)),
+            line_to(30, 20),
+            line_to(30, 40),
+            line_to(10, 40),
+            clear_clip(),
+            line_to(10, 60),
+            line_to(30, 60),
+            line_to(30, 80),
+        ]);
+        assert_eq!(
+            elements,
+            [
+                r#"<path d="M10 20L30 20L30 40L10 40" fill="none" stroke="black" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" clip-path="url(#emf-clip-0)"/>"#,
+                r#"<path d="M10 40L10 60L30 60L30 80" fill="none" stroke="black" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10"/>"#,
+            ]
+        );
+    }
+
     #[test]
     fn bundled_classic_emf_plays_object_selection_and_line() {
         let mut pen = Vec::new();

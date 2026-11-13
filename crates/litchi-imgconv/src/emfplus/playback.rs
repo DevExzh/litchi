@@ -1765,6 +1765,56 @@ mod tests {
             vec![1, 2, 3, 4, 5, 6, 7, 8]
         );
     }
+    /// The engine has no header state: it plays draw records that precede a
+    /// Header and accepts a repeated Header. `EmfPlusStreamValidator` rejects
+    /// both, and the bundled renderer runs it first.
+    #[test]
+    fn draw_before_header_and_repeated_header_are_accepted() {
+        let mut engine = PlaybackEngine::new(PlaybackLimits::default()).unwrap();
+        let clear = record(RecordType::Clear, 0, &0xff00_1122u32.to_le_bytes());
+        let header = record(RecordType::Header, 0, &[0; 16]);
+
+        assert_eq!(engine.push(one(&clear)).unwrap().len(), 1);
+        assert!(engine.push(one(&header)).unwrap().is_empty());
+        assert!(engine.push(one(&header)).unwrap().is_empty());
+        assert_eq!(engine.push(one(&clear)).unwrap().len(), 1);
+        assert!(engine.diagnostics().is_empty());
+        assert!(!engine.is_finished());
+
+        engine
+            .push(one(&record(RecordType::EndOfFile, 0, &[])))
+            .unwrap();
+        assert!(engine.is_finished());
+        engine.finish().unwrap();
+        let error = engine.push(one(&clear)).unwrap_err().to_string();
+        assert!(error.contains("record appeared after EndOfFile"), "{error}");
+    }
+    /// A record of another type drops a pending continuation with a diagnostic
+    /// and is then played; the validator rejects the same sequence.
+    #[test]
+    fn interrupted_continuation_is_a_diagnostic() {
+        let mut engine = PlaybackEngine::new(PlaybackLimits::default()).unwrap();
+        let mut first = 8u32.to_le_bytes().to_vec();
+        first.extend_from_slice(&[1, 2, 3, 4]);
+        engine
+            .push(one(&record(RecordType::Object, 0x8103, &first)))
+            .unwrap();
+        let error = engine.finish().unwrap_err().to_string();
+        assert!(
+            error.contains("unterminated EMF+ object continuation"),
+            "{error}"
+        );
+
+        let clear = record(RecordType::Clear, 0, &0xff00_1122u32.to_le_bytes());
+        assert_eq!(engine.push(one(&clear)).unwrap().len(), 1);
+        assert_eq!(engine.diagnostics()[0].code, "object_interrupted");
+        assert!(engine.object(ObjectId::new(3, 64).unwrap()).is_none());
+        let error = engine.finish().unwrap_err().to_string();
+        assert!(
+            error.contains("EMF+ playback stream lacks EndOfFile"),
+            "{error}"
+        );
+    }
     #[test]
     fn bad_container_is_diagnostic() {
         let mut engine = PlaybackEngine::new(PlaybackLimits::default()).unwrap();

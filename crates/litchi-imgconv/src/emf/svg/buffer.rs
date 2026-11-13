@@ -5,22 +5,52 @@
 use super::state::DeviceContext;
 use crate::svg_utils::write_num;
 
+/// One buffered line segment: `(x1, y1, x2, y2)`.
+type Segment = (f64, f64, f64, f64);
+
+/// Lines are merged into one path once this many are pending.
+const RUN_FLUSH_THRESHOLD: usize = 10;
+
+/// The pending run of `<line>` elements that may still merge into one path.
+///
+/// A run holds only lines drawn with the same stroke under the same clip
+/// region, so the attributes of the run are the attributes of every line in
+/// it.
+///
+/// ```text
+/// Empty --line--------------------------> Run
+/// Run   --line, same stroke and clip----> Run   (emits the run at the threshold)
+/// Run   --line, other stroke or clip----> Run   (emits the old run first)
+/// Run   --any other element, or end-----> Empty (emits the run)
+/// ```
+enum LineRunState {
+    /// No line is pending.
+    Empty,
+    /// Lines that share `stroke` and `clip`. `lines` is empty right after a
+    /// threshold flush, which keeps the run open for the next line.
+    Run {
+        /// Serialized stroke attributes of the run.
+        stroke: String,
+        /// Serialized `clip-path` attribute of the run; empty when unclipped.
+        clip: String,
+        /// Pending segments in drawing order.
+        lines: Vec<Segment>,
+    },
+}
+
 /// Buffer for grouping and optimizing SVG elements
 pub(super) struct ElementBuffer {
     /// Finalized elements ready for output
     pub elements: Vec<String>,
-    /// Pending lines with same stroke for merging into polyline
-    pending_lines: Vec<(f64, f64, f64, f64)>, // x1, y1, x2, y2
-    /// Current stroke style for pending lines
-    current_stroke: Option<String>,
+    /// Lines waiting to be merged into a path
+    run: LineRunState,
 }
 
 impl ElementBuffer {
     pub(super) fn new() -> Self {
         Self {
             elements: Vec::new(),
-            pending_lines: Vec::new(),
-            current_stroke: None,
+            run: LineRunState::Empty,
         }
     }
 
@@ -39,31 +69,39 @@ impl ElementBuffer {
     /// Try to buffer a line for potential merging into polyline
     fn try_buffer_line(&mut self, line: String, dc: &DeviceContext) {
         // Parse line coordinates (simple extraction)
-        if let Some((x1, y1, x2, y2, _stroke)) = Self::parse_line(&line) {
-            let current_stroke_attrs = dc.get_stroke_attrs();
-
-            // Check if stroke matches current buffer
-            if let Some(ref buffered_stroke) = self.current_stroke
-                && buffered_stroke == &current_stroke_attrs
-            {
-                // Same stroke - buffer this line
-                self.pending_lines.push((x1, y1, x2, y2));
-
-                // Flush when buffer gets large enough
-                if self.pending_lines.len() >= 10 {
-                    self.flush_lines_as_path();
-                }
-                return;
-            }
-
-            // Different stroke - flush old lines and start new buffer
-            self.flush();
-            self.current_stroke = Some(current_stroke_attrs);
-            self.pending_lines.push((x1, y1, x2, y2));
-        } else {
+        let Some((x1, y1, x2, y2, _stroke)) = Self::parse_line(&line) else {
             // Can't parse - flush and add as-is
             self.flush();
             self.elements.push(line);
+            return;
+        };
+        let line_stroke = dc.get_stroke_attrs();
+        let line_clip = dc.clip_attr();
+
+        match &mut self.run {
+            LineRunState::Run {
+                stroke,
+                clip,
+                lines,
+            } if *stroke == line_stroke && *clip == line_clip => {
+                // Same stroke and clip - buffer this line
+                lines.push((x1, y1, x2, y2));
+
+                // Flush when buffer gets large enough
+                if lines.len() >= RUN_FLUSH_THRESHOLD {
+                    Self::output_run(&mut self.elements, lines, stroke, clip);
+                    lines.clear();
+                }
+            },
+            LineRunState::Empty | LineRunState::Run { .. } => {
+                // Different stroke or clip - flush old lines and start a new run
+                self.flush();
+                self.run = LineRunState::Run {
+                    stroke: line_stroke,
+                    clip: line_clip,
+                    lines: vec![(x1, y1, x2, y2)],
+                };
+            },
         }
     }
 
@@ -97,83 +135,33 @@ impl ElementBuffer {
         }
     }
 
-    /// Flush pending lines as path or individual line elements
-    fn flush_lines_as_path(&mut self) {
-        if self.pending_lines.is_empty() {
-            return;
-        }
-
+    /// Emit the lines of one run as paths or individual line elements
+    fn output_run(elements: &mut Vec<String>, lines: &[Segment], stroke: &str, clip: &str) {
         // Group lines into continuous paths
-        let mut current_path: Vec<(f64, f64, f64, f64)> = Vec::new();
-        // A pending line is normally installed together with its stroke. Keep
-        // this branch total nevertheless: conversion must not panic if an
-        // earlier malformed record leaves the optimization buffer incomplete.
-        let Some(stroke) = self.current_stroke.clone() else {
-            self.pending_lines.clear();
-            return;
-        };
-
-        for &line in &self.pending_lines {
-            let (x1, y1, _x2, _y2) = line;
-
-            if current_path.is_empty() {
-                // Start new path
-                current_path.push(line);
-            } else if let Some(&(_, _, prev_x2, prev_y2)) = current_path.last() {
-                // Check if this line connects to the previous one
-                let connects = (x1 - prev_x2).abs() < 0.1 && (y1 - prev_y2).abs() < 0.1;
-
-                if connects {
-                    // Continues path
-                    current_path.push(line);
-                } else {
-                    // Disconnected - flush current path and start new one
-                    Self::output_path_or_lines(&mut self.elements, &current_path, &stroke);
-                    current_path.clear();
-                    current_path.push(line);
-                }
-            } else {
-                // `current_path` is populated above, but retain a safe path
-                // for future changes to the grouping logic.
-                current_path.push(line);
+        let mut start = 0;
+        for index in 1..lines.len() {
+            let (_, _, prev_x2, prev_y2) = lines[index - 1];
+            let (x1, y1, _, _) = lines[index];
+            // Check if this line connects to the previous one
+            let connects = (x1 - prev_x2).abs() < 0.1 && (y1 - prev_y2).abs() < 0.1;
+            if !connects {
+                // Disconnected - flush current path and start new one
+                Self::output_path_or_lines(elements, &lines[start..index], stroke, clip);
+                start = index;
             }
         }
-
         // Flush remaining path
-        if !current_path.is_empty() {
-            Self::output_path_or_lines(&mut self.elements, &current_path, &stroke);
-        }
-
-        self.pending_lines.clear();
+        Self::output_path_or_lines(elements, &lines[start..], stroke, clip);
     }
 
     /// Output a path or individual lines depending on what's more efficient (optimized)
     fn output_path_or_lines(
         elements: &mut Vec<String>,
-        lines: &[(f64, f64, f64, f64)],
+        lines: &[Segment],
         stroke: &str,
+        clip: &str,
     ) {
-        if lines.is_empty() {
-            return;
-        }
-
-        if lines.len() == 1 {
-            // Single line - output as line element
-            let (x1, y1, x2, y2) = lines[0];
-            let mut s = String::with_capacity(96);
-            s.push_str("<line x1=\"");
-            write_num(&mut s, x1);
-            s.push_str("\" y1=\"");
-            write_num(&mut s, y1);
-            s.push_str("\" x2=\"");
-            write_num(&mut s, x2);
-            s.push_str("\" y2=\"");
-            write_num(&mut s, y2);
-            s.push_str("\" ");
-            s.push_str(stroke);
-            s.push_str("/>");
-            elements.push(s);
-        } else if lines.len() >= 3 {
+        if lines.len() >= 3 {
             // Multiple connected lines - use path (more compact)
             let mut path_data = String::with_capacity(lines.len() * 15);
             let (x1, y1, _, _) = lines[0];
@@ -182,22 +170,21 @@ impl ElementBuffer {
             path_data.push(' ');
             write_num(&mut path_data, y1);
 
-            for &(_, _, x2, y2) in lines.iter() {
+            for &(_, _, x2, y2) in lines {
                 path_data.push('L');
                 write_num(&mut path_data, x2);
                 path_data.push(' ');
                 write_num(&mut path_data, y2);
             }
 
-            let mut s = String::with_capacity(path_data.len() + stroke.len() + 32);
+            let mut s = String::with_capacity(path_data.len() + stroke.len() + clip.len() + 32);
             s.push_str("<path d=\"");
             s.push_str(&path_data);
             s.push_str("\" fill=\"none\" ");
-            s.push_str(stroke);
-            s.push_str("/>");
+            Self::close_element(&mut s, stroke, clip);
             elements.push(s);
         } else {
-            // 2 lines - output as individual lines (similar size to path)
+            // 1 or 2 lines - output as individual lines (similar size to path)
             for &(x1, y1, x2, y2) in lines {
                 let mut s = String::with_capacity(96);
                 s.push_str("<line x1=\"");
@@ -209,19 +196,32 @@ impl ElementBuffer {
                 s.push_str("\" y2=\"");
                 write_num(&mut s, y2);
                 s.push_str("\" ");
-                s.push_str(stroke);
-                s.push_str("/>");
+                Self::close_element(&mut s, stroke, clip);
                 elements.push(s);
             }
         }
     }
 
+    /// Append the run attributes and close the element.
+    fn close_element(element: &mut String, stroke: &str, clip: &str) {
+        element.push_str(stroke);
+        if !clip.is_empty() {
+            element.push(' ');
+            element.push_str(clip);
+        }
+        element.push_str("/>");
+    }
+
     /// Flush all pending buffered elements
     pub(super) fn flush(&mut self) {
-        if !self.pending_lines.is_empty() {
-            self.flush_lines_as_path();
+        match std::mem::replace(&mut self.run, LineRunState::Empty) {
+            LineRunState::Empty => {},
+            LineRunState::Run {
+                stroke,
+                clip,
+                lines,
+            } => Self::output_run(&mut self.elements, &lines, &stroke, &clip),
         }
-        self.current_stroke = None;
     }
 }
 
@@ -256,13 +256,11 @@ mod tests {
     }
 
     #[test]
-    fn incomplete_pending_state_is_discarded_without_panicking() {
+    fn flushing_without_pending_lines_emits_nothing() {
         let mut buffer = ElementBuffer::new();
-        buffer.pending_lines.push((1.0, 2.0, 3.0, 4.0));
 
         buffer.flush();
 
-        assert!(buffer.pending_lines.is_empty());
         assert!(buffer.elements.is_empty());
     }
 }

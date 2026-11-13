@@ -211,10 +211,25 @@ impl<'a> Iterator for EmfPlusRecordIter<'a> {
     }
 }
 
+/// Lifecycle of one logical EMF+ stream.
+///
+/// ```text
+/// AwaitingHeader           --Header-------------------------> Active { pending: None }
+/// Active { pending: None } --Object fragment, more to come--> Active { pending: Some }
+/// Active { pending: Some } --Object fragment, more to come--> Active { pending: Some }
+/// Active { pending: Some } --last Object fragment-----------> Active { pending: None }
+/// Active { pending: None } --EndOfFile----------------------> Ended
+/// ```
+///
+/// A rejected record leaves the state unchanged. `Ended` accepts no record.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum StreamState {
+    /// No record has been accepted yet.
     AwaitingHeader,
-    Active,
+    /// The Header was accepted; `pending` is the object whose continuation
+    /// fragments are still expected.
+    Active { pending: Option<PendingObject> },
+    /// EndOfFile was accepted.
     Ended,
 }
 
@@ -232,7 +247,6 @@ struct PendingObject {
 pub struct EmfPlusStreamValidator {
     limits: ParserLimits,
     state: StreamState,
-    pending_object: Option<PendingObject>,
     bytes_seen: usize,
     records_seen: usize,
 }
@@ -242,7 +256,6 @@ impl EmfPlusStreamValidator {
         Ok(Self {
             limits: limits.validate()?,
             state: StreamState::AwaitingHeader,
-            pending_object: None,
             bytes_seen: 0,
             records_seen: 0,
         })
@@ -291,7 +304,7 @@ impl EmfPlusStreamValidator {
 
         match self.state {
             StreamState::AwaitingHeader => self.validate_initial_header(record)?,
-            StreamState::Active => self.validate_active_record(record)?,
+            StreamState::Active { pending } => self.validate_active_record(record, pending)?,
             StreamState::Ended => {
                 return Err(parse_error("EMF+ record appears after EndOfFile"));
             },
@@ -304,13 +317,15 @@ impl EmfPlusStreamValidator {
     /// Finish a logical stream. An `EndOfFile` record and a completed object are
     /// required; a comment boundary alone is not end-of-stream.
     pub fn finish(&self) -> Result<()> {
-        if self.pending_object.is_some() {
-            return Err(parse_error("unterminated continued EmfPlusObject"));
-        }
         match self.state {
             StreamState::Ended => Ok(()),
             StreamState::AwaitingHeader => Err(parse_error("empty EMF+ stream")),
-            StreamState::Active => Err(parse_error("EMF+ stream lacks EndOfFile record")),
+            StreamState::Active { pending: Some(_) } => {
+                Err(parse_error("unterminated continued EmfPlusObject"))
+            },
+            StreamState::Active { pending: None } => {
+                Err(parse_error("EMF+ stream lacks EndOfFile record"))
+            },
         }
     }
 
@@ -331,11 +346,15 @@ impl EmfPlusStreamValidator {
         if record.header.data_size != 16 {
             return Err(parse_error("EmfPlusHeader DataSize must be 16"));
         }
-        self.state = StreamState::Active;
+        self.state = StreamState::Active { pending: None };
         Ok(())
     }
 
-    fn validate_active_record(&mut self, record: EmfPlusRecord<'_>) -> Result<()> {
+    fn validate_active_record(
+        &mut self,
+        record: EmfPlusRecord<'_>,
+        pending: Option<PendingObject>,
+    ) -> Result<()> {
         if record.header.record_type == RecordType::Header {
             return Err(parse_error("duplicate EmfPlusHeader record"));
         }
@@ -345,14 +364,14 @@ impl EmfPlusStreamValidator {
                 record.header.record_type.raw()
             )));
         }
-        if self.pending_object.is_some() && record.header.record_type != RecordType::Object {
+        if pending.is_some() && record.header.record_type != RecordType::Object {
             return Err(parse_error(
                 "continued EmfPlusObject was interrupted by another record type",
             ));
         }
 
         if record.header.record_type == RecordType::Object {
-            return self.validate_object(record);
+            return self.validate_object(record, pending);
         }
         if record.header.record_type == RecordType::EndOfFile {
             return self.validate_end_of_file(record);
@@ -370,9 +389,13 @@ impl EmfPlusStreamValidator {
         Ok(())
     }
 
-    fn validate_object(&mut self, record: EmfPlusRecord<'_>) -> Result<()> {
+    fn validate_object(
+        &mut self,
+        record: EmfPlusRecord<'_>,
+        pending: Option<PendingObject>,
+    ) -> Result<()> {
         let fragment = record.object_fragment(self.limits)?;
-        match self.pending_object {
+        match pending {
             None => self.start_or_complete_object(fragment),
             Some(pending) => self.continue_object(fragment, pending),
         }
@@ -400,12 +423,14 @@ impl EmfPlusStreamValidator {
         if received == total_size {
             return Ok(());
         }
-        self.pending_object = Some(PendingObject {
-            object_id: fragment.flags.object_id,
-            object_type: fragment.flags.object_type,
-            total_size,
-            received,
-        });
+        self.state = StreamState::Active {
+            pending: Some(PendingObject {
+                object_id: fragment.flags.object_id,
+                object_type: fragment.flags.object_type,
+                total_size,
+                received,
+            }),
+        };
         Ok(())
     }
 
@@ -437,12 +462,14 @@ impl EmfPlusStreamValidator {
         }
 
         if received == pending.total_size {
-            self.pending_object = None;
+            self.state = StreamState::Active { pending: None };
         } else if fragment.flags.continued {
-            self.pending_object = Some(PendingObject {
-                received,
-                ..pending
-            });
+            self.state = StreamState::Active {
+                pending: Some(PendingObject {
+                    received,
+                    ..pending
+                }),
+            };
         } else {
             return Err(parse_error(format!(
                 "continued object ended at {received} bytes, expected {}",

@@ -528,3 +528,75 @@ fn continuation_total_and_cumulative_stream_obey_byte_limit() {
     assert!(validator.push_payload(&header()).is_ok());
     assert!(validator.push_payload(&total_too_large).is_err());
 }
+
+fn validation_error(parts: &[Vec<u8>]) -> String {
+    let bytes = parts.concat();
+    match validate_complete_stream(&bytes, limits()) {
+        Ok(()) => panic!("stream unexpectedly validated"),
+        Err(error) => error.to_string(),
+    }
+}
+
+#[test]
+fn stream_lifecycle_violations_keep_their_messages() {
+    let clear = record(RecordType::Clear.raw(), 0, &[0; 4]);
+    let continued = record(RecordType::Object.raw(), 0x8101, &[8, 0, 0, 0, 1, 2, 3, 4]);
+    let cases: [(&[Vec<u8>], &str); 9] = [
+        (&[], "empty EMF+ stream"),
+        (
+            std::slice::from_ref(&clear),
+            "first EMF+ record is not Header",
+        ),
+        (&[header()], "EMF+ stream lacks EndOfFile record"),
+        (&[header(), header()], "duplicate EmfPlusHeader record"),
+        (
+            &[header(), eof(), clear.clone()],
+            "EMF+ record appears after EndOfFile",
+        ),
+        (
+            &[header(), eof(), eof()],
+            "EMF+ record appears after EndOfFile",
+        ),
+        (
+            &[header(), continued.clone()],
+            "unterminated continued EmfPlusObject",
+        ),
+        (
+            &[header(), continued.clone(), clear.clone()],
+            "continued EmfPlusObject was interrupted by another record type",
+        ),
+        (
+            &[header(), continued, eof()],
+            "continued EmfPlusObject was interrupted by another record type",
+        ),
+    ];
+    for (parts, message) in cases {
+        let error = validation_error(parts);
+        assert!(error.contains(message), "{error} lacks {message}");
+    }
+}
+
+#[test]
+fn failed_push_leaves_the_validator_in_its_previous_state() {
+    let mut validator = EmfPlusStreamValidator::new(limits()).unwrap();
+    let clear = record(RecordType::Clear.raw(), 0, &[0; 4]);
+    let continued = record(RecordType::Object.raw(), 0x8101, &[8, 0, 0, 0, 1, 2, 3, 4]);
+
+    assert!(validator.push_payload(&clear).is_err());
+    assert_eq!(validator.records_seen(), 0);
+    assert!(validator.push_payload(&header()).is_ok());
+    assert!(validator.push_payload(&continued).is_ok());
+    // An interrupting record is rejected and the continuation stays pending.
+    assert!(validator.push_payload(&clear).is_err());
+    assert_eq!(validator.records_seen(), 2);
+    let error = validator.finish().unwrap_err().to_string();
+    assert!(error.contains("unterminated continued EmfPlusObject"));
+    assert!(
+        validator
+            .push_payload(&record(RecordType::Object.raw(), 0x0101, &[5, 6, 7, 8]))
+            .is_ok()
+    );
+    assert!(validator.push_payload(&eof()).is_ok());
+    assert!(validator.finish().is_ok());
+    assert_eq!(validator.records_seen(), 4);
+}
