@@ -358,4 +358,89 @@ mod tests {
         )
         .is_err());
     }
+
+    /// The font and color-scheme flags are independent: none of the elements
+    /// is checked against the schema, so they may nest and several may be
+    /// open at once.
+    #[test]
+    fn nested_and_repeated_context_elements_keep_their_independent_flags() {
+        const NS: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
+        let read = |body: &str| {
+            let theme =
+                parse_theme(format!(r#"<a:theme xmlns:a="{NS}">{body}</a:theme>"#).as_bytes())
+                    .unwrap();
+            let colors: Vec<_> = theme
+                .colors
+                .iter()
+                .map(|color| format!("{}={}", color.name, color.rgb.as_deref().unwrap_or("-")))
+                .collect();
+            (
+                theme.major_font.map(|font| font.typeface),
+                theme.minor_font.map(|font| font.typeface),
+                colors.join(","),
+            )
+        };
+        let fonts = |major: Option<&str>, minor: Option<&str>, colors: &str| {
+            (
+                major.map(str::to_owned),
+                minor.map(str::to_owned),
+                colors.to_owned(),
+            )
+        };
+
+        // Both fonts open: the first `latin` is the major font, the second
+        // the minor.
+        assert_eq!(
+            read(
+                r#"<a:majorFont><a:minorFont><a:latin typeface="1"/><a:latin typeface="2"/></a:minorFont></a:majorFont>"#
+            ),
+            fonts(Some("1"), Some("2"), "")
+        );
+        // The end of the inner element leaves the outer one open.
+        assert_eq!(
+            read(
+                r#"<a:majorFont><a:minorFont><a:latin typeface="1"/></a:minorFont><a:latin typeface="2"/></a:majorFont>"#
+            ),
+            fonts(Some("1"), None, "")
+        );
+        // A nested element of the same name closes the flag for its parent.
+        assert_eq!(
+            read(
+                r#"<a:majorFont><a:majorFont></a:majorFont><a:latin typeface="1"/></a:majorFont><a:minorFont><a:latin typeface="2"/><a:latin typeface="3"/></a:minorFont>"#
+            ),
+            fonts(None, Some("2"), "")
+        );
+        // An empty-element tag opens nothing; `latin` and colors outside
+        // their context are ignored.
+        assert_eq!(
+            read(
+                r#"<a:majorFont/><a:latin typeface="0"/><a:clrScheme/><a:dk1><a:srgbClr val="000000"/></a:dk1><a:majorFont><a:latin/><a:latin typeface="1"/><a:latin typeface="2"/></a:majorFont>"#
+            ),
+            fonts(Some("1"), None, "")
+        );
+        // A font inside the color scheme, and colors inside a font inside the
+        // color scheme, are all read.
+        assert_eq!(
+            read(
+                r#"<a:clrScheme><a:majorFont><a:latin typeface="1"/><a:dk1><a:srgbClr val="111111"/></a:dk1></a:majorFont><a:lt1><a:srgbClr val="222222"/></a:lt1></a:clrScheme><a:accent1><a:srgbClr val="333333"/></a:accent1>"#
+            ),
+            fonts(Some("1"), None, "dk1=111111,lt1=222222")
+        );
+        // A color scheme inside a font ends without closing the font, and a
+        // nested color scheme closes the flag for its parent.
+        assert_eq!(
+            read(
+                r#"<a:minorFont><a:clrScheme><a:clrScheme></a:clrScheme><a:dk1><a:srgbClr val="111111"/></a:dk1></a:clrScheme><a:latin typeface="2"/></a:minorFont>"#
+            ),
+            fonts(None, Some("2"), "")
+        );
+        // A color slot stays pending across the end of the color scheme only
+        // until that end: the scheme end clears it.
+        assert_eq!(
+            read(
+                r#"<a:clrScheme><a:dk1></a:dk1><a:srgbClr val="111111"/><a:lt1><a:clrScheme></a:clrScheme><a:srgbClr val="222222"/></a:lt1></a:clrScheme>"#
+            ),
+            fonts(None, None, "")
+        );
+    }
 }

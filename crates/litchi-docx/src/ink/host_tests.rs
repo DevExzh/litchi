@@ -483,3 +483,129 @@ fn reference_values_xml_envelope_matrix() {
         assert_eq!(reference_values_envelope_outcome(xml), expected, "{name}");
     }
 }
+
+/// Every sequence of at most `max_len` symbols, shortest first.
+fn sequences(symbols: &[char], max_len: usize) -> Vec<String> {
+    let mut all = vec![String::new()];
+    let mut start = 0;
+    for _ in 0..max_len {
+        let end = all.len();
+        for index in start..end {
+            for &symbol in symbols {
+                let mut next = all[index].clone();
+                next.push(symbol);
+                all.push(next);
+            }
+        }
+        start = end;
+    }
+    all
+}
+
+/// One character per captured host (`R` removable, `-` not), or the error.
+fn group_host_outcome(group_children: &str) -> String {
+    let object = format!(
+        r#"<w:drawing><wp:inline><a:graphic><a:graphicData uri="{WPG}"><wpg:wgp>{group_children}</wpg:wgp></a:graphicData></a:graphic></wp:inline></w:drawing>"#
+    );
+    let fragment = group_fragment(&object);
+    let xml = story(&format!("<w:p><w:r>{fragment}</w:r></w:p>"), "");
+    match capture_story(&xml) {
+        Ok(hosts) => hosts
+            .iter()
+            .map(|host| if host.removable { 'R' } else { '-' })
+            .collect(),
+        Err(error) => format!("error: {error}"),
+    }
+}
+
+/// How many sequences produced each outcome, as `outcome:count`.
+fn outcome_counts(outcomes: &[(String, String)]) -> Vec<String> {
+    let mut counts = std::collections::BTreeMap::<String, usize>::new();
+    for (_, outcome) in outcomes {
+        *counts.entry(outcome.clone()).or_default() += 1;
+    }
+    counts
+        .into_iter()
+        .map(|(outcome, count)| format!("{outcome}:{count}"))
+        .collect()
+}
+
+fn removable_sequences(outcomes: &[(String, String)]) -> Vec<&str> {
+    outcomes
+        .iter()
+        .filter(|(_, outcome)| outcome.contains('R'))
+        .map(|(sequence, _)| sequence.as_str())
+        .collect::<Vec<_>>()
+}
+
+#[test]
+fn group_child_order_matrix_accepts_only_the_canonical_sequence() {
+    let outcomes: Vec<_> = sequences(&['N', 'P', 'C', 'X'], 4)
+        .into_iter()
+        .map(|sequence| {
+            let children: String = sequence
+                .chars()
+                .map(|symbol| match symbol {
+                    'N' => "<wpg:cNvGrpSpPr/>".to_owned(),
+                    'P' => format!("<wpg:grpSpPr>{GROUP_TRANSFORM}</wpg:grpSpPr>"),
+                    'C' => r#"<w14:contentPart r:id="groupInk"/>"#.to_owned(),
+                    _ => "<wpg:wsp/>".to_owned(),
+                })
+                .collect();
+            let outcome = group_host_outcome(&children);
+            (sequence, outcome)
+        })
+        .collect();
+    assert_eq!(removable_sequences(&outcomes), ["NPC"]);
+    assert_eq!(
+        outcome_counts(&outcomes),
+        [":121", "-:141", "--:64", "---:13", "----:1", "R:1"]
+    );
+}
+
+#[test]
+fn group_properties_child_matrix_accepts_only_one_transform() {
+    let outcomes: Vec<_> = sequences(&['T', 'X'], 3)
+        .into_iter()
+        .map(|sequence| {
+            let children: String = sequence
+                .chars()
+                .map(|symbol| match symbol {
+                    'T' => GROUP_TRANSFORM,
+                    _ => "<a:ln/>",
+                })
+                .collect();
+            let outcome = group_host_outcome(&format!(
+                r#"<wpg:cNvGrpSpPr/><wpg:grpSpPr>{children}</wpg:grpSpPr><w14:contentPart r:id="groupInk"/>"#
+            ));
+            (sequence, outcome)
+        })
+        .collect();
+    assert_eq!(removable_sequences(&outcomes), ["T"]);
+    assert_eq!(outcome_counts(&outcomes), ["-:14", "R:1"]);
+}
+
+#[test]
+fn group_transform_child_order_matrix_accepts_only_the_canonical_sequence() {
+    let outcomes: Vec<_> = sequences(&['O', 'E', 'H', 'X', 'Z'], 5)
+        .into_iter()
+        .map(|sequence| {
+            let children: String = sequence
+                .chars()
+                .map(|symbol| match symbol {
+                    'O' => r#"<a:off x="0" y="0"/>"#,
+                    'E' => r#"<a:ext cx="127000" cy="127000"/>"#,
+                    'H' => r#"<a:chOff x="0" y="0"/>"#,
+                    'X' => r#"<a:chExt cx="127000" cy="127000"/>"#,
+                    _ => "<a:other/>",
+                })
+                .collect();
+            let outcome = group_host_outcome(&format!(
+                r#"<wpg:cNvGrpSpPr/><wpg:grpSpPr><a:xfrm>{children}</a:xfrm></wpg:grpSpPr><w14:contentPart r:id="groupInk"/>"#
+            ));
+            (sequence, outcome)
+        })
+        .collect();
+    assert_eq!(removable_sequences(&outcomes), ["OEHX"]);
+    assert_eq!(outcome_counts(&outcomes), ["-:3905", "R:1"]);
+}

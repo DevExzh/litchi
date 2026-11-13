@@ -244,4 +244,63 @@ mod tests {
         )
         .is_err());
     }
+
+    /// The two font flags are independent: neither element is checked against
+    /// the schema, so one may be nested in the other and both may be open.
+    #[test]
+    fn nested_and_repeated_font_elements_keep_their_independent_flags() {
+        const NS: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
+        let fonts = |body: &str| {
+            let theme =
+                parse_theme(format!(r#"<a:theme xmlns:a="{NS}">{body}</a:theme>"#).as_bytes())
+                    .unwrap();
+            (
+                theme.major_font().map(str::to_owned),
+                theme.minor_font().map(str::to_owned),
+            )
+        };
+        let some = |major: &str, minor: &str| (Some(major.to_owned()), Some(minor.to_owned()));
+
+        // Both open: the first `latin` is the major font, the second the minor.
+        assert_eq!(
+            fonts(
+                r#"<a:majorFont><a:minorFont><a:latin typeface="1"/><a:latin typeface="2"/></a:minorFont></a:majorFont>"#
+            ),
+            some("1", "2")
+        );
+        assert_eq!(
+            fonts(
+                r#"<a:minorFont><a:majorFont><a:latin typeface="1"/></a:majorFont><a:latin typeface="2"/></a:minorFont>"#
+            ),
+            some("1", "2")
+        );
+        // The end of the inner element leaves the outer one open.
+        assert_eq!(
+            fonts(
+                r#"<a:majorFont><a:minorFont/><a:minorFont></a:minorFont><a:latin typeface="1"/></a:majorFont><a:minorFont><a:latin typeface="2"/></a:minorFont>"#
+            ),
+            some("1", "2")
+        );
+        assert_eq!(
+            fonts(
+                r#"<a:majorFont><a:minorFont><a:latin typeface="1"/></a:minorFont><a:latin typeface="2"/></a:majorFont>"#
+            ),
+            (Some("1".to_owned()), None)
+        );
+        // A nested element of the same name closes the flag for its parent.
+        assert_eq!(
+            fonts(
+                r#"<a:majorFont><a:majorFont></a:majorFont><a:latin typeface="1"/></a:majorFont><a:minorFont><a:latin typeface="2"/><a:latin typeface="3"/></a:minorFont>"#
+            ),
+            (None, Some("2".to_owned()))
+        );
+        // An empty-element font tag opens nothing, and only the first typeface
+        // of each font is kept, also across repeated elements.
+        assert_eq!(
+            fonts(
+                r#"<a:majorFont/><a:latin typeface="0"/><a:majorFont><a:latin/><a:latin typeface="1"/><a:latin typeface="2"/></a:majorFont><a:majorFont><a:latin typeface="3"/></a:majorFont>"#
+            ),
+            (Some("1".to_owned()), None)
+        );
+    }
 }

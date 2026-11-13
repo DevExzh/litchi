@@ -1467,4 +1467,144 @@ mod tests {
             ))
         ));
     }
+
+    const NOOP: Diagnostics = Diagnostics {
+        changed: false,
+        operation_count: 0,
+        auxiliary_changed: false,
+    };
+
+    /// A package whose body the strict body engine refuses, opened leniently.
+    fn package_with_refused_body() -> crate::Package {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/ole/doc/duplicate-style-names.doc");
+        crate::Package::from_bytes_with_options(
+            &std::fs::read(path).expect("fixture bytes"),
+            crate::OpenOptions::default().leniency(crate::Leniency::TolerateStylesheetDefects),
+        )
+        .expect("lenient open")
+    }
+
+    const REFUSED_BODY: &str = "Body(Invalid(Error::Corrupted(\"invalid stylesheet: style names and aliases must be unique\")))";
+
+    #[test]
+    fn body_edit_opens_on_first_use_and_stays_open() {
+        let source = package();
+        let bytes = source.to_bytes().expect("source bytes");
+
+        // Nothing is opened at construction.
+        let mut edit = source.edit().expect("edit");
+        assert_eq!(edit.retained_render_bytes(), None);
+        let debug = format!("{edit:?}");
+        assert!(
+            debug.starts_with("Edit { package: ")
+                && debug.ends_with(", retained_render_bytes: None, .. }"),
+            "{debug}"
+        );
+
+        // The first body operation opens it; later ones use the same body edit.
+        assert_eq!(edit.changes().expect("changes").len(), 0);
+        assert_eq!(edit.source_bytes().expect("source bytes"), bytes);
+        edit.replace_paragraph(Position::new(0), "after")
+            .expect("replace");
+        assert_eq!(edit.changes().expect("changes").len(), 1);
+        // The staged candidate is visible without opening anything.
+        let retained = edit.retained_render_bytes();
+        assert!(retained.is_some());
+        assert!(
+            format!("{edit:?}").ends_with(&format!(", retained_render_bytes: {retained:?}, .. }}"))
+        );
+        let commit = edit.commit().expect("commit");
+        assert_eq!(commit.diagnostics().operation_count(), 1);
+        assert_ne!(commit.package().to_bytes().unwrap(), bytes);
+    }
+
+    #[test]
+    fn commit_of_an_unused_edit_opens_the_body_and_publishes_a_noop() {
+        let source = package();
+        let commit = source.edit().expect("edit").commit().expect("commit");
+        assert_eq!(*commit.diagnostics(), NOOP);
+        assert_eq!(
+            commit.package().to_bytes().unwrap(),
+            source.to_bytes().unwrap()
+        );
+    }
+
+    #[test]
+    fn a_failed_deferred_open_is_reported_by_every_use_and_by_commit() {
+        let source = package_with_refused_body();
+        let mut edit = source.edit().expect("construction does not open the body");
+        for _ in 0..2 {
+            let error = edit
+                .changes()
+                .map(|changes| changes.len())
+                .expect_err("open");
+            assert_eq!(format!("{error:?}"), REFUSED_BODY);
+            assert_eq!(edit.retained_render_bytes(), None);
+        }
+        let error = edit.source_bytes().expect_err("open");
+        assert_eq!(format!("{error:?}"), REFUSED_BODY);
+        let error = edit.commit().expect_err("open at commit");
+        assert_eq!(format!("{error:?}"), REFUSED_BODY);
+
+        let error = source
+            .edit()
+            .expect("construction does not open the body")
+            .commit()
+            .expect_err("open at commit");
+        assert_eq!(format!("{error:?}"), REFUSED_BODY);
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
+    fn profiled_edit_opens_on_first_use_or_on_conversion() {
+        let source = package();
+        let bytes = source.to_bytes().expect("source bytes");
+        let events = std::cell::Cell::new(0usize);
+        let count = |_| events.set(events.get() + 1);
+
+        // Conversion opens a still deferred body edit.
+        let edit = source
+            .edit_profiled(EditOptions::default(), count, |_| {})
+            .expect("profiled edit");
+        assert_eq!(events.get(), 0);
+        assert_eq!(edit.retained_render_bytes(), None);
+        let mut ordinary = edit.into_unprofiled().expect("conversion");
+        let opened = events.get();
+        assert_ne!(opened, 0);
+        assert_eq!(ordinary.changes().expect("changes").len(), 0);
+        assert_eq!(*ordinary.commit().expect("commit").diagnostics(), NOOP);
+        assert_eq!(events.get(), opened);
+
+        // A body edit opened by an operation is kept by the conversion.
+        events.set(0);
+        let mut edit = source
+            .edit_profiled(EditOptions::default(), count, |_| {})
+            .expect("profiled edit");
+        edit.replace_paragraph(Position::new(0), "after")
+            .expect("replace");
+        assert_eq!(events.get(), opened);
+        let mut ordinary = edit.into_unprofiled().expect("conversion");
+        assert_eq!(events.get(), opened);
+        assert_eq!(ordinary.changes().expect("changes").len(), 1);
+        let commit = ordinary.commit().expect("commit");
+        assert_eq!(commit.diagnostics().operation_count(), 1);
+        assert_ne!(commit.package().to_bytes().unwrap(), bytes);
+
+        // A profiled edit commits from the deferred state too.
+        let commit = source
+            .edit_profiled(EditOptions::default(), |_| {}, |_| {})
+            .expect("profiled edit")
+            .commit()
+            .expect("commit");
+        assert_eq!(*commit.diagnostics(), NOOP);
+
+        // A failed open fails the conversion with the open's error.
+        let error = package_with_refused_body()
+            .edit_profiled(EditOptions::default(), |_| {}, |_| {})
+            .expect("construction does not open the body")
+            .into_unprofiled()
+            .expect_err("open at conversion");
+        assert_eq!(format!("{error:?}"), REFUSED_BODY);
+    }
 }
