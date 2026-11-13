@@ -163,25 +163,86 @@ pub(crate) struct Parsed {
     layout: Layout,
 }
 
+/// The Data Model collections, in the order a block must list them.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum ModelSection {
+    /// No collection has been read yet.
+    None,
+    Tables,
+    Relationships,
+    TimeGroupings,
+}
+
+/// Where the scanner stands inside an open `BrtBeginDataModel` block.
+///
+/// ```text
+/// Between(None)              --BrtBeginModelTables-->        Tables
+/// Between(None | Tables)     --BrtBeginModelRelationships--> Relationships
+/// Between(.. Relationships)  --brtBeginModelTimeGroupings--> TimeGroupings
+/// Tables                     --BrtEndModelTables-->          Between(Tables)
+/// Relationships              --BrtEndModelRelationships-->   Between(Relationships)
+/// TimeGroupings              --brtEndModelTimeGroupings-->   Between(TimeGroupings)
+/// TimeGroupings              --brtBeginModelTimeGrouping-->  TimeGrouping
+/// TimeGrouping               --brtEndModelTimeGrouping-->    TimeGroupings
+/// ```
+///
+/// Member records are read only inside their own collection, and
+/// `BrtEndDataModel` is accepted only in `Between`. A record of another kind
+/// never moves the position.
+enum ModelPosition {
+    /// No collection is open; holds the last collection that was closed.
+    Between(ModelSection),
+    Tables,
+    Relationships,
+    TimeGroupings,
+    /// Inside one grouping of the time-grouping collection.
+    TimeGrouping(TimeGrouping),
+}
+
+impl ModelPosition {
+    /// The last collection closed, when no collection is open.
+    const fn between(&self) -> Option<ModelSection> {
+        match self {
+            Self::Between(last) => Some(*last),
+            Self::Tables | Self::Relationships | Self::TimeGroupings | Self::TimeGrouping(_) => {
+                None
+            },
+        }
+    }
+}
+
+/// Where the workbook stream stands relative to its one Data Model block.
+///
+/// ```text
+/// Before --BrtBeginDataModel--> Open --BrtEndDataModel--> Closed
+/// ```
+///
+/// Every Data Model record is refused in `Before` (except the begin) and in
+/// `Closed`; `BrtEndBook` is refused in `Open`.
+enum ModelBlockState {
+    Before,
+    Open {
+        /// Offset of the `BrtBeginDataModel` record.
+        begin: usize,
+        min_version_load: u8,
+        position: ModelPosition,
+    },
+    Closed {
+        /// From the start of `BrtBeginDataModel` to the end of
+        /// `BrtEndDataModel`.
+        range: Range<usize>,
+        min_version_load: u8,
+    },
+}
+
 /// Parse the workbook's optional `BrtBeginDataModel` block.
 pub(crate) fn parse_workbook(data: &[u8], limits: SemanticLimits) -> Result<Parsed> {
     let limits = limits.validate()?;
     let mut iterator = Records::bounded(data, limits.raw)?;
     let mut record_count = 0_usize;
-    let mut begin: Option<usize> = None;
-    let mut end: Option<usize> = None;
     let mut end_book_offset = None;
-    let mut book_ended = false;
-    let mut definition = None;
+    let mut state = ModelBlockState::Before;
     let mut layout = Layout::default();
-    let mut tables_open = false;
-    let mut relationships_open = false;
-    let mut time_groupings_open = false;
-    let mut seen_tables = false;
-    let mut seen_relationships = false;
-    let mut seen_time_groupings = false;
-    let mut section = 0_u8;
-    let mut current_grouping: Option<TimeGrouping> = None;
     let mut tables = Vec::new();
     let mut relationships = Vec::new();
     let mut time_groupings = Vec::new();
@@ -202,45 +263,45 @@ pub(crate) fn parse_workbook(data: &[u8], limits: SemanticLimits) -> Result<Pars
                 return Err(invalid("duplicate BrtEndBook record"));
             }
             end_book_offset = Some(record_start);
-            book_ended = true;
-        } else if book_ended && is_model_record(record_kind) {
+        } else if end_book_offset.is_some() && is_model_record(record_kind) {
             return Err(invalid(
                 "Data Model record appears after BrtEndBook in the workbook stream",
             ));
         }
-        if begin.is_none() {
-            if record_kind == kind::BEGIN_DATA_MODEL.get() {
-                if definition.is_some() {
-                    return Err(invalid("duplicate BrtBeginDataModel record"));
+        let (begin, min_version_load, position) = match &mut state {
+            ModelBlockState::Before => {
+                if record_kind == kind::BEGIN_DATA_MODEL.get() {
+                    let (header, min_version_load) = parse_begin_data_model(payload)?;
+                    layout.begin_header = header;
+                    state = ModelBlockState::Open {
+                        begin: record_start,
+                        min_version_load,
+                        position: ModelPosition::Between(ModelSection::None),
+                    };
+                } else if is_model_record(record_kind) {
+                    return Err(invalid(
+                        "Data Model collection record appears outside BrtBeginDataModel",
+                    ));
                 }
-                let (header, min_version) = parse_begin_data_model(payload)?;
-                layout.begin_header = header;
-                definition = Some(Definition {
-                    min_version_load: min_version,
-                    tables: Vec::new(),
-                    relationships: Vec::new(),
-                    time_groupings: Vec::new(),
-                });
-                begin = Some(record_start);
-            } else if is_model_record(record_kind) {
-                return Err(invalid(
-                    "Data Model collection record appears outside BrtBeginDataModel",
-                ));
-            }
-            continue;
-        }
-
-        if end.is_some() {
-            if record_kind == kind::BEGIN_DATA_MODEL.get() {
-                return Err(invalid("multiple BrtBeginDataModel blocks"));
-            }
-            if is_model_record(record_kind) {
-                return Err(invalid(
-                    "Data Model collection record appears after BrtEndDataModel",
-                ));
-            }
-            continue;
-        }
+                continue;
+            },
+            ModelBlockState::Closed { .. } => {
+                if record_kind == kind::BEGIN_DATA_MODEL.get() {
+                    return Err(invalid("multiple BrtBeginDataModel blocks"));
+                }
+                if is_model_record(record_kind) {
+                    return Err(invalid(
+                        "Data Model collection record appears after BrtEndDataModel",
+                    ));
+                }
+                continue;
+            },
+            ModelBlockState::Open {
+                begin,
+                min_version_load,
+                position,
+            } => (*begin, *min_version_load, position),
+        };
 
         if record_kind == kind::END_BOOK.get() {
             return Err(invalid(
@@ -254,28 +315,21 @@ pub(crate) fn parse_workbook(data: &[u8], limits: SemanticLimits) -> Result<Pars
             },
             value if value == kind::BEGIN_MODEL_TABLES.get() => {
                 require_empty(payload, "BrtBeginModelTables")?;
-                if tables_open
-                    || relationships_open
-                    || time_groupings_open
-                    || seen_tables
-                    || section != 0
-                {
+                if position.between() != Some(ModelSection::None) {
                     return Err(invalid("nested or overlapping Data Model table collection"));
                 }
-                tables_open = true;
-                seen_tables = true;
-                section = 1;
+                *position = ModelPosition::Tables;
                 layout.has_tables = true;
             },
             value if value == kind::END_MODEL_TABLES.get() => {
                 require_empty(payload, "BrtEndModelTables")?;
-                if !tables_open {
+                if !matches!(position, ModelPosition::Tables) {
                     return Err(invalid("BrtEndModelTables has no matching begin"));
                 }
-                tables_open = false;
+                *position = ModelPosition::Between(ModelSection::Tables);
             },
             value if value == kind::MODEL_TABLE.get() => {
-                if !tables_open {
+                if !matches!(position, ModelPosition::Tables) {
                     return Err(invalid("BrtModelTable is outside BrtBeginModelTables"));
                 }
                 if tables.len() >= limits.max_tables {
@@ -289,30 +343,28 @@ pub(crate) fn parse_workbook(data: &[u8], limits: SemanticLimits) -> Result<Pars
             },
             value if value == kind::BEGIN_MODEL_RELATIONSHIPS.get() => {
                 require_empty(payload, "BrtBeginModelRelationships")?;
-                if relationships_open || tables_open || time_groupings_open {
+                let Some(last) = position.between() else {
                     return Err(invalid(
                         "nested or overlapping Data Model relationship collection",
                     ));
-                }
-                if seen_relationships || section > 1 {
+                };
+                if last > ModelSection::Tables {
                     return Err(invalid(
                         "Data Model relationship collection is duplicated or out of order",
                     ));
                 }
-                relationships_open = true;
-                seen_relationships = true;
-                section = 2;
+                *position = ModelPosition::Relationships;
                 layout.has_relationships = true;
             },
             value if value == kind::END_MODEL_RELATIONSHIPS.get() => {
                 require_empty(payload, "BrtEndModelRelationships")?;
-                if !relationships_open {
+                if !matches!(position, ModelPosition::Relationships) {
                     return Err(invalid("BrtEndModelRelationships has no matching begin"));
                 }
-                relationships_open = false;
+                *position = ModelPosition::Between(ModelSection::Relationships);
             },
             value if value == kind::MODEL_RELATIONSHIP.get() => {
-                if !relationships_open {
+                if !matches!(position, ModelPosition::Relationships) {
                     return Err(invalid(
                         "brtModelRelationship is outside brtBeginModelRelationships",
                     ));
@@ -331,30 +383,28 @@ pub(crate) fn parse_workbook(data: &[u8], limits: SemanticLimits) -> Result<Pars
             },
             value if value == kind::BEGIN_MODEL_TIME_GROUPINGS.get() => {
                 require_empty(payload, "brtBeginModelTimeGroupings")?;
-                if time_groupings_open || tables_open || relationships_open {
+                let Some(last) = position.between() else {
                     return Err(invalid(
                         "nested or overlapping Data Model time-grouping collection",
                     ));
-                }
-                if seen_time_groupings || section > 2 {
+                };
+                if last > ModelSection::Relationships {
                     return Err(invalid(
                         "Data Model time-grouping collection is duplicated or out of order",
                     ));
                 }
-                time_groupings_open = true;
-                seen_time_groupings = true;
-                section = 3;
+                *position = ModelPosition::TimeGroupings;
                 layout.has_time_groupings = true;
             },
             value if value == kind::END_MODEL_TIME_GROUPINGS.get() => {
                 require_empty(payload, "brtEndModelTimeGroupings")?;
-                if !time_groupings_open || current_grouping.is_some() {
+                if !matches!(position, ModelPosition::TimeGroupings) {
                     return Err(invalid("brtEndModelTimeGroupings has no matching begin"));
                 }
-                time_groupings_open = false;
+                *position = ModelPosition::Between(ModelSection::TimeGroupings);
             },
             value if value == kind::BEGIN_MODEL_TIME_GROUPING.get() => {
-                if !time_groupings_open || current_grouping.is_some() {
+                if !matches!(position, ModelPosition::TimeGroupings) {
                     return Err(invalid("invalid nested brtBeginModelTimeGrouping"));
                 }
                 if time_groupings.len() >= limits.max_time_groupings {
@@ -368,19 +418,23 @@ pub(crate) fn parse_workbook(data: &[u8], limits: SemanticLimits) -> Result<Pars
                 let (header, grouping) = parse_time_grouping(payload, limits.raw)?;
                 layout.time_grouping_headers.push(header);
                 layout.column_headers.push(Vec::new());
-                current_grouping = Some(grouping);
+                *position = ModelPosition::TimeGrouping(grouping);
             },
             value if value == kind::END_MODEL_TIME_GROUPING.get() => {
                 require_empty(payload, "brtEndModelTimeGrouping")?;
-                let grouping = current_grouping
-                    .take()
-                    .ok_or_else(|| invalid("brtEndModelTimeGrouping has no matching begin"))?;
+                // The position is left as written only on the accepted path;
+                // the refusal returns from the scan.
+                let ModelPosition::TimeGrouping(grouping) =
+                    std::mem::replace(position, ModelPosition::TimeGroupings)
+                else {
+                    return Err(invalid("brtEndModelTimeGrouping has no matching begin"));
+                };
                 time_groupings.push(grouping);
             },
             value if value == kind::MODEL_TIME_GROUPING_CALC_COL.get() => {
-                let grouping = current_grouping
-                    .as_mut()
-                    .ok_or_else(|| invalid("brtModelTimeGroupingCalcCol is outside a grouping"))?;
+                let ModelPosition::TimeGrouping(grouping) = position else {
+                    return Err(invalid("brtModelTimeGroupingCalcCol is outside a grouping"));
+                };
                 if grouping.columns.len() >= limits.max_time_grouping_columns {
                     return Err(limit("time grouping calculated-column count"));
                 }
@@ -396,14 +450,13 @@ pub(crate) fn parse_workbook(data: &[u8], limits: SemanticLimits) -> Result<Pars
             },
             value if value == kind::END_DATA_MODEL.get() => {
                 require_empty(payload, "BrtEndDataModel")?;
-                if tables_open
-                    || relationships_open
-                    || time_groupings_open
-                    || current_grouping.is_some()
-                {
+                if position.between().is_none() {
                     return Err(invalid("BrtEndDataModel closes an unbalanced collection"));
                 }
-                end = Some(record_end);
+                state = ModelBlockState::Closed {
+                    range: begin..record_end,
+                    min_version_load,
+                };
             },
             _ => {
                 // A model block can contain future records. Read them and keep
@@ -414,32 +467,38 @@ pub(crate) fn parse_workbook(data: &[u8], limits: SemanticLimits) -> Result<Pars
         }
     }
 
-    let Some(begin_index) = begin else {
-        return Ok(Parsed {
+    match state {
+        ModelBlockState::Before => Ok(Parsed {
             definition: None,
             block_range: None,
             end_book_offset,
             layout,
-        });
-    };
-    let Some(end_offset) = end else {
-        return Err(invalid("BrtBeginDataModel has no matching BrtEndDataModel"));
-    };
-    if begin_index >= end_offset {
-        return Err(invalid("invalid Data Model record range"));
+        }),
+        ModelBlockState::Open { .. } => {
+            Err(invalid("BrtBeginDataModel has no matching BrtEndDataModel"))
+        },
+        ModelBlockState::Closed {
+            range,
+            min_version_load,
+        } => {
+            if range.start >= range.end {
+                return Err(invalid("invalid Data Model record range"));
+            }
+            let value = Definition {
+                min_version_load,
+                tables,
+                relationships,
+                time_groupings,
+            };
+            validate_definition(&value, limits)?;
+            Ok(Parsed {
+                definition: Some(value),
+                block_range: Some(range),
+                end_book_offset,
+                layout,
+            })
+        },
     }
-    let mut value = definition.ok_or_else(|| invalid("missing Data Model definition"))?;
-    value.tables = tables;
-    value.relationships = relationships;
-    value.time_groupings = time_groupings;
-    validate_definition(&value, limits)?;
-    let range = begin_index..end_offset;
-    Ok(Parsed {
-        definition: Some(value),
-        block_range: Some(range),
-        end_book_offset,
-        layout,
-    })
 }
 
 #[cfg(test)]
@@ -1283,6 +1342,463 @@ mod tests {
         let mut bytes = fixture;
         bytes.splice(end.range.start..end.range.start, end_book);
         assert!(parse_workbook(&bytes, SemanticLimits::DEFAULT).is_err());
+    }
+
+    /// Runs the scanner over a space-separated record sequence and summarizes
+    /// the outcome. Tokens: `B`/`E` begin/end the model block; `T( t u T)` the
+    /// table collection with two tables; `R( r R)` the relationship
+    /// collection; `G( g( c g) G)` the time-grouping collection with one
+    /// grouping and one calculated column; `K` BrtEndBook; `X` an unknown
+    /// record; ranges are reported in tokens.
+    fn scan(sequence: &str) -> String {
+        let model = Definition {
+            min_version_load: 5,
+            tables: vec![
+                Table {
+                    id: "table-1".to_string(),
+                    name: "Sales".to_string(),
+                    connection: "Connection".to_string(),
+                },
+                Table {
+                    id: "table-2".to_string(),
+                    name: "Dates".to_string(),
+                    connection: "Connection".to_string(),
+                },
+            ],
+            relationships: vec![Relationship {
+                from_table: "Sales".to_string(),
+                from_column: "Date".to_string(),
+                to_table: "Dates".to_string(),
+                to_column: "Date".to_string(),
+            }],
+            time_groupings: definition().time_groupings,
+        };
+        let source =
+            serialize_definition(&model, None, SemanticLimits::DEFAULT).expect("source model");
+        let records = collect_records(&source, RawLimits::DEFAULT, MAX_RECORDS).expect("records");
+        let wire = |wanted: Kind, occurrence: usize| -> Vec<u8> {
+            let record = records
+                .iter()
+                .filter(|record| record.kind == wanted.get())
+                .nth(occurrence)
+                .expect("source record");
+            source[record.range.clone()].to_vec()
+        };
+        let synthetic = |wanted: Kind, payload: &[u8]| -> Vec<u8> {
+            let mut bytes = Vec::new();
+            Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT)
+                .write_record(wanted, payload)
+                .expect("record");
+            bytes
+        };
+        let mut bytes = Vec::new();
+        let mut starts = Vec::new();
+        for token in sequence.split_whitespace() {
+            starts.push(bytes.len());
+            bytes.extend_from_slice(&match token {
+                "B" => wire(kind::BEGIN_DATA_MODEL, 0),
+                "E" => wire(kind::END_DATA_MODEL, 0),
+                "T(" => wire(kind::BEGIN_MODEL_TABLES, 0),
+                "t" => wire(kind::MODEL_TABLE, 0),
+                "u" => wire(kind::MODEL_TABLE, 1),
+                "T)" => wire(kind::END_MODEL_TABLES, 0),
+                "R(" => wire(kind::BEGIN_MODEL_RELATIONSHIPS, 0),
+                "r" => wire(kind::MODEL_RELATIONSHIP, 0),
+                "R)" => wire(kind::END_MODEL_RELATIONSHIPS, 0),
+                "G(" => wire(kind::BEGIN_MODEL_TIME_GROUPINGS, 0),
+                "g(" => wire(kind::BEGIN_MODEL_TIME_GROUPING, 0),
+                "c" => wire(kind::MODEL_TIME_GROUPING_CALC_COL, 0),
+                "g)" => wire(kind::END_MODEL_TIME_GROUPING, 0),
+                "G)" => wire(kind::END_MODEL_TIME_GROUPINGS, 0),
+                "K" => synthetic(kind::END_BOOK, &[]),
+                "X" => synthetic(Kind::new(4095).expect("kind"), &[1, 2]),
+                other => panic!("unknown token {other}"),
+            });
+        }
+        starts.push(bytes.len());
+        let token_at = |offset: usize| {
+            starts
+                .iter()
+                .position(|start| *start == offset)
+                .expect("record boundary")
+        };
+        match parse_workbook(&bytes, SemanticLimits::DEFAULT) {
+            Err(error) => format!("error: {error}"),
+            Ok(parsed) => {
+                let end_book = parsed.end_book_offset.map(token_at);
+                let range = parsed
+                    .block_range
+                    .map(|range| token_at(range.start)..token_at(range.end));
+                let layout = &parsed.layout;
+                let content = parsed.definition.map(|value| {
+                    (
+                        value.tables.len(),
+                        value.relationships.len(),
+                        value
+                            .time_groupings
+                            .iter()
+                            .map(|grouping| grouping.columns.len())
+                            .collect::<Vec<_>>(),
+                    )
+                });
+                format!(
+                    "model {content:?} at {range:?}, sections {}{}{}, opaque {}, end book {end_book:?}",
+                    if layout.has_tables { "T" } else { "-" },
+                    if layout.has_relationships { "R" } else { "-" },
+                    if layout.has_time_groupings { "G" } else { "-" },
+                    layout.opaque,
+                )
+            },
+        }
+    }
+
+    #[test]
+    fn block_scanner_accepts_and_rejects_the_same_sequences() {
+        let cases: &[(&str, &str)] = &[
+            (
+                "",
+                "model None at None, sections ---, opaque false, end book None",
+            ),
+            (
+                "X K",
+                "model None at None, sections ---, opaque false, end book Some(1)",
+            ),
+            (
+                "B E K",
+                "model Some((0, 0, [])) at Some(0..2), sections ---, opaque false, end book Some(2)",
+            ),
+            (
+                "X B E X K",
+                "model Some((0, 0, [])) at Some(1..3), sections ---, opaque false, end book Some(4)",
+            ),
+            (
+                "B T( t u T) R( r R) G( g( c g) G) E K",
+                "model Some((2, 1, [1])) at Some(0..14), sections TRG, opaque false, end book Some(14)",
+            ),
+            (
+                "B T( t T) E",
+                "model Some((1, 0, [])) at Some(0..5), sections T--, opaque false, end book None",
+            ),
+            (
+                "B T( T) E",
+                "model Some((0, 0, [])) at Some(0..4), sections T--, opaque false, end book None",
+            ),
+            (
+                "B R( R) E",
+                "model Some((0, 0, [])) at Some(0..4), sections -R-, opaque false, end book None",
+            ),
+            (
+                "B G( G) E",
+                "model Some((0, 0, [])) at Some(0..4), sections --G, opaque false, end book None",
+            ),
+            (
+                "B T( t u T) G( g( c g) G) E",
+                "model Some((2, 0, [1])) at Some(0..11), sections T-G, opaque false, end book None",
+            ),
+            (
+                "B T( t u T) R( r R) E",
+                "model Some((2, 1, [])) at Some(0..9), sections TR-, opaque false, end book None",
+            ),
+            (
+                "B R( r R) E",
+                "error: Invalid format: relationship references unknown from_table",
+            ),
+            (
+                "B G( g( g) g( c c g) G) E",
+                "error: Invalid format: time grouping references unknown table",
+            ),
+            (
+                "B X T( X t X T) X E",
+                "model Some((1, 0, [])) at Some(0..9), sections T--, opaque true, end book None",
+            ),
+            // Collections out of order or repeated.
+            (
+                "B T( T) T( T) E",
+                "error: Invalid format: nested or overlapping Data Model table collection",
+            ),
+            (
+                "B R( R) T( T) E",
+                "error: Invalid format: nested or overlapping Data Model table collection",
+            ),
+            (
+                "B G( G) T( T) E",
+                "error: Invalid format: nested or overlapping Data Model table collection",
+            ),
+            (
+                "B R( R) R( R) E",
+                "error: Invalid format: Data Model relationship collection is duplicated or out of order",
+            ),
+            (
+                "B G( G) R( R) E",
+                "error: Invalid format: Data Model relationship collection is duplicated or out of order",
+            ),
+            (
+                "B T( T) G( G) R( R) E",
+                "error: Invalid format: Data Model relationship collection is duplicated or out of order",
+            ),
+            (
+                "B G( G) G( G) E",
+                "error: Invalid format: Data Model time-grouping collection is duplicated or out of order",
+            ),
+            // Collections nested in one another.
+            (
+                "B T( T(",
+                "error: Invalid format: nested or overlapping Data Model table collection",
+            ),
+            (
+                "B T( R(",
+                "error: Invalid format: nested or overlapping Data Model relationship collection",
+            ),
+            (
+                "B T( G(",
+                "error: Invalid format: nested or overlapping Data Model time-grouping collection",
+            ),
+            (
+                "B R( T(",
+                "error: Invalid format: nested or overlapping Data Model table collection",
+            ),
+            (
+                "B R( R(",
+                "error: Invalid format: nested or overlapping Data Model relationship collection",
+            ),
+            (
+                "B R( G(",
+                "error: Invalid format: nested or overlapping Data Model time-grouping collection",
+            ),
+            (
+                "B G( T(",
+                "error: Invalid format: nested or overlapping Data Model table collection",
+            ),
+            (
+                "B G( R(",
+                "error: Invalid format: nested or overlapping Data Model relationship collection",
+            ),
+            (
+                "B G( G(",
+                "error: Invalid format: nested or overlapping Data Model time-grouping collection",
+            ),
+            (
+                "B G( g( T(",
+                "error: Invalid format: nested or overlapping Data Model table collection",
+            ),
+            (
+                "B G( g( R(",
+                "error: Invalid format: nested or overlapping Data Model relationship collection",
+            ),
+            (
+                "B G( g( G(",
+                "error: Invalid format: nested or overlapping Data Model time-grouping collection",
+            ),
+            (
+                "B G( g( g(",
+                "error: Invalid format: invalid nested brtBeginModelTimeGrouping",
+            ),
+            // Ends without a begin.
+            (
+                "B T)",
+                "error: Invalid format: BrtEndModelTables has no matching begin",
+            ),
+            (
+                "B R)",
+                "error: Invalid format: BrtEndModelRelationships has no matching begin",
+            ),
+            (
+                "B G)",
+                "error: Invalid format: brtEndModelTimeGroupings has no matching begin",
+            ),
+            (
+                "B g)",
+                "error: Invalid format: brtEndModelTimeGrouping has no matching begin",
+            ),
+            (
+                "B T( T) T)",
+                "error: Invalid format: BrtEndModelTables has no matching begin",
+            ),
+            (
+                "B T( R)",
+                "error: Invalid format: BrtEndModelRelationships has no matching begin",
+            ),
+            (
+                "B R( G)",
+                "error: Invalid format: brtEndModelTimeGroupings has no matching begin",
+            ),
+            (
+                "B G( T)",
+                "error: Invalid format: BrtEndModelTables has no matching begin",
+            ),
+            (
+                "B G( g)",
+                "error: Invalid format: brtEndModelTimeGrouping has no matching begin",
+            ),
+            (
+                "B G( g( G)",
+                "error: Invalid format: brtEndModelTimeGroupings has no matching begin",
+            ),
+            (
+                "B G( g( g) g)",
+                "error: Invalid format: brtEndModelTimeGrouping has no matching begin",
+            ),
+            // Members outside their collection.
+            (
+                "B t",
+                "error: Invalid format: BrtModelTable is outside BrtBeginModelTables",
+            ),
+            (
+                "B r",
+                "error: Invalid format: brtModelRelationship is outside brtBeginModelRelationships",
+            ),
+            (
+                "B g(",
+                "error: Invalid format: invalid nested brtBeginModelTimeGrouping",
+            ),
+            (
+                "B c",
+                "error: Invalid format: brtModelTimeGroupingCalcCol is outside a grouping",
+            ),
+            (
+                "B T( r",
+                "error: Invalid format: brtModelRelationship is outside brtBeginModelRelationships",
+            ),
+            (
+                "B T( g(",
+                "error: Invalid format: invalid nested brtBeginModelTimeGrouping",
+            ),
+            (
+                "B T( c",
+                "error: Invalid format: brtModelTimeGroupingCalcCol is outside a grouping",
+            ),
+            (
+                "B R( t",
+                "error: Invalid format: BrtModelTable is outside BrtBeginModelTables",
+            ),
+            (
+                "B G( t",
+                "error: Invalid format: BrtModelTable is outside BrtBeginModelTables",
+            ),
+            (
+                "B G( c",
+                "error: Invalid format: brtModelTimeGroupingCalcCol is outside a grouping",
+            ),
+            (
+                "B G( g( t",
+                "error: Invalid format: BrtModelTable is outside BrtBeginModelTables",
+            ),
+            (
+                "B G( g( r",
+                "error: Invalid format: brtModelRelationship is outside brtBeginModelRelationships",
+            ),
+            (
+                "B T( T) t",
+                "error: Invalid format: BrtModelTable is outside BrtBeginModelTables",
+            ),
+            // The block itself.
+            (
+                "B",
+                "error: Invalid format: BrtBeginDataModel has no matching BrtEndDataModel",
+            ),
+            (
+                "B T( t",
+                "error: Invalid format: BrtBeginDataModel has no matching BrtEndDataModel",
+            ),
+            (
+                "B B",
+                "error: Invalid format: nested BrtBeginDataModel record",
+            ),
+            (
+                "B T( B",
+                "error: Invalid format: nested BrtBeginDataModel record",
+            ),
+            (
+                "B E B E",
+                "error: Invalid format: multiple BrtBeginDataModel blocks",
+            ),
+            (
+                "B E X B",
+                "error: Invalid format: multiple BrtBeginDataModel blocks",
+            ),
+            (
+                "B E E",
+                "error: Invalid format: Data Model collection record appears after BrtEndDataModel",
+            ),
+            (
+                "B E t",
+                "error: Invalid format: Data Model collection record appears after BrtEndDataModel",
+            ),
+            (
+                "B E T(",
+                "error: Invalid format: Data Model collection record appears after BrtEndDataModel",
+            ),
+            (
+                "E",
+                "error: Invalid format: Data Model collection record appears outside BrtBeginDataModel",
+            ),
+            (
+                "t",
+                "error: Invalid format: Data Model collection record appears outside BrtBeginDataModel",
+            ),
+            (
+                "T( T)",
+                "error: Invalid format: Data Model collection record appears outside BrtBeginDataModel",
+            ),
+            (
+                "X g(",
+                "error: Invalid format: Data Model collection record appears outside BrtBeginDataModel",
+            ),
+            (
+                "B T( E",
+                "error: Invalid format: BrtEndDataModel closes an unbalanced collection",
+            ),
+            (
+                "B R( E",
+                "error: Invalid format: BrtEndDataModel closes an unbalanced collection",
+            ),
+            (
+                "B G( E",
+                "error: Invalid format: BrtEndDataModel closes an unbalanced collection",
+            ),
+            (
+                "B G( g( E",
+                "error: Invalid format: BrtEndDataModel closes an unbalanced collection",
+            ),
+            // BrtEndBook.
+            (
+                "K",
+                "model None at None, sections ---, opaque false, end book Some(0)",
+            ),
+            ("K K", "error: Invalid format: duplicate BrtEndBook record"),
+            (
+                "B E K K",
+                "error: Invalid format: duplicate BrtEndBook record",
+            ),
+            (
+                "K B E",
+                "error: Invalid format: Data Model record appears after BrtEndBook in the workbook stream",
+            ),
+            (
+                "K X",
+                "model None at None, sections ---, opaque false, end book Some(0)",
+            ),
+            (
+                "B K E",
+                "error: Invalid format: BrtEndBook appears before the Data Model block is closed",
+            ),
+            (
+                "B T( K",
+                "error: Invalid format: BrtEndBook appears before the Data Model block is closed",
+            ),
+            (
+                "B E K t",
+                "error: Invalid format: Data Model record appears after BrtEndBook in the workbook stream",
+            ),
+        ];
+        let mismatches: Vec<String> = cases
+            .iter()
+            .filter_map(|(sequence, expected)| {
+                let actual = scan(sequence);
+                (actual != *expected).then(|| format!("(\"{sequence}\", \"{actual}\"),"))
+            })
+            .collect();
+        assert!(mismatches.is_empty(), "\n{}\n", mismatches.join("\n"));
     }
 
     #[test]

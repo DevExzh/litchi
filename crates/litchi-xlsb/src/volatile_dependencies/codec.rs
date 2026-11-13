@@ -56,6 +56,31 @@ pub(crate) fn read(data: &[u8], limits: SemanticLimits, sheet_count: usize) -> R
     parser.finish(sheet_count)
 }
 
+/// Where the stream stands relative to its one BrtBeginVolDeps block.
+///
+/// ```text
+/// Before --BrtBeginVolDeps--> Open --BrtEndVolDeps--> Closed
+/// ```
+///
+/// Type collections are read only in `Open`. A second BrtBeginVolDeps is
+/// refused in `Open`. In `Closed` every record of the family is refused and
+/// any other record only marks the stream as not safe to rewrite.
+#[derive(Clone, Copy)]
+enum DepsBlockState {
+    Before,
+    Open,
+    Closed,
+}
+
+impl DepsBlockState {
+    const fn is_open(self) -> bool {
+        match self {
+            Self::Before | Self::Closed => false,
+            Self::Open => true,
+        }
+    }
+}
+
 struct Parser {
     limits: SemanticLimits,
     records: usize,
@@ -69,8 +94,7 @@ struct Parser {
     current_main: Option<MainTopic>,
     current_topic: Option<Topic>,
     value_seen: bool,
-    began: bool,
-    ended: bool,
+    block: DepsBlockState,
     rewrite_safe: bool,
 }
 
@@ -89,19 +113,21 @@ impl Parser {
             current_main: None,
             current_topic: None,
             value_seen: false,
-            began: false,
-            ended: false,
+            block: DepsBlockState::Before,
             rewrite_safe: true,
         }
     }
 
     fn accept(&mut self, record_kind: crate::raw::Kind, payload: &[u8]) -> Result<()> {
-        if self.ended {
-            if is_known(record_kind) {
-                return Err(invalid("record follows BrtEndVolDeps"));
-            }
-            self.rewrite_safe = false;
-            return Ok(());
+        match self.block {
+            DepsBlockState::Before | DepsBlockState::Open => {},
+            DepsBlockState::Closed => {
+                if is_known(record_kind) {
+                    return Err(invalid("record follows BrtEndVolDeps"));
+                }
+                self.rewrite_safe = false;
+                return Ok(());
+            },
         }
         match record_kind {
             kind if kind == kind::BEGIN_VOL_DEPS => self.begin_deps(payload),
@@ -130,8 +156,11 @@ impl Parser {
 
     fn begin_deps(&mut self, payload: &[u8]) -> Result<()> {
         empty(payload, "BrtBeginVolDeps")?;
-        if self.began {
-            return Err(invalid("duplicate BrtBeginVolDeps"));
+        match self.block {
+            DepsBlockState::Before => {},
+            DepsBlockState::Open | DepsBlockState::Closed => {
+                return Err(invalid("duplicate BrtBeginVolDeps"));
+            },
         }
         if !self.dependencies.is_empty()
             || self.current_type.is_some()
@@ -140,7 +169,7 @@ impl Parser {
         {
             return Err(invalid("BrtBeginVolDeps is not at stream start"));
         }
-        self.began = true;
+        self.block = DepsBlockState::Open;
         self.dependencies
             .try_reserve_exact(self.limits.max_types.min(2))
             .map_err(|source| Error::Allocation {
@@ -152,21 +181,19 @@ impl Parser {
 
     fn end_deps(&mut self, payload: &[u8]) -> Result<()> {
         empty(payload, "BrtEndVolDeps")?;
-        if !self.began
-            || self.ended
+        if !self.block.is_open()
             || self.current_type.is_some()
             || self.current_main.is_some()
             || self.current_topic.is_some()
         {
             return Err(invalid("unbalanced BrtEndVolDeps"));
         }
-        self.ended = true;
+        self.block = DepsBlockState::Closed;
         Ok(())
     }
 
     fn begin_type(&mut self, payload: &[u8]) -> Result<()> {
-        if !self.began
-            || self.ended
+        if !self.block.is_open()
             || self.current_type.is_some()
             || self.current_main.is_some()
             || self.current_topic.is_some()
@@ -529,8 +556,11 @@ impl Parser {
     }
 
     fn finish(self, sheet_count: usize) -> Result<Parsed> {
-        if !self.began
-            || !self.ended
+        let closed = match self.block {
+            DepsBlockState::Before | DepsBlockState::Open => false,
+            DepsBlockState::Closed => true,
+        };
+        if !closed
             || self.current_type.is_some()
             || self.current_main.is_some()
             || self.current_topic.is_some()

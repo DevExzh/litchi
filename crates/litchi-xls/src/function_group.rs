@@ -61,12 +61,30 @@ impl FunctionGroups {
     }
 }
 
+/// Where the workbook-global record stream stands relative to its one
+/// function-group block (BuiltInFnGroupCount followed directly by the
+/// FnGroupName and FnGrp12 records).
+///
+/// ```text
+/// Before --BuiltInFnGroupCount--> Open --any other record--> Closed
+/// Open   --FnGroupName / FnGrp12--> Open
+/// ```
+///
+/// A name record is refused in `Before`, a second BuiltInFnGroupCount in
+/// `Open`, and every function-group record in `Closed`.
+#[derive(Debug, Default, Clone, Copy)]
+enum FunctionGroupBlockState {
+    #[default]
+    Before,
+    Open(BuiltInFunctionCategories),
+    Closed(BuiltInFunctionCategories),
+}
+
 #[derive(Debug, Default)]
 pub(crate) struct FunctionGroupCollector {
-    built_in: Option<BuiltInFunctionCategories>,
+    state: FunctionGroupBlockState,
     classic: Vec<String>,
     extended: Vec<String>,
-    closed: bool,
 }
 
 impl FunctionGroupCollector {
@@ -79,23 +97,26 @@ impl FunctionGroupCollector {
             record_type,
             BUILT_IN_FN_GROUP_COUNT_RECORD_TYPE | FN_GROUP_NAME_RECORD_TYPE | FN_GRP12_RECORD_TYPE
         );
-        if self.built_in.is_some() && !target {
-            self.closed = true;
-            return Ok(());
-        }
         if !target {
+            if let FunctionGroupBlockState::Open(built_in) = self.state {
+                self.state = FunctionGroupBlockState::Closed(built_in);
+            }
             return Ok(());
         }
-        if self.closed {
-            return invalid(
-                record_type,
-                "function-group record is outside its contiguous BIFF8 collection",
-            );
-        }
+        let built_in = match self.state {
+            FunctionGroupBlockState::Before => None,
+            FunctionGroupBlockState::Open(built_in) => Some(built_in),
+            FunctionGroupBlockState::Closed(_) => {
+                return invalid(
+                    record_type,
+                    "function-group record is outside its contiguous BIFF8 collection",
+                );
+            },
+        };
 
         match record_type {
             BUILT_IN_FN_GROUP_COUNT_RECORD_TYPE => {
-                if self.built_in.is_some() {
+                if built_in.is_some() {
                     return invalid(record_type, "duplicate BuiltInFnGroupCount record");
                 }
                 if data.len() != 2 {
@@ -104,7 +125,7 @@ impl FunctionGroupCollector {
                         found: data.len(),
                     });
                 }
-                self.built_in = Some(match read_u16(data, 0)? {
+                self.state = FunctionGroupBlockState::Open(match read_u16(data, 0)? {
                     14 => BuiltInFunctionCategories::Fourteen,
                     16 => BuiltInFunctionCategories::Sixteen,
                     17 => BuiltInFunctionCategories::SeventeenCompatibility,
@@ -119,7 +140,7 @@ impl FunctionGroupCollector {
                 });
             },
             FN_GROUP_NAME_RECORD_TYPE => {
-                if self.built_in.is_none() {
+                if built_in.is_none() {
                     return invalid(
                         record_type,
                         "FnGroupName appears without BuiltInFnGroupCount",
@@ -131,7 +152,7 @@ impl FunctionGroupCollector {
                 self.classic.push(parse_unicode_string(record_type, data)?);
             },
             FN_GRP12_RECORD_TYPE => {
-                if self.built_in.is_none() {
+                if built_in.is_none() {
                     return invalid(record_type, "FnGrp12 appears without BuiltInFnGroupCount");
                 }
                 if data.len() < FN_GRP12_HEADER_LEN + UNICODE_STRING_HEADER_LEN {
@@ -168,7 +189,12 @@ impl FunctionGroupCollector {
     }
 
     fn validate_resource_bounds(&self, record_type: u16) -> Result<()> {
-        let built_in = self.built_in.map_or(0, BuiltInFunctionCategories::count) as usize;
+        let built_in = match self.state {
+            FunctionGroupBlockState::Before => 0,
+            FunctionGroupBlockState::Open(built_in) | FunctionGroupBlockState::Closed(built_in) => {
+                built_in.count()
+            },
+        } as usize;
         let total = built_in
             .checked_add(self.classic.len())
             .and_then(|total| total.checked_add(self.extended.len()))
@@ -183,14 +209,13 @@ impl FunctionGroupCollector {
     }
 
     pub(crate) fn finish(self) -> Result<Option<FunctionGroups>> {
-        let Some(built_in) = self.built_in else {
-            if self.classic.is_empty() && self.extended.is_empty() {
-                return Ok(None);
-            }
-            return invalid(
-                BUILT_IN_FN_GROUP_COUNT_RECORD_TYPE,
-                "function categories lack BuiltInFnGroupCount",
-            );
+        let built_in = match self.state {
+            // No name is collected before the block opens, so there is nothing
+            // to report.
+            FunctionGroupBlockState::Before => return Ok(None),
+            FunctionGroupBlockState::Open(built_in) | FunctionGroupBlockState::Closed(built_in) => {
+                built_in
+            },
         };
         let classic_limit = 32usize
             .checked_sub(usize::from(built_in.count()))
@@ -412,5 +437,82 @@ mod tests {
                 .feed_record(FN_GRP12_RECORD_TYPE, &[0; 14])
                 .is_err()
         );
+    }
+
+    /// One row per record sequence: the outcome of every record and the classic
+    /// category count (`None` when no collection was found).
+    #[test]
+    fn block_contiguity_accepts_and_rejects_the_same_sequences() {
+        type Record = (u16, &'static [u8]);
+        type Case = (&'static [Record], &'static [&'static str], Option<usize>);
+        const COUNT: Record = (BUILT_IN_FN_GROUP_COUNT_RECORD_TYPE, &[14, 0]);
+        const BAD_COUNT: Record = (BUILT_IN_FN_GROUP_COUNT_RECORD_TYPE, &[15, 0]);
+        const NAME_A: Record = (FN_GROUP_NAME_RECORD_TYPE, &[1, 0, 0, b'A']);
+        const NAME_B: Record = (FN_GROUP_NAME_RECORD_TYPE, &[1, 0, 0, b'B']);
+        const GRP12: Record = (FN_GRP12_RECORD_TYPE, &[0; 14]);
+        const OTHER: Record = (0x0018, &[]);
+        const OUTSIDE_COUNT: &str = "Invalid record 0x009C: function-group record is outside its contiguous BIFF8 collection";
+        const OUTSIDE_NAME: &str = "Invalid record 0x009A: function-group record is outside its contiguous BIFF8 collection";
+        const OUTSIDE_GRP12: &str = "Invalid record 0x0898: function-group record is outside its contiguous BIFF8 collection";
+        const DUPLICATE: &str = "Invalid record 0x009C: duplicate BuiltInFnGroupCount record";
+        const NAME_ALONE: &str =
+            "Invalid record 0x009A: FnGroupName appears without BuiltInFnGroupCount";
+        const GRP12_ALONE: &str =
+            "Invalid record 0x0898: FnGrp12 appears without BuiltInFnGroupCount";
+        const BAD_COUNT_ERROR: &str = "Invalid record 0x009C: built-in function category count must be 14, 16, or compatibility value 17, got 15";
+        let cases: &[Case] = &[
+            (&[], &[], None),
+            (&[OTHER, OTHER], &["ok", "ok"], None),
+            (&[COUNT], &["ok"], Some(0)),
+            (&[OTHER, COUNT, NAME_A, NAME_B], &["ok"; 4], Some(2)),
+            (&[COUNT, NAME_A, OTHER, OTHER], &["ok"; 4], Some(1)),
+            (
+                &[COUNT, NAME_A, OTHER, NAME_B],
+                &["ok", "ok", "ok", OUTSIDE_NAME],
+                Some(1),
+            ),
+            (
+                &[COUNT, OTHER, COUNT],
+                &["ok", "ok", OUTSIDE_COUNT],
+                Some(0),
+            ),
+            (
+                &[COUNT, OTHER, GRP12],
+                &["ok", "ok", OUTSIDE_GRP12],
+                Some(0),
+            ),
+            (&[COUNT, COUNT, NAME_A], &["ok", DUPLICATE, "ok"], Some(1)),
+            (&[NAME_A], &[NAME_ALONE], None),
+            (&[GRP12], &[GRP12_ALONE], None),
+            (
+                &[OTHER, NAME_A, OTHER, COUNT, NAME_A],
+                &["ok", NAME_ALONE, "ok", "ok", "ok"],
+                Some(1),
+            ),
+            (
+                &[BAD_COUNT, OTHER, NAME_A, COUNT, NAME_A],
+                &[BAD_COUNT_ERROR, "ok", NAME_ALONE, "ok", "ok"],
+                Some(1),
+            ),
+        ];
+        for (records, expected, classic) in cases {
+            let mut collector = FunctionGroupCollector::new();
+            let outcomes: Vec<String> = records
+                .iter()
+                .map(
+                    |(record_type, data)| match collector.feed_record(*record_type, data) {
+                        Ok(()) => "ok".to_string(),
+                        Err(error) => error.to_string(),
+                    },
+                )
+                .collect();
+            assert_eq!(outcomes, *expected, "{records:?}");
+            let groups = collector.finish().unwrap();
+            assert_eq!(
+                groups.map(|groups| groups.classic_categories().len()),
+                *classic,
+                "{records:?}"
+            );
+        }
     }
 }

@@ -30,6 +30,36 @@ struct PendingDdeMatrix {
     remaining: usize,
 }
 
+/// Where a workbook-global record stream stands relative to its one
+/// external-link block (the SupBook records with their ExternName, XCT, CRN
+/// and ExternSheet records).
+///
+/// ```text
+/// Before --SupBook--> Open --record outside the family--> Closed
+/// Open   --family record--> Open
+/// ```
+///
+/// Continue never moves the state. A family record other than SupBook leaves
+/// `Before` unchanged, so an ExternSheet may precede the block without opening
+/// it. Every family record is refused in `Closed`.
+#[derive(Clone, Copy, Default)]
+enum SupBookBlockState {
+    #[default]
+    Before,
+    Open,
+    Closed,
+}
+
+impl SupBookBlockState {
+    /// A record outside the family ends an open block.
+    fn leave_family(&mut self) {
+        *self = match *self {
+            Self::Before => Self::Before,
+            Self::Open | Self::Closed => Self::Closed,
+        };
+    }
+}
+
 #[derive(Default)]
 pub(crate) struct ExternalLinkCollector {
     books: Vec<SupportingBook>,
@@ -39,7 +69,7 @@ pub(crate) struct ExternalLinkCollector {
     pending_dde_matrix: Option<PendingDdeMatrix>,
     names_allowed: bool,
     extern_sheet_seen: bool,
-    closed: bool,
+    block: SupBookBlockState,
     cached_cells: usize,
     external_name_bytes: usize,
 }
@@ -82,17 +112,21 @@ impl Package {
         let mut caches = Vec::new();
         let mut current_book = None;
         let mut names_allowed = false;
-        let mut collection_started = false;
-        let mut collection_closed = false;
+        let mut block = SupBookBlockState::Before;
         for (record_index, record) in records.iter().copied().enumerate() {
             match record.record_type {
                 SUP_BOOK_RECORD_TYPE => {
-                    collection_started = true;
-                    if collection_closed {
-                        return Err(Error::InvalidRecord {
-                            record_type: record.record_type,
-                            message: "SupBook appears outside the external-link collection".into(),
-                        });
+                    match block {
+                        SupBookBlockState::Before | SupBookBlockState::Open => {
+                            block = SupBookBlockState::Open;
+                        },
+                        SupBookBlockState::Closed => {
+                            return Err(Error::InvalidRecord {
+                                record_type: record.record_type,
+                                message: "SupBook appears outside the external-link collection"
+                                    .into(),
+                            });
+                        },
                     }
                     current_book = Some(supporting_books.len());
                     supporting_books.push(record_index);
@@ -134,8 +168,7 @@ impl Package {
                 },
                 CRN_RECORD_TYPE | EXTERN_SHEET_RECORD_TYPE => names_allowed = false,
                 CONTINUE_RECORD_TYPE => {},
-                _ if collection_started => collection_closed = true,
-                _ => {},
+                _ => block.leave_family(),
             }
         }
 
@@ -327,13 +360,13 @@ impl ExternalLinkCollector {
                 }
                 return Ok(());
             }
-            if !self.books.is_empty() && !self.closed {
-                return invalid(
+            return match self.block {
+                SupBookBlockState::Before | SupBookBlockState::Closed => Ok(()),
+                SupBookBlockState::Open => invalid(
                     CONTINUE_RECORD_TYPE,
                     "Continue is not associated with a DDE/OLE ExternName",
-                );
-            }
-            return Ok(());
+                ),
+            };
         }
 
         let target = matches!(
@@ -345,16 +378,17 @@ impl ExternalLinkCollector {
                 | EXTERN_SHEET_RECORD_TYPE
         );
         if !target {
-            if !self.books.is_empty() {
-                self.closed = true;
-            }
+            self.block.leave_family();
             return Ok(());
         }
-        if self.closed {
-            return invalid(
-                record_type,
-                "external-link record is outside its contiguous SUPBOOK collection",
-            );
+        match self.block {
+            SupBookBlockState::Before | SupBookBlockState::Open => {},
+            SupBookBlockState::Closed => {
+                return invalid(
+                    record_type,
+                    "external-link record is outside its contiguous SUPBOOK collection",
+                );
+            },
         }
 
         match record_type {
@@ -366,6 +400,7 @@ impl ExternalLinkCollector {
                     return invalid(record_type, "supporting-book count exceeds resource bound");
                 }
                 self.books.push(parse_sup_book(data)?);
+                self.block = SupBookBlockState::Open;
                 self.names_allowed = true;
             },
             EXTERN_NAME_RECORD_TYPE => {

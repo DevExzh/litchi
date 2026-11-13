@@ -149,6 +149,73 @@ fn rejects_cross_record_view_inconsistencies() {
     assert!(collector.finish().is_err());
 }
 
+/// One row per record sequence: the outcome of every record and what `finish`
+/// returns (the number of views, or the error text).
+#[test]
+fn window_production_order_accepts_and_rejects_the_same_sequences() {
+    const PLV_RECORD_TYPE: u16 = 0x088b;
+    const OTHER: u16 = 0x01aa;
+    const PLV_ORDER: &str =
+        "Invalid record 0x088B: record is out of order in the WINDOW production";
+    const SCL_ORDER: &str =
+        "Invalid record 0x00A0: record is out of order in the WINDOW production";
+    const PANE_ORDER: &str =
+        "Invalid record 0x0041: record is out of order in the WINDOW production";
+    let payload = |record_type: u16| -> Vec<u8> {
+        match record_type {
+            WINDOW2_RECORD_TYPE => window2(0x07be).to_vec(),
+            SCL_RECORD_TYPE => vec![3, 0, 4, 0],
+            PANE_RECORD_TYPE => pane().to_vec(),
+            SELECTION_RECORD_TYPE => selection(0).to_vec(),
+            _ => Vec::new(),
+        }
+    };
+    const W: u16 = WINDOW2_RECORD_TYPE;
+    const L: u16 = PLV_RECORD_TYPE;
+    const Z: u16 = SCL_RECORD_TYPE;
+    const P: u16 = PANE_RECORD_TYPE;
+    const S: u16 = SELECTION_RECORD_TYPE;
+    type Case = (&'static [u16], &'static [&'static str], usize);
+    let cases: &[Case] = &[
+        (&[], &[], 0),
+        (&[L, Z, P, S, OTHER], &["ok"; 5], 0),
+        (&[W], &["ok"], 1),
+        (&[W, L, Z, P, S], &["ok"; 5], 1),
+        (&[W, L, P, S, S], &["ok"; 5], 1),
+        (&[W, Z, S], &["ok"; 3], 1),
+        (&[W, L, L, L], &["ok", "ok", PLV_ORDER, PLV_ORDER], 1),
+        (&[W, Z, L], &["ok", "ok", PLV_ORDER], 1),
+        (&[W, P, L], &["ok", "ok", PLV_ORDER], 1),
+        (&[W, S, L], &["ok", "ok", PLV_ORDER], 1),
+        (&[W, Z, Z], &["ok", "ok", SCL_ORDER], 1),
+        (&[W, P, Z], &["ok", "ok", SCL_ORDER], 1),
+        (&[W, S, Z], &["ok", "ok", SCL_ORDER], 1),
+        (&[W, P, P], &["ok", "ok", PANE_ORDER], 1),
+        (&[W, S, P], &["ok", "ok", PANE_ORDER], 1),
+        (&[W, L, OTHER, L, Z, P], &["ok"; 6], 1),
+        (&[W, L, W, L, Z, W, Z, P], &["ok"; 8], 3),
+        (
+            &[W, L, L, Z, P, S],
+            &["ok", "ok", PLV_ORDER, "ok", "ok", "ok"],
+            1,
+        ),
+    ];
+    for (records, expected, views) in cases {
+        let mut collector = ViewCollector::new();
+        let outcomes: Vec<String> = records
+            .iter()
+            .map(
+                |record_type| match collector.feed_record(*record_type, &payload(*record_type)) {
+                    Ok(()) => "ok".to_string(),
+                    Err(error) => error.to_string(),
+                },
+            )
+            .collect();
+        assert_eq!(outcomes, *expected, "{records:04x?}");
+        assert_eq!(collector.finish().unwrap().len(), *views, "{records:04x?}");
+    }
+}
+
 #[test]
 fn reads_poi_pane_and_zoom_fixtures() {
     use crate::raw::Reader;

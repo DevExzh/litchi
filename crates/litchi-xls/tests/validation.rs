@@ -1648,3 +1648,216 @@ fn preserves_incomplete_metadata_before_filepass_stop() {
         );
     }
 }
+
+/// The distinct issue codes a workbook stream produces, sorted.
+fn issue_codes(stream: Vec<u8>) -> Vec<String> {
+    let report = validate_source(
+        source(cfb_with_streams(&[("Workbook", stream)], &[])),
+        Limits::default(),
+    )
+    .expect("validation report");
+    let mut codes: Vec<String> = report
+        .issues()
+        .iter()
+        .map(|issue| issue.code().to_string())
+        .collect();
+    codes.sort();
+    codes.dedup();
+    codes
+}
+
+/// One row per workbook-global record sequence around the external-link
+/// (SUPBOOK) block: no block, one block, records after it, a second block
+/// after a gap, and members without an opening SUPBOOK.
+#[test]
+fn external_link_block_contiguity_is_reported_per_sequence() {
+    const NONE: &[&str] = &[];
+    const PRESENT: &[&str] = &["xls.external_reference.present"];
+    const INVALID: &[&str] = &["xls.external_reference.invalid"];
+    let book = || frame(0x01AE, &external_supbook_payload());
+    let own_book = || frame(0x01AE, &[1, 0, 1, 4]);
+    let dde_book = || frame(0x01AE, &dde_supbook_payload());
+    let dde_name = || frame(0x0023, &dde_pending_name_payload());
+    let sheets = || frame(0x0017, &[0, 0]);
+    let cache = |rows: u8| frame(0x0059, &[rows, 0, 0, 0]);
+    let row = || frame(0x005A, &external_cache_row(0, 0, 0));
+    let continuation = || frame(0x003C, &[0; 9]);
+    let other = || frame(0x7777, &[0xAA]);
+    let cases: Vec<(&str, Vec<Vec<u8>>, &[&str])> = vec![
+        ("no block", vec![other(), other()], NONE),
+        ("own book only", vec![own_book()], NONE),
+        ("one block", vec![book()], PRESENT),
+        (
+            "block after other records",
+            vec![other(), book(), sheets()],
+            PRESENT,
+        ),
+        (
+            "records after the block",
+            vec![book(), cache(1), row(), sheets(), other(), other()],
+            PRESENT,
+        ),
+        (
+            "second book after a gap",
+            vec![book(), other(), book()],
+            INVALID,
+        ),
+        (
+            "sheets after a gap",
+            vec![book(), other(), sheets()],
+            INVALID,
+        ),
+        (
+            "cache after a gap",
+            vec![book(), other(), cache(0)],
+            INVALID,
+        ),
+        ("cache without a book", vec![cache(0)], INVALID),
+        ("row without a book", vec![row()], INVALID),
+        ("name without a book", vec![dde_name()], INVALID),
+        (
+            "sheets without a book do not open the block",
+            vec![sheets(), other(), sheets()],
+            NONE,
+        ),
+        ("book after sheets", vec![sheets(), book()], INVALID),
+        (
+            "name after sheets",
+            vec![dde_book(), sheets(), dde_name(), continuation()],
+            INVALID,
+        ),
+        ("continue before the block", vec![continuation()], NONE),
+        (
+            "continue inside the block",
+            vec![book(), continuation()],
+            INVALID,
+        ),
+        (
+            "continue after the block",
+            vec![book(), other(), continuation()],
+            PRESENT,
+        ),
+        (
+            "pending values completed by continue",
+            vec![dde_book(), dde_name(), continuation(), other()],
+            PRESENT,
+        ),
+        (
+            "pending values interrupted",
+            vec![dde_book(), dde_name(), other()],
+            INVALID,
+        ),
+        (
+            "pending rows interrupted",
+            vec![book(), cache(1), other()],
+            INVALID,
+        ),
+    ];
+    for (name, records, expected) in cases {
+        for (before, after) in [(&records[..], &[][..]), (&[][..], &records[..])] {
+            let stream = minimal_workbook(before, after, &bof_payload(0x0010, 16), &[], &[]);
+            assert_eq!(issue_codes(stream), expected, "{name}");
+        }
+    }
+}
+
+/// One row per layout of the single bound sheet's substream: never started,
+/// started and ended, started but not ended, and records around it.
+#[test]
+fn bound_sheet_substream_lifecycle_is_reported_per_sequence() {
+    const CLEAN: &[&str] = &[];
+    // An invalid BIFF stream is reported instead of its worksheet inventory.
+    const BIFF: &[&str] = &["xls.biff.invalid"];
+    const SHEET: &[&str] = &["xls.worksheet.invalid"];
+    // Global BOF + BoundSheet8 records + EOF; every BoundSheet8 is 13 bytes.
+    let globals = |targets: &[u32]| {
+        let mut output = frame(0x0809, &bof_payload(0x0005, 16));
+        for target in targets {
+            let mut payload = target.to_le_bytes().to_vec();
+            payload.extend_from_slice(&[0, 0, 1, 0, b'S']);
+            output.extend_from_slice(&frame(0x0085, &payload));
+        }
+        output.extend_from_slice(&frame(0x000A, &[]));
+        output
+    };
+    let bof = || frame(0x0809, &bof_payload(0x0010, 16));
+    let eof = || frame(0x000A, &[]);
+    let other = || frame(0x7777, &[0xAA]);
+    const ONE: u32 = 20 + 13 + 4;
+    const TWO: u32 = 20 + 13 + 13 + 4;
+    let cases: Vec<(&str, &[u32], Vec<Vec<u8>>, &[&str])> = vec![
+        ("started and ended", &[ONE], vec![bof(), eof()], CLEAN),
+        (
+            "started and ended with content",
+            &[ONE],
+            vec![bof(), other(), eof()],
+            CLEAN,
+        ),
+        ("never started, no records", &[ONE], vec![], SHEET),
+        ("never started, dangling target", &[9_999], vec![], SHEET),
+        (
+            "never started, substream elsewhere",
+            &[ONE + 5],
+            vec![other(), bof(), eof()],
+            BIFF,
+        ),
+        ("started, not ended", &[ONE], vec![bof()], BIFF),
+        (
+            "started, not ended with content",
+            &[ONE],
+            vec![bof(), other()],
+            BIFF,
+        ),
+        ("end without a begin", &[ONE], vec![eof()], BIFF),
+        ("target is not a BOF", &[ONE], vec![other(), eof()], BIFF),
+        ("nested begin", &[ONE], vec![bof(), bof(), eof()], BIFF),
+        (
+            "records after the end",
+            &[ONE],
+            vec![bof(), eof(), other()],
+            BIFF,
+        ),
+        (
+            "second substream without an owner",
+            &[ONE],
+            vec![bof(), eof(), bof(), eof()],
+            BIFF,
+        ),
+        (
+            "two sheets, both complete",
+            &[TWO, TWO + 24],
+            vec![bof(), eof(), bof(), eof()],
+            CLEAN,
+        ),
+        (
+            "two sheets, second never started",
+            &[TWO, TWO + 24],
+            vec![bof(), eof()],
+            SHEET,
+        ),
+        (
+            "two sheets, second not ended",
+            &[TWO, TWO + 24],
+            vec![bof(), eof(), bof()],
+            BIFF,
+        ),
+        (
+            "two sheets, first not ended before the second target",
+            &[TWO, TWO + 20],
+            vec![bof(), bof(), eof()],
+            BIFF,
+        ),
+    ];
+    let mut mismatches = Vec::new();
+    for (name, targets, records, expected) in cases {
+        let mut stream = globals(targets);
+        for record in &records {
+            stream.extend_from_slice(record);
+        }
+        let actual = issue_codes(stream);
+        if actual != expected {
+            mismatches.push(format!("{name}: {actual:?}, expected {expected:?}"));
+        }
+    }
+    assert!(mismatches.is_empty(), "{mismatches:#?}");
+}

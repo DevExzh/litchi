@@ -696,3 +696,96 @@ fn writer_preflights_record_quota_for_empty_streams() {
         .expect_err("writer must reject the second record before allocation");
     assert_limit(error, super::LimitKind::Records, 2, 1);
 }
+
+/// One row per record sequence around the BrtBeginVolDeps block: `B`/`E`
+/// begin and end it, `T` is one complete type collection, `(` begins a type
+/// collection without ending it, `X` is a record outside the family.
+#[test]
+fn deps_block_accepts_and_rejects_the_same_sequences() {
+    let cases: &[(&str, &str)] = &[
+        (
+            "",
+            "error: Invalid format: Volatile Dependencies stream is empty",
+        ),
+        (
+            "X",
+            "error: Unexpected end of stream: Volatile Dependencies record hierarchy",
+        ),
+        (
+            "B",
+            "error: Unexpected end of stream: Volatile Dependencies record hierarchy",
+        ),
+        ("BE", "types 0, rewrite safe true"),
+        ("BTE", "types 1, rewrite safe true"),
+        ("XBTE", "types 1, rewrite safe false"),
+        ("BXTXE", "types 1, rewrite safe false"),
+        ("BTEX", "types 1, rewrite safe false"),
+        ("BTEXX", "types 1, rewrite safe false"),
+        (
+            "BTEB",
+            "error: Invalid format: record follows BrtEndVolDeps",
+        ),
+        (
+            "BTEBE",
+            "error: Invalid format: record follows BrtEndVolDeps",
+        ),
+        (
+            "BTEXBE",
+            "error: Invalid format: record follows BrtEndVolDeps",
+        ),
+        (
+            "BTEE",
+            "error: Invalid format: record follows BrtEndVolDeps",
+        ),
+        (
+            "BTET",
+            "error: Invalid format: record follows BrtEndVolDeps",
+        ),
+        (
+            "BTEXT",
+            "error: Invalid format: record follows BrtEndVolDeps",
+        ),
+        ("E", "error: Invalid format: unbalanced BrtEndVolDeps"),
+        ("XE", "error: Invalid format: unbalanced BrtEndVolDeps"),
+        ("T", "error: Invalid format: unbalanced BrtBeginVolType"),
+        ("TBE", "error: Invalid format: unbalanced BrtBeginVolType"),
+        ("BB", "error: Invalid format: duplicate BrtBeginVolDeps"),
+        ("BTB", "error: Invalid format: duplicate BrtBeginVolDeps"),
+        ("B(E", "error: Invalid format: unbalanced BrtEndVolDeps"),
+        ("B(B", "error: Invalid format: duplicate BrtBeginVolDeps"),
+        (
+            "B(",
+            "error: Unexpected end of stream: Volatile Dependencies record hierarchy",
+        ),
+        (
+            "BT",
+            "error: Unexpected end of stream: Volatile Dependencies record hierarchy",
+        ),
+    ];
+    let inner = valid_records();
+    let mismatches: Vec<String> = cases
+        .iter()
+        .filter_map(|(sequence, expected)| {
+            let mut records = Vec::new();
+            for token in sequence.chars() {
+                match token {
+                    'B' => records.push((kind::BEGIN_VOL_DEPS, Vec::new())),
+                    'E' => records.push((kind::END_VOL_DEPS, Vec::new())),
+                    'T' => records.extend_from_slice(&inner[1..inner.len() - 1]),
+                    '(' => records.push(inner[1].clone()),
+                    _ => records.push((Kind::new(4095).expect("kind"), vec![1, 2])),
+                }
+            }
+            let actual = match codec::read(&encode(&records), SemanticLimits::DEFAULT, 1) {
+                Ok(parsed) => format!(
+                    "types {}, rewrite safe {}",
+                    parsed.dependencies.types.len(),
+                    parsed.rewrite_safe
+                ),
+                Err(error) => format!("error: {error}"),
+            };
+            (actual != *expected).then(|| format!("(\"{sequence}\", \"{actual}\"),"))
+        })
+        .collect();
+    assert!(mismatches.is_empty(), "\n{}\n", mismatches.join("\n"));
+}

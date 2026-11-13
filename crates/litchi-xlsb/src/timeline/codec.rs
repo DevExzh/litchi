@@ -353,6 +353,25 @@ fn parse_filter(node: &Node) -> Result<Filter> {
     })
 }
 
+/// The last child read of `timelineCacheDefinition`, whose children are, in
+/// order, `pivotTables?`, `state`, `timelinePivotFilter?`.
+///
+/// ```text
+/// Start --pivotTables--> PivotTables
+/// Start | PivotTables --state--> State
+/// State --timelinePivotFilter--> Filter
+/// ```
+///
+/// Every other child, and every child that arrives in another stage, is
+/// refused.
+#[derive(Clone, Copy)]
+enum CacheChildStage {
+    Start,
+    PivotTables,
+    State,
+    Filter,
+}
+
 /// Parse one timeline cache definition XML part.
 pub fn parse_cache(xml: &[u8], xml_limits: litchi_core::Limits) -> Result<Cache> {
     let root = parse_document(xml, xml_limits)?;
@@ -365,10 +384,10 @@ pub fn parse_cache(xml: &[u8], xml_limits: litchi_core::Limits) -> Result<Cache>
     let mut pivot_tables = Vec::new();
     let mut state = None;
     let mut filter = None;
-    let mut stage = 0u8;
+    let mut stage = CacheChildStage::Start;
     for child in &root.children {
         match child.name.as_str() {
-            "pivotTables" if stage == 0 => {
+            "pivotTables" if matches!(stage, CacheChildStage::Start) => {
                 if child.namespace != X15
                     || !child.attributes.is_empty()
                     || !child.text.trim().is_empty()
@@ -386,15 +405,15 @@ pub fn parse_cache(xml: &[u8], xml_limits: litchi_core::Limits) -> Result<Cache>
                         name: required_attr(pivot, "name")?.to_string(),
                     });
                 }
-                stage = 1;
+                stage = CacheChildStage::PivotTables;
             },
-            "state" if stage <= 1 && state.is_none() => {
+            "state" if matches!(stage, CacheChildStage::Start | CacheChildStage::PivotTables) => {
                 state = Some(parse_state(child)?);
-                stage = 2;
+                stage = CacheChildStage::State;
             },
-            "timelinePivotFilter" if stage == 2 && filter.is_none() => {
+            "timelinePivotFilter" if matches!(stage, CacheChildStage::State) => {
                 filter = Some(parse_filter(child)?);
-                stage = 3;
+                stage = CacheChildStage::Filter;
             },
             _ => return Err(invalid("invalid or out-of-order timeline cache child")),
         }

@@ -721,12 +721,25 @@ struct Analysis {
     scan_interrupted: bool,
 }
 
+/// The lifecycle of one bound sheet's substream.
+///
+/// ```text
+/// Pending --BOF at the BoundSheet8 position--> Open --EOF--> Closed
+/// ```
+///
+/// A workbook is complete only when every bound sheet is `Closed`.
+#[derive(Debug, Clone, Copy)]
+enum SubstreamState {
+    Pending,
+    Open,
+    Closed,
+}
+
 #[derive(Debug, Clone, Copy)]
 struct SheetObservation {
     sheet_type: SheetType,
     expected_dt: u16,
-    started: bool,
-    ended: bool,
+    substream: SubstreamState,
 }
 
 struct ActiveSheet {
@@ -1128,14 +1141,32 @@ enum ExternalBookKind {
     DdeOrOle,
 }
 
+/// Where the workbook globals stand relative to their one external-link block
+/// (the SupBook records with their ExternName, XCT, CRN and ExternSheet
+/// records).
+///
+/// ```text
+/// Before --SupBook--> Open --record outside the family--> Closed
+/// Open   --SupBook--> Open (the new book becomes current)
+/// Open   --other family record--> Open
+/// ```
+///
+/// Continue never moves the state. A family record other than SupBook leaves
+/// `Before` unchanged. Every family record is refused in `Closed`.
+#[derive(Debug, Clone, Copy)]
+enum ExternalBlockState {
+    Before,
+    Open { current_book: usize },
+    Closed,
+}
+
 #[derive(Debug)]
 struct ExternalPresenceState {
     books: [ExternalBookKind; MAX_EXTERNAL_BOOKS],
     book_count: usize,
-    current_book: Option<usize>,
+    block: ExternalBlockState,
     names_allowed: bool,
     extern_sheet_seen: bool,
-    closed: bool,
     pending_crn: usize,
     pending_dde_values: usize,
     cached_cells: usize,
@@ -1153,10 +1184,9 @@ impl Default for ExternalPresenceState {
         Self {
             books: [ExternalBookKind::SelfReference; MAX_EXTERNAL_BOOKS],
             book_count: 0,
-            current_book: None,
+            block: ExternalBlockState::Before,
             names_allowed: false,
             extern_sheet_seen: false,
-            closed: false,
             pending_crn: 0,
             pending_dde_values: 0,
             cached_cells: 0,
@@ -1181,7 +1211,10 @@ impl ExternalPresenceState {
         }
         if record_type == CONTINUE_RECORD_TYPE {
             if self.pending_dde_values == 0 {
-                return Ok(self.current_book.is_none() || self.closed);
+                return Ok(match self.block {
+                    ExternalBlockState::Before | ExternalBlockState::Closed => true,
+                    ExternalBlockState::Open { .. } => false,
+                });
             }
             let Some((count, consumed)) = count_ser_ar_values(data, self.pending_dde_values) else {
                 return Ok(false);
@@ -1195,13 +1228,17 @@ impl ExternalPresenceState {
 
         let is_target = is_external_record(record_type);
         if !is_target {
-            if self.current_book.is_some() && !self.closed {
-                self.closed = true;
-            }
+            self.block = match self.block {
+                ExternalBlockState::Before => ExternalBlockState::Before,
+                ExternalBlockState::Open { .. } | ExternalBlockState::Closed => {
+                    ExternalBlockState::Closed
+                },
+            };
             return Ok(true);
         }
-        if self.closed {
-            return Ok(false);
+        match self.block {
+            ExternalBlockState::Before | ExternalBlockState::Open { .. } => {},
+            ExternalBlockState::Closed => return Ok(false),
         }
 
         match record_type {
@@ -1225,7 +1262,9 @@ impl ExternalPresenceState {
         let index = self.book_count;
         self.books[index] = kind;
         self.book_count += 1;
-        self.current_book = Some(index);
+        self.block = ExternalBlockState::Open {
+            current_book: index,
+        };
         self.names_allowed = true;
         self.external_present |= matches!(
             kind,
@@ -1237,7 +1276,10 @@ impl ExternalPresenceState {
     }
 
     fn feed_extern_name(&mut self, data: &[u8]) -> bool {
-        let Some(book_index) = self.current_book else {
+        let ExternalBlockState::Open {
+            current_book: book_index,
+        } = self.block
+        else {
             return false;
         };
         if !self.names_allowed || book_index >= self.book_count {
@@ -1255,7 +1297,10 @@ impl ExternalPresenceState {
     }
 
     fn feed_xct(&mut self, data: &[u8]) -> Result<bool, Error> {
-        let Some(book_index) = self.current_book else {
+        let ExternalBlockState::Open {
+            current_book: book_index,
+        } = self.block
+        else {
             return Ok(false);
         };
         let Some(declared) = read_i16(data, 0) else {
@@ -2079,8 +2124,7 @@ fn analyze_workbook(
                                     SheetObservation {
                                         sheet_type,
                                         expected_dt: expected_sheet_bof_type(sheet_type),
-                                        started: false,
-                                        ended: false,
+                                        substream: SubstreamState::Pending,
                                     },
                                     "BoundSheet8 inventory",
                                 )?;
@@ -2135,11 +2179,15 @@ fn analyze_workbook(
                     output.biff_invalid = true;
                     continue;
                 };
-                if observation.started || kind != BOF {
+                let already_started = match observation.substream {
+                    SubstreamState::Pending => false,
+                    SubstreamState::Open | SubstreamState::Closed => true,
+                };
+                if already_started || kind != BOF {
                     output.worksheet_invalid = true;
                     output.biff_invalid = true;
                 } else {
-                    observation.started = true;
+                    observation.substream = SubstreamState::Open;
                     let expected_dt = observation.expected_dt;
                     let bof = parse_bof(record.payload());
                     let version_matches = global_bof
@@ -2164,7 +2212,7 @@ fn analyze_workbook(
                     output.worksheet_invalid = true;
                 }
                 if let Some(observation) = bound_sheets.get_mut(active.index) {
-                    observation.ended = true;
+                    observation.substream = SubstreamState::Closed;
                 }
                 if !active.protection.finish() {
                     protection_feed_failed = true;
@@ -2224,10 +2272,10 @@ fn analyze_workbook(
     if bound_sheets.is_empty() && !output.worksheet_limit {
         output.worksheet_invalid = true;
     }
-    if bound_sheets
-        .iter()
-        .any(|sheet| !sheet.started || !sheet.ended)
-    {
+    if bound_sheets.iter().any(|sheet| match sheet.substream {
+        SubstreamState::Pending | SubstreamState::Open => true,
+        SubstreamState::Closed => false,
+    }) {
         output.worksheet_invalid = true;
     }
 

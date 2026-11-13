@@ -12,8 +12,51 @@ use super::validation::validate_tables;
 use crate::Result;
 use std::collections::HashSet;
 
+/// Where a worksheet's record stream stands relative to its one list FEAT11
+/// family (the list FeatHdr11 followed directly by the table features).
+///
+/// ```text
+/// Before --list FeatHdr11--> Open --record outside the list family--> Closed
+/// Open   --list family record--> Open
+/// ```
+///
+/// A FeatHdr11, Feature11 or Feature12 of another feature counts as outside
+/// the list family. A table feature is refused in `Before`, a second list
+/// FeatHdr11 in `Open`, and every list header, table feature and List12 in
+/// `Closed`.
+#[derive(Clone, Copy)]
+enum Feat11FamilyState {
+    Before,
+    Open,
+    Closed,
+}
+
+impl Feat11FamilyState {
+    const fn is_before(self) -> bool {
+        match self {
+            Self::Before => true,
+            Self::Open | Self::Closed => false,
+        }
+    }
+
+    const fn is_closed(self) -> bool {
+        match self {
+            Self::Before | Self::Open => false,
+            Self::Closed => true,
+        }
+    }
+
+    /// A record outside the list family ends a family that has begun.
+    const fn leave_family(&mut self) {
+        *self = match *self {
+            Self::Before => Self::Before,
+            Self::Open | Self::Closed => Self::Closed,
+        };
+    }
+}
+
 pub(crate) struct ListObjectCollector {
-    header: Option<u32>,
+    family: Feat11FamilyState,
     pending: Option<PendingFeature>,
     current: Option<ListObject>,
     pending_future: Option<PendingFuture>,
@@ -21,13 +64,12 @@ pub(crate) struct ListObjectCollector {
     list12_count: usize,
     sort_continuations: usize,
     tables: Vec<ListObject>,
-    ended: bool,
 }
 
 impl ListObjectCollector {
     pub(crate) fn new() -> Self {
         Self {
-            header: None,
+            family: Feat11FamilyState::Before,
             pending: None,
             current: None,
             pending_future: None,
@@ -35,12 +77,11 @@ impl ListObjectCollector {
             list12_count: 0,
             sort_continuations: 0,
             tables: Vec::new(),
-            ended: false,
         }
     }
 
     pub(crate) fn feed_record(&mut self, rt: u16, data: &[u8]) -> Result<()> {
-        if self.header.is_none()
+        if self.family.is_before()
             && matches!(
                 rt,
                 AUTO_FILTER12_RECORD_TYPE
@@ -62,13 +103,13 @@ impl ListObjectCollector {
                 | crate::sort_data::CONTINUE_FRT12_RECORD_TYPE
         );
         if !family {
-            if self.header.is_some() {
+            if !self.family.is_before() {
                 if self.sort_continuations != 0 {
                     return Err(invalid(rt, "incomplete table SortData continuation chain"));
                 }
                 self.materialize()?;
                 self.finish_future()?;
-                self.ended = true;
+                self.family = Feat11FamilyState::Closed;
             }
             return Ok(());
         }
@@ -76,15 +117,13 @@ impl ListObjectCollector {
             // FeatHdr11 is shared by all Feat11 feature families. Leave non-list
             // discriminators to their dedicated collectors.
             if data.len() < 14 || u16_at(data, 12, rt, "isf")? != ISF_LIST {
-                if self.header.is_some() {
-                    self.ended = true;
-                }
+                self.family.leave_family();
                 return Ok(());
             }
-            if self.ended {
+            if self.family.is_closed() {
                 return Err(invalid(rt, "noncontiguous list FEAT11 family"));
             }
-            if self.header.is_some() || data.len() != 29 {
+            if !self.family.is_before() || data.len() != 29 {
                 return Err(invalid(rt, "duplicate or malformed FeatHdr11"));
             }
             validate_frt(data, rt, false)?;
@@ -96,18 +135,18 @@ impl ListObjectCollector {
             {
                 return Err(invalid(rt, "invalid FeatHdr11 fields"));
             }
-            self.header = Some(u32_at(data, 23, rt, "idListNext")?);
+            // idListNext is read for its bounds check only; nothing uses it.
+            u32_at(data, 23, rt, "idListNext")?;
+            self.family = Feat11FamilyState::Open;
         } else if matches!(rt, FEATURE11_RECORD_TYPE | FEATURE12_RECORD_TYPE) {
             if data.len() < 14 || u16_at(data, 12, rt, "isf")? != ISF_LIST {
-                if self.header.is_some() {
-                    self.ended = true;
-                }
+                self.family.leave_family();
                 return Ok(());
             }
-            if self.ended {
+            if self.family.is_closed() {
                 return Err(invalid(rt, "noncontiguous list FEAT11 family"));
             }
-            if self.header.is_none() {
+            if self.family.is_before() {
                 return Err(invalid(rt, "table feature without FeatHdr11"));
             }
             if self.sort_continuations != 0 {
@@ -161,7 +200,7 @@ impl ListObjectCollector {
         } else if rt == LIST12_RECORD_TYPE {
             self.materialize()?;
             self.finish_future()?;
-            if self.ended {
+            if self.family.is_closed() {
                 return Err(invalid(rt, "noncontiguous list FEAT11 family"));
             }
             let kind = self

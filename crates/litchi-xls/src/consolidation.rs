@@ -406,57 +406,82 @@ fn is_r1c1(value: &str) -> bool {
         && column.parse::<u16>().is_ok_and(|v| (1..=256).contains(&v))
 }
 
+/// Where a worksheet's record stream stands relative to its one DCON block
+/// (a DCon directory followed directly by its source records).
+///
+/// ```text
+/// Before --DCon--> Open --any other record--> Closed
+/// Open   --DConRef / DConName / DConBin--> Open
+/// ```
+///
+/// A second DCon is refused in `Open` and `Closed`; a source record is refused
+/// in `Before` and `Closed`.
+#[derive(Debug, Default)]
+enum ConsolidationBlockState {
+    #[default]
+    Before,
+    Open(Consolidation),
+    Closed(Consolidation),
+}
+
+impl ConsolidationBlockState {
+    /// `Open --> Closed`; the other states stay as they are. The directory is
+    /// moved only on that one transition, not for every later record.
+    fn close(&mut self) {
+        if matches!(self, Self::Open(_))
+            && let Self::Open(value) = std::mem::take(self)
+        {
+            *self = Self::Closed(value);
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub(crate) struct ConsolidationCollector {
-    value: Option<Consolidation>,
-    open: bool,
-    closed: bool,
+    state: ConsolidationBlockState,
 }
 impl ConsolidationCollector {
     pub(crate) fn new() -> Self {
         Self::default()
     }
     pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> Result<()> {
-        let source = matches!(
-            record_type,
-            DCON_REF_RECORD_TYPE | DCON_NAME_RECORD_TYPE | DCON_BIN_RECORD_TYPE
-        );
-        if record_type == DCON_RECORD_TYPE {
-            if self.value.is_some() {
-                return invalid(
-                    record_type,
-                    "worksheet contains more than one DCon directory",
-                );
-            }
-            self.value = Some(parse_dcon(data)?);
-            self.open = true;
-            return Ok(());
-        }
-        if source {
-            if !self.open || self.closed {
-                return invalid(
-                    record_type,
-                    "data-consolidation source is detached from DCon",
-                );
-            }
-            let source = match record_type {
-                DCON_REF_RECORD_TYPE => parse_ref(data)?,
-                DCON_NAME_RECORD_TYPE => parse_name(data)?,
-                DCON_BIN_RECORD_TYPE => parse_bin(data)?,
-                _ => unreachable!(),
-            };
-            self.value
-                .as_mut()
-                .expect("open directory")
-                .add_source(source)?;
-        } else if self.open {
-            self.open = false;
-            self.closed = true;
+        match record_type {
+            DCON_RECORD_TYPE => match self.state {
+                ConsolidationBlockState::Before => {
+                    self.state = ConsolidationBlockState::Open(parse_dcon(data)?);
+                },
+                ConsolidationBlockState::Open(_) | ConsolidationBlockState::Closed(_) => {
+                    return invalid(
+                        record_type,
+                        "worksheet contains more than one DCon directory",
+                    );
+                },
+            },
+            DCON_REF_RECORD_TYPE | DCON_NAME_RECORD_TYPE | DCON_BIN_RECORD_TYPE => {
+                let ConsolidationBlockState::Open(value) = &mut self.state else {
+                    return invalid(
+                        record_type,
+                        "data-consolidation source is detached from DCon",
+                    );
+                };
+                let source = match record_type {
+                    DCON_REF_RECORD_TYPE => parse_ref(data)?,
+                    DCON_NAME_RECORD_TYPE => parse_name(data)?,
+                    _ => parse_bin(data)?,
+                };
+                value.add_source(source)?;
+            },
+            _ => self.state.close(),
         }
         Ok(())
     }
     pub(crate) fn finish(self) -> Option<Consolidation> {
-        self.value
+        match self.state {
+            ConsolidationBlockState::Before => None,
+            ConsolidationBlockState::Open(value) | ConsolidationBlockState::Closed(value) => {
+                Some(value)
+            },
+        }
     }
 }
 
@@ -692,5 +717,78 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    /// One row per record sequence: the outcome of every record and the number
+    /// of collected sources (`None` when no directory was collected).
+    #[test]
+    fn block_contiguity_accepts_and_rejects_the_same_sequences() {
+        type Record = (u16, &'static [u8]);
+        type Case = (&'static [Record], &'static [&'static str], Option<usize>);
+        const DCON: Record = (DCON_RECORD_TYPE, &[8, 0, 0, 0, 0, 0, 0, 0]);
+        const BAD_DCON: Record = (DCON_RECORD_TYPE, &[8, 0, 0, 0, 0, 0, 0]);
+        const BIN: Record = (DCON_BIN_RECORD_TYPE, &[0, 0, 0, 0, 0, 0]);
+        const BAD_BIN: Record = (DCON_BIN_RECORD_TYPE, &[0, 1, 0, 0, 0, 0]);
+        const OTHER: Record = (0x0200, &[]);
+        const DETACHED: &str =
+            "Invalid record 0x01B5: data-consolidation source is detached from DCon";
+        const DUPLICATE: &str =
+            "Invalid record 0x0050: worksheet contains more than one DCon directory";
+        const BAD_DCON_ERROR: &str = "Invalid record 0x0050: DCon payload must be exactly 8 bytes";
+        const BAD_BIN_ERROR: &str = "Invalid record 0x01B5: DConBin reserved fields must be zero";
+        let cases: &[Case] = &[
+            (&[], &[], None),
+            (&[OTHER, OTHER], &["ok", "ok"], None),
+            (&[DCON], &["ok"], Some(0)),
+            (&[OTHER, DCON, BIN, BIN], &["ok"; 4], Some(2)),
+            (&[DCON, BIN, OTHER, OTHER], &["ok"; 4], Some(1)),
+            (
+                &[DCON, BIN, OTHER, BIN],
+                &["ok", "ok", "ok", DETACHED],
+                Some(1),
+            ),
+            (&[DCON, OTHER, BIN], &["ok", "ok", DETACHED], Some(0)),
+            (
+                &[DCON, BIN, OTHER, DCON],
+                &["ok", "ok", "ok", DUPLICATE],
+                Some(1),
+            ),
+            (&[DCON, DCON, BIN], &["ok", DUPLICATE, "ok"], Some(1)),
+            (&[BIN], &[DETACHED], None),
+            (
+                &[OTHER, BIN, DCON, BIN],
+                &["ok", DETACHED, "ok", "ok"],
+                Some(1),
+            ),
+            (
+                &[BAD_DCON, BIN, DCON, BIN],
+                &[BAD_DCON_ERROR, DETACHED, "ok", "ok"],
+                Some(1),
+            ),
+            (&[DCON, BAD_BIN, BIN], &["ok", BAD_BIN_ERROR, "ok"], Some(1)),
+            (
+                &[DCON, OTHER, BAD_DCON, DCON, BIN],
+                &["ok", "ok", DUPLICATE, DUPLICATE, DETACHED],
+                Some(0),
+            ),
+        ];
+        for (records, expected, sources) in cases {
+            let mut collector = ConsolidationCollector::new();
+            let outcomes: Vec<String> = records
+                .iter()
+                .map(
+                    |(record_type, data)| match collector.feed_record(*record_type, data) {
+                        Ok(()) => "ok".to_string(),
+                        Err(error) => error.to_string(),
+                    },
+                )
+                .collect();
+            assert_eq!(outcomes, *expected, "{records:?}");
+            assert_eq!(
+                collector.finish().map(|value| value.sources().len()),
+                *sources,
+                "{records:?}"
+            );
+        }
     }
 }

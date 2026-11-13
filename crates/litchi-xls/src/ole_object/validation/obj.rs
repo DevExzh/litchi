@@ -144,6 +144,21 @@ fn validate_subrecord_owner(value: &ObjSubrecord, object_type: u16) -> Result<()
     }
 }
 
+/// The last picture field seen in an OLE Obj record, in the fixed field order
+/// of MS-XLS 2.4.181: `Start < Format (pictFormat) < Flags (pictFlags) <
+/// Formula (pictFmla)`.
+///
+/// A field moves the stage to its own variant and is refused when the stage is
+/// already past it; a repeated field keeps the stage. The record is complete
+/// only when the stage ends at `Formula`.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum PictureFieldStage {
+    Start,
+    Format,
+    Flags,
+    Formula,
+}
+
 impl OleObjectRecord {
     /// # Errors
     ///
@@ -188,7 +203,7 @@ impl OleObjectRecord {
         // a later mandatory field appear before an earlier one.  Checking the
         // order here also prevents a malformed extra FtCf from being hidden
         // behind an otherwise valid pictFormat.
-        let mut picture_stage = 0u8;
+        let mut picture_stage = PictureFieldStage::Start;
         let mut end_count = 0usize;
         for (index, value) in self.subrecords.iter().enumerate() {
             match value {
@@ -196,32 +211,25 @@ impl OleObjectRecord {
                     return Err(invalid(OBJ, "OLE Obj contains a second FtCmo"));
                 },
                 ObjSubrecord::PictureFormat(_) => {
-                    if picture_stage > 1 {
+                    if picture_stage > PictureFieldStage::Format {
                         return Err(invalid(
                             OBJ,
                             "OLE Obj pictFormat is out of MS-XLS field order",
                         ));
                     }
-                    picture_stage = 1;
+                    picture_stage = PictureFieldStage::Format;
                 },
                 ObjSubrecord::PictureFlags(_) => {
-                    if picture_stage > 2 {
+                    if picture_stage > PictureFieldStage::Flags {
                         return Err(invalid(
                             OBJ,
                             "OLE Obj pictFlags is out of MS-XLS field order",
                         ));
                     }
-                    picture_stage = 2;
+                    picture_stage = PictureFieldStage::Flags;
                 },
-                ObjSubrecord::PictureFormula(_) => {
-                    if picture_stage > 3 {
-                        return Err(invalid(
-                            OBJ,
-                            "OLE Obj pictFmla is out of MS-XLS field order",
-                        ));
-                    }
-                    picture_stage = 3;
-                },
+                // pictFmla is the last field, so no stage is past it.
+                ObjSubrecord::PictureFormula(_) => picture_stage = PictureFieldStage::Formula,
                 ObjSubrecord::End => {
                     end_count = end_count.saturating_add(1);
                     if index + 1 != self.subrecords.len() {
@@ -234,7 +242,7 @@ impl OleObjectRecord {
         if end_count != 1 {
             return Err(invalid(OBJ, "OLE Obj requires exactly one FtEnd"));
         }
-        if picture_stage != 3 {
+        if picture_stage != PictureFieldStage::Formula {
             return Err(invalid(
                 OBJ,
                 "OLE Obj mandatory picture fields are incomplete",

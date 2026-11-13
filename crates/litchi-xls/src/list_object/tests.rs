@@ -600,3 +600,120 @@ fn cached_disk_header_presence_lengths_and_flags_are_strict() {
         .copy_from_slice(&(flags | 0x200).to_le_bytes());
     assert!(parse_feature_records(&empty_value, &spurious_flag).is_err());
 }
+
+/// One row per record sequence around the list FEAT11 family: `H` the list
+/// FeatHdr11, `F` one table Feature11, `L` its List12 records, `h`/`f` a
+/// FeatHdr11/Feature11 of another feature, `O` a record outside the family.
+/// The outcome lists every refused record and what `finish` returns.
+#[test]
+fn feat11_family_contiguity_accepts_and_rejects_the_same_sequences() {
+    let value = table(2, 3);
+    let header = feature_header_record(std::slice::from_ref(&value)).unwrap();
+    let feature = value.to_feature_record_bytes().unwrap();
+    assert_eq!(feature.len(), 1);
+    let list12 = value.to_list12_record_bytes().unwrap();
+    let cases: &[(&str, &str)] = &[
+        ("", "tables 0"),
+        ("O", "tables 0"),
+        ("H", "tables 0"),
+        ("HFL", "tables 1"),
+        ("OHFLO", "tables 1"),
+        ("HFLOO", "tables 1"),
+        ("hHFL", "tables 1"),
+        ("fHFL", "tables 1"),
+        ("HFLh", "tables 1"),
+        ("HFLf", "tables 1"),
+        (
+            "HH",
+            "1H: Invalid record 0x0871: duplicate or malformed FeatHdr11; tables 0",
+        ),
+        (
+            "HOH",
+            "2H: Invalid record 0x0871: noncontiguous list FEAT11 family; tables 0",
+        ),
+        (
+            "HhH",
+            "2H: Invalid record 0x0871: noncontiguous list FEAT11 family; tables 0",
+        ),
+        (
+            "HfH",
+            "2H: Invalid record 0x0871: noncontiguous list FEAT11 family; tables 0",
+        ),
+        (
+            "HOF",
+            "2F: Invalid record 0x0872: noncontiguous list FEAT11 family; tables 0",
+        ),
+        (
+            "HhF",
+            "2F: Invalid record 0x0872: noncontiguous list FEAT11 family; tables 0",
+        ),
+        (
+            "HFOL",
+            "3L: Invalid record 0x0877: noncontiguous list FEAT11 family; 3L: Invalid record 0x0877: noncontiguous list FEAT11 family; 3L: Invalid record 0x0877: noncontiguous list FEAT11 family; finish: Invalid record 0x0877: missing table style",
+        ),
+        (
+            "HFfL",
+            "3L: Invalid record 0x0877: noncontiguous list FEAT11 family; 3L: Invalid record 0x0877: noncontiguous list FEAT11 family; 3L: Invalid record 0x0877: noncontiguous list FEAT11 family; finish: Invalid record 0x0877: missing table style",
+        ),
+        (
+            "HFLOHFL",
+            "4H: Invalid record 0x0871: noncontiguous list FEAT11 family; 5F: Invalid record 0x0872: noncontiguous list FEAT11 family; 6L: Invalid record 0x0877: noncontiguous list FEAT11 family; 6L: Invalid record 0x0877: noncontiguous list FEAT11 family; 6L: Invalid record 0x0877: noncontiguous list FEAT11 family; tables 1",
+        ),
+        (
+            "F",
+            "0F: Invalid record 0x0872: table feature without FeatHdr11; tables 0",
+        ),
+        (
+            "OF",
+            "1F: Invalid record 0x0872: table feature without FeatHdr11; tables 0",
+        ),
+        (
+            "hF",
+            "1F: Invalid record 0x0872: table feature without FeatHdr11; tables 0",
+        ),
+        (
+            "L",
+            "0L: Invalid record 0x0877: List12 without Feature11; 0L: Invalid record 0x0877: List12 without Feature11; 0L: Invalid record 0x0877: List12 without Feature11; tables 0",
+        ),
+        (
+            "HL",
+            "1L: Invalid record 0x0877: List12 without Feature11; 1L: Invalid record 0x0877: List12 without Feature11; 1L: Invalid record 0x0877: List12 without Feature11; tables 0",
+        ),
+        (
+            "FH",
+            "0F: Invalid record 0x0872: table feature without FeatHdr11; tables 0",
+        ),
+    ];
+    let mismatches: Vec<String> = cases
+        .iter()
+        .filter_map(|(sequence, expected)| {
+            let mut collector = ListObjectCollector::new();
+            let mut outcome = Vec::new();
+            for (index, token) in sequence.chars().enumerate() {
+                let records: Vec<(u16, &[u8])> = match token {
+                    'H' => vec![(FEAT_HDR11_RECORD_TYPE, payload(&header))],
+                    'F' => vec![(FEATURE11_RECORD_TYPE, payload(&feature[0]))],
+                    'L' => list12
+                        .iter()
+                        .map(|record| (LIST12_RECORD_TYPE, payload(record)))
+                        .collect(),
+                    'h' => vec![(FEAT_HDR11_RECORD_TYPE, &[][..])],
+                    'f' => vec![(FEATURE11_RECORD_TYPE, &[][..])],
+                    _ => vec![(0x0200, &[][..])],
+                };
+                for (record_type, data) in records {
+                    if let Err(error) = collector.feed_record(record_type, data) {
+                        outcome.push(format!("{index}{token}: {error}"));
+                    }
+                }
+            }
+            outcome.push(match collector.finish() {
+                Ok(tables) => format!("tables {}", tables.len()),
+                Err(error) => format!("finish: {error}"),
+            });
+            let actual = outcome.join("; ");
+            (actual != *expected).then(|| format!("(\"{sequence}\", \"{actual}\"),"))
+        })
+        .collect();
+    assert!(mismatches.is_empty(), "\n{}\n", mismatches.join("\n"));
+}

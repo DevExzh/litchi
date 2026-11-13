@@ -278,9 +278,22 @@ pub(super) fn parse_selection(data: &[u8]) -> Result<Selection> {
     })
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+/// The last optional part read of one `WINDOW` production, which is
+/// `Window2 [PLV] [Scl] [Pane] *Selection`.
+///
+/// ```text
+/// Start --PLV--> PageLayout
+/// Start | PageLayout --Scl--> Zoom
+/// Start | PageLayout | Zoom --Pane--> Pane
+/// any phase --Selection--> Selections
+/// ```
+///
+/// A PLV, Scl or Pane that arrives in any other phase is out of order. Window2
+/// and every record outside the production start over at `Start`.
+#[derive(Clone, Copy)]
 enum ViewPhase {
     Start,
+    PageLayout,
     Zoom,
     Pane,
     Selections,
@@ -291,7 +304,6 @@ pub(crate) struct ViewCollector {
     views: Vec<View>,
     current: Option<View>,
     phase: ViewPhase,
-    saw_plv: bool,
     zoom_defects: Vec<ZoomDefect>,
 }
 
@@ -301,7 +313,6 @@ impl ViewCollector {
             views: Vec::new(),
             current: None,
             phase: ViewPhase::Start,
-            saw_plv: false,
             zoom_defects: Vec::new(),
         }
     }
@@ -336,7 +347,6 @@ impl ViewCollector {
             self.views.push(view);
         }
         self.phase = ViewPhase::Start;
-        self.saw_plv = false;
         Ok(())
     }
 
@@ -350,14 +360,19 @@ impl ViewCollector {
             return Ok(());
         };
         match record_type {
-            PLV_RECORD_TYPE if self.phase == ViewPhase::Start && !self.saw_plv => {
-                self.saw_plv = true;
+            PLV_RECORD_TYPE if matches!(self.phase, ViewPhase::Start) => {
+                self.phase = ViewPhase::PageLayout;
             },
-            SCL_RECORD_TYPE if self.phase == ViewPhase::Start => {
+            SCL_RECORD_TYPE if matches!(self.phase, ViewPhase::Start | ViewPhase::PageLayout) => {
                 view.zoom_fraction = Some(parse_scl(data)?);
                 self.phase = ViewPhase::Zoom;
             },
-            PANE_RECORD_TYPE if matches!(self.phase, ViewPhase::Start | ViewPhase::Zoom) => {
+            PANE_RECORD_TYPE
+                if matches!(
+                    self.phase,
+                    ViewPhase::Start | ViewPhase::PageLayout | ViewPhase::Zoom
+                ) =>
+            {
                 view.pane = Some(parse_pane(data, view.has_frozen_panes())?);
                 self.phase = ViewPhase::Pane;
             },

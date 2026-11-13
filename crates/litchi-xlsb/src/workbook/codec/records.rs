@@ -60,6 +60,36 @@ pub(in crate::workbook) struct ParsedWorkbookInfo {
     pub(in crate::workbook) calc: Option<Props>,
 }
 
+/// Where the workbook stream stands relative to its one PivotCache ID
+/// collection.
+///
+/// ```text
+/// Before --BrtBeginPivotCacheIDs--> Open --BrtEndPivotCacheIDs--> Closed
+/// Open   --BrtBeginPivotCacheID-->  InCache
+/// InCache --BrtEndPivotCacheID-->   Open
+/// ```
+///
+/// Each of the four records is refused in every other state. Records outside
+/// the family never move the state. A stream that ends in `Open` or `InCache`
+/// is unterminated.
+#[derive(Clone, Copy)]
+enum PivotCacheIdsState {
+    Before,
+    Open,
+    InCache,
+    Closed,
+}
+
+impl PivotCacheIdsState {
+    /// Inside the collection and outside every cache.
+    const fn is_open(self) -> bool {
+        match self {
+            Self::Open => true,
+            Self::Before | Self::InCache | Self::Closed => false,
+        }
+    }
+}
+
 impl Workbook {
     /// Parse the workbook stream, recording every Excel-compatible repair
     /// into `report` (see [`crate::leniency`]).
@@ -334,23 +364,23 @@ impl Workbook {
         data: &[u8],
         raw_limits: crate::raw::Limits,
     ) -> Result<Vec<(u32, String)>> {
-        let mut in_collection = false;
-        let mut open_cache = false;
-        let mut ended = false;
+        let mut state = PivotCacheIdsState::Before;
         let mut caches = Vec::new();
         for record in Records::new(data, raw_limits) {
             let record = record?;
             match record.kind() {
-                kind::BEGIN_PIVOT_CACHE_IDS => {
-                    if in_collection || ended {
+                kind::BEGIN_PIVOT_CACHE_IDS => match state {
+                    PivotCacheIdsState::Before => state = PivotCacheIdsState::Open,
+                    PivotCacheIdsState::Open
+                    | PivotCacheIdsState::InCache
+                    | PivotCacheIdsState::Closed => {
                         return Err(crate::package::error::Error::InvalidFormula(
                             "duplicate BrtBeginPivotCacheIDs collection",
                         ));
-                    }
-                    in_collection = true;
+                    },
                 },
                 kind::BEGIN_PIVOT_CACHE_ID => {
-                    if !in_collection || open_cache || record.payload().len() < 8 {
+                    if !state.is_open() || record.payload().len() < 8 {
                         return Err(crate::package::error::Error::InvalidFormula(
                             "malformed BrtBeginPivotCacheID nesting or payload",
                         ));
@@ -370,34 +400,41 @@ impl Workbook {
                         ));
                     }
                     caches.push((cache_id, rel_id));
-                    open_cache = true;
+                    state = PivotCacheIdsState::InCache;
                 },
                 kind::END_PIVOT_CACHE_ID => {
-                    if !open_cache || !record.payload().is_empty() {
+                    let in_cache = match state {
+                        PivotCacheIdsState::InCache => true,
+                        PivotCacheIdsState::Before
+                        | PivotCacheIdsState::Open
+                        | PivotCacheIdsState::Closed => false,
+                    };
+                    if !in_cache || !record.payload().is_empty() {
                         return Err(crate::package::error::Error::InvalidFormula(
                             "unbalanced BrtEndPivotCacheID",
                         ));
                     }
-                    open_cache = false;
+                    state = PivotCacheIdsState::Open;
                 },
                 kind::END_PIVOT_CACHE_IDS => {
-                    if !in_collection || open_cache || !record.payload().is_empty() {
+                    if !state.is_open() || !record.payload().is_empty() {
                         return Err(crate::package::error::Error::InvalidFormula(
                             "unbalanced BrtEndPivotCacheIDs",
                         ));
                     }
-                    in_collection = false;
-                    ended = true;
+                    state = PivotCacheIdsState::Closed;
                 },
                 _ => {},
             }
         }
-        if in_collection || open_cache {
-            return Err(crate::package::error::Error::InvalidFormula(
-                "unterminated PivotCache ID collection",
-            ));
+        match state {
+            PivotCacheIdsState::Before | PivotCacheIdsState::Closed => Ok(caches),
+            PivotCacheIdsState::Open | PivotCacheIdsState::InCache => {
+                Err(crate::package::error::Error::InvalidFormula(
+                    "unterminated PivotCache ID collection",
+                ))
+            },
         }
-        Ok(caches)
     }
 
     pub(in crate::workbook) fn parse_pivot_view(

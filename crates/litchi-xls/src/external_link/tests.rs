@@ -321,3 +321,112 @@ fn malformed_source_framing_and_link_ownership_are_rejected() {
     stream.extend_from_slice(&record(EXTERN_NAME_RECORD_TYPE, &external_name("Late")));
     assert!(Snapshot::parse(stream).is_err());
 }
+
+/// One row per record sequence: the collector's outcome for every record, and
+/// what the package owner makes of the same records as one stream (the number
+/// of supporting books, or the error text).
+#[test]
+fn supbook_block_contiguity_accepts_and_rejects_the_same_sequences() {
+    type Record = (u16, &'static [u8]);
+    type Case = (
+        &'static [Record],
+        &'static [&'static str],
+        Result<usize, &'static str>,
+    );
+    const SELF: Record = (SUP_BOOK_RECORD_TYPE, &[1, 0, 1, 4]);
+    const ADDIN: Record = (SUP_BOOK_RECORD_TYPE, &[1, 0, 1, 0x3a]);
+    const NAME: Record = (
+        EXTERN_NAME_RECORD_TYPE,
+        &[0, 0, 0, 0, 0, 0, 1, 0, b'F', 2, 0, 0x1c, 0x17],
+    );
+    const SHEET: Record = (EXTERN_SHEET_RECORD_TYPE, &[0, 0]);
+    const XCT: Record = (XCT_RECORD_TYPE, &[1, 0, 0, 0]);
+    const CRN: Record = (super::CRN_RECORD_TYPE, &[0, 0, 7, 0]);
+    const CONTINUE: Record = (CONTINUE_RECORD_TYPE, &[0]);
+    const OTHER: Record = (0x0018, &[]);
+    const OUTSIDE_BOOK: &str =
+        "Invalid record 0x01AE: external-link record is outside its contiguous SUPBOOK collection";
+    const OUTSIDE_SHEET: &str =
+        "Invalid record 0x0017: external-link record is outside its contiguous SUPBOOK collection";
+    const OUTSIDE_NAME: &str =
+        "Invalid record 0x0023: external-link record is outside its contiguous SUPBOOK collection";
+    const NAME_DETACHED: &str =
+        "Invalid record 0x0023: ExternName must directly follow its active SupBook name collection";
+    const XCT_ALONE: &str = "Invalid record 0x0059: XCT appears without a preceding SupBook";
+    const CRN_ALONE: &str = "Invalid record 0x005A: CRN appears without XCT";
+    const BOOK_AFTER_SHEET: &str = "Invalid record 0x01AE: SupBook must precede ExternSheet";
+    const STRAY_CONTINUE: &str =
+        "Invalid record 0x003C: Continue is not associated with a DDE/OLE ExternName";
+    let cases: &[Case] = &[
+        (&[], &[], Ok(0)),
+        (&[OTHER, OTHER], &["ok", "ok"], Ok(0)),
+        (&[SELF], &["ok"], Ok(1)),
+        (&[OTHER, ADDIN, NAME, SHEET], &["ok"; 4], Ok(1)),
+        (&[SELF, SHEET, OTHER, OTHER], &["ok"; 4], Ok(1)),
+        (&[SELF, ADDIN, OTHER], &["ok"; 3], Ok(2)),
+        (
+            &[SELF, OTHER, SELF],
+            &["ok", "ok", OUTSIDE_BOOK],
+            Err(OUTSIDE_BOOK),
+        ),
+        (
+            &[SELF, OTHER, SHEET],
+            &["ok", "ok", OUTSIDE_SHEET],
+            Err(OUTSIDE_SHEET),
+        ),
+        (
+            &[ADDIN, OTHER, NAME],
+            &["ok", "ok", OUTSIDE_NAME],
+            Err(OUTSIDE_NAME),
+        ),
+        (
+            &[ADDIN, SHEET, NAME],
+            &["ok", "ok", NAME_DETACHED],
+            Err(NAME_DETACHED),
+        ),
+        (&[NAME], &[NAME_DETACHED], Err(NAME_DETACHED)),
+        (&[XCT], &[XCT_ALONE], Err(XCT_ALONE)),
+        (&[CRN], &[CRN_ALONE], Err(CRN_ALONE)),
+        (&[SHEET, OTHER, SHEET], &["ok"; 3], Ok(0)),
+        (
+            &[SHEET, OTHER, SELF],
+            &["ok", "ok", BOOK_AFTER_SHEET],
+            Err(BOOK_AFTER_SHEET),
+        ),
+        (&[CONTINUE, OTHER], &["ok", "ok"], Ok(0)),
+        (
+            &[SELF, CONTINUE],
+            &["ok", STRAY_CONTINUE],
+            Err(STRAY_CONTINUE),
+        ),
+        (&[SELF, OTHER, CONTINUE], &["ok"; 3], Ok(1)),
+    ];
+    for (records, expected, package) in cases {
+        let mut collector = ExternalLinkCollector::new();
+        let outcomes: Vec<String> = records
+            .iter()
+            .map(
+                |(record_type, data)| match collector.feed_record(*record_type, data) {
+                    Ok(()) => "ok".to_string(),
+                    Err(error) => error.to_string(),
+                },
+            )
+            .collect();
+        assert_eq!(outcomes, *expected, "{records:?}");
+
+        let stream: Vec<u8> = records
+            .iter()
+            .flat_map(|(record_type, data)| record(*record_type, data))
+            .collect();
+        let parsed = super::package::Package::parse(&stream)
+            .map(|package| {
+                assert_eq!(
+                    package.supporting_book_record(0).is_ok(),
+                    !package.links().supporting_books().is_empty()
+                );
+                package.links().supporting_books().len()
+            })
+            .map_err(|error| error.to_string());
+        assert_eq!(parsed, package.map_err(str::to_string), "{records:?}");
+    }
+}

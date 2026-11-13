@@ -187,6 +187,71 @@ fn add_and_reorder_repairs_sheet_offset_and_preserves_unknown_data() {
     );
 }
 
+/// One row per order of the picture fields: `c` FtCmo, `f` pictFormat,
+/// `g` pictFlags, `p` pictFmla, `u` an unknown subrecord, `e` FtEnd.
+#[test]
+fn picture_field_order_accepts_and_rejects_the_same_sequences() {
+    const FORMAT_ORDER: &str =
+        "Invalid record 0x005D: OLE Obj pictFormat is out of MS-XLS field order";
+    const FLAGS_ORDER: &str =
+        "Invalid record 0x005D: OLE Obj pictFlags is out of MS-XLS field order";
+    const INCOMPLETE: &str =
+        "Invalid record 0x005D: OLE Obj mandatory picture fields are incomplete";
+    const ONE_FLAGS: &str = "Invalid record 0x005D: OLE Obj requires one FtPioGrbit";
+    const ONE_FORMAT: &str = "Invalid record 0x005D: OLE Obj requires exactly one FtCf pictFormat";
+    const ONE_FORMULA: &str = "Invalid record 0x005D: duplicate FtPictFmla";
+    let cases: &[(&str, &str)] = &[
+        ("cfgupe", "ok"),
+        ("cfgpe", "ok"),
+        ("cufugupue", "ok"),
+        ("cgfpe", FORMAT_ORDER),
+        ("cfpge", FLAGS_ORDER),
+        ("cpfge", FORMAT_ORDER),
+        ("cgpfe", FORMAT_ORDER),
+        ("cpgfe", FLAGS_ORDER),
+        ("cfgpfe", FORMAT_ORDER),
+        ("cfgpge", FLAGS_ORDER),
+        ("ce", INCOMPLETE),
+        ("cfe", INCOMPLETE),
+        ("cfge", INCOMPLETE),
+        ("cge", INCOMPLETE),
+        ("cpe", ONE_FLAGS),
+        ("cfpe", ONE_FLAGS),
+        ("cgpe", ONE_FORMAT),
+        ("cffgpe", ONE_FORMAT),
+        ("cfggpe", ONE_FLAGS),
+        ("cfgppe", ONE_FORMULA),
+        ("cfgpupe", ONE_FORMULA),
+    ];
+    let template = object(1, 1, 0);
+    for (order, expected) in cases {
+        let subrecords = order
+            .chars()
+            .map(|field| {
+                let index = match field {
+                    'c' => 0,
+                    'f' => 1,
+                    'g' => 2,
+                    'u' => 3,
+                    'p' => 4,
+                    'e' => 5,
+                    other => panic!("unknown field {other}"),
+                };
+                template.subrecords[index].clone()
+            })
+            .collect();
+        let record = OleObjectRecord {
+            subrecords,
+            text_object: None,
+        };
+        let outcome = match record.validate() {
+            Ok(()) => "ok".to_string(),
+            Err(error) => error.to_string(),
+        };
+        assert_eq!(outcome, *expected, "{order}");
+    }
+}
+
 #[test]
 fn invalid_flags_and_reorder_are_atomic() {
     for raw in [0x0010, 0x0020, 0x0012] {

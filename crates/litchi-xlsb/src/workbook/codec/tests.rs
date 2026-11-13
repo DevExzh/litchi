@@ -162,6 +162,116 @@ fn pivot_cache_record_owner_preserves_relationship_identity() {
     );
 }
 
+/// One row per record sequence around the PivotCache ID collection: `[`/`]`
+/// begin and end the collection, `(`/`)` begin and end one cache (each with
+/// its own ID), `X` is a record outside the family.
+#[test]
+fn pivot_cache_id_collection_accepts_and_rejects_the_same_sequences() {
+    let cases: &[(&str, &str)] = &[
+        ("", "caches 0"),
+        ("X", "caches 0"),
+        ("[]", "caches 0"),
+        ("X[]X", "caches 0"),
+        ("[()]", "caches 1"),
+        ("[()()]", "caches 2"),
+        ("[X(X)X]", "caches 1"),
+        ("[()]X", "caches 1"),
+        (
+            "[",
+            "error: Invalid formula: unterminated PivotCache ID collection",
+        ),
+        (
+            "[(",
+            "error: Invalid formula: unterminated PivotCache ID collection",
+        ),
+        (
+            "[()",
+            "error: Invalid formula: unterminated PivotCache ID collection",
+        ),
+        (
+            "[][]",
+            "error: Invalid formula: duplicate BrtBeginPivotCacheIDs collection",
+        ),
+        (
+            "[]X[]",
+            "error: Invalid formula: duplicate BrtBeginPivotCacheIDs collection",
+        ),
+        (
+            "[[",
+            "error: Invalid formula: duplicate BrtBeginPivotCacheIDs collection",
+        ),
+        (
+            "[([",
+            "error: Invalid formula: duplicate BrtBeginPivotCacheIDs collection",
+        ),
+        (
+            "]",
+            "error: Invalid formula: unbalanced BrtEndPivotCacheIDs",
+        ),
+        (
+            "[]]",
+            "error: Invalid formula: unbalanced BrtEndPivotCacheIDs",
+        ),
+        (
+            "[(]",
+            "error: Invalid formula: unbalanced BrtEndPivotCacheIDs",
+        ),
+        (
+            "(",
+            "error: Invalid formula: malformed BrtBeginPivotCacheID nesting or payload",
+        ),
+        (
+            "[](",
+            "error: Invalid formula: malformed BrtBeginPivotCacheID nesting or payload",
+        ),
+        (
+            "[((",
+            "error: Invalid formula: malformed BrtBeginPivotCacheID nesting or payload",
+        ),
+        (")", "error: Invalid formula: unbalanced BrtEndPivotCacheID"),
+        (
+            "[)",
+            "error: Invalid formula: unbalanced BrtEndPivotCacheID",
+        ),
+        (
+            "[())",
+            "error: Invalid formula: unbalanced BrtEndPivotCacheID",
+        ),
+        (
+            "[])",
+            "error: Invalid formula: unbalanced BrtEndPivotCacheID",
+        ),
+    ];
+    let mismatches: Vec<String> = cases
+        .iter()
+        .filter_map(|(sequence, expected)| {
+            let mut next_id = 0_u32;
+            let records: Vec<(Kind, Vec<u8>)> = sequence
+                .chars()
+                .map(|token| match token {
+                    '[' => (kind::BEGIN_PIVOT_CACHE_IDS, Vec::new()),
+                    ']' => (kind::END_PIVOT_CACHE_IDS, Vec::new()),
+                    '(' => {
+                        next_id += 1;
+                        let mut cache = next_id.to_le_bytes().to_vec();
+                        cache.extend_from_slice(&wide_string("rId"));
+                        (kind::BEGIN_PIVOT_CACHE_ID, cache)
+                    },
+                    ')' => (kind::END_PIVOT_CACHE_ID, Vec::new()),
+                    _ => (Kind::new(4095).unwrap(), vec![1, 2]),
+                })
+                .collect();
+            let data = record_stream(&records).unwrap();
+            let actual = match Workbook::parse_pivot_cache_ids(&data, crate::raw::Limits::DEFAULT) {
+                Ok(caches) => format!("caches {}", caches.len()),
+                Err(error) => format!("error: {error}"),
+            };
+            (actual != *expected).then(|| format!("(\"{sequence}\", \"{actual}\"),"))
+        })
+        .collect();
+    assert!(mismatches.is_empty(), "\n{}\n", mismatches.join("\n"));
+}
+
 #[test]
 fn ordinary_table_owner_ignores_opaque_balanced_xml_map_extensions() {
     let mut data = Vec::new();

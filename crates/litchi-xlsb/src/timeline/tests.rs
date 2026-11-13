@@ -85,3 +85,71 @@ fn xml_limits_bound_timeline_input_elements_depth_and_output() {
     );
     assert!(write_cache(&original, limits(u64::MAX, len - 1, u64::MAX, u64::MAX)).is_err());
 }
+
+/// One row per order of the cache definition's children: `p` pivotTables,
+/// `s` state, `f` timelinePivotFilter, `u` an element the schema does not
+/// place there.
+#[test]
+fn cache_child_order_accepts_and_rejects_the_same_sequences() {
+    const ORDER: &str = "error: Invalid format: invalid or out-of-order timeline cache child";
+    const NO_STATE: &str = "error: Invalid format: timeline cache requires exactly one state";
+    let server = litchi_core::Limits::for_profile(litchi_core::Profile::Server);
+    let written = String::from_utf8(write_cache(&cache(), server).unwrap()).unwrap();
+    let element = |open: &str, close: &str| {
+        let start = written.find(open).unwrap();
+        let end = start + written[start..].find(close).unwrap() + close.len();
+        written[start..end].to_string()
+    };
+    let state = element("<x15:state", "</x15:state>");
+    let filter = element("<x15:timelinePivotFilter", "/>");
+    let cases: &[(&str, &str)] = &[
+        ("s", "pivot tables 0, filter false"),
+        ("ps", "pivot tables 1, filter false"),
+        ("sf", "pivot tables 0, filter true"),
+        ("psf", "pivot tables 1, filter true"),
+        ("", NO_STATE),
+        ("p", NO_STATE),
+        ("pp", ORDER),
+        ("sp", ORDER),
+        ("ss", ORDER),
+        ("pss", ORDER),
+        ("f", ORDER),
+        ("pf", ORDER),
+        ("fs", ORDER),
+        ("sff", ORDER),
+        ("sfs", ORDER),
+        ("psfp", ORDER),
+        ("u", ORDER),
+        ("su", ORDER),
+        ("psfu", ORDER),
+    ];
+    let mismatches: Vec<String> = cases
+        .iter()
+        .filter_map(|(order, expected)| {
+            let mut xml = String::from(
+                "<x15:timelineCacheDefinition xmlns:x15=\"http://schemas.microsoft.com/office/spreadsheetml/2010/11/main\" name=\"c\" sourceName=\"d\">",
+            );
+            for child in order.chars() {
+                xml.push_str(match child {
+                    'p' => {
+                        "<x15:pivotTables><x15:pivotTable tabId=\"1\" name=\"P\"/></x15:pivotTables>"
+                    },
+                    's' => &state,
+                    'f' => &filter,
+                    _ => "<x15:extLst/>",
+                });
+            }
+            xml.push_str("</x15:timelineCacheDefinition>");
+            let actual = match parse_cache(xml.as_bytes(), server) {
+                Ok(cache) => format!(
+                    "pivot tables {}, filter {}",
+                    cache.pivot_tables.len(),
+                    cache.filter.is_some()
+                ),
+                Err(error) => format!("error: {error}"),
+            };
+            (actual != *expected).then(|| format!("(\"{order}\", \"{actual}\"),"))
+        })
+        .collect();
+    assert!(mismatches.is_empty(), "\n{}\n", mismatches.join("\n"));
+}
