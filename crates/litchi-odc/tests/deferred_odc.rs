@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "tests are expected to panic on unexpected errors"
-)]
-
 use litchi_odc::flat::Chart as FlatChart;
 use litchi_odc::{AxisUpdate, ChartClassKind};
 

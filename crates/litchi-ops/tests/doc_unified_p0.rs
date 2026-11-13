@@ -3,12 +3,6 @@
 //! paragraph add/remove/move/swap; exact no-ops, signature and encryption
 //! policies, and read-back after reopen.
 #![cfg(feature = "doc")]
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::indexing_slicing,
-    reason = "integration tests favor concise panic-driven assertions"
-)]
 
 use std::io::Cursor;
 

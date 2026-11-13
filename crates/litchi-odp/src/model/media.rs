@@ -499,10 +499,6 @@ pub(crate) fn validate_ncname(value: &str, description: &str) -> Result<()> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

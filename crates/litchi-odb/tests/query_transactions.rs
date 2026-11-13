@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "tests are expected to panic on unexpected fixture failures"
-)]
-
 use litchi_odb::{Builder, Package};
 
 const SOURCE: &str = r#"<?xml version="1.0" encoding="UTF-8"?><o:document-content xmlns:d="urn:oasis:names:tc:opendocument:xmlns:database:1.0" xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><o:body><o:database><d:data-source><d:connection-data><d:connection-resource xmlns:x="http://www.w3.org/1999/xlink" x:href="sdbc:embedded:firebird" x:type="simple"/></d:connection-data></d:data-source><d:queries><d:query d:name="ledger" d:command="SELECT 1"/></d:queries></o:database></o:body></o:document-content>"#;

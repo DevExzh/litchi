@@ -64,10 +64,6 @@ pub(super) fn classify(target: &TargetArg<'_>) -> Option<TextKind> {
 
 /// Admitted rich text assignments, owned so they outlive the props borrow.
 #[derive(Clone, Default)]
-#[allow(
-    clippy::option_option,
-    reason = "omission, removal and replacement are distinct assignments"
-)]
 pub(in crate::format::pptx) struct TextValues {
     text: Option<String>,
     bold: Option<Option<bool>>,
@@ -537,11 +533,6 @@ fn font_size(points: f64) -> Result<u32> {
         )
         .with_property("size"));
     }
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "the value was range-checked against the u32 font-size domain"
-    )]
     Ok(hundredths as u32)
 }
 

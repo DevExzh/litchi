@@ -611,10 +611,6 @@ impl Scanner {
     }
 }
 
-#[allow(
-    clippy::unnecessary_wraps,
-    reason = "kept Result-returning for uniformity with the sibling fallible page writers called by the same authoring code"
-)]
 pub(crate) fn write_page_attributes(
     metadata: Option<&Collection>,
     slide_index: usize,
@@ -813,10 +809,6 @@ fn xml_error(error: impl std::fmt::Display) -> Error {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
     use crate::Builder;

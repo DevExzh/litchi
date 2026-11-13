@@ -184,7 +184,6 @@ pub struct StreamingLimits {
 
 impl StreamingLimits {
     /// Creates a checked provider limit profile.
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         max_rows: usize,
         max_cells: usize,

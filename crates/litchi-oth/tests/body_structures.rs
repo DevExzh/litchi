@@ -1,5 +1,3 @@
-#![allow(clippy::unwrap_used, reason = "focused semantic projection assertions")]
-
 use litchi_oth::{Builder, change, frame, index, note, table};
 
 const CONTENT: &str = concat!(

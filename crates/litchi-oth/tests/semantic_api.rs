@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "test code panics on failure; unwrap keeps assertions concise"
-)]
-
 use litchi_core::{HistoryLimits, Metadata, Position};
 use litchi_oth::{
     Block, Builder, CapabilityState, History, JoinFailure, Package, Patch, ResourceMember,

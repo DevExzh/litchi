@@ -1931,10 +1931,6 @@ fn fill_value(fill: &Fill) -> Option<Value<'static>> {
             return None;
         }
         // Degrees are written as a whole number, as OfficeCLI's `(int)` does.
-        #[allow(
-            clippy::cast_possible_truncation,
-            reason = "a gradient angle is a small finite number of degrees"
-        )]
         let degree = gradient.degree() as i64;
         out.push(';');
         out.push_str(&degree.to_string());
@@ -2002,10 +1998,6 @@ pub(super) fn font_color_value(
 
 /// A length of `points`, rounded to the nearest EMU.
 pub(super) fn points(points: f64) -> Length {
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "font sizes and row heights are a few hundred points at most"
-    )]
     Length::from_emu((points * 12_700.0).round() as i64)
 }
 

@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "test code panics on failure; unwrap keeps assertions concise"
-)]
-
 use litchi_odm::{
     Builder, Package,
     section::Section,

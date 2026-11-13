@@ -172,11 +172,6 @@ fn date_value(days: i64, seconds: f64, time: bool) -> Option<String> {
     let mut lexical = format!("{year:04}-{month:02}-{day:02}");
     if time {
         let whole = seconds.trunc();
-        #[allow(
-            clippy::cast_possible_truncation,
-            clippy::cast_sign_loss,
-            reason = "the seconds of a day are below 86,400"
-        )]
         let whole = whole.clamp(0.0, 86_399.0) as u32;
         lexical.push_str(&format!(
             "T{:02}:{:02}:{:02}",

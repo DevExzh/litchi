@@ -5,13 +5,6 @@
 //! Refusals that the facade reported as a string-flattened
 //! `Error::Unsupported` are asserted through the typed code here.
 
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::panic,
-    reason = "test assertions panic by design"
-)]
-
 #[allow(unused_imports, reason = "used by the suites of the enabled formats")]
 use litchi_markdown::{MarkdownOptions, ToMarkdown};
 

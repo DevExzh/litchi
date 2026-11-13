@@ -1,9 +1,3 @@
-#![allow(
-    clippy::shadow_reuse,
-    clippy::unwrap_used,
-    reason = "integration-test assertions panic on failure by design"
-)]
-
 use litchi_odp::core::{OwnedPackage, PackageWriter};
 use litchi_odp::{Builder, Package};
 use soapberry_zip::office::StreamingArchiveWriter;

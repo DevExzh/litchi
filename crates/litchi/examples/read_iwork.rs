@@ -10,12 +10,6 @@
 //! cargo run -p litchi --example read_iwork --features iwork -- document.pages
 //! ```
 
-#![allow(
-    clippy::print_stderr,
-    clippy::print_stdout,
-    reason = "this command-line example intentionally renders semantic document content"
-)]
-
 #[cfg(feature = "iwork")]
 use std::{env, error::Error, path::PathBuf};
 

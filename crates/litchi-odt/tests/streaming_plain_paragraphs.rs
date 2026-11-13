@@ -1,7 +1,5 @@
 //! Public contracts for bounded plain paragraph ODT authoring.
 
-#![allow(clippy::expect_used, clippy::unwrap_used)]
-
 use std::{
     borrow::Cow,
     error::Error as StdError,
@@ -1231,7 +1229,6 @@ fn cancellation_before_middle_and_final_write_is_typed() {
 }
 
 mod execution_budgets {
-    #![allow(clippy::expect_used, clippy::unwrap_used)]
 
     use super::*;
 

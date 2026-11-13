@@ -4751,7 +4751,6 @@ mod raw_package_diff_tests {
 mod retained_xml_policy_tests {
     #![allow(
         clippy::unwrap_used,
-        clippy::expect_used,
         reason = "small in-memory packages make the policy regression deterministic"
     )]
 

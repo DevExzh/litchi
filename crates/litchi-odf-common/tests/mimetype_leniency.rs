@@ -4,12 +4,6 @@
 //! recorded in the opening [`ToleranceReport`]. A conforming package records
 //! nothing, and structural or content defects stay hard errors.
 
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "hand-built fixtures keep tolerance assertions focused"
-)]
-
 #[path = "support/odf_rezip.rs"]
 mod odf_rezip;
 

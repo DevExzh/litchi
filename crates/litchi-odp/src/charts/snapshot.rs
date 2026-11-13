@@ -152,10 +152,6 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for a missing or ambiguous selector or a resource-limit breach.
-    #[allow(
-        clippy::needless_pass_by_value,
-        reason = "replacement takes ownership of an authored chart part and may install it at multiple shared occurrences"
-    )]
     pub(crate) fn replace<'a, S>(&mut self, selector: S, part: Part) -> Result<()>
     where
         S: Into<Selector<'a>>,

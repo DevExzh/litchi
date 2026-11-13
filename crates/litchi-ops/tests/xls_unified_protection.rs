@@ -1,12 +1,6 @@
 //! Every unified XLS write refuses signed and encrypted workbooks with a
 //! typed error and leaves the owner unchanged.
 #![cfg(feature = "xls")]
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::panic,
-    reason = "integration fixtures fail fast"
-)]
 
 use litchi_ops::{Code, File, NewNode, Placement, props};
 

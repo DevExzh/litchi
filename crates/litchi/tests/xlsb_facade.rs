@@ -12,12 +12,6 @@
 //! box a `litchi::Error` whose typed source is that XLSB or OPC error.
 
 #![cfg(feature = "xlsb")]
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::panic,
-    reason = "test assertions panic on failure by design"
-)]
 
 use std::io::{Cursor, Write};
 

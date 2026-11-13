@@ -438,10 +438,6 @@ enum RootPhase {
     Closed,
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "parser state is intentionally explicit"
-)]
 fn classify_start(
     namespace: NamespaceKind,
     start: &BytesStart<'_>,

@@ -665,10 +665,6 @@ impl Database {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    reason = "test code panics on failure; unwrap keeps assertions concise"
-)]
 mod tests {
     use super::Builder;
     use crate::model::{parse_count, parse_test_lock, reset_parse_count};

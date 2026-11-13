@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "Test assertions intentionally unwrap known-valid coordinate fixture construction failures."
-)]
-
 use super::codec::{alpha_to_digit, digit_to_alpha};
 use super::model::{CellCoord, CellRange, MAX_INDEX};
 

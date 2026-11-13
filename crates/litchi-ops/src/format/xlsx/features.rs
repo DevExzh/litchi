@@ -218,10 +218,6 @@ fn rgb(color: xlsx::Rgb) -> Value<'static> {
 }
 
 fn points(points: f64) -> Value<'static> {
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "font sizes are a few thousand points at most"
-    )]
     Value::Length(Length::from_emu((points * 12_700.0).round() as i64))
 }
 
@@ -1021,7 +1017,6 @@ fn shape_value(element: &Element, key: ShapeKey) -> Option<Value<'_>> {
                     color.blue()
                 );
                 if let Some(width) = width {
-                    #[allow(clippy::cast_precision_loss, reason = "line widths are small")]
                     let points = width as f64 / 12_700.0;
                     value.push_str(&format!(":{}", crate::value::DotNetDouble(points)));
                 }
@@ -1062,7 +1057,6 @@ fn shape_value(element: &Element, key: ShapeKey) -> Option<Value<'_>> {
         ShapeKey::Alt => element.description.as_deref().map(text),
         ShapeKey::Margin => element.margin.map(|margin| {
             let points = |emu: i64| {
-                #[allow(clippy::cast_precision_loss, reason = "insets are small")]
                 let points = emu as f64 / 12_700.0;
                 crate::value::DotNetDouble(points).to_string()
             };

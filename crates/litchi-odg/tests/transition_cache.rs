@@ -1,5 +1,3 @@
-#![allow(clippy::unwrap_used, reason = "test fixtures use unwrap for clarity")]
-
 use litchi_core::Error;
 use litchi_odf_common::core::PackageWriter;
 use litchi_odg::Package;

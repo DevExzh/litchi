@@ -15,10 +15,6 @@
 //! `--all-features`).
 
 #![cfg(all(feature = "test-support", feature = "xlsx"))]
-#![allow(
-    unsafe_code,
-    reason = "The test-only allocator is the measurement boundary; production crates remain safe"
-)]
 
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;

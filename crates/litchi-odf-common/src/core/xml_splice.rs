@@ -47,10 +47,6 @@ pub struct AuthoredXmlFragment {
 
 /// A checked set of byte-minimal edits to one exact source-loaded XML part.
 #[derive(Debug)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "The public name distinguishes a publishable transaction from source parts and ranges."
-)]
 pub struct XmlSplicePublication {
     edits: Vec<Edit>,
     /// The largest end of the edits' ranges: an edit starting after it

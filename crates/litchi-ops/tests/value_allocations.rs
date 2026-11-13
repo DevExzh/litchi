@@ -9,11 +9,6 @@
 //! probing parses in a query costs nothing. XLS adapter tests additionally
 //! track requested bytes so a growing vector cannot hide behind one allocation.
 
-#![allow(
-    unsafe_code,
-    reason = "The test-only allocator is the measurement boundary; production crates remain safe"
-)]
-
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 use std::fmt::{self, Write as _};

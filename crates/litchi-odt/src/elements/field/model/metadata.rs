@@ -1,9 +1,5 @@
 //! Document metadata fields and validated mixed-content trees.
 
-#![allow(
-    clippy::wildcard_imports,
-    reason = "semantic field owners share the stable model facade namespace"
-)]
 use super::*;
 /// One of the eight temporal/revision ODF document-metadata fields.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -864,7 +860,6 @@ fn validate_meta_nodes(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn validate_meta_exact_pair(
     nodes: &[MetaFieldNode],
     depth: usize,
@@ -902,7 +897,6 @@ fn validate_meta_exact_pair(
     )
 }
 
-#[allow(clippy::too_many_arguments)]
 fn validate_meta_required_element(
     node: &MetaFieldNode,
     depth: usize,

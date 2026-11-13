@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "Test assertions intentionally unwrap known-valid fixture construction failures."
-)]
-
 use super::codec::{parse, write};
 use super::model::{Iteration, IterationStatus, NullDate, Settings, is_xsd_date, is_xsd_double};
 use std::num::NonZeroUsize;

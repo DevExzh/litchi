@@ -401,11 +401,7 @@ impl Arg {
 
     fn number(&self, key: &'static str) -> Result<f64> {
         match self {
-            Self::Int(value) =>
-            {
-                #[allow(clippy::cast_precision_loss, reason = "angles and sizes are small")]
-                Ok(*value as f64)
-            },
+            Self::Int(value) => Ok(*value as f64),
             Self::Number(value) => Ok(*value),
             Self::Text(value) => value
                 .trim()
@@ -1225,7 +1221,6 @@ fn margin(key: &'static str, value: &str) -> Result<[i64; 4]> {
         let text = text.trim();
         match text.parse::<f64>() {
             Ok(points) if points.is_finite() && points >= 0.0 => {
-                #[allow(clippy::cast_possible_truncation, reason = "bounded by the leaf")]
                 let emu = (points * 12_700.0).round() as i64;
                 Ok(emu)
             },

@@ -4,11 +4,6 @@
 //! do not evaluate formulas, resolve names, open external IRIs, or make claims
 //! about function arity beyond the syntax rules in Part 4 sections 5.1--5.14.
 
-#![allow(
-    unsafe_code,
-    reason = "The integration-only allocator injects fallible failures."
-)]
-
 use litchi_core::Error;
 use litchi_ods::codec::formula::expression::{
     Expression, HARD_MAX_EXPRESSION_DEPTH, InfixOperator, Kind, Limits, NameScope, Node,

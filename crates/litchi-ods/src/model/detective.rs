@@ -231,10 +231,6 @@ impl Detective {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "the codec entry point keeps its historical element-qualified name"
-)]
 pub fn write_detective(out: &mut String, detective: &Detective) {
     out.push_str("<table:detective>");
     for range in detective.highlighted_ranges() {

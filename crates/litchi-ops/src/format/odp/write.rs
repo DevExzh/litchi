@@ -81,10 +81,6 @@ struct Values {
 
 /// A font size as ODF points (`18pt`, `10.5pt`).
 fn points(length: Length) -> String {
-    #[allow(
-        clippy::cast_precision_loss,
-        reason = "EMU values of font sizes are far below 2^52"
-    )]
     let points = length.emu() as f64 / 12_700.0;
     let mut text = format!("{points:.4}");
     while text.ends_with('0') {

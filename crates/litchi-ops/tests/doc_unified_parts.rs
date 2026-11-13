@@ -4,12 +4,6 @@
 //! answer the DOCX paths and keys; writes round-trip through a reopen, equal
 //! values are exact no-ops, and the generic views list what they listed.
 #![cfg(feature = "doc")]
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::indexing_slicing,
-    reason = "integration tests favor concise panic-driven assertions"
-)]
 
 use litchi_ops::{Code, File, NewNode, Placement, open_bytes, props};
 

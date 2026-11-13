@@ -1661,7 +1661,6 @@ const fn own_at(names: &[&str], name: &str) -> u8 {
     let mut index = 0;
     while index < names.len() {
         if same(names[index], name) {
-            #[allow(clippy::cast_possible_truncation, reason = "own-key lists are short")]
             return index as u8;
         }
         index += 1;

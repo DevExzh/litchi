@@ -10,12 +10,6 @@
 //! `sheet` openers with a `*_with_limits` form.
 
 #![cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::panic,
-    reason = "test assertions panic on failure by design"
-)]
 #![cfg_attr(
     not(all(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")),
     allow(dead_code, reason = "helpers are shared by feature-gated tests")

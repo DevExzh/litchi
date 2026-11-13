@@ -2,12 +2,6 @@
 //! save, typed caller-selected limits, deterministic fresh creation and exact
 //! no-op publication.
 
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "integration-test assertions panic on failure by design"
-)]
-
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 

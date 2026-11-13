@@ -394,11 +394,6 @@ fn invalid(message: impl Into<String>) -> Error {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

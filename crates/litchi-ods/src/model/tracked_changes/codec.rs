@@ -646,7 +646,6 @@ fn reject_illegal_host_position(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn complete_source_element(
     open: SourceOpen,
     close: Option<Span>,

@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "test code panics on failure; unwrap keeps assertions concise"
-)]
-
 use litchi_odg::{Builder, Package, layer::Layer, page::Page};
 
 const COMPACT_CONTENT: &str = concat!(

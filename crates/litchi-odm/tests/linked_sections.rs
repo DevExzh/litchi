@@ -1,5 +1,3 @@
-#![allow(clippy::unwrap_used, reason = "test assertions use unwrap for clarity")]
-
 use litchi_core::Position;
 use litchi_odf_common::{compact_xml, core::PackageWriter};
 use litchi_odm::{Package, subdocument::Target};

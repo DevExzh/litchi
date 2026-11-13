@@ -665,10 +665,6 @@ fn cell_value(scalar: Scalar<'_>) -> Result<(CellValue, String)> {
             if value { "TRUE" } else { "FALSE" }.to_owned(),
         ),
         Scalar::Int(value) => {
-            #[allow(
-                clippy::cast_precision_loss,
-                reason = "ODF stores every number as office:value; a wider integer keeps its text"
-            )]
             let number = value as f64;
             (CellValue::Number(number), value.to_string())
         },

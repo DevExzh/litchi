@@ -58,10 +58,6 @@ pub fn validate_byte_limit(context: &str, value: &str, maximum: usize) -> Result
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    reason = "Assertions unwrap expected validation errors to compare their diagnostics."
-)]
 mod tests {
     use super::*;
 

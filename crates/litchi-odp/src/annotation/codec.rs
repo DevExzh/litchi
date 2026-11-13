@@ -422,10 +422,6 @@ fn check_event_budget(
     Ok(())
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "the structural scanner threads the full parser context through explicit parameters to avoid a state struct for one call site"
-)]
 fn structural_kind(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,

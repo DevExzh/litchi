@@ -1,10 +1,5 @@
 //! Stable facade for the contextual ODF field semantic model.
 
-#![allow(
-    clippy::wildcard_imports,
-    reason = "the model facade intentionally gathers contextual field owners"
-)]
-
 use super::*;
 use crate::elements::element::{Element, ElementBase};
 use litchi_core::{Error, Result};

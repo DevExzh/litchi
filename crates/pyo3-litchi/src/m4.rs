@@ -35,7 +35,6 @@ fn one_char(name: &str, value: &str) -> Result<char, Failure> {
 }
 
 /// The import options and limits from the keyword arguments.
-#[allow(clippy::too_many_arguments, reason = "the Python keyword arguments")]
 pub(crate) fn options(
     delimiter: Option<&str>,
     quote: Option<&str>,

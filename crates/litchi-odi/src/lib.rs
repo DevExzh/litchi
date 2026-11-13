@@ -1,15 +1,5 @@
 //! `OpenDocument` Image support with semantic responsibility layers.
 #![forbid(unsafe_code)]
-#![allow(
-    clippy::missing_errors_doc,
-    clippy::module_name_repetitions,
-    reason = "the image edit trait and facade share one documented typed-error contract and ODF vocabulary"
-)]
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    clippy::shadow_reuse,
-    reason = "image codecs follow ODF traversal order and keep source/target names aligned with ODF traversal"
-)]
 
 mod authoring;
 mod codec;

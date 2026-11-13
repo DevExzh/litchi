@@ -1,10 +1,5 @@
 //! Namespace URI normalization and reserved-binding contract tests.
 
-#![allow(
-    clippy::unwrap_used,
-    reason = "small fixed namespace values keep these assertions focused"
-)]
-
 use litchi_odf_common::namespace::{
     MAX_NAMESPACE_URI_BYTES, XMLNS, XMLNS_DECLARATION_NAMESPACE, namespace_matches,
     normalize_namespace_uri, resolved_namespace_uri, validate_namespace_binding,

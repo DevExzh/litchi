@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    reason = "This integration fixture is fixed-size and assertion-driven."
-)]
-
 //! Downstream coverage for source-backed ODF publication from a ZIP64 source.
 //!
 //! The fixture promotes a small ODF archive into a structurally valid ZIP64

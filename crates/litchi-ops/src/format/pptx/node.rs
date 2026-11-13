@@ -1964,10 +1964,6 @@ fn slide_size(width: i64, height: i64) -> Option<&'static str> {
     if width <= 0 || height <= 0 {
         return None;
     }
-    #[allow(
-        clippy::cast_precision_loss,
-        reason = "slide sizes are far below 2^53 EMU"
-    )]
     let ratio = width as f64 / height as f64;
     let token = if (ratio - 16.0 / 9.0).abs() < 0.02 {
         "widescreen"

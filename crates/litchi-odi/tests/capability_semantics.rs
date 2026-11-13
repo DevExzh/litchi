@@ -1,5 +1,3 @@
-#![allow(clippy::unwrap_used, reason = "test assertions use unwrap for clarity")]
-
 use litchi_odi::flat::Image as FlatImage;
 use litchi_odi::{
     Builder, FrameEditor, History,

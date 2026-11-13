@@ -124,11 +124,6 @@ impl Rgba {
     /// assert_eq!(Rgba::new(0, 0, 0).drawing_alpha(), None);
     /// ```
     #[must_use]
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "OfficeCLI truncates a value in 0..=100000"
-    )]
     pub fn drawing_alpha(self) -> Option<u32> {
         (self.alpha != 255).then(|| (f64::from(self.alpha) / 255.0 * 100_000.0) as u32)
     }
@@ -813,10 +808,6 @@ impl Color {
     /// The color with a SpreadsheetML tint, or `None` unless `tint` is a
     /// finite value from -1.0 to 1.0. A zero tint removes it.
     #[must_use]
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the scaled tint is rounded and within ±1e9"
-    )]
     pub fn with_spreadsheet_tint(mut self, tint: f64) -> Option<Self> {
         if !(-1.0..=1.0).contains(&tint) {
             return None;
@@ -1154,11 +1145,6 @@ fn split_arguments(body: &str) -> Option<([&str; 3], Option<&str>)> {
 }
 
 /// Rounds a channel to a byte, ties to even (.NET `Math.Round`).
-#[allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    reason = "the value is rounded and clamped to 0..=255 first"
-)]
 fn to_byte(value: f64) -> u8 {
     value.round_ties_even().clamp(0.0, 255.0) as u8
 }

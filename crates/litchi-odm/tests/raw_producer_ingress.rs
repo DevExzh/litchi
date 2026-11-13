@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "fixed in-memory raw ZIP fixtures keep boundary assertions concise"
-)]
-
 use litchi_core::Position;
 use litchi_odf_common::compact_xml;
 use litchi_odm::{Package, transaction::SectionSpec};

@@ -4,11 +4,6 @@
 //! per-literal capacity proportional to the value. OpenFormula permits control
 //! characters other than NUL inside a string, and represents a quote by `""`.
 
-#![allow(
-    unsafe_code,
-    reason = "The integration-only allocator injects one fallible failure."
-)]
-
 use litchi_core::{Error, Resource};
 use litchi_ods::codec::formula::{FormulaLimits, FormulaParser, Token};
 use std::alloc::{GlobalAlloc, Layout, System};

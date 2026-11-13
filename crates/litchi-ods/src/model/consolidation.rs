@@ -117,10 +117,6 @@ impl Options {
 /// # Errors
 ///
 /// Returns an error when the input is malformed or exceeds the parser's resource limits.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "the codec entry point keeps its historical element-qualified name"
-)]
 pub fn parse_consolidation(xml: &str) -> Result<Option<Options>> {
     let mut reader = NsReader::from_str(xml);
     let mut buf = Vec::new();
@@ -325,10 +321,6 @@ fn parse_bool(name: &str, value: &str) -> Result<bool> {
 /// # Errors
 ///
 /// Returns an error when the value cannot be serialized.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "the codec entry point keeps its historical element-qualified name"
-)]
 pub fn write_consolidation(out: &mut String, consolidation: Option<&Options>) -> Result<()> {
     let Some(consolidation) = consolidation else {
         return Ok(());

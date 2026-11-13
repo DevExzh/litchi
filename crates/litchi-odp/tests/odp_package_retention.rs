@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "integration-test assertions panic on failure by design"
-)]
-
 use litchi_odf_common::core::{PackageWriter, Profile};
 use litchi_odp::{Builder, Package, edit};
 use soapberry_zip::office::StreamingArchiveWriter;

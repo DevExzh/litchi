@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "integration-test assertions panic on failure by design"
-)]
-
 use litchi_core::{Result, xml::escape_xml};
 use litchi_odf_common::{
     constants,

@@ -1,9 +1,4 @@
 #![cfg(feature = "rtf")]
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure"
-)]
 
 //! Unified RTF tables, header/footer, note and comment stories,
 //! hyperlinks, pictures, styles and lists.

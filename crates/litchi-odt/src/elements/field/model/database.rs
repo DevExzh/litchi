@@ -1,9 +1,5 @@
 //! Database field identities and bounded source values.
 
-#![allow(
-    clippy::wildcard_imports,
-    reason = "semantic field owners share the stable model facade namespace"
-)]
 use super::*;
 /// One of the five `OpenDocument` database field elements.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

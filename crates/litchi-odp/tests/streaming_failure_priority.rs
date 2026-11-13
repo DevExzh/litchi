@@ -6,8 +6,6 @@
 //! test pairs that remembered sink failure with a second cause and pins the
 //! error the caller receives.
 
-#![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
-
 use std::{
     io::{self, Write},
     num::{NonZeroU64, NonZeroUsize},

@@ -701,10 +701,6 @@ enum TextStep {
 }
 
 /// A formatting plan for a direct paragraph or run path.
-#[allow(
-    clippy::too_many_arguments,
-    reason = "the shared admission inputs of every plan kind"
-)]
 fn text_plan(
     file: &Pptx,
     slide: usize,
@@ -757,10 +753,6 @@ fn text_plan(
 
 /// A formatting plan of a direct shape, paragraph or run, resolved against
 /// the run's base and judged against the reader's model of its text.
-#[allow(
-    clippy::too_many_arguments,
-    reason = "the shared admission inputs of every plan kind"
-)]
 fn format_plan(
     file: &Pptx,
     slide: usize,
@@ -952,10 +944,6 @@ fn story_path(path: &Path<'_>) -> Option<StoryPath> {
 /// paragraph or run. Tables and the notes body are read once
 /// per run and slide (the run's base is immutable); anything the plan
 /// cannot judge falls back to the ordinary writer.
-#[allow(
-    clippy::too_many_lines,
-    reason = "one admission, resolution and judgement per story leaf"
-)]
 fn story_plan(
     file: &Pptx,
     path: &crate::path::PathArg<'_>,

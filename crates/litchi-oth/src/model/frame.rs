@@ -29,10 +29,6 @@ pub struct Frame {
 }
 
 impl Frame {
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "projection fields mirror ODF frame attributes"
-    )]
     pub(crate) const fn projected(
         kind: Kind,
         name: Option<String>,

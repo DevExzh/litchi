@@ -183,10 +183,6 @@ impl fmt::Debug for DocxEditor {
 }
 
 /// The two owner states of a DOCX handle.
-#[allow(
-    clippy::large_enum_variant,
-    reason = "one owner per handle, inside its `Arc`; boxing the source owner would add an indirection to every read"
-)]
 pub(crate) enum DocxOwner {
     /// Deferred part payloads over the retained positional source.
     Source(Box<source_backed::Package>),

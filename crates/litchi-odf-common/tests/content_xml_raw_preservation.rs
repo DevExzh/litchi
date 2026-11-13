@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "Fixed in-memory ODF fixtures keep raw preservation assertions concise."
-)]
-
 use std::collections::BTreeMap;
 
 use litchi_odf_common::{

@@ -366,10 +366,6 @@ impl Decimal {
     pub(super) const fn normalized(negative: bool, mut magnitude: u128, mut scale: u8) -> Self {
         if magnitude <= u64::MAX as u128 {
             // 64-bit division where the magnitude allows it.
-            #[allow(
-                clippy::cast_possible_truncation,
-                reason = "the magnitude was just checked to fit 64 bits"
-            )]
             let mut small = magnitude as u64;
             while scale > 0 && small % 10 == 0 {
                 small /= 10;
@@ -408,10 +404,6 @@ impl Decimal {
             .ok()
             .filter(|magnitude| *magnitude <= 1 << 53)?;
         let power = POWERS.get(usize::from(self.scale))?;
-        #[allow(
-            clippy::cast_precision_loss,
-            reason = "the magnitude is at most 2^53, exact as a double"
-        )]
         let value = magnitude as f64 / power;
         Some(if self.negative { -value } else { value })
     }

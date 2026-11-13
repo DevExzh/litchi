@@ -1,9 +1,5 @@
 //! Reference, measure, and document-statistic semantics.
 
-#![allow(
-    clippy::wildcard_imports,
-    reason = "semantic field owners share the stable model facade namespace"
-)]
 use super::*;
 /// Display mode permitted by `text:user-field-get`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

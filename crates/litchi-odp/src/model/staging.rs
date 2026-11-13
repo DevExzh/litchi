@@ -150,11 +150,6 @@ pub(crate) fn parse_with_content_source(xml: &str) -> Result<Staged> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::panic,
-    clippy::expect_used,
-    reason = "fixture differential assertions panic on a mismatched corpus"
-)]
 mod tests {
     use super::{Metadata, declaration, page_metadata, parse, parse_with_content_source, settings};
     use crate::codec::content_source::ContentSource;

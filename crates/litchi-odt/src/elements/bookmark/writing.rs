@@ -369,7 +369,6 @@ fn scan_locations(xml: &str) -> Result<Scan> {
     })
 }
 
-#[allow(clippy::too_many_arguments)]
 fn start_marker(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,

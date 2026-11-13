@@ -532,11 +532,6 @@ fn allocation(resource: &'static str, source: TryReserveError) -> super::Error {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::expect_used,
-        clippy::unwrap_used,
-        reason = "index fixtures use panic-on-failure assertions"
-    )]
 
     use super::*;
     use crate::worksheet::formula::Error;

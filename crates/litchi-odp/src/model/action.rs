@@ -679,10 +679,6 @@ fn validate_percent(value: &str) -> Result<()> {
         number = unsigned;
     }
     let mut parts = number.split('.');
-    #[allow(
-        clippy::expect_used,
-        reason = "str::split always yields at least one part"
-    )]
     let integer = parts.next().expect("split always yields one part");
     let fraction = parts.next();
     if parts.next().is_some()
@@ -704,10 +700,6 @@ fn push_attribute(output: &mut String, name: &str, value: &str) {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

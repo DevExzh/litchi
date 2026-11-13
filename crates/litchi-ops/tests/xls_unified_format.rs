@@ -1,12 +1,6 @@
 //! Unified XLS cell formatting reads and writes through the public [`File`]
 //! API on both owner routes.
 #![cfg(feature = "xls")]
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::panic,
-    reason = "integration fixtures fail fast"
-)]
 
 use std::ops::Deref;
 

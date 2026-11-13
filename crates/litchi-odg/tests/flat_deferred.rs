@@ -1,5 +1,3 @@
-#![allow(clippy::unwrap_used, reason = "test assertions use unwrap for clarity")]
-
 use litchi_core::Error as CoreError;
 use litchi_odg::flat::{Drawing, Error};
 

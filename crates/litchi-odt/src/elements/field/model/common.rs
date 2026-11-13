@@ -1,9 +1,5 @@
 //! Shared bounded XML, lexical, and attribute helpers.
 
-#![allow(
-    clippy::wildcard_imports,
-    reason = "semantic field owners share the stable model facade namespace"
-)]
 use super::*;
 
 pub(crate) fn validate_dynamic_value(

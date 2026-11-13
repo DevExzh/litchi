@@ -205,10 +205,6 @@ impl Length {
 
     /// The length in points, as a float.
     #[must_use]
-    #[allow(
-        clippy::cast_precision_loss,
-        reason = "EMU values beyond 2^53 lose precision, as OfficeCLI's double arithmetic does"
-    )]
     pub fn points(self) -> f64 {
         self.0 as f64 / EMU_PER_POINT as f64
     }
@@ -403,10 +399,6 @@ impl Unit {
 /// the unit, and, as OfficeCLI checks by re-parsing its text as a double, the
 /// floating-point read to land on `emu`, which can fail above 2^53 EMU. Zero
 /// has no exact form here; the styles print it themselves.
-#[allow(
-    clippy::cast_precision_loss,
-    reason = "the floating-point re-read is the check being replicated"
-)]
 fn exact(emu: i64, unit: Unit) -> Option<Form> {
     let hundredth = unit.per_unit() / 100;
     if emu == 0 || emu % hundredth != 0 {
@@ -477,10 +469,6 @@ impl Length {
     pub(super) fn display_facts(self, style: LengthStyle) -> Option<DisplayFacts> {
         let emu = self.0;
         let exact = |unit: DisplayUnit, hundredth: i64| {
-            #[allow(
-                clippy::cast_precision_loss,
-                reason = "below 2^50 EMU the hundredths are below 2^53, exact as a double"
-            )]
             let number = (emu / hundredth) as f64 / 100.0;
             (emu % hundredth == 0).then_some(DisplayFacts {
                 number: Some(number),
@@ -529,10 +517,6 @@ impl LengthDisplay {
                 // parse `ExtractNumber` does, then scales it by the unit's
                 // size (the `UNITS` factors) and rounds to even.
                 let number = value.to_f64_exact()?;
-                #[allow(
-                    clippy::cast_precision_loss,
-                    reason = "the unit sizes are small integers, exact as doubles"
-                )]
                 let factor = unit.per_unit() as f64;
                 Some(DisplayFacts {
                     number: Some(number),
@@ -569,10 +553,6 @@ const TWO_POW_63: f64 = 9_223_372_036_854_775_808.0;
 
 /// Rounds an EMU value to the nearest integer, ties to even (.NET
 /// `Math.Round`), refusing values outside the 64-bit range.
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "the value is rounded and checked against the 64-bit range first"
-)]
 fn round_emu(value: f64) -> Option<i64> {
     let rounded = value.round_ties_even();
     (-TWO_POW_63..TWO_POW_63)

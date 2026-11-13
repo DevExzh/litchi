@@ -3,11 +3,6 @@
 //! These cases keep the common lexer boundary observable without repeating the
 //! complete function catalog or the structured OpenFormula reference matrix.
 
-#![allow(
-    unsafe_code,
-    reason = "The integration-only allocator injects one fallible failure."
-)]
-
 use litchi_core::Error;
 use litchi_ods::codec::formula::{FormulaParser, Token};
 use std::alloc::{GlobalAlloc, Layout, System};

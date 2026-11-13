@@ -7,12 +7,6 @@
 //! documents, recorded before the facade types were removed.
 
 #![cfg(all(feature = "docx", feature = "markdown"))]
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::panic,
-    reason = "test assertions panic on failure by design"
-)]
 
 use std::io::{Cursor, Write};
 

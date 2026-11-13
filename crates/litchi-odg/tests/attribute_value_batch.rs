@@ -1,5 +1,3 @@
-#![allow(clippy::unwrap_used, reason = "test assertions use unwrap for clarity")]
-
 use litchi_odf_common::core::PackageWriter;
 use litchi_odg::{Package, shape::ShapeKind};
 use soapberry_zip::office::StreamingArchiveWriter;

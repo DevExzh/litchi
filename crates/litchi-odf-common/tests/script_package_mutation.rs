@@ -1,11 +1,3 @@
-#![cfg_attr(
-    test,
-    allow(
-        clippy::unwrap_used,
-        reason = "Fixed in-memory package fixtures use direct assertion setup."
-    )
-)]
-
 use litchi_odf_common::{
     constants,
     core::{OwnedPackage, PackageWriter},

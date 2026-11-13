@@ -831,7 +831,6 @@ fn shape_value(drawing: &sf::Drawing, key: ShapeKey) -> Option<Value<'_>> {
         ShapeKey::Line => match drawing.line? {
             Line::None => Some(Value::Token("none")),
             Line::Solid { color, width } => {
-                #[allow(clippy::cast_precision_loss, reason = "line widths are small")]
                 let points = f64::from(width) / 12_700.0;
                 Some(owned(format!(
                     "#{:06X}:{}",

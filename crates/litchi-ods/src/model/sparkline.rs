@@ -620,10 +620,6 @@ pub fn validate_complex_color(complex_color: &ComplexColor) -> Result<()> {
 /// # Errors
 ///
 /// Returns an error when a value violates the format or resource constraints.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "the codec entry point keeps its historical element-qualified name"
-)]
 pub fn validate_sparkline(sparkline: &Item) -> Result<()> {
     if sparkline.cell_address.is_empty() || sparkline.cell_address.trim() != sparkline.cell_address
     {

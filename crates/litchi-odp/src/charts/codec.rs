@@ -1,11 +1,5 @@
 //! Bounded ODP chart discovery and XML span codecs.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    clippy::items_after_statements,
-    reason = "the codec keeps parsing helpers beside the state machines that use them; reordering them would make the bounded scans harder to audit"
-)]
-
 use super::model::{Chart, Limits, Location, Page, Part, Storage};
 use crate::core::OwnedPackage;
 use litchi_core::{Error, Result};
@@ -267,10 +261,6 @@ impl Part {
         })
     }
 
-    #[allow(
-        clippy::needless_pass_by_value,
-        reason = "the owned XML is retained by the returned source-backed chart part without a second allocation"
-    )]
     pub(crate) fn from_inline_with_limit(xml: String, max_bytes: usize) -> Result<Self> {
         let Some(media_type) = inline_mimetype(&xml)? else {
             return invalid("inline ODP chart has no office:mimetype");

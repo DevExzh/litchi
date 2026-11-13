@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "fixture tests use panic-on-failure assertions"
-)]
-
 use litchi_core::Position;
 use litchi_oth::{Builder, Package, Patch, change, index, table};
 

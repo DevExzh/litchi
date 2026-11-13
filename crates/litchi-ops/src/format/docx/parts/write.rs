@@ -1564,7 +1564,6 @@ fn numbering_path(step: &'static str, ordinal: usize) -> Path<'static> {
 /// A new definition from OfficeCLI's `add abstractNum` keys: nine template
 /// levels, an explicit `format` on every level, and `text`, `start` and
 /// `indent` seeding level 0.
-#[allow(clippy::too_many_arguments, reason = "one argument per OfficeCLI key")]
 /// Which bare level-0 keys a new definition was given: they win over the
 /// same `level0.*` key (OfficeCLI).
 #[derive(Clone, Copy)]

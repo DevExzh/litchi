@@ -7,8 +7,6 @@
 //! - the same dump of the replayed document (the dump is a fixed point, so
 //!   every element and property the dump carries survived the replay).
 
-#![allow(clippy::unwrap_used, clippy::expect_used, reason = "tests")]
-
 use std::path::{Path, PathBuf};
 
 use litchi_core::FileFormat;

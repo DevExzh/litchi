@@ -383,10 +383,6 @@ const LINE: usize = 1;
 
 /// The proof of one Pages leaf transaction.
 #[derive(Debug)]
-#[allow(
-    clippy::large_enum_variant,
-    reason = "a write holds its proofs once; boxing would add an allocation per commit"
-)]
 pub(crate) enum Patch {
     Text(litchi_pages::section::text::Patch),
     Paragraphs(litchi_pages::section::paragraphs::Patch),

@@ -511,7 +511,6 @@ pub fn parse(xml: &str) -> Result<Styles> {
     Ok(result)
 }
 
-#[allow(clippy::too_many_arguments)]
 fn start(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,

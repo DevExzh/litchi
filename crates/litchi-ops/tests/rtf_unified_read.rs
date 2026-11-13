@@ -1,9 +1,4 @@
 #![cfg(feature = "rtf")]
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure"
-)]
 
 use litchi_ops::capabilities::Verb;
 use litchi_ops::view::Mode;

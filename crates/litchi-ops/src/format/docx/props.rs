@@ -1196,10 +1196,6 @@ fn width_text<'a>(width: Width) -> NodeValue<'a> {
 
 /// A `pct` width in fiftieths of a percent, as `FormatPctWidth` writes it.
 fn percent(fiftieths: i64) -> String {
-    #[allow(
-        clippy::cast_precision_loss,
-        reason = "widths are far below 2^53 fiftieths"
-    )]
     let value = fiftieths as f64 / 50.0;
     format!("{}%", decimal(value, 2))
 }

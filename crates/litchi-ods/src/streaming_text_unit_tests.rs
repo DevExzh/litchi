@@ -1,7 +1,5 @@
 //! Scalar-reference checks for text encoding and exact refusal boundaries.
 
-#![allow(clippy::expect_used, clippy::unwrap_used)]
-
 use std::num::{NonZeroU64, NonZeroUsize};
 
 use litchi_core::{

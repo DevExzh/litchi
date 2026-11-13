@@ -1069,10 +1069,6 @@ const TREE_PARENTS: &[Kind] = &[Slide, Group, SlideMaster, SlideLayout];
 const SHAPE_IDS: &[&str] = &["id", "name"];
 
 /// One element with no gap.
-#[allow(
-    clippy::too_many_arguments,
-    reason = "a table row of the spec; named fields would triple the table's length"
-)]
 const fn element(
     kind: Kind,
     name: &'static str,

@@ -5,13 +5,6 @@
 //! `OpenOptions::ooxml_limits` (the opens were ported from the facade's
 //! `Document`, `Presentation` and `Workbook` types).
 
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::panic,
-    reason = "test assertions panic on failure by design"
-)]
-
 #[cfg(any(feature = "pptx", feature = "xlsx"))]
 const PPTX_PRESENTATION_MAIN_CONTENT_TYPE: &str =
     "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml";

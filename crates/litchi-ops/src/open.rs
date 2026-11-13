@@ -181,13 +181,6 @@ pub fn open_with_tail<T: ZipTail>(
 /// Pages, Keynote or Numbers directory opens through its leaf; a directory
 /// of a format whose feature is off is `unsupported_format` naming the
 /// feature.
-#[cfg_attr(
-    not(feature = "iwork-adapter"),
-    allow(
-        clippy::unnecessary_wraps,
-        reason = "the directory route exists only with an iWork format"
-    )
-)]
 fn open_directory(path: &Path, options: &OpenOptions, error: Error) -> Result<File> {
     #[cfg(feature = "iwork-adapter")]
     if path.is_dir()

@@ -5,12 +5,6 @@
 //! compatibility fixture.
 
 #![cfg(feature = "iwork")]
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::panic,
-    reason = "test assertions panic on failure by design"
-)]
 
 use std::fs;
 use std::io;

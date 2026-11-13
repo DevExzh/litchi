@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "These integration fixtures are fixed and assertions are the test oracle."
-)]
-
 //! Regression coverage for XML general references in ODS cell text.
 //!
 //! `quick_xml` exposes predefined and numeric references as separate

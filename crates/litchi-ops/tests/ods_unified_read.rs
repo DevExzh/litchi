@@ -3,7 +3,6 @@
 //! flat ODS, on both open routes.
 
 #![cfg(feature = "ods")]
-#![allow(clippy::expect_used, clippy::unwrap_used, reason = "test assertions")]
 
 use std::path::PathBuf;
 

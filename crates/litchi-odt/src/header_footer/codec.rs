@@ -170,7 +170,6 @@ fn write_background(xml: &mut String, image: &crate::SectionBackgroundImage) -> 
     Ok(())
 }
 
-#[allow(clippy::type_complexity)]
 fn attributes(
     reader: &NsReader<&[u8]>,
     version: XmlVersion,

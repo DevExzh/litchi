@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "fixed corpus assertions use unwrap for clarity"
-)]
-
 use litchi_core::{BlobId, HistoryLimits, Position};
 use litchi_odf_common::compact_xml;
 use litchi_odm::{

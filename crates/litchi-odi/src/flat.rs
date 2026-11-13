@@ -8,10 +8,6 @@
 //! accessibility text. [`Image::edit`] stages an [`Edit`];
 //! [`Edit::commit`] publishes a new [`Image`] with its [`Patch`] and
 //! [`Diagnostics`]; [`Image::apply`] replays a patch onto its exact source.
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The file keeps public snapshot/transaction types before their private XML machinery."
-)]
 
 use crate::{
     active::{ActiveContent, ActiveContentLocation},
@@ -1356,10 +1352,6 @@ fn patch_flat_metadata(
 }
 
 #[derive(Default)]
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "Each Boolean records a distinct one-time ODF grammar occurrence."
-)]
 struct Structure {
     root_seen: bool,
     body_seen: bool,
@@ -1843,10 +1835,6 @@ struct ActiveArea {
     text: Option<(usize, MapTextKind, String)>,
 }
 
-#[allow(
-    clippy::too_many_lines,
-    reason = "One bounded streaming state machine keeps image-map placement, text, and area closure checks coherent."
-)]
 fn scan_image_map(xml: &str) -> Result<Option<ImageMap>> {
     let mut reader = NsReader::from_reader(xml.as_bytes());
     let mut depth = 0usize;

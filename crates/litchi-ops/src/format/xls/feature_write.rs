@@ -235,11 +235,7 @@ impl Arg {
 
     fn number(&self, key: &'static str) -> Result<f64> {
         match self {
-            Self::Int(value) =>
-            {
-                #[allow(clippy::cast_precision_loss, reason = "angles are small")]
-                Ok(*value as f64)
-            },
+            Self::Int(value) => Ok(*value as f64),
             Self::Number(value) => Ok(*value),
             Self::Text(value) => value
                 .trim()
@@ -1798,11 +1794,6 @@ fn cf_request(operation: Operation, props: &Props<'_>) -> Result<CfRequest> {
                     if !(20.0..=8_191.0).contains(&twips) {
                         return Err(invalid(name, "the font size is 1 to 409.55 points"));
                     }
-                    #[allow(
-                        clippy::cast_possible_truncation,
-                        clippy::cast_sign_loss,
-                        reason = "bounded above"
-                    )]
                     let twips = twips as u32;
                     request.style.size_twips = Some(twips);
                 }
@@ -2395,7 +2386,6 @@ fn validation_formula(key: &'static str, value: &str, list: bool) -> Result<(Vec
         let mut tokens = vec![0x17, count];
         if units.iter().all(|unit| *unit <= 0xff) {
             tokens.push(0);
-            #[allow(clippy::cast_possible_truncation, reason = "checked above")]
             tokens.extend(units.iter().map(|unit| *unit as u8));
         } else {
             tokens.push(1);

@@ -15,17 +15,9 @@ use crate::node::{
 pub(crate) fn chart_length(points: f32) -> Result<crate::value::Length> {
     let emu = f64::from(points) * 12_700.0;
     let rounded = emu.round();
-    #[allow(
-        clippy::cast_precision_loss,
-        reason = "the comparison deliberately bounds the f64 EMU value by i64"
-    )]
     // `i64::MAX as f64` rounds to 2^63, and Rust's float-to-int cast would
     // saturate that boundary back to i64::MAX.  Reject the rounded 2^63
     // value explicitly instead of admitting a silent saturation.
-    #[allow(
-        clippy::cast_precision_loss,
-        reason = "the comparison deliberately bounds the f64 EMU value below 2^63"
-    )]
     let max_emu_exclusive = (1_u64 << 63) as f64;
     if !emu.is_finite() || rounded <= 0.0 || rounded >= max_emu_exclusive {
         return Err(crate::error::Error::new(
@@ -34,10 +26,6 @@ pub(crate) fn chart_length(points: f32) -> Result<crate::value::Length> {
         )
         .with_property("font.size".to_owned()));
     }
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the checked range above is exactly the target i64 range"
-    )]
     Ok(crate::value::Length::from_emu(rounded as i64))
 }
 
@@ -290,11 +278,6 @@ mod tests {
             chart_length(f32::MAX).unwrap_err().code(),
             Code::LimitExceeded
         );
-        #[allow(
-            clippy::cast_possible_truncation,
-            clippy::cast_precision_loss,
-            reason = "the f32 neighbors are the actual leaf-representable boundary inputs"
-        )]
         let threshold = (2_f64.powi(63) / 12_700.0) as f32;
         for points in [
             f32::from_bits(threshold.to_bits().saturating_sub(1)),

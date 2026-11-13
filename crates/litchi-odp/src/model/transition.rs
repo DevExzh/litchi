@@ -243,10 +243,6 @@ impl Sound {
 
 /// Complete drawing-page transition configuration for a slide.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-#[allow(
-    clippy::struct_field_names,
-    reason = "the transition_type field mirrors the ODF presentation:transition-type attribute and the public transition_type() accessor"
-)]
 pub struct Transition {
     pub(crate) transition_type: Option<Type>,
     pub(crate) style: Option<Style>,
@@ -502,10 +498,6 @@ fn invalid(attribute: &str, value: &str) -> Error {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

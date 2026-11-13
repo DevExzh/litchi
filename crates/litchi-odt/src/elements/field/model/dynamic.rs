@@ -1,9 +1,5 @@
 //! Dynamic text-field variants and their semantic XML projection.
 
-#![allow(
-    clippy::wildcard_imports,
-    reason = "semantic field owners share the stable model facade namespace"
-)]
 use super::*;
 /// Typed conditional and placeholder text metadata in document order.
 ///

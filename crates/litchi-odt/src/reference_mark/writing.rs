@@ -404,7 +404,6 @@ fn scan_locations(xml: &str) -> Result<Scan> {
     Ok(Scan { paragraphs, marks })
 }
 
-#[allow(clippy::too_many_arguments)]
 fn marker_start(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,

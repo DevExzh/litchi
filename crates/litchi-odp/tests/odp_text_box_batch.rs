@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "integration-test assertions panic on failure by design"
-)]
-
 use litchi_odf_common::core::{OwnedPackage, PackageWriter};
 use litchi_odf_common::package::raw_identical_members;
 use litchi_odp::content::{

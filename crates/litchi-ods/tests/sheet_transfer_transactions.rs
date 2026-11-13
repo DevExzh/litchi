@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "integration-test assertions panic on fixed in-memory fixtures"
-)]
-
 use litchi_core::Result;
 use litchi_odf_common::{constants, core::PackageWriter, package::raw_identical_members};
 use litchi_ods::{

@@ -1267,10 +1267,6 @@ fn error(message: impl Into<String>) -> Error {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    reason = "scanner boundary assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

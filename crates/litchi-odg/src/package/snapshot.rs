@@ -2841,10 +2841,6 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for an invalid position, duplicate page identity, or limit violation.
-    #[allow(
-        clippy::needless_pass_by_value,
-        reason = "detached page values transfer ownership into the transaction"
-    )]
     pub fn insert_page(&mut self, position: usize, page: Page) -> Result<()> {
         let parsed = parse_content(&self.content)?;
         if position > parsed.pages.len() {
@@ -3157,10 +3153,6 @@ impl Edit {
     ///
     /// Returns an error for invalid selectors, undeclared layers, inert-only
     /// shape kinds, or limits.
-    #[allow(
-        clippy::needless_pass_by_value,
-        reason = "detached shape values transfer ownership into the transaction"
-    )]
     pub fn insert_shape(&mut self, page: usize, position: usize, shape: Shape) -> Result<()> {
         if shape.kind().is_three_dimensional() {
             return Err(Error::Refused(litchi_core::edit::Refusal::new(
@@ -3959,10 +3951,6 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for invalid selectors, duplicate names, or limits.
-    #[allow(
-        clippy::needless_pass_by_value,
-        reason = "detached layer values transfer ownership into the transaction"
-    )]
     pub fn add_layer(&mut self, page: usize, layer: Layer) -> Result<()> {
         let parsed = parse_content(&self.content)?;
         let selected = parsed

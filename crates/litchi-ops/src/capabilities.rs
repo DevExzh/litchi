@@ -3610,10 +3610,6 @@ fn option_gap(adapter: Adapter, index: usize) -> Option<Option<&'static GapSpec>
 /// assert!(read_only.get && !read_only.set);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "OfficeCLI's help schema flags, one per verb"
-)]
 pub struct Operations {
     /// `add` creates the element.
     pub add: bool,

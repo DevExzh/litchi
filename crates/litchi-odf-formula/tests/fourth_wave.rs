@@ -1,8 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    reason = "integration tests deliberately panic on unexpected failures"
-)]
-
 use litchi_odf_common::constants::ODF_FORMULA;
 use litchi_odf_formula::authoring::content::{self, Closure, NumberType, Qualifier};
 use litchi_odf_formula::{

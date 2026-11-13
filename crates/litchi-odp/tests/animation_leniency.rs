@@ -6,12 +6,6 @@
 //! conforming deck records nothing; a known element in a disallowed position
 //! and malformed XML stay hard errors.
 
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "hand-built fixtures keep tolerance assertions focused"
-)]
-
 #[path = "../../litchi-odf-common/tests/support/odf_rezip.rs"]
 mod odf_rezip;
 

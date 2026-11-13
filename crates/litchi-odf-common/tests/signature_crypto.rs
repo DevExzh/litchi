@@ -1,11 +1,3 @@
-#![cfg_attr(
-    test,
-    allow(
-        clippy::unwrap_used,
-        reason = "Fixed signature fixtures use direct assertion setup."
-    )
-)]
-
 use litchi_odf_common::{
     core::{OwnedPackage, PackageWriter, Profile},
     signature::{CanonicalizationAlgorithm, DocumentSigner, SignatureAlgorithm, SignatureValidity},

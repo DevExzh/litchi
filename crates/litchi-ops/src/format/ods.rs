@@ -75,10 +75,6 @@ struct Inner {
 }
 
 /// The ODS owner, in the state the open route or the last commit built.
-#[allow(
-    clippy::large_enum_variant,
-    reason = "the owner lives once behind the handle's `Arc`; boxing a variant would add an allocation to that open route"
-)]
 enum OdsOwner {
     /// The immutable package and its parsed projection (byte and reader
     /// routes, creation, and every committed edit).

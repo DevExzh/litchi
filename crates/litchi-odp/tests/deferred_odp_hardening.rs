@@ -1,9 +1,3 @@
-#![allow(
-    clippy::let_underscore_must_use,
-    clippy::unwrap_used,
-    reason = "integration-test assertions panic on failure by design"
-)]
-
 use litchi_core::Error;
 use litchi_odp::flat::Presentation as FlatPresentation;
 

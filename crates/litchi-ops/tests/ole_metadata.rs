@@ -1,11 +1,6 @@
 //! Legacy OLE metadata through the unified layer: initial
 //! metadata at creation and the `/metadata` set path for DOC, XLS and PPT.
 #![cfg(all(feature = "doc", feature = "xls", feature = "ppt"))]
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "integration tests favor concise panic-driven assertions"
-)]
 
 use litchi_core::{FileFormat, Metadata};
 use litchi_ops::props::PropValue;

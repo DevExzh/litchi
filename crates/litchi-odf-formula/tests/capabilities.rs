@@ -1,8 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    reason = "integration tests deliberately panic on unexpected failures"
-)]
-
 use litchi_odf_formula::authoring::{self, Display};
 use litchi_odf_formula::{
     Builder, ChangeKind, DependencyConflictKind, History, MAX_COMMIT_HISTORY,

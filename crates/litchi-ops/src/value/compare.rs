@@ -184,10 +184,6 @@ fn decimal(text: &str) -> Option<f64> {
     let Some(power) = power else {
         return text.parse().ok();
     };
-    #[allow(
-        clippy::cast_precision_loss,
-        reason = "the mantissa is at most 2^53, exact as a double"
-    )]
     let value = mantissa as f64 / power;
     Some(if negative { -value } else { value })
 }
@@ -677,10 +673,6 @@ impl Compiled {
             // `i64` text reads back exactly: `NumericText` gives the
             // correctly rounded double, `ParseEmu` the integer.
             Scalar::Int(value) => Lazy::known(Facts {
-                #[allow(
-                    clippy::cast_precision_loss,
-                    reason = "the correctly rounded double is what the text reads as"
-                )]
                 number: Some(value as f64),
                 unit: Unit::None,
                 emu: Some(value),

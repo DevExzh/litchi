@@ -1866,10 +1866,6 @@ fn invalid<T>(message: impl Into<String>) -> Result<T> {
 
 #[cfg(test)]
 mod cache_regressions {
-    #![allow(
-        clippy::expect_used,
-        reason = "unit tests use expectations for concise fixture assertions"
-    )]
 
     use super::super::model::{
         Deletion, Dimension, Info, Insertion, Metadata, NestedDeletion, PositiveInteger,

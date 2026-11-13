@@ -2,12 +2,6 @@
 //! documents whose property sets the editor cannot rewrite: every request
 //! follows the signature policy or is refused with a user-facing code.
 #![cfg(all(feature = "doc", feature = "xls", feature = "ppt"))]
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::panic,
-    reason = "integration tests favor concise panic-driven assertions"
-)]
 
 use std::io::Cursor;
 

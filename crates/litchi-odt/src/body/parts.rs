@@ -335,10 +335,6 @@ fn scan_styles(xml: &str, prefixes: &Prefixes, parts: &mut Parts) -> Result<()> 
 }
 
 /// Close whichever open entry the element `closed` at `depth` ends.
-#[allow(
-    clippy::too_many_arguments,
-    reason = "the scan's open entries, closed in one place for empty and end tags alike"
-)]
 fn finish_open(
     closed: &Option<(Ns, Vec<u8>)>,
     depth: usize,
@@ -482,10 +478,6 @@ enum Open {
     Skipped,
 }
 
-#[allow(
-    clippy::too_many_lines,
-    reason = "one pass over content.xml for every part kind, kept together so the open-element bookkeeping reads in one place"
-)]
 fn scan_content(xml: &str, prefixes: &Prefixes, parts: &mut Parts) -> Result<()> {
     let mut reader = Reader::from_str(xml);
     reader.config_mut().trim_text(false);

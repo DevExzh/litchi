@@ -462,10 +462,6 @@ impl Flavor for Keynote {
 }
 
 /// The proof of one Keynote leaf transaction.
-#[allow(
-    clippy::large_enum_variant,
-    reason = "a write holds its proofs once; boxing would add an allocation per commit"
-)]
 pub(crate) enum Patch {
     Text(litchi_keynote::slide::text::Patch),
     Notes(litchi_keynote::slide::notes::Patch),
@@ -558,10 +554,6 @@ const NONE: usize = u32::MAX as usize;
 
 /// Points to EMU, rounded.
 fn emu(points: f32) -> Length {
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "a frame coordinate in points is far inside the i64 range"
-    )]
     Length::from_emu((f64::from(points) * 12_700.0).round() as i64)
 }
 

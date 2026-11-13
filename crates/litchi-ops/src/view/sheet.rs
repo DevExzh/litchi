@@ -455,10 +455,6 @@ impl CoreWorksheet for Worksheet<'_> {
         Ok(Cell(cell))
     }
 
-    #[allow(
-        clippy::useless_conversion,
-        reason = "the XLSX arm's error is already the unified error"
-    )]
     #[inline]
     fn cell_value(&self, row: u32, column: u32) -> Result<Cow<'_, CellValue>> {
         match &self.0 {

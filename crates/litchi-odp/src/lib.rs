@@ -40,10 +40,6 @@ pub use package::source_append as tail_append;
 
 // Keep implementation modules ergonomic internally without flattening their
 // semantic vocabulary into the public crate root.
-#[allow(
-    clippy::wildcard_imports,
-    reason = "internal-only glob keeps model vocabulary ergonomic without affecting the public API"
-)]
 pub(crate) use model::*;
 
 pub use litchi_odf_common::core;

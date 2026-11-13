@@ -503,10 +503,6 @@ impl File {
     /// Raises:
     ///     As ``set``
     #[pyo3(signature = (parent, r#type, props = None, *, index = None, after = None, before = None))]
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "the keyword arguments mirror OfficeCLI's add options"
-    )]
     fn add(
         &self,
         py: Python<'_>,
@@ -570,10 +566,6 @@ impl File {
     /// Raises:
     ///     As ``set``
     #[pyo3(name = "move", signature = (path, to = None, *, index = None, after = None, before = None))]
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "the keyword arguments mirror OfficeCLI's move options"
-    )]
     fn move_(
         &self,
         py: Python<'_>,
@@ -772,7 +764,6 @@ impl File {
         max_cells = None,
         max_bytes = None
     ))]
-    #[allow(clippy::too_many_arguments, reason = "the Python keyword arguments")]
     fn import_csv(
         &self,
         py: Python<'_>,
@@ -1156,7 +1147,6 @@ impl File {
     ///     UnsupportedError: (a ValueError) Outside DOCX, XLSX, PPTX and XLSB
     ///     ProtectedError: (a ValueError) If the File is signed or encrypted
     #[pyo3(signature = (parent, r#type = None, *, content_type = None, relationship = None, data = None, name = None))]
-    #[allow(clippy::too_many_arguments, reason = "the Python keyword arguments")]
     fn add_part(
         &self,
         py: Python<'_>,

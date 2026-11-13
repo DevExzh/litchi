@@ -68,11 +68,6 @@ pub(super) fn set_slide_transition(
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::shadow_unrelated,
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::Builder;
     use crate::{Speed, Style, Transition, Type};

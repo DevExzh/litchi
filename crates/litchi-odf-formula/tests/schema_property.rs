@@ -1,8 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    reason = "integration tests deliberately panic on unexpected failures"
-)]
-
 use litchi_odf_common::core::OwnedPackage;
 use litchi_odf_formula::{NodePath, OpaqueStarMath, Package, Patch, StarMathVersion, codec};
 

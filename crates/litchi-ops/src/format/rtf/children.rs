@@ -130,10 +130,6 @@ impl<'f> Children<'f> {
     }
 
     /// The next child of `kind` under `parent`, advancing this axis.
-    #[allow(
-        clippy::too_many_lines,
-        reason = "one flat dispatch per native axis keeps document order visible"
-    )]
     fn produce(&mut self, kind: Kind) -> Option<Node<'f>> {
         let position = Position::new(self.ordinal);
         // The hot main-story axes read the compact state directly.

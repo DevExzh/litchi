@@ -605,10 +605,6 @@ fn validate_page_parent_and_limit(
     Ok(())
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "the scanner threads root/body/presentation bookkeeping through one validation pass; splitting it would obscure the state machine"
-)]
 fn validate_open(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,

@@ -5,10 +5,6 @@ use crate::limits::{LimitKind, RawXmlLimitKind};
 use litchi_core::{Error, Result};
 
 /// A validated, immutable UTF-8 XML part.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`XmlPart` is the established public name for the XML storage primitive."
-)]
 #[derive(Debug)]
 pub struct XmlPart {
     content: String,

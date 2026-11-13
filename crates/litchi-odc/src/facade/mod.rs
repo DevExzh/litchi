@@ -952,10 +952,6 @@ impl Edit<'_> {
         Ok(self.publish()?)
     }
 
-    #[allow(
-        clippy::too_many_lines,
-        reason = "publication keeps content, styles, resources, and readback in one atomic boundary"
-    )]
     fn publish(mut self) -> CoreResult<Commit> {
         let mut definition_changes = Vec::new();
         if let Some(typed_transaction) = self.typed_transaction.take() {
@@ -2398,10 +2394,6 @@ fn validate_media_type(media_type: &str) -> CoreResult<()> {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        reason = "tests are expected to panic on unexpected errors"
-    )]
 
     use super::{Builder, Package};
 

@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "integration tests panic on unexpected errors to keep assertions concise"
-)]
-
 use litchi_odc::{
     AxisSpec, AxisUpdate, Builder, ChartClass, Definition, Package, chart::Dimension,
 };

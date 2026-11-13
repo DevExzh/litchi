@@ -706,11 +706,6 @@ pub(crate) fn validate_z_index(value: &str) -> Result<()> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::default_trait_access,
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

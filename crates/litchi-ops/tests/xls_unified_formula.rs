@@ -2,12 +2,6 @@
 //! public [`File`] API, on both the retained positional owner and the eager
 //! byte owner.
 #![cfg(feature = "xls")]
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::panic,
-    reason = "integration fixtures fail fast"
-)]
 
 use std::ops::Deref;
 

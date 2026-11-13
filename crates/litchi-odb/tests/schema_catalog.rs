@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "tests are expected to panic on unexpected fixture failures"
-)]
-
 use litchi_odb::{
     ComponentKind, DataType, KeyKind, Limits, Package, ReferentialAction, TableKind,
     connection::Connection,

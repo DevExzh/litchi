@@ -86,7 +86,6 @@ pub struct StreamingLimits {
 }
 
 impl StreamingLimits {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         max_paragraphs: usize,
         max_paragraph_text_bytes: usize,

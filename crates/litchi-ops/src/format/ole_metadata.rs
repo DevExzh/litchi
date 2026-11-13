@@ -367,7 +367,6 @@ pub(crate) fn snapshot_bytes(before: &[u8], after: &[u8]) -> usize {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::unwrap_used, reason = "test assertions panic by design")]
 
     use super::*;
 

@@ -1,13 +1,5 @@
 //! Shared-parser compatibility over compact in-memory ODT packages.
 
-#![cfg_attr(
-    test,
-    allow(
-        clippy::unwrap_used,
-        reason = "Fixed in-memory package fixtures use direct assertion setup."
-    )
-)]
-
 use litchi_core::Error;
 use litchi_odf_common::core::{Package, PackageWriter};
 use litchi_odf_common::style::{data, master};

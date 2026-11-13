@@ -576,10 +576,6 @@ impl std::fmt::Debug for Document {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    reason = "test code panics on failure; unwrap keeps assertions concise"
-)]
 mod tests {
     use super::{Builder, Package};
 

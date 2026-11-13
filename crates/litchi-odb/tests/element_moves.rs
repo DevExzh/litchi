@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "tests are expected to panic on unexpected fixture failures"
-)]
-
 //! Query, table and column moves relocate one element's bytes among its
 //! siblings and leave every other byte in place.
 

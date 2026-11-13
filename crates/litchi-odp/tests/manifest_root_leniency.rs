@@ -4,12 +4,6 @@
 //! recorded on the document handle's tolerance report. A conflicting
 //! non-empty root stays a hard error.
 
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "hand-built fixtures keep tolerance assertions focused"
-)]
-
 #[path = "../../litchi-odf-common/tests/support/odf_rezip.rs"]
 mod odf_rezip;
 

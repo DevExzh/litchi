@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "integration-test assertions panic on failure by design"
-)]
-
 use litchi_odp::annotation::{Anchor, Annotation, Position};
 use litchi_odp::{Builder, Package, Shape, Slide};
 

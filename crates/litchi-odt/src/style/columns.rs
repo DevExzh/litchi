@@ -426,7 +426,6 @@ pub(crate) fn parse_page_layout_property_columns(xml: &str) -> Result<Vec<Column
     parse(&wrapped)
 }
 
-#[allow(clippy::too_many_arguments)]
 fn start(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,

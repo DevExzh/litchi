@@ -192,7 +192,6 @@ impl StreamingLimits {
     ///
     /// The minimum output ceiling is only a ZIP lower bound. Construction
     /// does not guarantee that the required ODP members fit that ceiling.
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         max_slides: usize,
         max_title_text_bytes: usize,

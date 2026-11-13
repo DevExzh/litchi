@@ -172,10 +172,6 @@ fn validate_media_type(media_type: &str) -> Result<()> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    reason = "test code panics on unexpected errors to keep assertions concise"
-)]
 mod tests {
     use super::{ChartClass, Definition, package_content};
     use litchi_core::{Error, xml::CompactnessKind};

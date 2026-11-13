@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    reason = "These integration fixtures are deliberately small and assertion-driven."
-)]
-
 //! Integration coverage for bounded decoded `content.xml` insertion.
 //!
 //! The tests exercise both ZIP framing and the source transaction.  The

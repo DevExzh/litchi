@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "integration-test assertions panic on failure by design"
-)]
-
 use litchi_odp::core::OwnedPackage;
 use litchi_odp::{Builder, Package, image::Length as OdfLength};
 

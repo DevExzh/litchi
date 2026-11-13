@@ -596,7 +596,6 @@ pub(crate) fn serial(days: i64, seconds: f64, date1904: bool) -> Option<f64> {
     } else {
         days - EXCEL_1900_BASE
     };
-    #[allow(clippy::cast_precision_loss, reason = "serials stay far below 2^52")]
     Some(whole as f64 + seconds / 86_400.0)
 }
 
@@ -905,11 +904,6 @@ fn date(field: &str) -> Option<(i64, f64, bool)> {
         }
         let text = std::str::from_utf8(digits).ok()?;
         let value: f64 = text.parse().ok()?;
-        #[allow(
-            clippy::cast_possible_truncation,
-            clippy::cast_possible_wrap,
-            reason = "at most nine digits"
-        )]
         let scale = 10f64.powi(digits.len() as i32);
         seconds += value / scale;
     }

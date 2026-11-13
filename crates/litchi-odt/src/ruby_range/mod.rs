@@ -26,7 +26,6 @@ pub(super) fn locate_balanced_ruby_ranges(
     codec::locate_balanced_ruby_ranges(xml, paragraph_index, range)
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn collect_ruby_text_node(
     xml: &str,
     span: Range<usize>,

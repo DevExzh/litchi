@@ -387,10 +387,6 @@ impl Builder {
         Self::generate_shape_xml_at_depth(shape, idx, 0, None, &mut node_count)
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "ShapeType is a non-exhaustive litchi-core enum, so a wildcard arm is required and intentionally covers any future variants"
-    )]
     fn generate_shape_xml_at_depth(
         shape: &crate::Shape,
         idx: usize,
@@ -993,11 +989,6 @@ impl Builder {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::shadow_unrelated,
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
     use crate::core::OwnedPackage;

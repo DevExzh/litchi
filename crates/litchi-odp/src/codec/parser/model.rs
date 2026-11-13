@@ -87,10 +87,6 @@ pub(super) enum Element {
 }
 
 /// Internal structure for building shapes during parsing
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "parser-internal builder accumulates independent XML parse flags and fields consumed by later pipeline stages; splitting them would complicate the parser without changing behavior"
-)]
 pub(super) struct ShapeBuilder {
     pub(super) shape_type: ShapeType,
     pub(super) drawing_kind: Option<DrawingShapeKind>,

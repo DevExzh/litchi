@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "the focused allocator regression uses deterministic fixtures"
-)]
-
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::io::{self, Write};
 use std::sync::{

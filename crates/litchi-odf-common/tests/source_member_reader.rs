@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    reason = "The source-member fixtures are fixed and assertion-driven."
-)]
-
 use litchi_core::{Error, OwnedSource, ReadAt, SourceVersion};
 use litchi_odf_common::core::{
     PackageWriter, Profile, SourceBackedPackage, SourceMemberReaderError,

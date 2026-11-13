@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "integration-test assertions panic on failure by design"
-)]
-
 use litchi_odp::Package;
 use litchi_odp::core::PackageWriter;
 use litchi_odp::embedded::{Kind, Source};

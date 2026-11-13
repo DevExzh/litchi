@@ -593,7 +593,6 @@ pub(crate) fn remove_bibliography_configuration_xml_with_xml_limits(
     Ok(format!("{}{}", &xml[..span.start], &xml[span.end..]))
 }
 
-#[allow(clippy::too_many_arguments)]
 fn start_configuration(
     reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,

@@ -131,10 +131,6 @@ pub(crate) fn finish(
 
 /// An ODF length: points with up to four decimals (`12pt`, `10.5pt`).
 pub(crate) fn odf_length(length: Length) -> String {
-    #[allow(
-        clippy::cast_precision_loss,
-        reason = "EMU values of document lengths are far below 2^52"
-    )]
     let points = length.emu() as f64 / 12_700.0;
     let mut text = format!("{points:.4}");
     while text.ends_with('0') {
@@ -288,10 +284,6 @@ fn check_style(body: litchi_odt::body::Body<'_>, style: &str, key: &'static str)
 }
 
 /// Translate one set call's properties for a node of `kind`.
-#[allow(
-    clippy::too_many_lines,
-    reason = "one flat key table, kept in one place so it reads against the spec tables"
-)]
 fn translate(kind: Kind, props: &Props<'_>, body: litchi_odt::body::Body<'_>) -> Result<Staged> {
     let mut staged = Staged::default();
     let specs = spec::SPEC.elements[kind as usize].props;
@@ -1029,10 +1021,6 @@ fn missing(key: &'static str, message: &'static str) -> Error {
 }
 
 /// Translate a unified new node into the leaf node.
-#[allow(
-    clippy::too_many_lines,
-    reason = "one arm per insertable element, kept together for review against the leaf"
-)]
 fn new_node(kind: Kind, props: &Props<'_>, body: litchi_odt::body::Body<'_>) -> Result<LeafNew> {
     let text = || add_text(props, "text").map(Option::unwrap_or_default);
     Ok(match kind {

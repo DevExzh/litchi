@@ -1,5 +1,3 @@
-#![allow(clippy::unwrap_used, reason = "test assertions use unwrap for clarity")]
-
 use litchi_core::{HistoryLimits, Position};
 use litchi_odf_common::Error;
 use litchi_odf_common::{

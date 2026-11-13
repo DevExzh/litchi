@@ -564,10 +564,6 @@ impl TableStructureAxis {
 /// # Errors
 ///
 /// Returns an error when the value cannot be serialized.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "the codec entry point keeps its historical element-qualified name"
-)]
 pub fn write_table_structure(
     out: &mut String,
     structure: &[Structure],
@@ -598,10 +594,6 @@ pub fn write_table_structure(
 /// # Errors
 ///
 /// Returns an error when a value violates the format or resource constraints.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "the codec entry point keeps its historical element-qualified name"
-)]
 pub fn validate_table_structure(
     structure: &[Structure],
     axis: TableStructureAxis,

@@ -499,18 +499,10 @@ impl MarkdownWriter {
     ///
     /// **Performance**: Optimized to avoid redundant XML parsing by extracting runs
     /// once and deriving text from them when needed.
-    #[allow(
-        irrefutable_let_patterns,
-        reason = "the compat enum collapses to a single variant when only one format feature is enabled"
-    )]
     pub(super) fn write_paragraph(&mut self, para: &Paragraph) -> Result<()> {
         self.write_paragraph_with_list(para, None, None)
     }
 
-    #[allow(
-        irrefutable_let_patterns,
-        reason = "the compat enum collapses to a single variant when only one format feature is enabled"
-    )]
     pub(super) fn write_paragraph_with_list(
         &mut self,
         para: &Paragraph,
@@ -1686,10 +1678,6 @@ impl MarkdownWriter {
     /// Extract formula content from a run and convert to markdown.
     ///
     /// Returns the markdown representation of the formula if one is found, None otherwise.
-    #[allow(
-        irrefutable_let_patterns,
-        reason = "the compat enum collapses to a single variant when only one format feature is enabled"
-    )]
     fn extract_formula_from_run(&self, _run: &Run) -> Result<Option<String>> {
         // Try OOXML OMML formulas first
         #[cfg(feature = "docx")]
@@ -1723,10 +1711,6 @@ impl MarkdownWriter {
             // pattern is refutable in most builds and irrefutable in an
             // `doc`-only build; `if let` covers both without a wildcard arm that
             // would be unreachable in the latter.
-            #[allow(
-                irrefutable_let_patterns,
-                reason = "the compat enum collapses to a single variant when only one format feature is enabled"
-            )]
             if let Run::Doc(ole_run) = _run
                 && ole_run.has_mtef_formula()
             {

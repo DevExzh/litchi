@@ -638,10 +638,6 @@ fn le_u64(bytes: &[u8], offset: usize) -> Option<u64> {
 ///
 /// Returns an error when the replacement data exceeds a resource limit or the
 /// source package cannot be copied into a valid rebuilt package.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "The established public API distinguishes a whole-package rebuild from part edits."
-)]
 pub fn rebuild_package(
     source: &OwnedPackage,
     content: &str,

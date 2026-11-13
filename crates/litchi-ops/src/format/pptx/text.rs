@@ -488,11 +488,6 @@ pub(crate) fn drawing_color(value: &drawing::Value) -> Option<Color> {
                         if let crate::value::Base::Rgb(rgba) = color.base() {
                             if color.transforms().is_empty() {
                                 let channel = (f64::from(alpha) * 255.0 / 100_000.0).round();
-                                #[allow(
-                                    clippy::cast_possible_truncation,
-                                    clippy::cast_sign_loss,
-                                    reason = "the alpha percentage is 0..=100000, so the channel is 0..=255"
-                                )]
                                 let channel = channel.clamp(0.0, 255.0) as u8;
                                 color =
                                     Color::new(crate::value::Base::Rgb(rgba.with_alpha(channel)));

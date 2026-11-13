@@ -16,12 +16,6 @@
     any(unix, windows),
     any(feature = "docx", feature = "pptx", feature = "xlsx")
 ))]
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::panic,
-    reason = "test assertions panic on failure by design"
-)]
 #![cfg_attr(
     not(all(
         feature = "doc",

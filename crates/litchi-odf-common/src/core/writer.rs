@@ -612,10 +612,6 @@ fn validate_canonical_odf_datetime(value: &str, field: &str) -> Result<()> {
 /// # Ok(())
 /// # }
 /// ```
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`PackageWriter` is the established public ODF package writer name."
-)]
 pub struct PackageWriter<W: Write = io::Cursor<Vec<u8>>> {
     // The locally retained limits also bound generated ODF manifest XML and
     // manifest-only entries; ZIP transport metadata alone is insufficient.
@@ -2516,10 +2512,6 @@ fn source_manifest_version(bytes: &[u8]) -> Result<Option<String>> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    reason = "Test fixtures use infallible ZIP setup operations so assertions can focus on writer behavior."
-)]
 mod tests {
     use super::*;
     use soapberry_zip::office::ArchiveReader;
@@ -3165,10 +3157,6 @@ mod tests {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    reason = "Test fixtures use infallible encrypted-package setup so assertions can focus on rewrite behavior."
-)]
 mod encrypted_copy_tests {
     use super::*;
 

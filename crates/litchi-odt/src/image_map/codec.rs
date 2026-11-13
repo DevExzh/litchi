@@ -71,7 +71,6 @@ fn bool_attr(
     }
 }
 
-#[allow(clippy::type_complexity)]
 fn parse_link_attributes(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,

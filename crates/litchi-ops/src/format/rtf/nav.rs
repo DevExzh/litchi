@@ -77,10 +77,6 @@ impl<'f> Navigate<'f> for Nav<'f> {
         Ok(Node::root(self.doc))
     }
 
-    #[allow(
-        clippy::too_many_lines,
-        reason = "one flat dispatch per native axis keeps the path grammar visible"
-    )]
     fn child(
         &self,
         parent: &Self::Node,

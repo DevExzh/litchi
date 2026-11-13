@@ -26,10 +26,6 @@ const DATABASE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:databa
 const XLINK_NAMESPACE: &[u8] = b"http://www.w3.org/1999/xlink";
 
 /// Finite limits for semantic ODB catalog discovery.
-#[allow(
-    clippy::struct_field_names,
-    reason = "each field names its stable public max-setting builder counterpart"
-)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
     max_xml_bytes: usize,

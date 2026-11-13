@@ -5,20 +5,6 @@
 //! without implementing an XForms processor: XPath, expressions, actions,
 //! submissions, network access, and instance evaluation remain strings.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    clippy::cast_possible_truncation,
-    clippy::doc_markdown,
-    clippy::format_push_string,
-    clippy::items_after_statements,
-    clippy::manual_let_else,
-    clippy::missing_errors_doc,
-    clippy::must_use_candidate,
-    clippy::needless_pass_by_value,
-    clippy::similar_names,
-    reason = "the XForms model is a bounded inert XML declaration projection"
-)]
-
 use crate::core::{ResolvedReader, XmlStreamLimits};
 use crate::generic::{ChargedXml, FlatMutationBudget, MemoryLease, allocate_xml};
 use crate::namespace::{FORMNS, OFFICENS, XFORMSNS, XMLNS};

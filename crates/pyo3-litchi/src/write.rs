@@ -247,7 +247,6 @@ pub(crate) fn results<'py>(
                 dict.set_item(pyo3::intern!(py, "error"), failure.message())?;
                 dict.set_item(pyo3::intern!(py, "suggestion"), failure.suggestion())?;
             },
-            #[allow(unreachable_patterns, reason = "ItemResult is non-exhaustive")]
             _ => {
                 dict.set_item(pyo3::intern!(py, "success"), false)?;
                 dict.set_item(pyo3::intern!(py, "code"), "internal_error")?;
@@ -742,10 +741,6 @@ impl Edit {
     /// Returns:
     ///     The new element's canonical path
     #[pyo3(signature = (parent, r#type, props = None, *, index = None, after = None, before = None))]
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "the keyword arguments mirror OfficeCLI's add options"
-    )]
     fn add(
         &self,
         py: Python<'_>,
@@ -786,10 +781,6 @@ impl Edit {
     ///     after: Move right after the element at this path
     ///     before: Move right before the element at this path
     #[pyo3(name = "move", signature = (path, to = None, *, index = None, after = None, before = None))]
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "the keyword arguments mirror OfficeCLI's move options"
-    )]
     fn move_(
         &self,
         py: Python<'_>,

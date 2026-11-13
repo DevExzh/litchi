@@ -2,11 +2,6 @@
 //! part with its producer spelling, while unbalanced or out-of-range
 //! relocations are refused.
 
-#![allow(
-    clippy::unwrap_used,
-    reason = "Fixed in-memory raw ZIP fixtures keep publication assertions concise."
-)]
-
 use litchi_odf_common::constants;
 use litchi_odf_common::core::{
     AuthoredXmlFragment, OwnedPackage, XmlSourcePart, XmlSplicePublication,

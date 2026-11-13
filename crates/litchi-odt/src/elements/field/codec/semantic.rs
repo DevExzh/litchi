@@ -1,8 +1,3 @@
-#![allow(
-    clippy::wildcard_imports,
-    reason = "the semantic field codec consumes the complete typed model"
-)]
-
 use super::super::model::*;
 use super::super::{FORM_NAMESPACE, STYLE_NAMESPACE, TEXT_DATABASE_NAMESPACE, XLINK_NAMESPACE};
 use super::validation::{validate_constructed_database_field, validate_database_field};

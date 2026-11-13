@@ -1671,10 +1671,6 @@ fn push_paragraph_properties(
 /// copy is rebuilt from its tags, so it is compact whatever the source
 /// formatting. `tabs`, when given, replaces the paragraph properties'
 /// `style:tab-stops`.
-#[allow(
-    clippy::too_many_lines,
-    reason = "one event loop over the declaration, kept whole so the depth bookkeeping reads in one place"
-)]
 fn clone_style(
     style: Style<'_>,
     prefixes: &Prefixes,

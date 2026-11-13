@@ -488,7 +488,6 @@ pub(super) fn parse_part(xml: &str, part: ContentValidationPart) -> Result<Conte
     Ok(result)
 }
 
-#[allow(clippy::too_many_arguments)]
 fn handle_start(
     namespace: NamespaceKind,
     local: &str,
@@ -671,7 +670,6 @@ fn handle_empty(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn start_validation_child(
     namespace: NamespaceKind,
     local: &str,

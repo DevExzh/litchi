@@ -11,10 +11,6 @@
 //! test runs with `--features test-support` (or `--all-features`).
 
 #![cfg(feature = "test-support")]
-#![allow(
-    unsafe_code,
-    reason = "The test-only allocator is the measurement boundary; production crates remain safe"
-)]
 
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::borrow::Cow;

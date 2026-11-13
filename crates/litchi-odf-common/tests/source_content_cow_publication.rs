@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    reason = "These integration fixtures are deliberately small, fixed, and assertion-driven."
-)]
-
 //! Adversarial coverage for the source-backed `content.xml` raw publisher.
 //!
 //! The fixture helpers intentionally retain ZIP framing rather than comparing

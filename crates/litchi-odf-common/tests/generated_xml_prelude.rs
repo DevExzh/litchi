@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "These are fixed generated-XML seam boundary tests."
-)]
-
 //! Public integration coverage for the opt-in generated-XML fixed-prelude seam.
 
 use litchi_core::Error;

@@ -1,8 +1,4 @@
 //! Bounded, namespace-aware ODF text-web content validation and projection.
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the streaming codec is ordered by validation and projection pipeline"
-)]
 
 use litchi_core::{Error, Position, Result};
 use litchi_odf_common::compact_xml;
@@ -1985,7 +1981,6 @@ fn invalid<T>(message: &str) -> Result<T> {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::unwrap_used, reason = "tests use panic-on-failure assertions")]
 
     use super::{BlockOrder, project, validate_authored};
 

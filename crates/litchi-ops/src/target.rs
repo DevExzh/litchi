@@ -248,7 +248,6 @@ static QUERY_BYTES: [bool; 256] = {
     let mut table = [false; 256];
     let mut byte = 0;
     while byte < 256 {
-        #[allow(clippy::cast_possible_truncation, reason = "byte < 256")]
         let b = byte as u8;
         table[byte] = matches!(b, b'"' | b'\'' | b',' | b'>' | b'*' | b':' | b'(' | b')')
             || b.is_ascii_whitespace();

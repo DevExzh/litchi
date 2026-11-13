@@ -569,10 +569,6 @@ pub(crate) enum Props<'a> {
 
 impl<'a> Props<'a> {
     /// The value at `index` of the kind's property table, if the node has it.
-    #[allow(
-        clippy::too_many_lines,
-        reason = "one flat projection per native kind keeps the table order visible"
-    )]
     pub(crate) fn get(&self, index: usize) -> Option<crate::node::Value<'a>> {
         use crate::node::Value;
         use crate::value::{Color, Length};

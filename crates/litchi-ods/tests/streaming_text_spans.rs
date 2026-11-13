@@ -1,7 +1,5 @@
 //! Public regression checks for bounded scalar text spans.
 
-#![allow(clippy::expect_used, clippy::unwrap_used)]
-
 use std::{
     borrow::Cow,
     io::{self, Cursor, Read, Write},

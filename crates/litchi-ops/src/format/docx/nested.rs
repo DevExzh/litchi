@@ -1158,7 +1158,6 @@ pub(super) fn cell_width(text: &str) -> Result<litchi_docx::properties::Width> {
         if !percent.is_finite() || percent < 0.0 {
             return Err(invalid());
         }
-        #[allow(clippy::cast_possible_truncation)]
         return Ok(Width::Percent((percent * 50.0).round() as i64));
     }
     Ok(Width::Twips(Twips(i64::from(

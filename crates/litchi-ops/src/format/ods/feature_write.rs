@@ -717,7 +717,6 @@ fn length_cm(key: &'static str, arg: &Arg) -> Result<f64> {
             .with_suggestion("use a length such as 2cm or 914400emu"));
         },
     };
-    #[allow(clippy::cast_precision_loss, reason = "drawing lengths are small")]
     let cm = emu as f64 / 360_000.0;
     Ok(cm)
 }

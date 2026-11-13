@@ -1,8 +1,3 @@
-#![allow(
-    clippy::wildcard_imports,
-    reason = "the wire field codec consumes the complete typed model"
-)]
-
 use super::super::model::*;
 use super::super::{
     FORM_NAMESPACE, MAX_DATABASE_VALUE, MAX_DROP_DOWN_LABELS, MAX_FIELD_DEPTH, MAX_FIELDS,

@@ -628,11 +628,6 @@ impl Iwork {
     }
 
     /// The handle's source is in memory: always current.
-    #[allow(
-        clippy::unnecessary_wraps,
-        clippy::unused_self,
-        reason = "the uniform handle surface returns a freshness result"
-    )]
     pub(crate) fn check_source(&self) -> Result<()> {
         Ok(())
     }
@@ -984,10 +979,6 @@ impl fmt::Debug for Iwork {
 }
 
 /// One element of a flavor's spec table.
-#[allow(
-    clippy::too_many_arguments,
-    reason = "one argument per spec table column keeps the tables readable"
-)]
 pub(crate) const fn element<K: Copy>(
     kind: K,
     name: &'static str,

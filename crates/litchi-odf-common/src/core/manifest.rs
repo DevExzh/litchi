@@ -449,10 +449,6 @@ fn take_manifest_attributes(
     }
 }
 
-#[allow(
-    clippy::type_complexity,
-    reason = "Manifest and LibreOffice extension attributes must be returned separately."
-)]
 fn take_manifest_and_loext_attributes(
     attributes: common_package::ManifestScanAttributes,
 ) -> Result<(HashMap<Vec<u8>, String>, HashMap<Vec<u8>, String>)> {
@@ -823,10 +819,6 @@ fn finish_encryption(partial: PartialEncryption) -> Result<ManifestEncryption> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    reason = "Test fixtures use infallible parsing setup so assertions can focus on manifest validation."
-)]
 mod tests {
     use super::*;
     use std::fmt::Write as _;

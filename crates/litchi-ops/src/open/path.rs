@@ -327,10 +327,6 @@ mod zip {
     use crate::{File, OpenOptions};
 
     /// Classify a positional ZIP and adopt the owner its format keeps.
-    #[allow(
-        clippy::too_many_lines,
-        reason = "one precedence chain, kept in one place so its order is reviewable"
-    )]
     pub(super) fn open<T: ZipTail>(
         path: &Path,
         source: Arc<dyn ReadAt>,
@@ -484,7 +480,6 @@ mod zip {
         not(any(feature = "odt", feature = "ods", feature = "odp", odf_objects)),
         allow(
             unused_variables,
-            clippy::needless_pass_by_value,
             reason = "without an ODF format there is no ODF owner to build"
         )
     )]

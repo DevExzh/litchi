@@ -399,7 +399,6 @@ fn new_event_listener(target: Target, attributes: Vec<Attribute>) -> Result<List
     })
 }
 
-#[allow(clippy::too_many_arguments)]
 fn scope_start(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
@@ -795,7 +794,6 @@ fn resolve_links(result: &mut Forms) -> Result<()> {
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn collect_form(
     form: &Form,
     group: usize,
@@ -818,7 +816,6 @@ fn collect_form(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn collect_control(
     control: &Control,
     group: usize,

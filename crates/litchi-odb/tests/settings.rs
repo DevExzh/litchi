@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "settings integration tests keep assertions concise"
-)]
-
 use litchi_odb::{
     ApplicationConnectionSettings, AutoIncrementSettings, BooleanComparisonMode,
     CharacterSetSettings, Connection, DataSourceSetting, DataSourceSettingType, DelimiterSettings,

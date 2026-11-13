@@ -182,7 +182,6 @@ pub(crate) fn parse_reference_marks(xml: &str) -> Result<Vec<ReferenceMark>> {
     Ok(marks.into_iter().map(|(_, mark)| mark).collect())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn process_marker(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,

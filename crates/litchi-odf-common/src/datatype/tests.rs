@@ -1,10 +1,5 @@
 //! Behavioral tests for the public ODF scalar facade.
 
-#![allow(
-    clippy::unwrap_used,
-    reason = "Test assertions intentionally unwrap known-valid scalar fixture construction failures."
-)]
-
 use super::{Boolean, Date, DateTime, Duration};
 use chrono::{Datelike, Duration as ChronoDuration, NaiveDate, TimeZone, Utc};
 

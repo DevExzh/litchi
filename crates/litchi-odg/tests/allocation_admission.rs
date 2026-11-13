@@ -1,8 +1,3 @@
-#![allow(
-    unsafe_code,
-    reason = "the integration test observes allocation admission"
-)]
-
 use litchi_odg::{Package, flat::Drawing};
 use soapberry_zip::office::StreamingArchiveWriter;
 use std::alloc::{GlobalAlloc, Layout, System};

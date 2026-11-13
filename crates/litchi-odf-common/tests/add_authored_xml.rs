@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "These are fixed-package boundary tests; an unexpected result is a test failure."
-)]
-
 //! Typed authored-XML publication, preflight, and transport failure contracts.
 
 use litchi_core::Error;

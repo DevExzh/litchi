@@ -1,11 +1,3 @@
-#![cfg_attr(
-    test,
-    allow(
-        clippy::unwrap_used,
-        reason = "Fixed semantic XML fixtures use direct assertion setup."
-    )
-)]
-
 use litchi_odf_common::{
     drawing::Part,
     media::{Image, Source, scan_flat, scan_package},

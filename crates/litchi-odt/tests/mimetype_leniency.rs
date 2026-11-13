@@ -3,12 +3,6 @@
 //! first entry opens by default through every ODT open path, and the
 //! deviation is recorded on the document handle's tolerance report.
 
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "hand-built fixtures keep tolerance assertions focused"
-)]
-
 #[path = "../../litchi-odf-common/tests/support/odf_rezip.rs"]
 mod odf_rezip;
 

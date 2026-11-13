@@ -887,11 +887,6 @@ fn make_error(message: impl Into<String>) -> Error {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::float_cmp,
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design; one fixture uses an exactly representable decimal"
-)]
 mod tests {
     use super::*;
 

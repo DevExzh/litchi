@@ -263,10 +263,6 @@ fn color(value: &str) -> Option<Value<'static>> {
 
 /// A length in centimetres as OfficeCLI's EMU spelling.
 fn emu(cm: f64) -> Value<'static> {
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "drawing lengths are bounded"
-    )]
     let emu = (cm * 360_000.0).round() as i64;
     owned(format!("{emu}emu"))
 }

@@ -2629,10 +2629,6 @@ struct Span {
     children: Vec<usize>,
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "the source span constructor receives every bounded scanner fact explicitly"
-)]
 fn make_span(
     reader: &NsReader<&[u8]>,
     namespace: Option<String>,

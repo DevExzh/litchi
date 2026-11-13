@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "fixed ZIP fixtures keep assertions focused on validation outcomes"
-)]
-
 use std::io::{Cursor, Write};
 
 use litchi_core::{CheckStatus, IssueSeverity, ValidationLimitKind, ValidationLimits};

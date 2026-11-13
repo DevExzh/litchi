@@ -935,10 +935,6 @@ impl Cells {
     /// The slot of the stored cell at `row`, `column` when `kind` is the
     /// cell kind (`Some(None)`: the table stores no such cell); `None` for
     /// another kind, which the caller scans for.
-    #[allow(
-        clippy::option_option,
-        reason = "`None` asks the caller to scan; `Some(None)` is a miss"
-    )]
     pub(crate) fn locate(
         &self,
         file: &Iwork,
@@ -1099,10 +1095,6 @@ pub(crate) fn value_input(value: &PropValue<'_>) -> Result<Option<Input>> {
                 Some(Scalar::Text(text)) => Some(Input::text(text).map_err(staging)?),
                 Some(Scalar::Bool(value)) => Some(Input::boolean(value)),
                 Some(Scalar::Int(value)) => {
-                    #[allow(
-                        clippy::cast_precision_loss,
-                        reason = "Numbers stores cell numbers as doubles"
-                    )]
                     let number = value as f64;
                     Some(Input::number(number).map_err(|_| non_finite())?)
                 },
@@ -1150,10 +1142,6 @@ fn cached_value(value: &PropValue<'_>) -> Result<CachedValue> {
             },
             Some(Scalar::Bool(value)) => Ok(CachedValue::boolean(value)),
             Some(Scalar::Int(value)) => {
-                #[allow(
-                    clippy::cast_precision_loss,
-                    reason = "Numbers stores cached numeric results as doubles"
-                )]
                 let value = value as f64;
                 CachedValue::number(value).map_err(|error| edit_error(EditError::Formula(error)))
             },

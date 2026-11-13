@@ -4,10 +4,6 @@
 //! state verb (open, edit, apply, save). [`Drawing`] is its read-only
 //! projection. The primary transaction family lives in [`edit`].
 #![forbid(unsafe_code)]
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "drawing package helpers stay in manifest and content traversal order"
-)]
 
 mod authoring;
 mod codec;

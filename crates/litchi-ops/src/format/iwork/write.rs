@@ -24,14 +24,6 @@ use crate::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
 use crate::value::{Scalar, ValueType};
 
 /// One leaf transaction's reversible proof.
-#[allow(
-    clippy::large_enum_variant,
-    reason = "a write holds its proofs once; boxing would add an allocation per commit"
-)]
-#[allow(
-    clippy::enum_variant_names,
-    reason = "in a one-format build the remaining variants share that format's prefix"
-)]
 pub(crate) enum LeafPatch {
     #[cfg(feature = "pages")]
     Pages(super::pages::Patch),
@@ -280,7 +272,6 @@ pub(crate) fn font_property(
                         Ok(scalar.and_then(|scalar| match scalar {
                             Scalar::Length(length) => Some(length.points()),
                             Scalar::Number(value) => Some(value),
-                            #[allow(clippy::cast_precision_loss, reason = "point sizes are small")]
                             Scalar::Int(value) => Some(value as f64),
                             _ => None,
                         }))
@@ -288,10 +279,6 @@ pub(crate) fn font_property(
                 )
                 .map_err(|error| error.with_property("font.size"))?
                 .ok_or_else(|| cleared(key))?;
-            #[allow(
-                clippy::cast_possible_truncation,
-                reason = "iWork stores font sizes as 32-bit floats"
-            )]
             let points = points as f32;
             if !points.is_finite() || points <= 0.0 {
                 return Err(refusal(Code::InvalidValue, "a font size must be positive")
@@ -347,7 +334,6 @@ pub(crate) fn cell_scalar(key: &str, value: &PropValue<'_>) -> Result<CellScalar
                 None => CellScalar::Empty,
                 Some(Scalar::Text(text)) => CellScalar::Text(text.to_owned()),
                 Some(Scalar::Bool(flag)) => CellScalar::Boolean(flag),
-                #[allow(clippy::cast_precision_loss, reason = "table cells store doubles")]
                 Some(Scalar::Int(number)) => CellScalar::Number(number as f64),
                 Some(Scalar::Number(number)) if number.is_finite() => CellScalar::Number(number),
                 Some(other) => {
@@ -483,7 +469,6 @@ pub(crate) fn chart_font_points(value: &PropValue<'_>) -> Result<f32> {
                 Ok(scalar.and_then(|scalar| match scalar {
                     Scalar::Length(length) => Some(length.points()),
                     Scalar::Number(value) => Some(value),
-                    #[allow(clippy::cast_precision_loss, reason = "point sizes are small")]
                     Scalar::Int(value) => Some(value as f64),
                     _ => None,
                 }))
@@ -494,10 +479,6 @@ pub(crate) fn chart_font_points(value: &PropValue<'_>) -> Result<f32> {
             refusal(Code::InvalidValue, "a chart font size must be positive")
                 .with_property("font.size".to_owned())
         })?;
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "iWork stores chart font sizes as 32-bit floats"
-    )]
     let points = points as f32;
     if !points.is_finite() || points <= 0.0 {
         return Err(refusal(

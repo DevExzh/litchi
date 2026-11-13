@@ -1561,10 +1561,6 @@ fn vertical(value: xlsb::package::styles::VerticalAlignment) -> Value<'static> {
 }
 
 fn points(value: f64) -> Value<'static> {
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "validated font/row points fit in EMU"
-    )]
     let emu = (value * 12_700.0).round() as i64;
     Value::Length(Length::from_emu(emu))
 }

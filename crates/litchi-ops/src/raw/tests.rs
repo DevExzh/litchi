@@ -1,7 +1,5 @@
 //! Raw-layer unit tests.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, reason = "tests")]
-
 #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "odt"))]
 use super::Action;
 #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx"))]

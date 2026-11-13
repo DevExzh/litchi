@@ -40,10 +40,6 @@ impl From<usize> for Selector<'_> {
 /// The recognized ODF drawing shape family.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "public API compatibility uses ShapeKind"
-)]
 pub enum ShapeKind {
     Caption,
     Circle,

@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "integration-test assertions panic on failure by design"
-)]
-
 use litchi_odf_common::chart::ChartClass;
 use litchi_odf_common::chart::authoring::{
     CachedCell, CachedRow, CachedTable, CachedValue, Definition, SeriesSpec, Text,

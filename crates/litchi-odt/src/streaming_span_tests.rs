@@ -3,8 +3,6 @@
 //! Retains the original scalar write boundaries as an independent oracle for
 //! encoded bytes, local XML refusals, and hierarchical Work accounting.
 
-#![allow(clippy::expect_used, clippy::unwrap_used)]
-
 use super::*;
 
 use litchi_core::{Budget, CancellationSource, ExecutionLimits, Limits};
@@ -320,7 +318,6 @@ fn assert_observations_equivalent(
     assert_execution_equivalent(&actual.execution_error, &expected.execution_error);
 }
 
-#[allow(clippy::too_many_arguments)]
 fn compare_threshold_run(
     label: &str,
     value: &str,

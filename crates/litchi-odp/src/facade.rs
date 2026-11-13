@@ -34,10 +34,6 @@ pub mod layer {
 
 /// Presentation master pages and their shared ODF regions/children.
 pub mod master {
-    #[allow(
-        clippy::module_name_repetitions,
-        reason = "re-exporting the master page type under its own module is the intended public API shape"
-    )]
     pub use crate::package::MasterPage;
     pub use crate::package::layout_master::{
         MasterSummary as Summary, list_masters as list, parse_masters as parse,

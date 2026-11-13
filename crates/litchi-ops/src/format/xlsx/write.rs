@@ -2127,10 +2127,6 @@ fn parse_semicolon_gradient(
         .try_reserve_exact(color_count)
         .map_err(|source| allocation("XLSX gradient stops", source))?;
     for (index, color) in value.split(';').take(color_count).enumerate() {
-        #[allow(
-            clippy::cast_precision_loss,
-            reason = "gradient stop counts stay below the exact f64 integer range"
-        )]
         let position = index as f64 / (color_count - 1) as f64;
         stops.push(gradient_stop_from_text(color, position, key)?);
     }
@@ -2208,10 +2204,6 @@ fn parse_dash_gradient(
         } else {
             color_end
         };
-        #[allow(
-            clippy::cast_precision_loss,
-            reason = "gradient stop counts stay below the exact f64 integer range"
-        )]
         let position = index as f64 / (stop_count - 1) as f64;
         stops.push(gradient_stop_from_text(&value[start..end], position, key)?);
     }

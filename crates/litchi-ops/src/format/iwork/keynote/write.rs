@@ -455,17 +455,12 @@ fn run_style(style: &mut Style, key: &str, value: &PropValue<'_>) -> Result<()> 
                     Ok(scalar.and_then(|scalar| match scalar {
                         Scalar::Length(length) => Some(length.points()),
                         Scalar::Number(value) => Some(value),
-                        #[allow(clippy::cast_precision_loss, reason = "point sizes are small")]
                         Scalar::Int(value) => Some(value as f64),
                         _ => None,
                     }))
                 })
                 .map_err(|error| error.with_property("size"))?
                 .ok_or_else(cleared)?;
-            #[allow(
-                clippy::cast_possible_truncation,
-                reason = "Keynote stores font sizes as 32-bit floats"
-            )]
             let points = points as f32;
             if !points.is_finite() || points <= 0.0 {
                 return Err(refusal(Code::InvalidValue, "a font size must be positive")
@@ -519,10 +514,6 @@ fn points(value: &PropValue<'_>, key: &'static str, extent: bool) -> Result<f32>
             refusal(Code::InvalidValue, "a frame property cannot be cleared")
                 .with_property(key.to_owned())
         })?;
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "Keynote stores frames as 32-bit floats"
-    )]
     let points = points as f32;
     if !points.is_finite() || (extent && points <= 0.0) {
         return Err(refusal(
@@ -540,7 +531,6 @@ fn degrees(value: &PropValue<'_>) -> Result<f32> {
         .with_coerced(ValueType::Number, |scalar| {
             Ok(scalar.and_then(|scalar| match scalar {
                 Scalar::Number(value) => Some(value),
-                #[allow(clippy::cast_precision_loss, reason = "degrees are small")]
                 Scalar::Int(value) => Some(value as f64),
                 _ => None,
             }))
@@ -550,10 +540,6 @@ fn degrees(value: &PropValue<'_>) -> Result<f32> {
             refusal(Code::InvalidValue, "a frame property cannot be cleared")
                 .with_property("rotation".to_owned())
         })?;
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "Keynote stores rotations as 32-bit floats"
-    )]
     let degrees = degrees as f32;
     if !degrees.is_finite() {
         return Err(refusal(Code::InvalidValue, "the rotation must be finite")
@@ -593,14 +579,7 @@ fn chart_font_size(
 fn frame_of(node: &Node<'_>) -> Option<Geometry> {
     let item = node.item();
     let length = |key| match item.value(key) {
-        Some(crate::node::Value::Length(length)) =>
-        {
-            #[allow(
-                clippy::cast_possible_truncation,
-                reason = "Keynote stores frames as 32-bit floats"
-            )]
-            Some(length.points() as f32)
-        },
+        Some(crate::node::Value::Length(length)) => Some(length.points() as f32),
         _ => None,
     };
     let mut geometry = Geometry::new(
@@ -610,10 +589,6 @@ fn frame_of(node: &Node<'_>) -> Option<Geometry> {
         length("height")?,
     );
     if let Some(crate::node::Value::Number(rotation)) = item.value("rotation") {
-        #[allow(
-            clippy::cast_possible_truncation,
-            reason = "Keynote stores rotations as 32-bit floats"
-        )]
         {
             geometry = geometry.with_rotation(*rotation as f32);
         }

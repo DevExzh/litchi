@@ -1,5 +1,3 @@
-#![allow(clippy::unwrap_used, reason = "test assertions use unwrap for clarity")]
-
 use litchi_core::edit::RefusalKind;
 use litchi_odf_common::Error as PackageError;
 use litchi_odi::flat::Image as FlatImage;

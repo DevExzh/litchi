@@ -13,12 +13,6 @@
 //! format-family types are deleted, so the goldens are fixed reference data.
 
 #![cfg(litchi_unified)]
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::panic,
-    reason = "test assertions panic on failure by design"
-)]
 #![cfg_attr(
     not(all(
         feature = "doc",

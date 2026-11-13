@@ -5,8 +5,6 @@
 //! envelope, and inspect the generated XML independently for page/frame
 //! topology.  No rich-slide adapter is involved in this test.
 
-#![allow(clippy::expect_used, clippy::unwrap_used)]
-
 use std::{
     error::Error as StdError,
     fmt,
@@ -70,10 +68,6 @@ fn generous_limits() -> StreamingLimits {
     .expect("isolated output ceiling")
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "Each independent provider ceiling is explicit in these boundary fixtures."
-)]
 fn limits_with(
     base: StreamingLimits,
     max_slides: usize,

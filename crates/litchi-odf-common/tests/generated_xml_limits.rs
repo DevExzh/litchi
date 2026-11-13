@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "These are fixed XML-limit boundary tests; unexpected results are failures."
-)]
-
 //! Typed XML audit boundaries through the public generated-member writer.
 
 use litchi_core::Error;

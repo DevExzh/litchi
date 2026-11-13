@@ -1453,7 +1453,6 @@ mod tests {
             seed ^= seed << 13;
             seed ^= seed >> 7;
             seed ^= seed << 17;
-            #[allow(clippy::cast_possible_wrap, reason = "any bit pattern is a test value")]
             let raw = seed as i64;
             values.extend([raw, raw >> 20, raw >> 34, (raw >> 40) * 127]);
         }

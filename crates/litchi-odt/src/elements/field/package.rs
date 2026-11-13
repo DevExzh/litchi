@@ -1,14 +1,6 @@
 //! Document-content field parsing and package-facing adapters.
 
-#[allow(
-    clippy::wildcard_imports,
-    reason = "the package facade exposes the complete field model"
-)]
 use super::model::*;
-#[allow(
-    clippy::wildcard_imports,
-    reason = "the package facade shares the owner-level field vocabulary"
-)]
 use super::*;
 use crate::elements::element::{Element, ElementBase, try_prefixed_name};
 use crate::elements::xml::{

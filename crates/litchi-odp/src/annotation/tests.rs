@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use super::codec::{annotations, apply_edits, serialize};
 use super::{Anchor, Annotation, Position};
 use litchi_odf_common::XmlStreamLimits;

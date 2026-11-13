@@ -25,8 +25,4 @@ pub use model::{
 pub(crate) use transaction::{Commit, update};
 pub use transaction::{Edit, Snapshot};
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "the codec entry points keep their historical element-qualified names"
-)]
 pub use codec::{parse_tracked_changes, write_tracked_changes};

@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "Streaming writer tests use fixed inputs and direct assertions."
-)]
-
 use litchi_core::Error;
 use litchi_odf_common::core::{
     OwnedPackage, PackageCompression, PackageWriter, PackageWriterError, StreamingArchiveLimits,

@@ -855,10 +855,6 @@ pub(super) fn xml_error(error: impl std::fmt::Display) -> Error {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
     use crate::Builder;

@@ -1525,10 +1525,6 @@ fn validate_resource_path(path: &str) -> Result<()> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    reason = "test code panics on failure; unwrap keeps assertions concise"
-)]
 mod tests {
     use super::{Builder, Package};
 

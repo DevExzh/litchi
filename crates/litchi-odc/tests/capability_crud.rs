@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "tests panic on unexpected errors for concise assertions"
-)]
-
 use litchi_odc::{
     AxisSpec, Builder, CachedCell, CachedRow, CachedTable, CachedValue, ChartClass, DataPointSpec,
     Definition, History, OpenOptions, Package, SemanticLimits, SeriesSpec, StyleTarget,

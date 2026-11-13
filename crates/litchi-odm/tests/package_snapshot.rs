@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "tests are expected to panic on unexpected fixture failures"
-)]
-
 use litchi_odf_common::core::PackageWriter;
 use litchi_odm::Package;
 

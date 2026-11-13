@@ -1,10 +1,5 @@
 //! Allocation evidence for borrowed property input construction and iteration.
 
-#![allow(
-    unsafe_code,
-    reason = "The test-only allocator is the measurement boundary; production crates remain safe"
-)]
-
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 

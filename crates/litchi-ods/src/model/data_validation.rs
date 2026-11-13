@@ -1411,10 +1411,6 @@ fn validate_xml_prefix(prefix: &str) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::expect_used,
-        reason = "unit tests use expectations for concise fixture assertions"
-    )]
 
     use super::*;
 

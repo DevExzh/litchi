@@ -3,7 +3,6 @@
 //! the auto-filter and page breaks, each added, read back on both owners,
 //! set, queried and removed, with the XLSX vocabulary.
 #![cfg(feature = "ods")]
-#![allow(clippy::expect_used, clippy::unwrap_used, reason = "test assertions")]
 
 use std::io::Read as _;
 

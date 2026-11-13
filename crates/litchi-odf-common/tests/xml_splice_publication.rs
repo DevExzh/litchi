@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "Fixed in-memory raw ZIP fixtures keep publication assertions concise."
-)]
-
 use litchi_odf_common::{
     constants,
     core::{

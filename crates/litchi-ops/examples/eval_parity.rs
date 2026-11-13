@@ -66,7 +66,6 @@ fn rate(part: usize, whole: usize) -> Json {
     if whole == 0 {
         Json::Null
     } else {
-        #[allow(clippy::cast_precision_loss, reason = "corpus counts are small")]
         let value = part as f64 / whole as f64;
         json!((value * 10_000.0).round() / 10_000.0)
     }

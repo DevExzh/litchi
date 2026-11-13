@@ -1068,7 +1068,6 @@ pub(super) struct ScopedName {
     name: String,
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn parse_part(
     xml: &str,
     part: Part,
@@ -1302,7 +1301,6 @@ pub(super) fn parse_part(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn start_group(
     _reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
@@ -1646,7 +1644,6 @@ fn parse_double(value: &str) -> Result<f64> {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn record_use(
     reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,

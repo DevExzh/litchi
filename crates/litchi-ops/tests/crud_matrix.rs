@@ -1874,10 +1874,6 @@ struct Report {
     adr: Vec<AdrObserved>,
 }
 
-#[allow(
-    clippy::too_many_lines,
-    reason = "one pass over the verbs of the checklist"
-)]
 fn run_format(spec: &Spec) -> Report {
     let caps = Capabilities::of(spec.format);
     let mut fixtures = load_fixtures(spec);
@@ -2799,7 +2795,6 @@ fn clean(text: &str) -> String {
 }
 
 #[test]
-#[allow(clippy::too_many_lines, reason = "renders the checklist and checks it")]
 fn crud_checklist_per_format() {
     let mut markdown = String::from(
         "# CRUD checklist (generated)\n\n\

@@ -16,10 +16,6 @@ use quick_xml::name::ResolveResult;
 use std::io::{BufRead, Write};
 
 impl Parser {
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "the recursive subtree parser threads the shared scan state explicitly"
-    )]
     pub(super) fn parse_animation_node<R: BufRead>(
         reader: &mut NsReader<R>,
         collector: &mut TransitionStyleCollector,

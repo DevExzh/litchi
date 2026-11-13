@@ -287,7 +287,6 @@ fn check_event_budget(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn structural_kind(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,

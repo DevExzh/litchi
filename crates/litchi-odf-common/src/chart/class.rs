@@ -29,10 +29,6 @@ pub enum ChartClassKind {
 
 /// A bounded, namespace-resolved `chart:class` token retaining its `QName` spelling.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "the public `ChartClass` name distinguishes the ODF chart vocabulary type"
-)]
 pub struct ChartClass {
     kind: ChartClassKind,
     lexical: String,

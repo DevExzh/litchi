@@ -1,9 +1,5 @@
 //! Reusable typed field values and display options.
 
-#![allow(
-    clippy::wildcard_imports,
-    reason = "semantic field owners share the stable model facade namespace"
-)]
 use super::*;
 /// The content category requested by a `text:placeholder` field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

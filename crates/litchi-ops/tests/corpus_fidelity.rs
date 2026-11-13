@@ -1123,10 +1123,6 @@ const NOT_OPENED: &[(&str, &str, Refusal, &str)] = &[
 ];
 
 #[test]
-#[allow(
-    clippy::too_many_lines,
-    reason = "runs the corpus and renders the report"
-)]
 fn open_empty_edit_save_is_byte_identical() {
     let dir = tempfile::tempdir().unwrap();
     let started = std::time::Instant::now();

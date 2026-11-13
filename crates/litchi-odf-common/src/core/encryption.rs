@@ -591,10 +591,6 @@ fn encryption_failure_from(error: impl std::fmt::Display) -> Error {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    reason = "Test fixtures use infallible setup operations, keeping assertions focused on decryption behavior."
-)]
 mod tests {
     use super::*;
     use crate::core::package::OwnedPackage;

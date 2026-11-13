@@ -2287,7 +2287,6 @@ fn copy_patch_bytes(bytes: &[u8], resource: &'static str) -> Result<Vec<u8>> {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::unwrap_used, reason = "test assertions use unwrap for clarity")]
 
     use super::*;
 

@@ -994,10 +994,6 @@ fn convert(value: &CellValue) -> Option<Value> {
     Some(match value {
         CellValue::Empty => Value::Empty,
         CellValue::Bool(value) => Value::Bool(*value),
-        #[allow(
-            clippy::cast_precision_loss,
-            reason = "spreadsheet numbers are doubles"
-        )]
         CellValue::Int(value) => Value::Number(*value as f64),
         CellValue::Float(value) | CellValue::DateTime(value) => Value::Number(*value),
         CellValue::String(text) => Value::Text(text.clone()),

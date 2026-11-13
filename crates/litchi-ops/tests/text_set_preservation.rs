@@ -7,8 +7,6 @@
 //! error naming it. Each module sets text on a container holding such
 //! content in one format and asserts which of the two happens.
 
-#![allow(clippy::unwrap_used, reason = "tests")]
-
 #[cfg(any(
     feature = "odt",
     feature = "docx",

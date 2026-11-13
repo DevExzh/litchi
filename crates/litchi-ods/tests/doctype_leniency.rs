@@ -4,12 +4,6 @@
 //! the repair is recorded on the document handle. Entity references that a
 //! DTD would have declared stay hard errors, so entity safety is unchanged.
 
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "hand-built fixtures keep tolerance assertions focused"
-)]
-
 #[path = "../../litchi-odf-common/tests/support/odf_rezip.rs"]
 mod odf_rezip;
 

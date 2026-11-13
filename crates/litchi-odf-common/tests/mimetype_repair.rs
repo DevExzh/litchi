@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "fixed ZIP fixtures keep repair assertions focused"
-)]
-
 use std::io::{self, Cursor, Write};
 
 use litchi_odf_common::{

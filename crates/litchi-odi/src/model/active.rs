@@ -327,7 +327,6 @@ fn invalid(message: impl Into<String>) -> Error {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::unwrap_used, reason = "test assertions use unwrap for clarity")]
 
     use super::*;
 

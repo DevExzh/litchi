@@ -1,13 +1,4 @@
 //! Unified, source-checked ODB package transactions.
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    clippy::cognitive_complexity,
-    clippy::missing_errors_doc,
-    clippy::similar_names,
-    clippy::too_many_arguments,
-    clippy::too_many_lines,
-    reason = "the unified transaction keeps related public CRUD verbs and its bounded XML splice engine together"
-)]
 
 use litchi_core::{Error, Result};
 use litchi_odf_common::package::edit::Addition;

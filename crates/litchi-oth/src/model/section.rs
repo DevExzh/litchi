@@ -16,10 +16,6 @@ pub struct Section {
 }
 
 impl Section {
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "projection fields mirror ODF section semantics"
-    )]
     pub(crate) const fn projected(
         name: Option<String>,
         style_name: Option<String>,
