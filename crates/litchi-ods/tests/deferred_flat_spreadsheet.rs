@@ -469,8 +469,7 @@ fn content_events_outside_the_document_root_are_rejected() {
 }
 
 /// XML 1.0 `Misc` (whitespace, comments, processing instructions) may
-/// follow the root; every LibreOffice flat document ends with a newline
-/// (record 0277).
+/// follow the root; every LibreOffice flat document ends with a newline.
 #[test]
 fn xml_misc_after_the_document_root_is_admitted() {
     for tail in [" ", "\n", "<!--outside-->", "<?pi data?>\n"] {

@@ -1,6 +1,6 @@
-//! Worksheet metadata edits of a [`SourceBackedSpreadsheet`] (record
-//! 0358a): consolidation, label ranges, cell-range sources and detective
-//! metadata, published by replacing only their spans in `content.xml`.
+//! Worksheet metadata edits of a [`SourceBackedSpreadsheet`]: consolidation,
+//! label ranges, cell-range sources and detective metadata, published by
+//! replacing only their spans in `content.xml`.
 //!
 //! [`SourceBackedSpreadsheet::edit_sheet_metadata`] (or
 //! [`SourceBackedSpreadsheet::edit_sheet_metadata_with`] under explicit

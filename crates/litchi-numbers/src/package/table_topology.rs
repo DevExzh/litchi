@@ -1,11 +1,10 @@
 //! Implementation of the public [`crate::table::topology`] transactions:
-//! inserting and removing table rows and columns (`IWORK_API_REQUESTS.md`
-//! request 6, record 0309).
+//! inserting and removing table rows and columns.
 //!
 //! The structural rewrite is the shared table-topology engine
-//! (`litchi_iwa_table::topology`, lifted from this module in record 0412e so
-//! Pages and Keynote run it too); this module keeps the Numbers selectors,
-//! the comment and cell clears of a removed axis, and the verification.
+//! (`litchi_iwa_table::topology`, lifted from this module so Pages and
+//! Keynote run it too); this module keeps the Numbers selectors, the
+//! comment and cell clears of a removed axis, and the verification.
 //!
 //! An axis edit moves every cell after the edited index. One edit rewrites,
 //! in one staged working set over the exact source:
@@ -24,8 +23,8 @@
 //! - the table formula owner's table extents (the drawable's layout cache
 //!   is left for the application to rebuild, as the host editor leaves it);
 //! - every formula coordinate of the calculation engine that addresses the
-//!   table (the engine's formula shift, record 0318): the table's own formulas and their
-//!   dependency records, and other tables' formulas that read it.
+//!   table (the engine's formula shift): the table's own formulas and their dependency
+//!   records, and other tables' formulas that read it.
 //!
 //! A removed row or column first has its comments cleared through the
 //! comment transaction and its stored cells cleared through the
@@ -33,10 +32,10 @@
 //! released there, and the caches of formulas that read them refreshed), so
 //! the structural pass only drops empty storage. Where the cell writer
 //! cannot clear them, the structural pass drops the cells itself, with
-//! their strings, formulas and dependency records (record 0329). A
-//! surviving formula that reads a removed cell reads `#REF!` there and
-//! caches an error result; a range that loses a row or column shrinks; a
-//! shared formula whose cells diverge is split into one entry per formula.
+//! their strings, formulas and dependency records. A surviving formula that
+//! reads a removed cell reads `#REF!` there and caches an error result; a
+//! range that loses a row or column shrinks; a shared formula whose cells
+//! diverge is split into one entry per formula.
 //!
 //! Ported from the host editor's `row_insert`, `column_insert`,
 //! `table_delete` and `formula_dependency_shift` phases. Refused with a
@@ -83,8 +82,7 @@ pub(super) const TILE_MESSAGE_TYPE: u32 = 6_002;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
-    /// (record 0351 §2.4, record 0361).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted source is malformed or ambiguous.
@@ -115,7 +113,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {
@@ -378,7 +376,7 @@ fn read_geometry(source: &Package, sheet: usize, table: usize) -> Result<Geometr
 }
 
 /// Clear the comments on a removed row or column through the comment
-/// transaction (record 0329); `None` when the axis holds none.
+/// transaction; `None` when the axis holds none.
 fn clear_comments(
     source: &Package,
     sheet: usize,
@@ -457,8 +455,8 @@ fn table_cells(
 
 /// Run one operation: check, clear a removed axis, rewrite, publish and
 /// verify. The structural rewrite is the shared engine
-/// (`litchi_iwa_table::topology`, record 0412e); the comment and cell
-/// clears are this package's own transactions.
+/// (`litchi_iwa_table::topology`); the comment and cell clears are
+/// this package's own transactions.
 fn run(
     source: &Package,
     sheet: usize,
@@ -478,7 +476,7 @@ fn run(
         None => (Vec::new(), true),
     };
     // Comments on the removed axis go through the comment transaction
-    // first, which removes their storage graphs (record 0329).
+    // first, which removes their storage graphs.
     let uncommented = match step.removed() {
         Some(index) if !cells.is_empty() => {
             clear_comments(source, sheet, table, step.row_axis(), index)?
@@ -488,10 +486,9 @@ fn run(
     let commented = uncommented.as_ref().unwrap_or(source);
     // The cell writer clears the removed cells and refreshes the caches of
     // the formulas that read them; where it cannot, the structural pass
-    // drops them itself (record 0329).
-    // A table no formula touches drops the removed cells in the structural
-    // pass, as the host's axis removal does (record 0370b): the previews
-    // stay, and a dropped cell's string key is handed back.
+    // drops them itself. A table no formula touches drops the removed
+    // cells in the structural pass, as the host's axis removal does: the
+    // previews stay, and a dropped cell's string key is handed back.
     let (cleared, drop_cells) = if cells.is_empty() {
         (None, false)
     } else if inert {
@@ -705,8 +702,7 @@ mod tests {
         BncCell::parse(&bytes, &crate::cell::wire::limits_for_source(&bytes)).expect("cell")
     }
 
-    /// Record 0329: a formula whose reference is removed reads `#REF!` and
-    /// caches an error result.
+    /// A formula whose reference is removed reads `#REF!` and caches an error result.
     #[test]
     fn deleted_references_cache_an_error() {
         let base = Package::new();

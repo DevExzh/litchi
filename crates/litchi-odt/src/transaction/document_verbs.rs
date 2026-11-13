@@ -1,4 +1,4 @@
-//! Staged structural document verbs of [`Edit`] (record 0358).
+//! Staged structural document verbs of [`Edit`].
 //!
 //! Each verb records one operation that the commit applies, in staging
 //! order, to its working document; consecutive verbs share that document.

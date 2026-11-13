@@ -287,7 +287,7 @@ impl Package {
     /// (`FileFormat::Odm`) — through this crate's text model, reusing the
     /// validated archive index. Every member outside the edited parts keeps
     /// its source bytes, so the package keeps its own MIME type. This is the
-    /// reuse hook of the unified OTH/ODM adapters (record 0282).
+    /// reuse hook of the unified OTH/ODM adapters.
     ///
     /// # Errors
     ///
@@ -1556,12 +1556,11 @@ impl Edit {
     /// tabs and line feeds are kept as `text:s`, `text:tab` and
     /// `text:line-break`; a cell becomes a string cell.
     ///
-    /// The set replaces text, not content (record 0304): an element inside
-    /// the node that shows no text — a frame, a note, an annotation, a
-    /// bookmark, a reference, index or change mark, a soft page break — is
-    /// kept, at the character offset it had in the old text (clamped to the
-    /// new text's length), so setting the old text back puts it back where
-    /// it was.
+    /// The set replaces text, not content: an element inside the node that
+    /// shows no text — a frame, a note, an annotation, a bookmark, a
+    /// reference, index or change mark, a soft page break — is kept, at
+    /// the character offset it had in the old text (clamped to the new
+    /// text's length), so setting the old text back puts it back where it was.
     ///
     /// Body edits name nodes of [`Document::body`] of this edit's source and
     /// must be staged before any other operation.
@@ -1586,7 +1585,7 @@ impl Edit {
 
     /// Stages replacing the displayed text of one body text field
     /// ([`crate::body::text_fields`]), keeping its element and attributes:
-    /// a field refresh (record 0295).
+    /// a field refresh.
     ///
     /// # Errors
     ///
@@ -1605,8 +1604,7 @@ impl Edit {
     /// ([`crate::body::parts::Region`] of this edit's source) with one
     /// paragraph that keeps the region's first paragraph start tag; spaces,
     /// tabs and line feeds are kept as `text:s`, `text:tab` and
-    /// `text:line-break` (record 0328). Setting the text the region shows
-    /// stages nothing.
+    /// `text:line-break`. Setting the text the region shows stages nothing.
     ///
     /// # Errors
     ///
@@ -2993,7 +2991,7 @@ impl History {
 }
 
 /// One staged structural document verb: the closure applies the verb to the
-/// working document of the commit (record 0358).
+/// working document of the commit.
 type DocumentStep = Arc<dyn Fn(&mut MutableDocument) -> CoreResult<OperationResult> + Send + Sync>;
 
 #[derive(Clone)]
@@ -4160,7 +4158,7 @@ impl DurablePatch {
             operations.push(Operation::Noop);
         }
         // Structural document verbs have no semantic wire vocabulary; a patch
-        // holding one is carried as the exact target artifact (record 0358a).
+        // holding one is carried as the exact target artifact.
         let restoring = operations
             .iter()
             .all(|operation| matches!(operation, Operation::RestoreSnapshot))

@@ -494,7 +494,7 @@ impl MutableDocument {
     }
 
     /// Apply one advanced-layout edit (section layouts, layout transfers)
-    /// to the retained `styles.xml` (record 0358).
+    /// to the retained `styles.xml`.
     pub(crate) fn edit_layout_styles(
         &mut self,
         update: impl FnOnce(&mut crate::header_footer::Transaction) -> Result<()>,

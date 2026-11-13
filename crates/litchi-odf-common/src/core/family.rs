@@ -893,8 +893,8 @@ mod tests {
         Ok(())
     }
 
-    /// Pre-0220 oracle: the historical buffered, fully-resolved
-    /// implementation of [`validate_content_document_part`], retained
+    /// Oracle: the historical buffered, fully-resolved implementation
+    /// of [`validate_content_document_part`], retained
     /// byte-identically to cross-check the borrowing, depth-gated
     /// implementation on both the synthetic edge cases and the fixture
     /// corpus.

@@ -1,6 +1,6 @@
-//! A pie chart authored in Keynote 14.4 with only its third wedge exploded
-//! (record 0433): six wedges, one override, stored `count` 3. The count is one
-//! past the highest index, not the number of series or of entries.
+//! A pie chart authored in Keynote 14.4 with only its third wedge exploded: six
+//! wedges, one override, stored `count` 3. The count is one past the highest
+//! index, not the number of series or of entries.
 
 use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::iwa::{Archive, SnappyStream};

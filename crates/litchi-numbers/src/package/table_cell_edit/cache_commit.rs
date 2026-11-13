@@ -574,7 +574,7 @@ pub(super) fn prepare_complete_final_formula_set<'formula, 'cache>(
             };
             // A pivot-category formula is not evaluable here; without a
             // supplied cache it keeps the host's zero placeholder until
-            // Numbers recalculates (record 0424).
+            // Numbers recalculates.
             let supplied = match cached {
                 Some(cached) => Some(supplied_cache(cached)),
                 None if expression.contains_pivot_category() => Some(cache::SuppliedCache::Number(

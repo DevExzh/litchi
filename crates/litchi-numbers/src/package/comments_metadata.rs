@@ -1149,7 +1149,7 @@ fn find_physical_descriptor(
     // The effective locator names the member. Native packages give many
     // components one preferred locator (`Tables/DataList`) and distinct
     // effective ones (`Tables/DataList-905013`), the first of which is
-    // also a member: the effective member is the component's (record 0318).
+    // also a member: the effective member is the component's.
     locator_index.find(effective_locator)
 }
 
@@ -1334,7 +1334,7 @@ mod tests {
         );
         // Native packages name many components `Tables/DataList` by
         // preference and `Tables/DataList-<id>` effectively, both present:
-        // the effective member is the component's (record 0318).
+        // the effective member is the component's.
         assert_eq!(
             find_physical_descriptor(&index, "member-124.iwa", "member-123.iwa"),
             Some(123)

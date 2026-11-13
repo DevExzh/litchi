@@ -1,4 +1,4 @@
-//! Fresh Numbers workbooks (ADR 0034 §4, IWORK_API_REQUESTS.md request 1).
+//! Fresh Numbers workbooks (ADR 0034 §4).
 //!
 //! [`Package::new`] returns the minimal native-shaped workbook: one sheet
 //! (`Sheet 1`) holding one empty 10 × 5 table (`Table 1`). Every artifact it
@@ -35,12 +35,12 @@
 //! `4d8a3e161f`, the last commit that contains the host; file format 14.4.1,
 //! stored members), with its identity rewritten to
 //! [`Identity::BLANK`] by this module and its build-history producer
-//! string set to `Litchi`. Record 0309 then gave its table's formula owner
-//! the native table extents (the spanning dependencies' total and body
-//! ranges, as a table added by `table::lifecycle` carries them), so formulas
-//! can be authored on a created workbook; the change was published through
-//! the structural working set and the asset regenerated from it. It is
-//! 6 KiB and holds no preview images.
+//! string set to `Litchi`. Its table's formula owner was then given the
+//! native table extents (the spanning dependencies' total and body ranges,
+//! as a table added by `table::lifecycle` carries them), so formulas can be
+//! authored on a created workbook; the change was published through the
+//! structural working set and the asset regenerated from it. It is 6 KiB and
+//! holds no preview images.
 
 use std::fmt;
 use std::io::Cursor;
@@ -320,7 +320,7 @@ impl Builder {
                 Profile::default(),
             )?);
         }
-        // One pass over the template's archives, opened once (record 0370i).
+        // One pass over the template's archives, opened once.
         let identity = (identity != Identity::BLANK).then_some(identity);
         synthesis::synthesize(BLANK, identity, &options).map_err(|failure| match failure {
             Failure::InvalidSize => Error::Dimensions(crate::table::resize::Error::Refused(

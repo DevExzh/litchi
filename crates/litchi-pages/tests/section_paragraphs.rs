@@ -1,8 +1,7 @@
-//! Paragraph-level section transactions (record 0299): set, insert, remove,
-//! relocate and swap through `Package::edit_section_paragraphs`; text sets
-//! coalesced into one section-text transaction where that publishes what
-//! they publish one at a time (record 0314), and exact inverses on every
-//! corpus file.
+//! Paragraph-level section transactions: set, insert, remove, relocate and
+//! swap through `Package::edit_section_paragraphs`; text sets coalesced
+//! into one section-text transaction where that publishes what they
+//! publish one at a time, and exact inverses on every corpus file.
 
 use std::path::PathBuf;
 
@@ -60,8 +59,8 @@ fn paragraph_operations_round_trip_on_a_plain_section() -> TestResult {
         .relocate(at(2), at(0))?
         .swap(at(1), at(2))?;
     let commit = edit.commit()?;
-    // Record 0314: structural operations publish one transaction each, as
-    // committing them one at a time does.
+    // Structural operations publish one transaction each, as committing them
+    // one at a time does.
     assert_eq!(
         commit.diagnostics().transactions(),
         5,
@@ -209,8 +208,8 @@ fn every_corpus_section_accepts_paragraph_set_and_insert_and_reverts_exactly() -
     Ok(())
 }
 
-/// Record 0314: a commit of several staged operations publishes exactly
-/// what committing each on its own, in order, publishes — on every corpus
+/// A commit of several staged operations publishes exactly what
+/// committing each on its own, in order, publishes — on every corpus
 /// section, for sets of every paragraph, repeated sets, a set that cancels
 /// an earlier one, and a mix with an insertion. (One splice across the
 /// paragraphs used to drop the paragraph-style entries between them.)

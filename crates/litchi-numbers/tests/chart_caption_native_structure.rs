@@ -1,4 +1,4 @@
-//! Native structure of a Numbers chart caption (record 0431).
+//! Native structure of a Numbers chart caption.
 //!
 //! A native Numbers chart lives in the calculation engine's component, and its
 //! caption's text storage names a paragraph style in the stylesheet's
@@ -118,8 +118,8 @@ fn native_files_list_every_cross_component_reference() -> TestResult {
     Ok(())
 }
 
-/// The caption Numbers 14.4 wrote (record 0433) reads back, and the leaf's
-/// replacement and removal keep the file's references listed.
+/// The caption Numbers 14.4 wrote reads back, and the leaf's replacement and
+/// removal keep the file's references listed.
 #[test]
 fn native_chart_caption_reads_and_edits() -> TestResult {
     let selector = DrawableSelector::of(Kind::Chart, 0);

@@ -1,5 +1,5 @@
-//! Selector-first caption transactions of body charts (record 0427) on the
-//! shared `litchi_iwa_style::caption` engine.
+//! Selector-first caption transactions of body charts on the shared
+//! `litchi_iwa_style::caption` engine.
 //!
 //! A chart's caption is the `TSD.DrawableArchive` caption reference of its
 //! chart message (field 1): a present caption is a caption info with a

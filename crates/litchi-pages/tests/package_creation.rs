@@ -1,6 +1,6 @@
-//! Fresh documents, document properties and package directories (record
-//! 0299): `Package::new`, `builder::{Builder, Identity}`,
-//! `Package::edit_metadata`, and the directory route of `Package::open`.
+//! Fresh documents, document properties and package directories:
+//! `Package::new`, `builder::{Builder, Identity}`, `Package::edit_metadata`,
+//! and the directory route of `Package::open`.
 
 use std::path::PathBuf;
 

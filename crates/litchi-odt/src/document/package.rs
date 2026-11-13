@@ -302,7 +302,7 @@ mod tests {
     const STYLE: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
     const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 
-    /// Pre-0222 oracle: the historical sequential owned-path open — full
+    /// Oracle: the historical sequential owned-path open — full
     /// `validate_content_document_part` scan, then `styles.xml` parse, then
     /// the `content.xml` automatic-styles rescan, then `try_extend` —
     /// retained verbatim to cross-check the fused `OpenParse` open on error

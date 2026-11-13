@@ -2330,12 +2330,12 @@ pub mod keynote_chart_legend_codec;
 
 /// Internal bounded property codec for the generated extensions of the eight
 /// TSCH chart style archives and the chart style-reference projection, shared
-/// by the Pages, Numbers and Keynote chart engines (record 0375).
+/// by the Pages, Numbers and Keynote chart engines.
 #[doc(hidden)]
 pub mod chart_style_codec;
 
 /// Internal bounded shape-geometry codec (native straight lines) shared by
-/// the Pages, Numbers and Keynote shape engines (record 0375).
+/// the Pages, Numbers and Keynote shape engines.
 #[doc(hidden)]
 pub mod shape_style_codec;
 

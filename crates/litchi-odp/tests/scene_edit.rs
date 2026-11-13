@@ -1,6 +1,6 @@
 //! Scene splices and metadata edits through the primary `Package::edit`
-//! transaction (record 0278): every changed byte range is a checked splice,
-//! the reopened package reads the change back, and every byte outside the
+//! transaction: every changed byte range is a checked splice, the
+//! reopened package reads the change back, and every byte outside the
 //! changed ranges keeps its source.
 
 use litchi_odp::Package;

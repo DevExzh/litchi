@@ -1,5 +1,5 @@
-//! Exact-source chart lifecycle of a Pages body chart (record 0416; the
-//! host's `set_body_chart_kind` and `set_body_chart_direction`).
+//! Exact-source chart lifecycle of a Pages body chart (the host's
+//! `set_body_chart_kind` and `set_body_chart_direction`).
 //!
 //! A chart is addressed by a [`BodyChartSelector`]. An [`Edit`] stages kind
 //! and series-direction changes; [`Edit::commit`] rewrites the two fields of

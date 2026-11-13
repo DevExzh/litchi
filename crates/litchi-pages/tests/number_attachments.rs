@@ -1,4 +1,4 @@
-//! Page-number attachments (`litchi_pages::number_attachment`, record 0371).
+//! Page-number attachments (`litchi_pages::number_attachment`).
 
 use litchi_pages::number_attachment::{
     Target, TextNumberAttachmentKind, TextNumberAttachmentSettings,

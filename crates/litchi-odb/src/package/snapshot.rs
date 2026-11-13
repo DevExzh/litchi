@@ -34,7 +34,7 @@ pub(crate) struct PackageDelta {
 }
 
 impl Snapshot {
-    /// The retained physical package (metadata transactions, record 0288).
+    /// The retained physical package (metadata transactions).
     pub(crate) fn owned_package(&self) -> &OwnedPackage {
         self.0.package.package()
     }

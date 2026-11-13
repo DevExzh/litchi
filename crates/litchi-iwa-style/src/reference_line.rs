@@ -1,4 +1,4 @@
-//! The reference-line graph engine (record 0375a): the ordered
+//! The reference-line graph engine: the ordered
 //! `TSCH.ReferenceLineNonStyleArchive` objects a chart's `reference_lines`
 //! extension (`TSCH.ChartReferenceLinesArchive`, field 10005 of the chart
 //! archive) lists for its primary value axis, each with a stable UUID.
@@ -636,7 +636,7 @@ fn next_extension(current: Option<&[u8]>, items: &[(u64, (u64, u64))]) -> Result
             continue;
         }
         let mut sparse = Vec::new();
-        // The array length, one past the highest index (record 0431).
+        // The array length, one past the highest index.
         let count = kept
             .iter()
             .map(|(index, _, _)| index + 1)
@@ -946,9 +946,8 @@ mod count_rule_tests {
         )))
     }
 
-    /// Record 0431: `count` is the array length, one past the highest kept
-    /// index, not the number of entries. No package with these styles has been
-    /// to a Mac (record 0434 §12).
+    /// `count` is the array length, one past the highest kept index, not the
+    /// number of entries. No package with these styles has been to a Mac.
     #[test]
     fn trimmed_style_count_is_one_past_the_highest_kept_index() -> Result<()> {
         assert_eq!(kept(&[0, 2], 3)?, Some((3, vec![0, 2])));

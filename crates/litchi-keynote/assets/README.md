@@ -4,7 +4,7 @@
 
 The blank presentation behind `Package::new()` and the starting point of
 `Builder::build()` (embedded with `include_bytes!` in
-`src/package/identity.rs`; record 0298).
+`src/package/identity.rs`).
 
 | Property | Value |
 |---|---|
@@ -23,7 +23,7 @@ these bytes.
 
 ### Regenerating
 
-The generator crate `litchi-iwa` was deleted by record 0429 (W3); check out
+The generator crate `litchi-iwa` was deleted; check out
 commit `802995d7b7` (or any commit up to `4d8a3e161f`, the last one that
 contains the crate) to regenerate.
 

@@ -1,4 +1,4 @@
-//! Body-table cell display formats through the shared engine (record 0379).
+//! Body-table cell display formats through the shared engine.
 
 use std::path::PathBuf;
 
@@ -102,7 +102,7 @@ fn refusals_are_typed() -> TestResult {
     let table = source.body_table_cell_format(99, B2).err();
     assert_eq!(table, Some(Error::Refused(Refusal::TableNotFound)));
     // Scalar controls and Automatic to Percentage on the native cell's
-    // implicit Number entry are written since record 0412.
+    // implicit Number entry are written.
     let control = source
         .edit_body_table_cell_format(0, B2)?
         .set(Checkbox)
@@ -127,8 +127,8 @@ fn refusals_are_typed() -> TestResult {
     Ok(())
 }
 
-/// Record 0428: a new Custom format mints its document-registry UUID
-/// deterministically, so the same edit on the same input is byte-identical.
+/// A new Custom format mints its document-registry UUID deterministically, so
+/// the same edit on the same input is byte-identical.
 #[test]
 fn custom_format_output_is_deterministic() -> TestResult {
     use litchi_iwa_common::table::cell::data_format::Custom;

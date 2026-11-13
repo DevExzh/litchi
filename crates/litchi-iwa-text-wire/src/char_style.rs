@@ -1,5 +1,5 @@
 //! Character-style runs of a `TSWP.StorageArchive` and the native records a
-//! span restyle writes (record 0309).
+//! span restyle writes.
 //!
 //! A storage's `table_char_style` (field 8) is an object attribute table:
 //! each entry names the UTF-16 index where a run starts and, optionally,

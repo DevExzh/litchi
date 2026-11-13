@@ -94,8 +94,7 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
-    /// (record 0351 §2.4, record 0361).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     #[error("the Keynote source cannot be deleted from safely")]
@@ -118,7 +117,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+/// [`Refusal::kind`].
 #[derive(Debug, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {
@@ -521,8 +520,7 @@ fn select_metadata<'a>(
     // A view state's slide selection references the selected node weakly
     // from its own component. Weak references do not own their target, so
     // the registry record is removed with the node; the selection payload is
-    // left as a dangling weak reference (not verified against Keynote; see
-    // record 0298).
+    // left as a dangling weak reference (not verified against Keynote).
     external_removals.extend(
         facts
             .weak_node_references

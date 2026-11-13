@@ -1,10 +1,10 @@
-//! Regressions of crate-private mutation paths (record 0358).
+//! Regressions of crate-private mutation paths.
 //!
 //! These suites drove the `&mut self` mutators of the generic packaged and
 //! flat owners, the standalone chart document and `MutableDocument` as
-//! integration tests. Record 0358 makes those mutators crate-private (the
-//! public routes are the owners' `edit()` families and `Package::edit`), so
-//! the suites compile here as unit tests of the same code.
+//! integration tests. Those mutators are now crate-private (the public
+//! routes are the owners' `edit()` families and `Package::edit`), so the
+//! suites compile here as unit tests of the same code.
 
 #[path = "../tests/support/mod.rs"]
 mod support;

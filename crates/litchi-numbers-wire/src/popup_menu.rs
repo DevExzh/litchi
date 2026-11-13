@@ -65,8 +65,8 @@ const DECIMAL_CELL_FORMAT_KIND: u32 = 1;
 /// Whether the cell names only an implicit decimal entry: decimal kind, a
 /// generic identifier, no explicit-format flag and no control. A Pop-Up
 /// Menu replaces that entry (the host compatibility writer's behaviour on
-/// native Pages and Keynote cells, record 0412a).
-/// The generic identifier flag an implicit decimal cell gives up.
+/// native Pages and Keynote cells). The generic identifier flag an
+/// implicit decimal cell gives up.
 fn implicit_generic(parsed: &ParsedCell<'_>) -> u32 {
     if implicit_decimal(parsed) {
         GENERIC_FORMAT_IDENTIFIER_FLAG

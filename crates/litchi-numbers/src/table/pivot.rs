@@ -1,5 +1,4 @@
-//! Pivot-table vocabulary: the aggregate categories a pivot group-by
-//! exposes (records 0421 and 0424).
+//! Pivot-table vocabulary: the aggregate categories a pivot group-by exposes.
 //!
 //! A [`Category`](crate::table::pivot::Category) can be referenced from an
 //! authored formula through
@@ -14,10 +13,9 @@ use thiserror::Error as ThisError;
 ///
 /// The names come from a pivot table authored in Numbers 14.4 with one value
 /// column per "Summarize by" function
-/// (`test-data/iwork/numbers/pivot-all-summary-functions-native.numbers`,
-/// record 0432). A code that workbook does not hold reads as
-/// [`Aggregate::Unnamed`]. Two categories with the same summary function
-/// compare equal.
+/// (`test-data/iwork/numbers/pivot-all-summary-functions-native.numbers`).
+/// A code that workbook does not hold reads as [`Aggregate::Unnamed`].
+/// Two categories with the same summary function compare equal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Aggregate {

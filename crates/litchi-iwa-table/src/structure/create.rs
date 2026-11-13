@@ -1,6 +1,6 @@
-//! A new, empty table graph on the structural working set (record 0420;
-//! lifted from `litchi-numbers`' `table::lifecycle::add` so the Keynote
-//! slide-table owner shares it).
+//! A new, empty table graph on the structural working set (lifted from
+//! `litchi-numbers`' `table::lifecycle::add` so the Keynote slide-table owner
+//! shares it).
 //!
 //! Two sources, as the host editor has them:
 //!
@@ -43,8 +43,8 @@ const FORMULA_OWNER_MESSAGE_TYPE: u32 = 4_008;
 const FORMULA_OWNER_VERSIONS: [u32; 3] = [3, 2, 10];
 /// Table-info fields a clone drops, as the host editor clears them:
 /// editing state, summary and category models, view UIDs and pivot state
-/// (record 0370f; the group and hidden-state UUIDs, the pasteboard mapping
-/// and the pivot flag are kept, as native tables carry them).
+/// (the group and hidden-state UUIDs, the pasteboard mapping and the
+/// pivot flag are kept, as native tables carry them).
 const DROPPED_INFO_FIELDS: [u32; 6] = [3, 4, 5, 6, 15, 17];
 /// Drawable fields a clone drops: comment, pencil annotations, title and
 /// caption.
@@ -177,8 +177,8 @@ fn info_payload(
 }
 
 /// The objects a model payload references, sorted, as the host editor's
-/// `table_model_references` lists them (record 0370f): its style and owner
-/// references, and its data store's headers, tiles and lists.
+/// `table_model_references` lists them: its style and owner references, and its
+/// data store's headers, tiles and lists.
 fn model_references(model: &[u8]) -> FaultResult<Vec<u64>> {
     const MODEL_FIELDS: [u32; 43] = [
         3, 24, 25, 26, 27, 18, 19, 20, 21, 30, 36, 48, 5, 34, 35, 38, 46, 49, 60, 61, 62, 63, 64,
@@ -245,7 +245,7 @@ pub fn clone_template<P: TableLeaf>(
     let owned = table_create::owned_storage(&model_object.messages[0].data).map_err(write_fault)?;
 
     // The host editor's order: the drawable, the model and the owned
-    // storage in source-identifier order (record 0370f).
+    // storage in source-identifier order.
     let fresh = working.allocate(owned.len() + 2)?;
     let (new_info, new_model) = (fresh[0], fresh[1]);
     let mut remap: HashMap<u64, u64> = HashMap::new();

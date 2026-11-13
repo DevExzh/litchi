@@ -1,15 +1,14 @@
-//! A populated copy of a body table (record 0371; the migration host's
-//! `duplicate_table`).
+//! A populated copy of a body table (the migration host's `duplicate_table`).
 //!
 //! The copy's graph — fresh identifiers for its drawable, model and owned
 //! storage, the host's table UUID, its CalculationEngine owner family and
 //! formula-list rewrites, and the clones' registry records — is the shared
-//! engine `litchi_iwa_table::structure::duplicate` (record 0370h). This
-//! module attaches the copy to the body as the host does: a clone of the
-//! source table's drawable attachment naming the new drawable, one
-//! object-replacement character and attachment-table entry at the requested
-//! position, and the references of the body, the engine and the attachment
-//! to the copy across components.
+//! engine `litchi_iwa_table::structure::duplicate`. This module attaches
+//! the copy to the body as the host does: a clone of the source table's
+//! drawable attachment naming the new drawable, one object-replacement
+//! character and attachment-table entry at the requested position, and the
+//! references of the body, the engine and the attachment to the copy
+//! across components.
 
 use litchi_iwa_core::RawMessage;
 use litchi_iwa_table::structure::duplicate::{self as engine, Drawable};

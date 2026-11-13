@@ -1,5 +1,4 @@
-//! Payload-level cell writes shared by the table owners of Pages and
-//! Keynote (record 0309).
+//! Payload-level cell writes shared by the table owners of Pages and Keynote.
 //!
 //! A TST table stores each row's cells in a `TST.TileRowInfo` (BNC storage
 //! and a cell-offset table), its text in a string `TST.TableDataList`, and
@@ -501,7 +500,7 @@ pub fn tile_cell(
 
 /// `previous` without its formula: the formula reference, the cached result
 /// and every other value field go, the cell's metadata stays (the
-/// formula-removal half of a write into a formula cell, record 0376a).
+/// formula-removal half of a write into a formula cell).
 ///
 /// # Errors
 ///
@@ -591,7 +590,7 @@ pub fn tile_set_cell(
 
 /// [`tile_set_cell`], writing a new row after every stored row in field
 /// order: after the last row record, before the tile's storage-version
-/// fields, as the Numbers host writer's encoder places it (record 0370b).
+/// fields, as the Numbers host writer's encoder places it.
 /// [`tile_set_cell`] appends such a row after them, as the Pages and
 /// Keynote host writers do.
 ///
@@ -643,8 +642,7 @@ fn tile_set_cell_placed(
             requested: row_count,
         })?;
     // A new row's offset table takes the widest existing row's capacity
-    // (native rows keep spare slots), as the Numbers host writer sizes it
-    // (record 0370).
+    // (native rows keep spare slots), as the Numbers host writer sizes it.
     let mut capacity = columns_usize;
     for field in tile_fields.iter().filter(|field| field.number == 5) {
         rows.push(single_varint(field.payload, 1, limits)?.ok_or(WriteError::Invalid)?);
@@ -706,7 +704,7 @@ fn tile_set_cell_placed(
         let count = cells.iter().filter(|cell| cell.is_some()).count() as u64;
         if count == 0 {
             // A row left without cells goes, as the host writer drops it
-            // (record 0370; native tiles store no empty rows).
+            // (native tiles store no empty rows).
             return Ok(None);
         }
         let (storage, offsets) = encode(&cells, unit, limits)?;
@@ -1089,7 +1087,7 @@ pub fn header_adjust(bucket: &[u8], index: u32, delta: i64, limits: &Limits) -> 
             .ok_or(WriteError::Unsupported)?;
         if after == 0 && header_is_bare(field.payload, limits)? {
             // A header left counting no cell and carrying nothing else goes,
-            // as the host writer drops it (record 0370).
+            // as the host writer drops it.
             return Ok(Some(Vec::new()));
         }
         let header = rebuild(field.payload, limits, |inner| {
@@ -1248,8 +1246,7 @@ pub fn list_release(list: &[u8], key: u32, limits: &Limits) -> Result<Vec<u8>> {
     if !done {
         return Err(WriteError::Unsupported);
     }
-    // A removed last key is handed back, as the Numbers cell writers do
-    // (record 0370).
+    // A removed last key is handed back, as the Numbers cell writers do.
     if single_varint(&output, 2, limits)? == Some(u64::from(key) + 1)
         && !fields(&output, limits)?.iter().any(|field| {
             field.number == 3

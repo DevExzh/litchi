@@ -564,9 +564,9 @@ fn export_native_hidden_axes_focus_candidates_when_requested() -> TestResult {
     Ok(())
 }
 
-/// Callgrind probe (record 0379): set, then clear, the native document's
-/// hidden axes, serializing each output. Measured before and after the
-/// engine moved to `litchi-iwa-table` with
+/// Callgrind probe: set, then clear, the native document's hidden
+/// axes, serializing each output. Measured before and after the engine
+/// moved to `litchi-iwa-table` with
 /// `--toggle-collect=*native_hidden_axes::hidden_axes_probe_routes*`.
 #[inline(never)]
 fn hidden_axes_probe_routes(source: &[u8]) -> TestResult<usize> {

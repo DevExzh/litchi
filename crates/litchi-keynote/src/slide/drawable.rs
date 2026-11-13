@@ -1,6 +1,6 @@
 //! Selector-first edits of the drawables a slide owns: read the inventory,
 //! set geometry, remove, reorder (z-order) and create text boxes, preset
-//! shapes and images, as one exact-source transaction (record 0298).
+//! shapes and images, as one exact-source transaction.
 //!
 //! [`Package::slide_drawable_list`](crate::Package::slide_drawable_list)
 //! reads a slide's drawables in source order, the order
@@ -36,7 +36,7 @@
 //! z-order moves; new text boxes, rectangle / rounded-rectangle / ellipse
 //! shapes and PNG / JPEG / GIF images styled from the theme as the legacy
 //! host does; new tables cloned from the deck's first slide table
-//! ([`Edit::add_table`], record 0329); table cell values; character runs. Refused with
+//! ([`Edit::add_table`]); table cell values; character runs. Refused with
 //! [`Refusal::Unsupported`]: removing tables, charts, groups, movies, audio
 //! and placeholders, removing drawables referenced by builds or other
 //! objects, geometry of tables, charts, groups, lines and movies, and
@@ -52,7 +52,7 @@ pub use crate::slide::media::MediaProperties;
 pub use litchi_iwa_common::shape::geometry::FlipAxis;
 /// Whole-text character and paragraph properties
 /// ([`Edit::set_text_property`], [`Edit::reset_text_property`]), the shared
-/// W1-D paragraph-style vocabulary.
+/// paragraph-style vocabulary.
 pub mod text_property {
     pub use litchi_iwa_text_wire::paragraph_style::{Property, PropertyKind};
 }
@@ -64,7 +64,7 @@ pub mod named_style {
     };
 }
 /// Paragraph-list vocabulary ([`Edit::set_list`], [`Edit::set_list_property`]
-/// and the list reads), shared with the W1-D list engine.
+/// and the list reads), shared with the list engine.
 pub mod list {
     pub use litchi_iwa_text::paragraph::list::{
         ParagraphList, ParagraphListBullet, ParagraphListBulletBaselineOffset,

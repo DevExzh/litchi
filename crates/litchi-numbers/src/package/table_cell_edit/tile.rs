@@ -5,10 +5,10 @@
 //! of a table edit: rewrite the BNC rows which are already attached to one
 //! tile.  The caller owns string/rich-text/formula reference accounting and
 //! sparse attachment.  An absent row of a modern tile is materialised in row
-//! order (record 0309: rows inserted by a table-topology edit sit between
-//! stored rows); a legacy tile reports it as [`TileError::NeedSparse`].  A
-//! canonical modern tile with no row records is materialised in place,
-//! retaining its top-level unknown fields exactly.
+//! order (rows inserted by a table-topology edit sit between stored rows); a
+//! legacy tile reports it as [`TileError::NeedSparse`].  A canonical modern
+//! tile with no row records is materialised in place, retaining its top-level
+//! unknown fields exactly.
 
 use std::mem::size_of;
 
@@ -1954,7 +1954,7 @@ fn classify_prepared_mode(
         {
             continue;
         }
-        // A comment on an empty cell materialises it too (record 0329).
+        // A comment on an empty cell materialises it too.
         let materialized = group.iter().any(|change| {
             matches!(
                 change.change,

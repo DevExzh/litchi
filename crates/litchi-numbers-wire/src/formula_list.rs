@@ -936,7 +936,7 @@ fn prepare_logical<'a>(
     }
     // As the host releases a cell's formula before it stores the new one, a
     // root entry released just below `nextListID` lowers it and its key is
-    // allocated again (record 0376c); an entry a new formula reuses stays.
+    // allocated again; an entry a new formula reuses stays.
     let mut next_key = root.next_list_id();
     while let Some(index) = next_key
         .checked_sub(1)

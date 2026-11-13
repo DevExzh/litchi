@@ -1,5 +1,5 @@
 //! The staged edit family shared by the format-neutral packaged and flat
-//! owners and the standalone chart document (record 0358).
+//! owners and the standalone chart document.
 
 /// The owner contract the staged family needs: a fallible working copy, a
 /// reopen of exact bytes under the owner's own policies, and its bytes.

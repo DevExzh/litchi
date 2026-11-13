@@ -739,7 +739,7 @@ fn validate_model_owners(
     }
     // A pivot owner (field 85) or an active category does not refuse a cell
     // edit: the host writes cells of pivot and categorized tables and leaves
-    // their group-by state for Numbers to recompute (record 0424a).
+    // their group-by state for Numbers to recompute.
     if let Some(reference) = filter_reference {
         validate_inert_filter_set(
             source,
@@ -800,7 +800,7 @@ fn well_formed_deprecated_category_owner(source: &[u8], path: Path) -> Result<bo
     if owner.is_none() {
         return Ok(false);
     }
-    // Validates the inline group-bys; activity no longer refuses (0424a).
+    // Validates the inline group-bys; activity no longer refuses.
     table_headers::dependencies::deprecated_category_grouping_active(source)
         .map_err(map_header_failure)?;
     Ok(true)
@@ -1429,8 +1429,8 @@ fn validate_selected_formula_owner_closure(
             .whole_owner_dependencies()
             .is_none_or(empty_whole_owner_dependencies)
         && owner.cell_errors().is_none_or(empty_message)
-        // A native pivot table's owner lists its category formulas' UUIDs
-        // (record 0432); the formula set is validated node by node.
+        // A native pivot table's owner lists its category formulas' UUIDs; the
+        // formula set is validated node by node.
         && owner.uuid_references().is_none_or(well_formed_uuid_references)
         && owner
             .spill_range_sizes()
@@ -3555,9 +3555,9 @@ fn resolve_dependencies(
     let (owner_identities, owner_map_fields) = parse_owner_id_map(owner_map_payload, budget, path)?;
     budget.charge_wire_scan(owner_map_payload.len(), owner_map_fields, 2)?;
     // Numbers keeps map entries without a registered owner object (the owners
-    // of a pivot's snapshot table, record 0432); `litchi_numbers_wire`'s
-    // formula graph reads them as unregistered. Every registered owner must
-    // still have its entry (checked below).
+    // of a pivot's snapshot table); `litchi_numbers_wire`'s formula graph
+    // reads them as unregistered. Every registered owner must still have
+    // its entry (checked below).
     if owner_identities.len() < stage.formula_owners.len() {
         return Err(Error::InvalidSource { path });
     }
@@ -4359,8 +4359,8 @@ fn validate_formula_owner_reference(
             validate_selected_table_info_target(source, native, id, path)?;
         } else {
             // Another table's owner: native packages leave this weak
-            // back-reference undeclared too (record 0301), so a declaration
-            // is checked only when the header carries one.
+            // back-reference undeclared too, so a declaration is checked only
+            // when the header carries one.
             let declared = owner
                 .archive_info
                 .message_infos

@@ -98,8 +98,7 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
-    /// (record 0351 §2.4, record 0361).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The source graph or selected storage cannot be decoded or rewritten safely.
@@ -130,7 +129,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {
@@ -372,10 +371,10 @@ impl<'a> Edit<'a> {
     /// Whether a sequence of edits of this text, each a splice within
     /// `hull` (UTF-16 code units of [`Self::text`], both ends inclusive),
     /// publishes exactly what one splice from the text before them to the
-    /// text after them publishes (record 0314): no attribute entry of the
-    /// storage lies where the two could differ. `false` asks the caller to
-    /// commit the edits one at a time. Whether a later edit follows an
-    /// emptied text is the caller's to check.
+    /// text after them publishes: no attribute entry of the storage lies
+    /// where the two could differ. `false` asks the caller to commit the
+    /// edits one at a time. Whether a later edit follows an emptied text
+    /// is the caller's to check.
     ///
     /// # Errors
     ///

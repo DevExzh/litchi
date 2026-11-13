@@ -1,5 +1,5 @@
-//! Document language and locale of a fresh presentation (record 0372; the
-//! migration host builder's `language`/`locale`).
+//! Document language and locale of a fresh presentation (the migration host
+//! builder's `language`/`locale`).
 //!
 //! The host writes the language into the document archive and every text
 //! storage's language table, and the locale into the document archive (its

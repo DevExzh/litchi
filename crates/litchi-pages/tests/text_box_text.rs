@@ -1,6 +1,6 @@
 //! Body text-box character and paragraph properties
-//! (`litchi_pages::drawable::text_box_text`, record 0413). The host
-//! differential cases ran in the retired host's parity harness
+//! (`litchi_pages::drawable::text_box_text`). The host differential
+//! cases ran in the retired host's parity harness
 //! (`pages_text_box_cases.rs` at commit `4d8a3e161f`); these pin the leaf
 //! refusals.
 

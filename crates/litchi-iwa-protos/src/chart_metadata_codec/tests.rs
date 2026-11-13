@@ -519,7 +519,7 @@ fn exact_and_one_below_limits_report_the_attempted_resource() {
 }
 
 /// A by-column chart holds its series in the columns: the grid's row count is
-/// not its series count (record 0433).
+/// not its series count.
 #[test]
 fn by_column_series_are_the_column_labels() {
     let mut grid = Vec::new();

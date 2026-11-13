@@ -5,11 +5,11 @@
 //! and leaves the source untouched;
 //! [`Package::apply_metadata`](crate::Package::apply_metadata) replays the
 //! [`Patch`] onto the exact source snapshot. The engine is shared by every
-//! ODF leaf ([`litchi_odf_common::metadata`], record 0288): a change splices
-//! only the touched `office:meta` children of `meta.xml` (or adds a
-//! `meta.xml` to a package without one); generator, dates and statistics
-//! are never rewritten, so a commit consults no clock. A changed edit of a
-//! signed or encrypted package is refused.
+//! ODF leaf ([`litchi_odf_common::metadata`]): a change splices only the
+//! touched `office:meta` children of `meta.xml` (or adds a `meta.xml` to a
+//! package without one); generator, dates and statistics are never
+//! rewritten, so a commit consults no clock. A changed edit of a signed or
+//! encrypted package is refused.
 //!
 //! ```
 //! use litchi_odg::Package;

@@ -8,10 +8,10 @@
 //! root rendering previews.
 //!
 //! The permutation and the row rewrite are the shared executor
-//! `litchi_iwa_table::sort` (record 0421a), with Keynote's hooks: root
-//! previews dropped and row records moved only inside their storage tile.
-//! This module keeps what Keynote does differently: its selection and
-//! physical admission (`slide_table_core`), its strict key scan, and its
+//! `litchi_iwa_table::sort`, with Keynote's hooks: root previews dropped
+//! and row records moved only inside their storage tile. This module
+//! keeps what Keynote does differently: its selection and physical
+//! admission (`slide_table_core`), its strict key scan, and its
 //! post-publication verification of keys, UID maps, headers and locality.
 
 #![allow(

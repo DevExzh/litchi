@@ -1,18 +1,18 @@
-//! Slide-table addition, duplication and removal (records 0372 and 0423;
-//! the Keynote leaf of the host's `add_slide_table`,
-//! `duplicate_slide_table` and `remove_slide_table`) over the shared table
-//! structure set (`litchi_iwa_table::structure`, record 0379).
+//! Slide-table addition, duplication and removal (the Keynote leaf of
+//! the host's `add_slide_table`, `duplicate_slide_table` and
+//! `remove_slide_table`) over the shared table structure set
+//! (`litchi_iwa_table::structure`).
 //!
 //! Addition empties a copy of the deck's detached creation table and sizes
 //! it to the requested frame (see the `add` module).
 //!
-//! Duplication is the shared table-graph copy (record 0370h): fresh
-//! identifiers for the drawable, model and owned storage, the host's table
-//! UUID, its CalculationEngine owner family and the clones' registry
-//! records. This owner names the copy as the host does (`"<name> copy"`,
-//! then a numeric suffix, unique on the slide), offsets it by ten points,
-//! appends it to the slide's owned drawables and z-order (in front), and
-//! records the cross-component references to it.
+//! Duplication is the shared table-graph copy: fresh identifiers for the
+//! drawable, model and owned storage, the host's table UUID, its
+//! CalculationEngine owner family and the clones' registry records. This
+//! owner names the copy as the host does (`"<name> copy"`, then a numeric
+//! suffix, unique on the slide), offsets it by ten points, appends it to
+//! the slide's owned drawables and z-order (in front), and records the
+//! cross-component references to it.
 //!
 //! Removal takes out the drawable's private object closure and the
 //! CalculationEngine owners of its contexts, detaches it from the slide's
@@ -104,7 +104,7 @@ impl fmt::Display for LimitKind {
 #[non_exhaustive]
 pub enum Error {
     /// A well-formed request this route refuses; [`Refusal::kind`]
-    /// classifies it (record 0351 §2.4).
+    /// classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted table graph is malformed or ambiguous.
@@ -266,7 +266,7 @@ fn select_error(error: core::Error) -> Error {
 /// Preserve bounded-work failures while redacting the candidate's native
 /// read detail.  Candidate verification is still a focused-route operation:
 /// a limit or allocation refusal must not turn into an untyped verification
-/// failure (record 0351 §2.4).
+/// failure.
 fn reopen_error(error: super::ReadError) -> Error {
     match error {
         super::ReadError::SemanticLimit {
@@ -929,7 +929,7 @@ fn remove(source: &Package, target: &core::Target) -> Result<Published<Package>,
         transition.remove_objects(&registry, &removed_list)?;
     }
     // A removed suffix of the identifier space lowers the watermark, as the
-    // host editor releases it (record 0370g).
+    // host editor releases it.
     transition.release_suffix(&removed_list)?;
     for identifier in &removed_list {
         working.remove(*identifier)?;

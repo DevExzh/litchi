@@ -1,5 +1,5 @@
 //! Payload codecs of the objects a storage's ranged tables name: hyperlink
-//! and bookmark smart fields (record 0374).
+//! and bookmark smart fields.
 //!
 //! Each object is one message whose `TSWP.SmartFieldArchive` carries a
 //! text-attribute UUID. The host draws that UUID at random; the codecs take

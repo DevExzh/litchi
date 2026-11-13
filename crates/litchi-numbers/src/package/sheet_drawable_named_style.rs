@@ -1,8 +1,7 @@
 //! Implementation of the public [`crate::sheet::drawable::named_style`]
 //! transaction: the named paragraph styles of the text a sheet text box or
-//! shape owns, on W1-D's engine
-//! ([`litchi_iwa_text_wire::paragraph_style::named`], record 0374), record
-//! 0378.
+//! shape owns, on the shared engine
+//! ([`litchi_iwa_text_wire::paragraph_style::named`]).
 //!
 //! The catalog is the union of the paragraph presets of the themes whose
 //! document stylesheet is the storage's. The engine plans each change; this
@@ -64,8 +63,7 @@ const STORAGE_PARAGRAPH_TABLE: u32 = 5;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies
-    /// it (record 0351 §2.4).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted source is malformed or ambiguous.
@@ -96,7 +94,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {

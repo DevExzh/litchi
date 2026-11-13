@@ -285,7 +285,7 @@ pub(super) fn drawable_archive(geometry: Geometry, slide: u64, title: u64, capti
 }
 
 /// The host's `shape_path_source` for every preset, on the shared
-/// `litchi_iwa_style::shape_path` builder (record 0413b).
+/// `litchi_iwa_style::shape_path` builder.
 pub(super) fn path_source(preset: Preset, width: f32, height: f32) -> Result<Vec<u8>, Error> {
     use litchi_iwa_common::shape::path::{CornerRadius, Preset as Shared};
     let invalid = || Error::Refused(crate::slide::drawable::Refusal::InvalidGeometry);

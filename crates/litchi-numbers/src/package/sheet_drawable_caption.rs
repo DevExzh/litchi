@@ -1,6 +1,5 @@
 //! Selector-first title and caption transactions of sheet shapes, images,
-//! movies and charts (record 0425) on the shared
-//! `litchi_iwa_style::caption` engine.
+//! movies and charts on the shared `litchi_iwa_style::caption` engine.
 //!
 //! A drawable's title and caption are references in its
 //! `TSD.DrawableArchive` (fields 10 and 11): a present label is a caption
@@ -338,7 +337,7 @@ fn workspace(
 }
 
 /// The document stylesheet, the paragraph style of a new `label` and the
-/// document language (`caption::theme_label_paragraph_style`, record 0435).
+/// document language (`caption::theme_label_paragraph_style`).
 fn theme(
     package: &Package,
     label: caption::Label,

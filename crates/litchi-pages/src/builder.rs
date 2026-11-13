@@ -35,9 +35,8 @@
 //! ```
 //!
 //! The built-in template was authored once by the retired migration host's
-//! Pages builder (last present at commit `4d8a3e161f`; record 0299 lists the
-//! template's provenance and digest); the crate embeds the bytes, so building
-//! performs no protobuf authoring.
+//! Pages builder (last present at commit `4d8a3e161f`); the crate embeds the
+//! bytes, so building performs no protobuf authoring.
 
 use std::fmt;
 

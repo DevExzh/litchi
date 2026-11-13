@@ -436,8 +436,7 @@ pub enum LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
-    /// (record 0351 §2.4, record 0361).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The source has an ambiguous or malformed native ownership graph.
@@ -474,7 +473,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {
@@ -584,9 +583,8 @@ pub struct Edit<'a> {
     before: Option<Comment>,
     after: Option<Comment>,
     staging_error: Option<Error>,
-    /// A clear for a row or column removal (record 0370b): the root
-    /// previews stay and a released last comment key is handed back, as
-    /// the host's axis removal does.
+    /// A clear for a row or column removal: the root previews stay and a
+    /// released last comment key is handed back, as the host's axis removal does.
     axis_removal: bool,
 }
 
@@ -1307,8 +1305,7 @@ impl Package {
     }
 
     /// Clear one table-cell comment for a row or column removal: the root
-    /// previews stay and a released last key is handed back (record
-    /// 0370b).
+    /// previews stay and a released last key is handed back.
     pub(crate) fn clear_table_cell_comment_for_axis_removal(
         &self,
         sheet: SheetSelector<'_>,
@@ -1326,7 +1323,7 @@ impl Package {
     ///
     /// A new comment is written by the package's one commenting author, or,
     /// among several (or none), by the generated `litchi-iwa` author; an
-    /// empty cell takes the comment as a comment-only cell (record 0329).
+    /// empty cell takes the comment as a comment-only cell.
     pub fn set_table_cell_comment<'sheet, 'table>(
         &self,
         sheet: impl Into<SheetSelector<'sheet>>,
@@ -4529,8 +4526,8 @@ fn prove_global_comment_ownership(source: &Package, selected: &Located) -> Resul
 }
 
 /// Prove a root clear's ownership; `true` when the deleted storage's own
-/// object-UUID registration goes with it (a storage this crate created,
-/// record 0318), `false` when metadata does not name it (native storages).
+/// object-UUID registration goes with it (a storage this crate created),
+/// `false` when metadata does not name it (native storages).
 fn prove_root_clear_ownership(source: &Package, selected: &Located) -> Result<bool, Error> {
     prove_global_comment_ownership(source, selected)?;
     let entry = selected.entry.as_ref().ok_or(Error::InvalidSource {
@@ -5473,9 +5470,9 @@ fn validate_comment_message_metadata(
     }
     // Native Numbers keeps the aggregate ArchiveInfo edge of a comment list
     // and omits the FieldInfo mirror (every natively commented corpus
-    // workbook does, record 0318). The aggregate is checked against the
-    // payload's references above in both modes; a present FieldInfo
-    // sequence is still checked in full, and the writers keep whichever
+    // workbook does). The aggregate is checked against the payload's
+    // references above in both modes; a present FieldInfo sequence is
+    // still checked in full, and the writers keep whichever
     // representation the message has.
     let _ = require_field_infos;
     if !expected.is_empty()

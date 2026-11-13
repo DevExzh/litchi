@@ -1,4 +1,4 @@
-//! The rooted body story as one rich-text value (record 0371).
+//! The rooted body story as one rich-text value.
 //!
 //! [`crate::Package::body_storage`] reads the body's complete native text
 //! (section breaks, object-replacement and footnote markers included) with

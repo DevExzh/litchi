@@ -156,8 +156,7 @@ pub enum Change {
     },
     /// Replace the displayed text of one field run (`text:page-number`,
     /// `text:date`, `text:title`, ...), keeping its element and attributes:
-    /// a field refresh (record 0295). Bookmarks and other markers are
-    /// refused.
+    /// a field refresh. Bookmarks and other markers are refused.
     SetFieldText {
         /// The story.
         story: StoryRef,
@@ -170,9 +169,9 @@ pub enum Change {
     },
     /// Set character formatting on a paragraph (`run: None`, through its
     /// paragraph style) or on one run: a `text:span`; plain text or a field,
-    /// which a new span wraps; a hyperlink, whose content span carries it
-    /// (record 0316). A new automatic style derived from the node's own
-    /// carries the properties; no existing style changes (record 0308).
+    /// which a new span wraps; a hyperlink, whose content span carries
+    /// it. A new automatic style derived from the node's own carries the
+    /// properties; no existing style changes.
     SetTextProperties {
         /// The story.
         story: StoryRef,
@@ -278,7 +277,7 @@ pub enum Change {
     },
     /// Set (`href: Some`) a link run's target, and optionally its
     /// `office:title` (`title: Some(None)` removes it), or remove the link
-    /// (`href: None`), keeping its content (record 0328).
+    /// (`href: None`), keeping its content.
     SetRunLink {
         /// The story.
         story: StoryRef,
@@ -292,7 +291,7 @@ pub enum Change {
         title: Option<Option<String>>,
     },
     /// Make a plain-text or span run a hyperlink: the run is wrapped in a
-    /// `text:a` to `href`, with an optional `office:title` (record 0328).
+    /// `text:a` to `href`, with an optional `office:title`.
     LinkRun {
         /// The story.
         story: StoryRef,
@@ -306,15 +305,14 @@ pub enum Change {
         title: Option<String>,
     },
     /// Set (`Some`) or remove (`None`) what clicking an object does: its
-    /// click listener (`office:event-listeners`), or the `draw:a` it sits
-    /// in (record 0328).
+    /// click listener (`office:event-listeners`), or the `draw:a` it sits in.
     SetShapeClick {
         /// The object.
         object: ObjectRef,
         /// The new action.
         click: Option<ShapeAction>,
     },
-    /// Append a `text:line-break` to a paragraph (record 0328).
+    /// Append a `text:line-break` to a paragraph.
     InsertLineBreak {
         /// The story.
         story: StoryRef,
@@ -322,7 +320,7 @@ pub enum Change {
         paragraph: usize,
     },
     /// Remove one `text:line-break` of a paragraph
-    /// ([`super::parts::line_breaks`] order, record 0328).
+    /// ([`super::parts::line_breaks`] order).
     RemoveLineBreak {
         /// The story.
         story: StoryRef,
@@ -464,7 +462,7 @@ fn invalid(message: impl Into<String>) -> Error {
 }
 
 /// The refusal of a text set that would replace `element`, content that
-/// is not text (record 0304).
+/// is not text.
 fn dropped(_element: &str) -> Error {
     unsupported(
         "an ODP text set would replace content that is not text: set the text of the runs \
@@ -1244,8 +1242,7 @@ impl<'a> Planner<'a> {
             Some(run) => {
                 let selected = paragraph.runs.get(run).ok_or_else(|| missing("run"))?;
                 match (selected.kind, &selected.inner_span) {
-                    // A span, or the span that formats a field (record
-                    // 0316): derive its style.
+                    // A span, or the span that formats a field: derive its style.
                     (RunKind::Span, _) => (
                         selected.start_tag.clone(),
                         Pointer::StartTag,
@@ -1264,7 +1261,7 @@ impl<'a> Planner<'a> {
                     },
                     // A link keeps its own (link character) style: the span
                     // its content is, or a new one inside it, carries the
-                    // text's formatting (record 0316).
+                    // text's formatting.
                     (RunKind::Link, Some((tag, style))) => {
                         (tag.clone(), Pointer::StartTag, "text", style.clone())
                     },

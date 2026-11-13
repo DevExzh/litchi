@@ -1,11 +1,10 @@
 //! Execution of a body table's persisted sort order: the body rows move
-//! physically, as Pages' **Sort Now** does (record 0371).
+//! physically, as Pages' **Sort Now** does.
 //!
 //! The rewrite is the shared executor `litchi_iwa_table::sort` (lifted from
-//! this module in record 0421): the facade resolves the table, reads its
-//! persisted order, checks the scope and merges, supplies the user-hidden
-//! rows, and verifies them after publication. Root previews are kept, as the
-//! host keeps them.
+//! this module): the facade resolves the table, reads its persisted order,
+//! checks the scope and merges, supplies the user-hidden rows, and verifies
+//! them after publication. Root previews are kept, as the host keeps them.
 
 use std::collections::HashSet;
 use std::fmt;
@@ -103,8 +102,7 @@ impl Refusal {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies
-    /// it (record 0351 §2.4).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The table graph is malformed.

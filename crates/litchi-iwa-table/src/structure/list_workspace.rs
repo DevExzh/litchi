@@ -1,7 +1,6 @@
 //! The structural working set as the package side of the shared
-//! storage-list publisher (`litchi_iwa_text_wire::list::publish`, record
-//! 0413). Pages and Numbers publish their text-box and cell lists through
-//! it.
+//! storage-list publisher (`litchi_iwa_text_wire::list::publish`). Pages
+//! and Numbers publish their text-box and cell lists through it.
 
 use litchi_iwa_core::{ArchiveObject, RawMessage};
 use litchi_iwa_text_wire::list::publish::Workspace;

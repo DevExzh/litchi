@@ -133,8 +133,8 @@ pub enum ProtectionRefusal {
 }
 
 impl ProtectionRefusal {
-    /// The refusal class litchi-ops reports for this reason (record 0351
-    /// §2.4): the route does not implement the operation.
+    /// The refusal class litchi-ops reports for this reason: the route does not
+    /// implement the operation.
     #[must_use]
     pub const fn kind(self) -> litchi_core::edit::RefusalKind {
         match self {

@@ -1,8 +1,7 @@
-//! Record 0372 (wave W1-C; the gap record 0368 left open): Keynote's
-//! slide-table Number display format and cell coordinate are the shared
-//! `litchi_iwa_common::table` values, re-exported at their established
-//! `litchi_keynote` paths as the same nominal types — never a second
-//! definition.
+//! Keynote's slide-table Number display format and cell coordinate are
+//! the shared `litchi_iwa_common::table` values, re-exported at their
+//! established `litchi_keynote` paths as the same nominal types —
+//! never a second definition.
 
 use std::any::TypeId;
 

@@ -1,6 +1,6 @@
 //! Formula authoring and removal in a table of the calculation graph, for the
 //! table owners that stage payloads by object identifier (Keynote slide
-//! tables, Pages body tables; record 0376a).
+//! tables, Pages body tables).
 //!
 //! [`encode`](crate::formula_cache::author::encode) lowers a
 //! [`FormulaExpression`](litchi_iwa_common::formula::FormulaExpression) into the native formula archive and its dependency
@@ -371,7 +371,7 @@ fn lower<'e>(
             push(output, FormulaWriteNode::Percent)?;
         },
         // Other tables are named by native identifier, and pivot
-        // categories by native UUIDs: not admitted (record 0376a).
+        // categories by native UUIDs: not admitted.
         FormulaExpression::PivotCategory(_)
         | FormulaExpression::TableCell { .. }
         | FormulaExpression::TableRange { .. }
@@ -790,8 +790,8 @@ pub fn plan<'a>(
 
 /// The rewritten owner `output` with every dependency envelope `source`
 /// held kept, empty, in source field order: the shared rewrite drops an
-/// envelope it empties, while the host and the native files keep it
-/// (record 0376a). Fields are singular, so they are matched by number.
+/// envelope it empties, while the host and the native files keep it.
+/// Fields are singular, so they are matched by number.
 fn keep_empty_envelopes(source: &[u8], output: &[u8], limits: &Limits) -> Result<Vec<u8>, Error> {
     const ENVELOPES: [u32; 4] = [4, 5, 13, 15];
     let produced = table_write::fields(output, limits).map_err(map_write)?;

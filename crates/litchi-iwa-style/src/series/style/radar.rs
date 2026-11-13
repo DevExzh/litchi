@@ -1,5 +1,4 @@
-//! The chart-wide Radar series style (the host's
-//! `charts::radar_series_style`, record 0419).
+//! The chart-wide Radar series style (the host's `charts::radar_series_style`).
 //!
 //! The Radar inspector's "Style" control applies one coordinated
 //! representation to every series. iWork stores it in three inherited

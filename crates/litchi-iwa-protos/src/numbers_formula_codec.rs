@@ -680,7 +680,7 @@ impl FormulaWriteAxis {
 /// This is an archive-boundary lowering type, not the public Numbers formula
 /// vocabulary. Higher layers privately resolve cross-table owners before
 /// constructing the resolved reference variants below. A pivot category is
-/// resolved by the caller against the group-by model (record 0424).
+/// resolved by the caller against the group-by model.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum FormulaWriteNode<'text> {
     Number(f64),
@@ -5449,8 +5449,8 @@ fn decode_node<V: FormulaVisitor + ?Sized>(
     {
         return Err(DecodeError::invalid(InvalidReason::MalformedWire));
     }
-    // A resolved pivot-category reference (record 0424): its precedents live
-    // in the group-by model, not in the AST, so the dependency projection
+    // A resolved pivot-category reference: its precedents live in the
+    // group-by model, not in the AST, so the dependency projection
     // tolerates it as an opaque operand and the formula is not evaluable.
     // The payload is still strictly validated.
     if kind == 66
@@ -8199,9 +8199,9 @@ mod tests {
         assert!(ast.is_empty());
     }
 
-    /// Record 0424: a category reference is written exactly as the host's
-    /// Prost compiler writes it, streams its two group-by-owner precedents,
-    /// and reads back as an opaque, non-evaluable dependency operand.
+    /// A category reference is written exactly as the host's Prost compiler
+    /// writes it, streams its two group-by-owner precedents, and reads back as
+    /// an opaque, non-evaluable dependency operand.
     #[test]
     fn writer_category_reference_matches_prost_host_shape() {
         use crate::{tsce, tsp};

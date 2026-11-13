@@ -159,8 +159,8 @@ pub enum SecurityLifecycleRefusal {
 }
 
 impl SecurityLifecycleRefusal {
-    /// The refusal class litchi-ops reports for this reason (record 0351
-    /// §2.4): the route does not implement the operation.
+    /// The refusal class litchi-ops reports for this reason: the route does not
+    /// implement the operation.
     #[must_use]
     pub const fn kind(self) -> litchi_core::edit::RefusalKind {
         match self {
@@ -442,7 +442,7 @@ const TEMPLATE: Flavor = Flavor {
 };
 
 impl Package {
-    /// The retained physical package (metadata transactions, record 0288).
+    /// The retained physical package (metadata transactions).
     pub(crate) fn owned_package(&self) -> &litchi_odf_common::OwnedPackage {
         self.0.package.package()
     }
@@ -1856,7 +1856,7 @@ impl Edit {
     /// markup (or delete it), keeping the edit on the exact-source splice
     /// path when the range maps onto source bytes no earlier edit touched.
     /// Otherwise the edit falls back to a whole-part rewrite, which the
-    /// commit admits only for compact sources (record 0288).
+    /// commit admits only for compact sources.
     fn splice_content(&mut self, range: &Range<usize>, replacement: &str) -> Result<()> {
         let next = replace_xml(&self.content, range, replacement)?;
         if let Some(splices) = &mut self.content_splices

@@ -1,7 +1,7 @@
 //! Schema-driven merge of a replacement message into a stored one: the
 //! fields a schema knows are replaced (singular messages recursively), every
 //! unknown field keeps its bytes and position (the migration host's
-//! `replace_known_wire_fields_preserving_unknown_with_schema`, record 0375a).
+//! `replace_known_wire_fields_preserving_unknown_with_schema`).
 
 use super::{Budget, Error, Field, Limits, allocate, push_varint, read_varint, visit_fields};
 

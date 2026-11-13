@@ -1,5 +1,4 @@
-//! Character styling of body text spans (`IWORK_API_REQUESTS.md` request 13,
-//! record 0309).
+//! Character styling of body text spans.
 //!
 //! A Pages body is one `TSWP.StorageArchive` whose `table_char_style`
 //! (field 8) names the character style of each run. Styling a span of a
@@ -91,8 +90,7 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
-    /// (record 0351 §2.4, record 0361).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted source is malformed or ambiguous.
@@ -123,7 +121,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {

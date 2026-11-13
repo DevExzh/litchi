@@ -1,6 +1,6 @@
 //! Wire codec of `KN.BuildArchive` / `KN.BuildChunkArchive` for the
-//! slide-build family (a port of the migration host's `builds.rs`, record
-//! 0372). Fields this codec does not model keep their bytes on a patch.
+//! slide-build family (a port of the migration host's `builds.rs`). Fields this
+//! codec does not model keep their bytes on a patch.
 
 use litchi_iwa_common::WireLimits;
 

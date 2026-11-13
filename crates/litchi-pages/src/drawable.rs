@@ -56,7 +56,8 @@ pub mod caption {
 }
 
 /// Drawing styles of body shapes and text boxes: fill, stroke, shadow,
-/// effects, text layout, text columns and line endpoints, over the shared shape-style variation engine (record 0371).
+/// effects, text layout, text columns and line endpoints, over the shared
+/// shape-style variation engine.
 pub mod style {
     pub use crate::package::body_drawable_style::{
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
@@ -136,7 +137,7 @@ pub mod text {
 }
 
 /// Character and paragraph properties of the whole text a body text box
-/// or shape owns, over the shared paragraph-style engine (record 0413).
+/// or shape owns, over the shared paragraph-style engine.
 pub mod text_box_text {
     pub use crate::package::text_box_text::{
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
@@ -147,7 +148,7 @@ pub mod text_box_text {
 
 /// Paragraph lists, list levels, numbering and per-level list properties
 /// of the text a body text box or shape owns, over the shared list engine
-/// and storage-list publisher (record 0413).
+/// and storage-list publisher.
 pub mod list {
     pub use crate::package::text_box_list::{
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
@@ -165,8 +166,7 @@ pub mod list {
 }
 
 /// Named paragraph styles of the text a body text box or shape owns:
-/// apply, create, rename, delete and redefine, over the shared named-style
-/// engine (record 0413).
+/// apply, create, rename, delete and redefine, over the shared named-style engine.
 pub mod named_style {
     pub use crate::package::text_box_named_style::{
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
@@ -177,7 +177,7 @@ pub mod named_style {
 }
 
 /// Plain-text Drop Caps of the paragraphs of the text a body text box or
-/// shape owns (record 0413).
+/// shape owns.
 pub mod drop_cap {
     pub use crate::package::text_box_drop_cap::{
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
@@ -189,7 +189,7 @@ pub mod drop_cap {
 }
 
 /// Highlights, text comments and replies of the text a body text box or
-/// shape owns (record 0413).
+/// shape owns.
 pub mod annotation {
     pub use crate::package::text_box_annotation::{
         Comment, Commit, Diagnostics, Edit, Error, Highlight, LimitKind, Patch, Refusal,
@@ -197,8 +197,7 @@ pub mod annotation {
     pub use litchi_iwa_text::position::{TextPosition, TextRange};
 }
 
-/// Date & Time fields of the text a body text box or shape owns (record
-/// 0413).
+/// Date & Time fields of the text a body text box or shape owns.
 pub mod date_time {
     pub use crate::package::text_box_date_time::{
         Commit, DateTimeField, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
@@ -209,7 +208,7 @@ pub mod date_time {
     pub use litchi_iwa_text::position::{TextPosition, TextRange};
 }
 
-/// Hyperlinks of the text a body text box or shape owns (record 0413).
+/// Hyperlinks of the text a body text box or shape owns.
 pub mod hyperlink {
     pub use crate::package::text_box_hyperlink::{
         Commit, Diagnostics, Edit, Error, Hyperlink, LimitKind, Patch, Refusal,
@@ -218,7 +217,7 @@ pub mod hyperlink {
     pub use litchi_iwa_text::position::{TextPosition, TextRange};
 }
 
-/// Language runs of the text a body text box or shape owns (record 0413).
+/// Language runs of the text a body text box or shape owns.
 pub mod language {
     pub use crate::package::text_box_language::{
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
@@ -227,8 +226,7 @@ pub mod language {
     pub use litchi_iwa_text::language::{TextLanguage, TextLanguageRun};
 }
 
-/// The comment attached directly to a body drawable and its replies
-/// (record 0413).
+/// The comment attached directly to a body drawable and its replies.
 pub mod comment {
     pub use crate::package::text_box_drawable_comment::{
         Commit, Diagnostics, DrawableComment, Edit, Error, LimitKind, Patch, Refusal,

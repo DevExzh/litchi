@@ -326,7 +326,7 @@ fn remove_slot(
 /// One row's pre-BNC cell storage and offset table after removing column
 /// `column` of a `columns`-wide table, as the structural column removal
 /// rewrites it (`None` when they are unchanged). Exposed for the host
-/// editor's column removal (record 0370b).
+/// editor's column removal.
 ///
 /// # Errors
 ///
@@ -393,8 +393,7 @@ fn row_columns(row: &[u8], columns: u32, edit: AxisEdit) -> Result<Option<Vec<u8
             return Ok(None);
         }
         // A BNC row the host's column shift rebuilds (no spare slot, or a
-        // cell after the removed column) states its offset width (record
-        // 0370b).
+        // cell after the removed column) states its offset width.
         let rebuilt_by_shift = match single_bytes(row, 7)? {
             Some(offsets) => {
                 let slots = offsets.len() / 2;
@@ -448,8 +447,7 @@ fn row_columns(row: &[u8], columns: u32, edit: AxisEdit) -> Result<Option<Vec<u8
         return Ok(None);
     }
     // A rewritten row states its offset width, as the host editor's row
-    // encoder does (record 0370); an absent `has_wide_offsets` reads as
-    // narrow.
+    // encoder does; an absent `has_wide_offsets` reads as narrow.
     let mut rebuilt = rebuilt;
     if single_varint(row, 8)?.is_none() {
         push_varint_field(&mut rebuilt, 8, 0)?;
@@ -473,7 +471,7 @@ pub fn tile_columns(tile: &[u8], columns: u32, edit: AxisEdit) -> Result<Option<
         let local = single_varint(field.payload, 1)?.ok_or(Error::Invalid)?;
         match row_columns(field.payload, columns, edit)? {
             // A row the removal leaves without cells goes, as the host's
-            // cell removal drops it (record 0370b).
+            // cell removal drops it.
             Some(row)
                 if single_varint(&row, 2)? == Some(0)
                     && single_varint(field.payload, 2)? != Some(0) =>
@@ -559,7 +557,7 @@ pub fn header_bucket(
         }
         changed = true;
         // A header left counting no cell and holding nothing else goes, as
-        // the host's cell removal drops it (record 0370b).
+        // the host's cell removal drops it.
         if cells_after == Some(0) && header_is_bare(field.payload)? {
             return Ok(Some(Vec::new()));
         }
@@ -797,7 +795,7 @@ impl UidMap {
     /// The map for a table resized from `old_rows` × `old_columns` to
     /// `rows` × `columns`: trailing identities go, and new trailing ones
     /// are allocated above every existing one (the host editor's
-    /// `resize_uid_axis`; record 0370e).
+    /// `resize_uid_axis`).
     ///
     /// # Errors
     ///

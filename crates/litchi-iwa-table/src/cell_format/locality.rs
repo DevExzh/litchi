@@ -1,8 +1,8 @@
 //! Exact ZIP-record locality checks of a reassembled candidate (moved from
-//! `litchi-numbers`' table-header rewrite, record 0412a): an untouched member
-//! keeps its local and central records byte for byte (only the central
-//! offset may move); a rewritten member keeps every record field except its
-//! CRC, sizes and offset.
+//! `litchi-numbers`' table-header rewrite): an untouched member keeps its
+//! local and central records byte for byte (only the central offset may
+//! move); a rewritten member keeps every record field except its CRC, sizes
+//! and offset.
 
 /// Whether a central-directory record is unchanged except for its offset.
 #[must_use]

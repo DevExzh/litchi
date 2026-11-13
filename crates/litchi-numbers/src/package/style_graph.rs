@@ -1,8 +1,9 @@
-//! The bridge between a Numbers package and W1-E's shared style-variation
-//! graph engine (`litchi_iwa_style::graph`, record 0375a), for the chart
-//! series families of record 0378: the package's parsed components as the
-//! engine's [`Components`], and a finished workspace's [`Changes`]
-//! republished through exact-source reassembly and a strict reopen.
+//! The bridge between a Numbers package and the shared
+//! style-variation graph engine (`litchi_iwa_style::graph`), for
+//! the chart series families: the package's parsed components as
+//! the engine's [`Components`], and a finished workspace's
+//! [`Changes`] republished through exact-source reassembly and a
+//! strict reopen.
 
 use std::mem::size_of;
 use std::sync::Arc;

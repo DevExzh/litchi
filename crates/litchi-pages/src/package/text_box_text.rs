@@ -1,13 +1,13 @@
 //! Implementation of the public [`crate::drawable::text_box_text`]
 //! transaction: one character or paragraph property of the whole text a
-//! body text box (or ordinary shape) owns (record 0413, the port of the
-//! Numbers family of record 0378).
+//! body text box (or ordinary shape) owns (the port of the Numbers
+//! family).
 //!
 //! The drawable's storage is uniformly styled by one paragraph style. Each
 //! staged change runs the shared paragraph-style engine
-//! ([`litchi_iwa_text_wire::paragraph_style`], record 0374) over that style,
-//! counted exclusive when nothing but the storage references it and no
-//! paragraph style names it as parent. The engine's plan is published here:
+//! ([`litchi_iwa_text_wire::paragraph_style`]) over that style, counted
+//! exclusive when nothing but the storage references it and no paragraph
+//! style names it as parent. The engine's plan is published here:
 //!
 //! - **Rewrite**: the storage's own variation takes the new payload in place;
 //! - **Derive**: a new child variation of the storage's style is stored
@@ -59,8 +59,7 @@ const STORAGE_MESSAGE_TYPE: u32 = 2_001;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies
-    /// it (record 0351 §2.4).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted source is malformed or ambiguous.
@@ -91,7 +90,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {
@@ -566,7 +565,7 @@ fn apply_one(
             let after = variation.references().to_vec();
             // The header keeps every reference it had, as the host editor's
             // in-place rewrite does: a following style replaced by "same
-            // style" leaves its named style referenced (record 0413 §3).
+            // style" leaves its named style referenced.
             let removed: [u64; 0] = [];
             let appended: Vec<u64> = after
                 .iter()

@@ -508,7 +508,7 @@ fn rewrite_native_popup_menu_transition(
     )?;
     // The selected table's own tiles: a component may hold several tables'
     // tiles (native Pages and Keynote), whose cells name other format and
-    // control lists (record 0412a).
+    // control lists.
     let table_tiles = {
         let mut visitor = TileReferenceVisitor::default();
         let (_, report) = storage_codec::decode_tile_storage_with_visitor(
@@ -542,7 +542,7 @@ fn rewrite_native_popup_menu_transition(
     let old_control = cell.control_cell_spec_identifier();
     // A native cell naming an implicit Number entry (no control, no
     // explicit-format flag) gives that entry up when it becomes a Pop-Up
-    // Menu, as the host's compatibility writer does (record 0412a).
+    // Menu, as the host's compatibility writer does.
     let implicit_format = old_format.filter(|_| {
         old_control.is_none()
             && cell.explicit_format_flags() == 0
@@ -669,9 +669,8 @@ fn rewrite_native_popup_menu_transition(
         budget,
         input.path,
     )?;
-    // Pages and Keynote append list keys and hand a released last key back
-    // (record 0379); a cleared menu's CellSpec key returns to the watermark
-    // as the host's writer does (record 0412a).
+    // Pages and Keynote append list keys and hand a released last key back; a
+    // cleared menu's CellSpec key returns to the watermark as the host's writer does.
     if desired_state.is_none()
         && budget.list_keys == super::ListKeys::Append
         && let Some(old) = old_state
@@ -1922,7 +1921,7 @@ fn census_bnc_cell(bytes: &[u8], counts: &mut BncReferenceCounts) -> Result<()> 
         .map_err(|_| NativePopUpError::InvalidSource)?;
     // Native Pages and Keynote tables hold format-only cells (an implicit
     // Number entry, an explicit display format, a secondary generic entry);
-    // each names its format-list entries without a control (record 0412a).
+    // each names its format-list entries without a control.
     for format in [cell.format_identifier(), cell.secondary_format_identifier()]
         .into_iter()
         .flatten()

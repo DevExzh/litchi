@@ -3,9 +3,9 @@
 //! Every packaged ODF owner's `save` and `save_with_durability` route through
 //! [`save_bytes`], which stages the artifact in a uniquely named sibling file
 //! and publishes it with one replacement through the format-neutral
-//! [`litchi_core::atomic`] publisher (record 0226).  A failure before
-//! publication leaves an existing destination byte-identical and removes the
-//! staging file; a failure after publication is reported as the typed
+//! [`litchi_core::atomic`] publisher.  A failure before publication leaves an
+//! existing destination byte-identical and removes the staging file; a
+//! failure after publication is reported as the typed
 //! [`litchi_core::Error::Committed`] payload so callers never retry it as an
 //! untouched destination.
 

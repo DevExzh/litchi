@@ -1,12 +1,12 @@
-//! Body chart creation (record 0418; the host's `add_body_chart`): the
-//! shared `litchi_iwa_style::chart_lifecycle::author` graph with the Pages
+//! Body chart creation (the host's `add_body_chart`): the shared
+//! `litchi_iwa_style::chart_lifecycle::author` graph with the Pages
 //! profile in the body component, a body attachment and U+FFFC at the
 //! anchor, the z-order (created on first use), the styles in the document
 //! stylesheet and the preset in the theme's chart presets, with the host's
 //! cross-component references and UUIDs.
 //!
-//! Duplication and removal (record 0426; the host's `duplicate_body_chart`
-//! and `remove_body_chart`) work on the chart's private graph in the host's
+//! Duplication and removal (the host's `duplicate_body_chart` and
+//! `remove_body_chart`) work on the chart's private graph in the host's
 //! discovery order (`litchi_iwa_style::chart_lifecycle::graph`): the
 //! drawable, its caption objects and title, its own preset and the styles
 //! only it references, and its attachment. A copy clones the graph under
@@ -351,7 +351,7 @@ pub(super) fn add(
 }
 
 // ---------------------------------------------------------------------------
-// Duplicate and remove (record 0426; the host's `duplicate_body_chart` and
+// Duplicate and remove (the host's `duplicate_body_chart` and
 // `remove_body_chart`).
 
 /// `TSCH.ChartDrawableArchive` and `TSCH.ChartStylePreset`.

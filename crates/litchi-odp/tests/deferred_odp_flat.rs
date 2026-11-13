@@ -187,8 +187,8 @@ fn flat_changed_publication_never_materializes_an_oversized_output() {
     ));
 }
 
-/// Record 0341: XML's predefined entities and character references need no
-/// document type, so a flat presentation holding them opens (LibreOffice's
+/// XML's predefined entities and character references need no document
+/// type, so a flat presentation holding them opens (LibreOffice's
 /// `theme.fodp` and `alternativeText.fodp` write `&apos;`, `&lt;` and
 /// `&gt;`); an undeclared custom entity is still refused.
 #[test]

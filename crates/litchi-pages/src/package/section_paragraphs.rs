@@ -1,5 +1,4 @@
-//! Paragraph-level transactions over one section's body text
-//! (IWORK_API_REQUESTS.md request 12).
+//! Paragraph-level transactions over one section's body text.
 //!
 //! A section's paragraphs are its body text split at the paragraph break
 //! (`\n`). An [`Edit`] stages paragraph operations — set a paragraph's text,
@@ -9,7 +8,7 @@
 //! verification rule:
 //!
 //! - a commit publishes exactly what committing each operation on its own,
-//!   in order, publishes (record 0314);
+//!   in order, publishes;
 //! - consecutive text sets share **one** section-text transaction (one
 //!   splice from the text before them to the text after them) when that is
 //!   provably the same: the splice consumes no object anchor (an inline
@@ -63,8 +62,7 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
-    /// (record 0351 §2.4, record 0361).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The underlying section-text transaction refused the change.
@@ -86,7 +84,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {
@@ -381,8 +379,8 @@ impl<'a> Edit<'a> {
     }
 
     /// Publish the staged operations: exactly what committing each one on
-    /// its own, in order, publishes (record 0314), in as few section-text
-    /// transactions as that allows.
+    /// its own, in order, publishes, in as few section-text transactions as
+    /// that allows.
     ///
     /// Consecutive text sets share one transaction (one splice from the
     /// text before them to the text after them) while that splice is
@@ -786,7 +784,7 @@ impl Package {
     /// The body tables each paragraph of one section anchors: for every
     /// paragraph, in order, the catalog positions
     /// ([`crate::table::catalog::Snapshot::position`]) of the tables whose
-    /// object anchor sits in it (record 0301).
+    /// object anchor sits in it.
     ///
     /// A paragraph whose anchor count is larger than its table count also
     /// anchors other objects (charts, images, footnotes).

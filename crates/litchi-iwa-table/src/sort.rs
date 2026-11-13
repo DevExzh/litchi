@@ -1,7 +1,6 @@
 //! The shared table sort executor: a table's persisted sort order runs as a
 //! physical row permutation, as Numbers' and Pages' **Sort Now** does
-//! (record 0371, lifted from `litchi-pages` for Numbers and Keynote in
-//! record 0421).
+//! (lifted from `litchi-pages` for Numbers and Keynote).
 //!
 //! The executor follows the migration host's scalar executor
 //! (`numbers::editor::table_sort::apply`): every sort key must be a complete

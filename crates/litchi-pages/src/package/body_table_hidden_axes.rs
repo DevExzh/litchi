@@ -2,10 +2,10 @@
 //!
 //! The public value is deliberately archive free.  This adapter resolves the
 //! rooted table through `table_lock`; the shared engine
-//! (`litchi_iwa_table::hidden_axes`, record 0379) proves its hidden-state
-//! dependency closure and rewrites it.  Payload surgery is limited to the
-//! selected table-info/model fields; all unrelated wire bytes and all
-//! unrelated package members remain source authoritative.
+//! (`litchi_iwa_table::hidden_axes`) proves its hidden-state dependency
+//! closure and rewrites it.  Payload surgery is limited to the selected
+//! table-info/model fields; all unrelated wire bytes and all unrelated
+//! package members remain source authoritative.
 
 #![allow(
     clippy::arbitrary_source_item_ordering,
@@ -99,8 +99,7 @@ impl fmt::Display for LimitKind {
 #[derive(ThisError, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
-    /// (record 0351 §2.4, record 0361).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     #[error("the selected Pages body-table hidden-axis source is invalid")]
@@ -122,7 +121,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+/// [`Refusal::kind`].
 #[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Refusal {

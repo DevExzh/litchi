@@ -1,7 +1,7 @@
 //! The semantic reading of stored native drawing values: colors, strokes,
 //! gradients and image fills as `litchi_iwa_protos::shape_style_codec::native`
 //! decodes them (plain native fields), converted to the shared values with
-//! the native rules — defaults, enum values, unsupported forms (record 0375).
+//! the native rules — defaults, enum values, unsupported forms.
 
 use crate::color::{RgbColorSpace, Rgba};
 use crate::shape::fill::{

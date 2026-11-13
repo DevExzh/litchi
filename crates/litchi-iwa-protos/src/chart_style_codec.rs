@@ -13,13 +13,13 @@
 //! - [`rewrite`](crate::chart_style_codec::rewrite) applies a batch of [`Write`](crate::chart_style_codec::Write) values and returns the candidate
 //!   payload, borrowing the source when nothing changed.
 //!
-//! Byte semantics are those of the migration host's per-property patches
-//! (record 0375): a field present in the source is replaced in place (its key
-//! bytes, and its length prefix when the length is unchanged, are kept); a
-//! cleared field is removed; a missing field is appended to the end of the
-//! extension; a missing extension is created, with its fields in field-number
-//! order, only when the batch sets at least one value. Every unrelated byte,
-//! including unknown fields, stays where it was.
+//! Byte semantics are those of the migration host's per-property patches: a
+//! field present in the source is replaced in place (its key bytes, and its
+//! length prefix when the length is unchanged, are kept); a cleared field is
+//! removed; a missing field is appended to the end of the extension; a
+//! missing extension is created, with its fields in field-number order, only
+//! when the batch sets at least one value. Every unrelated byte, including
+//! unknown fields, stays where it was.
 //!
 //! [`references`](crate::chart_style_codec::references) projects the style and paragraph-style references of one
 //! `TSCH.ChartDrawableArchive` payload without decoding its data grid, so the
@@ -1453,8 +1453,8 @@ pub(crate) fn remove_field(data: &[u8], field: &Field, limits: Limits) -> Result
 /// The native write rules of the inspector properties the shared chart
 /// engine edits: one call maps a property's stored value to the archive it
 /// lives in, the batch of [`Write`]s that stores it and the empty-extension
-/// policy (the migration host's per-property rules, record 0375). Format
-/// families convert their `litchi_iwa_common` value to the stored natives
+/// policy (the migration host's per-property rules). Format families
+/// convert their `litchi_iwa_common` value to the stored natives
 /// (`degrees()`, `native_fraction()`, `native_ratio()`, …) and pass the
 /// result to [`rewrite`] unchanged.
 pub mod property {
@@ -1868,8 +1868,8 @@ impl SparseReferences {
     /// The array length (`count`), not the number of present entries.
     ///
     /// Keynote, Pages and Numbers 14.4 refuse to open a document whose entry
-    /// index exceeds it (record 0431): a `count` of 1 with an entry at index
-    /// 2 failed on all three apps, while index 1 of `count` 1 opened.
+    /// index exceeds it: a `count` of 1 with an entry at index 2 failed on all
+    /// three apps, while index 1 of `count` 1 opened.
     #[must_use]
     pub const fn count(&self) -> u32 {
         self.count

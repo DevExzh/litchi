@@ -1,6 +1,6 @@
 //! Any display format or control of a stored Numbers table cell, as the
-//! neutral [`DataFormat`] (record 0370k; the host editor's
-//! `set_table_cell_data_format` and `table_cell_data_format`).
+//! neutral [`DataFormat`] (the host editor's `set_table_cell_data_format` and
+//! `table_cell_data_format`).
 //!
 //! The read is the shared `litchi_iwa_table::cell_format::data_format`
 //! dispatch. A write composes the Numbers per-family transactions: a change
@@ -47,7 +47,7 @@ impl fmt::Display for LimitKind {
 #[non_exhaustive]
 pub enum Error {
     /// A well-formed request this route refuses; [`Refusal::kind`]
-    /// classifies it (record 0351 §2.4).
+    /// classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted table graph is malformed or ambiguous.
@@ -431,7 +431,7 @@ impl Edit<'_> {
         let (before, after) = (owner(&self.before), owner(&self.after));
         // A change that involves a numeral system runs every step through
         // the shared engine, appending list keys as the host editor's
-        // compatibility writer does (record 0370k).
+        // compatibility writer does.
         let numeral = before == Some(Owner::NumeralSystem) || after == Some(Owner::NumeralSystem);
         let rewrite =
             |source: &Package, family: Owner, before: &DataFormat, after: Option<&DataFormat>| {
@@ -557,7 +557,7 @@ fn engine_rewrite(
     }
     // The host editor writes a numeral system through its compatibility
     // writer, which appends list keys at the watermark; the Numbers
-    // per-family owners reuse free keys (record 0379).
+    // per-family owners reuse free keys.
     let mut budget = engine::TransactionBudget::for_cell_control(source)
         .with_list_keys(engine::ListKeys::Append);
     budget.charge_package_source(catalog, path)?;

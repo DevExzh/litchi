@@ -1,6 +1,5 @@
-//! Cell fill and text layout of rooted body tables (record 0371; the
-//! migration host's `table_cell_fill`, `table_cell_layout` and their set and
-//! reset routes).
+//! Cell fill and text layout of rooted body tables (the migration host's
+//! `table_cell_fill`, `table_cell_layout` and their set and reset routes).
 //!
 //! The format-neutral cell-style engine
 //! (`litchi_iwa_table::cell_appearance`) plans each change; this owner
@@ -113,8 +112,7 @@ impl Refusal {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies
-    /// it (record 0351 §2.4).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The table's style graph is malformed.

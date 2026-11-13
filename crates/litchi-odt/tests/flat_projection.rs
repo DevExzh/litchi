@@ -1,5 +1,5 @@
 //! A flat text document's packaged projection and the republication of an
-//! edit of it (record 0292).
+//! edit of it.
 
 use litchi_odt::flat::Document;
 use litchi_odt::metadata::Field;

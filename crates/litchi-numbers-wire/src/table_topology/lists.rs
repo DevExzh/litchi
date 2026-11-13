@@ -29,7 +29,7 @@ pub fn release(
 }
 
 /// [`release`], handing back the list's last key when its entry goes
-/// (`reclaim`; record 0329), as the cell writer does for a string list.
+/// (`reclaim`), as the cell writer does for a string list.
 pub fn release_with(
     list: &[u8],
     remaining: &mut BTreeMap<u32, u32>,

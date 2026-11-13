@@ -1,6 +1,5 @@
 //! Implementation of the public [`crate::section::lifecycle`] transactions:
-//! adding a section and removing one (`IWORK_API_REQUESTS.md` request 11,
-//! record 0312).
+//! adding a section and removing one.
 //!
 //! A Pages body is one `TSWP.StorageArchive` whose section table
 //! (`table_section`, field 17) maps a UTF-16 boundary to each
@@ -110,8 +109,7 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
-    /// (record 0351 §2.4, record 0361).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted source is malformed or ambiguous.
@@ -142,7 +140,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {

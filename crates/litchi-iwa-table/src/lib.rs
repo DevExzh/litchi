@@ -10,8 +10,8 @@
 //! publication (ZIP reassembly, candidate reopen, previews) and its public
 //! transaction vocabulary.
 //!
-//! This crate is a private implementation layer of those owners (record
-//! 0379, ADR 0024). It is never re-exported by a facade: its signatures name
+//! This crate is a private implementation layer of those owners (ADR
+//! 0024). It is never re-exported by a facade: its signatures name
 //! native archive structures and resolved object positions, which the
 //! supported APIs do not expose.
 
@@ -22,18 +22,17 @@ use litchi_iwa_core::RawMessage;
 
 /// Cell data formats and cell controls of an existing table cell: the eleven
 /// display families, the four scalar controls and the Pop-Up Menu graph
-/// (moved from `litchi-numbers`, record 0379).
+/// (moved from `litchi-numbers`).
 pub mod cell_format;
 
-/// Cell fill and text layout through the copy-on-write cell-style graph
-/// (record 0371).
+/// Cell fill and text layout through the copy-on-write cell-style graph.
 pub mod cell_appearance;
 
 /// Format-neutral whole-cell character-style graph planning.
 pub mod cell_text_style;
 
 /// Character and paragraph properties and paragraph lists of whole cells'
-/// text (lifted from `litchi-numbers`, record 0412).
+/// text (lifted from `litchi-numbers`).
 pub mod cell_rich_text;
 
 /// Bounded row/column header-count publication for style-only cell materialization.
@@ -109,9 +108,9 @@ pub trait TableSource {
     /// The semantic reference ceiling the package was opened with.
     fn max_references(&self) -> usize;
 
-    /// The package-level proofs the leaf memoizes for this package (record
-    /// 0370k); `None` recomputes every proof. The proofs depend only on the
-    /// immutable package, so a leaf keeps one set per opened package.
+    /// The package-level proofs the leaf memoizes for this package; `None`
+    /// recomputes every proof. The proofs depend only on the immutable package,
+    /// so a leaf keeps one set per opened package.
     fn proofs(&self) -> Option<&cell_format::control::PackageProofs> {
         None
     }

@@ -1,7 +1,7 @@
 //! Implementation of the public [`crate::sheet::drawable::drop_cap`]
 //! transaction: plain-text Drop Caps of the paragraphs of the text a sheet
-//! text box or shape owns, on W1-D's engine
-//! ([`litchi_iwa_text_wire::drop_cap`], record 0374), record 0378.
+//! text box or shape owns, on the shared engine
+//! ([`litchi_iwa_text_wire::drop_cap`]).
 //!
 //! The engine plans each change; this module publishes the plan as the host
 //! text editor does:
@@ -57,8 +57,7 @@ const DROP_CAP_PRESETS_FIELD: u32 = 8;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies
-    /// it (record 0351 §2.4).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted source is malformed or ambiguous.
@@ -89,7 +88,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {

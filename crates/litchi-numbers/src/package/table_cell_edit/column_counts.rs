@@ -1,4 +1,4 @@
-//! Column-header cell counts (record 0376c).
+//! Column-header cell counts.
 //!
 //! Native files count the stored cells of each column in the column-header
 //! bucket as well as each row's in the row-header buckets. The row counts

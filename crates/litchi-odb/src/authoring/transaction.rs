@@ -106,7 +106,7 @@ pub struct Edit<'source> {
     changes: Vec<Change>,
     legacy_query: Option<QueryChange>,
     /// Whether scalar setters touched more than one query: the patch then
-    /// reports no single legacy query change (record 0288).
+    /// reports no single legacy query change.
     several_queries: bool,
     payload_additions: Vec<Addition>,
     payload_directories: Vec<(String, String)>,

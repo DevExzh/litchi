@@ -1,6 +1,6 @@
 //! The calculation-engine owner family a volatile conditional-highlight rule
 //! (today, yesterday, tomorrow, the next or last period, an offset from
-//! today) needs, shared by the table owners (records 0376a, 0376b).
+//! today) needs, shared by the table owners.
 //!
 //! The first volatile rule of a table registers twelve formula owners (the
 //! conditional-style owner, its style-storage, global and global-name owners
@@ -108,8 +108,8 @@ pub struct Source<'a> {
     /// The cell column.
     pub column: u32,
     /// Whether the first volatile rule may give an existing family's
-    /// conditional-style owner its set and tile (Numbers' own shape, record
-    /// 0432). Only Numbers has native evidence.
+    /// conditional-style owner its set and tile (Numbers' own shape). Only
+    /// Numbers has native evidence.
     pub creates_first_tile: bool,
 }
 
@@ -825,8 +825,8 @@ pub fn remove<'a>(
 /// Every Numbers-saved table already registers the whole owner family; only
 /// its conditional-style owner has no volatile-time set and no tile until the
 /// first volatile rule (compare `basic.numbers` with
-/// `volatile-highlight-native.numbers`, record 0432). The first add creates
-/// them as Numbers does.
+/// `volatile-highlight-native.numbers`). The first add creates them as
+/// Numbers does.
 fn append<'a>(
     source: Source<'a>,
     owner: Object<'_>,
@@ -1084,8 +1084,8 @@ fn append<'a>(
 /// The engine with one coordinate added to or taken out of
 /// `uuid_reference_map` (field 7) under the table's UUID and the
 /// conditional-style owner, as Numbers lists its rule cells
-/// (`volatile-highlight-native.numbers`, record 0433). An engine without the
-/// field (a host-built document) stays as it is, and so does a removal of a
+/// (`volatile-highlight-native.numbers`). An engine without the field (a
+/// host-built document) stays as it is, and so does a removal of a
 /// coordinate the map does not list: leaf output of earlier records holds none.
 fn with_uuid_reference(
     engine: Vec<u8>,

@@ -4122,9 +4122,9 @@ fn split_popup_ownership_aliases_undercounts_inbound_and_limits_fail_closed() ->
     Ok(())
 }
 
-/// Callgrind probe (record 0379): set each of the five controls on empty
-/// cells and clear the first, serializing each output. Measured before and
-/// after the shared `litchi-iwa-table` engine move with
+/// Callgrind probe: set each of the five controls on empty cells and
+/// clear the first, serializing each output. Measured before and after
+/// the shared `litchi-iwa-table` engine move with
 /// `--toggle-collect=*table_cell_control::control_probe_routes*`.
 #[inline(never)]
 fn control_probe_routes(source: &[u8]) -> TestResult<usize> {

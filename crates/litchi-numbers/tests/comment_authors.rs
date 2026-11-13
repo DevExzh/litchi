@@ -1,7 +1,7 @@
-//! Comments in packages with more than one commenting author (record
-//! 0329), built from `comment-metadata-native-resaved.numbers`: a new
-//! comment is the generated author's, reused when the package holds it, else
-//! a new generated author joins the author storage; no present author is
+//! Comments in packages with more than one commenting author, built from
+//! `comment-metadata-native-resaved.numbers`: a new comment is the
+//! generated author's, reused when the package holds it, else a new
+//! generated author joins the author storage; no present author is
 //! impersonated.
 
 use litchi_iwa_archive::Limits;

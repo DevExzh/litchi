@@ -1,8 +1,8 @@
-//! App-authored Pages package directories (IWORK_API_REQUESTS.md request 16).
+//! App-authored Pages package directories.
 //!
 //! The capture, conversion and bundle publication are shared with the
-//! Keynote and Numbers owners in [`litchi_iwa_archive::bundle`] (record
-//! 0306); this module maps the Pages limits and errors onto it.
+//! Keynote and Numbers owners in [`litchi_iwa_archive::bundle`]; this module
+//! maps the Pages limits and errors onto it.
 
 use std::path::Path;
 

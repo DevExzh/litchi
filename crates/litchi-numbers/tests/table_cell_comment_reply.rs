@@ -1386,8 +1386,8 @@ fn read_only_graphs_preserve_strict_mutation_ownership() -> TestResult {
 }
 
 /// Native Numbers keeps a comment graph's aggregate references and omits
-/// their FieldInfo mirror (record 0318): such a graph is edited like a
-/// mirrored one, and the edit is exactly reversible.
+/// their FieldInfo mirror: such a graph is edited like a mirrored one, and the
+/// edit is exactly reversible.
 #[test]
 fn graphs_without_field_info_mirrors_are_edited() -> TestResult {
     let source = with_corruption(FixtureMode::SingleRoot, Corruption::FieldInfoMissing)?;

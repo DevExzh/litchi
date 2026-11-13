@@ -84,9 +84,9 @@ pub struct OwnedPackage {
     tolerance: ToleranceReport,
     /// The `mimetype` member and the parsed manifest, read once: every
     /// [`Self::package`] view (and so every `has_file`, `mimetype` and
-    /// `get_file`) used to read and strictly re-parse both (record 0377a).
-    /// The bytes are immutable and the parse depends only on them and the
-    /// retained limits, so clones share it.
+    /// `get_file`) used to read and strictly re-parse both. The bytes are
+    /// immutable and the parse depends only on them and the retained
+    /// limits, so clones share it.
     meta: Arc<std::sync::OnceLock<Arc<PackageMeta>>>,
 }
 

@@ -1,4 +1,4 @@
-//! The ADR 0034 §7 metadata family over the shared ODF engine (record 0288).
+//! The ADR 0034 §7 metadata family over the shared ODF engine.
 
 use litchi_odp::Package;
 use litchi_odp::metadata::Field;

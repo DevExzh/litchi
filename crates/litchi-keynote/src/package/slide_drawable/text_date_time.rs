@@ -1,9 +1,8 @@
-//! Date & Time fields of a text box or shape text (record 0372; the Keynote
-//! leaf of the host's `*_slide_text_box_date_time_field*` families over the
-//! shared W1-D smart-field engine). A field is a
-//! `TSWP.DateTimeSmartFieldArchive` covering a range of the storage's
-//! smart-field table, addressed by its position among the storage's
-//! date-time fields in text order.
+//! Date & Time fields of a text box or shape text (the Keynote leaf of the
+//! host's `*_slide_text_box_date_time_field*` families over the shared
+//! smart-field engine). A field is a `TSWP.DateTimeSmartFieldArchive`
+//! covering a range of the storage's smart-field table, addressed by its
+//! position among the storage's date-time fields in text order.
 
 use litchi_iwa_core::{ArchiveObject, RawMessage};
 use litchi_iwa_text::date_time::Settings;

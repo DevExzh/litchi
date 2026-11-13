@@ -196,7 +196,7 @@ struct ParagraphBuilder {
     wrappers: Vec<Wrapper>,
     /// The index of the innermost list item among the story's wrappers.
     item: Option<usize>,
-    /// Inline content that is not text (record 0304).
+    /// Inline content that is not text.
     objects: Vec<(usize, String)>,
 }
 
@@ -210,8 +210,7 @@ struct RunBuilder {
     text: Projection,
     /// The direct children of the run element (controls included), its
     /// first one, and whether character data sits directly in it: a span
-    /// that holds one field, or a link that holds one span, is recorded as
-    /// such (record 0316).
+    /// that holds one field, or a link that holds one span, is recorded as such.
     children: u8,
     child: Option<Child>,
     direct_text: bool,
@@ -934,7 +933,7 @@ impl Scanner<'_> {
     }
 
     /// Record inline content of the open paragraph that is not text: a
-    /// frame, a note, an annotation, a field or a hyperlink (record 0304).
+    /// frame, a note, an annotation, a field or a hyperlink.
     fn note_object(&mut self, element: &BytesStart<'_>, start: usize) {
         if let Some(paragraph) = &mut self.paragraph
             && paragraph.objects.len() < 8
@@ -1293,8 +1292,7 @@ impl Scanner<'_> {
                     let mut field = None;
                     let mut inner_span = None;
                     match sole {
-                        // A span holding one field is that field, formatted
-                        // (record 0316).
+                        // A span holding one field is that field, formatted.
                         Some((true, _, tag, content, range, _))
                             if kind == RunKind::Span && !text.is_empty() =>
                         {

@@ -1,6 +1,5 @@
 //! The per-series properties stored in a chart's series styles: strokes,
-//! fills, data-symbol fills and data-symbol outlines (records 0375a, 0378,
-//! 0414).
+//! fills, data-symbol fills and data-symbol outlines.
 //!
 //! The value of a series is read through its effective style (the private
 //! override of `series_private_styles`, else the theme style) and that
@@ -9,7 +8,7 @@
 //! `ensure_exclusive`; a shared style is refused). Nothing is allocated and
 //! the package metadata does not change. These are the host editors'
 //! `set_*_chart_series_{strokes, fills, symbol_fills, symbol_outlines}` and
-//! `reset_*` routes on W1-E's series-style write rules
+//! `reset_*` routes on the shared series-style write rules
 //! (`chart_style_codec::property`).
 //!
 //! Two layers: [`effective`] and [`rewrite`] work on payloads for an owner

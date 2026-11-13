@@ -39,7 +39,7 @@ fn copy_input(bytes: &[u8]) -> Result<Vec<u8>, PackageError> {
 }
 
 impl Package {
-    /// The retained physical package (metadata transactions, record 0288).
+    /// The retained physical package (metadata transactions).
     pub(crate) fn owned_package(&self) -> &litchi_odf_common::OwnedPackage {
         self.package.owned_package()
     }

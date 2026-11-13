@@ -1,4 +1,4 @@
-//! Inserting and removing slide-table rows and columns (record 0412e).
+//! Inserting and removing slide-table rows and columns.
 //!
 //! The structural rewrite is the shared table-topology engine
 //! (`litchi_iwa_table::topology`), the engine the Numbers family runs: it
@@ -54,7 +54,7 @@ impl fmt::Display for LimitKind {
 #[non_exhaustive]
 pub enum Error {
     /// A well-formed request this route refuses; [`Refusal::kind`]
-    /// classifies it (record 0351 §2.4).
+    /// classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted source is malformed or ambiguous.
@@ -85,7 +85,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {
@@ -487,7 +487,7 @@ fn run(
     let (_, _, target) = select(base)?;
     // The removed cells go with the axis: their values, styles, strings and
     // formulas are released in the structural pass, and a formula that
-    // reads one reads `#REF!` (record 0329).
+    // reads one reads `#REF!`.
     let mut options = engine::Publish::default();
     options.drop_cells = !cells.is_empty();
     options.fit_drawable = true;

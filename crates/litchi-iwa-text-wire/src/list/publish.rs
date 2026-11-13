@@ -1,6 +1,5 @@
-//! Publication of paragraph-list plans on one `TSWP.StorageArchive`
-//! (record 0413; the publisher of record 0370b, lifted out of
-//! `litchi-numbers`).
+//! Publication of paragraph-list plans on one `TSWP.StorageArchive` (the
+//! publisher lifted out of `litchi-numbers`).
 //!
 //! The planners of this module's parent read and plan; [`Publisher`]
 //! publishes their plans as the host text editor's list families do:

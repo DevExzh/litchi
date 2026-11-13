@@ -13,8 +13,8 @@ pub mod arrangement {
     };
 }
 
-/// Chart lifecycle of a body chart: the native kind and series direction
-/// (record 0416); `Package::body_chart_geometry` reads its frame.
+/// Chart lifecycle of a body chart: the native kind and series direction;
+/// `Package::body_chart_geometry` reads its frame.
 pub mod lifecycle {
     pub use crate::package::body_chart_lifecycle::{
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,

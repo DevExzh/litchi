@@ -45,8 +45,8 @@ pub enum ComponentTransferRefusal {
 }
 
 impl ComponentTransferRefusal {
-    /// The refusal class litchi-ops reports for this reason (record 0351
-    /// §2.4): the payload is content the writer cannot keep.
+    /// The refusal class litchi-ops reports for this reason: the payload is
+    /// content the writer cannot keep.
     #[must_use]
     pub const fn kind(self) -> litchi_core::edit::RefusalKind {
         match self {

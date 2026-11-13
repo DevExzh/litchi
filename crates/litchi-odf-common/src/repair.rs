@@ -690,7 +690,7 @@ impl<'source, Intent: RepairIntent> RepairPlan<'source, Intent> {
             "member_payloads_preserved": self.effects().member_payloads_preserved(),
             "reversible": self.effects().reversible(),
         });
-        // Sorted members whatever `serde_json` features are unified (0349).
+        // Sorted members whatever `serde_json` features are unified.
         let encoded = litchi_core::canonical_json::to_vec(&value);
         if encoded.len() > self.limits.max_plan_json_bytes {
             return Err(RepairError::Limit {

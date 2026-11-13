@@ -1,5 +1,5 @@
-//! Record 0290 F6: the metadata edit of a package without `meta.xml` (OTH and
-//! ODM leaf builders write none) creates the part instead of refusing.
+//! The metadata edit of a package without `meta.xml` (OTH and ODM leaf builders
+//! write none) creates the part instead of refusing.
 
 use litchi_odt::Package;
 use litchi_odt::core::{OwnedPackage, PackageWriter};

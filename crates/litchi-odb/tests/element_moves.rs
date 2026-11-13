@@ -4,7 +4,7 @@
 )]
 
 //! Query, table and column moves relocate one element's bytes among its
-//! siblings and leave every other byte in place (record 0292).
+//! siblings and leave every other byte in place.
 
 use litchi_odb::Builder;
 

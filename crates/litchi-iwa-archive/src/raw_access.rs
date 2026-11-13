@@ -1,13 +1,13 @@
-//! Raw physical member access and message-type statistics (record 0363 D5).
+//! Raw physical member access and message-type statistics.
 //!
 //! These functions are the physical inspection vocabulary that the
-//! retired migration host (deleted by record 0429) used to own on its `Package` and `Document`
+//! retired migration host used to own on its `Package` and `Document`
 //! types: ordered member names, IWA component names, raw member bytes, a
 //! bounded cached parse of one IWA component, and message-type statistics.
 //! They operate on the archive-owned [`PackageState`] and on parsed
-//! [`Archive`] values only. They publish no generated messages, native object
-//! identifiers or format semantic values, and they are re-exported only from
-//! [`crate::unstable`], never from a format facade.
+//! [`Archive`] values only. They publish no generated messages, native
+//! object identifiers or format semantic values, and they are re-exported
+//! only from [`crate::unstable`], never from a format facade.
 
 use std::collections::HashMap;
 use std::sync::Arc;

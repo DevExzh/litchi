@@ -1,8 +1,7 @@
-//! `TSD.LineEndArchive` payloads of the standard line endpoints (record
-//! 0371): the host's `shapes::line_end::native::endpoint_archive`, field by
-//! field in tag order, and the identifier-based read back. Lifted from the
-//! Keynote leaf's line-endpoint writer (record 0372) so the Pages and
-//! Numbers owners share it.
+//! `TSD.LineEndArchive` payloads of the standard line endpoints: the
+//! host's `shapes::line_end::native::endpoint_archive`, field by field in
+//! tag order, and the identifier-based read back. Lifted from the Keynote
+//! leaf's line-endpoint writer so the Pages and Numbers owners share it.
 
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::shape::line::{Endpoint, Endpoints};
@@ -331,7 +330,7 @@ pub fn decode(payload: Option<&[u8]>, limits: WireLimits) -> Result<Endpoint, De
 // ---- The endpoints of a straight-line shape (the host's
 // `shapes::line_end` read and `set_shape_line_endpoints`), shared by the
 // Pages and Numbers owners over the style workspace and by Keynote over its
-// own staging (record 0426) ----
+// own staging ----
 
 const SHAPE_INFO_MESSAGE_TYPE: u32 = 2_011;
 const SHAPE_INFO_SHAPE: u32 = 1;
@@ -375,9 +374,9 @@ impl From<litchi_iwa_common::Error> for EndpointsError {
     }
 }
 
-/// What the endpoint rules read from a staged package (record 0426): the
-/// shared [`crate::graph::Workspace`], or an owner's own staging that
-/// publishes shape-style plans itself (Keynote's slide-drawable workspace).
+/// What the endpoint rules read from a staged package: the shared
+/// [`crate::graph::Workspace`], or an owner's own staging that publishes
+/// shape-style plans itself (Keynote's slide-drawable workspace).
 pub trait Staged: crate::shape::Styles {
     /// The owner's error; the rules' own failures convert into it.
     type Error: From<EndpointsError>;

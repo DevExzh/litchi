@@ -291,8 +291,8 @@ fn edits_on_a_real_document() {
     assert_eq!(paragraphs[1].text().unwrap(), "changed");
 }
 
-/// Record 0295: text fields are listed with their text and attributes, and
-/// one field's text is replaced in place, keeping its element.
+/// Text fields are listed with their text and attributes, and one field's text
+/// is replaced in place, keeping its element.
 #[test]
 fn text_fields_are_listed_and_rewritten() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -484,8 +484,8 @@ fn parts_index_real_writer_documents() {
 
 #[test]
 fn paragraph_formatting_rewrites_the_one_paragraph_properties() {
-    // Record 0328: formatting a paragraph whose automatic style already has
-    // paragraph properties rewrites them; the copy no longer gains a second
+    // Formatting a paragraph whose automatic style already has paragraph
+    // properties rewrites them; the copy no longer gains a second
     // `style:paragraph-properties`.
     let package = built();
     let align = |value: &str| {

@@ -229,7 +229,7 @@ impl EditOptions {
 }
 
 impl Package {
-    /// The retained physical package (metadata transactions, record 0288).
+    /// The retained physical package (metadata transactions).
     pub(crate) fn owned_package(&self) -> &litchi_odf_common::OwnedPackage {
         self.package.package()
     }
@@ -1127,8 +1127,8 @@ pub enum EncryptionWriteRefusal {
 }
 
 impl EncryptionWriteRefusal {
-    /// The refusal class litchi-ops reports for this reason (record 0351
-    /// §2.4): the route cannot encrypt this source under the given policy.
+    /// The refusal class litchi-ops reports for this reason: the route cannot
+    /// encrypt this source under the given policy.
     #[must_use]
     pub const fn kind(self) -> litchi_core::edit::RefusalKind {
         match self {
@@ -2196,9 +2196,9 @@ impl Edit {
         self.stage_spliced_family("conditional-format.edit", sheet, bytes)
     }
 
-    /// Add one conditional format to a sheet (record 0327); the formatting
-    /// it applies becomes a named cell style in `styles.xml`. Returns its
-    /// position among the sheet's conditional formats.
+    /// Add one conditional format to a sheet; the formatting it applies becomes
+    /// a named cell style in `styles.xml`. Returns its position among the
+    /// sheet's conditional formats.
     ///
     /// # Errors
     ///
@@ -2221,7 +2221,7 @@ impl Edit {
         Ok(position)
     }
 
-    /// Replace the conditional format at `index` of a sheet (record 0327).
+    /// Replace the conditional format at `index` of a sheet.
     ///
     /// # Errors
     ///
@@ -2245,7 +2245,7 @@ impl Edit {
         Ok(self.stage_feature("conditional-format.set", sheet, bytes)?)
     }
 
-    /// Remove the conditional format at `index` of a sheet (record 0327).
+    /// Remove the conditional format at `index` of a sheet.
     ///
     /// # Errors
     ///
@@ -2260,8 +2260,8 @@ impl Edit {
         Ok(self.stage_feature("conditional-format.remove", sheet, bytes)?)
     }
 
-    /// Add one content validation bound to cells of a sheet (record 0327);
-    /// returns its position among the sheet's validations.
+    /// Add one content validation bound to cells of a sheet; returns its
+    /// position among the sheet's validations.
     ///
     /// # Errors
     ///
@@ -2282,7 +2282,7 @@ impl Edit {
         Ok(position)
     }
 
-    /// Replace the validation at `index` of a sheet (record 0327).
+    /// Replace the validation at `index` of a sheet.
     ///
     /// # Errors
     ///
@@ -2305,7 +2305,7 @@ impl Edit {
     }
 
     /// Remove the validation at `index` of a sheet: its bindings, and its
-    /// definition when no other sheet binds it (record 0327).
+    /// definition when no other sheet binds it.
     ///
     /// # Errors
     ///
@@ -2322,7 +2322,7 @@ impl Edit {
 
     /// Set (or, with `None`, remove) the auto-filter database range of a
     /// sheet, a zero-based inclusive `(first_row, first_column, last_row,
-    /// last_column)` rectangle (record 0327).
+    /// last_column)` rectangle.
     ///
     /// # Errors
     ///
@@ -2343,7 +2343,7 @@ impl Edit {
     }
 
     /// Replace the manual page breaks of a sheet's rows (`rows`) or columns:
-    /// the zero-based indexes a break precedes (record 0327).
+    /// the zero-based indexes a break precedes.
     ///
     /// # Errors
     ///
@@ -2366,8 +2366,8 @@ impl Edit {
     }
 
     /// Add a cell-anchored custom shape, or a picture frame whose image is
-    /// `resource`, to a sheet (record 0327); returns its position among the
-    /// sheet's drawings of its kind.
+    /// `resource`, to a sheet; returns its position among the sheet's drawings
+    /// of its kind.
     ///
     /// # Errors
     ///
@@ -2400,7 +2400,7 @@ impl Edit {
     }
 
     /// Change the frame, end cell, name or alternative text of the drawing
-    /// at `index` among a sheet's drawings of `kind` (record 0327).
+    /// at `index` among a sheet's drawings of `kind`.
     ///
     /// # Errors
     ///
@@ -2425,7 +2425,7 @@ impl Edit {
     }
 
     /// Remove the drawing at `index` among a sheet's drawings of `kind`, and
-    /// a picture's image when nothing else references it (record 0327).
+    /// a picture's image when nothing else references it.
     ///
     /// # Errors
     ///
@@ -4114,7 +4114,7 @@ fn known_operation(operation: &str) -> bool {
             | "form.edit"
             | "form.bindings"
             | "form.rich"
-            // The package routes of the former part families (record 0358a).
+            // The package routes of the former part families.
             | "content-validation.edit"
             | "content-validation.patch"
             | "database-range.edit"

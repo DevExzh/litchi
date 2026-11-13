@@ -1,5 +1,5 @@
 //! Duplicate, Arrange Flip and property staging of text boxes, shapes and
-//! lines (record 0372; a port of the host's `duplicate_slide_shape`,
+//! lines (a port of the host's `duplicate_slide_shape`,
 //! `duplicate_slide_text_box`, `flip_slide_shape`,
 //! `set_slide_shape_properties` and `set_slide_text_box_properties`).
 

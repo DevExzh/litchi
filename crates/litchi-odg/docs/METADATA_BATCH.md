@@ -20,7 +20,7 @@ sounds are outside this surface. The
 | Unknown source preservation | Transition sound comments and adjacent unknown XML remain source-backed; paired contour/glue-point tests retain comments. |
 | Bounded auxiliary inventory | Image-map retained-area and owner XML accounting has a focused rejection test. |
 | Optional-inventory dispatch | [`inventory_dispatch.rs`](../tests/inventory_dispatch.rs) checks local aliases, default namespaces, foreign rebinding, and malformed-owner rejection when optional passes are selected during the mandatory scan. |
-| Optional metadata storage | Metadata-free shapes retain one optional pointer; enhanced geometry, image maps, contours, and glue points allocate their shared private metadata owner only when present. See the measured layout and memory receipts in change 0502. |
+| Optional metadata storage | Metadata-free shapes retain one optional pointer; enhanced geometry, image maps, contours, and glue points allocate their shared private metadata owner only when present. |
 | Existing CRUD behavior | [`package_snapshot.rs`](../tests/package_snapshot.rs) exercises the existing package, edit, patch, resource, and preservation surface. |
 | Dependency ownership | `litchi-odg` continues to depend on `litchi-core` and `litchi-odf-common`; ZIP remains a development-only direct dependency. |
 | Independent consumer | [LibreOffice receipt](NATIVE_METADATA.md): headless Draw opens/resaves the generated artifact but drops transition metadata. No native transition-persistence claim follows. |

@@ -1,6 +1,6 @@
 //! Archive-free inventory of the embedded media of an iWork package: every
 //! `TSP.DataInfo` record with its materialized member and the references
-//! that keep it alive (record 0375).
+//! that keep it alive.
 //!
 //! A format owner feeds an [`Inventory`] with the package metadata's data
 //! records and component data references, the `MessageInfo.data_references`

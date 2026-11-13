@@ -1,5 +1,5 @@
 //! Body-media frame, property and playback transactions
-//! (`litchi_pages::drawable::properties`, record 0371).
+//! (`litchi_pages::drawable::properties`).
 
 use std::time::Duration;
 

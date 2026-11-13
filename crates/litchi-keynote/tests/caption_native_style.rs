@@ -1,5 +1,4 @@
-//! The paragraph style of a new caption against captions Keynote authored
-//! (record 0435).
+//! The paragraph style of a new caption against captions Keynote authored.
 //!
 //! `chart-caption-native.key` and `slide-movie-geometry-source-native.key` hold
 //! captions typed in Keynote 14.4, on a chart and on a movie. Both use the
@@ -149,7 +148,7 @@ fn new_image_caption_equals_the_native_paragraph_style() -> TestResult {
 }
 
 /// A new caption on a native chart stays refused, as it was: the slide does
-/// not list the document stylesheet, which the route requires (record 0435).
+/// not list the document stylesheet, which the route requires.
 #[test]
 fn a_new_caption_on_a_native_chart_stays_refused() -> TestResult {
     let package = Package::from_bytes(&fixture("chart-caption-native.key")?)?;

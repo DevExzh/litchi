@@ -1,7 +1,7 @@
 //! The capabilities of the removed ODS part-level patches on the package
-//! route (record 0358a): every part closure of `Package::edit` publishes a
-//! package `Patch` that serializes deterministically, replays only onto its
-//! exact source, inverts, and joins with disjoint part edits.
+//! route: every part closure of `Package::edit` publishes a package
+//! `Patch` that serializes deterministically, replays only onto its exact
+//! source, inverts, and joins with disjoint part edits.
 
 use litchi_ods::database_range::Range;
 use litchi_ods::styles::table_template::{Region, Style, Template};

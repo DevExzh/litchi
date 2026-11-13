@@ -22,9 +22,9 @@ pub(in crate::package) fn validate_dependencies(
     validate_dependencies_with(source, target, before, after, false)
 }
 
-/// The cell route's dependency check (record 0424a): a pivot owner alone
-/// does not refuse a cell edit, which changes no header or section count;
-/// the host writes cells of pivot tables. Every count-change rule applies.
+/// The cell route's dependency check: a pivot owner alone does not refuse a
+/// cell edit, which changes no header or section count; the host writes cells
+/// of pivot tables. Every count-change rule applies.
 pub(in crate::package) fn validate_cell_dependencies(
     source: &Package,
     target: Target,

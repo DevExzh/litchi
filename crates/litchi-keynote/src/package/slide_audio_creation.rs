@@ -1432,10 +1432,9 @@ pub(super) fn allocate_ids(
         .checked_add(4)
         .ok_or(SlideAudioCreationError::InvalidSource)?;
     // The host draws random GUIDs here. Leaf output must be a pure function
-    // of its input (record 0428), so every UUID is derived from the fresh
-    // identifier it names (above the package watermark) with the SplitMix64
-    // scheme of record 0375a §2.1; the build UUID is salted apart from the
-    // build object's own map UUID.
+    // of its input, so every UUID is derived from the fresh identifier it
+    // names (above the package watermark) with the SplitMix64 scheme; the
+    // build UUID is salted apart from the build object's own map UUID.
     let build = first
         .checked_add(3)
         .ok_or(SlideAudioCreationError::InvalidSource)?;
@@ -1556,7 +1555,7 @@ const OBJECT_UUID_SALT: u64 = 0x6f62_6a65_6374_7575;
 const BUILD_UUID_SALT: u64 = 0x6275_696c_6475_7569;
 
 /// A deterministic RFC 4122 version 4, variant 1 GUID for `identifier`
-/// (SplitMix64, record 0375a §2.1; record 0428). Never nil.
+/// (SplitMix64). Never nil.
 fn derived_guid(identifier: u64, salt: u64) -> [u8; 16] {
     use litchi_numbers_wire::table_create::mix;
     let lower = mix(identifier ^ salt);

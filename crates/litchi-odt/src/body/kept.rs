@@ -1,4 +1,4 @@
-//! What a text set keeps (record 0304).
+//! What a text set keeps.
 //!
 //! A text set replaces the *text* of a node: its character data, `text:s`,
 //! `text:tab` and `text:line-break`, and the `text:span` wrappers that hold
@@ -295,7 +295,7 @@ fn refusal(_root: Kind, element: &str, _what: &str) -> Error {
             concat!(
                 "an ODT text set would replace ",
                 $name,
-                ": set the text of the runs around it, or remove it first (record 0304)"
+                ": set the text of the runs around it, or remove it first"
             )
         };
     }
@@ -412,7 +412,7 @@ fn refusal(_root: Kind, element: &str, _what: &str) -> Error {
         "table:covered-table-cell" => reason!("table:covered-table-cell"),
         _ => {
             "an ODT text set would replace a non-text element: set the text of the runs around it, \
-              or remove it first (record 0304)"
+              or remove it first"
         },
     };
     Error::Refused(litchi_core::edit::Refusal::new(

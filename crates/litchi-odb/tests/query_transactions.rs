@@ -86,8 +86,7 @@ fn transaction_rejects_ambiguous_and_absent_query_selectors() {
     let mut edit = database.edit();
     assert!(edit.set_query_command("missing", "SELECT 0").is_err());
     edit.set_query_command("ledger", "SELECT 3").unwrap();
-    // A second query stages too (record 0288); the patch then reports no
-    // single legacy query change.
+    // A second query stages too; the patch then reports no single legacy query change.
     edit.set_query_command("other", "SELECT 4").unwrap();
     assert!(edit.set_query_command("missing", "SELECT 0").is_err());
     let commit = edit.commit().unwrap();

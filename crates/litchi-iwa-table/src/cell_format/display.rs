@@ -134,7 +134,7 @@ pub enum DisplayFormatFamily {
     DateTime,
     Duration,
     Text,
-    /// A positional numeral system (record 0370k).
+    /// A positional numeral system.
     NumeralSystem,
 }
 
@@ -1058,7 +1058,7 @@ fn map_bnc_error(error: litchi_numbers_wire::Error, path: Path) -> Error {
 /// Convert a decimal cell to a Currency, Date and Time, Duration or (text
 /// and empty cells) Text cell naming `key`: the stored scalar takes the family's native type (a
 /// Duration's value becomes seconds) and the format metadata the family's
-/// explicit tuple, as the host's compatibility writer does (record 0412a).
+/// explicit tuple, as the host's compatibility writer does.
 fn convert_cell_to_family(
     source: &[u8],
     family: DisplayFormatFamily,
@@ -1513,8 +1513,7 @@ pub fn rewrite_scientific_format(
     )
 }
 
-/// Read one existing numeral-system format with a fresh transaction ledger
-/// (record 0370k).
+/// Read one existing numeral-system format with a fresh transaction ledger.
 pub fn read_numeral_system_format(
     source: &dyn TableSource,
     target: Target,
@@ -1549,7 +1548,7 @@ pub fn read_numeral_system_format_with_budget(
 }
 
 /// Rewrite one ordinary numeral-system cell without manufacturing a
-/// CellSpec graph (record 0370k).
+/// CellSpec graph.
 pub fn rewrite_numeral_system_format(
     source: &dyn TableSource,
     target: Target,
@@ -1689,7 +1688,7 @@ const fn is_decimal_family(family: DisplayFormatFamily) -> bool {
 }
 
 /// Read the selected cell's display format whatever its family, in one
-/// validation pass (record 0370k): `Ok(None)` is an automatic cell, and
+/// validation pass: `Ok(None)` is an automatic cell, and
 /// [`DisplayReadError::WrongFormatFamily`] a cell outside the display
 /// families (a control, a custom format).
 fn read_any_display_format_with_budget(
@@ -1704,7 +1703,7 @@ fn read_any_display_format_with_budget(
 /// The display format of the selected cell as the neutral
 /// [`litchi_iwa_common::table::cell::data_format::DataFormat`]:
 /// `Ok(Some(DataFormat::Automatic))` for an automatic cell, `Ok(None)` for a
-/// cell outside the display families (record 0370k).
+/// cell outside the display families.
 ///
 /// # Errors
 ///
@@ -2216,8 +2215,7 @@ fn rewrite_display_format(
     // A native decimal cell naming an implicit Number entry converted to
     // Currency, Date and Time, Duration or (a text cell) Text: the host's compatibility writer
     // interns the new family's entry, converts the stored scalar and changes
-    // the cell's kind, as `BncCell::set_data_format_identifier` does
-    // (record 0412a).
+    // the cell's kind, as `BncCell::set_data_format_identifier` does.
     let converting = (matches!(
         family,
         DisplayFormatFamily::Currency
@@ -2448,7 +2446,7 @@ fn rewrite_display_format(
     // native Pages and Keynote cells name an implicit Number entry. The
     // host's compatibility writer interns a fresh entry of the requested
     // family and releases the cell's reference to the implicit one instead
-    // of rewriting it in place (record 0412, the 0370k gap).
+    // of rewriting it in place.
     let mut implicit_foreign = false;
     if let Some(old_key) = old_format {
         let entry = format_facts
@@ -2581,7 +2579,7 @@ fn rewrite_display_format(
         } else if family == DisplayFormatFamily::DateTime {
             // A cleared Date and Time cell holding a plain number goes back
             // to the ordinary numeric type, as the host's
-            // `clear_explicit_format` does (record 0412a).
+            // `clear_explicit_format` does.
             let cleared = rewrite_date_time_cell_metadata(cell_source, None, path, budget)?;
             let mut cell = BncCell::parse(
                 &cleared,
@@ -4541,14 +4539,14 @@ fn rewrite_custom_cell_clear(
 /// Derive the registry UUID of a new Custom format deterministically.
 ///
 /// The host draws a random GUID here. Leaf output must be a pure function of
-/// its input (patch replay, content identity, record 0351), so the UUID is
-/// derived as the shared W4 engines derive object UUIDs (record 0375a §2.1,
-/// record 0298 §2.1): SplitMix64 over a seed made from package content and
-/// position — the registry object, the owning table, the new entry's index
-/// and a digest of the encoded format — with a counter that is advanced until
-/// the UUID is non-zero in both halves and unused by the registry. The bits
-/// keep the RFC 4122 version 4, variant 1 layout of the GUIDs the host writes
-/// (`litchi_core::id::generate_guid_bytes`, little-endian halves). Record 0428.
+/// its input (patch replay, content identity), so the UUID is derived as the
+/// shared engines derive object UUIDs: SplitMix64 over a seed made from
+/// package content and position — the registry object, the owning table, the
+/// new entry's index and a digest of the encoded format — with a counter that
+/// is advanced until the UUID is non-zero in both halves and unused by the
+/// registry. The bits keep the RFC 4122 version 4, variant 1 layout of the
+/// GUIDs the host writes (`litchi_core::id::generate_guid_bytes`,
+/// little-endian halves).
 fn derived_custom_uuid(
     entries: &[CustomRegistryEntry],
     registry_identifier: u64,
@@ -5736,9 +5734,9 @@ const KEYNOTE_DOCUMENT_SUPER_FIELD: u32 = 3;
 /// `KN.DocumentArchive.tables_custom_format_list`.
 const KEYNOTE_CUSTOM_REGISTRY_REFERENCE_FIELD: u32 = 4;
 
-/// Where one format's document root names the custom-format registry
-/// (record 0412a): its message, its direct reference field, and its
-/// `TSA.DocumentArchive` envelope (whose field 12 is the native reference).
+/// Where one format's document root names the custom-format registry: its
+/// message, its direct reference field, and its `TSA.DocumentArchive` envelope
+/// (whose field 12 is the native reference).
 #[derive(Debug, Clone, Copy)]
 struct DocumentLayout {
     index: usize,
@@ -6316,8 +6314,8 @@ const NUMERAL_SYSTEM_FIELDS: [u32; 4] = [1, 8, 9, 10];
 /// fraction accuracy, date suppression and the date-time pattern).
 const NUMERAL_SYSTEM_FORBIDDEN_FIELDS: [u32; 9] = [2, 3, 4, 5, 6, 11, 12, 13, 14];
 
-/// Decode a numeral-system `TSK.FormatStructArchive` (record 0370k), as the
-/// host editor's codec admits it.
+/// Decode a numeral-system `TSK.FormatStructArchive`, as the host editor's
+/// codec admits it.
 fn decode_numeral_system(source: &[u8], path: Path) -> Result<NumeralSystem, DisplayReadError> {
     let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
         .map_err(|_| Error::InvalidSource { path })?;

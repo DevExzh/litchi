@@ -1,6 +1,6 @@
 //! Archive-free per-series chart values: strokes, fills, connection lines,
 //! data symbols and trendlines, and the native field families a chart kind
-//! stores them in (record 0375).
+//! stores them in.
 //!
 //! The field numbers of the families are those of the generated
 //! `TSCH.Generated.ChartSeriesStyleArchive` (strokes, fills, symbol sizes,

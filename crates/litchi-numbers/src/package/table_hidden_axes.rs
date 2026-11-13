@@ -1,5 +1,4 @@
-//! Exact-source hidden-row/hidden-column transactions for Numbers tables
-//! (record 0379).
+//! Exact-source hidden-row/hidden-column transactions for Numbers tables.
 //!
 //! The sheet and table selectors resolve to the table's native route; the
 //! shared engine (`litchi_iwa_table::hidden_axes`, the one the Pages and
@@ -77,7 +76,7 @@ impl fmt::Display for LimitKind {
 #[non_exhaustive]
 pub enum Error {
     /// A well-formed request this route refuses; [`Refusal::kind`]
-    /// classifies it (record 0351 §2.4).
+    /// classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted table graph is malformed or ambiguous.
@@ -254,7 +253,7 @@ impl engine::Leaf for Leaf {
     type Selector<'s> = Selection<'s>;
     type Budget = engine::WireBudget;
 
-    // Numbers cell-level families keep the root previews (record 0370).
+    // Numbers cell-level families keep the root previews.
     const DELETES_ROOT_PREVIEWS: bool = false;
 
     fn position_selector(scope: usize, table: usize) -> Self::Selector<'static> {

@@ -77,7 +77,7 @@ pub mod unstable {
         ReassemblyPreparationRequirements,
     };
     /// Raw member access, bounded component reads and message-type statistics
-    /// over the archive-owned package state (record 0363 D5).
+    /// over the archive-owned package state.
     pub use crate::raw_access::{
         ComponentReadError, cached_component, count_message_types, entry, entry_names,
         iwa_entry_names, message_type_summary, most_common_message_type, normalize_entry_name,

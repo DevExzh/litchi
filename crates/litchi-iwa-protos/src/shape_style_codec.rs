@@ -1,7 +1,7 @@
 //! Bounded wire codec of shape geometry shared by the Pages, Numbers and
-//! Keynote shape engines (record 0375): today the native straight line —
-//! a `TSWP.ShapeInfoArchive` whose Bézier path source is one `moveTo`/`lineTo`
-//! pair along the x axis.
+//! Keynote shape engines: today the native straight line — a
+//! `TSWP.ShapeInfoArchive` whose Bézier path source is one
+//! `moveTo`/`lineTo` pair along the x axis.
 //!
 //! [`line`](crate::shape_style_codec::line) reads the line's drawable
 //! geometry and path; [`rewrite_line`](crate::shape_style_codec::rewrite_line)

@@ -1,5 +1,4 @@
-//! Archive-free hidden-row and hidden-column values for Keynote slide
-//! tables (record 0379).
+//! Archive-free hidden-row and hidden-column values for Keynote slide tables.
 //!
 //! The values are the shared iWork axis vocabulary; the native hidden-state
 //! graph stays inside the package adapter and the shared table engine.

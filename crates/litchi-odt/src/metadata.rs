@@ -31,7 +31,7 @@ pub use litchi_odf_common::Error;
 pub use litchi_odf_common::LimitKind;
 
 /// A document property the metadata transaction writes (shared by every
-/// ODF leaf, record 0288).
+/// ODF leaf).
 pub use litchi_odf_common::metadata::Field;
 
 /// A detached metadata edit of one source package.

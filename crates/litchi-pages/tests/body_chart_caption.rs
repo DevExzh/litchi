@@ -1,5 +1,4 @@
-//! Selector, reversibility and refusal coverage for body-chart captions
-//! (record 0427).
+//! Selector, reversibility and refusal coverage for body-chart captions.
 
 use litchi_pages::chart::caption::{Error, Refusal};
 use litchi_pages::{BodyChartSelector, Package};
@@ -78,7 +77,7 @@ fn body_chart_caption_refusals_are_typed() -> TestResult {
 /// No Pages file we hold has a caption Pages authored, so a new caption keeps
 /// the theme's first preset, the title's style, and this pins that choice: the
 /// template does list a caption style, and using it would be a guess until a
-/// native file shows it (record 0435).
+/// native file shows it.
 #[test]
 fn new_caption_keeps_the_theme_first_preset_without_native_evidence() -> TestResult {
     let package = Package::from_bytes(NATIVE)?;

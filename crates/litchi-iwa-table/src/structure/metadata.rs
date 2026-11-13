@@ -378,7 +378,7 @@ pub struct Transition {
     /// leaves the registry and its package entry is deleted.
     pub data_removals: Vec<(u64, String)>,
     /// Unreferenced data with no package entry (an unmaterialized record):
-    /// only its `DataInfo` record leaves the registry (record 0417).
+    /// only its `DataInfo` record leaves the registry.
     pub data_record_removals: Vec<u64>,
     /// Data-reference owner records of new objects (a duplicate sharing its
     /// source's embedded data).
@@ -419,14 +419,14 @@ impl Transition {
     }
 
     /// Lower the watermark over `objects` when the last registered
-    /// identifier is one of them (record 0370).
+    /// identifier is one of them.
     pub fn release_suffix(&mut self, objects: &[u64]) -> FaultResult<()> {
         reserve(&mut self.released, objects.len())?;
         self.released.extend_from_slice(objects);
         Ok(())
     }
 
-    /// Advance the save token of `component` (record 0370d).
+    /// Advance the save token of `component`.
     pub fn stamp(&mut self, component: u64) -> FaultResult<()> {
         if !self.stamps.contains(&component) {
             reserve(&mut self.stamps, 1)?;
@@ -763,8 +763,8 @@ pub fn apply(
         let adds = !external_additions.is_empty() || !uuid_additions.is_empty();
         // The addition batches require a rising watermark; a transaction
         // that adds registry records without allocating (a reference to an
-        // existing style, record 0370b) passes one step up and the
-        // watermark is put back to `last` below.
+        // existing style) passes one step up and the watermark is put
+        // back to `last` below.
         let unraised = adds && last <= current;
         if unraised {
             restore = Some(last);

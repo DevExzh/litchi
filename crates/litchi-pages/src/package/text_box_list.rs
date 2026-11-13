@@ -1,16 +1,17 @@
 //! Implementation of the public [`crate::drawable::list`] transactions:
-//! paragraph lists of the text a body text box or shape owns (record 0413,
-//! the port of the Numbers family of record 0378).
+//! paragraph lists of the text a body text box or shape owns (the port of the
+//! Numbers family).
 //!
-//! The list change runs W1-D's engine ([`litchi_iwa_text_wire::list`],
-//! record 0374) and is published by the shared storage-list publisher
-//! (`litchi_iwa_text_wire::list::publish`, the record 0370b publisher of the
-//! Numbers cell-list family, lifted into the text crate by record 0413);
-//! `litchi_iwa_table::structure::list_workspace` is its working-set side.
-//! Host `set_x`/`reset_x` pairs collapse into one property verb
-//! ([`Edit::set`]/[`Edit::reset`]); `reset_text_box_paragraph_list`
-//! and `reset_text_box_paragraph_list_level` are [`Edit::set_list`]
-//! with [`ParagraphList::None`] and [`Edit::set_level`] with
+//! The list change runs the shared engine
+//! ([`litchi_iwa_text_wire::list`]) and is published by the shared
+//! storage-list publisher (`litchi_iwa_text_wire::list::publish`, the
+//! publisher of the Numbers cell-list family, lifted into the text
+//! crate); `litchi_iwa_table::structure::list_workspace` is its
+//! working-set side. Host `set_x`/`reset_x` pairs collapse into one
+//! property verb ([`Edit::set`]/[`Edit::reset`]);
+//! `reset_text_box_paragraph_list` and
+//! `reset_text_box_paragraph_list_level` are [`Edit::set_list`] with
+//! [`ParagraphList::None`] and [`Edit::set_level`] with
 //! [`ParagraphListLevel::ZERO`].
 
 #![allow(
@@ -45,8 +46,7 @@ structure::text_box_family!("text-box list", Wire(litchi_iwa_common::LimitKind))
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies
-    /// it (record 0351 §2.4).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted source is malformed or ambiguous.
@@ -77,7 +77,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {

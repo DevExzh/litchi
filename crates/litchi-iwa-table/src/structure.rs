@@ -1,5 +1,5 @@
-//! Shared exact-source working set of the structural table transactions
-//! (record 0301, moved from `litchi-numbers` in record 0379).
+//! Shared exact-source working set of the structural table transactions (moved
+//! from `litchi-numbers`).
 //!
 //! A structural edit stages its changes on a [`Working`] set: every
 //! component it touches is decompressed and parsed once from the exact
@@ -27,8 +27,8 @@ pub mod metadata;
 pub mod plan;
 pub mod references;
 /// Exact wire helpers of the structural rewrites (moved from
-/// `litchi-numbers`' table topology, record 0412): every rewrite keeps the
-/// bytes of each field it does not change.
+/// `litchi-numbers`' table topology): every rewrite keeps the bytes of each
+/// field it does not change.
 pub mod wire;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -44,8 +44,8 @@ use crate::TableSource;
 /// view plus the leaf's strict candidate reopen.
 pub trait TableLeaf: TableSource + Sized {
     /// Whether a first volatile conditional-highlight rule may complete a
-    /// saved document's owner family. Numbers has native evidence (record
-    /// 0432); Keynote and Pages keep refusing, as the host does.
+    /// saved document's owner family. Numbers has native evidence; Keynote and
+    /// Pages keep refusing, as the host does.
     const CREATES_FIRST_VOLATILE_TILE: bool = false;
 
     /// Reopen exact candidate bytes under this package's ingress profile.
@@ -321,11 +321,11 @@ pub struct Working<'p, P> {
     allocated: Option<u64>,
     /// The next identifier to allocate.
     next_identifier: u64,
-    /// Whether [`Self::publish`] keeps the root previews (record 0370: the
-    /// cell-level families keep them, as the host editor does).
+    /// Whether [`Self::publish`] keeps the root previews (the cell-level
+    /// families keep them, as the host editor does).
     keep_previews: bool,
     /// The package save token the publication writes, for a transaction
-    /// composed of several publications (record 0370g).
+    /// composed of several publications.
     save_token: Option<u64>,
 }
 
@@ -481,8 +481,7 @@ impl<'p, P: TableLeaf> Working<'p, P> {
     }
 
     /// The identifier the next [`Self::allocate`] returns first (a planner
-    /// that names the objects it creates before they are allocated, record
-    /// 0376b).
+    /// that names the objects it creates before they are allocated).
     #[must_use]
     pub const fn next_identifier(&self) -> u64 {
         self.next_identifier
@@ -567,12 +566,11 @@ impl<'p, P: TableLeaf> Working<'p, P> {
     }
 
     /// Keep the root previews on [`Self::publish`] instead of deleting them
-    /// as stale: a cell-level edit (topology, record 0370) leaves them in
-    /// place, as the host editor and the native application's own saves
-    /// before it regenerates them do.
-    /// Write `token` as the package save token on publication: a
-    /// transaction composed of several publications advances its source's
-    /// token once (record 0370g).
+    /// as stale: a cell-level edit (topology) leaves them in place, as
+    /// the host editor and the native application's own saves before it
+    /// regenerates them do. Write `token` as the package save token on
+    /// publication: a transaction composed of several publications
+    /// advances its source's token once.
     pub fn set_save_token(&mut self, token: u64) {
         self.save_token = Some(token);
     }

@@ -1,4 +1,4 @@
-//! Numbers sheet shape and text-frame style transactions (W2-A, record 0380).
+//! Numbers sheet shape and text-frame style transactions.
 //!
 //! These tests exercise the selector-first facade on a source-built drawable
 //! pair. The host differential cases ran in the retired host's parity

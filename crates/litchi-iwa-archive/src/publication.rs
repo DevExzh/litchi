@@ -629,7 +629,7 @@ fn sync_tree(root: &Path) -> io::Result<()> {
 /// staging directory, every file and directory in it is synchronized, an
 /// existing destination directory is renamed aside, the staging directory
 /// takes the destination name, and only then is the old directory deleted
-/// (record 0301, Pages package directories).
+/// (Pages package directories).
 ///
 /// A failure before the swap leaves the destination untouched; a failure of
 /// the swap renames the old directory back. Deleting the retired directory

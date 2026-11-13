@@ -1,5 +1,5 @@
 //! Implementation of the public [`crate::table::cell_list`] transactions:
-//! paragraph lists of the text in one body-table cell (record 0412).
+//! paragraph lists of the text in one body-table cell.
 //!
 //! A cell's text carries lists only as rich text: a `TST.RichTextPayload`
 //! in its table's rich-text list names a `TSWP.StorageArchive` whose
@@ -7,7 +7,7 @@
 //! string key) reads as unlisted paragraphs; the first change that needs a
 //! list promotes it to rich text, as the host editor's `cell_paragraph_list`
 //! does. Every change runs the shared cell rich-text engine
-//! (`litchi_iwa_table::cell_rich_text::list`) over W1-D's list engine
+//! (`litchi_iwa_table::cell_rich_text::list`) over the shared list engine
 //! (`litchi_iwa_text_wire::list`). Host `set_x`/`reset_x` pairs collapse into
 //! one property verb ([`Edit::set`]/[`Edit::reset`]); `reset_list` and
 //! `reset_level` are [`Edit::set_list`] with [`ParagraphList::None`] and
@@ -38,7 +38,7 @@ use crate::BodyTableSelector;
 rich_text_family!("body-table cell list");
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {

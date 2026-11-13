@@ -1,7 +1,7 @@
-//! Drawing styles of body shapes (record 0371; the Pages leaf of the host's
-//! `{,set_,reset_}body_shape_{fill,stroke,shadow,effects,text_layout}`) over
-//! the shared shape-style variation engine (`litchi_iwa_style::shape`,
-//! record 0375a).
+//! Drawing styles of body shapes (the Pages leaf of the host's
+//! `{,set_,reset_}body_shape_{fill,stroke,shadow,effects,text_layout}`)
+//! over the shared shape-style variation engine
+//! (`litchi_iwa_style::shape`).
 //!
 //! A shape's own value lives in a copy-on-write variation of its
 //! `TSWP.ShapeStyleArchive`. The engine plans and applies each write on a
@@ -130,8 +130,7 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies
-    /// it (record 0351 §2.4).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The drawable or style graph is malformed.
@@ -394,7 +393,7 @@ enum Change {
     },
 }
 
-/// A new embedded image an image fill references (record 0413b).
+/// A new embedded image an image fill references.
 struct NewImage {
     data: u64,
     bytes: Arc<[u8]>,
@@ -608,11 +607,10 @@ impl Edit<'_> {
                 Change::Reset(_) | Change::ImageFill { .. } => None,
             })
             .collect::<Vec<_>>();
-        // The shared release (record 0426; record 0424b): a style that no
-        // longer stores a captured image fill drops its data reference and
-        // registered owner, and data nothing references loses its
-        // `DataInfo`. A `Data/` member the package does not hold is not
-        // deleted.
+        // The shared release: a style that no longer stores a captured
+        // image fill drops its data reference and registered owner, and
+        // data nothing references loses its `DataInfo`. A `Data/`
+        // member the package does not hold is not deleted.
         let deletions = if releases.is_empty() {
             Vec::new()
         } else {
@@ -895,7 +893,7 @@ fn embedded_fill(
 /// Give the shape's (new) style variation the image's data reference and
 /// register the asset: its `DataInfo` and the variation's data-reference
 /// owner in the package metadata (the media family's data-owner
-/// transition, record 0371; Keynote's image fills, record 0372).
+/// transition; Keynote's image fills).
 fn own_image(
     source: &Package,
     archives: &mut Vec<(Arc<str>, Archive)>,

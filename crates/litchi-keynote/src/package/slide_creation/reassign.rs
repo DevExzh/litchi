@@ -1,5 +1,5 @@
 //! Layout reassignment of a live slide (a port of the migration host's
-//! `set_slide_layout`, record 0372).
+//! `set_slide_layout`).
 //!
 //! The slide keeps its text, notes, builds, transition and ordinary
 //! drawables. The selected layout supplies the slide style and template,

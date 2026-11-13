@@ -1,5 +1,5 @@
-//! Body-table cell values (record 0309): text, numbers, booleans and
-//! clears in a Pages body table, through the shared TST cell writer
+//! Body-table cell values: text, numbers, booleans and clears in a Pages body
+//! table, through the shared TST cell writer
 //! (`litchi_numbers_wire::table_write`).
 //!
 //! A write rewrites only the cell's storage tile, the table's string list
@@ -70,8 +70,7 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
-    /// (record 0351 §2.4, record 0361).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted source is malformed or ambiguous.
@@ -102,7 +101,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {
@@ -113,7 +112,7 @@ pub enum Refusal {
     #[error("cell outside the table or value not finite")]
     InvalidCell,
     /// The cell holds a formula, or a formula that reads it is outside the
-    /// shared cache refresh (record 0376).
+    /// shared cache refresh.
     #[error("the cell takes part in a formula graph")]
     Formulas,
     /// The cell storage is outside the shared writer (a legacy tile, a
@@ -285,7 +284,7 @@ pub struct Edit<'a> {
     target: Option<table_lock::BodyTableTarget>,
     cells: Vec<(u32, u32, Value)>,
     /// The formulas staged with `set_formula_cached`; their cached values
-    /// are in `cells` (record 0376a).
+    /// are in `cells`.
     formulas: Vec<(u32, u32, formula::FormulaExpression)>,
 }
 
@@ -337,8 +336,8 @@ impl Edit<'_> {
 
     /// Stage the formula of a cell, with `cached` as its displayed result
     /// until the next native recalculation; any formula the cell holds is
-    /// replaced (record 0376a). A later stage of the same cell replaces this
-    /// one; [`Edit::set`] clears the formula.
+    /// replaced. A later stage of the same cell replaces this one;
+    /// [`Edit::set`] clears the formula.
     ///
     /// The formula reads cells of its own table: a reference to another
     /// table (named by native identifier) or a pivot category is refused at
@@ -528,12 +527,12 @@ fn publish(edit: &Edit<'_>) -> Result<Package, Error> {
         .numbers_wire_limits()
         .map_err(|_| Error::InvalidSource)?;
     // A formula to author or to remove takes the structural path, which can
-    // create and delete dependency tiles (record 0376a).
+    // create and delete dependency tiles.
     if formulas::involved(edit, &limits)? {
         return formulas::publish(edit);
     }
     // The calculation graph: plan the refresh of the formula caches that
-    // read the written cells (record 0376) before any payload changes.
+    // read the written cells before any payload changes.
     let mut engine = None;
     let mut owners = Vec::new();
     for component in package.state.source.components().iter() {

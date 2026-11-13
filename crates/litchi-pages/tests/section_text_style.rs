@@ -1,4 +1,4 @@
-//! Character styling of body text spans (record 0309).
+//! Character styling of body text spans.
 
 use std::path::PathBuf;
 

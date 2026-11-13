@@ -1,5 +1,5 @@
-//! Cell fill, text layout and borders of Numbers table cells (record 0412b;
-//! the Numbers leaf of the host's `set_table_cell_{fill,layout,border}`,
+//! Cell fill, text layout and borders of Numbers table cells (the Numbers
+//! leaf of the host's `set_table_cell_{fill,layout,border}`,
 //! `reset_table_cell_{fill,layout}`, `clear_table_cell_border` and the
 //! `table_cell_{fill,layout,borders}` reads) over the shared cell-appearance
 //! engine (`litchi_iwa_table::cell_appearance`), which also serves the Pages
@@ -32,8 +32,7 @@ structure::structural_family!("cell-appearance");
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies
-    /// it (record 0351 §2.4).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The table's style graph is malformed or ambiguous.

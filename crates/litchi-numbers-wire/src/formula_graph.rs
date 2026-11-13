@@ -667,7 +667,7 @@ impl<'a> Remap<'a> {
     ///
     /// Each map must be sorted by source, with no zero identity and no
     /// repeated source or target. The check runs once here, so every rewrite
-    /// that takes the remap trusts it (record 0368a).
+    /// that takes the remap trusts it.
     ///
     /// # Errors
     ///
@@ -754,8 +754,8 @@ enum Leaf {
     EdgeIds,
 }
 
-/// The identity-bearing paths of a `FormulaOwnerDependenciesArchive`
-/// (record 0368: the same paths the host's sequential rewrite visits).
+/// The identity-bearing paths of a `FormulaOwnerDependenciesArchive` (the same
+/// paths the host's sequential rewrite visits).
 const OWNER_RULES: &[(&[u32], Leaf)] = &[
     (&[1], Leaf::Uuid),
     (&[11], Leaf::Reference),
@@ -1032,7 +1032,7 @@ pub fn remap_cell_record_tile(
     // The rewrite replaces only owner-identifier varints that the strict
     // source decode admitted, with checked non-zero `u32` targets, so the
     // result's structure is the source's; re-decoding it in release builds
-    // would only repeat the source decode (record 0368a).
+    // would only repeat the source decode.
     #[cfg(debug_assertions)]
     decode_cell_tile(&output, &mut budget)?;
     Ok(output)
@@ -1072,7 +1072,7 @@ pub fn remap_range_precedents_tile(
 ///
 /// The legacy host counted only owner payloads, so on engines whose owner
 /// map holds identifiers without an owner object it allocated identifiers
-/// already in the map (record 0368a); this allocator never does.
+/// already in the map; this allocator never does.
 ///
 /// # Errors
 ///

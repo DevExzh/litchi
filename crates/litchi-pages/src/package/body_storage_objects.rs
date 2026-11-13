@@ -3,12 +3,11 @@
 //! or deleting such an object requires, and text splices. The ranged-object
 //! tables are the shared `litchi_iwa_text_wire::ranged` engine.
 //!
-//! The rules follow the native graph the migration host writes (record 0371):
-//! a new object takes the identifier one above every physical object and
-//! every metadata registration, and raises the metadata watermark to it; a
-//! deleted object loses its external references and UUID registration, and a
-//! deleted watermark identifier releases the suffix to the largest remaining
-//! object.
+//! The rules follow the native graph the migration host writes: a new object
+//! takes the identifier one above every physical object and every metadata
+//! registration, and raises the metadata watermark to it; a deleted object
+//! loses its external references and UUID registration, and a deleted
+//! watermark identifier releases the suffix to the largest remaining object.
 
 use std::num::NonZeroU64;
 use std::sync::Arc;
@@ -597,11 +596,10 @@ pub(crate) fn new_object(
 /// A hyphenated UUID for a smart field's `text_attribute_uuid_string`.
 ///
 /// The host draws a random GUID. Leaf output must be a pure function of its
-/// input (record 0428), so the UUID is derived from the new field object's
-/// `identifier` (fresh above the package's identifier watermark) and its
-/// `message_type`, with the SplitMix64 scheme the shared engines use for new
-/// object UUIDs (record 0375a §2.1), keeping the RFC 4122 version 4,
-/// variant 1 bits of the GUIDs the host writes.
+/// input, so the UUID is derived from the new field object's `identifier`
+/// (fresh above the package's identifier watermark) and its `message_type`,
+/// with the SplitMix64 scheme the shared engines use for new object UUIDs,
+/// keeping the RFC 4122 version 4, variant 1 bits of the GUIDs the host writes.
 pub(crate) fn text_attribute_uuid(identifier: u64, message_type: u32) -> GraphResult<String> {
     use litchi_numbers_wire::table_create::mix;
     let seed = identifier ^ u64::from(message_type).rotate_left(40) ^ 0x7465_7874_6174_7472;
@@ -685,7 +683,7 @@ pub(crate) fn splice_text(
 }
 
 // The package-metadata data-owner helpers are shared with the other iWork
-// formats (`litchi_iwa_style::data_owner`, record 0422).
+// formats (`litchi_iwa_style::data_owner`).
 use litchi_iwa_style::data_owner as data_owner_engine;
 
 fn view_varint(payload: &[u8], number: u32) -> litchi_iwa_common::Result<Option<u64>> {

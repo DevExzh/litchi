@@ -1,4 +1,4 @@
-//! A new, empty slide table (the host's `add_slide_table`, record 0423).
+//! A new, empty slide table (the host's `add_slide_table`).
 //!
 //! Builder decks carry a detached creation table: a `TST.TableInfoArchive`
 //! whose drawable has no parent. As the host does, the new table is an
@@ -7,16 +7,16 @@
 //! storage, the scaffold's styles shared, a new table identity. The frame
 //! is then set with flags 3 and angle 0, and every row and column sized
 //! uniformly to fill it (`litchi_iwa_table::topology::{stage_frame,
-//! stage_uniform_dimensions}`, record 0412g). The drawable joins the
-//! slide's owned drawables and z-order (in front), the table gets its own
+//! stage_uniform_dimensions}`). The drawable joins the slide's owned
+//! drawables and z-order (in front), the table gets its own
 //! CalculationEngine formula owner, and the registry records the clones'
 //! UUIDs and every new cross-component reference.
 //!
 //! A deck without the creation table (native decks) is refused, as the
 //! host refuses it; `edit_slide_drawables().add_table` copies a slide table
-//! there (record 0329). The shared from-scratch graph is not a fallback yet:
-//! native Keynote themes archive their table style network in two
-//! messages, which `table_create::fresh::preset_styles` does not read.
+//! there. The shared from-scratch graph is not a fallback yet: native
+//! Keynote themes archive their table style network in two messages, which
+//! `table_create::fresh::preset_styles` does not read.
 
 use litchi_iwa_table::structure::create::{self, Graph};
 use litchi_iwa_table::structure::metadata::{self, Transition};

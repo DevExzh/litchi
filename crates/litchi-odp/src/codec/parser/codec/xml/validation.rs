@@ -1087,7 +1087,7 @@ mod tests {
         }
     }
 
-    /// Byte-identical copy of the pre-0215 fresh-scan
+    /// Byte-identical copy of the earlier fresh-scan
     /// `Parser::drawing_attributes`, kept as the parity oracle for
     /// `ElementAttrs::drawing_attributes`.
     fn oracle_drawing_attributes(

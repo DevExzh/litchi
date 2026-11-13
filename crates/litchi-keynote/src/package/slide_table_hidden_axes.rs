@@ -1,5 +1,4 @@
-//! Exact-source hidden-row/hidden-column transactions for Keynote slide
-//! tables (record 0379).
+//! Exact-source hidden-row/hidden-column transactions for Keynote slide tables.
 //!
 //! The slide and table selectors resolve to the table's native route; the
 //! shared engine (`litchi_iwa_table::hidden_axes`, the one the Pages owner
@@ -72,7 +71,7 @@ impl fmt::Display for LimitKind {
 #[non_exhaustive]
 pub enum Error {
     /// A well-formed request this route refuses; [`Refusal::kind`]
-    /// classifies it (record 0351 §2.4).
+    /// classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted table graph is malformed or ambiguous.

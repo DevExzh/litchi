@@ -1,6 +1,6 @@
 //! Implementation of the public [`crate::cell::text_style`] transactions:
 //! character properties (bold, italic, underline, size, font, colour) of
-//! table cells (`IWORK_API_REQUESTS.md` request 7, record 0309).
+//! table cells.
 //!
 //! A Numbers cell's text style is a key in its table's style list
 //! (`DataStore.styleTable`) whose entry references a
@@ -12,8 +12,8 @@
 //! appends a style-list entry for it and points the cell at the new key;
 //! the old key's entry loses the cell's reference. Each cell takes its own
 //! variation, and a property equal to the inherited one stays inherited,
-//! as the host editor writes them (record 0370). Ported from the host
-//! editor's `cell_paragraph_style` (new-style path).
+//! as the host editor writes them. Ported from the host editor's
+//! `cell_paragraph_style` (new-style path).
 
 #![allow(
     clippy::arbitrary_source_item_ordering,
@@ -48,8 +48,7 @@ const HEADER_BUCKET_MESSAGE_TYPE: u32 = 6_006;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
-    /// (record 0351 §2.4, record 0361).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted source is malformed or ambiguous.
@@ -80,7 +79,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {
@@ -287,8 +286,7 @@ impl Edit<'_> {
                 return Err(Error::Verification);
             }
         }
-        // Every stored cell survives; an empty cell may gain a style-only
-        // cell (record 0370).
+        // Every stored cell survives; an empty cell may gain a style-only cell.
         let count = |package: &Package| {
             package.workbook_ref().sheets()[self.sheet]
                 .tables()
@@ -305,7 +303,7 @@ impl Edit<'_> {
     }
 }
 
-/// The shared rich-text engine's error (record 0412).
+/// The shared rich-text engine's error.
 impl From<litchi_iwa_table::cell_rich_text::Error> for Error {
     fn from(error: litchi_iwa_table::cell_rich_text::Error) -> Self {
         use litchi_iwa_table::cell_rich_text::{Error as E, LimitKind as K, Refusal as R};
@@ -829,7 +827,7 @@ fn with_flags_off(mut properties: CharacterProperties) -> CharacterProperties {
 }
 
 /// Replace one message, transitioning its aggregate object references, or
-/// keeping its header (the shared engine's helpers, record 0412).
+/// keeping its header (the shared engine's helpers).
 pub(super) use litchi_iwa_table::cell_rich_text::{replace_message, replace_with_references};
 
 impl From<topology::Error> for Error {

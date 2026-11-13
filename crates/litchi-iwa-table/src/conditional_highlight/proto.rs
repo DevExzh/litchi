@@ -1,5 +1,4 @@
-//! A prost-free mirror of the schema subset conditional highlights encode and
-//! decode (record 0370d).
+//! A prost-free mirror of the schema subset conditional highlights encode and decode.
 //!
 //! The leaf has no protobuf runtime. These plain structs keep the generated
 //! names the host editor's conditional-highlight code uses, so its node
@@ -390,8 +389,8 @@ pub(crate) mod tswp {
                     _ => properties.other = true,
                 }
             }
-            // Numbers' preset rule styles ("Red Fill", record 0432) repeat the
-            // font colour as the text's colour fill: the same override, twice.
+            // Numbers' preset rule styles ("Red Fill") repeat the font colour
+            // as the text's colour fill: the same override, twice.
             if text_fill.is_some_and(|fill| fill.other || fill.color != properties.font_color) {
                 properties.other = true;
             }

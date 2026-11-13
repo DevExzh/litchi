@@ -568,7 +568,7 @@ fn scan_flat(xml: &str, bounds: Bounds) -> Result<Vec<Range<usize>>> {
                 }
             },
             // The five predefined entities and character references are
-            // plain XML (quick-xml reports them as references, record 0341).
+            // plain XML (quick-xml reports them as references).
             Event::GeneralRef(reference) if is_plain_reference(&reference) => {},
             Event::DocType(_) | Event::GeneralRef(_) => {
                 return invalid("DOCTYPE and custom entities are not allowed in flat ODP");

@@ -1,7 +1,6 @@
 //! The dependent formula-cache refresh of value writes into a table that
 //! takes part in a formula graph, for the table owners that stage payloads
-//! by object identifier (Keynote slide tables, Pages body tables; record
-//! 0376).
+//! by object identifier (Keynote slide tables, Pages body tables).
 //!
 //! [`plan`](crate::formula_cache::refresh::plan) reads the document's calculation engine and formula owners, the
 //! edited table's storage and every formula-owning table's values through a
@@ -13,9 +12,8 @@
 //! payload. The policy is the Numbers table owner's, except that range
 //! precedents are planned (the Numbers owner refuses a selected owner with
 //! range-precedent tiles) and formulas in every formula-owning table are
-//! refreshed, as the host refreshes them (record 0376a): a write that
-//! replaces or clears a formula cell or a formula the evaluator does not
-//! support is refused with
+//! refreshed, as the host refreshes them: a write that replaces or clears a formula cell or a
+//! formula the evaluator does not support is refused with
 //! [`Error::UnsupportedDependency`](crate::formula_cache::Error::UnsupportedDependency).
 
 use litchi_iwa_common::formula::FormulaCachedValue;
@@ -188,8 +186,8 @@ pub fn plan<'a>(
     limits: &Limits,
 ) -> Result<Plan, Error> {
     // A write no formula reads, into a cell that holds none, needs no plan:
-    // the graph is not consulted (as the cell writer's admission did before
-    // record 0376), so unrelated owners the planner declines do not refuse it.
+    // the graph is not consulted (the cell writer's admission used to consult
+    // it), so unrelated owners the planner declines do not refuse it.
     let mut owner_payloads = Vec::new();
     for owner in source.owners {
         push(&mut owner_payloads, owner.bytes)?;
@@ -417,7 +415,7 @@ pub fn plan<'a>(
     // An owner's UUID references name the tables its formulas read (for
     // structural edits; the dependency edges carry the same reads). Admit
     // them when every named table is registered and hand the planner the
-    // owner without them; this plan publishes no owner (record 0376a).
+    // owner without them; this plan publishes no owner.
     let mut stripped = Vec::new();
     for owner in source.owners {
         push(

@@ -2,7 +2,7 @@
 //! attribute scanning, entity decoding and escaping.
 //!
 //! The scanner is linear in the tag length and never builds a map, so a
-//! hostile tag with many attributes costs one pass (record 0770).
+//! hostile tag with many attributes costs one pass.
 
 use std::borrow::Cow;
 

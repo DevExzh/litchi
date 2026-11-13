@@ -1,5 +1,5 @@
 //! Automatic text and paragraph styles of `content.xml`, and the character
-//! formatting edits that derive new ones (record 0308, G-ODP-1).
+//! formatting edits that derive new ones.
 //!
 //! Character formatting in a presentation lives in automatic styles
 //! (`office:automatic-styles`): a `text:span` names a `text`-family style,
@@ -20,7 +20,7 @@ use litchi_core::{Error, Result};
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 ///
 /// Values are shared (`Arc<str>`), so resolving a style chain
-/// ([`AutomaticStyles::resolve`]) copies no text (record 0316).
+/// ([`AutomaticStyles::resolve`]) copies no text.
 pub struct TextProperties {
     pub(crate) font_weight: Option<Arc<str>>,
     pub(crate) font_style: Option<Arc<str>>,
@@ -223,8 +223,8 @@ impl AutomaticStyles {
         Some(self.get("text", run.style_name()?)?.text_properties())
     }
 
-    /// The character properties the style `family`/`name` resolves to
-    /// (record 0316): its own, then those of its parents through
+    /// The character properties the style `family`/`name` resolves to:
+    /// its own, then those of its parents through
     /// `style:parent-style-name` (an automatic style's parent is looked up
     /// here, then in `common`), then the family's default style
     /// (`style:default-style`). A missing parent ends the chain, and a
@@ -306,8 +306,8 @@ impl AutomaticStyles {
 /// The common styles of a presentation: the `style:style` and
 /// `style:default-style` children of `office:styles`, in `styles.xml` or a
 /// flat document. Automatic styles name them as parents, and
-/// [`AutomaticStyles::resolve`] reads formatting through them (record
-/// 0316). A family's default style is indexed under the empty name.
+/// [`AutomaticStyles::resolve`] reads formatting through them. A
+/// family's default style is indexed under the empty name.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct CommonStyles {
     styles: AutomaticStyles,

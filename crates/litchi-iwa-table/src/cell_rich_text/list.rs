@@ -1,5 +1,4 @@
-//! Paragraph lists of the text in one cell (lifted from `litchi-numbers`,
-//! record 0370b).
+//! Paragraph lists of the text in one cell (lifted from `litchi-numbers`).
 //!
 //! A cell's text carries lists only as rich text: a `TST.RichTextPayload`
 //! in its table's rich-text list names a `TSWP.StorageArchive` whose
@@ -14,9 +13,9 @@
 //! - a rich-text entry names the payload, the cell becomes a rich-text cell
 //!   pointing at it, and the cell's string entry is released.
 //!
-//! The list change itself runs W1-D's engine
-//! ([`litchi_iwa_text_wire::list`], record 0374) and is published by
-//! the shared publisher (`litchi_iwa_text_wire::list::publish`) over the
+//! The list change itself runs the shared engine
+//! ([`litchi_iwa_text_wire::list`]) and is published by the shared
+//! publisher (`litchi_iwa_text_wire::list::publish`) over the
 //! working set's [`ListWorkspace`](crate::structure::list_workspace::ListWorkspace).
 
 use litchi_iwa_common::WireLimits;

@@ -1,8 +1,7 @@
-//! The style-variation graph engine of per-series chart overrides (record
-//! 0375a): the sparse `TSCH.ChartSeriesNonStyleArchive` objects a chart
-//! references from `series_non_styles`, one per series that overrides a
-//! behavioral property (connection lines, wedge explosions, label
-//! distances, …).
+//! The style-variation graph engine of per-series chart overrides: the
+//! sparse `TSCH.ChartSeriesNonStyleArchive` objects a chart references
+//! from `series_non_styles`, one per series that overrides a behavioral
+//! property (connection lines, wedge explosions, label distances, …).
 //!
 //! [`set_values`] writes one property for every series, as the migration
 //! host's editors do byte for byte: an override object is patched in place
@@ -6162,9 +6161,9 @@ mod symbol_tests {
         assert!(workspace.object(4).is_ok());
     }
 
-    /// Record 0431: Keynote, Pages and Numbers 14.4 refuse a document whose
-    /// sparse array holds an entry beyond `count`, so `count` is the array
-    /// length (one past the highest index), not the number of entries.
+    /// Keynote, Pages and Numbers 14.4 refuse a document whose sparse array
+    /// holds an entry beyond `count`, so `count` is the array length (one past
+    /// the highest index), not the number of entries.
     #[test]
     fn sparse_count_is_one_past_the_highest_series_index() {
         use litchi_iwa_common::chart::pie::WedgeExplosion;

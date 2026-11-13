@@ -1,7 +1,7 @@
 //! Implementation of the public [`crate::sheet::drawable::media`] family:
 //! the embedded media assets reachable from the document or one sheet, their
 //! bytes, and replacing the data of an asset or of a sheet image, movie
-//! (data or poster) or audio clip (record 0378).
+//! (data or poster) or audio clip.
 //!
 //! An asset is reachable when an object reachable from the root through
 //! object references carries a data reference to it, directly or through a
@@ -60,8 +60,7 @@ const DOCUMENT_ROOT: u64 = 1;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies
-    /// it (record 0351 §2.4).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted source is malformed or ambiguous.
@@ -92,7 +91,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {
@@ -221,8 +220,8 @@ impl Edit<'_> {
     /// package metadata and its `Data/` member, when it has one, is
     /// deleted (the host's `media::Draft::remove_unreferenced`, over the
     /// shared `litchi_iwa_style::media::unreferenced_data` rule and the
-    /// shared data-owner transition's data removals, record 0417). A
-    /// package without such records is an exact no-op.
+    /// shared data-owner transition's data removals). A package without
+    /// such records is an exact no-op.
     ///
     /// # Errors
     ///

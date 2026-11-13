@@ -1,5 +1,4 @@
-//! Selector-first plain-text edits of the storage a sheet text box or shape
-//! owns (record 0378).
+//! Selector-first plain-text edits of the storage a sheet text box or shape owns.
 //!
 //! One edit stages one UTF-16 splice; the shared TSWP rewrite
 //! ([`litchi_iwa_text_wire::prepare_storage_text_rewrite_with_behavior`])
@@ -60,8 +59,7 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies
-    /// it (record 0351 §2.4).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted drawable graph or its text storage is malformed.

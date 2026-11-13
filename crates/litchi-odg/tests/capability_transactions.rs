@@ -390,7 +390,7 @@ fn drawing_with_resource(content: &str, resource: Option<&[u8]>) -> Package {
 }
 
 /// A shape whose text is more than one plain span is an unsupported
-/// capability, not an invalid value (record 0308).
+/// capability, not an invalid value.
 #[test]
 fn shape_text_with_several_paragraphs_is_unsupported() {
     let content = CONTENT.replace(

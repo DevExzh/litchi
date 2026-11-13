@@ -6,18 +6,18 @@
 //! candidate reopen.  The public surface intentionally keeps native object
 //! identifiers, archives and protobuf payloads private.
 //!
-//! An image fill (record 0423, the host's `set_sheet_shape_image_fill`)
-//! goes through the shared `litchi_iwa_style::shape::set_image_fill`: the
-//! fill is planned on the style graph and the bytes are registered with
-//! the shared data-owner transition (`litchi_iwa_style::data_owner`), the
+//! An image fill (the host's `set_sheet_shape_image_fill`) goes through
+//! the shared `litchi_iwa_style::shape::set_image_fill`: the fill is
+//! planned on the style graph and the bytes are registered with the
+//! shared data-owner transition (`litchi_iwa_style::data_owner`), the
 //! drawable's style variation owning them; the bytes are published as a
 //! new `Data/` member.
 //!
 //! A fill set, a fill reset or a new image fill over an image fill the
 //! drawable's own style stores releases it as the host's
 //! `remove_style_data_reference` and `remove_orphaned_image_asset` do
-//! (record 0426, the Pages route of record 0415): the style that no longer
-//! stores it drops the data reference and its registered owner
+//! (the Pages route): the style that no longer stores it drops the data
+//! reference and its registered owner
 //! (`litchi_iwa_style::data_owner::release`), and data nothing references
 //! any more loses its `DataInfo` and `Data/` member.
 

@@ -1,6 +1,6 @@
-//! Slide-table layout (record 0412g): resizing a slide table at its
-//! trailing edges and setting its drawable frame, with every row and column
-//! sized uniformly to fill the frame, as Keynote's host moves a slide
+//! Slide-table layout: resizing a slide table at its trailing edges
+//! and setting its drawable frame, with every row and column sized
+//! uniformly to fill the frame, as Keynote's host moves a slide
 //! table's bounds and dimensions together.
 //!
 //! The rewrites are the shared table engine's
@@ -51,7 +51,7 @@ impl fmt::Display for LimitKind {
 #[non_exhaustive]
 pub enum Error {
     /// A well-formed request this route refuses; [`Refusal::kind`]
-    /// classifies it (record 0351 §2.4).
+    /// classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted source is malformed or ambiguous.
@@ -82,7 +82,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {

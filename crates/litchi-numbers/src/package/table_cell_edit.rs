@@ -4242,10 +4242,9 @@ fn extend_formula_referenced_paths(
                     continue;
                 }
                 // A precedent owner without a table (the group-by a category
-                // reference reads, record 0424) adds no table path: the cache
-                // engine validates it against the registered owners. A workbook
-                // with another table reaches this scan, as a native pivot's
-                // does (record 0432).
+                // reference reads) adds no table path: the cache engine
+                // validates it against the registered owners. A workbook with
+                // another table reaches this scan, as a native pivot's does.
                 if let Some(referenced) = owner_index
                     .binary_search_by_key(&target_owner, |entry| entry.0)
                     .ok()

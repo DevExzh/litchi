@@ -54,8 +54,8 @@ fn native_single_sheet_noop_and_typed_staging_errors_are_exact() -> TestResult<(
     Ok(())
 }
 
-/// Record 0297: a package without previews (here, stripped by an earlier
-/// changed move) still reorders, and the inverse restores it exactly.
+/// A package without previews (here, stripped by an earlier changed move) still
+/// reorders, and the inverse restores it exactly.
 #[test]
 fn a_package_without_previews_still_reorders() -> Result<(), Box<dyn std::error::Error>> {
     let source = std::fs::read(concat!(

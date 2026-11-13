@@ -1,8 +1,9 @@
 //! The per-series properties stored in a chart's series styles (strokes,
-//! fills, data-symbol fills and outlines) for [`super::sheet_chart_series`]
-//! (record 0378): the host editor's `set_sheet_chart_series_{strokes,
-//! fills, symbol_fills, symbol_outlines}` and `reset_*` routes on W1-E's
-//! series-style write rules (`chart_style_codec::property`, record 0375a).
+//! fills, data-symbol fills and outlines) for
+//! [`super::sheet_chart_series`]: the host editor's
+//! `set_sheet_chart_series_{strokes, fills, symbol_fills,
+//! symbol_outlines}` and `reset_*` routes on the shared series-style
+//! write rules (`chart_style_codec::property`).
 //!
 //! The value of a series is read through its effective style (the private
 //! override, else the theme style) and its `TSS.StyleArchive.parent` chain;

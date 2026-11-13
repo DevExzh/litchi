@@ -1,9 +1,8 @@
-//! The chart-level and axis-level style properties of a chart (records
-//! 0375, 0378, 0414): the inspector values stored in the generated
-//! extension (field 10,000) of a chart's `TSCH.ChartStyleArchive`,
-//! `TSCH.ChartNonStyleArchive`, `TSCH.ChartAxisStyleArchive` and
-//! `TSCH.ChartAxisNonStyleArchive`, plus the legend frame of the chart
-//! drawable itself.
+//! The chart-level and axis-level style properties of a chart: the
+//! inspector values stored in the generated extension (field 10,000)
+//! of a chart's `TSCH.ChartStyleArchive`, `TSCH.ChartNonStyleArchive`,
+//! `TSCH.ChartAxisStyleArchive` and `TSCH.ChartAxisNonStyleArchive`,
+//! plus the legend frame of the chart drawable itself.
 //!
 //! The property values ([`chart::Property`], [`axis::Property`]) are the
 //! shared vocabulary of the three format families; the mapping of each

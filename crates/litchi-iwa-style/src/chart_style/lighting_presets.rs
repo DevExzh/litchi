@@ -1,9 +1,8 @@
 //! The encoded `TSCH.Chart3DLightingPackageArchive` of each non-default
 //! native lighting preset, byte for byte as the host editor writes it
 //! (retired host at commit `4d8a3e161f`, `charts::lighting_3d::presets::native_lighting_package`,
-//! encoded with `prost`). The parity cases of record 0414 compare the
-//! published bytes with the host's, so a change to the host presets
-//! fails them.
+//! encoded with `prost`). The parity cases compare the published bytes
+//! with the host's, so a change to the host presets fails them.
 
 pub(super) const SOFT_LIGHT: &[u8] = &[
     10, 10, 83, 111, 102, 116, 32, 76, 105, 103, 104, 116, 18, 134, 1, 10, 11, 70, 105, 108, 108,

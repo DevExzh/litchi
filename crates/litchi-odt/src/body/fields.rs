@@ -1,8 +1,8 @@
-//! Text fields of the body (record 0295): the `text:*` field elements a
-//! paragraph holds inline (`text:date`, `text:page-number`, `text:title`,
-//! ...), read with their displayed text, and the staged replacement of
-//! that text ([`crate::transaction::Edit::set_field_text`]). Fields are not
-//! indexed body nodes, so they are listed by one scan of the body.
+//! Text fields of the body: the `text:*` field elements a paragraph holds
+//! inline (`text:date`, `text:page-number`, `text:title`, ...), read with
+//! their displayed text, and the staged replacement of that text
+//! ([`crate::transaction::Edit::set_field_text`]). Fields are not indexed
+//! body nodes, so they are listed by one scan of the body.
 
 use std::borrow::Cow;
 use std::ops::Range;
@@ -44,9 +44,9 @@ const FIELDS: [&str; 26] = [
     "file-name",
 ];
 
-/// Every `text:*` field element [`fields`] lists (record 0328): the
-/// [`text_fields`] set, then the variable, reference, sequence, chapter,
-/// sender, template, database and conditional fields.
+/// Every `text:*` field element [`fields`] lists: the [`text_fields`] set, then
+/// the variable, reference, sequence, chapter, sender, template, database and
+/// conditional fields.
 const ALL_FIELDS: [&str; 59] = [
     "date",
     "time",

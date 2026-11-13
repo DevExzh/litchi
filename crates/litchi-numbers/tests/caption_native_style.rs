@@ -1,5 +1,4 @@
-//! The paragraph style of a new caption against a caption Numbers authored
-//! (record 0435).
+//! The paragraph style of a new caption against a caption Numbers authored.
 //!
 //! `chart-caption-native.numbers` is `basic.numbers` with a chart and a caption
 //! typed in Numbers 14.4. Its caption uses the template's caption style, which

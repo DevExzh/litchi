@@ -1,7 +1,7 @@
 //! Implementation of the public [`crate::sheet::drawable::annotation`]
 //! transaction: highlights, text comments and replies of the text a sheet
-//! text box or shape owns, on W1-D's annotation and ranged engines
-//! ([`litchi_iwa_text_wire::annotation`], record 0374), record 0378.
+//! text box or shape owns, on the shared annotation and ranged engines
+//! ([`litchi_iwa_text_wire::annotation`]).
 //!
 //! A highlight or comment is a `TSWP.HighlightArchive` object named by a
 //! range of the storage's highlight table; it points at a
@@ -50,8 +50,7 @@ const STORAGE_MESSAGE_TYPE: u32 = 2_001;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies
-    /// it (record 0351 §2.4).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted source is malformed or ambiguous.
@@ -82,7 +81,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {

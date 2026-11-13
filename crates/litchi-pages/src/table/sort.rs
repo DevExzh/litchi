@@ -14,7 +14,7 @@ pub mod transaction {
 }
 
 /// Exact-source execution of a body table's persisted sort order (the
-/// body rows move; record 0371).
+/// body rows move).
 pub mod execution {
     pub use crate::package::body_table_sort_execution::{
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal, Unsupported,

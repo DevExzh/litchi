@@ -1,8 +1,7 @@
-//! The formula side of a body-table value edit (record 0376a): writes that
-//! author a formula or replace one, staged on the structural working set,
-//! because the shared engine
-//! (`litchi_numbers_wire::formula_cache::{author, refresh}`) may create or
-//! delete a cell-record tile.
+//! The formula side of a body-table value edit: writes that author a
+//! formula or replace one, staged on the structural working set, because
+//! the shared engine (`litchi_numbers_wire::formula_cache::{author,
+//! refresh}`) may create or delete a cell-record tile.
 //!
 //! The order is the host's: every formula a write replaces is removed and
 //! every authored formula is planned first, then the dependent caches of the

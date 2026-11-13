@@ -1566,8 +1566,8 @@ impl Commit {
 }
 
 /// Admit an exact target `content.xml` under a destination's limits and
-/// execution context, as a patch replay did before record 0358a: the output
-/// ceiling, an output reservation and a full parse under that policy.
+/// execution context, as a patch replay once did: the output ceiling, an output
+/// reservation and a full parse under that policy.
 pub(crate) fn admit_target(
     target: &Arc<str>,
     limits: Limits,

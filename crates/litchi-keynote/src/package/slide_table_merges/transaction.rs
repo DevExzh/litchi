@@ -666,8 +666,7 @@ fn rewrite_merges(
         max_overlap_checks: budget.remaining_work().map_err(super::map_core_error)?,
     };
     // A new merge owner's UUID derives from the table model's own UUID, so
-    // identical rewrites of identical sources are byte-identical (ADR 0034
-    // §9; record 0300).
+    // identical rewrites of identical sources are byte-identical (ADR 0034 §9).
     let write = table_merges::rewrite_table_merges_derived(&original, desired, limits).map_err(
         |error| {
             super::charge_attempted(budget, &error);

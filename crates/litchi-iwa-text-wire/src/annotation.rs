@@ -1,4 +1,4 @@
-//! Storage-scoped highlight and text-comment engine (record 0374).
+//! Storage-scoped highlight and text-comment engine.
 //!
 //! A `TSWP.StorageArchive`'s highlight table (field 23, read and rewritten
 //! with [`crate::ranged`] and [`Table::Highlight`]) names

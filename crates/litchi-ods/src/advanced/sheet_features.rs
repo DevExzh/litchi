@@ -1,6 +1,6 @@
-//! Worksheet features of an ODS sheet (record 0327): drawing frames and
-//! custom shapes, `calcext` conditional formats, content validations, the
-//! auto-filter database range and manual page breaks.
+//! Worksheet features of an ODS sheet: drawing frames and custom shapes,
+//! `calcext` conditional formats, content validations, the auto-filter database
+//! range and manual page breaks.
 //!
 //! [`read`] projects them from `content.xml` without decoding cell values.
 //! The `Edit` verbs in `document.rs` change them as byte-exact provenance
@@ -1379,7 +1379,7 @@ fn put_format_style(
         return Ok((source.to_vec(), "Default".to_owned()));
     }
     let styles = part_xml(source, "styles.xml")?.ok_or_else(|| {
-        Error::Refused(litchi_core::edit::Refusal::new(litchi_core::edit::RefusalKind::UnsupportedOperation, "ods.advanced.sheet_features", "an ODS package without styles.xml takes no conditional-format style (record 0327 follow-up: author styles.xml)"))
+        Error::Refused(litchi_core::edit::Refusal::new(litchi_core::edit::RefusalKind::UnsupportedOperation, "ods.advanced.sheet_features", "an ODS package without styles.xml takes no conditional-format style (authoring styles.xml is not supported yet)"))
     })?;
     let spans = scan(&styles)?;
     let office_styles = spans

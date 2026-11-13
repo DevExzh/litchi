@@ -1,8 +1,8 @@
-//! Regressions of the crate-private part families (record 0358).
+//! Regressions of the crate-private part families.
 //!
 //! These suites drove the part-level `Snapshot`/`Edit`/`Commit`/`Patch`
 //! workflows and the `*_with_limits` parser twins as integration tests.
-//! Record 0358 makes those workflows crate-private (the public routes are
+//! Those workflows are now crate-private (the public routes are
 //! `Package::edit` and `builder::Workbook`), so the suites compile here as
 //! unit tests of the same code.
 

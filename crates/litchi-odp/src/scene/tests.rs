@@ -331,7 +331,7 @@ fn references_and_overlaps_are_refused() {
         r#"<draw:page draw:name="B" draw:master-page-name="M"/>"#,
     ));
     let scene = Scene::parse(&xml).unwrap();
-    // A text set over the link would drop it (record 0304).
+    // A text set over the link would drop it.
     let error = plan(
         &xml,
         &scene,
@@ -394,9 +394,9 @@ fn byte_order_mark_offsets_ranges() {
     assert!(xml[paragraph.range()].starts_with("<text:p"));
 }
 
-/// Record 0295: a field run's displayed text is replaced in place, its
-/// element and attributes kept; a text run, and a run that does not exist
-/// (bookmarks are not runs), are refused.
+/// A field run's displayed text is replaced in place, its element and
+/// attributes kept; a text run, and a run that does not exist (bookmarks are
+/// not runs), are refused.
 #[test]
 fn field_text_keeps_the_field_element() {
     let xml = document(concat!(
@@ -809,9 +809,8 @@ fn formatting_resolves_through_common_styles() {
     assert_eq!(CommonStyles::parse(&xml).unwrap(), CommonStyles::default());
 }
 
-/// A page with the record-0328 elements: a link run, line breaks, a click
-/// listener, a `draw:a` link, a plain shape, declared columns, a plugin and
-/// an inline formula.
+/// A page with these elements: a link run, line breaks, a click listener, a
+/// `draw:a` link, a plain shape, declared columns, a plugin and an inline formula.
 fn elements() -> String {
     let head = HEAD.replace(
         "xmlns:presentation=",

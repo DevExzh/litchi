@@ -774,11 +774,10 @@ pub(super) fn allocate_identifier(
 /// UUID allocation variant that includes already staged archives.
 ///
 /// The host draws a random GUID. Leaf output must be a pure function of its
-/// input (record 0428), so the UUID is derived from `identifier`, the comment
-/// storage object it names, with the SplitMix64 scheme of record 0375a §2.1
-/// and a counter advanced until no comment storage in the working set uses
-/// it. The halves keep the RFC 4122 version 4, variant 1 bits of the GUIDs
-/// the host writes.
+/// input, so the UUID is derived from `identifier`, the comment storage
+/// object it names, with the SplitMix64 scheme and a counter advanced
+/// until no comment storage in the working set uses it. The halves keep
+/// the RFC 4122 version 4, variant 1 bits of the GUIDs the host writes.
 pub(super) fn fresh_storage_uuid_in_working_set(
     source: &Package,
     working: &WorkingSet<'_>,

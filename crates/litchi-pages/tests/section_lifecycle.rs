@@ -1,4 +1,4 @@
-//! Adding and removing sections (request 11, record 0312).
+//! Adding and removing sections.
 
 use std::path::PathBuf;
 

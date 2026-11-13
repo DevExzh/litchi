@@ -1,6 +1,6 @@
-//! Document parts beyond the body index (record 0328): list styles and
-//! their levels, master-page headers and footers, text fields, tables of
-//! contents, drawing shapes, embedded objects and table columns.
+//! Document parts beyond the body index: list styles and their levels,
+//! master-page headers and footers, text fields, tables of contents, drawing
+//! shapes, embedded objects and table columns.
 //!
 //! [`Parts`] is built on demand, in one pass over each of `content.xml` and
 //! `styles.xml`, from the same bytes as the body [`super::Tree`]; it keeps
@@ -1868,10 +1868,10 @@ pub fn formula_text(mathml: &str) -> Option<String> {
 
 impl Region<'_> {
     /// The splice that replaces the region's content with one paragraph
-    /// holding `text` (record 0328): the first paragraph's start tag is
-    /// kept; spaces, tabs and line feeds are encoded as `text:s`,
-    /// `text:tab` and `text:line-break`. `None` when the region already
-    /// shows `text` (an exact no-op).
+    /// holding `text`: the first paragraph's start tag is kept; spaces,
+    /// tabs and line feeds are encoded as `text:s`, `text:tab` and
+    /// `text:line-break`. `None` when the region already shows `text`
+    /// (an exact no-op).
     ///
     /// # Errors
     ///

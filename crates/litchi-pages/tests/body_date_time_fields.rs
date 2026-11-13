@@ -1,4 +1,4 @@
-//! Body Date & Time smart fields (`litchi_pages::date_time`, record 0371).
+//! Body Date & Time smart fields (`litchi_pages::date_time`).
 
 use litchi_pages::date_time::{
     DisplayText, Format, Instant, LocaleIdentifier, Settings, TextRange,
@@ -75,8 +75,8 @@ fn insert_update_remove_round_trip_and_invert() {
     );
 }
 
-/// Record 0428: a new field's text-attribute UUID is derived, not drawn, so
-/// the same edit on the same input is byte-identical.
+/// A new field's text-attribute UUID is derived, not drawn, so the same edit on
+/// the same input is byte-identical.
 #[test]
 fn inserted_field_output_is_deterministic() {
     let run = || {

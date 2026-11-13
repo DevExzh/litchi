@@ -3,8 +3,8 @@
 //! metadata checks, the source fingerprint and compressed-size bounds.
 //!
 //! These are the Pages page-layout and table-lock helpers the engine used
-//! before it moved out of `litchi-pages` (record 0379), with the same error
-//! mapping onto the engine's [`Error`].
+//! before it moved out of `litchi-pages`, with the same error mapping onto the
+//! engine's [`Error`].
 
 use litchi_iwa_archive::SourceCatalog;
 use litchi_iwa_common::{decode_varint_from_bytes, varint::encoded_len};

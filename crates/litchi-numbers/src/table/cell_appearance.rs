@@ -1,4 +1,4 @@
-//! Cell fill, text layout and borders of one table cell (record 0412b).
+//! Cell fill, text layout and borders of one table cell.
 //!
 //! [`crate::Package::table_cell_appearance`] reads a cell's effective fill,
 //! layout and explicit edge strokes;

@@ -1,10 +1,10 @@
 //! Implementation of the public [`crate::sheet::chart::legend_style`]
 //! transaction: the legend fill, border and shadow of one sheet chart on the
-//! shared legend-style variation graph (`litchi_iwa_style::legend_style`,
-//! record 0414). A write derives a private legend-style variation when the
-//! chart's legend style is shared or not a variation, writes the value and
-//! collapses the variation when it equals its parent again; the changes are
-//! published through the chart-series workspace path (record 0378a).
+//! shared legend-style variation graph (`litchi_iwa_style::legend_style`).
+//! A write derives a private legend-style variation when the chart's legend
+//! style is shared or not a variation, writes the value and collapses the
+//! variation when it equals its parent again; the changes are published
+//! through the chart-series workspace path.
 
 use std::fmt;
 

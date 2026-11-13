@@ -362,8 +362,8 @@ fn the_edit_stages_exactly_one_audio_creation() -> TestResult {
     Ok(())
 }
 
-/// Record 0428: the new objects' metadata UUIDs, the build UUID and the build
-/// seed are derived, not drawn, so the same edit is byte-identical.
+/// The new objects' metadata UUIDs, the build UUID and the build seed are
+/// derived, not drawn, so the same edit is byte-identical.
 #[test]
 fn audio_creation_output_is_deterministic() -> TestResult {
     let data = audio();

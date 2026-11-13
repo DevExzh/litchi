@@ -1535,7 +1535,7 @@ fn package_cell_comment_edit_clear_and_inverse_are_selector_first() -> TestResul
     );
 
     // The storage is registered in the package metadata's object-UUID map:
-    // the clear removes that registration with it (record 0318).
+    // the clear removes that registration with it.
     let cleared = package.clear_table_cell_comment(sheet, table, position)?;
     assert_eq!(
         cleared

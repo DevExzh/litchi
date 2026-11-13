@@ -1,11 +1,11 @@
 //! Numbers pivot categories and category formulas on one synthetic inline
 //! group-by added to `basic.numbers`' calculation engine (string, number,
 //! Boolean and date group values, a grand-total root, two aggregated columns),
-//! with the values the deleted `litchi-iwa` host agreed with at its last commit,
-//! `4d8a3e161f` (records 0421, 0424, 0429).
+//! with the values the deleted `litchi-iwa` host agreed with at its last
+//! commit, `4d8a3e161f`.
 //!
 //! The object is not native data, and Numbers drops it because no owner lists
-//! it (record 0434 §6): these tests pin the leaf's answer only.
+//! it: these tests pin the leaf's answer only.
 
 use litchi_iwa_archive::iwa::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_archive::package::{Catalog, EntryEdit};

@@ -416,7 +416,7 @@ pub struct SourceBackedPresentation {
     /// complete slide scan.
     tolerance: OnceLock<litchi_odf_common::leniency::ToleranceReport>,
     /// The committed output of a source-backed edit, written when this
-    /// presentation is written; reads materialize it once (record 0358a).
+    /// presentation is written; reads materialize it once.
     deferred: Option<Arc<Deferred>>,
 }
 
@@ -807,7 +807,7 @@ impl SourceBackedPresentation {
 
     /// Write this presentation as a complete ODP package: the source archive,
     /// or the committed output of a source-backed edit, which copies every
-    /// untouched member raw from the retained source (record 0358a).
+    /// untouched member raw from the retained source.
     ///
     /// # Errors
     ///
@@ -1373,7 +1373,7 @@ impl SourceBackedPresentation {
     }
 
     /// Read one package member (an embedded object's part) on demand, or
-    /// `None` when the package has no member at `path` (record 0328).
+    /// `None` when the package has no member at `path`.
     ///
     /// # Errors
     /// Returns an error when the source changed or the member cannot be read.

@@ -1,5 +1,5 @@
 //! Exact-source publication of a Pop-Up Menu change (lifted from the
-//! Numbers Pop-Up Menu facade, record 0412a).
+//! Numbers Pop-Up Menu facade).
 //!
 //! The native graph rewrite, the metadata registry transition and the menu
 //! model allocation are this crate's [`pop_up_menu`](crate::cell_format::pop_up_menu) engine; this

@@ -1,5 +1,5 @@
 //! Exact-source, selector-first Keynote slide creation: duplicate an existing
-//! slide or add a fresh slide from a theme layout (record 0298).
+//! slide or add a fresh slide from a theme layout.
 //!
 //! An [`Edit`] stages any number of operations against one immutable package.
 //! Selectors are resolved against that base snapshot when an operation is
@@ -230,8 +230,7 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
-    /// (record 0351 §2.4, record 0361).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The package cannot be edited safely (malformed or inconsistent).
@@ -262,7 +261,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+/// [`Refusal::kind`].
 #[derive(Debug, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {

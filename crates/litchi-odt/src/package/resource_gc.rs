@@ -105,8 +105,7 @@ pub enum EmbeddedResourceGcRefusal {
 }
 
 impl EmbeddedResourceGcRefusal {
-    /// The refusal class litchi-ops reports for this reason (record 0351
-    /// §2.4).
+    /// The refusal class litchi-ops reports for this reason.
     #[must_use]
     pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
         use litchi_core::edit::RefusalKind;

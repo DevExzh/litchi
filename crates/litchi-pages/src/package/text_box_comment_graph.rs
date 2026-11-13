@@ -1,7 +1,7 @@
 //! The comment-storage graph the text annotation and drawable comment
-//! families share (record 0378): the generated annotation author, comment
-//! storage creation and removal, and their package-metadata registrations,
-//! as the host editor's `comments` module keeps them.
+//! families share: the generated annotation author, comment storage
+//! creation and removal, and their package-metadata registrations, as the
+//! host editor's `comments` module keeps them.
 
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::comment::{AuthorId, GENERATED_AUTHOR_NAME, Uuid};
@@ -33,10 +33,7 @@ pub(super) const fn engine_fault(error: &engine::Error) -> Fault {
 }
 
 /// The decoded comment storage of `identifier`.
-#[allow(
-    dead_code,
-    reason = "the drawable-comment family uses it (record 0413)"
-)]
+#[allow(dead_code, reason = "the drawable-comment family uses it")]
 pub(super) fn comment_storage(
     working: &Working<'_>,
     identifier: u64,
@@ -280,10 +277,7 @@ impl Graph<'_, '_> {
     }
 
     /// The member of the document's author storage.
-    #[allow(
-        dead_code,
-        reason = "the drawable-comment family uses it (record 0413)"
-    )]
+    #[allow(dead_code, reason = "the drawable-comment family uses it")]
     pub(super) fn author_member(&self) -> FaultResult<Option<String>> {
         match author_storage(self.working)? {
             Some(storage) => self.working.locate(storage),

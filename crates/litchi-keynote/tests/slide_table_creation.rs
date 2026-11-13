@@ -1,6 +1,6 @@
-//! Slide-table creation (record 0329): a new, empty table cloned from the
-//! structure of the deck's first slide table, read back through the slide
-//! table reader, reopened, inverted exactly; decks without a table refuse,
+//! Slide-table creation: a new, empty table cloned from the structure of
+//! the deck's first slide table, read back through the slide table
+//! reader, reopened, inverted exactly; decks without a table refuse,
 //! typed.
 
 use std::path::{Path, PathBuf};

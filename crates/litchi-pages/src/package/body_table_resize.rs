@@ -1,4 +1,4 @@
-//! Resizing a body table to a new row and column count (record 0371).
+//! Resizing a body table to a new row and column count.
 //!
 //! The port follows the migration host's `resize_attached_table_in_package`:
 //! a shrink drops the stored rows past the new row count (refused when one
@@ -8,8 +8,8 @@
 //! new identity is one above the largest lower and upper halves, as the
 //! host allocates it), the stroke sidecar records the new dimensions and the
 //! model records the new counts, and the table's own formula owner moves its
-//! table and body extents (record 0370e). Nothing else (header counts,
-//! formulas, merges) is touched, as in the host.
+//! table and body extents. Nothing else (header counts, formulas, merges) is
+//! touched, as in the host.
 
 use std::fmt;
 use std::num::NonZeroU64;
@@ -155,8 +155,7 @@ impl Refusal {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies
-    /// it (record 0351 §2.4).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The table graph is malformed.
@@ -680,8 +679,8 @@ fn resize(source: &Package, table: usize, rows: usize, columns: usize) -> Result
         });
     }
 
-    // The table's own formula owner: its table and body extents (record
-    // 0370e fixed the host to move them).
+    // The table's own formula owner: its table and body extents (the host was
+    // fixed to move them).
     let count = |number: u32| -> Result<u32, Error> {
         u32::try_from(varint(&model_view, number)?.unwrap_or(0))
             .map_err(|_error| Error::InvalidSource)

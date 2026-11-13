@@ -2,7 +2,7 @@
 //! the axis-style switches of one sheet chart's primary value or category
 //! axis (line, gridlines, minor tick marks, the value axis's minimum label,
 //! the major tick-mark location) on the shared chart style codec
-//! (`litchi_iwa_protos::chart_style_codec`, record 0375), record 0378.
+//! (`litchi_iwa_protos::chart_style_codec`).
 //!
 //! Each property is one field of the axis style's generated extension; a
 //! write rewrites the primary axis style in place when only this chart uses
@@ -40,8 +40,7 @@ pub use litchi_iwa_style::chart_style::axis::{Frequency, Layout, Property, Prope
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies
-    /// it (record 0351 §2.4).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted chart graph or an axis style is malformed.
@@ -72,7 +71,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {

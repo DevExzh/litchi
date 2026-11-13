@@ -173,11 +173,11 @@ pub(crate) enum Operation {
     AddResources {
         resources: Vec<ResourceDependency>,
     },
-    /// Checked splices of the presentation pages (record 0278).
+    /// Checked splices of the presentation pages.
     SpliceScene {
         changes: Vec<crate::scene::Change>,
     },
-    /// A retained-source `meta.xml` patch (record 0278).
+    /// A retained-source `meta.xml` patch.
     SetMetadata {
         metadata: Box<litchi_core::Metadata>,
     },

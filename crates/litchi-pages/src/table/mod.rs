@@ -8,7 +8,7 @@ pub mod catalog {
 pub mod cells {
     pub use crate::package::table_cells::{Error, LimitKind};
 }
-/// Formula values of [`values::Edit::set_formula_cached`] (record 0376a).
+/// Formula values of [`values::Edit::set_formula_cached`].
 pub mod formula {
     pub use litchi_iwa_common::formula::{
         FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,
@@ -16,22 +16,21 @@ pub mod formula {
     };
 }
 
-/// Cell values of one body table (record 0309).
+/// Cell values of one body table.
 pub mod values {
     pub use crate::package::body_table_values::{
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal, Value,
     };
 }
 /// Exact-source creation of a body table cloned from the document's first
-/// body table (record 0329), or of a populated copy of an existing body
-/// table (record 0371).
+/// body table, or of a populated copy of an existing body table.
 pub mod creation {
     pub use crate::package::body_table_creation::{
         Commit, Diagnostics, Edit, Error, LimitKind, NewTable, Patch, Refusal,
     };
 }
 /// Display formats of stored body-table cells: one family over the neutral
-/// `DataFormat` (record 0379).
+/// `DataFormat`.
 pub mod format {
     pub use crate::package::body_table_cell_format::{
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
@@ -41,7 +40,7 @@ pub mod format {
 }
 /// One character or paragraph property of whole body-table cells' text,
 /// started by [`crate::Package::edit_body_table_cell_text`] and read by
-/// [`crate::Package::body_table_cell_text`] (record 0412).
+/// [`crate::Package::body_table_cell_text`].
 pub mod cell_text {
     pub use crate::package::body_table_cell_text::{
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
@@ -51,7 +50,7 @@ pub mod cell_text {
 }
 /// Paragraph lists of body-table cells' text, started by
 /// [`crate::Package::edit_body_table_cell_lists`]: a plain cell is promoted
-/// to rich text on its first list change (record 0412).
+/// to rich text on its first list change.
 pub mod cell_list {
     pub use crate::package::body_table_cell_list::{
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
@@ -68,15 +67,14 @@ pub mod cell_list {
     pub use litchi_iwa_text::position::TextPosition;
     pub use litchi_iwa_text_wire::list::{Property, PropertyKind};
 }
-/// Exact-source resize of one rooted body table to a new row and column
-/// count (record 0371).
+/// Exact-source resize of one rooted body table to a new row and column count.
 pub mod size {
     pub use crate::package::body_table_resize::{
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
     };
 }
 /// Ordered conditional-highlight rules of body-table cells over the shared
-/// conditional-highlight engine (record 0412f).
+/// conditional-highlight engine.
 pub mod conditional_highlight {
     pub use crate::package::body_table_conditional_highlight::{
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
@@ -87,7 +85,7 @@ pub mod conditional_highlight {
     };
 }
 /// Exact-source row and column insertion and removal in one rooted body
-/// table over the shared table-topology engine (record 0412e).
+/// table over the shared table-topology engine.
 pub mod topology {
     pub use crate::package::body_table_topology::{
         ColumnDeletion, ColumnInsertion, Commit, Diagnostics, Edit, Error, LimitKind, Patch,
@@ -102,7 +100,7 @@ pub mod deletion {
 }
 /// Effective style, gridline, banding, and row-sizing settings for a body table.
 pub mod appearance;
-/// Cell fill and text layout of one body-table cell (record 0371).
+/// Cell fill and text layout of one body-table cell.
 pub mod cell_appearance;
 /// Checked, archive-free row and column dimension values.
 pub mod dimension;

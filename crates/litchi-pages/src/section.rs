@@ -1,6 +1,6 @@
 /// Exact-source transactions for the fill stored directly on one section.
 pub mod background;
-/// Adding and removing sections (record 0312).
+/// Adding and removing sections.
 pub mod lifecycle {
     pub use crate::package::section_lifecycle::{
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
@@ -21,7 +21,7 @@ pub mod paragraphs {
 pub mod pagination;
 /// Exact-source transactions for the settings stored on one section.
 pub mod settings;
-/// Character styling of spans of one section's body text (record 0309).
+/// Character styling of spans of one section's body text.
 pub mod text_style {
     pub use crate::package::section_text_style::{
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal, Run,

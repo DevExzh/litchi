@@ -1,5 +1,5 @@
-//! Document language and locale fields (record 0370i; the migration host
-//! builder's `language` and `locale`).
+//! Document language and locale fields (the migration host builder's `language`
+//! and `locale`).
 //!
 //! The host builder writes the language into the document archive
 //! (`TSA.DocumentArchive.document_language`) and the locale into its current

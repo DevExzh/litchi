@@ -1,5 +1,5 @@
-//! Shared drawing-style and media engines of the iWork owners (record
-//! 0375a, ADR 0024 2026-10-26 amendment).
+//! Shared drawing-style and media engines of the iWork owners (ADR 0024
+//! 2026-10-26 amendment).
 //!
 //! The Pages, Numbers and Keynote packages consume this crate privately; no
 //! facade re-exports it (ADR 0028's rule for focused low-level crates). It
@@ -7,13 +7,13 @@
 //! wire codecs of `litchi-iwa-protos` and the IWA objects of
 //! `litchi-iwa-core`:
 //!
-//! - [`caption`]: the inline title and caption graph of a drawable
-//!   (records 0371, 0372, 0425), shared by the three owners;
+//! - [`caption`]: the inline title and caption graph of a drawable, shared by
+//!   the three owners;
 //! - [`chart_font`]: the chart-font graph engine (paragraph-style font
 //!   variations of a chart's text);
 //! - [`chart_lifecycle`]: the chart kind and series direction a chart
 //!   drawable stores, read and rewritten in place, and the private graph
-//!   of a new chart (`chart_lifecycle::author`, record 0418);
+//!   of a new chart (`chart_lifecycle::author`);
 //! - [`chart_style`]: the chart-level and axis-level style properties and
 //!   their in-place rewrites;
 //! - [`chart_text`]: the shared chart title and axis-title wire engine;

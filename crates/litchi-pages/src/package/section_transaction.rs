@@ -1232,7 +1232,7 @@ pub(super) fn editable_archive(
     .map_err(map_core_error)?;
     // The catalog already holds this component parsed from the same bytes:
     // check the stream's framing and clone that archive rather than parsing
-    // it again (record 0371).
+    // it again.
     let parsed = source
         .components()
         .get(component_name)
@@ -1787,7 +1787,7 @@ mod tests {
 /// constructed in memory), where the encoder must measure it.
 ///
 /// This replaces a full header re-encode (`Archive::encoded_len`) in the
-/// physical preflight of every section and body text edit (record 0371).
+/// physical preflight of every section and body text edit.
 fn parsed_archive_len(archive: &Archive) -> Option<usize> {
     let mut length = 0usize;
     for object in &archive.objects {

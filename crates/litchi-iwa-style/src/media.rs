@@ -170,7 +170,7 @@ pub struct Pruning {
     pub metadata: Vec<u8>,
 }
 
-/// The shared media data-owner rule for pruning (record 0417; the host's
+/// The shared media data-owner rule for pruning (the host's
 /// `media::Draft::remove_unreferenced`): a data record is unreferenced when
 /// no component data-reference owner, no object's `MessageInfo` data
 /// reference and no `DataMetadataMap` entry names it. Returns `None` when

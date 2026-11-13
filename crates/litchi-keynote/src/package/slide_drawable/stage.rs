@@ -601,7 +601,7 @@ pub(super) fn set_text(
 }
 
 /// Whether splices within `hull` of the text storage `storage` publish
-/// what one combined splice publishes (record 0314).
+/// what one combined splice publishes.
 pub(super) fn storage_admits_combined_splice(
     source: &super::Package,
     storage: u64,
@@ -1055,7 +1055,7 @@ pub(super) fn set_table_cell(
 }
 
 /// Set the formula of one cell of the table whose drawable is `info`, with
-/// `cached` as its displayed result (record 0376a).
+/// `cached` as its displayed result.
 pub(super) fn set_table_formula(
     workspace: &mut Workspace<'_>,
     info: u64,
@@ -1139,8 +1139,7 @@ fn replace_first(
 }
 
 /// Publish the formula side of one cell change into the workspace: the
-/// changed payloads, and the cell-record tile the engine created or emptied
-/// (record 0376a).
+/// changed payloads, and the cell-record tile the engine created or emptied.
 fn apply_formula_edit(
     workspace: &mut Workspace<'_>,
     edit: litchi_numbers_wire::formula_cache::author::Edit,
@@ -1243,8 +1242,8 @@ fn write_table_cell(
         formula_cache::Error::UnsupportedDependency(_) => table_formulas(),
         _ => table_storage(),
     };
-    // The formula side (record 0376a): remove the formula a value write
-    // replaces, or author the new one, through the shared engine.
+    // The formula side: remove the formula a value write replaces, or author
+    // the new one, through the shared engine.
     let (tile, local, columns) = table_cell_tile(workspace, info, row, column)?;
     let (tile_index, tile_type, tile_payload) = payload_of(workspace, tile, &[TILE])?;
     let previous = table_write::tile_cell(tile_payload, local, column, &limits)
@@ -1311,8 +1310,8 @@ fn write_table_cell(
         }
     }
     // The calculation graph: plan the refresh of the formula caches that
-    // read the cell (record 0376) before the value changes. An authored
-    // formula keeps its supplied cache and refreshes nothing, as the host.
+    // read the cell before the value changes. An authored formula keeps its
+    // supplied cache and refreshes nothing, as the host.
     let refresh = if formula.is_some() {
         refresh::Plan::default()
     } else {

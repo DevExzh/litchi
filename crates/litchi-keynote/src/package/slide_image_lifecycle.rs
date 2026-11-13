@@ -1,5 +1,5 @@
-//! Exact-source, selector-first lifecycle of ordinary slide images (record
-//! 0372; a port of the migration host's `duplicate_slide_image`,
+//! Exact-source, selector-first lifecycle of ordinary slide images (a
+//! port of the migration host's `duplicate_slide_image`,
 //! `flip_slide_image`, `restore_slide_image_original_size`,
 //! `set_slide_image_properties`, `replace_slide_image_data` and the image
 //! reads).

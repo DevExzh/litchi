@@ -4,7 +4,7 @@
 //! A format owner feeds the package's member names and sizes to
 //! [`Catalog::from_members`]; the catalog keeps the `Data/` members, checks
 //! basename uniqueness and the [`Limits`], and answers the read queries the
-//! migration host's `MediaManager` answered (record 0375).
+//! migration host's `MediaManager` answered.
 
 use std::collections::HashMap;
 use std::fmt;

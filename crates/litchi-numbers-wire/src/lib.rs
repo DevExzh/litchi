@@ -37,29 +37,25 @@ pub mod table_merges;
 
 /// Bounded, source-preserving rewrites of the native formula graph (owner
 /// dependencies, dependency tiles and the calculation-engine owner registry)
-/// for table and sheet duplication (record 0368).
+/// for table and sheet duplication.
 pub mod formula_graph;
-/// Formula-owner identities and the canonical empty table owner (record 0368).
+/// Formula-owner identities and the canonical empty table owner.
 pub mod formula_owner;
-/// Source-preserving object-reference rewrites for table duplication and
-/// removal (record 0368).
+/// Source-preserving object-reference rewrites for table duplication and removal.
 pub mod table_lifecycle;
 /// Payload rewrites of table-axis insertions and deletions shared by the
-/// three table owners (record 0370).
+/// three table owners.
 pub mod table_topology;
 
-/// The calculation-engine owner family of volatile conditional-highlight
-/// rules (record 0376a).
+/// The calculation-engine owner family of volatile conditional-highlight rules.
 pub mod conditional_volatile;
 /// Final-state formula dependency and dependent-cache refresh planning,
-/// with the strict scalar evaluator, shared by the three table owners
-/// (record 0376).
+/// with the strict scalar evaluator, shared by the three table owners.
 pub mod formula_cache;
 /// Exact rewrites of the complete native formula dependency graph: removal
-/// and insertion of formula hosts (record 0376).
+/// and insertion of formula hosts.
 pub mod formula_dependencies;
-/// Bounded exact formula-list planning for rooted and segmented lists
-/// (record 0376).
+/// Bounded exact formula-list planning for rooted and segmented lists.
 pub mod formula_list;
 /// Shared native Numbers formula function-token registry.
 pub mod function_map;
@@ -69,7 +65,7 @@ pub mod table_write;
 /// Caller-selected budgets for raw Numbers-wire parsing and rewrites.
 pub mod limits;
 /// Payload builders for new tables cloned from a template, shared by the
-/// Pages and Keynote table owners (record 0329).
+/// Pages and Keynote table owners.
 pub mod table_create;
 
 pub use limits::{LimitKind, Limits};
@@ -317,7 +313,7 @@ pub enum CellDataFormatKind {
     PopUpMenu,
 }
 
-/// The table data list a BNC cell key indexes (record 0309).
+/// The table data list a BNC cell key indexes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum ListKind {
     /// `string_table`.
@@ -833,8 +829,8 @@ impl BncCell {
     }
 
     /// Replaces a formula's cached result with an error result (cell type
-    /// 8, no value fields), as a formula whose reference was deleted
-    /// evaluates (record 0329). The formula and its formula-error key stay.
+    /// 8, no value fields), as a formula whose reference was deleted evaluates.
+    /// The formula and its formula-error key stay.
     ///
     /// Returns the string-list key the replaced text cache held, which the
     /// caller releases.
@@ -859,8 +855,8 @@ impl BncCell {
         Ok(released)
     }
 
-    /// Point the cell at another formula-list entry (record 0329: a shared
-    /// formula split when its cells diverge).
+    /// Point the cell at another formula-list entry (a shared formula split
+    /// when its cells diverge).
     ///
     /// # Errors
     ///

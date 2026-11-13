@@ -1,6 +1,6 @@
-//! The chart-font graph engine (record 0375a): a chart's uniform font
-//! identity, face traits and point size, stored in the paragraph styles its
-//! `paragraph_styles` list (`TSCH.ChartArchive`, field 20) names.
+//! The chart-font graph engine: a chart's uniform font identity, face traits
+//! and point size, stored in the paragraph styles its `paragraph_styles` list
+//! (`TSCH.ChartArchive`, field 20) names.
 //!
 //! [`set`] (with a reset [`Change`]) is the host's `set_chart_font*` /
 //! `reset_chart_font*` ported operation for operation over a

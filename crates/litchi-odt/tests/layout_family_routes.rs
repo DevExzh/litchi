@@ -1,8 +1,8 @@
 //! The layout and protection capabilities of the removed part-level families
 //! (`header_footer::{DurablePatch, History, MergePlan}` and the protection
 //! policy transaction's durable patch, transfer and merge) on the package
-//! route (record 0358a): durable patches, bounded history, joined and
-//! three-way merged edits of disjoint layout owners, and transfers.
+//! route: durable patches, bounded history, joined and three-way merged
+//! edits of disjoint layout owners, and transfers.
 
 use litchi_core::{HistoryLimits, MergeChoice};
 use litchi_odt::header_footer::{Kind, SectionLayout, Snapshot};

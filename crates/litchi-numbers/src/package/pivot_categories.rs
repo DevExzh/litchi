@@ -1,5 +1,5 @@
-//! Read the pivot aggregate categories of a workbook (record 0421, the
-//! host's `numbers::Draft::pivot_categories`).
+//! Read the pivot aggregate categories of a workbook (the host's
+//! `numbers::Draft::pivot_categories`).
 //!
 //! A pivot table's group-by (`TST.GroupByArchive`, in the calculation
 //! engine component) groups rows into a tree of group nodes; each node
@@ -7,11 +7,11 @@
 //! formula. A category is one (group node, aggregated column, summary
 //! function) of an enabled group-by whose formula owner kind names exactly
 //! one formula owner. Numbers summarizes one source column by several
-//! functions with one aggregator and one `column_agg_type` per function
-//! (record 0432), so a pair can hold several functions; the host read only
-//! the first. Pairs that two group-bys describe differently are dropped as
-//! ambiguous, as the host drops them. The walk is a bounded wire read that
-//! skips messages it cannot decode, as the host's Prost decode skips them.
+//! functions with one aggregator and one `column_agg_type` per function,
+//! so a pair can hold several functions; the host read only the first.
+//! Pairs that two group-bys describe differently are dropped as ambiguous,
+//! as the host drops them. The walk is a bounded wire read that skips
+//! messages it cannot decode, as the host's Prost decode skips them.
 
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};

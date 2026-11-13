@@ -1,6 +1,5 @@
-//! Exact-source, selector-first edits of the drawables a Keynote slide owns
-//! (record 0298): inventory, geometry, removal, z-order, text-box, shape and
-//! image creation.
+//! Exact-source, selector-first edits of the drawables a Keynote slide owns:
+//! inventory, geometry, removal, z-order, text-box, shape and image creation.
 //!
 //! A drawable is addressed by its [`DrawableSelector`]: its position in the
 //! slide's owned-drawable list (`KN.SlideArchive` field 7), the same source
@@ -314,8 +313,8 @@ pub enum Unsupported {
     /// A character style that sets nothing ([`Edit::set_text_style`]).
     TextStyling,
     /// The write replaces a formula cell, or a formula that reads the cell
-    /// is outside the shared cache refresh (record 0376: a direct text
-    /// reference, an unsupported function, a volatile, spanning or
+    /// is outside the shared cache refresh (a direct text reference,
+    /// an unsupported function, a volatile, spanning or
     /// UUID-referenced dependency) ([`Edit::set_table_cell`]).
     TableFormulas,
     /// The table's cell storage is outside the shared cell writer (a legacy
@@ -424,8 +423,7 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
-    /// (record 0351 §2.4, record 0361).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The package cannot be edited safely (malformed or inconsistent).
@@ -456,7 +454,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+/// [`Refusal::kind`].
 #[derive(Debug, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {
@@ -2375,11 +2373,11 @@ impl<'a> Edit<'a> {
     }
 
     /// Stage a new, empty table in front of the slide's drawables, cloned
-    /// from the structure of the deck's first slide table (record 0329):
-    /// its styles, header counts and storage layout, without its content,
-    /// sort, filter, category or summary state. Rows and columns divide the
-    /// frame evenly; seeded cells are written with [`Self::set_table_cell`]'s
-    /// writer. The table gets its own formula owner.
+    /// from the structure of the deck's first slide table: its styles,
+    /// header counts and storage layout, without its content, sort, filter,
+    /// category or summary state. Rows and columns divide the frame evenly;
+    /// seeded cells are written with [`Self::set_table_cell`]'s writer. The
+    /// table gets its own formula owner.
     ///
     /// # Errors
     ///
@@ -2470,10 +2468,9 @@ impl<'a> Edit<'a> {
     /// Whether a sequence of text sets of one text box or shape, each a
     /// splice within `hull` (UTF-16 code units of the drawable's text in
     /// the source package, both ends inclusive), publishes exactly what one
-    /// splice from the text before them to the text after them publishes
-    /// (record 0314). `false` asks the caller to commit the sets one at a
-    /// time. Whether a later set follows an emptied text is the caller's to
-    /// check.
+    /// splice from the text before them to the text after them publishes.
+    /// `false` asks the caller to commit the sets one at a time. Whether a
+    /// later set follows an emptied text is the caller's to check.
     ///
     /// # Errors
     ///
@@ -2626,8 +2623,8 @@ impl<'a> Edit<'a> {
     ) -> Result<&mut Self, Error> {
         let (selected, item) = self.drawable(slide.into(), drawable.into())?;
         // Title and body placeholders style their slide's own storage, as
-        // text boxes do (record 0312); their text writes go through
-        // `slide::text`, never through this edit.
+        // text boxes do; their text writes go through `slide::text`, never
+        // through this edit.
         let (
             Kind::TextBox | Kind::Shape | Kind::TitlePlaceholder | Kind::BodyPlaceholder,
             Some(storage),
@@ -2668,10 +2665,10 @@ impl<'a> Edit<'a> {
     }
 
     /// Stage character styling of one span (characters) of a slide's
-    /// speaker notes (record 0329), as [`Self::set_text_style`] styles a
-    /// text box: each character-style run inside the span gets a new
-    /// variation of its style carrying the set properties, registered in
-    /// the notes storage's stylesheet. Notes text is written by
+    /// speaker notes, as [`Self::set_text_style`] styles a text box:
+    /// each character-style run inside the span gets a new variation of
+    /// its style carrying the set properties, registered in the notes
+    /// storage's stylesheet. Notes text is written by
     /// [`Package::edit_slide_notes`], never by this edit.
     ///
     /// # Errors
@@ -2794,7 +2791,7 @@ impl<'a> Edit<'a> {
 
     /// Stage the formula of the cell `row`/`column` of a table drawable, with
     /// `cached` as its displayed result until the next native
-    /// recalculation; any formula the cell holds is replaced (record 0376a).
+    /// recalculation; any formula the cell holds is replaced.
     ///
     /// The formula reads cells of its own table: a reference to another
     /// table (`TableCell`, `TableRange`, `TableRows`, `TableColumns`, which
@@ -3554,8 +3551,8 @@ impl Package {
         text::runs(self, storage, text_value, wire).map_err(lift)
     }
 
-    /// Read the character-style runs of one slide's speaker notes (record
-    /// 0329), as [`Self::slide_drawable_text_runs`] reads a text box's.
+    /// Read the character-style runs of one slide's speaker notes, as
+    /// [`Self::slide_drawable_text_runs`] reads a text box's.
     ///
     /// ```no_run
     /// use litchi_keynote::{Package, SlideSelector};

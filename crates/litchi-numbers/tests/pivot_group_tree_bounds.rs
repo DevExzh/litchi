@@ -1,7 +1,7 @@
 //! Numbers 14.4 overflows its own stack on a group-node tree with a child
-//! reference cycle (record 0433: 1658 frames of one function, under the
-//! document's load). Nothing in Litchi writes a child reference; these files
-//! must still read, on a stack as small as the one Numbers crashed on.
+//! reference cycle (1658 frames of one function, under the document's
+//! load). Nothing in Litchi writes a child reference; these files must
+//! still read, on a stack as small as the one Numbers crashed on.
 
 use litchi_iwa_archive::iwa::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
@@ -11,7 +11,7 @@ use prost::Message;
 
 const BASIC: &[u8] = include_bytes!("../../../test-data/iwork/numbers/basic.numbers");
 const ENGINE: &str = "Index/CalculationEngine.iwa";
-/// The registered category owner of `basic.numbers` (record 0424).
+/// The registered category owner of `basic.numbers`.
 const OWNER_KIND: i32 = 8;
 /// Below the 544 KiB secondary stack of the crash report, to leave no margin.
 const SMALL_STACK: usize = 256 * 1024;

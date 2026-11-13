@@ -1,11 +1,11 @@
 //! One character or paragraph property of whole cells' text (lifted from
-//! `litchi-numbers`, record 0370).
+//! `litchi-numbers`).
 //!
 //! A staged change runs the shared paragraph-style engine
-//! ([`litchi_iwa_text_wire::paragraph_style`], record 0374) over the cell's
-//! style, with the cell's own variation counted exclusive when its list
-//! entry is its only referrer, nothing else references the style and no
-//! style names it as parent. The engine's plan is published here:
+//! ([`litchi_iwa_text_wire::paragraph_style`]) over the cell's style,
+//! with the cell's own variation counted exclusive when its list entry
+//! is its only referrer, nothing else references the style and no style
+//! names it as parent. The engine's plan is published here:
 //!
 //! - **Rewrite**: the cell's own variation takes the new payload in place;
 //! - **Derive**: a new child variation of the cell's style is stored beside

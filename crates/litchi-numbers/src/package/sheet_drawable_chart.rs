@@ -1,5 +1,5 @@
 //! Sheet chart creation, duplication and removal inside the structural
-//! sheet-drawable transaction (record 0418; the host's `add_sheet_chart`,
+//! sheet-drawable transaction (the host's `add_sheet_chart`,
 //! `duplicate_sheet_chart` and `remove_sheet_chart`).
 //!
 //! A Numbers chart's private graph lives in the CalculationEngine

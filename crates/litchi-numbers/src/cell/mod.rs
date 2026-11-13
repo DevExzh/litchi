@@ -10,8 +10,8 @@ pub mod comment;
 
 /// Checked, archive-free cell display formats.
 pub mod data_format;
-/// One character or paragraph property of whole cells' text (record 0370),
-/// started by [`crate::Package::edit_table_cell_text`] and read by
+/// One character or paragraph property of whole cells' text, started by
+/// [`crate::Package::edit_table_cell_text`] and read by
 /// [`crate::Package::table_cell_text`].
 pub mod text {
     pub use crate::package::table_cell_text::{
@@ -19,7 +19,7 @@ pub mod text {
     };
     pub use litchi_iwa_text_wire::paragraph_style::{Property, PropertyKind};
 }
-/// Ordered conditional-highlight rules of cells (record 0370d), started by
+/// Ordered conditional-highlight rules of cells, started by
 /// [`crate::Package::edit_table_cell_conditional_highlights`] and read by
 /// [`crate::Package::table_cell_conditional_highlight`].
 pub mod conditional_highlight {
@@ -31,7 +31,7 @@ pub mod conditional_highlight {
         PeriodUnit, Range, Rule, Style, Text,
     };
 }
-/// Paragraph lists of cells' text (record 0370b), started by
+/// Paragraph lists of cells' text, started by
 /// [`crate::Package::edit_table_cell_lists`]: a plain cell is promoted to
 /// rich text on its first list change.
 pub mod list {
@@ -49,7 +49,7 @@ pub mod list {
     pub use litchi_iwa_text::position::TextPosition;
     pub use litchi_iwa_text_wire::list::{Property, PropertyKind};
 }
-/// Character properties of cells' text (record 0309), started by
+/// Character properties of cells' text, started by
 /// [`crate::Package::edit_table_cell_text_style`].
 pub mod text_style {
     pub use crate::package::table_cell_text_style::{

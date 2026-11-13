@@ -2,9 +2,9 @@
 //!
 //! A workbook's owner map can hold entries with no owner object. The retired
 //! host allocated one above the largest owner object, so on some workbooks it
-//! took an identifier already in the map, a corrupt map (record 0368a). This is
-//! the leaf half of its `leaf_allocator_avoids_the_host_owner_map_collision`
-//! (at `4d8a3e161f`): `next_owner_id` is above the map and the owners, the
+//! took an identifier already in the map, a corrupt map. This is the leaf
+//! half of its `leaf_allocator_avoids_the_host_owner_map_collision` (at
+//! `4d8a3e161f`): `next_owner_id` is above the map and the owners, the
 //! allocation is valid, and the colliding identifier is refused.
 
 use std::collections::HashSet;

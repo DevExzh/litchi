@@ -1,5 +1,5 @@
 //! Implementation of the public [`crate::table::resize`] transaction:
-//! resizing a table at its trailing edges (record 0370e).
+//! resizing a table at its trailing edges.
 //!
 //! Growth adds blank trailing rows and columns; shrinking is accepted only
 //! when the removed trailing region holds no stored cell. The tiles lose
@@ -8,7 +8,7 @@
 //! ones are allocated above every existing one), the stroke sidecar takes
 //! the new size, and the table's own formula owner moves its table and body
 //! extents. This is the host editor's `resize_table`; the staged rewrite is
-//! the shared `litchi_iwa_table::topology::stage_resize` (record 0412g).
+//! the shared `litchi_iwa_table::topology::stage_resize`.
 
 #![allow(
     clippy::arbitrary_source_item_ordering,

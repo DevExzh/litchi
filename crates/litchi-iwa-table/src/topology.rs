@@ -1,6 +1,5 @@
 //! The shared table-topology engine: inserting and removing one table row
-//! or column (record 0309, lifted from `litchi-numbers` for Pages and Keynote
-//! in record 0412e).
+//! or column (lifted from `litchi-numbers` for Pages and Keynote).
 //!
 //! An axis edit moves every cell after the edited index. [`publish`]
 //! rewrites, in one staged working set over the exact source:
@@ -17,7 +16,7 @@
 //!   section edit, its section count;
 //! - the table formula owner's table extents;
 //! - every formula coordinate of the calculation engine that addresses the
-//!   table (`shift`, record 0318).
+//!   table (`shift`).
 //!
 //! A leaf locates the table ([`Target`]), resolves the operation against its
 //! geometry ([`resolve`]), runs the deletion-safe preflight ([`check`]) and
@@ -97,9 +96,9 @@ pub enum Unsupported {
     /// Calculation-engine state the coordinate shift does not rewrite:
     /// volatile, spanning, whole-owner, error or spill dependencies, a
     /// category reference whose host moves, a packed coordinate, a
-    /// dependency record that would leave its tile, or (record 0329) a
-    /// range over a removed row or column whose cells the cell writer could
-    /// not clear, so its cached result would go stale.
+    /// dependency record that would leave its tile, or a range over a
+    /// removed row or column whose cells the cell writer could not
+    /// clear, so its cached result would go stale.
     Formulas,
     /// A chart or another non-table owner reads the table, or a formula
     /// reads it through legacy UUID ranges or UUID references.
@@ -129,11 +128,10 @@ pub enum Unsupported {
     /// The removed row or column is one of several ranges of one colon
     /// tract a formula reads, or an endpoint of a merge range. (A single
     /// reference to it, or a range wholly on it, reads `#REF!`, and a range
-    /// that loses it shrinks: record 0329.)
+    /// that loses it shrinks.)
     DeletedReference,
     /// One formula shared by several cells would become different formulas
-    /// in a segmented formula list (an unsegmented one is split: record
-    /// 0329).
+    /// in a segmented formula list (an unsegmented one is split).
     SharedFormulas,
 }
 
@@ -763,7 +761,7 @@ fn formula_inert<P: TableLeaf>(working: &Working<'_, P>, info: u64) -> Result<bo
 }
 
 /// The planned rewrites of one operation, and the objects it removes
-/// (record 0329: dependency tiles emptied by dropped formula hosts).
+/// (dependency tiles emptied by dropped formula hosts).
 struct Planned {
     replacements: Vec<Replacement>,
     removed: Vec<u64>,
@@ -780,9 +778,9 @@ struct Replacement {
 
 /// The data-store list field a released cell key belongs to, or `None` for
 /// a key this transaction does not release (values, comments). With
-/// `values` (record 0329: the removed cells were not cleared through the
-/// cell writer) strings and formula errors are released too; formula keys
-/// are counted for the coordinate shift, which owns the formula list.
+/// `values` (the removed cells were not cleared through the cell writer)
+/// strings and formula errors are released too; formula keys are counted
+/// for the coordinate shift, which owns the formula list.
 const fn list_field(kind: ListKind, values: bool) -> Option<u32> {
     match kind {
         ListKind::Style => Some(5),
@@ -812,9 +810,9 @@ struct Released {
     /// Data-store list field -> key -> references released.
     keys: BTreeMap<u32, BTreeMap<u32, u32>>,
     /// Data-store list field -> keys in release order (cell by cell), for
-    /// the host's per-release hand-back of a last key (record 0370b).
+    /// the host's per-release hand-back of a last key.
     order: BTreeMap<u32, Vec<u32>>,
-    /// Formula-list key -> references the dropped cells hold (record 0329).
+    /// Formula-list key -> references the dropped cells hold.
     formulas: BTreeMap<u64, u64>,
 }
 
@@ -874,9 +872,9 @@ fn released_cells<P: TableLeaf>(
     Ok(released)
 }
 
-/// Apply one formula cell patch (record 0329) to the tile of `store` that
-/// holds the cell, keeping the rewritten tile in `patched`; returns the
-/// string-list key a replaced text cache held.
+/// Apply one formula cell patch to the tile of `store` that holds the cell,
+/// keeping the rewritten tile in `patched`; returns the string-list key a
+/// replaced text cache held.
 fn patch_cell<P: TableLeaf>(
     working: &Working<'_, P>,
     store: &[u8],
@@ -932,9 +930,8 @@ fn patch_cell<P: TableLeaf>(
 ///
 /// With `cells_pending`, the removed row or column may still hold the cells
 /// the caller clears before the real plan, so the storage tiles are not
-/// planned. With `drop_cells` (record 0329), the removed cells were not
-/// cleared through the cell writer: their values, strings and formulas are
-/// released here.
+/// planned. With `drop_cells`, the removed cells were not cleared through
+/// the cell writer: their values, strings and formulas are released here.
 fn plan<P: TableLeaf>(
     working: &Working<'_, P>,
     target: &Target,
@@ -957,7 +954,7 @@ fn plan<P: TableLeaf>(
         _ => Released::default(),
     };
 
-    // The calculation graph: the formula-coordinate shift (record 0318).
+    // The calculation graph: the formula-coordinate shift.
     let (insert, position) = match step.edit {
         AxisEdit::Insert(index) => (true, index),
         AxisEdit::Remove(index) => (false, index),
@@ -1001,9 +998,9 @@ fn plan<P: TableLeaf>(
             Ok(())
         };
 
-    // Cells the formula rewrite changes (record 0329): error caches of
-    // `#REF!` formulas and cells of split shared formulas. The edited
-    // table's tiles are patched before they move; other tables' in place.
+    // Cells the formula rewrite changes: error caches of `#REF!` formulas and
+    // cells of split shared formulas. The edited table's tiles are patched
+    // before they move; other tables' in place.
     let mut patched: BTreeMap<u64, Vec<u8>> = BTreeMap::new();
     let mut readers: BTreeMap<u64, Vec<shift::CellPatch>> = BTreeMap::new();
     for patch in &calculation.cells {
@@ -1067,7 +1064,7 @@ fn plan<P: TableLeaf>(
             lists::release_with(data, &mut remaining, false).map_err(storage_fault)?;
         if let Some(payload) = payload {
             // A released last key goes back as each release empties it, as
-            // the host's per-cell list decrements do (record 0370b).
+            // the host's per-cell list decrements do.
             let order = released.order.get(field).map_or(&[][..], Vec::as_slice);
             let payload = reclaim_in_order(data, payload, order)?;
             push(list, index, payload, pruned)?;
@@ -1222,9 +1219,9 @@ fn plan<P: TableLeaf>(
     }
     push(target.model, model_index, new_model, Vec::new())?;
 
-    // The drawable's layout cache stays as it is (record 0370): the
-    // application rebuilds a cache that no longer describes the table, and
-    // the host editor, whose output carries the native evidence, leaves it.
+    // The drawable's layout cache stays as it is: the application rebuilds a
+    // cache that no longer describes the table, and the host editor, whose
+    // output carries the native evidence, leaves it.
 
     // The calculation engine: the shifted payloads, and the table formula
     // owner's extents.

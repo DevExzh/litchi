@@ -1,5 +1,5 @@
-//! Document language, locale and revision identifier of a fresh document
-//! (record 0371; the migration host builder's `language`/`locale`).
+//! Document language, locale and revision identifier of a fresh document (the
+//! migration host builder's `language`/`locale`).
 //!
 //! The host builder writes the language into the document archive, the
 //! body storage's language table and the document settings, and the locale

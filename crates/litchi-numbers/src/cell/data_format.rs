@@ -1,8 +1,8 @@
 //! Archive-free display formats for Numbers cells.
 //!
 //! The values are the neutral `litchi_iwa_common::table::cell::data_format`
-//! vocabulary (record 0368), re-exported here at their established paths
-//! beside the Numbers transactions.
+//! vocabulary, re-exported here at their established paths beside the Numbers
+//! transactions.
 //!
 //! This module is the semantic owner for cell display and control values. It
 //! contains no protobuf messages, archive identifiers, package handles, or
@@ -30,8 +30,7 @@ pub mod text;
 pub use litchi_iwa_common::table::cell::data_format::{Checkbox, DataFormat, StarRating, Text};
 
 /// Selector-first exact-source transactions for any display format or
-/// control of one existing table cell, as the neutral [`DataFormat`]
-/// (record 0370k).
+/// control of one existing table cell, as the neutral [`DataFormat`].
 pub mod transaction {
     pub use crate::package::table_cell_data_format::{
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,

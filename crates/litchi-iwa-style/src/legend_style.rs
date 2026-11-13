@@ -1,5 +1,5 @@
-//! The legend-style variation graph of a chart and its fill, stroke and
-//! shadow (record 0414): the host's `charts::legend_style` slot
+//! The legend-style variation graph of a chart and its fill, stroke
+//! and shadow: the host's `charts::legend_style` slot
 //! (`ensure_exclusive`, `update`, `collapse_if_equivalent`) and its
 //! `legend_{fill, stroke, shadow}` properties over a [`Workspace`].
 //!

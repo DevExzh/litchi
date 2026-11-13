@@ -1,4 +1,4 @@
-//! One-pass builder options over the blank template (record 0370i).
+//! One-pass builder options over the blank template.
 //!
 //! A fresh workbook with options is the template with a handful of fields
 //! rewritten, so the builder writes them straight into the template's two
@@ -401,9 +401,9 @@ fn document(
     if options.table_name.is_none() && resize.is_none() {
         return Ok(None);
     }
-    // The table is the shared from-scratch graph (record 0420) with the
-    // template's identifiers, styles and identity: the template is the
-    // host builder's table, which the graph reproduces byte for byte.
+    // The table is the shared from-scratch graph with the template's
+    // identifiers, styles and identity: the template is the host builder's
+    // table, which the graph reproduces byte for byte.
     let model = stream.message(model_location)?.to_vec();
     let before = geometry(&model)?;
     let (rows, columns) = resize.map_or((before.rows, before.columns), |(_, rows, columns)| {
@@ -542,9 +542,9 @@ pub(crate) fn synthesize(
 mod tests {
     use super::*;
 
-    /// The template's table is the shared from-scratch graph (record 0420):
-    /// every object it builds, apart from the host builder's random UID
-    /// map, is the template's own payload byte for byte, and so are the
+    /// The template's table is the shared from-scratch graph: every
+    /// object it builds, apart from the host builder's random UID map,
+    /// is the template's own payload byte for byte, and so are the
     /// preset and style network.
     #[test]
     fn the_template_table_is_the_shared_fresh_graph() {

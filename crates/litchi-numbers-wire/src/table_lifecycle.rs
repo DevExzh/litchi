@@ -1,13 +1,13 @@
 //! Source-preserving object-reference rewrites for the Numbers table graph
 //! lifecycle (duplicate and remove), shared by the three table owners.
 //!
-//! Ported in record 0368 from the donor `numbers_table_lifecycle_codec`
-//! (record 0363 W0-B). The rewrite changes only the identifiers of
-//! schema-selected `TSP.Reference` envelopes and, for a model, its UUID and
-//! name; every other field, unknown field and byte of framing is copied
-//! verbatim. One caller-selected [`Limits`] governs a whole call: input and
-//! output bytes, parsed fields per message and the aggregate number of
-//! visited fields ([`LimitKind::Items`]).
+//! Ported from the donor `numbers_table_lifecycle_codec`. The rewrite
+//! changes only the identifiers of schema-selected `TSP.Reference`
+//! envelopes and, for a model, its UUID and name; every other field,
+//! unknown field and byte of framing is copied verbatim. One
+//! caller-selected [`Limits`] governs a whole call: input and output bytes,
+//! parsed fields per message and the aggregate number of visited fields
+//! ([`LimitKind::Items`]).
 
 use core::fmt;
 use std::cell::Cell;

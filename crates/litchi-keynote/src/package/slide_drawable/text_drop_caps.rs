@@ -1,6 +1,6 @@
-//! Plain-text Drop Caps of a text box or shape text (record 0372; the
-//! Keynote leaf of the host's `*_slide_text_box_paragraph_drop_cap*`
-//! families over the shared W1-D engine, `litchi_iwa_text_wire::drop_cap`).
+//! Plain-text Drop Caps of a text box or shape text (the Keynote leaf of the
+//! host's `*_slide_text_box_paragraph_drop_cap*` families over the shared
+//! engine, `litchi_iwa_text_wire::drop_cap`).
 //!
 //! A paragraph's Drop Cap is a variation of the stylesheet's Drop Cap base
 //! (the theme preset that is a root style of the stylesheet) named by the

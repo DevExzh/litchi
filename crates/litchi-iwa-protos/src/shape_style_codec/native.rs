@@ -2,8 +2,7 @@
 //! chart styles: `TSP.Color`, `TSD.StrokeArchive`, `TSD.FillArchive` (color,
 //! gradient and image fills) and the shape-style property slots of
 //! `TSWP.ShapeStyleArchive`. The results are plain native fields; the
-//! semantic conversion lives in `litchi_iwa_common::shape::native`
-//! (record 0375).
+//! semantic conversion lives in `litchi_iwa_common::shape::native`.
 
 use crate::chart_style_codec::{
     Budget, Error, Field, Limits, check_bytes, read_f32, require_wire_type, singular, visit_fields,

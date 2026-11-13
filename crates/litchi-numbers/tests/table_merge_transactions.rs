@@ -194,8 +194,8 @@ fn changed_publication_honors_the_package_output_ceiling() -> TestResult {
 
 #[test]
 fn identical_merges_are_byte_identical() -> TestResult {
-    // Record 0300: creating a merge owner used to draw a random UUID, so two
-    // identical merges on the same workbook differed byte for byte.
+    // Creating a merge owner used to draw a random UUID, so two identical
+    // merges on the same workbook differed byte for byte.
     let region = Region::new(1, 1, 2, 2)?;
     let merge = || -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         let source = Package::new();

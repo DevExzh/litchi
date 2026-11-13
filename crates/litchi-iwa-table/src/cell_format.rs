@@ -11,7 +11,7 @@
 //! transaction types.
 //!
 //! Moved from `litchi-numbers` (`package/table_cell_*_native.rs` and the
-//! Pop-Up Menu engine) in record 0379. Numbers behaviour is unchanged.
+//! Pop-Up Menu engine). Numbers behaviour is unchanged.
 
 use std::fmt;
 

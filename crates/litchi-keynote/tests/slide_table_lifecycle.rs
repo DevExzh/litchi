@@ -1,5 +1,4 @@
-//! Slide-table duplication and removal over the shared table structure set
-//! (record 0372).
+//! Slide-table duplication and removal over the shared table structure set.
 
 use std::path::PathBuf;
 

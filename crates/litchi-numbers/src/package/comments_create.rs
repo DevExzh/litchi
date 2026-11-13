@@ -1,13 +1,12 @@
 //! Root-comment creation: the target table's comment list, its tile and
-//! the author storage may live in different members (record 0318).
+//! the author storage may live in different members.
 //!
-//! Record 0329: a comment on an empty cell in a row its tile does not store
-//! materialises the row; with several commenting authors, a new comment is
-//! the generated author's (reused when present, else appended to the author
-//! storage), so no present author is impersonated. A table without a comment
-//! list still takes its new list beside the table model: a member of its
-//! own needs a component registration the strict metadata codec does not
-//! write yet.
+//! A comment on an empty cell in a row its tile does not store materialises
+//! the row; with several commenting authors, a new comment is the generated
+//! author's (reused when present, else appended to the author storage), so
+//! no present author is impersonated. A table without a comment list still
+//! takes its new list beside the table model: a member of its own needs a
+//! component registration the strict metadata codec does not write yet.
 
 use std::sync::Arc;
 
@@ -81,7 +80,7 @@ pub(super) fn create_root_comment(
     // other components (native packages keep lists, tiles and authors in
     // their own members): every component the creation touches is
     // rewritten, and the storage's cross-component author edge is
-    // registered (record 0318).
+    // registered.
     let owner_component_index = graph
         .list
         .map_or(graph.model.component_index, |route| route.component_index);
@@ -550,7 +549,7 @@ impl<'a> Archives<'a> {
 fn creation_graph(source: &Package, located: &Located, path: Path) -> Result<CreationGraph, Error> {
     // The census proves every comment list and storage of the package well
     // formed; creation then owns only the target table's list (native
-    // Numbers gives each table its own, record 0318).
+    // Numbers gives each table its own).
     let census = super::census_comment_ownership(source, path)?;
     let model = MessageRoute {
         component_index: located.target.native.component_index,
@@ -643,9 +642,9 @@ fn creation_graph(source: &Package, located: &Located, path: Path) -> Result<Cre
         });
     }
     if !authors.is_empty() {
-        // Several authors (record 0329): a new comment is the generated
-        // author's, reused when the package already holds it, else a new
-        // one joins the author storage. No present author is impersonated.
+        // Several authors: a new comment is the generated author's, reused when
+        // the package already holds it, else a new one joins the author
+        // storage. No present author is impersonated.
         super::validate_comment_authors(source, &census, path)?;
         for author in &authors {
             let (decoded, _) = super::decode_comment_author(
@@ -786,9 +785,9 @@ fn append_author_storage(
         .ok_or(Error::InvalidSource { path })?
         .clone();
     if !present.is_empty() {
-        // A populated storage (record 0329, several authors): native
-        // storages list their authors in the payload only; this crate's
-        // carry the same list in the aggregate and one FieldInfo.
+        // A populated storage (several authors): native storages list their
+        // authors in the payload only; this crate's carry the same list in the
+        // aggregate and one FieldInfo.
         if info.object_references.is_empty() && info.field_infos.is_empty() {
             object
                 .replace_message_preserving_header(

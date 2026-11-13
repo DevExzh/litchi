@@ -1,5 +1,5 @@
-//! Cell character properties (record 0309): bold, italic, size, font and
-//! colour of cell text, on the created workbook and across the corpus.
+//! Cell character properties: bold, italic, size, font and colour of cell text,
+//! on the created workbook and across the corpus.
 
 use std::path::PathBuf;
 
@@ -965,7 +965,7 @@ fn refusals_are_typed() -> TestResult {
             litchi_numbers::cell::text_style::Refusal::CellNotFound
         ))
     ));
-    // An empty cell takes a style-only cell (record 0370).
+    // An empty cell takes a style-only cell.
     let commit = package
         .edit_table_cell_text_style(0, 0)?
         .set(At::new(3, 3), bold())?
@@ -1130,8 +1130,8 @@ fn corpus_cells_take_bold_or_refuse_typed() -> TestResult {
     Ok(())
 }
 
-/// A created workbook authors formulas (request 18, record 0309): its
-/// table owner carries the native table extents.
+/// A created workbook authors formulas: its table owner carries the native
+/// table extents.
 #[test]
 fn formulas_work_on_a_created_workbook() -> TestResult {
     use litchi_numbers::cell::Value as CellValue;

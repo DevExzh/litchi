@@ -1,10 +1,10 @@
-//! Body-table creation (record 0329): a new, empty table cloned from the
-//! structure of the document's first body table and anchored in the body
-//! story, read back through the catalog and cell reader, reopened and
-//! inverted exactly; documents without a body table refuse, typed, except
-//! a table-less built-in-template document, whose first table is built from
-//! scratch (record 0426). A duplication (record 0371) copies a populated
-//! table under the next free `"<name> copy"` name.
+//! Body-table creation: a new, empty table cloned from the structure of
+//! the document's first body table and anchored in the body story, read
+//! back through the catalog and cell reader, reopened and inverted
+//! exactly; documents without a body table refuse, typed, except a
+//! table-less built-in-template document, whose first table is built from
+//! scratch. A duplication copies a populated table under the next free
+//! `"<name> copy"` name.
 
 use std::path::{Path, PathBuf};
 
@@ -356,8 +356,8 @@ fn every_corpus_body_table_duplicates_or_refuses_typed() -> TestResult {
 }
 
 /// A table-less document made from the built-in template takes the host's
-/// from-scratch first table (record 0426) at any body position, with seeded
-/// cells, and a second insertion clones it.
+/// from-scratch first table at any body position, with seeded cells, and a
+/// second insertion clones it.
 #[test]
 fn a_built_in_template_document_takes_its_first_table() -> TestResult {
     let built = litchi_pages::builder::Builder::new()

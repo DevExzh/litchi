@@ -1,11 +1,11 @@
 //! Implementation of the public [`crate::sheet::chart::value_axis`]
 //! transaction: the bounds, step counts and scale of one sheet chart's
 //! primary value axis, edited as one aggregate on the shared rules and
-//! in-place write of `litchi_iwa_style::value_axis` (record 0422). As the
-//! host's `set_sheet_chart_value_axis_{bounds,steps,scale}` do, the axis
-//! non-style object is rewritten in place and one another chart axis shares
-//! is refused; the change is published through the chart-series workspace
-//! path (record 0378a).
+//! in-place write of `litchi_iwa_style::value_axis`. As the host's
+//! `set_sheet_chart_value_axis_{bounds,steps,scale}` do, the axis
+//! non-style object is rewritten in place and one another chart axis
+//! shares is refused; the change is published through the chart-series
+//! workspace path.
 
 use std::fmt;
 

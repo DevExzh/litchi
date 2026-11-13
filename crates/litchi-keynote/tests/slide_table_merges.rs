@@ -71,8 +71,8 @@ fn selection_and_merge_decode_share_the_cumulative_reference_budget()
 }
 
 /// A merge owner the commit creates takes a UUID derived from the table
-/// model (record 0300, `rewrite_table_merges_derived`): two identical merge
-/// rewrites of identical sources are byte-identical.
+/// model (`rewrite_table_merges_derived`): two identical merge rewrites of
+/// identical sources are byte-identical.
 #[test]
 fn merge_rewrites_are_deterministic_including_a_new_owner() -> Result<(), Box<dyn StdError>> {
     let package = Package::from_bytes(NATIVE_SOURCE)?;

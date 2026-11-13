@@ -1,4 +1,4 @@
-//! Replacing one embedded media asset by its handle (record 0417):
+//! Replacing one embedded media asset by its handle:
 //! `Package::edit_media_asset_data` keeps the asset's identity, rewrites its
 //! bytes, digest and length, reads back, replays and inverts exactly.
 

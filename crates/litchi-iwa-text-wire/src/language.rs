@@ -1,4 +1,4 @@
-//! Storage-scoped language-run engine (record 0374).
+//! Storage-scoped language-run engine.
 //!
 //! A storage's `table_language` (field 19) is a `StringAttributeTable`:
 //! sorted boundaries at UTF-16 indexes, each naming the BCP 47 tag of the

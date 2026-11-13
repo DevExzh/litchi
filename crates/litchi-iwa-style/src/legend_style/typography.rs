@@ -1,5 +1,5 @@
-//! The legend label typography (record 0414): the host's
-//! `charts::legend_font` graph over a [`Workspace`].
+//! The legend label typography: the host's `charts::legend_font` graph over a
+//! [`Workspace`].
 //!
 //! iWork stores the legend's typography indirectly: field 2 of the legend
 //! style's generated extension selects one entry of the chart's

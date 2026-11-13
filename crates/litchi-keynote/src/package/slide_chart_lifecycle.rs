@@ -1,6 +1,6 @@
-//! Exact-source, selector-first chart lifecycle of a Keynote slide (record
-//! 0372; a port of the migration host's `set_slide_chart_kind`,
-//! `set_slide_chart_direction` and `set_slide_chart_geometry`).
+//! Exact-source, selector-first chart lifecycle of a Keynote slide (a port of
+//! the migration host's `set_slide_chart_kind`, `set_slide_chart_direction` and
+//! `set_slide_chart_geometry`).
 //!
 //! A chart is addressed by its slide and a [`ChartSelector`] (its position
 //! in the slide's chart order, or its exact visible title). An [`Edit`]

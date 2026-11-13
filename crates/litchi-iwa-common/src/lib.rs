@@ -223,8 +223,8 @@ impl WireLimits {
 }
 
 impl WireLimits {
-    /// The default finite wire profile (record 0361: the limits a caller
-    /// passes when it selects none).
+    /// The default finite wire profile (the limits a caller passes when it
+    /// selects none).
     pub const DEFAULT: Self = Self {
         max_input_bytes: Self::MAX_INPUT_BYTES,
         max_fields: 100_000,

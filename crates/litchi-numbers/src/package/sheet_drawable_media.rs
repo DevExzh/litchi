@@ -1,11 +1,10 @@
 //! Authoring of new sheet images, movies and audio clips for
-//! [`crate::sheet::drawable::Edit::add_image`] and its siblings (record
-//! 0378): the host editor's `add_sheet_{image,movie,audio}` graphs (the
-//! drawable and its title and caption stand-ins, encoded as the host's
-//! generated messages encode them), their embedded data (`DataInfo` records
-//! and `Data/` members named `stem-identifier.extension`) and their package
-//! metadata (UUIDs, data-reference owners, the style's cross-component
-//! reference).
+//! [`crate::sheet::drawable::Edit::add_image`] and its siblings: the host
+//! editor's `add_sheet_{image,movie,audio}` graphs (the drawable and its
+//! title and caption stand-ins, encoded as the host's generated messages
+//! encode them), their embedded data (`DataInfo` records and `Data/`
+//! members named `stem-identifier.extension`) and their package metadata
+//! (UUIDs, data-reference owners, the style's cross-component reference).
 
 use litchi_iwa_common::media::Type;
 use litchi_iwa_core::{ArchiveObject, RawMessage};

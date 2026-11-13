@@ -71,8 +71,7 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
-    /// (record 0351 §2.4, record 0361).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The selected native body cannot be decoded or rewritten safely.
@@ -103,7 +102,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {
@@ -788,7 +787,7 @@ pub(super) struct NativeBodySnapshot {
 }
 
 impl NativeBodySnapshot {
-    /// The native identifier of section `position` (record 0312).
+    /// The native identifier of section `position`.
     pub(super) fn section_identifier(&self, position: usize) -> Option<u64> {
         self.references
             .get(position)
@@ -903,7 +902,7 @@ fn validate_rooted_body_ownership(
                 // drawable the attachment holds) declares its parent body
                 // storage as one aggregate edge. The parent reference holds
                 // no text position, and the rewrite preserves it and every
-                // attachment's identity (record 0299).
+                // attachment's identity.
                 if aggregate_count == 1
                     && field_count == 0
                     && !data_reference
@@ -1045,7 +1044,7 @@ pub(super) fn native_body(package: &Package) -> Result<NativeBodySnapshot, Error
 
 /// The attribute boundaries of the body storage around one section's text,
 /// in section-relative UTF-16 units: what decides whether a sequence of
-/// paragraph splices of the section may publish as one (record 0314).
+/// paragraph splices of the section may publish as one.
 pub(crate) struct SectionBoundaries {
     storage: litchi_iwa_text_wire::StorageBoundaries,
     offset: usize,

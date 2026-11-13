@@ -759,8 +759,7 @@ fn selectors_fail_atomically_for_missing_source_table_and_destination() -> TestR
 }
 
 /// Table names are unique within a sheet: a destination sheet that holds
-/// the relocated table's name refuses the move, typed and before any
-/// rewrite (record 0347).
+/// the relocated table's name refuses the move, typed and before any rewrite.
 #[test]
 fn a_destination_name_collision_is_refused_typed() -> TestResult {
     let bytes = fixture_with_destination_table(BETA_TABLE_NAME)?;

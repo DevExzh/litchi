@@ -1,5 +1,5 @@
 //! Geometry inserted on a fresh image whose compact `content.xml` dropped
-//! the unused `svg` namespace declaration (record 0288, 0282 G4).
+//! the unused `svg` namespace declaration.
 
 use litchi_odi::Package;
 

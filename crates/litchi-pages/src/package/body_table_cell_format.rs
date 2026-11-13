@@ -1,4 +1,4 @@
-//! Display formats of stored body-table cells (record 0379).
+//! Display formats of stored body-table cells.
 //!
 //! One family takes the neutral [`DataFormat`] for every display format:
 //! Number, Currency, Percentage, Scientific, Fraction, Date and Time,
@@ -11,9 +11,9 @@
 //! artifacts, so its inverse restores the source byte for byte.
 //!
 //! Checkbox, Star Rating, Slider and Stepper cells are written through the
-//! engine's scalar-control writer (record 0412); Pop-Up Menus through the
-//! shared Pop-Up Menu publication, which also allocates the menu model and
-//! rewrites the package metadata registry (record 0412a).
+//! engine's scalar-control writer; Pop-Up Menus through the shared Pop-Up
+//! Menu publication, which also allocates the menu model and rewrites the
+//! package metadata registry.
 
 use std::fmt;
 
@@ -90,8 +90,7 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies
-    /// it (record 0351 §2.4).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted table graph is malformed or ambiguous.
@@ -533,9 +532,9 @@ fn rewrite(
         _ => None,
     };
     if matches!(before, DataFormat::PopUpMenu(_)) || matches!(after, DataFormat::PopUpMenu(_)) {
-        // The shared Pop-Up Menu publication (record 0412a): the menu model,
-        // its metadata registry entry and the cell's control spec, with the
-        // host's root-preview policy (kept) and list-key policy (append).
+        // The shared Pop-Up Menu publication: the menu model, its metadata
+        // registry entry and the cell's control spec, with the host's
+        // root-preview policy (kept) and list-key policy (append).
         let published = engine::pop_up_publish::publish(
             source,
             target,
@@ -556,7 +555,7 @@ fn rewrite(
         return Ok(published.package);
     }
     // Pages and Keynote append list keys at the watermark and hand a removed
-    // last key back; the Numbers owners reuse free keys (record 0379).
+    // last key back; the Numbers owners reuse free keys.
     let mut budget =
         TransactionBudget::for_cell_control(source).with_list_keys(engine::ListKeys::Append);
     budget.charge_package_source(catalog, path)?;

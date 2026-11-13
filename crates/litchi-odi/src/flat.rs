@@ -2475,7 +2475,7 @@ fn root_prefix_bindings(source: &[u8]) -> Vec<&'static str> {
 
 /// Declare, on the rewritten `tag`, the prefix of every attribute the
 /// rewrite inserted whose namespace the root does not bind (a compact
-/// package drops unused declarations, record 0288).
+/// package drops unused declarations).
 fn declare_inserted_prefixes(source: &str, tag: &mut String, declared: &[&str]) -> Result<()> {
     for (prefix, uri) in INSERTED_PREFIXES {
         if declared.contains(&prefix) {

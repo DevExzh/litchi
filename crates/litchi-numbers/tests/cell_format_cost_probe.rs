@@ -1,4 +1,4 @@
-//! Callgrind probe of the Numbers cell-format routes (record 0379).
+//! Callgrind probe of the Numbers cell-format routes.
 //!
 //! Each route opens the deterministic data-format fixture of its family,
 //! sets a new value on the first cell, serializes, clears the format on that

@@ -510,8 +510,8 @@ impl ThemeReferenceSnapshot {
     ///
     /// # Errors
     ///
-    /// A typed invalid-source [`DecodeError`] when the identifier is zero
-    /// (record 0368a: no panicking twin).
+    /// A typed invalid-source [`DecodeError`] when the identifier is zero (no
+    /// panicking twin).
     pub fn encode(self) -> Result<Vec<u8>, DecodeError> {
         if self.identifier == 0 {
             return Err(DecodeError::invalid(

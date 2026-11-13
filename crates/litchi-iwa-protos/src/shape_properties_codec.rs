@@ -1623,7 +1623,7 @@ fn once(
     Ok(())
 }
 
-/// Allocation-free strict decode of a drawable (record 0368a).
+/// Allocation-free strict decode of a drawable.
 ///
 /// Applies the same framing, canonical-encoding, duplicate, finiteness and
 /// UTF-8 rules as the rewrite scan, in one pass over the source and its
@@ -3380,8 +3380,8 @@ mod tests {
         );
         assert_eq!(report.input_bytes(), source.len());
         assert!(report.fields() >= 12);
-        // The read path is allocation-free (record 0368a); the rewrite path
-        // keeps its field tables and generated cross-check.
+        // The read path is allocation-free; the rewrite path keeps its field
+        // tables and generated cross-check.
         assert_eq!(report.allocations(), 0);
         assert_eq!(report.scratch_bytes(), 0);
         assert!(report.work_bytes() > source.len());
@@ -3583,8 +3583,8 @@ mod tests {
     fn buffa_traversal_limits_are_charged_before_projection() {
         let source = drawable_fixture();
         let constrained = options(&source).with_max_allocations(8);
-        // The read path allocates nothing (record 0368a); the rewrite scan
-        // still precharges its generated cross-check traversals.
+        // The read path allocates nothing; the rewrite scan still precharges
+        // its generated cross-check traversals.
         decode_drawable_archive(&source, constrained).expect("allocation-free read");
         let error = prepare_drawable_archive_rewrite(
             &source,

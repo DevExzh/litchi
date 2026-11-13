@@ -535,7 +535,7 @@ impl Presentation {
     }
 
     /// Read one package member (an embedded object's part), or `None` when
-    /// the package has no member at `path` (record 0328).
+    /// the package has no member at `path`.
     ///
     /// # Errors
     /// Returns an error when the package or the member cannot be read.

@@ -2188,8 +2188,8 @@ pub fn require_exclusive_selected_model_reference(
 }
 
 /// The package-level proofs of the cell-format engines that a leaf memoizes
-/// for one immutable package (record 0370k): the object-reference census
-/// and the metadata registry inspections.
+/// for one immutable package: the object-reference census and the metadata
+/// registry inspections.
 ///
 /// Each proof is a function of the package's components and limits, so a
 /// memoized proof charges and refuses exactly as a fresh one. A package

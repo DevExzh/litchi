@@ -1,7 +1,7 @@
 //! The comment-storage graph the text annotation and drawable comment
-//! families share (record 0378): the generated annotation author, comment
-//! storage creation and removal, and their package-metadata registrations,
-//! as the host editor's `comments` module keeps them.
+//! families share: the generated annotation author, comment storage
+//! creation and removal, and their package-metadata registrations, as the
+//! host editor's `comments` module keeps them.
 
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::comment::{AuthorId, GENERATED_AUTHOR_NAME, Uuid};

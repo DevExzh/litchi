@@ -18,9 +18,9 @@
 //!
 //! The payloads come from `litchi_numbers_wire::table_create`, shared with
 //! the Pages and Keynote table owners. A workbook with no table left to
-//! clone takes the shared from-scratch graph (`table_create::fresh`,
-//! record 0420) styled by its theme's first table preset, as the host
-//! editor's `bootstrap_empty_table_graph` builds it.
+//! clone takes the shared from-scratch graph (`table_create::fresh`)
+//! styled by its theme's first table preset, as the host editor's
+//! `bootstrap_empty_table_graph` builds it.
 
 use litchi_iwa_common::wire::append_length_delimited_field;
 use litchi_iwa_table::structure::create::{self, Graph};

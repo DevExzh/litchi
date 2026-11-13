@@ -1,6 +1,6 @@
 //! Structural edits of LibreOffice-authored drawings publish as exact-source
-//! `content.xml` splices (record 0288): the producer's prolog and every byte
-//! outside the inserted, removed or moved elements are kept.
+//! `content.xml` splices: the producer's prolog and every byte outside the
+//! inserted, removed or moved elements are kept.
 
 use litchi_odg::Package;
 use litchi_odg::page::Page;
@@ -183,7 +183,7 @@ fn moves_a_shape_into_another_producer_page_and_back() {
     let from = counts[0] - 1;
     let source = start.content_xml().to_owned();
 
-    // Append to the last page (record 0292).
+    // Append to the last page.
     let mut edit = start.edit();
     edit.move_shape_to_page(0, from, 2, counts[2]).unwrap();
     let moved = edit.commit().unwrap().into_package();

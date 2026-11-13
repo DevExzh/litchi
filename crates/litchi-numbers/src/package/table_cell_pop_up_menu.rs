@@ -103,8 +103,7 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
-    /// (record 0351 §2.4, record 0361).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// Rooted ownership or wire framing is invalid.
@@ -134,7 +133,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {
@@ -181,9 +180,9 @@ impl From<Refusal> for Error {
     }
 }
 
-// The shared table engine (`litchi_iwa_table::cell_format`, record 0379)
-// reports the same failures with a leaf-neutral location: its `scope` is the
-// rooted sheet position.
+// The shared table engine (`litchi_iwa_table::cell_format`) reports the same
+// failures with a leaf-neutral location: its `scope` is the rooted sheet
+// position.
 impl From<table::Path> for Path {
     fn from(path: table::Path) -> Self {
         match path {

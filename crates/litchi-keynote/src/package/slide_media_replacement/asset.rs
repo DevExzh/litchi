@@ -1,6 +1,6 @@
-//! Exact-source replacement of one embedded media asset by its handle
-//! (record 0417; the migration host's Keynote `replace_media` and the
-//! format-neutral `media::Draft::replace`).
+//! Exact-source replacement of one embedded media asset by its handle (the
+//! migration host's Keynote `replace_media` and the format-neutral
+//! `media::Draft::replace`).
 //!
 //! The asset is any [`MediaAsset`] that [`Package::media_assets`] lists:
 //! image data, movie or audio content, a poster, a slide or master
@@ -138,9 +138,9 @@ impl<'a> Edit<'a> {
     /// `DataMetadataMap` entry names it. Each record's `DataInfo` leaves the
     /// package metadata and its `Data/` member is deleted (the host's
     /// `media::Draft::remove_unreferenced`, over the shared
-    /// `litchi_iwa_style::media::unreferenced_data` rule, record 0417). It
-    /// replaces a staged replacement. A package without such records
-    /// commits as an exact no-op.
+    /// `litchi_iwa_style::media::unreferenced_data` rule). It replaces a
+    /// staged replacement. A package without such records commits as an
+    /// exact no-op.
     pub fn prune_unreferenced(&mut self) -> &mut Self {
         self.after = None;
         self.prune = true;

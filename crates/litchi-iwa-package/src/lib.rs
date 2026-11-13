@@ -325,7 +325,7 @@ impl EntryStoreState {
         for (position, entry) in self.entries.iter().enumerate() {
             // The insertion must stay outside the assertion: release builds
             // compile `debug_assert!` away, which left the name index empty
-            // and every by-name lookup missing (record 0300).
+            // and every by-name lookup missing.
             let previous = self.positions.insert(Arc::clone(&entry.name), position);
             debug_assert!(previous.is_none(), "entry names must be unique");
         }

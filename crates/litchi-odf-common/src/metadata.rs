@@ -3,14 +3,13 @@
 //!
 //! Every ODF leaf exposes the family as `Package::{edit_metadata,
 //! apply_metadata}` and a `metadata` module whose `Edit`, `Commit` and
-//! `Patch` are this module's generic types bound to the leaf's `Package`
-//! (record 0288). [`Edit::set`] stages one [`Field`]; [`Edit::commit`]
-//! replaces only the touched `office:meta` children, copies every other
-//! byte and member of the source, and adopts the result through the leaf's
-//! own ingress. Generator, dates and statistics are never rewritten, so a
-//! commit consults no clock. An edit that changes nothing returns the source
-//! package (an exact no-op); a changed edit of a signed or encrypted package
-//! is refused.
+//! `Patch` are this module's generic types bound to the leaf's `Package`.
+//! [`Edit::set`] stages one [`Field`]; [`Edit::commit`] replaces only the
+//! touched `office:meta` children, copies every other byte and member of the
+//! source, and adopts the result through the leaf's own ingress. Generator,
+//! dates and statistics are never rewritten, so a commit consults no clock.
+//! An edit that changes nothing returns the source package (an exact no-op);
+//! a changed edit of a signed or encrypted package is refused.
 //!
 //! ```
 //! use litchi_odf_common::metadata::{Edit, Field, Owner};

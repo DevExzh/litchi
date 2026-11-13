@@ -1,5 +1,5 @@
 //! Body-drawable title and caption transactions
-//! (`litchi_pages::drawable::caption`, record 0371).
+//! (`litchi_pages::drawable::caption`).
 
 use litchi_pages::drawable::caption::{Error, Kind, Refusal};
 use litchi_pages::{DrawableSelector, Package};

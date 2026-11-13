@@ -1,13 +1,13 @@
 //! Exact-source hidden-row/hidden-column engine of a TST table.
 //!
-//! Moved from `litchi-pages` (`package/body_table_hidden_axes`, record
-//! 0379). The leaf resolves its selector into a [`Target`] through its
-//! [`Leaf`] implementation and supplies its wire [`Budget`]; the engine
-//! proves the table's hidden-state dependency closure, and only then
-//! crosses into the strict hidden-state codec. Payload surgery is limited to
-//! the selected table-info/model fields; all unrelated wire bytes and all
-//! unrelated package members remain source authoritative. The leaf keeps its
-//! public transaction types and publication policy.
+//! Moved from `litchi-pages` (`package/body_table_hidden_axes`). The leaf
+//! resolves its selector into a [`Target`] through its [`Leaf`]
+//! implementation and supplies its wire [`Budget`]; the engine proves the
+//! table's hidden-state dependency closure, and only then crosses into the
+//! strict hidden-state codec. Payload surgery is limited to the selected
+//! table-info/model fields; all unrelated wire bytes and all unrelated
+//! package members remain source authoritative. The leaf keeps its public
+//! transaction types and publication policy.
 
 #![allow(
     clippy::arbitrary_source_item_ordering,
@@ -275,8 +275,7 @@ impl fmt::Display for LimitKind {
 /// A redacted failure from a body-table hidden-axis read or transaction.
 #[derive(ThisError, Clone, Copy, PartialEq, Eq)]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
-    /// (record 0351 §2.4, record 0361).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     #[error("the selected Pages body-table hidden-axis source is invalid")]
@@ -298,7 +297,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+/// [`Refusal::kind`].
 #[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
 pub enum Refusal {
     #[error("the Pages body has no table matching the requested selector")]

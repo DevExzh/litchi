@@ -1,8 +1,8 @@
-//! The dual chart number-format codec (record 0375a): chart axes and series
-//! value labels store the same `TSK.FormatStructArchive` in a legacy and a
-//! current generated field, with a companion format-type field. Reads require
-//! both copies to agree; writes keep them synchronised and keep every other
-//! byte (the host's `charts::number_format`).
+//! The dual chart number-format codec: chart axes and series value labels
+//! store the same `TSK.FormatStructArchive` in a legacy and a current
+//! generated field, with a companion format-type field. Reads require both
+//! copies to agree; writes keep them synchronised and keep every other byte
+//! (the host's `charts::number_format`).
 
 use litchi_iwa_common::chart::number_format::{
     DecimalPlaces, FixedDecimalPlaces, LabelAffixes, NegativeStyle, NumberFormat,

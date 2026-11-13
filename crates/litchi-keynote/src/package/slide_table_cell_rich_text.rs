@@ -1,9 +1,10 @@
 //! Shared plumbing of the two slide-table cell rich-text families
-//! ([`crate::slide::table::cell_text`] and [`crate::slide::table::cell_list`],
-//! record 0412): selector resolution to the table model, the exact-source
-//! patch and the publication types. The native graph surgery is the shared
-//! `litchi_iwa_table::cell_rich_text` engine that the Numbers cell families
-//! run; this module only adapts it to the Keynote selectors and package.
+//! ([`crate::slide::table::cell_text`] and
+//! [`crate::slide::table::cell_list`]): selector resolution to the table
+//! model, the exact-source patch and the publication types. The native
+//! graph surgery is the shared `litchi_iwa_table::cell_rich_text` engine
+//! that the Numbers cell families run; this module only adapts it to the
+//! Keynote selectors and package.
 
 use litchi_iwa_archive::package::SharedBytes;
 use litchi_iwa_common::table::coordinate::At;
@@ -123,7 +124,7 @@ macro_rules! rich_text_family {
         #[non_exhaustive]
         pub enum Error {
             /// A well-formed request this route refuses; [`Refusal::kind`]
-            /// classifies it (record 0351 §2.4).
+            /// classifies it.
             #[error(transparent)]
             Refused(Refusal),
             /// The rooted source is malformed or ambiguous.

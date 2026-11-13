@@ -1,6 +1,6 @@
-//! `AuthoredXmlFragment::relocated` (record 0278): balanced source markup
-//! moves within its part with its producer spelling, while unbalanced or
-//! out-of-range relocations are refused.
+//! `AuthoredXmlFragment::relocated`: balanced source markup moves within its
+//! part with its producer spelling, while unbalanced or out-of-range
+//! relocations are refused.
 
 #![allow(
     clippy::unwrap_used,

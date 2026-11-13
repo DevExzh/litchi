@@ -1,11 +1,10 @@
 //! Implementation of the public [`crate::sheet::chart::reference_lines`]
 //! transaction: the ordered reference lines of one sheet chart's primary
 //! value axis on the shared reference-line graph
-//! (`litchi_iwa_style::reference_line`, records 0375a and 0419). A write
-//! patches retained lines in place, removes surplus ones and allocates new
-//! ones with fresh UUIDs, as the host's `set_sheet_chart_reference_lines`
-//! does; the changes are published through the chart-series workspace path
-//! (record 0378a).
+//! (`litchi_iwa_style::reference_line`). A write patches retained lines in
+//! place, removes surplus ones and allocates new ones with fresh UUIDs, as
+//! the host's `set_sheet_chart_reference_lines` does; the changes are
+//! published through the chart-series workspace path.
 
 use std::fmt;
 

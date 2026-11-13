@@ -1,4 +1,4 @@
-//! A volatile conditional highlight authored in Numbers 14.4 (record 0432).
+//! A volatile conditional highlight authored in Numbers 14.4.
 //!
 //! `volatile-highlight-native.numbers`: A2 today, A3 yesterday, A4 tomorrow as
 //! authored on 2026-11-04, with the rule "Date is today" and the preset style
@@ -173,9 +173,9 @@ fn native_rule_reads_on_every_cell_of_its_range() -> TestResult {
     Ok(())
 }
 
-/// The rule Numbers itself added to a cell that had one (record 0433): A2 holds
-/// tomorrow's date with "today" and "tomorrow", A3 and A4 keep "today" alone. The
-/// second rule's preset fill is read, not assumed.
+/// The rule Numbers itself added to a cell that had one: A2 holds tomorrow's date
+/// with "today" and "tomorrow", A3 and A4 keep "today" alone. The second rule's
+/// preset fill is read, not assumed.
 #[test]
 fn native_second_rule_reads_in_order() -> TestResult {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -417,7 +417,7 @@ fn first_volatile_rule_on_a_numbers_saved_table_builds_what_numbers_builds() -> 
 /// Every Numbers-saved table registers the owner family, without the
 /// conditional-style owner's tile until its first volatile rule. The retired
 /// host failed here ("dependency tile is missing"); the leaf builds the tile
-/// (record 0432, formerly the leaf half of
+/// (formerly the leaf half of
 /// `numbers_native_conditional_highlight_volatile_host_fails_leaf_registers`).
 #[test]
 fn numbers_saved_tables_register_their_first_volatile_rule() -> TestResult {

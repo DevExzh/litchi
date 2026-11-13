@@ -1,7 +1,6 @@
 //! Implementation of the public [`crate::sheet::drawable`] structural
 //! transaction: the back-to-front list of the drawables a sheet owns, the
-//! removal of a drawable and its private graph, and z-order moves
-//! (record 0378).
+//! removal of a drawable and its private graph, and z-order moves.
 //!
 //! An [`Edit`] stages any number of operations against one sheet of an
 //! immutable package. Selectors resolve against that base snapshot and the
@@ -55,8 +54,7 @@ structure::structural_family!("sheet-drawable");
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies
-    /// it (record 0351 §2.4).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted source is malformed or ambiguous.
@@ -87,7 +85,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {

@@ -3861,8 +3861,8 @@ mod tests {
         source
     }
 
-    /// Record 0314: the boundaries admit a combined splice exactly where
-    /// one splice publishes what the splices publish one at a time.
+    /// The boundaries admit a combined splice exactly where one splice
+    /// publishes what the splices publish one at a time.
     #[test]
     fn boundaries_admit_combined_splices_that_equal_their_sequence() {
         let limits = RewriteLimits::default();
@@ -5000,7 +5000,7 @@ mod tests {
 
 /// Where a validated storage's attribute tables place their entries, in
 /// UTF-16 code units of its text: what decides whether several splices of
-/// the text can be published as one (record 0314).
+/// the text can be published as one.
 ///
 /// One storage rewrite takes one splice. A caller that wants to publish a
 /// sequence of edits of one text (each paragraph of a batch, say) as one

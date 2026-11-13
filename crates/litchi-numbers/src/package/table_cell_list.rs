@@ -1,5 +1,5 @@
 //! Implementation of the public [`crate::cell::list`] transactions:
-//! paragraph lists of the text in one cell (record 0370b).
+//! paragraph lists of the text in one cell.
 //!
 //! A cell's text carries lists only as rich text: a `TST.RichTextPayload`
 //! in its table's rich-text list names a `TSWP.StorageArchive` whose
@@ -14,11 +14,12 @@
 //! - a rich-text entry names the payload, the cell becomes a rich-text cell
 //!   pointing at it, and the cell's string entry is released.
 //!
-//! The list change itself runs W1-D's engine
-//! ([`litchi_iwa_text_wire::list`], record 0374) and is published by
-//! the shared publisher (`litchi_iwa_text_wire::list::publish`). Host `set_x`/`reset_x` pairs collapse into one
-//! property verb ([`Edit::set`]/[`Edit::reset`]); `reset_list` and
-//! `reset_level` are [`Edit::set_list`] with [`ParagraphList::None`] and
+//! The list change itself runs the shared engine
+//! ([`litchi_iwa_text_wire::list`]) and is published by the shared
+//! publisher (`litchi_iwa_text_wire::list::publish`). Host
+//! `set_x`/`reset_x` pairs collapse into one property verb
+//! ([`Edit::set`]/[`Edit::reset`]); `reset_list` and `reset_level` are
+//! [`Edit::set_list`] with [`ParagraphList::None`] and
 //! [`Edit::set_level`] with [`ParagraphListLevel::ZERO`].
 
 #![allow(
@@ -49,8 +50,7 @@ structure::structural_family!("cell-list", Wire(litchi_iwa_common::LimitKind));
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies
-    /// it (record 0351 §2.4, record 0361).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted source is malformed or ambiguous.
@@ -81,7 +81,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {
@@ -161,7 +161,7 @@ impl From<topology::Error> for Error {
     }
 }
 
-/// The shared engine's error (record 0412).
+/// The shared engine's error.
 impl From<rich::Error> for Error {
     fn from(error: rich::Error) -> Self {
         use rich::Refusal as R;

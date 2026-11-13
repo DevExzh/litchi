@@ -1,5 +1,4 @@
-//! Fresh Keynote authoring: `Package::new`, `Builder` and explicit
-//! `Identity` (record 0298).
+//! Fresh Keynote authoring: `Package::new`, `Builder` and explicit `Identity`.
 
 use litchi_keynote::builder::Error as BuilderError;
 use litchi_keynote::identity::{Error as IdentityError, Role};

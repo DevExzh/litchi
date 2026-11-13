@@ -1,4 +1,4 @@
-//! Paragraph-list engine (record 0374).
+//! Paragraph-list engine.
 //!
 //! A storage names a `TSWP.ListStyleArchive` (2023) per run of paragraphs
 //! in its list-style table (field 7); each paragraph's nesting level lives

@@ -1,13 +1,12 @@
 //! Payload builders for a new, empty table cloned from the structure of an
-//! existing one (the template), shared by the Keynote and Pages table
-//! owners (record 0329).
+//! existing one (the template), shared by the Keynote and Pages table owners.
 //!
-//! This is the payload half of `litchi-numbers`' `table::lifecycle::add`
-//! (record 0301), which the Keynote and Pages owners pair with their own
-//! object-graph plumbing (identifier allocation, component placement,
-//! registry identities and references). The clone takes the template's
-//! table drawable and model and one emptied copy of each storage object the
-//! model owns: tiles hold no rows, header buckets no headers, data lists no
+//! This is the payload half of `litchi-numbers`' `table::lifecycle::add`,
+//! which the Keynote and Pages owners pair with their own object-graph
+//! plumbing (identifier allocation, component placement, registry
+//! identities and references). The clone takes the template's table
+//! drawable and model and one emptied copy of each storage object the model
+//! owns: tiles hold no rows, header buckets no headers, data lists no
 //! entries, the merge map no ranges, and the row/column UID map and stroke
 //! sidecar are rebuilt for the requested size. Styles stay shared.
 //! Everything the template owns beyond its storage (sort, filter, category,
@@ -56,8 +55,8 @@ const DROPPED_MODEL_FIELDS: [u32; 21] = [
 const ZEROED_MODEL_FIELDS: [u32; 5] = [14, 15, 41, 42, 40];
 /// Table-info fields the clone drops, as the host editor clears them:
 /// editing state, summary and category models, view UIDs and pivot state
-/// (record 0370f; the group and hidden-state UUIDs, the pasteboard mapping
-/// and the pivot flag are kept, as native tables carry them).
+/// (the group and hidden-state UUIDs, the pasteboard mapping and the
+/// pivot flag are kept, as native tables carry them).
 const DROPPED_INFO_FIELDS: [u32; 6] = [3, 4, 5, 6, 15, 17];
 /// Drawable fields the clone drops: comment, pencil annotations, title and
 /// caption.
@@ -534,14 +533,13 @@ pub fn empty_storage(
         },
         Role::MergeMap => strip_fields(payload, &[1])?,
         Role::UidMap => {
-            // The host editor's fresh map (record 0370f): identities in
-            // creation order derived from `seed` (the new model's
-            // identifier), so the sorted lists and both index permutations
-            // are the identity; the index lists are unpacked, as native maps
-            // store them.
-            // Encoded in one linear pass (record 0370i): appending each
-            // field through the checked appender re-parsed the growing
-            // output, quadratic in the table size.
+            // The host editor's fresh map: identities in creation order
+            // derived from `seed` (the new model's identifier), so the
+            // sorted lists and both index permutations are the identity;
+            // the index lists are unpacked, as native maps store them.
+            // Encoded in one linear pass: appending each field through the
+            // checked appender re-parsed the growing output, quadratic in
+            // the table size.
             use litchi_iwa_common::varint::encode_varint_into;
             let mut output = Vec::new();
             output

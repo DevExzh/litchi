@@ -1,17 +1,17 @@
-//! Shared exact-source machinery of the structural Pages transactions
-//! (record 0312): [`crate::section::lifecycle`].
+//! Shared exact-source machinery of the structural Pages transactions:
+//! [`crate::section::lifecycle`].
 //!
-//! The toolkit follows `litchi-numbers`' structural machinery (record 0301):
-//! a structural edit stages its changes on a [`Working`] set. Every
-//! component it touches is decompressed and parsed once from the exact
-//! source, canonical framing is checked, and the edit mutates the parsed
-//! objects in place; objects the edit does not touch keep their exact
-//! encoded bytes, and members it does not touch keep their exact compressed
-//! bytes. [`Working::publish`] re-encodes only the touched components,
-//! applies the package metadata registry transition (UUID bindings,
-//! external references and the issued-identifier watermark) and reassembles
-//! the ZIP once. The candidate is reopened through the ordinary strict
-//! ingress, and every member the edit did not rewrite is proven unchanged.
+//! The toolkit follows `litchi-numbers`' structural machinery: a structural
+//! edit stages its changes on a [`Working`] set. Every component it touches
+//! is decompressed and parsed once from the exact source, canonical framing
+//! is checked, and the edit mutates the parsed objects in place; objects
+//! the edit does not touch keep their exact encoded bytes, and members it
+//! does not touch keep their exact compressed bytes. [`Working::publish`]
+//! re-encodes only the touched components, applies the package metadata
+//! registry transition (UUID bindings, external references and the
+//! issued-identifier watermark) and reassembles the ZIP once. The candidate
+//! is reopened through the ordinary strict ingress, and every member the
+//! edit did not rewrite is proven unchanged.
 
 #![allow(
     clippy::arbitrary_source_item_ordering,

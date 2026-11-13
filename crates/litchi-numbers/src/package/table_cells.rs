@@ -94,8 +94,7 @@ pub enum DependencyKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies
-    /// it (record 0351 §2.4, record 0361).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     Refused(Refusal),
     Limit {
         kind: LimitKind,
@@ -117,7 +116,7 @@ pub enum Error {
 }
 
 /// A well-formed table-cell request this route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Refusal {
@@ -144,11 +143,10 @@ pub enum Refusal {
         path: Path,
         kind: DependencyKind,
     },
-    /// A formula references a pivot category the edited package does not
-    /// hold (record 0424).
+    /// A formula references a pivot category the edited package does not hold.
     PivotCategoryNotFound,
     /// A formula references a pivot category whose summary function or
-    /// group level differs in the edited package (record 0424).
+    /// group level differs in the edited package.
     PivotCategoryChanged,
 }
 

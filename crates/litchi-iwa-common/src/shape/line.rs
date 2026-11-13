@@ -1,6 +1,5 @@
 //! Archive-independent line values shared by iWork owners: endpoint
-//! decorations and the straight-line [`Segment`] with its native geometry
-//! math (record 0375).
+//! decorations and the straight-line [`Segment`] with its native geometry math.
 
 use super::geometry::{Point, Size};
 

@@ -3,7 +3,7 @@
 //! The owner's spanning dependencies carry the table's total and body ranges
 //! (`total_range_for_table`, `body_range_for_table`); they follow the new
 //! geometry. Every other coordinate of the calculation graph moves with the
-//! owner's formula-coordinate shift (record 0318), which the caller runs.
+//! owner's formula-coordinate shift, which the caller runs.
 
 use super::wire::{bytes_field, fields, rebuild, single_varint, varint_field};
 use super::{Error, Result};
@@ -121,8 +121,7 @@ pub fn rewrite_extents(
 }
 
 /// Rewrite the own owner's table extents that describe the table before a
-/// resize from `before` to `after`; an unset (sentinel) or unrelated extent
-/// stays (record 0370e).
+/// resize from `before` to `after`; an unset (sentinel) or unrelated extent stays.
 ///
 /// # Errors
 ///

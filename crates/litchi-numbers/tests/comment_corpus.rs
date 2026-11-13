@@ -1,10 +1,10 @@
-//! Numbers cell comments over the corpus (record 0318): native packages keep
-//! each table's comment list, its tiles and the comment authors in members
-//! of their own, so a comment edit rewrites several members. Every corpus
+//! Numbers cell comments over the corpus: native packages keep each
+//! table's comment list, its tiles and the comment authors in members of
+//! their own, so a comment edit rewrites several members. Every corpus
 //! table takes a new comment on a stored cell, gives it back through the
 //! inverse byte for byte, and takes a further edit and a clear; every
 //! natively commented cell is rewritten and cleared the same way; an empty
-//! cell in a row its tile does not store takes one too (record 0329).
+//! cell in a row its tile does not store takes one too.
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -143,8 +143,8 @@ fn every_corpus_table_takes_and_gives_back_a_cell_comment() -> TestResult {
                     round_trip(&package, sheet, table, position, &label)?;
                     *summary.entry("created").or_default() += 1;
                 }
-                // Record 0329: an empty cell, in a row the tile does not
-                // store (the table's last cell), takes a comment too.
+                // An empty cell, in a row the tile does not store (the table's
+                // last cell), takes a comment too.
                 let stored: Vec<At> = semantic.iter_cells().map(|cell| cell.position()).collect();
                 let last = At::new(
                     semantic.row_count().saturating_sub(1),

@@ -215,7 +215,7 @@ pub struct RegistryFacts<'source> {
 }
 
 /// The payload-independent part of [`RegistryFacts`], shared by the proofs
-/// a leaf memoizes for one package (record 0370k).
+/// a leaf memoizes for one package.
 #[derive(Debug)]
 pub struct Registry {
     components: Vec<ComponentFact>,
@@ -783,8 +783,7 @@ impl Registry {
     }
 
     /// The removals of the `edges` the registry records; an edge without a
-    /// record is skipped (Pages and Keynote register no menu-model edge,
-    /// record 0412a).
+    /// record is skipped (Pages and Keynote register no menu-model edge).
     pub fn recorded_external_removals(
         &self,
         edges: &[ExternalEdge],

@@ -119,8 +119,7 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
-    /// (record 0351 §2.4, record 0361).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     #[error("the selected Keynote slide-table appearance source is invalid")]
@@ -142,7 +141,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {
@@ -4583,7 +4582,7 @@ impl ArchiveReferenceVisitor for AppearanceInboundVisitor<'_> {
         let source_is_show_aggregate =
             source_is_show && matches!(occurrence.scope, ArchiveReferenceScope::Message);
         // A cell's rich-text storage names the stylesheet its paragraph
-        // styles live in (`TSWP.StorageArchive.style_sheet`, record 0412).
+        // styles live in (`TSWP.StorageArchive.style_sheet`).
         let source_is_storage = source_message_type == TEXT_STORAGE_MESSAGE_TYPE;
         let target = occurrence.referenced_identifier;
         if target == self.model_identifier {

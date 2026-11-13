@@ -1,4 +1,4 @@
-//! Storage-scoped paragraph-style property engine (record 0374).
+//! Storage-scoped paragraph-style property engine.
 //!
 //! A uniformly styled `TSWP.StorageArchive` names one
 //! `TSWP.ParagraphStyleArchive` in its paragraph-style table (field 5).
@@ -672,7 +672,7 @@ fn variation(
 }
 
 /// The font subset of a variation's overrides: font identity, bold,
-/// italic and point size (the chart-font properties, record 0375a).
+/// italic and point size (the chart-font properties).
 #[derive(Debug, Clone, PartialEq, Default)]
 #[non_exhaustive]
 pub struct FontOverrides {
@@ -752,7 +752,7 @@ pub fn font_variation(
 
 /// Every override a managed variation holds (opaque), with its font subset
 /// editable: the chart legend typography keeps the variation's other
-/// overrides when it rewrites the font ones (record 0414).
+/// overrides when it rewrites the font ones.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct VariationOverrides(Overrides);
 
@@ -847,10 +847,9 @@ fn plan_set(
         PropertyKind::DecimalTabCharacter | PropertyKind::DefaultTabInterval
     );
     // A shared style is never rewritten, so its own overrides are decoded
-    // only for an exclusive variation (record 0412: native Keynote table
-    // base styles carry a zero default tab interval the override decoder
-    // refuses, and a derived child does not inherit that field as an
-    // override).
+    // only for an exclusive variation (native Keynote table base styles
+    // carry a zero default tab interval the override decoder refuses,
+    // and a derived child does not inherit that field as an override).
     if target.exclusive
         && let Some(mut overrides) = overrides::direct_overrides(&style, raw, budget)?
         && (!requires_child_variation || overrides.is_tab_defaults_only())

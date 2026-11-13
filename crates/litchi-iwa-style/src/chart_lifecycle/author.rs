@@ -1,6 +1,5 @@
 //! The source-free chart graph every format authors when it creates a chart
-//! (the host's `charts::source` builder, lifted from the Keynote leaf in
-//! record 0418).
+//! (the host's `charts::source` builder, lifted from the Keynote leaf).
 //!
 //! A new chart is a fixed private graph: the chart drawable, its title and
 //! caption stand-ins, a Numbers chart mediator, the chart's theme style

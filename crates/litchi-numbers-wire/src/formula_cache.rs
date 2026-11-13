@@ -10,11 +10,10 @@ use core::mem::size_of;
 
 use crate::formula_dependencies;
 
-/// Formula authoring and removal for the Keynote and Pages table owners
-/// (record 0376a).
+/// Formula authoring and removal for the Keynote and Pages table owners.
 pub mod author;
 /// The dependent-cache refresh of value writes for the Keynote and Pages
-/// table owners (record 0376).
+/// table owners.
 pub mod refresh;
 use litchi_iwa_common::formula::{FiniteF64, FormulaCachedValue};
 use litchi_iwa_common::{varint, wire::WireView};
@@ -433,10 +432,10 @@ pub enum Unsupported {
     TextScalar,
     CacheType,
     HeaderNameManager,
-    /// A tile or cell shape outside the shared cell writer (record 0376).
+    /// A tile or cell shape outside the shared cell writer.
     Storage,
     /// A dependency-graph shape the shared rewrite does not regenerate, such
-    /// as the selected table's mirrored range records (record 0376a).
+    /// as the selected table's mirrored range records.
     Graph,
 }
 
@@ -532,9 +531,9 @@ pub struct FormulaAnalysis {
     pub precedents: Vec<FormulaPrecedent>,
     pub ranges: Vec<FormulaRange>,
     pub evaluation_supported: bool,
-    /// Pivot-category references (record 0424). Their precedents are cells
-    /// of the group-by's formula owner, which has no table geometry; the
-    /// AST does not name them, so the dependency records are their
+    /// Pivot-category references. Their precedents are cells of the
+    /// group-by's formula owner, which has no table geometry; the AST
+    /// does not name them, so the dependency records are their
     /// authority.
     pub category_references: usize,
     pub usage: FormulaEvaluationUsage,
@@ -2401,10 +2400,10 @@ fn plan_final_cache_internal(
     // Registered owners without table geometry (group-by, conditional-style
     // and other engine owners) that the logical graph may name as a
     // precedent owner: a pivot-category reference reads two cells of its
-    // group-by's owner (record 0424).
+    // group-by's owner.
     let mut tableless_owners = Vec::new();
     // Other tables' owners with records, and those records' edges, kept apart
-    // from the graph the edit evaluates (record 0432).
+    // from the graph the edit evaluates.
     let mut foreign_owners = Vec::new();
     let mut foreign_edges = Vec::new();
     scratch_allocation::<u32>(&mut usage, engine_stage.owner_references.len(), limits)?;
@@ -2454,9 +2453,9 @@ fn plan_final_cache_internal(
                 }
                 if owner.formula_owner().is_some() {
                     // Another table's owner with no formula in the final set
-                    // and no dependency record at all (record 0301): it
-                    // cannot reach the edited cells, so it needs no
-                    // geometry. Anything else still does.
+                    // and no dependency record at all: it cannot reach
+                    // the edited cells, so it needs no geometry.
+                    // Anything else still does.
                     let inert = stage.records.is_empty()
                         && stage.ranges.is_empty()
                         && stage.tile_references.is_empty()
@@ -2465,10 +2464,9 @@ fn plan_final_cache_internal(
                     if inert && inert_foreign_owner(owner) {
                         continue;
                     }
-                    // Another table's formulas (a native pivot's body, record
-                    // 0432). They need no geometry while nothing the edit can
-                    // dirty reaches them; the check runs when the whole graph
-                    // is known.
+                    // Another table's formulas (a native pivot's body). They
+                    // need no geometry while nothing the edit can dirty
+                    // reaches them; the check runs when the whole graph is known.
                     if !stage.ranges.is_empty()
                         || !stage.range_references.is_empty()
                         || !foreign_owner_has_only_cell_records(owner)
@@ -3376,9 +3374,9 @@ fn reject_unsupported_owner(
         return Err(Error::UnsupportedDependency(Unsupported::WholeOwner));
     }
     // A native pivot table's owner lists the group-by and group UUIDs its
-    // category formulas name (record 0432). The formula set itself is validated
-    // node by node: only a strictly decoded category node is admitted, so these
-    // references cannot hide an evaluable operand.
+    // category formulas name. The formula set itself is validated node by node:
+    // only a strictly decoded category node is admitted, so these references
+    // cannot hide an evaluable operand.
     if owner
         .uuid_references()
         .is_some_and(|value| !empty_message(value) && !well_formed_message(value))
@@ -3438,11 +3436,10 @@ fn empty_whole_owner_dependencies(payload: &[u8]) -> bool {
 
 /// Whether another table's owner holds nothing but its own range contexts:
 /// no range, volatile, whole-owner, UUID, error or spill state, and spanning
-/// records only in the native total/body context shape (record 0301).
-/// Refuse when an edit of the selected table can dirty another table's
-/// formula: this route has no geometry to recompute it. Numbers keeps a pivot
-/// on its own snapshot of the source table (record 0432), so a source edit
-/// never reaches the pivot's formulas.
+/// records only in the native total/body context shape. Refuse when an edit
+/// of the selected table can dirty another table's formula: this route has
+/// no geometry to recompute it. Numbers keeps a pivot on its own snapshot of
+/// the source table, so a source edit never reaches the pivot's formulas.
 fn reject_reachable_foreign_owners(
     selected: u32,
     foreign_owners: &[u32],
@@ -7248,7 +7245,7 @@ mod tests {
             ..source
         };
         // Another table's owner with no dependency record cannot reach the
-        // edited cells and needs no geometry (record 0301).
+        // edited cells and needs no geometry.
         plan_final_cache(
             missing_table_source,
             &overlay,
@@ -7328,7 +7325,7 @@ mod tests {
         ));
 
         // Another table's formula that cannot be reached, as a native pivot's
-        // body from its source table (record 0432): it needs no geometry.
+        // body from its source table: it needs no geometry.
         let unreached_tile = tsce::CellRecordTileArchive {
             internal_owner_id: external_owner,
             tile_column_begin: 0,

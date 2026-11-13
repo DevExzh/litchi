@@ -1,6 +1,5 @@
 //! App-authored iWork package directories (the bundle form), shared by the
-//! Pages, Keynote and Numbers owners (`IWORK_API_REQUESTS.md` request 16,
-//! records 0299, 0301 and 0306).
+//! Pages, Keynote and Numbers owners.
 //!
 //! An iWork application can save a document as a directory bundle:
 //! `Index.zip` holds the IWA components (already under `Index/`), and the

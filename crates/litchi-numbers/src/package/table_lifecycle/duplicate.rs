@@ -1,4 +1,4 @@
-//! A populated copy of a table on a Numbers sheet (record 0370h).
+//! A populated copy of a table on a Numbers sheet.
 //!
 //! The copy itself — fresh identifiers for its drawable, model and owned
 //! storage, the host editor's table UUID, its CalculationEngine owner

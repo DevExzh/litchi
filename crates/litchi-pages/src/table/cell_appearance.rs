@@ -1,4 +1,4 @@
-//! Cell fill, text layout and borders of one body-table cell (record 0371).
+//! Cell fill, text layout and borders of one body-table cell.
 //!
 //! [`crate::Package::body_table_cell_appearance`] reads a cell's effective
 //! fill and layout; [`crate::Package::edit_body_table_cell_appearance`]

@@ -1,14 +1,13 @@
-//! The structural toolkit of the Pages text-box families (record 0413).
+//! The structural toolkit of the Pages text-box families.
 //!
 //! The text-box, annotation, field and comment families port the Numbers
-//! sheet-drawable publishers (records 0378 and 0378a). Those run on the
-//! shared structural working set `litchi_iwa_table::structure` (record
-//! 0379), which every leaf `Package` implements through
-//! [`litchi_iwa_table::structure::TableLeaf`]. This module gives the Pages
-//! families the same vocabulary the Numbers ones use: the working set over a
-//! Pages [`Package`], the exact artifact pair a patch retains, and the macro
-//! that declares a family's `LimitKind`, `Patch`, `Diagnostics` and
-//! `Commit`.
+//! sheet-drawable publishers. Those run on the shared structural working set
+//! `litchi_iwa_table::structure`, which every leaf `Package` implements
+//! through [`litchi_iwa_table::structure::TableLeaf`]. This module gives the
+//! Pages families the same vocabulary the Numbers ones use: the working set
+//! over a Pages [`Package`], the exact artifact pair a patch retains, and
+//! the macro that declares a family's `LimitKind`, `Patch`, `Diagnostics`
+//! and `Commit`.
 
 #![allow(
     clippy::arbitrary_source_item_ordering,

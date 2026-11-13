@@ -1,6 +1,6 @@
-//! Sheet-drawable families on native fixtures (record 0378): the drawable
-//! list, frame/property/playback edits and z-order moves, their exact
-//! inverses and their refusals.
+//! Sheet-drawable families on native fixtures: the drawable list,
+//! frame/property/playback edits and z-order moves, their exact inverses and
+//! their refusals.
 
 use std::path::PathBuf;
 use std::time::Duration;

@@ -712,8 +712,7 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
-    /// (record 0351 §2.4, record 0361).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The source chart, caption graph, or text storage is malformed or unsafe.
@@ -744,7 +743,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {
@@ -2832,7 +2831,7 @@ pub(super) fn caption_dependencies(
 }
 
 /// The stylesheet, paragraph style and language of a new `label` graph
-/// (`caption::theme_label_paragraph_style`, record 0435).
+/// (`caption::theme_label_paragraph_style`).
 fn caption_theme(
     package: &Package,
     label: litchi_iwa_style::caption::Label,

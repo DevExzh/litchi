@@ -1,10 +1,10 @@
 //! Archive-free display formats for Numbers cells.
 //!
 //! This module is the semantic owner for cell display and control values shared
-//! by the Numbers, Pages and Keynote table owners (record 0368). It
-//! contains no protobuf messages, archive identifiers, package handles, or
-//! transaction state. Native identifiers, codecs, unknown-field preservation,
-//! and publication remain responsibilities of the concrete IWA adapter.
+//! by the Numbers, Pages and Keynote table owners. It contains no protobuf
+//! messages, archive identifiers, package handles, or transaction state.
+//! Native identifiers, codecs, unknown-field preservation, and publication
+//! remain responsibilities of the concrete IWA adapter.
 
 pub mod control;
 /// Currency display values.

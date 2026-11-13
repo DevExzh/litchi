@@ -5,7 +5,7 @@
 //! and the canonical empty `TSCE.FormulaOwnerDependenciesArchive` envelope
 //! together, so table creation and duplication need no generated schema
 //! value. [`encode_empty_table`](crate::formula_owner::encode_empty_table) emits, byte for byte, the owner the legacy
-//! host built and encoded with Prost (record 0368 parity test).
+//! host built and encoded with Prost (checked by a parity test).
 
 use core::fmt;
 

@@ -1,8 +1,8 @@
-//! The package-metadata data-owner transitions of embedded media (record
-//! 0422): a `TSP.DataInfo` per `Data/` member and, per component, the
-//! objects that own a data reference (the host's
-//! `data_reference_registry` and `append_data_info`). Lifted from Pages
-//! (records 0371, 0413b, 0415) so the three format families share them.
+//! The package-metadata data-owner transitions of embedded media: a
+//! `TSP.DataInfo` per `Data/` member and, per component, the objects
+//! that own a data reference (the host's `data_reference_registry` and
+//! `append_data_info`). Lifted from Pages so the three format families
+//! share them.
 //!
 //! Payload functions edit a `TSP.PackageMetadata` payload; [`own_new`],
 //! [`own`] and [`release`] apply one owner transition to the registry of a

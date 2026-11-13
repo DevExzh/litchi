@@ -1,10 +1,10 @@
-//! The bounds, step counts and scale of a chart's primary value axis
-//! (record 0422): the inspector values stored in fields 5, 6, 8, 17 and 18
-//! of the generated extension (field 10,000) of the axis's
+//! The bounds, step counts and scale of a chart's primary value
+//! axis: the inspector values stored in fields 5, 6, 8, 17 and 18 of
+//! the generated extension (field 10,000) of the axis's
 //! `TSCH.ChartAxisNonStyleArchive`.
 //!
-//! The rules were Keynote's (`slide_chart_value_axis`, record 0372) and are
-//! now shared by the three format families:
+//! The rules were Keynote's (`slide_chart_value_axis`) and are now shared by
+//! the three format families:
 //!
 //! - a stored or requested value is one [`ValueAxisSettings`] aggregate;
 //!   a manual endpoint must be finite, the minimum must not exceed the

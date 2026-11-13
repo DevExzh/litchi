@@ -182,8 +182,8 @@ fn authored_chart_parts_must_be_compact_xml() {
     assert!(Part::from_xml(spaced).is_err());
 }
 
-/// Record 0358a: the removed inventory transaction's chart edits on the
-/// package route, with a durable, reversible, mergeable patch.
+/// The removed inventory transaction's chart edits on the package route, with a
+/// durable, reversible, mergeable patch.
 #[test]
 fn package_chart_edits_have_durable_patches() -> Result<()> {
     let bytes = package(false)?;

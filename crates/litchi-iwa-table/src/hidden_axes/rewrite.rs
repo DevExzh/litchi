@@ -763,7 +763,7 @@ fn next_owner_creation_ids(floor: u64) -> Result<OwnerCreationIds, Error> {
         maximum: u64::MAX - 1,
     })?;
     // The host editor allocates the two filter sets before the two formula
-    // owners (record 0379: identity allocation follows the host).
+    // owners (identity allocation follows the host).
     Ok(OwnerCreationIds {
         column_filter: first,
         row_filter: second,

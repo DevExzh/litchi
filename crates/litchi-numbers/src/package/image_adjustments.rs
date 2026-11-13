@@ -1,11 +1,10 @@
 //! Bounded Numbers image-adjustment projection and source-preserving rewrite.
 //!
 //! This module was the private native bridge for the retired migration host
-//! (deleted by record 0429; last present at commit `4d8a3e161f`). The
-//! complete `TSD.ImageArchive` payload stays byte-authoritative; this focused
-//! owner projects only the three semantic Image inspector
-//! controls and delegates wire validation and rewriting to the strict Buffa
-//! codec.
+//! (deleted; last present at commit `4d8a3e161f`). The complete
+//! `TSD.ImageArchive` payload stays byte-authoritative; this focused owner
+//! projects only the three semantic Image inspector controls and delegates
+//! wire validation and rewriting to the strict Buffa codec.
 
 use std::fmt;
 use std::mem::size_of;
@@ -88,8 +87,7 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
-    /// (record 0351 §2.4, record 0361).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The source graph or payload is malformed.
@@ -116,7 +114,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {

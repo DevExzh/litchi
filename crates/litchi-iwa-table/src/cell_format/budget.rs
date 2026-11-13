@@ -70,8 +70,7 @@ pub struct TransactionBudget {
 /// watermark (`next_list_id`) and keep the watermark on release. The Pages
 /// and Keynote owners follow the shared cell writer
 /// (`litchi_numbers_wire::table_write`) and the legacy host format writer:
-/// a new entry takes the watermark, and a removed last key is handed back
-/// (record 0379).
+/// a new entry takes the watermark, and a removed last key is handed back.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ListKeys {
     /// Reuse free keys; keep the watermark on release.

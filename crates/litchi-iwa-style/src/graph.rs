@@ -12,11 +12,11 @@
 //! package once (every component and member the edit did not touch keeps its
 //! exact bytes).
 //!
-//! Registry transitions follow the migration host byte for byte (record
-//! 0375a): a scalar is replaced in place, a repeated record is appended after
-//! the component's last field, and a removal drops exactly the selected
-//! record. New object UUIDs are derived deterministically (record 0298
-//! §2.1) where the host draws random ones.
+//! Registry transitions follow the migration host byte for byte: a
+//! scalar is replaced in place, a repeated record is appended after the
+//! component's last field, and a removal drops exactly the selected
+//! record. New object UUIDs are derived deterministically where the
+//! host draws random ones.
 
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};

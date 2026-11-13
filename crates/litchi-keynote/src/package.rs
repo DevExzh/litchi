@@ -456,8 +456,8 @@ pub struct Package {
     state: Arc<State>,
 }
 
-/// The shared table engines (`litchi-iwa-table`, record 0379) read the
-/// package through its catalog, object index and ingress limits.
+/// The shared table engines (`litchi-iwa-table`) read the package through its
+/// catalog, object index and ingress limits.
 impl litchi_iwa_table::TableSource for Package {
     fn catalog(&self) -> &ComponentCatalog {
         self.state.source.components()
@@ -687,9 +687,9 @@ impl Package {
     ///
     /// A package directory (the bundle form Keynote writes when "Save as
     /// package" is selected) is captured once and converted into its
-    /// single-file form ([`litchi_iwa_archive::bundle::capture`], record
-    /// 0306): the `Index.zip` members followed by every other file of the
-    /// bundle in byte order of its relative name. The result is an ordinary
+    /// single-file form ([`litchi_iwa_archive::bundle::capture`]): the
+    /// `Index.zip` members followed by every other file of the bundle in
+    /// byte order of its relative name. The result is an ordinary
     /// exact-source package: it edits like a single-file package,
     /// [`Self::save`] and [`Self::write_to`] publish the single-file form,
     /// and [`Self::save_directory`] writes the bundle form back.
@@ -1007,11 +1007,11 @@ impl Package {
         save::save(self, path)
     }
 
-    /// Save this package as an app-style package directory at `path`
-    /// (`IWORK_API_REQUESTS.md` request 16, record 0306): `Index.zip` holds
-    /// the `Index/` members with their records unchanged, and every other
-    /// member (metadata sidecars, previews, `Data/` media) is a plain file.
-    /// Opening the directory again gives back this package's exact bytes.
+    /// Save this package as an app-style package directory at
+    /// `path`: `Index.zip` holds the `Index/` members with their
+    /// records unchanged, and every other member (metadata sidecars,
+    /// previews, `Data/` media) is a plain file. Opening the
+    /// directory again gives back this package's exact bytes.
     ///
     /// The bundle is written into a sibling staging directory; an existing
     /// destination directory is swapped out only after the new one is

@@ -1,4 +1,4 @@
-//! The formula-coordinate shift of a table-axis edit (record 0318).
+//! The formula-coordinate shift of a table-axis edit.
 //!
 //! An inserted or removed row or column moves every cell after it, so every
 //! coordinate the calculation engine holds for the edited table moves too.
@@ -8,8 +8,7 @@
 //! primitives (`litchi_iwa_common::wire`) in the same order, so a payload it
 //! rewrites carries the bytes the host editor wrote; the host's differential
 //! test `numbers_topology_formula_differential.rs` checked that over the
-//! corpus and over synthetic workbooks until the host was deleted (record
-//! 0429).
+//! corpus and over synthetic workbooks until the host was deleted.
 //!
 //! What moves:
 //!
@@ -28,13 +27,13 @@
 //!
 //! Refused, typed, before anything is published:
 //!
-//! Removed rows and columns (record 0329): a reference to a removed cell,
-//! and a range wholly on the removed axis, become `REFERENCE_ERROR_NODE`s
-//! (`#REF!`, as native Numbers writes them) and the formula caches an error
-//! result; a range that loses a row or column shrinks; precedent edges and
-//! range dependencies into the removed axis go with it. Where the cell
-//! writer could not clear the removed cells, their hosts' dependency
-//! records go here, and an emptied dependency tile with them.
+//! Removed rows and columns: a reference to a removed cell, and a range
+//! wholly on the removed axis, become `REFERENCE_ERROR_NODE`s (`#REF!`, as
+//! native Numbers writes them) and the formula caches an error result; a
+//! range that loses a row or column shrinks; precedent edges and range
+//! dependencies into the removed axis go with it. Where the cell writer
+//! could not clear the removed cells, their hosts' dependency records go
+//! here, and an emptied dependency tile with them.
 //!
 //! - [`Unsupported::DeletedReference`]: the removed axis is one of several
 //!   ranges of one colon tract, or an endpoint of a merge range.
@@ -47,7 +46,7 @@
 //!   tile.
 //! - [`Unsupported::SharedFormulas`]: one formula-list entry shared by cells
 //!   whose rewritten formulas would differ, in a segmented formula list (an
-//!   unsegmented list is split: record 0329).
+//!   unsegmented list is split).
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -121,10 +120,10 @@ pub(crate) struct Shift {
     /// A check before the removed axis is cleared: formula hosts on it are
     /// left as they are (the clear removes them).
     pub(crate) pending_clear: bool,
-    /// The removed axis was not cleared through the cell writer (record
-    /// 0329): the formula hosts on it are dropped here, with their
-    /// dependency records and formula-list references, and no dependent
-    /// cache is recomputed, so a surviving range over the removed axis is
+    /// The removed axis was not cleared through the cell writer: the
+    /// formula hosts on it are dropped here, with their dependency
+    /// records and formula-list references, and no dependent cache is
+    /// recomputed, so a surviving range over the removed axis is
     /// refused.
     pub(crate) drop_hosts: bool,
 }
@@ -163,8 +162,8 @@ impl Shift {
     }
 
     /// The interval `[low, high]` after the edit: a removed endpoint moves
-    /// inward, as native Numbers shrinks a range that loses a row or
-    /// column (record 0329); `None` when the whole interval is removed.
+    /// inward, as native Numbers shrinks a range that loses a row or column;
+    /// `None` when the whole interval is removed.
     fn interval(self, low: u32, high: u32) -> Out<Option<(u32, u32)>> {
         if self.insert || !(low..=high).contains(&self.position) {
             return Ok(Some((self.coordinate(low)?, self.coordinate(high)?)));
@@ -234,7 +233,7 @@ pub(crate) struct Table<'a> {
     /// Footer rows before the edit.
     pub(crate) footer_rows: u32,
     /// The references removed cells hold per formula-list key, when the
-    /// cell writer could not clear them (record 0329).
+    /// cell writer could not clear them.
     pub(crate) dropped_formulas: &'a BTreeMap<u64, u64>,
 }
 
@@ -518,8 +517,7 @@ fn patch_range_coordinate(data: &[u8], values: [u32; 4]) -> Out<Vec<u8>> {
 }
 
 /// `mutate_range_coordinate`, with the footer override; a range that loses
-/// a row or column shrinks, and `None` is a range wholly removed (record
-/// 0329).
+/// a row or column shrinks, and `None` is a range wholly removed.
 fn mutate_range(
     range: [u32; 4],
     shift: Shift,
@@ -714,8 +712,7 @@ fn whole_axis(tract: &[u8], row_axis: bool) -> Out<bool> {
     )
 }
 
-/// `mutate_tract_interval`; `None` for an interval wholly removed (record
-/// 0329).
+/// `mutate_tract_interval`; `None` for an interval wholly removed.
 #[allow(
     clippy::too_many_arguments,
     reason = "the host editor's interval rule takes the whole edit context"
@@ -855,8 +852,7 @@ fn cfuuid_key(uuid: &[u8]) -> Out<Option<(u64, u64)>> {
 enum Tract {
     Unchanged,
     Rewritten(Vec<u8>),
-    /// Its only range on the edited axis was removed: the node reads
-    /// `#REF!` (record 0329).
+    /// Its only range on the edited axis was removed: the node reads `#REF!`.
     Removed,
 }
 
@@ -883,7 +879,7 @@ fn rewrite_tract(
     let mut removed = false;
     // A range whose endpoints mix absolute and relative rows (or columns),
     // `C$2:$C6`, holds one single-point range of each kind: its endpoints
-    // move as one interval's (record 0329).
+    // move as one interval's.
     let mixed = match (
         current[&relative_field].as_slice(),
         current[&absolute_field].as_slice(),
@@ -1136,8 +1132,8 @@ fn footer_overrides(
 const REFERENCE_ERROR_NODE: u64 = 30;
 
 /// The node that replaces a reference to a removed row or column (or a
-/// range wholly removed): `#REF!`, as native Numbers writes it (record
-/// 0329). The replaced node's leading whitespace stays.
+/// range wholly removed): `#REF!`, as native Numbers writes it. The replaced
+/// node's leading whitespace stays.
 fn reference_error_node(node: &[u8]) -> Out<Vec<u8>> {
     let mut output = Vec::new();
     push_varint_field(&mut output, 1, REFERENCE_ERROR_NODE)?;
@@ -1169,7 +1165,7 @@ fn moving_target(node: &[u8], host: Host, coordinate_field: u32) -> Out<Option<u
 
 /// The ranges (`reference, reference, COLON_NODE`) a removal reaches: the
 /// first-node indices of the ranges wholly removed, and the endpoints that
-/// move inward (record 0329). Footer overrides keep their endpoints.
+/// move inward. Footer overrides keep their endpoints.
 fn range_removals(
     nodes: &[&[u8]],
     host: Host,
@@ -1478,7 +1474,7 @@ fn formula_key(package: &dyn TableSource, store: &[u8], row: u32, column: u32) -
 /// `mutate_dependency_record` and its wire rewrite
 /// (`rewrite_shifted_dependency_records`, one record). `None` drops the
 /// record of a dropped host; precedent edges into a removed row or column
-/// go (record 0329: the formula reads `#REF!` there).
+/// go (the formula reads `#REF!` there).
 fn rewrite_record(
     record: &[u8],
     shift: Shift,
@@ -1635,8 +1631,8 @@ fn rewrite_records(
 }
 
 /// Rewrite the records of `container` (`field` repeated records); `None`
-/// from `map` drops the record (record 0329: a dependency on removed cells
-/// only, or a removed host's).
+/// from `map` drops the record (a dependency on removed cells only, or a
+/// removed host's).
 fn filter_records(
     container: &[u8],
     field: u32,
@@ -1753,8 +1749,8 @@ fn rewrite_from_to(
     Ok(Some(output))
 }
 
-/// `mutate_cell_coord_set` and its wire rewrite. With dropped hosts
-/// (record 0329) the removed row or column leaves the set.
+/// `mutate_cell_coord_set` and its wire rewrite. With dropped hosts the removed
+/// row or column leaves the set.
 fn rewrite_coord_set(set: &[u8], shift: Shift) -> Out<Vec<u8>> {
     if shift.pending_clear && !shift.insert {
         // The hosts on the removed axis are cleared first; the coordinates
@@ -1876,7 +1872,7 @@ fn formula_hosts(package: &dyn TableSource, owner: &[u8]) -> Out<Vec<(u32, u32)>
     Ok(hosts)
 }
 
-/// One cell rewrite the topology applies to a table's tiles (record 0329).
+/// One cell rewrite the topology applies to a table's tiles.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct CellPatch {
     /// The drawable of the table holding the cell.
@@ -1900,13 +1896,13 @@ struct Moved {
 
 /// Rewrite the formulas of `hosts` (cells of the table whose drawable is
 /// `info` and data store `store`) in its formula list. `dropped` counts the
-/// references of removed cells per formula-list key (record 0329: a
-/// removal whose cells the cell writer could not clear).
+/// references of removed cells per formula-list key (a removal whose
+/// cells the cell writer could not clear).
 ///
 /// An entry whose surviving cells all take one formula is rewritten in
-/// place. When they diverge, the entry is split (record 0329): it keeps the
-/// formula of its unchanged cells (or the first new formula), and every
-/// other new formula takes a new entry its cells move to.
+/// place. When they diverge, the entry is split: it keeps the formula
+/// of its unchanged cells (or the first new formula), and every other
+/// new formula takes a new entry its cells move to.
 #[allow(
     clippy::too_many_arguments,
     reason = "the formula list of one table, with the plan it feeds"
@@ -2020,7 +2016,7 @@ fn rewrite_formulas(
             // Rewriting in place keeps every cell's formula.)
             Some(with(Some(outcomes[0].0), surviving)?)
         } else {
-            // The cells diverge: split the entry (record 0329).
+            // The cells diverge: split the entry.
             if containers.len() > 1 {
                 // A segmented list: new keys would fall in a segment's range.
                 return refuse(Unsupported::SharedFormulas);
@@ -2346,8 +2342,8 @@ pub(crate) fn plan(
             Ok(Some(rewritten))
         })?;
         if repeated_bytes(&rewritten, 4)?.is_empty() && !repeated_bytes(data, 4)?.is_empty() {
-            // Its last record went with a dropped host (record 0329): the
-            // tile goes too, as the cell writer drops it.
+            // Its last record went with a dropped host: the tile goes too, as
+            // the cell writer drops it.
             empty_tiles.push((13, tile));
         } else if rewritten != data {
             output.push(tile, message, rewritten)?;
@@ -2514,11 +2510,11 @@ fn rewrite_incoming_rect(rect: &[u8], shift: Shift) -> Out<Vec<u8>> {
 pub(crate) struct Plan {
     pub(crate) own: Option<(u64, usize, Vec<u8>)>,
     pub(crate) rewrites: Vec<Rewrite>,
-    /// Cells whose tiles change with the formulas (record 0329): error
-    /// caches of `#REF!` formulas, cells of split shared formulas.
+    /// Cells whose tiles change with the formulas: error caches of `#REF!`
+    /// formulas, cells of split shared formulas.
     pub(crate) cells: Vec<CellPatch>,
     /// Dependency tiles emptied by dropped hosts, which go with their
-    /// owner's references to them (record 0329).
+    /// owner's references to them.
     pub(crate) removed: Vec<u64>,
 }
 

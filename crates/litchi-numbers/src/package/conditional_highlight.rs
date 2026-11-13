@@ -1,11 +1,10 @@
 //! Implementation of the public [`crate::cell::conditional_highlight`]
-//! transactions (record 0370d): the ordered conditional-highlight rules of
-//! one cell.
+//! transactions: the ordered conditional-highlight rules of one cell.
 //!
 //! The native rule graph surgery is the shared conditional-highlight engine
-//! (`litchi_iwa_table::conditional_highlight`, lifted from this module in
-//! record 0412f so Pages and Keynote run it too); this module keeps the
-//! Numbers selectors, the staged edit and the exact-source patch.
+//! (`litchi_iwa_table::conditional_highlight`, lifted from this module so
+//! Pages and Keynote run it too); this module keeps the Numbers
+//! selectors, the staged edit and the exact-source patch.
 
 use std::fmt;
 
@@ -29,8 +28,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies
-    /// it (record 0351 §2.4, record 0361).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted source is malformed, or its rules use a representation
@@ -242,8 +240,7 @@ impl Edit<'_> {
     ///
     /// [`Refusal::CellNotFound`], [`Refusal::InvalidRuleCount`] for no rule
     /// or more than fifteen, [`Error::Allocation`]. A volatile date rule
-    /// registers the cell with the calculation engine's volatile owner
-    /// family (record 0376a).
+    /// registers the cell with the calculation engine's volatile owner family.
     pub fn set(self, position: At, rules: impl IntoIterator<Item = Rule>) -> Result<Self> {
         let mut staged = Vec::new();
         for rule in rules {

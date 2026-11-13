@@ -1,7 +1,7 @@
-//! The chart-lifecycle values every format stores on its chart drawable
-//! (record 0416): the native chart kind and series direction in the
-//! drawable's `TSCH.ChartArchive` extension, read and rewritten in place
-//! (the host's `set_*_chart_kind` and `set_*_chart_direction`, which assign
+//! The chart-lifecycle values every format stores on its chart drawable:
+//! the native chart kind and series direction in the drawable's
+//! `TSCH.ChartArchive` extension, read and rewritten in place (the host's
+//! `set_*_chart_kind` and `set_*_chart_direction`, which assign
 //! `chart_type` and `series_direction`). Every other byte of the payload is
 //! kept. [`author`] writes the private graph of a new chart; [`graph`]
 //! lists and remaps the private references of an existing one.

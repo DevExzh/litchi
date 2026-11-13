@@ -1,6 +1,6 @@
 //! The private graph of a sheet drawable and its copy under fresh
-//! identifiers, for [`crate::sheet::drawable::Edit::duplicate`] (record
-//! 0378): the host editor's `clone_numbers_drawable_graph_object` with its
+//! identifiers, for [`crate::sheet::drawable::Edit::duplicate`]: the
+//! host editor's `clone_numbers_drawable_graph_object` with its
 //! per-type `TSP.Reference` routes.
 //!
 //! The graph is the drawable and the objects of its title and caption

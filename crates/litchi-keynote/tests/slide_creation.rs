@@ -1,5 +1,4 @@
-//! Slide creation: duplicate slides and add slides from theme layouts
-//! (record 0298).
+//! Slide creation: duplicate slides and add slides from theme layouts.
 
 use std::path::{Path, PathBuf};
 

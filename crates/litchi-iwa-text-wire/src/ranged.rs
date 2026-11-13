@@ -1,4 +1,4 @@
-//! Storage-scoped ranged-object table engine (record 0374).
+//! Storage-scoped ranged-object table engine.
 //!
 //! A `TSWP.StorageArchive` marks hyperlinks and date-time fields (the
 //! smart-field table, field 11), bookmarks (field 15) and highlights and

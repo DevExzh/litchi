@@ -64,8 +64,7 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies
-    /// it (record 0351 §2.4).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The body storage or a number attachment object is malformed.
@@ -183,7 +182,7 @@ pub enum Target<'a> {
     Body,
     /// One header or footer slot.
     HeaderFooter(HeaderFooterSelector<'a>),
-    /// The storage a body text box or shape owns (record 0413).
+    /// The storage a body text box or shape owns.
     Drawable(crate::selector::DrawableSelector),
 }
 

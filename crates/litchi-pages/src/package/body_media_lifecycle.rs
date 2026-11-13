@@ -3,10 +3,10 @@
 //! replacement and creation following the same private graph proof.
 //!
 //! The graph of one body media drawable is what the migration host
-//! deletes (record 0371): the drawable, the private objects of its title
-//! and caption (a stand-in, or the caption graph), and its body attachment,
-//! all in the drawable's component. Removal deletes the anchoring U+FFFC
-//! and its attachment entry, drops the drawable from the document z-order,
+//! deletes: the drawable, the private objects of its title and caption (a
+//! stand-in, or the caption graph), and its body attachment, all in the
+//! drawable's component. Removal deletes the anchoring U+FFFC and its
+//! attachment entry, drops the drawable from the document z-order,
 //! releases the graph's data-reference owners, UUID registrations and
 //! identifier watermark, and deletes every embedded data asset no object,
 //! component or data-metadata entry references any more.
@@ -83,8 +83,7 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies
-    /// it (record 0351 §2.4).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted media graph is malformed.
@@ -439,8 +438,8 @@ impl Edit<'_> {
     /// `DataMetadataMap` entry names it. Each record's `DataInfo` leaves the
     /// package metadata and its `Data/` member is deleted (the host's
     /// `media::Draft::remove_unreferenced`, over the shared
-    /// `litchi_iwa_style::media::unreferenced_data` rule, record 0417). A
-    /// package without such records commits as an exact no-op.
+    /// `litchi_iwa_style::media::unreferenced_data` rule). A package
+    /// without such records commits as an exact no-op.
     ///
     /// # Errors
     ///
@@ -765,7 +764,7 @@ impl Edit<'_> {
                 Err(Error::Refused(Refusal::Commented)) => {
                     // The host clears a removed drawable's direct comment
                     // first (its comment storages and author lifecycle);
-                    // the patch spans both steps (record 0413b).
+                    // the patch spans both steps.
                     let mut clear = self
                         .source
                         .edit_body_drawable_comment(selector)

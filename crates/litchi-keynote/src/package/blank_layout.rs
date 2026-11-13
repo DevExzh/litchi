@@ -1,8 +1,7 @@
-//! The fresh-presentation values of a [`crate::Builder`] in one publication
-//! (record 0417): language and locale (record 0372), the slide size with
-//! the title and body placeholder frames laid out for it (the migration
-//! host builder's `slide_size`), and the first slide's title, subtitle and
-//! notes text.
+//! The fresh-presentation values of a [`crate::Builder`] in one
+//! publication: language and locale, the slide size with the title and
+//! body placeholder frames laid out for it (the migration host builder's
+//! `slide_size`), and the first slide's title, subtitle and notes text.
 //!
 //! The host builder lays out the title and body placeholders of the
 //! template and the first slide as fractions of the slide size: the title

@@ -1,7 +1,7 @@
-//! Table layout: the trailing-edge resize (record 0370e, lifted from
-//! `litchi-numbers` in record 0412g), uniform row and column sizes and the
-//! table drawable's frame, as Keynote's host moves a slide table's bounds
-//! with its size.
+//! Table layout: the trailing-edge resize (lifted from
+//! `litchi-numbers`), uniform row and column sizes and the table
+//! drawable's frame, as Keynote's host moves a slide table's bounds with
+//! its size.
 
 use litchi_iwa_common::wire as common_wire;
 use litchi_iwa_protos::table_dimension_codec as dimension_codec;

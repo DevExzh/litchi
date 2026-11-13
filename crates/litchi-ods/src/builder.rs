@@ -1,4 +1,4 @@
-//! A builder draft over an existing spreadsheet (record 0358).
+//! A builder draft over an existing spreadsheet.
 //!
 //! [`Workbook`] starts from a read-only [`crate::Workbook`] projection, stages
 //! every change against an owned candidate and [`Workbook::build`]s an

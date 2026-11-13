@@ -1,5 +1,5 @@
-//! The preset a shape's path source draws (record 0372; a port of the
-//! host's `shapes::path::shape_preset`, read by `slide_shape_preset` and
+//! The preset a shape's path source draws (a port of the host's
+//! `shapes::path::shape_preset`, read by `slide_shape_preset` and
 //! `slide_shapes`): a rectangle or ellipse Bézier path (the leaf's or
 //! Keynote's native ellipse), a rounded rectangle or regular polygon scalar
 //! path, or an arrow or star point path. Any other path is no preset.
@@ -8,8 +8,7 @@ use super::{Error, Preset, lift};
 use litchi_iwa_common::WireLimits;
 
 /// The preset of one `TSWP.ShapeInfoArchive` payload (`None`: a path no
-/// preset draws), on the shared `litchi_iwa_style::shape_path` reader
-/// (record 0413b).
+/// preset draws), on the shared `litchi_iwa_style::shape_path` reader.
 pub(super) fn preset(shape_info: &[u8], wire: WireLimits) -> Result<Option<Preset>, Error> {
     use litchi_iwa_common::shape::path::Preset as Shared;
     let shared =

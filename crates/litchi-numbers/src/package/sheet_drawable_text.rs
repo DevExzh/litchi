@@ -1,12 +1,12 @@
 //! Implementation of the public [`crate::sheet::drawable::text`]
 //! transaction: one character or paragraph property of the whole text a
-//! sheet text box (or ordinary shape) owns (record 0378).
+//! sheet text box (or ordinary shape) owns.
 //!
 //! The drawable's storage is uniformly styled by one paragraph style. Each
 //! staged change runs the shared paragraph-style engine
-//! ([`litchi_iwa_text_wire::paragraph_style`], record 0374) over that style,
-//! counted exclusive when nothing but the storage references it and no
-//! paragraph style names it as parent. The engine's plan is published here:
+//! ([`litchi_iwa_text_wire::paragraph_style`]) over that style, counted
+//! exclusive when nothing but the storage references it and no paragraph
+//! style names it as parent. The engine's plan is published here:
 //!
 //! - **Rewrite**: the storage's own variation takes the new payload in place;
 //! - **Derive**: a new child variation of the storage's style is stored
@@ -62,8 +62,7 @@ const OWNED_STORAGE_FIELD: u32 = 4;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies
-    /// it (record 0351 §2.4).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted source is malformed or ambiguous.
@@ -94,7 +93,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {

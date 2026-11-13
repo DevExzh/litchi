@@ -1,6 +1,6 @@
-//! Named paragraph styles of a text box or shape text (record 0372; the
-//! Keynote leaf of the host's `*_slide_text_box_named_paragraph_style*`
-//! families over the shared W1-D engine,
+//! Named paragraph styles of a text box or shape text (the Keynote leaf
+//! of the host's `*_slide_text_box_named_paragraph_style*` families
+//! over the shared engine,
 //! `litchi_iwa_text_wire::paragraph_style::named`).
 //!
 //! The catalog is the union of the paragraph presets of the themes whose

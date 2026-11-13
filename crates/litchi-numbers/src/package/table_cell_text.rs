@@ -1,13 +1,13 @@
 //! Implementation of the public [`crate::cell::text`] transactions: one
-//! character or paragraph property of whole cells (record 0370).
+//! character or paragraph property of whole cells.
 //!
 //! A cell's text style is a key in its table's style list whose entry names
 //! a `TSWP.ParagraphStyleArchive`; a cell without a key uses its section's
 //! base style. Each staged change runs the shared paragraph-style engine
-//! ([`litchi_iwa_text_wire::paragraph_style`], record 0374) over the cell's
-//! style, with the cell's own variation counted exclusive when its list
-//! entry is its only referrer, nothing else references the style and no
-//! style names it as parent. The engine's plan is published here:
+//! ([`litchi_iwa_text_wire::paragraph_style`]) over the cell's style, with
+//! the cell's own variation counted exclusive when its list entry is its
+//! only referrer, nothing else references the style and no style names it
+//! as parent. The engine's plan is published here:
 //!
 //! - **Rewrite**: the cell's own variation takes the new payload in place;
 //! - **Derive**: a new child variation of the cell's style is stored beside
@@ -45,8 +45,7 @@ structure::structural_family!("cell-text", Wire(litchi_iwa_common::LimitKind));
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies
-    /// it (record 0351 §2.4, record 0361).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted source is malformed or ambiguous.
@@ -77,7 +76,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {
@@ -140,7 +139,7 @@ impl From<topology::Error> for Error {
     }
 }
 
-/// The shared engine's error (record 0412).
+/// The shared engine's error.
 impl From<rich::Error> for Error {
     fn from(error: rich::Error) -> Self {
         match error {

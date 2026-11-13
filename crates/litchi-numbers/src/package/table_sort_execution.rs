@@ -1,6 +1,5 @@
 //! Execution of a table's persisted sort order: the body rows move
-//! physically, as Numbers' **Organize → Sort → Sort Now** does (record
-//! 0421).
+//! physically, as Numbers' **Organize → Sort → Sort Now** does.
 //!
 //! The rewrite is the shared executor `litchi_iwa_table::sort` (tile row
 //! records, row header buckets, the row UID map, stroke layers and
@@ -36,7 +35,7 @@ structure::structural_family!("table sort execution");
 #[non_exhaustive]
 pub enum Error {
     /// A well-formed request this route refuses; [`Refusal::kind`]
-    /// classifies it (record 0351 §2.4).
+    /// classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted source is malformed or ambiguous.
@@ -66,8 +65,7 @@ pub enum Error {
     PatchConflict,
 }
 
-/// A well-formed request this family refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4).
+/// A well-formed request this family refuses, classified by [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {

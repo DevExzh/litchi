@@ -29,8 +29,8 @@ pub(super) fn stage(workspace: &mut Workspace<'_>, node: u64) -> Result<u64, Err
 
     let objects = workspace.member_objects(&member);
     // Charts register their styles in the document stylesheet and the
-    // theme; duplicating a slide does not re-register them (record 0372:
-    // the chart schema is admitted for the chart lifecycle family only).
+    // theme; duplicating a slide does not re-register them (the chart schema is
+    // admitted for the chart lifecycle family only).
     for object in &objects {
         if workspace
             .require(*object)

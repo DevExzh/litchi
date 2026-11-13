@@ -6,7 +6,7 @@
 
 /// Lossless table appearance values and selector-first transactions.
 pub mod appearance;
-/// Cell fill, text layout and borders of table cells (record 0412b).
+/// Cell fill, text layout and borders of table cells.
 pub mod cell_appearance;
 /// Presence-preserving semantic cell reads.
 pub mod cells;
@@ -18,7 +18,7 @@ pub mod dimension;
 pub mod edit;
 /// Header, footer, and repeating-row/column semantics.
 pub mod headers;
-/// Hidden rows and columns of a table (record 0379).
+/// Hidden rows and columns of a table.
 pub mod hidden_axes;
 /// Exact-source transactions that add an empty table to a sheet or remove a
 /// table and its private graph. Start with
@@ -30,7 +30,7 @@ pub mod lock;
 pub mod merge;
 /// Exact-source table order within a sheet.
 pub mod order;
-/// Pivot aggregate categories (record 0421).
+/// Pivot aggregate categories.
 pub mod pivot;
 /// Exact-source transactions for moving a rooted table between sheets.
 pub mod relocation;

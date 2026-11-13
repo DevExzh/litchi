@@ -12,7 +12,7 @@
 //! the drawable at a fresh stand-in and keeps the old graph, as the
 //! application does for undo. Created objects take identifiers above every
 //! object and metadata registration, are registered with UUIDs in the
-//! document component and raise the metadata watermark (record 0371).
+//! document component and raise the metadata watermark.
 
 use std::fmt;
 use std::num::NonZeroU64;
@@ -101,8 +101,7 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies
-    /// it (record 0351 §2.4).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted drawable graph or its label graph is malformed.

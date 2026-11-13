@@ -1,6 +1,5 @@
-//! The shared conditional-highlight engine (record 0370d, lifted from
-//! `litchi-numbers` for Pages and Keynote in record 0412f): the ordered
-//! conditional-highlight rules of one table cell.
+//! The shared conditional-highlight engine (lifted from `litchi-numbers` for
+//! Pages and Keynote): the ordered conditional-highlight rules of one table cell.
 //!
 //! A cell's rules are a key in its table's conditional-style list whose
 //! entry names a `TST.ConditionalStyleSetArchive`. The set holds each rule
@@ -136,8 +135,7 @@ const SECONDS_PER_DAY: f64 = 86_400.0;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies
-    /// it (record 0351 §2.4, record 0361).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted source is malformed, or its rules use a representation
@@ -1273,7 +1271,7 @@ pub fn apply_one<P: TableLeaf>(
         Staged::Set(rules) => {
             let current = entry(change.working, &table, position)?;
             // The host unregisters a volatile cell before it rewrites it,
-            // and registers it again for volatile rules (record 0376a).
+            // and registers it again for volatile rules.
             if current.is_some() {
                 volatile::remove(&mut change, &table, position)?;
             }

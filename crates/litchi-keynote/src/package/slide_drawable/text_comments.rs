@@ -1,7 +1,7 @@
 //! Highlights, text comments and replies of a text box or shape text
-//! (record 0372; the Keynote leaf of the host's
+//! (the Keynote leaf of the host's
 //! `*_slide_text_box_{highlight,comment,comment_reply}*` families over the
-//! shared W1-D annotation engine, `litchi_iwa_text_wire::annotation`).
+//! shared annotation engine, `litchi_iwa_text_wire::annotation`).
 //!
 //! A highlight and a comment are both a `TSWP.HighlightArchive` covering a
 //! range of the storage's highlight table and owning a

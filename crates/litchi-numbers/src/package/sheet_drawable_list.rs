@@ -1,13 +1,13 @@
 //! Implementation of the public [`crate::sheet::drawable::list`]
-//! transactions: paragraph lists of the text a sheet text box or shape owns
-//! (record 0378).
+//! transactions: paragraph lists of the text a sheet text box or shape owns.
 //!
-//! The list change runs W1-D's engine ([`litchi_iwa_text_wire::list`],
-//! record 0374) and is published by the shared storage-list publisher
-//! (`litchi_iwa_text_wire::list::publish`, record 0370b) that the cell-list family uses.
-//! Host `set_x`/`reset_x` pairs collapse into one property verb
-//! ([`Edit::set`]/[`Edit::reset`]); `reset_sheet_text_box_paragraph_list`
-//! and `reset_sheet_text_box_paragraph_list_level` are [`Edit::set_list`]
+//! The list change runs the shared engine
+//! ([`litchi_iwa_text_wire::list`]) and is published by the shared
+//! storage-list publisher (`litchi_iwa_text_wire::list::publish`) that
+//! the cell-list family uses. Host `set_x`/`reset_x` pairs collapse into
+//! one property verb ([`Edit::set`]/[`Edit::reset`]);
+//! `reset_sheet_text_box_paragraph_list` and
+//! `reset_sheet_text_box_paragraph_list_level` are [`Edit::set_list`]
 //! with [`ParagraphList::None`] and [`Edit::set_level`] with
 //! [`ParagraphListLevel::ZERO`].
 
@@ -46,8 +46,7 @@ structure::structural_family!("text-box list", Wire(litchi_iwa_common::LimitKind
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies
-    /// it (record 0351 §2.4).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted source is malformed or ambiguous.
@@ -78,7 +77,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {

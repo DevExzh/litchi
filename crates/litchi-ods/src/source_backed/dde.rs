@@ -1,6 +1,6 @@
-//! Inert DDE declaration edits of a [`SourceBackedSpreadsheet`] (record
-//! 0358a): formula DDE links and worksheet-local DDE sources, published by
-//! replacing only `content.xml`. No DDE source is resolved, refreshed or
+//! Inert DDE declaration edits of a [`SourceBackedSpreadsheet`]: formula
+//! DDE links and worksheet-local DDE sources, published by replacing
+//! only `content.xml`. No DDE source is resolved, refreshed or
 //! contacted.
 //!
 //! [`SourceBackedSpreadsheet::edit_dde`] (or

@@ -1,6 +1,6 @@
-//! Speaker-notes run styles (record 0329): character properties on a span
-//! of a slide's notes, read back through the notes run reader, the text
-//! kept, the inverse exact, over every corpus deck with notes.
+//! Speaker-notes run styles: character properties on a span of a slide's notes,
+//! read back through the notes run reader, the text kept, the inverse exact,
+//! over every corpus deck with notes.
 
 use std::path::{Path, PathBuf};
 

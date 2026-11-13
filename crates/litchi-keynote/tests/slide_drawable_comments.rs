@@ -1256,10 +1256,10 @@ fn with_hostile_comment(source: &[u8], mutation: HostileMutation) -> TestResult<
     )?)
 }
 
-/// Record 0428: new comment storages (root and reply) derive their storage
-/// UUIDs, so two runs of the same edits agree on every comment signature. The
-/// creation date is the documented exception: it is the wall-clock instant,
-/// as the host writes it, and is masked here.
+/// New comment storages (root and reply) derive their storage UUIDs, so two
+/// runs of the same edits agree on every comment signature. The creation
+/// date is the documented exception: it is the wall-clock instant, as the
+/// host writes it, and is masked here.
 #[test]
 fn created_comment_storage_uuids_are_deterministic() -> TestResult {
     let source = source_bytes()?;

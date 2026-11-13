@@ -1,7 +1,7 @@
 //! The default wire budget of a hidden-axis transaction: the Pages
-//! table-lock ledger (record 0379), for leaves without a budget of their
-//! own. It charges the same figures under the same ceilings, derived from
-//! the source's archive ingress limits.
+//! table-lock ledger, for leaves without a budget of their own. It
+//! charges the same figures under the same ceilings, derived from the
+//! source's archive ingress limits.
 
 use litchi_iwa_archive::{ComponentCatalog, Limits, SourceCatalog};
 use litchi_iwa_common::WireLimits;

@@ -1,6 +1,6 @@
 //! Character and paragraph properties of a whole text box or shape text
-//! (record 0372; the Keynote leaf of the host's `set_slide_text_box_*` /
-//! `reset_slide_text_box_*` families over the shared W1-D paragraph-style
+//! (the Keynote leaf of the host's `set_slide_text_box_*` /
+//! `reset_slide_text_box_*` families over the shared paragraph-style
 //! engine, `litchi_iwa_text_wire::paragraph_style`).
 //!
 //! A drawable's storage is uniformly styled by one paragraph style. Each

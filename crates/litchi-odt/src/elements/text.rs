@@ -2123,10 +2123,10 @@ fn may_declare_namespace(element: &BytesStart<'_>) -> bool {
 
 /// Attribute-name resolution and value decoding for the text-attribute
 /// helpers, abstracting over the two namespace machineries driving the text
-/// loops: `NsReader` (retained and selected paths) and the change-0227
-/// plain-[`Reader`] + [`BindingTracker`] pair (discard path). Both sides
-/// replicate `NamespaceResolver::resolve_attribute` (`use_default = false`)
-/// and expose the driving reader's decoder, so
+/// loops: `NsReader` (retained and selected paths) and the
+/// plain-[`Reader`] + [`BindingTracker`] pair (discard path). Both sides replicate
+/// `NamespaceResolver::resolve_attribute` (`use_default = false`) and
+/// expose the driving reader's decoder, so
 /// [`validate_text_block_attributes`] and [`text_space_count`] behave
 /// byte-identically under either.
 trait TextAttributeResolver {
@@ -2149,9 +2149,8 @@ impl TextAttributeResolver for NsReader<&[u8]> {
     }
 }
 
-/// The [`BindingTracker`] + decoder pair of the discard path (change 0227).
-/// The decoder is the plain reader's, the same UTF-8 pass-through
-/// `NsReader::from_str` carries.
+/// The [`BindingTracker`] + decoder pair of the discard path. The decoder is
+/// the plain reader's, the same UTF-8 pass-through `NsReader::from_str` carries.
 struct TrackedAttributes<'a> {
     tracker: &'a BindingTracker,
     decoder: Decoder,
@@ -2278,9 +2277,9 @@ impl TextNamespaceMemo {
 /// unreachable, since the tag derives from the same `b"p" | b"h"` match that
 /// started the block.
 pub(crate) fn parse_text_block_texts(xml_content: &str) -> Result<Vec<String>> {
-    // Plain reader + hand-rolled binding maintenance (change 0227): the
-    // tracker replicates the push/pop `NsReader` performs inside its read
-    // (the `BindingTracker` byte-exactness contract), and the borrowing read
+    // Plain reader + hand-rolled binding maintenance: the tracker
+    // replicates the push/pop `NsReader` performs inside its read (the
+    // `BindingTracker` byte-exactness contract), and the borrowing read
     // drops the per-event buffer copy of `read_event_into`.
     let mut reader = Reader::from_str(xml_content);
     let decoder = reader.decoder();
@@ -4682,10 +4681,10 @@ mod tests {
         assert_eq!(TextElements::extract_text(xml).unwrap(), "Before漢字After");
     }
 
-    // ========== 0216 discard-but-validate extraction pins ==========
+    // ========== discard-but-validate extraction pins ==========
 
-    /// The pre-0216 `extract_text` implementation, kept as the parity
-    /// oracle: retained owned blocks, `into_text` per block, '\n' join.
+    /// The earlier `extract_text` implementation, kept as the parity oracle:
+    /// retained owned blocks, `into_text` per block, '\n' join.
     fn oracle_extract_text(xml_content: &str) -> String {
         let mut blocks = parse_text_blocks_owned(xml_content)
             .expect("oracle parse must succeed for parity inputs")
@@ -4828,7 +4827,7 @@ mod tests {
         );
     }
 
-    // ========== 0225 namespace-memo differential pins ==========
+    // ========== namespace-memo differential pins ==========
 
     /// Drive both the memoized discard path and the direct-resolution
     /// retained oracle over `xml`, asserting identical per-block text or an
@@ -5010,11 +5009,11 @@ mod tests {
         }
     }
 
-    // ========== 0227 binding-tracker differential pins ==========
+    // ========== binding-tracker differential pins ==========
 
     /// Namespace-error and attribute-resolution parity between the
-    /// tracker-driven discard path (change 0227) and the `NsReader`-driven
-    /// retained oracle: identical outcomes and byte-identical error strings.
+    /// tracker-driven discard path and the `NsReader`-driven retained oracle:
+    /// identical outcomes and byte-identical error strings.
     #[test]
     fn tracker_driven_path_matches_ns_reader_oracle_on_adversarial_namespaces() {
         let text_ns = std::str::from_utf8(TEXT_NAMESPACE).unwrap();

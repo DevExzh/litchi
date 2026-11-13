@@ -1,6 +1,6 @@
-//! The structural `Edit` verbs (record 0358) publish exactly what the
-//! crate-private `MutableDocument` writes for the same verbs, chained verbs
-//! share one working document, and a failing verb leaves the source
+//! The structural `Edit` verbs publish exactly what the crate-private
+//! `MutableDocument` writes for the same verbs, chained verbs share
+//! one working document, and a failing verb leaves the source
 //! untouched.
 
 use crate::header_footer::Kind;

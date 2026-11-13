@@ -377,8 +377,8 @@ fn merge_transaction_rejects_out_of_bounds_regions_before_mutation() -> TestResu
 
 #[test]
 fn merge_creating_an_owner_is_byte_deterministic() -> TestResult {
-    // Record 0300: a new merge owner used to take a random UUID, so two
-    // identical merges on identical sources differed byte for byte.
+    // A new merge owner used to take a random UUID, so two identical merges on
+    // identical sources differed byte for byte.
     let source = rewrite_first_table_model(NATIVE, |model| model.merge_owner = None)?;
     let region = Region::new(0, 0, 1, 2)?;
     let merge = || -> TestResult<Vec<u8>> {

@@ -1,4 +1,4 @@
-//! Table hidden axes through the shared engine (record 0379).
+//! Table hidden axes through the shared engine.
 
 use std::path::PathBuf;
 

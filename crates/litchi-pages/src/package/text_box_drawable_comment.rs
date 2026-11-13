@@ -1,7 +1,7 @@
 //! Implementation of the public [`crate::drawable::comment`]
 //! transaction: the comment attached directly to a body drawable (a text
-//! box, shape, image, movie or audio clip) and its replies (record 0413,
-//! the port of the Numbers family of record 0378a).
+//! box, shape, image, movie or audio clip) and its replies (the port of
+//! the Numbers family).
 //!
 //! The comment and its replies are `TSD.CommentStorageArchive` objects the
 //! drawable's comment reference roots. The publication follows the host
@@ -54,8 +54,7 @@ const REFERENCE_IDENTIFIER_FIELD: u32 = 1;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies
-    /// it (record 0351 §2.4).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted source is malformed or ambiguous.
@@ -86,7 +85,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {

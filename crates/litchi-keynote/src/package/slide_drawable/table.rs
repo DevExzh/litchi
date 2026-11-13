@@ -1,14 +1,14 @@
 //! A new, empty slide table cloned from the structure of the deck's first
-//! slide table (the template), record 0329.
+//! slide table (the template).
 //!
 //! The payloads come from `litchi_numbers_wire::table_create` (the payload
-//! half of `litchi-numbers`' table creation, record 0301): the template's
-//! drawable and model, and one emptied copy of each storage object the
-//! model owns, with styles shared. This module places them: every clone
-//! goes into its source's package member, the drawable is appended to the
-//! slide's owned drawables and z-order, the table gets its own formula
-//! owner in the calculation engine, the clones of registered objects get
-//! registry UUIDs, and every new cross-member reference is registered as an
+//! half of `litchi-numbers`' table creation): the template's drawable and
+//! model, and one emptied copy of each storage object the model owns, with
+//! styles shared. This module places them: every clone goes into its
+//! source's package member, the drawable is appended to the slide's owned
+//! drawables and z-order, the table gets its own formula owner in the
+//! calculation engine, the clones of registered objects get registry
+//! UUIDs, and every new cross-member reference is registered as an
 //! external reference. No clock or randomness is consulted.
 
 use std::collections::{BTreeMap, HashMap};

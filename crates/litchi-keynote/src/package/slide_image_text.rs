@@ -1,5 +1,5 @@
 //! Exact-source, selector-first title and caption transactions of ordinary
-//! slide images (record 0372; a port of the migration host's
+//! slide images (a port of the migration host's
 //! `set_slide_image_title`, `remove_slide_image_title`,
 //! `set_slide_image_caption`, `remove_slide_image_caption` and
 //! `slide_image_title_caption`).
@@ -59,8 +59,8 @@ impl Text {
 }
 
 /// The drawable whose title or caption a transaction edits: an ordinary
-/// image, or an ordinary shape or line (record 0372), addressed by its
-/// position among the slide's drawables of that native type.
+/// image, or an ordinary shape or line, addressed by its position among the
+/// slide's drawables of that native type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Owner {
     Image,
@@ -125,8 +125,7 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
-    /// (record 0351 §2.4, record 0361).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     #[error("the Keynote image-text source cannot be edited safely")]
@@ -146,7 +145,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {
@@ -805,7 +804,7 @@ fn shape_position(
 /// slide component, returning the registered package; `None` when every
 /// dependency is already registered. The registration leaves save tokens to
 /// the caption transaction that follows, which rewrites the same component.
-/// The migration host wrote these edges unregistered (fixed in record 0372).
+/// The migration host wrote these edges unregistered (since fixed).
 fn register_dependencies(
     source: &Package,
     selection: &super::slide_movie_caption::MovieCaptionSelection,

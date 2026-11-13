@@ -1,7 +1,6 @@
-//! Hyperlinks of a text box or shape text (record 0372; the Keynote leaf of
-//! the host's `*_slide_text_box_hyperlink*` families over the shared W1-D
-//! ranged smart-field engine, `litchi_iwa_text_wire::{ranged,
-//! smart_field}`).
+//! Hyperlinks of a text box or shape text (the Keynote leaf of the host's
+//! `*_slide_text_box_hyperlink*` families over the shared ranged smart-field
+//! engine, `litchi_iwa_text_wire::{ranged, smart_field}`).
 //!
 //! A hyperlink is a `TSWP.HyperlinkFieldArchive` object in the storage's
 //! component, covering one range of the storage's smart-field table. It is

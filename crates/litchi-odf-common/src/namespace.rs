@@ -985,8 +985,8 @@ fn namespace_normalized_len(value: &str, context: &str) -> Result<(usize, bool)>
     // Every printable ASCII byte other than '&' is an XML 1.0 character that
     // attribute-value normalization keeps unchanged, so such a value (every
     // namespace URI in practice) normalizes to itself; one vectorizable scan
-    // replaces the per-character walk below (record 0377).
-    // No early exit, so the scan vectorizes.
+    // replaces the per-character walk below. No early exit, so the scan
+    // vectorizes.
     if bytes.iter().fold(true, |plain, &byte| {
         plain & (0x20..0x7f).contains(&byte) & (byte != b'&')
     }) {

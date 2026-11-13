@@ -1,4 +1,4 @@
-//! Archive-free chart-legend frame values (record 0375).
+//! Archive-free chart-legend frame values.
 
 /// Validation failures of the legend-frame values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]

@@ -1,9 +1,9 @@
-//! Drawing and frame styles of text boxes, shapes and lines (record 0372;
-//! the Keynote leaf of the host's `*_slide_shape_{fill,stroke,shadow,
+//! Drawing and frame styles of text boxes, shapes and lines (the Keynote
+//! leaf of the host's `*_slide_shape_{fill,stroke,shadow,
 //! effects,text_layout}`, `*_slide_text_box_{columns,text_layout}`,
-//! `*_slide_line_endpoints` and `set_slide_shape_image_fill` families) over
-//! the shared shape-style variation engine (`litchi_iwa_style::shape`,
-//! record 0375a).
+//! `*_slide_line_endpoints` and `set_slide_shape_image_fill` families)
+//! over the shared shape-style variation engine
+//! (`litchi_iwa_style::shape`).
 //!
 //! A drawable's own value lives in a copy-on-write variation of its
 //! `TSWP.ShapeStyleArchive`. The engine plans each write and this module
@@ -17,11 +17,11 @@
 //!   points back at its parent and the variation goes away.
 //!
 //! Line endpoints are the shared `litchi_iwa_style::line_end::{endpoints,
-//! set_endpoints}` rules over this module's staging (record 0426): read from
-//! the line's path (and its legacy per-shape overrides) and stored as a
-//! head/tail pair in the line's direction, published by the same plan
-//! steps. An image fill uses the plan layer with its own slot value, embeds
-//! its bytes and moves the style's data references.
+//! set_endpoints}` rules over this module's staging: read from the line's
+//! path (and its legacy per-shape overrides) and stored as a head/tail pair
+//! in the line's direction, published by the same plan steps. An image fill
+//! uses the plan layer with its own slot value, embeds its bytes and moves
+//! the style's data references.
 
 use std::sync::Arc;
 

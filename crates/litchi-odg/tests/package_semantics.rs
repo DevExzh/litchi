@@ -337,8 +337,8 @@ fn dtd_is_refused_and_noncompact_source_requires_checked_splices() {
         drawing.as_bytes()
     );
 
-    // Page insertion is a checked splice too (record 0288): the producer's
-    // whitespace survives.
+    // Page insertion is a checked splice too: the producer's whitespace
+    // survives.
     let mut inserted = drawing.edit();
     inserted.add_page(Page::new("Page 2")).unwrap();
     let inserted = inserted.commit().unwrap();

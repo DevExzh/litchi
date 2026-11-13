@@ -1,4 +1,4 @@
-//! Ranged body bookmarks (`litchi_pages::bookmark`, record 0371).
+//! Ranged body bookmarks (`litchi_pages::bookmark`).
 
 use litchi_pages::Package;
 use litchi_pages::bookmark::{Error, Name, Refusal, Settings, TextRange, Visibility};
@@ -88,8 +88,8 @@ fn overlaps_missing_selections_and_bad_ranges_are_refused() {
     );
 }
 
-/// Record 0428: a new bookmark's text-attribute UUID is derived, not drawn,
-/// so the same edit on the same input is byte-identical.
+/// A new bookmark's text-attribute UUID is derived, not drawn, so the same edit
+/// on the same input is byte-identical.
 #[test]
 fn added_bookmark_output_is_deterministic() {
     let run = || {

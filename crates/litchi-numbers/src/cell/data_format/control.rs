@@ -1,7 +1,7 @@
 //! Shared numeric-control values for Slider and Stepper cells.
 //!
 //! The values are the neutral `litchi_iwa_common::table::cell::data_format::control`
-//! vocabulary (record 0368), re-exported here at their established path.
+//! vocabulary, re-exported here at their established path.
 
 pub use litchi_iwa_common::table::cell::data_format::control::{
     CellControl, Checkbox, DisplayFormat, Error, NotCellControl, PopUpMenu, Range, Result, Slider,

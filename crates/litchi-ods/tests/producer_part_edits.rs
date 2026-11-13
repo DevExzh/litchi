@@ -1,4 +1,4 @@
-//! Record 0277 leaf gap closures: edits of LibreOffice-produced packages.
+//! Edits of LibreOffice-produced packages.
 //!
 //! LibreOffice ends every XML declaration with a newline, indents its
 //! manifest, restates each typed cell's `office:value-type` as

@@ -1,7 +1,6 @@
-//! Record 0368 (decision D4 of record 0363): the neutral table vocabulary
-//! moved to `litchi_iwa_common::table`, and every value stays reachable at
-//! its established `litchi_numbers` path as the same nominal type — a
-//! re-export, never a second definition or alias.
+//! The neutral table vocabulary moved to `litchi_iwa_common::table`, and
+//! every value stays reachable at its established `litchi_numbers` path
+//! as the same nominal type — a re-export, never a second definition or alias.
 
 use std::any::TypeId;
 

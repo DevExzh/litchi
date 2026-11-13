@@ -1,6 +1,5 @@
 //! Implementation of the public [`crate::table::order`] transaction: moving
-//! one table to another position among the tables of its sheet (record
-//! 0301).
+//! one table to another position among the tables of its sheet.
 //!
 //! A sheet lists its drawables (tables, charts, shapes) in one reference
 //! list, and the tables of a sheet are its table drawables in that order.
@@ -33,8 +32,7 @@ structure::structural_family!("table-order");
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
-    /// (record 0351 §2.4, record 0361).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted source is malformed or ambiguous.
@@ -65,7 +63,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {

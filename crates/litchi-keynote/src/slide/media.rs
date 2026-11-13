@@ -4,7 +4,7 @@ use std::time::Duration;
 
 pub mod properties;
 
-/// Embedded media reachable from the document or a slide (record 0372).
+/// Embedded media reachable from the document or a slide.
 pub mod assets {
     pub use crate::package::media_assets::{Error, Kind, MediaAsset};
 }
@@ -642,7 +642,7 @@ pub mod data {
 }
 
 /// Exact-source replacement of one embedded media asset by its
-/// [`assets::MediaAsset`] handle, keeping its identifier (record 0417).
+/// [`assets::MediaAsset`] handle, keeping its identifier.
 pub mod asset_data {
     pub use crate::package::slide_media_replacement::asset::{
         Commit, Diagnostics, Edit, EditOptions, Patch,

@@ -1,5 +1,5 @@
-//! Structural transactions (record 0301): sheet lifecycle and table order,
-//! on the created workbook and across the Numbers corpus.
+//! Structural transactions: sheet lifecycle and table order, on the created
+//! workbook and across the Numbers corpus.
 
 use std::path::PathBuf;
 

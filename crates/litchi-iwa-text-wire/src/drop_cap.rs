@@ -1,4 +1,4 @@
-//! Storage-scoped plain-text Drop Cap engine (record 0374).
+//! Storage-scoped plain-text Drop Cap engine.
 //!
 //! A storage's `table_drop_cap_style` (field 28) names, per paragraph
 //! start, a `TSWP.DropCapStyleArchive` (10024). A paragraph shows a drop

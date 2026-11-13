@@ -1,6 +1,5 @@
 //! Selector-first, source-preserving frame, property and playback edits of
-//! one sheet drawable: text boxes, shapes, images, movies, audio clips and
-//! charts (record 0378).
+//! one sheet drawable: text boxes, shapes, images, movies, audio clips and charts.
 //!
 //! The drawable is found through the shared [`super::sheet_drawable_graph`]
 //! proof. Each staged change is a field-level rewrite of the selected
@@ -79,8 +78,7 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies
-    /// it (record 0351 §2.4).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted drawable graph or the selected payload is malformed.

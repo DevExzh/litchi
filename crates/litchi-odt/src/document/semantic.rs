@@ -452,7 +452,7 @@ impl Document {
 
     /// The advanced-layout read view of `styles.xml` (master pages, page
     /// layouts, section layouts), from which master-page and section-layout
-    /// transfers to another document are prepared (record 0358a).
+    /// transfers to another document are prepared.
     ///
     /// # Errors
     ///

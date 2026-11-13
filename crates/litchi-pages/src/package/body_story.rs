@@ -1,5 +1,5 @@
-//! The rooted body story read (record 0371; the migration host's
-//! `body_storage` and `body_text`).
+//! The rooted body story read (the migration host's `body_storage` and
+//! `body_text`).
 
 use super::{Package, PackageError, PackageResult, storage_rewrite_limits};
 use crate::body::Storage;

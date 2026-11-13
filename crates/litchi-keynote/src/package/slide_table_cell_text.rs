@@ -1,6 +1,5 @@
 //! Implementation of the public [`crate::slide::table::cell_text`] transactions:
-//! one character or paragraph property of whole slide-table cells (record
-//! 0412).
+//! one character or paragraph property of whole slide-table cells.
 //!
 //! A cell's text style is a key in its table's style list whose entry names
 //! a `TSWP.ParagraphStyleArchive`; a cell without a key uses its section's
@@ -33,7 +32,7 @@ use crate::slide::table::TableSelector;
 rich_text_family!("slide-table cell text");
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {

@@ -1,5 +1,4 @@
-//! The ordered conditional-highlight rules of slide-table cells (record
-//! 0412f).
+//! The ordered conditional-highlight rules of slide-table cells.
 //!
 //! The rule graph surgery is the shared conditional-highlight engine
 //! (`litchi_iwa_table::conditional_highlight`), the engine the Numbers
@@ -56,7 +55,7 @@ impl fmt::Display for LimitKind {
 #[non_exhaustive]
 pub enum Error {
     /// A well-formed request this route refuses; [`Refusal::kind`]
-    /// classifies it (record 0351 §2.4).
+    /// classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted source is malformed or ambiguous.
@@ -87,7 +86,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {

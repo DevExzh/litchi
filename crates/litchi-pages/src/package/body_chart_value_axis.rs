@@ -1,4 +1,4 @@
-//! Selector-first Pages body-chart value-axis settings (record 0422):
+//! Selector-first Pages body-chart value-axis settings:
 //! [`crate::chart::value_axis`].
 //!
 //! The bounds, step counts and scale of a chart's primary value axis are

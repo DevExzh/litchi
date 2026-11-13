@@ -1,6 +1,6 @@
-//! Shared exact-source machinery of the structural Numbers transactions
-//! (record 0301): [`crate::sheet::lifecycle`], [`crate::table::lifecycle`]
-//! and [`crate::table::order`].
+//! Shared exact-source machinery of the structural Numbers transactions:
+//! [`crate::sheet::lifecycle`], [`crate::table::lifecycle`] and
+//! [`crate::table::order`].
 //!
 //! A structural edit stages its changes on a `Working` set: every
 //! component it touches is decompressed and parsed once from the exact
@@ -20,8 +20,8 @@
 )]
 
 // The working set and its phases are the shared table engine
-// (`litchi_iwa_table::structure`, record 0379); Numbers keeps its sheet and
-// document helpers, the patch artifacts and the family macro here.
+// (`litchi_iwa_table::structure`); Numbers keeps its sheet and document
+// helpers, the patch artifacts and the family macro here.
 pub(super) use litchi_iwa_table::structure::{
     Fault, FaultLimit, FaultResult, allocation, budget, collect, copy_bytes, exact_source, formula,
     map_archive, map_core, map_wire, metadata, new_object, plan, references, reserve, source_owner,

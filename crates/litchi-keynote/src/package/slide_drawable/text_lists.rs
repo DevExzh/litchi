@@ -1,6 +1,6 @@
-//! Paragraph lists of a text box or shape text (record 0372; the Keynote
-//! leaf of the host's `set_slide_text_box_paragraph_list*` families over
-//! the shared W1-D list engine, `litchi_iwa_text_wire::list`).
+//! Paragraph lists of a text box or shape text (the Keynote leaf of the host's
+//! `set_slide_text_box_paragraph_list*` families over the shared list engine,
+//! `litchi_iwa_text_wire::list`).
 //!
 //! The engine plans every change over the storage's list-style table; this
 //! module publishes the plans on the structural workspace exactly as the

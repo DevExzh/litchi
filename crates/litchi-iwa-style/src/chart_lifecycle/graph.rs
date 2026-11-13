@@ -1,6 +1,6 @@
-//! The private references of a chart drawable and their remap (record
-//! 0426; the host's `IWorkChartArchive::{typed_reference_identifiers,
-//! remap_references}` and `remap_chart_preset_wire`).
+//! The private references of a chart drawable and their remap (the host's
+//! `IWorkChartArchive::{typed_reference_identifiers, remap_references}` and
+//! `remap_chart_preset_wire`).
 //!
 //! A chart's private graph is reached from its `TSCH.ChartDrawableArchive`:
 //! the drawable's title and caption, the chart's preset and its chart,

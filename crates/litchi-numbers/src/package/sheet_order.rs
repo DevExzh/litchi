@@ -106,8 +106,7 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
-    /// (record 0351 §2.4, record 0361).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The retained source cannot support an unambiguous sheet-order move.
@@ -138,7 +137,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+/// [`Refusal::kind`].
 #[derive(Debug, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {
@@ -324,7 +323,7 @@ impl Edit<'_> {
         let previews = root_preview_deletions(source_catalog)?;
         // A package carries either the complete canonical preview set (which
         // a changed move removes as stale) or none at all (a fresh workbook,
-        // or one an earlier transaction already stripped): record 0297.
+        // or one an earlier transaction already stripped).
         if !previews.is_empty() && previews.len() != ROOT_PREVIEWS.len() {
             return Err(Error::Refused(Refusal::UnsupportedSource));
         }

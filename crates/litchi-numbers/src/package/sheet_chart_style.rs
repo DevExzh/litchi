@@ -1,7 +1,6 @@
 //! Implementation of the public [`crate::sheet::chart::style`] transaction:
 //! chart-level inspector properties of one sheet chart on the shared chart
-//! style engine (`litchi_iwa_protos::chart_style_codec`, record 0375),
-//! record 0378.
+//! style engine (`litchi_iwa_protos::chart_style_codec`).
 //!
 //! The chart's style objects are found through the codec's reference
 //! projection of the chart drawable; each change maps a common value
@@ -47,8 +46,7 @@ pub use litchi_iwa_style::chart_style::chart::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies
-    /// it (record 0351 §2.4).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted chart graph or a style payload is malformed.
@@ -79,7 +77,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {

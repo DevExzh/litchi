@@ -1,5 +1,5 @@
-//! Bounded append of one plain slide to a [`SourceBackedPresentation`]
-//! (record 0358a; the shape of DOCX record 0355a §1).
+//! Bounded append of one plain slide to a [`SourceBackedPresentation`] (the
+//! same shape as DOCX's).
 //!
 //! [`SourceBackedPresentation::edit_tail_append`] starts an [`Edit`] holding
 //! only the bounded title and body; [`Edit::prepare`] scans the source once

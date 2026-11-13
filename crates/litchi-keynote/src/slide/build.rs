@@ -1,5 +1,5 @@
 //! Slide builds: create, update and remove the build animations of a
-//! slide's drawables (record 0372).
+//! slide's drawables.
 //!
 //! [`crate::Package::slide_build_list`] reads a slide's builds in build
 //! order; [`crate::Package::edit_slide_builds`] stages [`Edit::add`],

@@ -1,5 +1,5 @@
-//! The builder's first body table (record 0420): the host builder's table
-//! graph, built from scratch on the shared `table_create::fresh` graph.
+//! The builder's first body table: the host builder's table graph, built from
+//! scratch on the shared `table_create::fresh` graph.
 //!
 //! The host Pages builder imports the host Numbers builder's table: the
 //! drawable (parented to the body storage), its model and storage, the
@@ -28,7 +28,7 @@
 //!
 //! The same graph is the first table [`crate::table::creation`] inserts
 //! into a table-less built-in-template document at any body position
-//! (record 0426; the host editor's `add_table` bootstraps it with
+//! (the host editor's `add_table` bootstraps it with
 //! `bootstrap_first_table_graph` on such a document and refuses any other
 //! table-less one).
 

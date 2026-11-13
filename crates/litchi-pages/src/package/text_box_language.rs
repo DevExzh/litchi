@@ -1,7 +1,7 @@
 //! Implementation of the public [`crate::drawable::language`]
 //! transaction: the text-language runs of the storage a body text box or
 //! shape owns, on the shared language engine
-//! ([`litchi_iwa_text_wire::language`], record 0374), record 0378.
+//! ([`litchi_iwa_text_wire::language`]).
 //!
 //! Each change rewrites the storage's language table in place; every other
 //! byte of the storage and every other object stays as it is. This is the
@@ -38,8 +38,7 @@ const STORAGE_MESSAGE_TYPE: u32 = 2_001;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies
-    /// it (record 0351 §2.4).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted drawable graph or its language table is malformed.
@@ -70,7 +69,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {

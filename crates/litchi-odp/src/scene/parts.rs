@@ -1,7 +1,6 @@
-//! Inline and frame details the scene index does not hold (record 0328):
-//! a table's declared columns, a paragraph's line breaks, a plugin frame's
-//! media, a shape's click action, a link's title and a formula object's
-//! inline MathML.
+//! Inline and frame details the scene index does not hold: a table's
+//! declared columns, a paragraph's line breaks, a plugin frame's media,
+//! a shape's click action, a link's title and a formula object's inline MathML.
 //!
 //! Each reader scans the bytes of one indexed node of the text the scene
 //! was built from, on demand; the scene itself is unchanged, so every

@@ -1,7 +1,6 @@
 //! Implementation of the public [`crate::sheet::drawable::comment`]
 //! transaction: the comment attached directly to a sheet drawable (a text
-//! box, shape, image, movie, audio clip or chart) and its replies, record
-//! 0378.
+//! box, shape, image, movie, audio clip or chart) and its replies.
 //!
 //! The comment and its replies are `TSD.CommentStorageArchive` objects the
 //! drawable's comment reference roots. The publication follows the host
@@ -56,8 +55,7 @@ const REFERENCE_IDENTIFIER_FIELD: u32 = 1;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies
-    /// it (record 0351 §2.4).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted source is malformed or ambiguous.
@@ -88,7 +86,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {

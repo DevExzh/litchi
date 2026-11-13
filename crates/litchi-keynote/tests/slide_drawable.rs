@@ -1,5 +1,5 @@
 //! Slide drawables: inventory, geometry, removal, z-order and creation of
-//! text boxes, shapes and images (record 0298).
+//! text boxes, shapes and images.
 
 use std::path::{Path, PathBuf};
 
@@ -171,8 +171,8 @@ fn removing_an_image_culls_its_final_owner_data() -> TestResult {
     let mut edit = package.edit_slide_drawables();
     edit.remove(SlideSelector::index(0), DrawableSelector::index(image))?;
     let commit = edit.commit()?;
-    // The image and its three derived renditions had no other owner
-    // (record 0372; host `remove_slide_image` parity).
+    // The image and its three derived renditions had no other owner (host
+    // `remove_slide_image` parity).
     assert_eq!(commit.diagnostics().removed_data(), 4);
     let output = bytes(commit.package())?;
     let catalog = litchi_iwa_archive::package::Catalog::from_bytes(&output, Default::default())?;
@@ -836,8 +836,8 @@ fn set_text_on_a_new_shape_and_on_every_corpus_text_box() -> TestResult {
     Ok(())
 }
 
-/// Character styling (record 0309): a span of a text box gets a variation
-/// of its run style, reads back, survives a reopen and inverts exactly.
+/// Character styling: a span of a text box gets a variation of its run style,
+/// reads back, survives a reopen and inverts exactly.
 #[test]
 fn text_spans_take_character_styles() -> TestResult {
     let package = open("basic.key")?;
@@ -960,8 +960,8 @@ fn corpus_text_boxes_take_character_styles() -> TestResult {
     Ok(())
 }
 
-/// Slide-table cell writes (record 0309): text, numbers, booleans and
-/// clears read back through the table reader and invert exactly.
+/// Slide-table cell writes: text, numbers, booleans and clears read back
+/// through the table reader and invert exactly.
 #[test]
 fn slide_table_cells_take_values() -> TestResult {
     use litchi_iwa_common::table::cell::value::Value;
@@ -1057,10 +1057,9 @@ fn slide_table_cells_take_values() -> TestResult {
 }
 
 /// The native formula cell D2 carries a comment, which the shared cell
-/// writer does not rewrite, so a value write over it is refused (record
-/// 0376a removes formulas from uncommented cells); a cell a formula reads
-/// takes the write and the formula's cached result is refreshed (record
-/// 0376).
+/// writer does not rewrite, so a value write over it is refused
+/// (formulas are removed from uncommented cells only); a cell a formula
+/// reads takes the write and the formula's cached result is refreshed.
 #[test]
 fn formula_cells_refuse_and_precedents_refresh_value_writes() -> TestResult {
     use litchi_iwa_common::table::cell::value::Value;
@@ -1113,8 +1112,7 @@ fn formula_cells_refuse_and_precedents_refresh_value_writes() -> TestResult {
 }
 
 /// Title and body placeholders take character styles on their slide's own
-/// storage (record 0312); the text stays, the runs read back, the inverse
-/// restores the bytes.
+/// storage; the text stays, the runs read back, the inverse restores the bytes.
 #[test]
 fn corpus_placeholders_take_character_styles() -> TestResult {
     let mut paths: Vec<PathBuf> = std::fs::read_dir(keynote_dir())?
@@ -1187,8 +1185,7 @@ fn corpus_placeholders_take_character_styles() -> TestResult {
 }
 
 /// A formula authored into a slide table reads back as its source and is
-/// removed again by a value write; the cell then takes a new formula
-/// (record 0376a).
+/// removed again by a value write; the cell then takes a new formula.
 #[test]
 fn slide_table_formulas_author_and_clear() -> TestResult {
     use litchi_iwa_common::table::cell::value::Value;

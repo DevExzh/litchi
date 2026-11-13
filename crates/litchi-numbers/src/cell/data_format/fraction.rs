@@ -7,7 +7,7 @@
 //! point.
 //!
 //! The values are the neutral `litchi_iwa_common::table::cell::data_format::fraction`
-//! vocabulary (record 0368), re-exported here at their established path.
+//! vocabulary, re-exported here at their established path.
 
 pub use litchi_iwa_common::table::cell::data_format::fraction::{Fraction, FractionAccuracy};
 

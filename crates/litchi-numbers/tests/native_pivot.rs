@@ -1,4 +1,4 @@
-//! Native pivot table authored in Numbers 14.4 (record 0432).
+//! Native pivot table authored in Numbers 14.4.
 //!
 //! `pivot-all-summary-functions-native.numbers`: sheet "Table 1 Pivot" pivots
 //! "Table 1" (rows Region, columns Product) with the values Amount summarized

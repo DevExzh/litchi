@@ -6,7 +6,7 @@
 //! the automatic-styles scan ([`StyleRegistry::from_xml`]).  This module runs
 //! both over one shared quick-xml [`Reader`] event stream, with the
 //! namespace-binding maintenance `NsReader` would perform replicated by the
-//! hand-rolled [`BindingTracker`] (change 0224).
+//! hand-rolled [`BindingTracker`].
 //!
 //! Observable behavior is identical to the sequential passes:
 //!
@@ -37,8 +37,8 @@
 //! call order.
 //!
 //! Both facades run this fused parse: the source-backed
-//! [`crate::document::SourceBackedDocument`] and, since change 0222, the
-//! owned [`crate::document::Document`] open path. The shared
+//! [`crate::document::SourceBackedDocument`] and the owned
+//! [`crate::document::Document`] open path. The shared
 //! `validate_content_document_part` preserves the historical contract below
 //! the intentional 4,096-depth ceiling, and the sequential sequence survives
 //! as cfg(test) equivalence oracles (the `sequential` helper in this module's
@@ -350,14 +350,13 @@ mod tests {
         Ok(project(&registry))
     }
 
-    /// Pre-0221 oracle: the buffered, fully-resolved fused open-parse loop,
-    /// retained verbatim to cross-check the borrowing, depth-gated
-    /// [`OpenParse::run`] on the synthetic edge cases and the fixture corpus.
-    /// Since change 0224 it doubles as the `NsReader` differential oracle for
-    /// the plain-`Reader` + [`BindingTracker`] driving loop: it still performs
-    /// quick-xml's own binding maintenance (and resolves every event), so any
-    /// divergence in the tracker's push/pop/error-stream replication shows up
-    /// here.
+    /// Oracle: the buffered, fully-resolved fused open-parse loop, retained
+    /// verbatim to cross-check the borrowing, depth-gated [`OpenParse::run`]
+    /// on the synthetic edge cases and the fixture corpus. It also doubles as
+    /// the `NsReader` differential oracle for the plain-`Reader` +
+    /// [`BindingTracker`] driving loop: it still performs quick-xml's own
+    /// binding maintenance (and resolves every event), so any divergence in
+    /// the tracker's push/pop/error-stream replication shows up here.
     fn run_buffered_oracle(content_xml: &str) -> Result<OpenParse> {
         use litchi_core::Error;
         use quick_xml::events::Event;
@@ -403,7 +402,7 @@ mod tests {
         })
     }
 
-    /// The pre-0221 fused loop with the same comparison projection.
+    /// The earlier fused loop with the same comparison projection.
     fn fused_oracle(xml: &str) -> Result<String> {
         let registry = run_buffered_oracle(xml)?.finish()?;
         Ok(project(&registry))
@@ -768,8 +767,8 @@ mod tests {
         }
     }
 
-    /// Change 0224 differential battery: every byte-exactness obligation of
-    /// the [`BindingTracker`] contract (push scan, silent break, declaration
+    /// Differential battery: every byte-exactness obligation of the
+    /// [`BindingTracker`] contract (push scan, silent break, declaration
     /// limit, reserved-prefix errors in attribute order, unbinding, deferred
     /// pop) is exercised against the `NsReader` oracle, including errors
     /// raised by binding maintenance at depth >= 3.

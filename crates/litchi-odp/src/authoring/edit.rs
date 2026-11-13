@@ -124,8 +124,8 @@ pub enum CryptoRefusal {
 }
 
 impl CryptoRefusal {
-    /// The refusal class litchi-ops reports for this reason (record 0351
-    /// §2.4): the editor does not implement the lifecycle operation.
+    /// The refusal class litchi-ops reports for this reason: the editor does
+    /// not implement the lifecycle operation.
     #[must_use]
     pub const fn kind(self) -> litchi_core::edit::RefusalKind {
         match self {
@@ -284,7 +284,7 @@ impl std::fmt::Debug for Package {
 }
 
 impl Package {
-    /// The retained physical package (metadata transactions, record 0288).
+    /// The retained physical package (metadata transactions).
     pub(crate) const fn owned_package(&self) -> &OwnedPackage {
         &self.package
     }

@@ -488,8 +488,7 @@ pub struct ParagraphPropertyUpdate {
     /// Background colour, `#rrggbb` or `transparent`.
     pub shading: Option<String>,
     /// The paragraph's tab stops (`style:tab-stops`), replacing the ones
-    /// its automatic style declares; an empty list declares none (record
-    /// 0328).
+    /// its automatic style declares; an empty list declares none.
     pub tab_stops: Option<Vec<TabStopSpec>>,
 }
 

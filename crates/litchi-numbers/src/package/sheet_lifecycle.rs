@@ -1,6 +1,5 @@
 //! Implementation of the public [`crate::sheet::lifecycle`] transactions:
-//! adding an empty sheet and removing a sheet with its private graph
-//! (`IWORK_API_REQUESTS.md` request 4, record 0301).
+//! adding an empty sheet and removing a sheet with its private graph.
 //!
 //! A new sheet copies the first sheet's settings record (page setup, style)
 //! without its drawables, headers, footers or guides, takes the requested
@@ -68,8 +67,7 @@ impl fmt::Display for InvalidName {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
-    /// (record 0351 §2.4, record 0361).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted source is malformed or ambiguous.
@@ -100,7 +98,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {
@@ -265,8 +263,7 @@ impl Edit<'_> {
     /// Stage a copy of the selected sheet, inserted right after it and named
     /// `"<name>-1"` (then `"<name>-2"`, …), as the host editor names it. The
     /// copy takes the sheet's settings and a populated copy of each of its
-    /// tables, at the same positions and under the same names (record
-    /// 0370j).
+    /// tables, at the same positions and under the same names.
     ///
     /// # Errors
     ///
@@ -543,7 +540,7 @@ fn duplicate_sheet(
         return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     // The copy keeps addressing the source's header, footer and guide
-    // storages, as the host editor's copy does (record 0370j gap).
+    // storages, as the host editor's copy does.
     let drawables = references::identifiers(&message.data, path)?;
     for drawable in &drawables {
         if structure::table_info_message(working.object(*drawable)?).is_err() {
@@ -832,7 +829,7 @@ fn remove_empty_sheet(
         transition.remove_objects(&registry, &removed)?;
     }
     // A removed suffix of the identifier space lowers the watermark, as the
-    // host editor releases it (record 0370g).
+    // host editor releases it.
     transition.release_suffix(&removed)?;
     for identifier in &removed {
         working.remove(*identifier)?;

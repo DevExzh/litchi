@@ -1,4 +1,4 @@
-//! Body-table cell values (record 0309) across the Pages corpus.
+//! Body-table cell values across the Pages corpus.
 
 use std::path::PathBuf;
 
@@ -120,7 +120,7 @@ fn refusals_are_typed() -> TestResult {
 }
 
 /// A formula authored into a body table reads back as its source and is
-/// removed again by a value write (record 0376a).
+/// removed again by a value write.
 #[test]
 fn body_table_formulas_author_and_clear() -> TestResult {
     use litchi_pages::table::formula::{

@@ -1,6 +1,5 @@
 //! Implementation of the public [`crate::table::lifecycle`] transactions:
-//! adding an empty table to a sheet and removing a table with its private
-//! graph (`IWORK_API_REQUESTS.md` request 5, record 0301).
+//! adding an empty table to a sheet and removing a table with its private graph.
 //!
 //! **Removal** detaches the table's drawable from its sheet (and its node
 //! from the sheet's sidebar node) and removes every object only the table
@@ -45,8 +44,7 @@ structure::structural_family!("table-lifecycle");
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
-    /// (record 0351 §2.4, record 0361).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The rooted source is malformed or ambiguous.
@@ -77,7 +75,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {
@@ -282,7 +280,7 @@ impl Edit<'_> {
     /// offset by ten points. The copy gets its own storage, a table UUID
     /// derived from its model and a clone of the table's CalculationEngine
     /// owner family; styles stay shared, and a formula that reads another
-    /// table keeps reading it (record 0370h).
+    /// table keeps reading it.
     ///
     /// # Errors
     ///
@@ -595,7 +593,7 @@ pub(super) fn remove_table(
         transition.remove_objects(&registry, &removed_list)?;
     }
     // A removed suffix of the identifier space lowers the watermark, as the
-    // host editor releases it (record 0370g).
+    // host editor releases it.
     transition.release_suffix(&removed_list)?;
     for identifier in &removed_list {
         working.remove(*identifier)?;

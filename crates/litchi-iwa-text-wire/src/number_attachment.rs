@@ -1,4 +1,4 @@
-//! Storage-scoped number-attachment engine (record 0374).
+//! Storage-scoped number-attachment engine.
 //!
 //! A number attachment (page number, page count, …) is a
 //! `TSWP.NumberAttachmentArchive` (2043) anchored to a U+FFFC character by

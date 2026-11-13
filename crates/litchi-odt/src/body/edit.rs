@@ -208,8 +208,8 @@ pub const fn admits(parent: Kind, child: Kind) -> bool {
 struct NodeEdit {
     attributes: Vec<(Ns, &'static str, Option<String>)>,
     text: Option<String>,
-    /// What a text set keeps (record 0304): elements of the old content
-    /// that add no text, at their character offsets.
+    /// What a text set keeps: elements of the old content that add no text, at
+    /// their character offsets.
     kept: Vec<Kept>,
     text_properties: Option<TextPropertyUpdate>,
     paragraph_properties: Option<ParagraphPropertyUpdate>,
@@ -258,13 +258,11 @@ pub(crate) struct BodyEdits {
     metadata: litchi_odf_common::metadata::Assignments,
     styles: StyleAllocator,
     generated: Generated,
-    /// Text field replacements (record 0295): each field's bytes and its
-    /// new markup.
+    /// Text field replacements: each field's bytes and its new markup.
     fields: Vec<(Range<usize>, String)>,
     /// The body's text field ranges, scanned on the first field edit.
     field_ranges: Option<Vec<Range<usize>>>,
-    /// Header and footer text replacements (record 0328): splices of
-    /// `styles.xml`.
+    /// Header and footer text replacements: splices of `styles.xml`.
     regions: Vec<(Range<usize>, String)>,
     /// The part index, built on the first region edit.
     parts: Option<Box<super::Parts>>,
@@ -449,8 +447,8 @@ impl BodyEdits {
         Ok(())
     }
 
-    /// Replace the displayed text of the text field at `range` (record
-    /// 0295), keeping its element and attributes.
+    /// Replace the displayed text of the text field at `range`, keeping its
+    /// element and attributes.
     pub(crate) fn set_field_text(
         &mut self,
         body: Body<'_>,
@@ -488,7 +486,7 @@ impl BodyEdits {
 
     /// Replace the text of the header or footer region at `range` (a
     /// [`super::parts::Region::range`] of this body's part index) with one
-    /// paragraph (record 0328).
+    /// paragraph.
     pub(crate) fn set_region_text(
         &mut self,
         body: Body<'_>,
@@ -1368,7 +1366,7 @@ fn render_paragraph(out: &mut String, prefixes: &Prefixes, style: Option<&str>, 
     });
 }
 
-/// [`render_paragraph`] with the elements a text set keeps (record 0304).
+/// [`render_paragraph`] with the elements a text set keeps.
 fn render_kept_paragraph(
     out: &mut String,
     prefixes: &Prefixes,
@@ -1672,7 +1670,7 @@ fn push_paragraph_properties(
 /// Copy an automatic style under a new name with changed properties. The
 /// copy is rebuilt from its tags, so it is compact whatever the source
 /// formatting. `tabs`, when given, replaces the paragraph properties'
-/// `style:tab-stops` (record 0328).
+/// `style:tab-stops`.
 #[allow(
     clippy::too_many_lines,
     reason = "one event loop over the declaration, kept whole so the depth bookkeeping reads in one place"
@@ -1693,8 +1691,8 @@ fn clone_style(
     let mut depth = 0usize;
     let mut seen_text = false;
     // A declaration that has paragraph properties has them rewritten in
-    // place; only one without gains a new element (record 0328: the copy
-    // used to gain a second `style:paragraph-properties` as well).
+    // place; only one without gains a new element (the copy used to gain a
+    // second `style:paragraph-properties` as well).
     let mut seen_paragraph = style.data().paragraph.is_some();
     let paragraph_wanted = !paragraph.is_empty() || tabs.is_some();
     // The tab stops still to write, and the depth of the open paragraph
@@ -1961,7 +1959,7 @@ pub(crate) fn apply(document: &Document, edits: BodyEdits) -> Result<Option<Vec<
         publications.push(publication);
     }
     // A package without meta.xml (OTH and ODM builders write none) gains
-    // one after the content splices (record 0290 F6).
+    // one after the content splices.
     let mut create_meta = false;
     if !edits.metadata.is_empty() {
         match metadata_publication(document, &edits.metadata)? {
@@ -2232,7 +2230,7 @@ fn whole_content(target: Node<'_>, text: &str, kept: &[Kept], out: &mut String) 
 }
 
 /// One `meta.xml` publication for the staged metadata edits, through the
-/// shared ODF metadata engine (record 0288).
+/// shared ODF metadata engine.
 fn metadata_publication(
     document: &Document,
     fields: &litchi_odf_common::metadata::Assignments,

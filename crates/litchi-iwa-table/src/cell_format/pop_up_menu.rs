@@ -446,7 +446,7 @@ pub fn rewrite_popup_metadata(
             .or_else(|| component_indices.first().copied())
             .ok_or(Error::InvalidSource { path })?;
         // Numbers registers the new menu model's UUID; the Pages and Keynote
-        // host writers do not (record 0412a).
+        // host writers do not.
         let additions = if register_model_uuid {
             facts
                 .uuid_additions(&[(component_index, fresh)])
@@ -515,7 +515,7 @@ pub fn rewrite_popup_metadata(
             .map_err(|error| map_popup_metadata_error(error, path))?;
             // Pages and Keynote register nothing for a menu model; with no
             // removal to record, only the watermark and save tokens change
-            // (the addition batch below, record 0412a).
+            // (the addition batch below).
             if !removals.is_empty() || !external_removals.is_empty() {
                 let transition = popup_metadata::CombinedTransition::new(
                     facts.last_object_identifier(),
@@ -987,7 +987,7 @@ fn read_non_popup_control<'source>(
     // A Date and Time (3) or Duration (4) cell without a control spec holds
     // no control; the display readers own it. The host writes these kinds
     // on number cells, and refusing them here made every format read of
-    // such a cell fail (record 0412a).
+    // such a cell fail.
     if control_identifier.is_none() && matches!(cell.cell_format_kind(), Some(3 | 4)) {
         return Ok(None);
     }
@@ -1050,7 +1050,7 @@ fn read_non_popup_control<'source>(
         // (Checkbox 263, Star Rating 267). Any other payload is a display
         // or custom format the display readers decode and validate; the
         // control codec does not model custom (270-272) payloads, so only
-        // the format type is read here (record 0412a).
+        // the format type is read here.
         if matches!(format_type(&format_payload), Some(263 | 267)) {
             return Err(Error::InvalidSource { path });
         }

@@ -2389,8 +2389,8 @@ fn control_entries(source: &[u8]) -> TestResult<Vec<tst::table_data_list::ListEn
     Err(io::Error::other("control-cell-spec list is missing").into())
 }
 
-/// Callgrind probe (record 0379): create, replace and clear a menu on an
-/// empty cell, serializing each output. Measured before and after the shared
+/// Callgrind probe: create, replace and clear a menu on an empty cell,
+/// serializing each output. Measured before and after the shared
 /// `litchi-iwa-table` engine move with
 /// `--toggle-collect=*table_cell_pop_up_menu::pop_up_menu_probe_routes*`.
 #[inline(never)]

@@ -1,6 +1,6 @@
-//! Embedded media reachable from a Keynote document or one slide (record
-//! 0372; a port of the host's `media_assets`, `slide_media_assets` and
-//! `extract_media`), on the W1-E embedded-media inventory
+//! Embedded media reachable from a Keynote document or one slide (a
+//! port of the host's `media_assets`, `slide_media_assets` and
+//! `extract_media`), on the shared embedded-media inventory
 //! (`litchi_iwa_common::media::embedded`).
 //!
 //! An asset is reachable when an object reachable from the roots (through

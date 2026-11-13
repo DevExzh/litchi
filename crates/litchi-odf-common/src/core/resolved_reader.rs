@@ -346,8 +346,7 @@ impl<'a> ResolvedReader<'a> {
         let mut attributes = element.attributes();
         // With document validation on, its expanded-name check refuses every
         // duplicate attribute (two equal qualified names have one expanded
-        // name), so the qualified-name check is not repeated here
-        // (record 0377a).
+        // name), so the qualified-name check is not repeated here.
         attributes.with_checks(self.check_attribute_errors && !self.document.enabled);
         for attribute in attributes {
             let attribute = match attribute {
@@ -673,21 +672,20 @@ fn validate_start_event(
 
     // Expanded names seen on this element, compared linearly: elements have
     // few attributes, and the borrowed keys avoid the per-attribute
-    // allocations and hashing of a set (record 0377a). The duplicate rule is
-    // unchanged.
+    // allocations and hashing of a set. The duplicate rule is unchanged.
     let mut expanded_names: Vec<(ExpandedNamespace<'_>, &[u8])> = Vec::new();
     let mut expanded_set: Option<HashSet<(ExpandedNamespace<'_>, &[u8])>> = None;
     // quick-xml's duplicate check compares qualified names; the
     // expanded-name check below refuses every such duplicate as well, so
-    // the attributes are read without it (record 0377a).
+    // the attributes are read without it.
     for attribute in element.attributes().with_checks(false) {
         let attribute = attribute
             .map_err(|error| invalid_xml(offset, format!("malformed XML attribute: {error}")))?;
         validate_qname(attribute.key.as_ref(), offset, "attribute")?;
         let value = attribute.value.as_ref();
-        // One vectorizable pass classifies the value (record 0377a); the
-        // checks below then run only where it found something, in the same
-        // order and with the same errors as the four scans they replace.
+        // One vectorizable pass classifies the value; the checks below then run
+        // only where it found something, in the same order and with the same
+        // errors as the four scans they replace.
         let mut non_ascii = false;
         let mut special = false;
         for &byte in value {

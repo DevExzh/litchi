@@ -501,7 +501,7 @@ pub mod font {
 }
 
 /// Chart lifecycle of a slide chart: kind, series direction, frame,
-/// complete data, removal and duplication (record 0372).
+/// complete data, removal and duplication.
 pub mod lifecycle {
     pub use crate::package::slide_chart_lifecycle::{
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,

@@ -150,7 +150,7 @@ pub mod adjustments {
 }
 
 /// Image lifecycle of ordinary slide images: duplicate, flip, original
-/// size, properties, data replacement and reads (record 0372).
+/// size, properties, data replacement and reads.
 pub mod lifecycle {
     pub use crate::package::slide_image_lifecycle::{
         Commit, Diagnostics, Edit, Error, Info, Kind, LimitKind, Patch, Refusal,
@@ -159,7 +159,7 @@ pub mod lifecycle {
     pub use litchi_iwa_common::shape::geometry::{FlipAxis, Size};
 }
 
-/// Title and caption of ordinary slide images (record 0372).
+/// Title and caption of ordinary slide images.
 pub mod text {
     pub use crate::package::slide_image_text::{
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal, Text,

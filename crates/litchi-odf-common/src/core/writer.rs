@@ -474,7 +474,7 @@ use crate::package::validate_manifest_path;
 const MANIFEST_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:manifest:1.0";
 
 /// Manifest entries in path order. The manifest model is a hash map, and a
-/// generated manifest must not depend on its iteration order (record 0289).
+/// generated manifest must not depend on its iteration order.
 fn sorted_entries(
     manifest: &super::manifest::Manifest,
 ) -> Vec<(&String, &super::manifest::ManifestEntry)> {

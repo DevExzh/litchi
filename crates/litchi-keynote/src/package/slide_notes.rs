@@ -91,8 +91,7 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
-    /// (record 0351 §2.4, record 0361).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The source graph or selected storage cannot be decoded or rewritten safely.
@@ -123,7 +122,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {
@@ -266,9 +265,9 @@ impl<'a> Edit<'a> {
     /// Whether a sequence of edits of these notes, each a splice within
     /// `hull` (UTF-16 code units of [`Self::text`], both ends inclusive),
     /// publishes exactly what one splice from the text before them to the
-    /// text after them publishes (record 0314). `false` asks the caller to
-    /// commit the edits one at a time. Whether a later edit follows an
-    /// emptied text is the caller's to check.
+    /// text after them publishes. `false` asks the caller to commit the
+    /// edits one at a time. Whether a later edit follows an emptied text
+    /// is the caller's to check.
     ///
     /// # Errors
     ///
@@ -724,8 +723,8 @@ fn map_slide_selector_error(error: SlideSelectorError) -> Error {
 }
 
 /// The note object, its text storage and the text of the notes of the
-/// slide at `position`, when it has notes (record 0329: the slide-drawable
-/// family styles the notes' runs).
+/// slide at `position`, when it has notes (the slide-drawable family styles the
+/// notes' runs).
 pub(in crate::package) fn notes_identity(
     package: &Package,
     position: Position,

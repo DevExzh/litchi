@@ -1,5 +1,5 @@
-//! Table row and column insertion and removal (record 0309), on the created
-//! workbook and across the Numbers corpus.
+//! Table row and column insertion and removal, on the created workbook and
+//! across the Numbers corpus.
 
 use std::path::PathBuf;
 
@@ -299,9 +299,8 @@ fn formulas(package: &Package, sheet: usize, table: usize) -> Vec<(u32, u32, Str
         .collect()
 }
 
-/// Record 0318: row and column edits move the formulas' references with
-/// their targets; record 0329: removing a row a surviving formula reads
-/// turns the reference into `#REF!`.
+/// Row and column edits move the formulas' references with their targets;
+/// removing a row a surviving formula reads turns the reference into `#REF!`.
 #[test]
 fn formula_references_follow_row_and_column_edits() -> TestResult {
     let base = Package::new();
@@ -351,8 +350,8 @@ fn formula_references_follow_row_and_column_edits() -> TestResult {
         .remove_row(RowDeletion::body(1))?
         .commit()?;
     assert_eq!(formulas(removed.package(), 0, 0), formulas(&package, 0, 0));
-    // Row 3 is read by every formula (record 0329): its references read
-    // `#REF!`, the range shrinks, and the inverse restores the source.
+    // Row 3 is read by every formula: its references read `#REF!`, the range
+    // shrinks, and the inverse restores the source.
     let removed = package
         .edit_table_topology(0, 0)?
         .remove_row(RowDeletion::body(1))?
@@ -371,8 +370,8 @@ fn formula_references_follow_row_and_column_edits() -> TestResult {
     Ok(())
 }
 
-/// Record 0329: one formula-list entry shared by cells whose formulas
-/// diverge after the edit is split; the inverse restores the source.
+/// One formula-list entry shared by cells whose formulas diverge after the edit
+/// is split; the inverse restores the source.
 #[test]
 fn shared_formulas_split_when_their_cells_diverge() -> TestResult {
     let base = Package::new();

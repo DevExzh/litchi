@@ -1,4 +1,4 @@
-//! The structural-edit kernel shared by structural transactions (record 0298).
+//! The structural-edit kernel shared by structural transactions.
 //!
 //! Structural edits clone, create and remove native objects and whole
 //! components, so they need what the focused value transactions never do:
@@ -285,8 +285,8 @@ impl Package {
     }
 }
 
-/// The shared table structure set (`litchi-iwa-table`, record 0379)
-/// reopens its candidates as structural candidates of this package.
+/// The shared table structure set (`litchi-iwa-table`) reopens its candidates
+/// as structural candidates of this package.
 impl litchi_iwa_table::structure::TableLeaf for Package {
     fn reopen_candidate(&self, candidate: Arc<[u8]>) -> FaultResult<Self> {
         self.structure_reopen_shared(candidate)

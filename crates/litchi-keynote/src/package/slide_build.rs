@@ -1,6 +1,6 @@
 //! Exact-source, selector-first creation, update and removal of slide
-//! builds (record 0372; a port of the migration host's `add_slide_build`,
-//! `set_slide_build`, `remove_slide_build` and `slide_builds`).
+//! builds (a port of the migration host's `add_slide_build`, `set_slide_build`,
+//! `remove_slide_build` and `slide_builds`).
 //!
 //! A build is addressed by its slide and its position in the slide's build
 //! list (`KN.SlideArchive.builds`, the order Keynote's Build Order lists

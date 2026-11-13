@@ -395,7 +395,7 @@ impl<'source> ChartMetadataSnapshot<'source> {
     /// The data components that hold the chart's series, by its series
     /// direction: the column labels of a by-column chart, otherwise
     /// [`Self::series_count`]. Keynote's default pie is by column, with one
-    /// grid row and one wedge per column (record 0433).
+    /// grid row and one wedge per column.
     #[must_use]
     pub const fn series_components(self) -> usize {
         if self.series_by_column {

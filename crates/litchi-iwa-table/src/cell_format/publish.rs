@@ -1,11 +1,11 @@
 //! Exact-source reassembly of the members a cell-format rewrite returns.
 //!
 //! The same sequence the Numbers display-format owners run after their
-//! native rewrite (record 0379): every changed archive is checked against the
-//! preflight bound, Snappy-compressed under the source's retained limits, and
-//! spliced into the source ZIP; every other member keeps its exact bytes.
-//! The caller reopens the returned bytes with its own package type and
-//! verifies the semantic readback.
+//! native rewrite: every changed archive is checked against the preflight
+//! bound, Snappy-compressed under the source's retained limits, and spliced
+//! into the source ZIP; every other member keeps its exact bytes. The caller
+//! reopens the returned bytes with its own package type and verifies the
+//! semantic readback.
 
 use litchi_iwa_archive::package::EntryEdit;
 use litchi_iwa_core::SnappyStream;

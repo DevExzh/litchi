@@ -1,6 +1,5 @@
 //! Archive-free shape-fill values shared by iWork format owners: gradients,
-//! image fills and the [`Fill`] they form with colors (record 0375 adds the
-//! image fill and [`Fill`]).
+//! image fills and the [`Fill`] they form with colors.
 
 use std::f32::consts::TAU;
 

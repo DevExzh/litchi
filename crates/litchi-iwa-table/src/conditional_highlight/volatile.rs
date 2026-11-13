@@ -1,5 +1,5 @@
-//! The calculation-engine owner family of a volatile rule (record 0376a):
-//! the host's `conditional_highlight::dependencies::{ensure_volatile_owner,
+//! The calculation-engine owner family of a volatile rule: the host's
+//! `conditional_highlight::dependencies::{ensure_volatile_owner,
 //! remove_volatile_host}` through the shared
 //! `litchi_numbers_wire::conditional_volatile` planner.
 

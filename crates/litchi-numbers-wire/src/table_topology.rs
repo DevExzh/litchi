@@ -1,5 +1,5 @@
 //! Payload rewrites of one table-axis insertion or deletion, shared by the
-//! Numbers, Pages and Keynote table owners (record 0370).
+//! Numbers, Pages and Keynote table owners.
 //!
 //! A TST table's axis edit rewrites, payload by payload:
 //!
@@ -17,9 +17,9 @@
 //! when it is unchanged); fields a rewrite does not own keep their exact
 //! bytes. The caller owns object lookup, identifier allocation, component
 //! placement and publication, as with [`crate::table_create`]. Moved from
-//! `litchi-numbers`' topology transaction (records 0309, 0318, 0329), which
-//! ported them from the host editor's `row_insert`, `column_insert`,
-//! `table_delete` and `stroke_layers` phases.
+//! `litchi-numbers`' topology transaction, which ported them from the
+//! host editor's `row_insert`, `column_insert`, `table_delete` and
+//! `stroke_layers` phases.
 
 pub mod extents;
 pub mod lists;

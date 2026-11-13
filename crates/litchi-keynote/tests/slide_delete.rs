@@ -1338,7 +1338,7 @@ fn public_deletion_values_are_send_sync() {
 
 /// A slide whose preview an earlier text edit invalidated keeps the
 /// registry's data-owner record of its dropped thumbnail; deleting the
-/// slide removes that record with it (record 0298, Phase G F8).
+/// slide removes that record with it.
 #[test]
 fn deleting_a_slide_with_a_stale_thumbnail_owner_record() -> TestResult<()> {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))

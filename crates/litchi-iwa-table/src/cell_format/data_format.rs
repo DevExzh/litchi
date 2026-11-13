@@ -6,7 +6,7 @@
 //! and report any other as a wrong family. This module dispatches over
 //! them, so a leaf can offer one `edit_*_table_cell_format` family that
 //! takes a `DataFormat` instead of
-//! one family per format (record 0363 §3.2, record 0379).
+//! one family per format.
 //!
 //! A rewrite changes one family at a time: Automatic to a format, a format
 //! to Automatic, or a format to another value of the same family. A change
@@ -74,8 +74,8 @@ pub const fn family(format: &DataFormat) -> Option<Family> {
 }
 
 /// Whether the engine can rewrite this family without a metadata
-/// transition: the ten display families, numeral systems included since
-/// record 0370k. Controls and Pop-Up Menus also rewrite the package metadata
+/// transition: the ten display families, numeral systems included.
+/// Controls and Pop-Up Menus also rewrite the package metadata
 /// registry.
 #[must_use]
 pub const fn is_display_family(family: Family) -> bool {
@@ -113,8 +113,8 @@ pub fn read_with_budget(
             CellControl::PopUpMenu(value) => DataFormat::PopUpMenu(value),
         });
     }
-    // One validation pass for the ten display families (record 0370k); a
-    // cell outside them is a custom format or unsupported.
+    // One validation pass for the ten display families; a cell outside them is
+    // a custom format or unsupported.
     if let Some(format) = display::read_any_display_format(source, target, path, budget)? {
         return Ok(format);
     }
@@ -208,9 +208,9 @@ pub fn scalar_control(format: &DataFormat) -> Option<CellControl> {
 
 /// Rewrite the selected stored cell within one family: the display
 /// families through [`rewrite`], the scalar controls through
-/// [`control::rewrite_scalar_control`](super::control::rewrite_scalar_control)
-/// (record 0412). Pop-Up Menus are refused here; their writes also allocate
-/// a menu model and rewrite the package metadata registry.
+/// [`control::rewrite_scalar_control`](super::control::rewrite_scalar_control).
+/// Pop-Up Menus are refused here; their writes also allocate a menu model
+/// and rewrite the package metadata registry.
 ///
 /// # Errors
 ///

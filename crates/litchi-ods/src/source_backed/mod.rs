@@ -1,5 +1,5 @@
-//! Edit families of the source-backed [`SourceBackedSpreadsheet`] (record
-//! 0358a; the shape of DOCX record 0355a §1).
+//! Edit families of the source-backed [`SourceBackedSpreadsheet`] (the same
+//! shape as DOCX's).
 //!
 //! ```text
 //! SourceBackedSpreadsheet::edit_x(&self, ..) -> x::Edit       // shares the owner
@@ -134,7 +134,7 @@ macro_rules! content_patch {
         #[doc = concat!("The exact, reversible `content.xml` change of ", $what, ".")]
         ///
         /// It replays onto a spreadsheet over the same retained source whose
-        /// `content.xml` is exactly its before content (record 0358a).
+        /// `content.xml` is exactly its before content.
         #[derive(Clone, Debug)]
         pub struct Patch {
             change: super::Change,

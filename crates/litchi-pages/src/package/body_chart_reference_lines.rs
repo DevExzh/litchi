@@ -1,4 +1,4 @@
-//! Selector-first Pages body-chart reference lines (record 0419):
+//! Selector-first Pages body-chart reference lines:
 //! [`crate::chart::reference_lines`].
 //!
 //! The shared reference-line graph (`litchi_iwa_style::reference_line`)

@@ -27,8 +27,8 @@ pub(super) fn text<'a>(node: Node<'a>) -> Result<Cow<'a, str>> {
 }
 
 /// The visible text of `content`, markup of a part bound by `prefixes`, read
-/// as the content of a `root` node (record 0328: header and footer regions,
-/// shapes and tables of contents).
+/// as the content of a `root` node (header and footer regions, shapes and
+/// tables of contents).
 pub(super) fn text_of(prefixes: &Prefixes, root: Kind, content: &str) -> Result<String> {
     if is_plain(content) {
         return Ok(content.to_owned());

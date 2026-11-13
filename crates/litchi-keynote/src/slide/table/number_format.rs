@@ -8,9 +8,8 @@
 /// Failure from a checked Number-format value constructor (the shared
 /// number-format error).
 pub use litchi_iwa_common::table::cell::data_format::number::Error as NumberError;
-/// The shared iWork decimal Number display format and its parts (D4,
-/// record 0368): the same nominal types as Numbers'
-/// `cell::data_format::number`.
+/// The shared iWork decimal Number display format and its parts: the same
+/// nominal types as Numbers' `cell::data_format::number`.
 pub use litchi_iwa_common::table::cell::data_format::number::{
     DecimalPlaces, FixedDecimalPlaces, MAX_DECIMAL_PLACES, NegativeStyle, Number,
     ThousandsSeparator,

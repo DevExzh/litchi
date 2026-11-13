@@ -1,6 +1,6 @@
-//! Existing-cell edits of a [`SourceBackedSpreadsheet`] (record 0358a):
-//! scalar values, formulas and direct hyperlinks of cells that already
-//! exist, published by replacing only the changed rows of `content.xml`.
+//! Existing-cell edits of a [`SourceBackedSpreadsheet`]: scalar values,
+//! formulas and direct hyperlinks of cells that already exist, published by
+//! replacing only the changed rows of `content.xml`.
 //!
 //! [`SourceBackedSpreadsheet::edit_cells`] starts an [`Edit`];
 //! [`Edit::commit`] returns a [`Commit`] holding the new spreadsheet, the

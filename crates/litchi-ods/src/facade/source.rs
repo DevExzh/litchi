@@ -79,7 +79,7 @@ pub struct SourceBackedSpreadsheet {
     /// `content.xml` member rather than the member itself.
     replaced: bool,
     /// The committed `content.xml` of a source-backed edit, published when
-    /// this spreadsheet is written; reads parse it once (record 0358a).
+    /// this spreadsheet is written; reads parse it once.
     deferred: Option<Arc<Deferred>>,
 }
 
@@ -452,7 +452,7 @@ impl SourceBackedSpreadsheet {
 
     /// Write this spreadsheet as a complete ODS package: the source archive
     /// with only `content.xml` replaced by the committed content (an
-    /// unedited spreadsheet writes its source; record 0358a).
+    /// unedited spreadsheet writes its source).
     ///
     /// Every other member is copied raw from the retained source, so memory
     /// stays bounded by `content.xml`. A source that changed since open is

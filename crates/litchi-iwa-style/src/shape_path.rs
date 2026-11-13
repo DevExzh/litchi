@@ -1,12 +1,12 @@
-//! Preset shape paths (record 0413b): the `TSD.PathSourceArchive` a
-//! [`Preset`] draws at a frame size, a straight line's path source, and the
+//! Preset shape paths: the `TSD.PathSourceArchive` a [`Preset`]
+//! draws at a frame size, a straight line's path source, and the
 //! preset an existing shape's path source draws, and the segment a
 //! straight line draws.
 //!
 //! This is the legacy host's `shapes::path::{shape_path_source,
-//! shape_preset}`. The Numbers sheet-drawable author (record 0378), the
-//! Keynote slide-drawable author and preset reader (record 0372) and the
-//! Pages body shapes all build and read their presets here.
+//! shape_preset}`. The Numbers sheet-drawable author, the Keynote
+//! slide-drawable author and preset reader and the Pages body shapes
+//! all build and read their presets here.
 
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::shape::path::{

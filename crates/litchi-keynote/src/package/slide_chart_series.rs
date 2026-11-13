@@ -1,9 +1,9 @@
-//! Selector-first Keynote slide-chart per-series transactions (D7-A, record
-//! 0414) and the shared core of the Keynote chart-property families.
+//! Selector-first Keynote slide-chart per-series transactions and the shared
+//! core of the Keynote chart-property families.
 //!
-//! The shared W1-E engines (`litchi_iwa_style::{series, chart_style}`) own
-//! the graph work: series overrides and their allocation, the effective
-//! series styles, the chart- and axis-level style objects. This leaf adapter
+//! The shared engines (`litchi_iwa_style::{series, chart_style}`) own the
+//! graph work: series overrides and their allocation, the effective series
+//! styles, the chart- and axis-level style objects. This leaf adapter
 //! supplies only Keynote chart selection, semantic values, the transaction
 //! ledger, exact-source publication under the engine's source-derived
 //! mutation scope, candidate reopen/readback, and typed refusal mapping. The

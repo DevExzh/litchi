@@ -455,8 +455,8 @@ fn test_into_metadata_no_keywords() {
     assert!(meta.keywords.is_empty());
 }
 
-/// Record 0290: both conversions to the common model carry `dc:language`,
-/// so `File::metadata()` reports a written language for every ODF format.
+/// Both conversions to the common model carry `dc:language`, so
+/// `File::metadata()` reports a written language for every ODF format.
 #[test]
 fn common_metadata_carries_the_language() {
     let xml = r#"<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/"><office:meta><dc:language>de-DE</dc:language></office:meta></office:document-meta>"#;
@@ -471,8 +471,8 @@ fn common_metadata_carries_the_language() {
     assert_eq!(checked.language.as_deref(), Some("de-DE"));
 }
 
-/// Record 0354: a keyword list patches one `meta:keyword` per keyword and
-/// an unchanged list keeps the source elements.
+/// A keyword list patches one `meta:keyword` per keyword and an unchanged list
+/// keeps the source elements.
 #[test]
 fn keyword_lists_patch_one_element_per_keyword() {
     let xml = concat!(

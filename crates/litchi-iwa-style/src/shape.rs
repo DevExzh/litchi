@@ -1,4 +1,4 @@
-//! The shape-style variation graph engine (record 0375a): the copy-on-write
+//! The shape-style variation graph engine: the copy-on-write
 //! `TSWP.ShapeStyleArchive` variations through which iWork gives one shape
 //! or text box its own fill, stroke, shadow, effects, text layout or text
 //! columns. It is the retired host's (commit `4d8a3e161f`) `shapes::line_end::registry`
@@ -1846,7 +1846,7 @@ impl Plan {
 }
 
 /// The fill a `TSWP.ShapeStyleArchive` payload stores directly, if any
-/// (for a format family's image-fill release check, record 0415).
+/// (for a format family's image-fill release check).
 ///
 /// # Errors
 ///
@@ -2604,8 +2604,8 @@ pub mod property {
     }
 
     /// [`Fills`] for a format family that releases the data reference and
-    /// media of an image fill it replaces or resets itself (record 0415):
-    /// the same slots and values, but a stored image fill is replaceable.
+    /// media of an image fill it replaces or resets itself: the same slots and
+    /// values, but a stored image fill is replaceable.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
     pub struct ReleasingFills;
 
@@ -3127,14 +3127,14 @@ pub mod property {
 }
 
 /// Store a new embedded image fill on shape or text box `drawable` with
-/// the shared data-owner transition (the host's `set_*_shape_image_fill`,
-/// record 0423): the fill is planned like any fill (rewriting the
-/// drawable's exclusive variation or deriving one), the bytes described
-/// by `new` are registered as the next data entry (`DataInfo`) owned by
-/// the variation the drawable then shows ([`crate::data_owner::own_new`]),
-/// and that variation's message info records the data reference. Returns
-/// the data identifier and the `Data/` member the caller publishes the
-/// bytes under.
+/// the shared data-owner transition (the host's
+/// `set_*_shape_image_fill`): the fill is planned like any fill
+/// (rewriting the drawable's exclusive variation or deriving one), the
+/// bytes described by `new` are registered as the next data entry
+/// (`DataInfo`) owned by the variation the drawable then shows
+/// ([`crate::data_owner::own_new`]), and that variation's message info
+/// records the data reference. Returns the data identifier and the
+/// `Data/` member the caller publishes the bytes under.
 ///
 /// # Errors
 ///
@@ -3190,9 +3190,9 @@ pub fn set_image_fill(
     Ok((data, name))
 }
 
-/// An image fill a shape style stores directly (record 0426): the style,
-/// the member holding it and the data identifier, captured before a change
-/// replaces or resets the fill so the owner can release it afterwards with
+/// An image fill a shape style stores directly: the style, the member
+/// holding it and the data identifier, captured before a change replaces
+/// or resets the fill so the owner can release it afterwards with
 /// [`release_image_fills`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StoredImage {
@@ -3246,10 +3246,10 @@ pub fn stored_image(workspace: &Workspace<'_>, drawable: u64) -> Result<Option<S
 }
 
 /// Release every captured image fill its style no longer stores (the
-/// host's `remove_style_data_reference` and `remove_orphaned_image_asset`,
-/// record 0426): a style kept with another fill drops the data reference
-/// from its message info, the style's registered owner is dropped and data
-/// nothing references any more loses its `DataInfo`
+/// host's `remove_style_data_reference` and
+/// `remove_orphaned_image_asset`): a style kept with another fill drops
+/// the data reference from its message info, the style's registered owner
+/// is dropped and data nothing references any more loses its `DataInfo`
 /// ([`crate::data_owner::release`]). Returns the `Data/` members the caller
 /// deletes.
 ///

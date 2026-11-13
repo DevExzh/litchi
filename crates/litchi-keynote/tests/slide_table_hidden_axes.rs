@@ -1,4 +1,4 @@
-//! Slide-table hidden axes through the shared engine (record 0379).
+//! Slide-table hidden axes through the shared engine.
 
 use std::path::PathBuf;
 

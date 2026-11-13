@@ -1,4 +1,4 @@
-//! CalculationEngine ownership of a removed Numbers table (record 0301).
+//! CalculationEngine ownership of a removed Numbers table.
 //!
 //! Ported from the Pages body-table deletion owner
 //! (`litchi-pages/src/package/body_table_deletion/formula.rs`), whose

@@ -1,5 +1,5 @@
-//! A populated copy of a table's graph (record 0370h; lifted from
-//! `litchi-numbers` so the Pages and Keynote table owners can wrap it).
+//! A populated copy of a table's graph (lifted from `litchi-numbers` so the
+//! Pages and Keynote table owners can wrap it).
 //!
 //! The port of the host editor's `duplicate_attached_table_graph_in_package`
 //! and `clone_table_formula_graph` on the structural working set. The copy
@@ -9,8 +9,8 @@
 //!   the model owns, including the data-list segments those lists chain to;
 //! - a table UUID derived from the new model's identifier, as the host does;
 //! - a clone of its CalculationEngine owner family, with its dependency
-//!   tiles, fresh internal owner identifiers (above every owner and owner-map
-//!   entry, policy 0368a) and owner UUIDs translated from the new table
+//!   tiles, fresh internal owner identifiers (above every owner and
+//!   owner-map entry) and owner UUIDs translated from the new table
 //!   UUID, on the shared `litchi_numbers_wire::formula_graph` rewrites;
 //! - its formula lists, with their host-table and self-table references
 //!   rewritten to the new UUIDs;
@@ -933,10 +933,10 @@ fn owner_family<P: TableLeaf>(working: &Working<'_, P>, component: &str, info: u
 }
 
 /// Clone `family` for the new drawable on the shared formula-graph
-/// rewrites (`litchi_numbers_wire::formula_graph`, record 0368); returns
-/// each clone's identifier, source and component. The new internal owner
-/// identifiers start above every owner and every owner-map entry (policy
-/// 0368a: the host allocates above the owners only).
+/// rewrites (`litchi_numbers_wire::formula_graph`); returns each clone's
+/// identifier, source and component. The new internal owner identifiers
+/// start above every owner and every owner-map entry (the host
+/// allocates above the owners only).
 #[allow(
     clippy::too_many_lines,
     reason = "the port keeps the host editor's clone_table_formula_graph sequence"

@@ -54,8 +54,7 @@ pub struct AuthoredXmlFragment {
 pub struct XmlSplicePublication {
     edits: Vec<Edit>,
     /// The largest end of the edits' ranges: an edit starting after it
-    /// overlaps none of them, so ascending edits are checked in O(1)
-    /// (record 0295).
+    /// overlaps none of them, so ascending edits are checked in O(1).
     max_end: usize,
     source: XmlSourcePart,
     source_candidate: Option<Vec<u8>>,
@@ -267,7 +266,7 @@ impl AuthoredXmlFragment {
     /// spacing) and are not held to the compact authored-XML contract; they
     /// must be one or more balanced markup nodes. Every publication still
     /// verifies the assembled part as a whole. Added for reordering whole
-    /// elements, such as presentation pages (record 0278).
+    /// elements, such as presentation pages.
     ///
     /// # Errors
     ///

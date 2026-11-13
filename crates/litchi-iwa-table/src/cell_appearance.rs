@@ -1,6 +1,6 @@
 //! Cell fill and text layout of one table cell, through the copy-on-write
-//! cell-style graph (record 0371; the migration host's `cell_style`,
-//! `cell_fill` and `cell_layout`).
+//! cell-style graph (the migration host's `cell_style`, `cell_fill` and
+//! `cell_layout`).
 //!
 //! A cell's appearance is the `TST.CellStyleArchive` its BNC style key names
 //! in the table's style `TST.TableDataList`, or, without a key, the model's
@@ -1724,11 +1724,10 @@ pub fn plan_border(
     })
 }
 
-/// Publication of a [`Plan`] on the shared structural working set (record
-/// 0412b): the leaves that edit through `structure::Working` (Numbers)
-/// apply the plan's rewrites, its new or removed style object and its
-/// registry changes, then publish. Pages and Keynote keep their own
-/// workspaces.
+/// Publication of a [`Plan`] on the shared structural working set: the
+/// leaves that edit through `structure::Working` (Numbers) apply the
+/// plan's rewrites, its new or removed style object and its registry
+/// changes, then publish. Pages and Keynote keep their own workspaces.
 pub mod working {
     use litchi_iwa_core::{ArchiveObject, RawMessage};
 

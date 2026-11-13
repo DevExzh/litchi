@@ -1,18 +1,18 @@
-//! Format-neutral rich text of whole table cells (record 0412): the
-//! character and paragraph properties of a cell's text style
-//! ([`text`](crate::cell_rich_text::text)) and the paragraph lists of its rich-text storage ([`list`](crate::cell_rich_text::list)).
+//! Format-neutral rich text of whole table cells: the character and paragraph
+//! properties of a cell's text style ([`text`](crate::cell_rich_text::text))
+//! and the paragraph lists of its rich-text storage
+//! ([`list`](crate::cell_rich_text::list)).
 //!
 //! Numbers sheets, Pages body tables and Keynote slide tables store a cell's
 //! text style the same way: a key in the table's style list
 //! (`DataStore.styleTable`) whose entry names a `TSWP.ParagraphStyleArchive`;
 //! a cell without a key uses its section's base style. A cell's lists live in
 //! a `TSWP.StorageArchive` named by a `TST.RichTextPayloadArchive` of the
-//! table's rich-text list. The engines here were lifted from `litchi-numbers`
-//! (records 0370 and 0370b) and run on any [`TableLeaf`](crate::structure::TableLeaf): the leaf resolves
-//! its selector to the table model's identifier, opens a
-//! [`Working`](crate::structure::Working) set over its exact source and keeps its own public
-//! transaction vocabulary, patch and candidate verification. The property,
-//! list and character planning is the shared text engines'
+//! table's rich-text list. The engines here were lifted from `litchi-numbers` and run on any
+//! [`TableLeaf`](crate::structure::TableLeaf): the leaf resolves its selector to the table
+//! model's identifier, opens a [`Working`](crate::structure::Working) set over its exact
+//! source and keeps its own public transaction vocabulary, patch and candidate verification.
+//! The property, list and character planning is the shared text engines'
 //! ([`litchi_iwa_text_wire::paragraph_style`], [`litchi_iwa_text_wire::list`]);
 //! nothing here re-plans a style.
 

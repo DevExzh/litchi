@@ -1,5 +1,4 @@
-//! A bounded parser from Numbers formula text to an [`Expression`]
-//! (IWORK_API_REQUESTS.md request 17).
+//! A bounded parser from Numbers formula text to an [`Expression`].
 //!
 //! The accepted language is the local, A1-addressed subset the authoring
 //! model represents: finite numbers, double-quoted text (`""` escapes a

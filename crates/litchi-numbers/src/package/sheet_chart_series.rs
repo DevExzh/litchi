@@ -1,7 +1,6 @@
 //! Implementation of the public [`crate::sheet::chart::series`]
-//! transaction: per-series chart properties of one sheet chart on W1-E's
-//! style-variation graph engine (`litchi_iwa_style::series`, record 0375a),
-//! record 0378.
+//! transaction: per-series chart properties of one sheet chart on the shared
+//! style-variation graph engine (`litchi_iwa_style::series`).
 //!
 //! Each property holds one value per series, in series order (the chart's
 //! row or column names, by its series direction). A write runs the engine
@@ -558,7 +557,7 @@ impl Property {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4).
+/// [`Refusal::kind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {

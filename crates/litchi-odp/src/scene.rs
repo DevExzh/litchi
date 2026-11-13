@@ -615,7 +615,7 @@ pub struct Paragraph {
     pub(crate) item: Option<Range<usize>>,
     /// The start offsets and names of the inline content that is not text
     /// (frames, notes, annotations, fields, hyperlinks), at most eight:
-    /// a text set that would replace one is refused (record 0304).
+    /// a text set that would replace one is refused.
     pub(crate) objects: Vec<(usize, String)>,
 }
 
@@ -678,7 +678,7 @@ pub enum RunKind {
     Link,
     /// Another inline element: a field, bookmark or reference mark. A
     /// `text:span` whose whole content is one field with text is that
-    /// field, formatted by the span's style (record 0316).
+    /// field, formatted by the span's style.
     Field,
 }
 
@@ -728,7 +728,7 @@ impl Run {
     }
 
     /// The `text:style-name` of the one `text:span` a link's whole content
-    /// is: the formatting of the link text (record 0316).
+    /// is: the formatting of the link text.
     #[must_use]
     pub fn link_text_style_name(&self) -> Option<&str> {
         self.inner_span.as_ref()?.1.as_deref()

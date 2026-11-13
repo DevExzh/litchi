@@ -1,28 +1,28 @@
-//! Exact-source creation of a body table (record 0329).
+//! Exact-source creation of a body table.
 //!
 //! A new, empty table is cloned from the structure of the document's first
 //! body table (the template): its drawable, model and emptied storage come
 //! from `litchi_numbers_wire::table_create` (the payload half of
-//! `litchi-numbers`' table creation, record 0301), with styles shared. Every
-//! clone goes into its source's package member; a copy of the template's
-//! drawable attachment names the new table; one object-replacement
-//! character (`U+FFFC`) and an attachment-table entry anchor it in the body
-//! story at the requested UTF-16 position, shifting later text attributes
-//! as a native text insertion does. The table gets its own formula owner in
-//! the calculation engine, the clones of registered objects get registry
-//! UUIDs and every new cross-member reference is registered. The graph is
-//! the host editor's `add_table` graph (records 0370f and 0371): the
-//! same identifier order, model references, kept drawable frame and
-//! registration order; only the table UUID differs in value. Seeded cell
-//! values are then written by the body-table value transaction
-//! ([`crate::table::values`]); the patch covers both. No clock or
-//! randomness is consulted: the same insertion into the same source
-//! publishes the same bytes.
+//! `litchi-numbers`' table creation), with styles shared. Every clone goes
+//! into its source's package member; a copy of the template's drawable
+//! attachment names the new table; one object-replacement character
+//! (`U+FFFC`) and an attachment-table entry anchor it in the body story at
+//! the requested UTF-16 position, shifting later text attributes as a
+//! native text insertion does. The table gets its own formula owner in the
+//! calculation engine, the clones of registered objects get registry UUIDs
+//! and every new cross-member reference is registered. The graph is the
+//! host editor's `add_table` graph: the same identifier order, model
+//! references, kept drawable frame and registration order; only the table
+//! UUID differs in value. Seeded cell values are then written by the
+//! body-table value transaction ([`crate::table::values`]); the patch
+//! covers both. No clock or randomness is consulted: the same insertion
+//! into the same source publishes the same bytes.
 //!
 //! [`Edit::duplicate`] instead copies an existing body table with its
-//! cells, styles, formulas and frame (the host editor's `duplicate_table`,
-//! record 0371) on the shared `litchi_iwa_table::structure::duplicate`
-//! engine, and anchors the copy in the body story the same way.
+//! cells, styles, formulas and frame (the host editor's
+//! `duplicate_table`) on the shared
+//! `litchi_iwa_table::structure::duplicate` engine, and anchors the
+//! copy in the body story the same way.
 
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
@@ -155,8 +155,7 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
-    /// (record 0351 §2.4, record 0361).
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
     #[error(transparent)]
     Refused(Refusal),
     /// The package cannot be edited safely (malformed or inconsistent).
@@ -192,7 +191,7 @@ pub enum Error {
 }
 
 /// A well-formed request this family's route refuses, classified by
-/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+/// [`Refusal::kind`].
 #[derive(Debug, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {
@@ -446,12 +445,11 @@ impl fmt::Debug for Edit<'_> {
 impl Edit<'_> {
     /// Stage a new, empty body table anchored at UTF-16 code unit `anchor`
     /// of the body story, cloned from the structure of the document's first
-    /// body table (record 0329). A table-less document made from the
-    /// built-in template ([`crate::Package::new`], [`crate::builder::Builder`])
-    /// gets the host's from-scratch first table graph instead, with its
-    /// calculation engine (record 0426). The anchor character joins the
-    /// paragraph holding `anchor`; seeded cells are written with the
-    /// body-table value writer.
+    /// body table. A table-less document made from the built-in template
+    /// ([`crate::Package::new`], [`crate::builder::Builder`]) gets the
+    /// host's from-scratch first table graph instead, with its calculation
+    /// engine. The anchor character joins the paragraph holding `anchor`;
+    /// seeded cells are written with the body-table value writer.
     ///
     /// # Errors
     ///
@@ -655,8 +653,8 @@ fn declared(template: &ArchiveObject, data: &[u8], remap: &dyn Fn(u64) -> Option
 }
 
 /// The objects a model payload references, sorted, as the host editor's
-/// `table_model_references` lists them (record 0370f): its style and owner
-/// references, and its data store's headers, tiles and lists.
+/// `table_model_references` lists them: its style and owner references, and its
+/// data store's headers, tiles and lists.
 fn model_references(model: &[u8]) -> Result<Vec<u64>, Error> {
     const MODEL_FIELDS: [u32; 43] = [
         3, 24, 25, 26, 27, 18, 19, 20, 21, 30, 36, 48, 5, 34, 35, 38, 46, 49, 60, 61, 62, 63, 64,
@@ -1068,10 +1066,9 @@ fn create(source: &Package, anchor: usize, table: &NewTable) -> Result<Commit, E
         return Err(Error::Refused(Refusal::Unsupported));
     }
 
-    // Fresh identities, in the host editor's order (record 0370f): the
-    // drawable, the model, the owned storage in source-identifier order,
-    // the formula owner (when the document has an engine), then the
-    // attachment.
+    // Fresh identities, in the host editor's order: the drawable, the
+    // model, the owned storage in source-identifier order, the formula
+    // owner (when the document has an engine), then the attachment.
     let engine_root = engine(source)?;
     let storage_count = owned.len();
     let fresh_identifiers =

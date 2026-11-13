@@ -1,6 +1,6 @@
 //! Selector-first Keynote slide-chart chart-level and axis-level style
-//! transactions (record 0414): [`crate::chart::style`] and the axis-style
-//! half of [`crate::chart::axis`].
+//! transactions: [`crate::chart::style`] and the axis-style half of
+//! [`crate::chart::axis`].
 //!
 //! The shared chart style engine (`litchi_iwa_style::chart_style`) resolves
 //! the chart's style object, refuses one another chart shares (the host's

@@ -1,5 +1,5 @@
-//! The inline title and caption graph of a drawable (records 0371, 0372,
-//! 0425), shared by the Keynote, Pages and Numbers owners.
+//! The inline title and caption graph of a drawable, shared by the Keynote,
+//! Pages and Numbers owners.
 //!
 //! A drawable's title and caption are references in its
 //! `TSD.DrawableArchive` (fields 10 and 11). A present label is a
@@ -67,8 +67,8 @@ const PARAGRAPH_STYLE_SUPER_FIELD: u32 = 1;
 /// `TSS.StyleArchive.style_identifier`.
 const STYLE_IDENTIFIER_FIELD: u32 = 2;
 /// The `style_identifier` of the paragraph style Numbers and Keynote give a
-/// caption they author (record 0435). Every template we hold, Pages' too,
-/// lists it in the theme's caption styles after the title's
+/// caption they author. Every template we hold, Pages' too, lists it in the
+/// theme's caption styles after the title's
 /// `captions-0-paragraphstyle-Caption Title`, except a document built by Litchi
 /// (one style, listed twice) and some built for Pages (the title's alone).
 const CAPTION_PARAGRAPH_STYLE_IDENTIFIER: &[u8] = b"captions-0-paragraphstyle-Caption Text";
@@ -206,8 +206,7 @@ pub struct Theme<'a> {
     /// The document stylesheet.
     pub stylesheet: u64,
     /// The label's paragraph style: [`theme_label_paragraph_style`] where a
-    /// native caption shows the style, [`theme_paragraph_style`] where none
-    /// does (record 0435).
+    /// native caption shows the style, [`theme_paragraph_style`] where none does.
     pub paragraph_style: u64,
     /// The document language.
     pub language: Option<&'a str>,
@@ -570,7 +569,7 @@ pub fn archive_width(drawable: &[u8]) -> Result<Option<f32>, Malformed> {
 /// payload (`application_presets.caption_styles[0]`): every template we hold
 /// names the title's style here, `captions-0-paragraphstyle-Caption Title`.
 /// A new title uses it; so does a new Pages caption, which has no native
-/// evidence (record 0435).
+/// evidence.
 #[must_use]
 pub fn theme_paragraph_style(theme: &[u8]) -> Option<u64> {
     let limits = WireLimits::DEFAULT;
@@ -584,9 +583,9 @@ pub fn theme_paragraph_style(theme: &[u8]) -> Option<u64> {
 }
 
 /// The paragraph style of a new `label` from a `TSS.ThemeArchive` payload,
-/// `object` resolving the presets (record 0435). A title takes the first
-/// preset. A caption takes the preset that is the paragraph style native
-/// captions use; a template that lists none falls back to the first preset, as
+/// `object` resolving the presets. A title takes the first preset. A
+/// caption takes the preset that is the paragraph style native captions
+/// use; a template that lists none falls back to the first preset, as
 /// every caption did before: documents Litchi built list one style for both.
 #[must_use]
 pub fn theme_label_paragraph_style<'a>(
@@ -1063,7 +1062,7 @@ pub fn write(
                 // The new storage in the drawable's component names the
                 // caption paragraph style, which lives in the stylesheet's
                 // component. Native files list every such cross-component
-                // reference (record 0431).
+                // reference.
                 let style_member = workspace
                     .member(workspace.locate(paragraph_style)?)
                     .to_owned();
