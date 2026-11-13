@@ -1266,6 +1266,9 @@ fn package_from_snapshot(source: &Package, snapshot: cell_values::Snapshot) -> R
     bytes.extend_from_slice(snapshot.bytes());
     let mut ole = litchi_cfb::OleFile::open(std::io::Cursor::new(bytes), snapshot.cfb_limits())
         .map_err(PackageError::Cfb)?;
+    // The new bytes decide the signature state, as they do for a positional
+    // owner: a handoff that removed the source's signature is unsigned.
+    let signed = super::has_signature(&ole);
     let metadata = super::eager_metadata(&mut ole);
     let options = OpenOptions::default()
         .leniency(source.leniency())
@@ -1279,7 +1282,7 @@ fn package_from_snapshot(source: &Package, snapshot: cell_values::Snapshot) -> R
                 encryption,
             },
             policy: source.inner.policy,
-            signed: source.inner.signed,
+            signed,
             metadata: OnceLock::from(metadata),
             catalog: OnceLock::new(),
             edit_snapshot: Some(snapshot),

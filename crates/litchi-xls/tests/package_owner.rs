@@ -1101,6 +1101,50 @@ fn transformed_byte_handoff_retains_native_policies_and_source_fences() {
     ));
 }
 
+/// The package of a byte handoff is signed when its own bytes carry a
+/// signature, not when the package it replaces did.
+#[test]
+fn transformed_byte_handoff_takes_its_signature_state_from_the_new_bytes() {
+    use litchi_xls::package::metadata::Error as MetadataError;
+
+    let signed = signed_package();
+    let unsigned = authored_package();
+    let titled = litchi_core::Metadata {
+        title: Some("Authorized".to_owned()),
+        ..Default::default()
+    };
+    let eager = Package::from_bytes(&signed).unwrap();
+    let positional = Package::from_source(
+        litchi_xls::SourceBackedWorkbook::from_read_at(Arc::new(CountingReadAt::new(
+            signed.clone(),
+        )))
+        .unwrap(),
+    )
+    .unwrap();
+    for source in [eager, positional] {
+        let mut edit = litchi_xls::raw::package_from_replacement_bytes(&source, unsigned.clone())
+            .unwrap()
+            .edit_metadata()
+            .unwrap();
+        assert!(edit.merge_metadata(&titled).unwrap());
+        let commit = edit.commit().unwrap();
+        assert!(commit.diagnostics().changed());
+        let (package, _) = commit.into_parts();
+        let reopened = Package::from_bytes(&package.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened.metadata().unwrap().title.as_deref(),
+            Some("Authorized")
+        );
+
+        // The source itself keeps the signed policy, and bytes that still
+        // carry a signature are not admitted as an edit owner.
+        let mut edit = source.edit_metadata().unwrap();
+        assert!(edit.merge_metadata(&titled).unwrap());
+        assert!(matches!(edit.commit(), Err(MetadataError::Protected)));
+        assert!(litchi_xls::raw::package_from_replacement_bytes(&source, signed.clone()).is_err());
+    }
+}
+
 #[test]
 fn primary_source_cell_uses_the_admitted_inventory_and_original_state() {
     use litchi_xls::cell_values::{Reference, Value};
