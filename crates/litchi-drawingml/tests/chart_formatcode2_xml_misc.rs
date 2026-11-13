@@ -109,3 +109,153 @@ fn empty_named_namespace_prefix_is_not_a_default_declaration() {
         "x"
     );
 }
+
+const ORDER: &str = "invalid: formatcode2 XML declaration has invalid attribute order";
+const UNKNOWN: &str = "invalid: formatcode2 XML declaration has an unknown attribute";
+const NO_VERSION: &str = "invalid: formatcode2 XML declaration must declare version";
+const BAD_VERSION: &str = "invalid: formatcode2 XML declaration must use version 1.0";
+const BAD_ENCODING: &str = "invalid: formatcode2 XML declaration must use UTF-8 encoding";
+const BAD_STANDALONE: &str = "invalid: formatcode2 XML declaration standalone must be yes or no";
+const DUPLICATE: &str = "xml: duplicated attribute";
+
+/// Read a document whose XML declaration carries the given pseudo-attributes
+/// and name the exact result: `ok`, or the error variant with its message.
+///
+/// Each letter of `attributes` is one pseudo-attribute: `v` version 1.0,
+/// `e` encoding UTF-8, `s` standalone yes, `u` an unknown name, and the
+/// rejected values `V` version 1.1, `E` encoding UTF-16, `S` standalone maybe.
+/// `l` is the lower-case spelling `utf-8` and `n` is standalone no.
+fn declaration_outcome(attributes: &str) -> String {
+    let mut source = String::from("<?xml");
+    for attribute in attributes.chars() {
+        source.push(' ');
+        source.push_str(match attribute {
+            'v' => "version=\"1.0\"",
+            'e' => "encoding=\"UTF-8\"",
+            's' => "standalone=\"yes\"",
+            'u' => "unknown=\"x\"",
+            'V' => "version=\"1.1\"",
+            'E' => "encoding=\"UTF-16\"",
+            'S' => "standalone=\"maybe\"",
+            'l' => "encoding=\"utf-8\"",
+            'n' => "standalone=\"no\"",
+            other => panic!("unknown declaration attribute key {other:?}"),
+        });
+    }
+    source.push_str("?>");
+    let mut document = source.into_bytes();
+    document.extend_from_slice(&with_markup(b""));
+    match formatcode2::read(&document, &formatcode2::Limits::DEFAULT) {
+        Ok(value) => {
+            assert_eq!(value.value(), "General");
+            "ok".to_string()
+        },
+        Err(litchi_drawingml::Error::Invalid(message)) => format!("invalid: {message}"),
+        // The XML reader reports a repeated name before the declaration
+        // check sees it; its wording belongs to the reader, so only the kind
+        // of refusal is pinned.
+        Err(litchi_drawingml::Error::Xml(message)) if message.contains("duplicated attribute") => {
+            DUPLICATE.to_string()
+        },
+        Err(litchi_drawingml::Error::Xml(message)) => format!("xml: {message}"),
+        Err(other) => panic!("unexpected declaration error {other:?}"),
+    }
+}
+
+fn assert_declaration_outcomes(rows: &[(&str, &str)]) {
+    let actual: Vec<(&str, String)> = rows
+        .iter()
+        .map(|(attributes, _)| (*attributes, declaration_outcome(attributes)))
+        .collect();
+    let expected: Vec<(&str, String)> = rows
+        .iter()
+        .map(|(attributes, outcome)| (*attributes, (*outcome).to_string()))
+        .collect();
+    assert_eq!(actual, expected, "{actual:#?}");
+}
+
+#[test]
+fn xml_declaration_accepts_only_version_then_encoding_then_standalone() {
+    // Every sequence of up to three of version, encoding and standalone.
+    assert_declaration_outcomes(&[
+        ("", NO_VERSION),
+        ("v", "ok"),
+        ("vv", DUPLICATE),
+        ("vvv", DUPLICATE),
+        ("vve", DUPLICATE),
+        ("vvs", DUPLICATE),
+        ("ve", "ok"),
+        ("vev", DUPLICATE),
+        ("vee", DUPLICATE),
+        ("ves", "ok"),
+        ("vs", "ok"),
+        ("vsv", DUPLICATE),
+        ("vse", ORDER),
+        ("vss", DUPLICATE),
+        ("e", ORDER),
+        ("ev", ORDER),
+        ("evv", ORDER),
+        ("eve", ORDER),
+        ("evs", ORDER),
+        ("ee", ORDER),
+        ("eev", ORDER),
+        ("eee", ORDER),
+        ("ees", ORDER),
+        ("es", ORDER),
+        ("esv", ORDER),
+        ("ese", ORDER),
+        ("ess", ORDER),
+        ("s", ORDER),
+        ("sv", ORDER),
+        ("svv", ORDER),
+        ("sve", ORDER),
+        ("svs", ORDER),
+        ("se", ORDER),
+        ("sev", ORDER),
+        ("see", ORDER),
+        ("ses", ORDER),
+        ("ss", ORDER),
+        ("ssv", ORDER),
+        ("sse", ORDER),
+        ("sss", ORDER),
+    ]);
+}
+
+#[test]
+fn xml_declaration_unknown_attributes_and_rejected_values() {
+    assert_declaration_outcomes(&[
+        // An unknown name is refused wherever it stands.
+        ("u", UNKNOWN),
+        ("uv", UNKNOWN),
+        ("ue", UNKNOWN),
+        ("vu", UNKNOWN),
+        ("veu", UNKNOWN),
+        ("vus", UNKNOWN),
+        ("vsu", UNKNOWN),
+        ("vesu", UNKNOWN),
+        ("vesv", DUPLICATE),
+        // A rejected value in a legal position.
+        ("V", BAD_VERSION),
+        ("Vu", BAD_VERSION),
+        ("Ve", BAD_VERSION),
+        ("vE", BAD_ENCODING),
+        ("vEs", BAD_ENCODING),
+        ("vS", BAD_STANDALONE),
+        ("veS", BAD_STANDALONE),
+        // The position is checked before the value.
+        ("E", ORDER),
+        ("S", ORDER),
+        ("eV", ORDER),
+        ("sV", ORDER),
+        ("vsE", ORDER),
+        ("vsS", DUPLICATE),
+        ("veE", DUPLICATE),
+        // Accepted spellings.
+        ("vl", "ok"),
+        ("vn", "ok"),
+        ("vln", "ok"),
+        ("vnl", ORDER),
+        ("vel", DUPLICATE),
+        ("vsn", DUPLICATE),
+    ]);
+}
