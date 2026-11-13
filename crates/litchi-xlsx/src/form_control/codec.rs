@@ -6467,4 +6467,189 @@ mod tests {
             expected
         );
     }
+
+    /// Parses `body` inside a `formControlPr` root, once owning the source
+    /// and once borrowing it. An accepted body is described by what each
+    /// path kept; a refused one by its error.
+    fn children_outcome(body: &str) -> String {
+        let xml =
+            format!(r#"<formControlPr xmlns="{NS}" objectType="Drop">{body}</formControlPr>"#);
+        let owned = match parse(xml.as_bytes(), &Limits::default()) {
+            Ok(properties) => format!(
+                "items {:?} list extLst {} root extLst {}",
+                properties.item_list().map(ItemList::len),
+                properties
+                    .item_list()
+                    .is_some_and(|list| list.extension_list().is_some()),
+                properties.root_extension_list().is_some(),
+            ),
+            Err(error) => format!("{error:?}"),
+        };
+        let borrowed = match inspect(xml.as_bytes(), &Limits::default()) {
+            Ok(view) => format!(
+                "items {:?} list extLst {} root extLst {}",
+                view.layout.item_list.as_ref().map(|list| list.items.len()),
+                view.layout
+                    .item_list
+                    .as_ref()
+                    .is_some_and(|list| list.extension.is_some()),
+                view.layout.root_extension.is_some(),
+            ),
+            Err(error) => format!("{error:?}"),
+        };
+        assert_eq!(owned, borrowed, "{body}");
+        owned
+    }
+
+    const ROOT_CHILDREN: [[&str; 2]; 2] = [
+        ["<itemLst/>", "<itemLst></itemLst>"],
+        ["<extLst/>", "<extLst></extLst>"],
+    ];
+    const LIST_CHILDREN: [[&str; 2]; 2] = [
+        [r#"<item val="a"/>"#, r#"<item val="a"></item>"#],
+        ["<extLst/>", "<extLst></extLst>"],
+    ];
+
+    fn refused(message: &str) -> String {
+        format!("Invalid({message:?})")
+    }
+
+    #[test]
+    fn root_child_pairs_follow_the_schema_sequence_in_both_spellings() {
+        let item_list = "duplicate or out-of-order form-control itemLst";
+        let extension_list = "duplicate or out-of-order form-control extLst";
+        // Row: first child; column: second child (itemLst, extLst).
+        let expected = [
+            [
+                refused(item_list),
+                "items Some(0) list extLst false root extLst true".to_owned(),
+            ],
+            [refused(item_list), refused(extension_list)],
+        ];
+        for (first, row) in expected.iter().enumerate() {
+            for (second, expected) in row.iter().enumerate() {
+                for first_form in ROOT_CHILDREN[first] {
+                    for second_form in ROOT_CHILDREN[second] {
+                        let body = format!("{first_form}{second_form}");
+                        assert_eq!(&children_outcome(&body), expected, "{body}");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn item_list_child_pairs_follow_the_schema_sequence_in_both_spellings() {
+        // Row: first child; column: second child (item, extLst).
+        let expected = [
+            [
+                "items Some(2) list extLst false root extLst false".to_owned(),
+                "items Some(1) list extLst true root extLst false".to_owned(),
+            ],
+            [
+                refused("itemLst contains an item after extLst"),
+                refused("duplicate itemLst extLst"),
+            ],
+        ];
+        for (first, row) in expected.iter().enumerate() {
+            for (second, expected) in row.iter().enumerate() {
+                for first_form in LIST_CHILDREN[first] {
+                    for second_form in LIST_CHILDREN[second] {
+                        let body = format!("<itemLst>{first_form}{second_form}</itemLst>");
+                        assert_eq!(&children_outcome(&body), expected, "{body}");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn single_empty_and_unknown_children_keep_their_outcomes() {
+        let root_child = "unexpected form-control root child";
+        let list_child = "unexpected itemLst child";
+        let nested = "x14:item must be empty";
+        for (body, expected) in [
+            (
+                "",
+                "items None list extLst false root extLst false".to_owned(),
+            ),
+            (
+                "<itemLst/>",
+                "items Some(0) list extLst false root extLst false".to_owned(),
+            ),
+            (
+                "<itemLst></itemLst>",
+                "items Some(0) list extLst false root extLst false".to_owned(),
+            ),
+            (
+                "<extLst/>",
+                "items None list extLst false root extLst true".to_owned(),
+            ),
+            (
+                "<extLst></extLst>",
+                "items None list extLst false root extLst true".to_owned(),
+            ),
+            (
+                r#"<itemLst><item val="a"/></itemLst>"#,
+                "items Some(1) list extLst false root extLst false".to_owned(),
+            ),
+            (
+                r#"<itemLst><item val="a"></item></itemLst>"#,
+                "items Some(1) list extLst false root extLst false".to_owned(),
+            ),
+            (
+                "<itemLst><extLst/></itemLst>",
+                "items Some(0) list extLst true root extLst false".to_owned(),
+            ),
+            (
+                "<itemLst><extLst></extLst></itemLst>",
+                "items Some(0) list extLst true root extLst false".to_owned(),
+            ),
+            (
+                r#"<itemLst><item val="a"/><item val="b"/><extLst/></itemLst><extLst/>"#,
+                "items Some(2) list extLst true root extLst true".to_owned(),
+            ),
+            (
+                r#"<itemLst><extLst></extLst></itemLst><extLst><ext uri="u"/></extLst>"#,
+                "items Some(0) list extLst true root extLst true".to_owned(),
+            ),
+            ("<bogus/>", refused(root_child)),
+            ("<bogus></bogus>", refused(root_child)),
+            (r#"<item val="a"/>"#, refused(root_child)),
+            ("<itemLst/><bogus/>", refused(root_child)),
+            ("<itemLst><bogus/></itemLst>", refused(list_child)),
+            ("<itemLst><bogus></bogus></itemLst>", refused(list_child)),
+            (
+                r#"<itemLst><item val="a"><item val="b"/></item></itemLst>"#,
+                refused(nested),
+            ),
+            (
+                r#"<itemLst><item val="a"><item val="b"></item></item></itemLst>"#,
+                refused(nested),
+            ),
+            (
+                r#"<itemLst><item val="a"><extLst/></item></itemLst>"#,
+                refused(nested),
+            ),
+            (
+                r#"<itemLst><item val="a"/><extLst/><item val="b"/></itemLst>"#,
+                refused("itemLst contains an item after extLst"),
+            ),
+            (
+                "<itemLst><extLst/></itemLst><extLst/><extLst/>",
+                refused("duplicate or out-of-order form-control extLst"),
+            ),
+            (
+                "<itemLst><extLst/></itemLst><extLst/><itemLst/>",
+                refused("duplicate or out-of-order form-control itemLst"),
+            ),
+        ] {
+            assert_eq!(children_outcome(body), expected, "{body}");
+        }
+        let self_closing_root = format!(r#"<formControlPr xmlns="{NS}" objectType="Drop"/>"#);
+        let properties =
+            parse(self_closing_root.as_bytes(), &Limits::default()).expect("self-closing root");
+        assert!(properties.item_list().is_none());
+        assert!(properties.root_extension_list().is_none());
+    }
 }

@@ -6496,4 +6496,282 @@ mod tests {
             package.rels().to_xml(),
         )
     }
+
+    const QUESTIONS: &str = r#"<questions><question binding="1"/></questions>"#;
+
+    /// The five children of `survey` in schema order, each as an empty
+    /// element and as a start/end pair.
+    const SURVEY_CHILDREN: [[&str; 2]; 5] = [
+        ["<surveyPr/>", "<surveyPr></surveyPr>"],
+        ["<titlePr/>", "<titlePr></titlePr>"],
+        ["<descriptionPr/>", "<descriptionPr></descriptionPr>"],
+        [
+            QUESTIONS,
+            r#"<questions><question binding="1"></question></questions>"#,
+        ],
+        ["<extLst/>", "<extLst></extLst>"],
+    ];
+
+    /// Parses `body` inside a Survey root. An accepted body is described by
+    /// the slot of every direct comment of the root plus the rewritten body
+    /// without its namespace declarations; a refused one by its error.
+    fn survey_outcome(body: &str) -> String {
+        match parse(&schema_xml(body), &Limits::default()) {
+            Ok(survey) => {
+                let slots = survey
+                    .comment_slots
+                    .iter()
+                    .map(|comment| comment.slot)
+                    .collect::<Vec<_>>();
+                let written = write(&survey, &Limits::default()).expect("write parsed Survey");
+                let written = String::from_utf8(written).expect("UTF-8 Survey");
+                let body_start = written.find('>').expect("root start tag") + 1;
+                let body_end = written.rfind("</survey>").expect("root end tag");
+                let body = written[body_start..body_end]
+                    .replace(&format!(r#" xmlns="{NAMESPACE_STR}""#), "");
+                format!("slots {slots:?} body {body}")
+            },
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    /// Joins `children` with one numbered comment before, between and after
+    /// them.
+    fn commented(children: &[&str]) -> String {
+        let mut body = String::new();
+        for (marker, child) in children.iter().enumerate() {
+            body.push_str(&format!("<!--{marker}-->{child}"));
+        }
+        body.push_str(&format!("<!--{}-->", children.len()));
+        body
+    }
+
+    /// The spelling the writer gives child `index` when the source used
+    /// `form`: modeled children are regenerated, `extLst` is kept verbatim.
+    fn written_child(index: usize, form: usize) -> &'static str {
+        if index == 4 {
+            source_child(index, form)
+        } else {
+            source_child(index, 0)
+        }
+    }
+
+    /// Child `index` of [`SURVEY_CHILDREN`] in spelling `form`.
+    fn source_child(index: usize, form: usize) -> &'static str {
+        SURVEY_CHILDREN[index][form]
+    }
+
+    fn rejected(message: &str) -> String {
+        format!("Invalid({message:?})")
+    }
+
+    const OUT_OF_ORDER: &str = "out-of-order Survey child";
+    const NO_QUESTION: &str = "survey requires at least one question";
+    const EXTENSION_FIRST: &str = "Survey extLst must follow questions";
+    const EMPTY_CONTAINER: &str = "survey XML has an empty required container";
+
+    #[test]
+    fn survey_child_pairs_follow_the_schema_sequence_in_both_spellings() {
+        // Row: first child; column: second child. An accepted pair lists the
+        // slots of the comments before, between and after the two children.
+        let expected: [[std::result::Result<[usize; 3], &str>; 5]; 5] = [
+            [
+                Err(OUT_OF_ORDER),
+                Err(NO_QUESTION),
+                Err(NO_QUESTION),
+                Ok([0, 1, 4]),
+                Err(EXTENSION_FIRST),
+            ],
+            [
+                Err(OUT_OF_ORDER),
+                Err(OUT_OF_ORDER),
+                Err(NO_QUESTION),
+                Ok([0, 2, 4]),
+                Err(EXTENSION_FIRST),
+            ],
+            [
+                Err(OUT_OF_ORDER),
+                Err(OUT_OF_ORDER),
+                Err(OUT_OF_ORDER),
+                Ok([0, 3, 4]),
+                Err(EXTENSION_FIRST),
+            ],
+            [
+                Err(OUT_OF_ORDER),
+                Err(OUT_OF_ORDER),
+                Err(OUT_OF_ORDER),
+                Err(OUT_OF_ORDER),
+                Ok([0, 4, 5]),
+            ],
+            [Err(EXTENSION_FIRST); 5],
+        ];
+        for (first, row) in expected.iter().enumerate() {
+            for (second, expected) in row.iter().enumerate() {
+                for first_form in 0..2 {
+                    for second_form in 0..2 {
+                        let body = commented(&[
+                            source_child(first, first_form),
+                            source_child(second, second_form),
+                        ]);
+                        let expected = match expected {
+                            Ok(slots) => format!(
+                                "slots {slots:?} body {}",
+                                commented(&[
+                                    written_child(first, first_form),
+                                    written_child(second, second_form),
+                                ])
+                            ),
+                            Err(message) => rejected(message),
+                        };
+                        assert_eq!(survey_outcome(&body), expected, "{body}");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn survey_property_pairs_before_questions_follow_the_schema_sequence() {
+        // Row: first properties child; column: second. `questions` follows
+        // the pair so an accepted order reaches the end of the part.
+        let expected: [[std::result::Result<[usize; 4], &str>; 3]; 3] = [
+            [Err(OUT_OF_ORDER), Ok([0, 1, 2, 4]), Ok([0, 1, 3, 4])],
+            [Err(OUT_OF_ORDER), Err(OUT_OF_ORDER), Ok([0, 2, 3, 4])],
+            [Err(OUT_OF_ORDER); 3],
+        ];
+        for (first, row) in expected.iter().enumerate() {
+            for (second, expected) in row.iter().enumerate() {
+                for first_form in 0..2 {
+                    for second_form in 0..2 {
+                        let body = commented(&[
+                            source_child(first, first_form),
+                            source_child(second, second_form),
+                            QUESTIONS,
+                        ]);
+                        let expected = match expected {
+                            Ok(slots) => format!(
+                                "slots {slots:?} body {}",
+                                commented(&[
+                                    written_child(first, 0),
+                                    written_child(second, 0),
+                                    QUESTIONS,
+                                ])
+                            ),
+                            Err(message) => rejected(message),
+                        };
+                        assert_eq!(survey_outcome(&body), expected, "{body}");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn survey_single_empty_and_unknown_children_keep_their_outcomes() {
+        let expected: [std::result::Result<[usize; 2], &str>; 5] = [
+            Err(NO_QUESTION),
+            Err(NO_QUESTION),
+            Err(NO_QUESTION),
+            Ok([0, 4]),
+            Err(EXTENSION_FIRST),
+        ];
+        for (child, expected) in expected.iter().enumerate() {
+            for form in 0..2 {
+                let body = commented(&[source_child(child, form)]);
+                let expected = match expected {
+                    Ok(slots) => format!(
+                        "slots {slots:?} body {}",
+                        commented(&[written_child(child, form)])
+                    ),
+                    Err(message) => rejected(message),
+                };
+                assert_eq!(survey_outcome(&body), expected, "{body}");
+            }
+        }
+        let unknown = "unexpected survey element 'bogus'";
+        for (body, message) in [
+            ("", NO_QUESTION),
+            ("<!--0-->", NO_QUESTION),
+            ("<bogus/>", unknown),
+            ("<bogus></bogus>", unknown),
+            (
+                r#"<questions><question binding="1"/></questions><bogus/>"#,
+                unknown,
+            ),
+            (
+                r#"<bogus/><questions><question binding="1"/></questions>"#,
+                unknown,
+            ),
+            ("<questions/>", EMPTY_CONTAINER),
+            ("<questions></questions>", NO_QUESTION),
+            ("<surveyPr/><questions/>", EMPTY_CONTAINER),
+            ("<questions/><questions/>", EMPTY_CONTAINER),
+            ("<questions/><surveyPr/>", EMPTY_CONTAINER),
+            ("<questions/><extLst/>", EMPTY_CONTAINER),
+            ("<extLst/><questions/>", EXTENSION_FIRST),
+            (
+                r#"<questions><question binding="1"/></questions><questions/>"#,
+                OUT_OF_ORDER,
+            ),
+        ] {
+            assert_eq!(survey_outcome(body), rejected(message), "{body}");
+        }
+        let self_closing_root = format!(
+            r#"<survey xmlns="{NAMESPACE_STR}" id="7" guid="{{01234567-89ab-cdef-0123-456789abcdef}}"/>"#
+        );
+        let error = parse(self_closing_root.as_bytes(), &Limits::default())
+            .expect_err("self-closing Survey root");
+        assert_eq!(format!("{error:?}"), rejected(EMPTY_CONTAINER));
+    }
+
+    #[test]
+    fn survey_comments_keep_the_slot_of_the_last_child_before_them() {
+        // Index: which optional children are present, as a bit set of
+        // surveyPr (1), titlePr (2), descriptionPr (4) and extLst (8) around
+        // the required `questions`. Value: the slot of each comment placed
+        // before, between and after the children that are present.
+        let expected: [&[usize]; 16] = [
+            &[0, 4],
+            &[0, 1, 4],
+            &[0, 2, 4],
+            &[0, 1, 2, 4],
+            &[0, 3, 4],
+            &[0, 1, 3, 4],
+            &[0, 2, 3, 4],
+            &[0, 1, 2, 3, 4],
+            &[0, 4, 5],
+            &[0, 1, 4, 5],
+            &[0, 2, 4, 5],
+            &[0, 1, 2, 4, 5],
+            &[0, 3, 4, 5],
+            &[0, 1, 3, 4, 5],
+            &[0, 2, 3, 4, 5],
+            &[0, 1, 2, 3, 4, 5],
+        ];
+        for (mask, slots) in expected.iter().enumerate() {
+            let present = (0..5)
+                .filter(|&child| match child {
+                    0..=2 => mask & (1 << child) != 0,
+                    3 => true,
+                    _ => mask & 8 != 0,
+                })
+                .collect::<Vec<_>>();
+            for form in 0..2 {
+                let source = present
+                    .iter()
+                    .map(|&child| source_child(child, form))
+                    .collect::<Vec<_>>();
+                let written = present
+                    .iter()
+                    .map(|&child| written_child(child, form))
+                    .collect::<Vec<_>>();
+                let body = commented(&source);
+                assert_eq!(
+                    survey_outcome(&body),
+                    format!("slots {slots:?} body {}", commented(&written)),
+                    "{body}"
+                );
+            }
+        }
+    }
 }
