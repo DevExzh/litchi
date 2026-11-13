@@ -329,9 +329,8 @@ fn assert_value(
 
 #[test]
 fn lookup_oracle_matches_all_retained_rows() {
-    let path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(
-        "../../docs/report/spec-gap-validation-evidence/ods-formula-lookups/lookup-goldens.json",
-    );
+    let path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/odf/formula-goldens/lookups/lookup-goldens.json");
     let bytes = std::fs::read(&path).unwrap_or_else(|error| {
         panic!(
             "retained lookup oracle is unavailable at {}: {error}",

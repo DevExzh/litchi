@@ -172,7 +172,7 @@ fn assert_close(actual: f64, expected: f64, formula: &str, mode: &str) {
 #[test]
 fn selected_libreoffice_descriptive_statistics_caches_match_literal_resolved_sources() {
     let source = include_str!(
-        "../../../docs/report/spec-gap-validation-evidence/ods-formula-descriptive-statistics/native/cached-results.json"
+        "../../../test-data/odf/formula-goldens/descriptive-statistics/native/cached-results.json"
     );
     let observations: serde_json::Value =
         serde_json::from_str(source).expect("cached observations");
@@ -265,7 +265,7 @@ fn selected_libreoffice_descriptive_statistics_caches_match_literal_resolved_sou
 #[test]
 fn descriptive_statistics_native_receipt_pins_sources_and_exclusions() {
     let source = include_str!(
-        "../../../docs/report/spec-gap-validation-evidence/ods-formula-descriptive-statistics/native/provenance.json"
+        "../../../test-data/odf/formula-goldens/descriptive-statistics/native/provenance.json"
     );
     let provenance: serde_json::Value = serde_json::from_str(source).expect("provenance receipt");
     assert_eq!(
@@ -312,7 +312,7 @@ fn descriptive_statistics_native_receipt_pins_sources_and_exclusions() {
     );
 
     let selected_source = include_str!(
-        "../../../docs/report/spec-gap-validation-evidence/ods-formula-descriptive-statistics/native/cached-results.json"
+        "../../../test-data/odf/formula-goldens/descriptive-statistics/native/cached-results.json"
     );
     let selected: serde_json::Value =
         serde_json::from_str(selected_source).expect("selected cache");

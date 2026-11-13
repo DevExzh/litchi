@@ -42,7 +42,7 @@ const WORKSHEET_MEMBER: &str = "xl/worksheets/sheet1.xml";
 const WORKSHEET_RELS_MEMBER: &str = "xl/worksheets/_rels/sheet1.xml.rels";
 const CORPUS: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../docs/report/spec-gap-validation-evidence/xlsx-form-control-properties/native-corpus.json"
+    "/../../test-data/ooxml/xlsx/form-control-properties/native-corpus.json"
 ));
 
 fn fixture_path(name: &str) -> PathBuf {

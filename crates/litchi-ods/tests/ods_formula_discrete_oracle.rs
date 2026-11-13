@@ -85,8 +85,9 @@ fn check(formula: &str, row: &serde_json::Value, actual: Result<f64, ScalarError
 
 fn compare_function(function: &str) {
     let document: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../docs/report/spec-gap-validation-evidence/ods-formula-discrete-math/numeric-goldens.json"
-    )).expect("retained oracle JSON");
+        "../../../test-data/odf/formula-goldens/discrete-math/numeric-goldens.json"
+    ))
+    .expect("retained oracle JSON");
     let rows = document["observations"].as_array().expect("oracle rows");
     assert_eq!(rows.len(), 361);
     let budget = Budget::root("discrete-oracle", CoreLimits::for_profile(Profile::Server));

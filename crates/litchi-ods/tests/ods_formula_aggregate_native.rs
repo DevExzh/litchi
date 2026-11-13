@@ -153,7 +153,7 @@ fn assert_close(actual: f64, expected: f64, formula: &str) {
 #[test]
 fn selected_libreoffice_aggregate_caches_match_literal_resolved_sources() {
     let source = include_str!(
-        "../../../docs/report/spec-gap-validation-evidence/ods-formula-aggregates/native/cached-results.json"
+        "../../../test-data/odf/formula-goldens/aggregates/native/cached-results.json"
     );
     let observations: serde_json::Value =
         serde_json::from_str(source).expect("cached observations");
@@ -224,9 +224,8 @@ fn selected_libreoffice_aggregate_caches_match_literal_resolved_sources() {
 
 #[test]
 fn aggregate_native_receipt_keeps_formula_cells_out_of_the_resolver_contract() {
-    let source = include_str!(
-        "../../../docs/report/spec-gap-validation-evidence/ods-formula-aggregates/native/provenance.json"
-    );
+    let source =
+        include_str!("../../../test-data/odf/formula-goldens/aggregates/native/provenance.json");
     let provenance: serde_json::Value = serde_json::from_str(source).expect("provenance receipt");
     assert_eq!(
         provenance["commit"].as_str(),

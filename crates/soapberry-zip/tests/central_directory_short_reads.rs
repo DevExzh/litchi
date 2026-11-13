@@ -130,14 +130,10 @@ fn exact_final_fixed_header_is_parsed_at_directory_end() {
 #[test]
 fn zip32_and_zip64_extra_fields_survive_short_reads() {
     let fixtures: [&[u8]; 3] = [
+        include_bytes!("../../../test-data/zip/python-zip64/zip32-signed-store-deflate.zip"),
+        include_bytes!("../../../test-data/zip/python-zip64/zip64-central-local-signed.zip"),
         include_bytes!(
-            "../../../docs/performance/results/change-0416/corpus/zip32-signed-store-deflate.zip"
-        ),
-        include_bytes!(
-            "../../../docs/performance/results/change-0416/corpus/zip64-central-local-signed.zip"
-        ),
-        include_bytes!(
-            "../../../docs/performance/results/change-0416/corpus/zip64-central-local-zip32-tail-signed.zip"
+            "../../../test-data/zip/python-zip64/zip64-central-local-zip32-tail-signed.zip"
         ),
     ];
     for (index, bytes) in fixtures.into_iter().enumerate() {

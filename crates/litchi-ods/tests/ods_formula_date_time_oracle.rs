@@ -216,9 +216,8 @@ fn panic_message(payload: Box<dyn Any + Send>) -> String {
 
 #[test]
 fn date_time_oracle_replays_all_contract_vectors() {
-    let path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(
-        "../../docs/report/spec-gap-validation-evidence/ods-formula-date-time/oracle-vectors.json",
-    );
+    let path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/odf/formula-goldens/date-time/oracle-vectors.json");
     let bytes = std::fs::read(&path).unwrap_or_else(|error| {
         panic!(
             "retained date/time oracle is unavailable at {}: {error}",

@@ -59,8 +59,9 @@ fn bits(value: &serde_json::Value) -> u64 {
 
 fn compare(function: &str) {
     let document: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../docs/report/spec-gap-validation-evidence/ods-formula-conditional-aggregates/numeric-goldens.json"
-    )).expect("retained independent oracle");
+        "../../../test-data/odf/formula-goldens/conditional-aggregates/numeric-goldens.json"
+    ))
+    .expect("retained independent oracle");
     let rows = document["observations"].as_array().expect("observations");
     assert_eq!(rows.len(), 288);
     let budget = Budget::root(

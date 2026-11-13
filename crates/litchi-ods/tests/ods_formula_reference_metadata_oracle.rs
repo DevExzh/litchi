@@ -183,7 +183,7 @@ fn assert_result(expected: &JsonValue, result: &value::Evaluated<'_>, case: &str
 #[test]
 fn reference_metadata_independent_oracle_matches_all_retained_rows() {
     let document: JsonValue = serde_json::from_str(include_str!(
-        "../../../docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/reference-metadata-goldens.json"
+        "../../../test-data/odf/formula-goldens/reference-metadata/reference-metadata-goldens.json"
     ))
     .expect("retained reference-metadata oracle JSON");
     let rows = document["observations"]

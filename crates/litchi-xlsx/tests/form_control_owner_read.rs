@@ -50,7 +50,7 @@ const ACTIVEX_NAMESPACE: &str = "http://schemas.microsoft.com/office/2006/active
 const ACTIVEX_DESCRIPTOR_MEMBER: &str = "xl/activeX/activeX1.xml";
 const NATIVE_CORPUS: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../docs/report/spec-gap-validation-evidence/xlsx-form-control-properties/native-corpus.json"
+    "/../../test-data/ooxml/xlsx/form-control-properties/native-corpus.json"
 ));
 
 /// Deterministically flips the source revision immediately before one version

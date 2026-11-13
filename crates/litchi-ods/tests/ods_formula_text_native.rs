@@ -252,7 +252,7 @@ fn assert_typed_value(
 #[test]
 fn selected_libreoffice_text_caches_match_literal_resolved_sources() {
     let source = include_str!(
-        "../../../docs/report/spec-gap-validation-evidence/ods-formula-text-functions/native/cached-results.json"
+        "../../../test-data/odf/formula-goldens/text-functions/native/cached-results.json"
     );
     let observations: serde_json::Value =
         serde_json::from_str(source).expect("cached observations");
@@ -398,7 +398,7 @@ fn selected_libreoffice_text_caches_match_literal_resolved_sources() {
 #[test]
 fn text_native_receipt_pins_sources_and_explicit_exclusions() {
     let source = include_str!(
-        "../../../docs/report/spec-gap-validation-evidence/ods-formula-text-functions/native/provenance.json"
+        "../../../test-data/odf/formula-goldens/text-functions/native/provenance.json"
     );
     let provenance: serde_json::Value = serde_json::from_str(source).expect("provenance receipt");
     assert_eq!(
@@ -463,7 +463,7 @@ fn text_native_receipt_pins_sources_and_explicit_exclusions() {
     );
 
     let selected_source = include_str!(
-        "../../../docs/report/spec-gap-validation-evidence/ods-formula-text-functions/native/cached-results.json"
+        "../../../test-data/odf/formula-goldens/text-functions/native/cached-results.json"
     );
     let selected: serde_json::Value =
         serde_json::from_str(selected_source).expect("selected cache");

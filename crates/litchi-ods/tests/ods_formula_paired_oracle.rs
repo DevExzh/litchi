@@ -230,7 +230,7 @@ fn compare_result(row: &JsonValue, result: Value<'_>) {
 
 fn compare_function(function: &str) {
     let document: JsonValue = serde_json::from_str(include_str!(
-        "../../../docs/report/spec-gap-validation-evidence/ods-formula-paired-statistics/numeric-goldens.json"
+        "../../../test-data/odf/formula-goldens/paired-statistics/numeric-goldens.json"
     ))
     .expect("retained independent paired-statistics oracle");
     let rows = document["observations"].as_array().expect("observations");

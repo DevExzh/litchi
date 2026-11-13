@@ -161,7 +161,7 @@ fn evaluate(source: &str, execution: &ExecutionContext) -> Result<Observed, Eval
 #[test]
 fn scalar_inspection_functions_match_independent_oracle() {
     let document: JsonValue = serde_json::from_str(include_str!(
-        "../../../docs/report/spec-gap-validation-evidence/ods-formula-value-inspection/inspection-goldens.json"
+        "../../../test-data/odf/formula-goldens/value-inspection/inspection-goldens.json"
     ))
     .expect("inspection oracle JSON");
     let declared_functions: std::collections::BTreeSet<_> = document["functions"]

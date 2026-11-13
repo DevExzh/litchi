@@ -240,7 +240,7 @@ fn compare(row: &JsonValue, result: Value<'_>, mode: Mode) {
 
 fn compare_function(function: &str) {
     let document: JsonValue = serde_json::from_str(include_str!(
-        "../../../docs/report/spec-gap-validation-evidence/ods-formula-text-functions/text-goldens.json"
+        "../../../test-data/odf/formula-goldens/text-functions/text-goldens.json"
     ))
     .expect("retained text oracle");
     assert_eq!(document["schema"], "litchi-ods-text-oracle-v1");

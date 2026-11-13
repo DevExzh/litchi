@@ -14,10 +14,9 @@ equals the original).
 - Upstream: LibreOffice core (<https://git.libreoffice.org/core>) at commit
   `d804d6aff49054bad1719ec3c2d136b545bbc7e7`; the source fixtures, their
   SHA-256 hashes, the converter receipt and the exclusions are in
-  `docs/report/spec-gap-validation-evidence/ods-formula-conditional-aggregates/native/provenance.json`,
-  and the extraction is `extract.py`/`reproduce.py` beside it.
+  `test-data/odf/formula-goldens/conditional-aggregates/native/provenance.json`.
 - License: MPL-2.0; the retained license text is
-  `docs/report/spec-gap-validation-evidence/ods-formula-conditional-aggregates/native/LICENSE-MPL-2.0.txt`.
+  `test-data/odf/formula-goldens/LICENSE-MPL-2.0.txt`.
 - `observations.json`: 352,876 bytes, SHA-256
   `a2c80e2295669bbef8c771e7623fa31d2d258eebbfd58052a2b55810c8256b3d`.
   Regenerate with `python3 compact.py <cached-results.json> > observations.json`.

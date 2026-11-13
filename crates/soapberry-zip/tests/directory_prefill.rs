@@ -21,12 +21,10 @@ use std::io;
 use soapberry_zip::office::{ArchiveLimits, IndexedArchive, StreamingArchiveWriter};
 use soapberry_zip::{ErrorKind, RECOMMENDED_BUFFER_SIZE, ReaderAt, ZipArchive, ZipLocator};
 
-const ZIP64_CENTRAL_LOCAL: &[u8] = include_bytes!(
-    "../../../docs/performance/results/change-0416/corpus/zip64-central-local-signed.zip"
-);
-const ZIP64_MANY_SMALL: &[u8] = include_bytes!(
-    "../../../docs/performance/results/change-0416/corpus/many-small-central-local-signed.zip"
-);
+const ZIP64_CENTRAL_LOCAL: &[u8] =
+    include_bytes!("../../../test-data/zip/python-zip64/zip64-central-local-signed.zip");
+const ZIP64_MANY_SMALL: &[u8] =
+    include_bytes!("../../../test-data/zip/python-zip64/many-small-central-local-signed.zip");
 
 /// A positional source that records every request it is asked to serve.
 #[derive(Debug)]

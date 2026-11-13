@@ -220,14 +220,14 @@ fn assert_steyx_host_deviation(
 #[test]
 fn selected_libreoffice_paired_statistics_caches_match_declared_host_deviation() {
     let source = include_str!(
-        "../../../docs/report/spec-gap-validation-evidence/ods-formula-paired-statistics/native/cached-results.json"
+        "../../../test-data/odf/formula-goldens/paired-statistics/native/cached-results.json"
     );
     let observations: serde_json::Value =
         serde_json::from_str(source).expect("cached observations");
     let rows = observations.as_array().expect("observation array");
     assert_eq!(rows.len(), 42);
     let proof_source = include_str!(
-        "../../../docs/report/spec-gap-validation-evidence/ods-formula-paired-statistics/native/steyx-deviation-proof.json"
+        "../../../test-data/odf/formula-goldens/paired-statistics/native/steyx-deviation-proof.json"
     );
     let proof: serde_json::Value = serde_json::from_str(proof_source).expect("STEYX proof");
     assert_eq!(proof["function"], "STEYX");
@@ -343,7 +343,7 @@ fn selected_libreoffice_paired_statistics_caches_match_declared_host_deviation()
 #[test]
 fn paired_statistics_native_receipt_pins_sources_and_exclusions() {
     let source = include_str!(
-        "../../../docs/report/spec-gap-validation-evidence/ods-formula-paired-statistics/native/provenance.json"
+        "../../../test-data/odf/formula-goldens/paired-statistics/native/provenance.json"
     );
     let provenance: serde_json::Value = serde_json::from_str(source).expect("provenance receipt");
     assert_eq!(
@@ -425,12 +425,12 @@ fn paired_statistics_native_receipt_pins_sources_and_exclusions() {
     );
 
     let selected_source = include_str!(
-        "../../../docs/report/spec-gap-validation-evidence/ods-formula-paired-statistics/native/cached-results.json"
+        "../../../test-data/odf/formula-goldens/paired-statistics/native/cached-results.json"
     );
     let selected: serde_json::Value =
         serde_json::from_str(selected_source).expect("selected cache");
     let proof_source = include_str!(
-        "../../../docs/report/spec-gap-validation-evidence/ods-formula-paired-statistics/native/steyx-deviation-proof.json"
+        "../../../test-data/odf/formula-goldens/paired-statistics/native/steyx-deviation-proof.json"
     );
     let proof: serde_json::Value = serde_json::from_str(proof_source).expect("STEYX proof");
     assert_eq!(proof["reference_hex"], "0x1.9a26885914f04p+0");

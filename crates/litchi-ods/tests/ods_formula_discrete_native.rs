@@ -166,7 +166,7 @@ fn numeric_result(value: Value<'_>, formula: &str) -> f64 {
 #[test]
 fn selected_libreoffice_discrete_caches_match_literal_resolved_sources() {
     let source = include_str!(
-        "../../../docs/report/spec-gap-validation-evidence/ods-formula-discrete-math/native/cached-results.json"
+        "../../../test-data/odf/formula-goldens/discrete-math/native/cached-results.json"
     );
     let observations: serde_json::Value =
         serde_json::from_str(source).expect("cached observations");
@@ -258,9 +258,8 @@ fn selected_libreoffice_discrete_caches_match_literal_resolved_sources() {
 
 #[test]
 fn discrete_native_receipt_keeps_variances_and_formula_cells_explicit() {
-    let source = include_str!(
-        "../../../docs/report/spec-gap-validation-evidence/ods-formula-discrete-math/native/provenance.json"
-    );
+    let source =
+        include_str!("../../../test-data/odf/formula-goldens/discrete-math/native/provenance.json");
     let provenance: serde_json::Value = serde_json::from_str(source).expect("provenance receipt");
     assert_eq!(
         provenance["commit"].as_str(),
@@ -305,7 +304,7 @@ fn discrete_native_receipt_keeps_variances_and_formula_cells_explicit() {
                 .contains("fractional LCM")
     }));
     let observations = serde_json::from_str::<serde_json::Value>(include_str!(
-        "../../../docs/report/spec-gap-validation-evidence/ods-formula-discrete-math/native/cached-results.json"
+        "../../../test-data/odf/formula-goldens/discrete-math/native/cached-results.json"
     ))
     .expect("cached observations");
     assert!(

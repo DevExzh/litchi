@@ -13,7 +13,7 @@ use litchi_ods::codec::formula::{
 #[test]
 fn selected_libreoffice_numeric_caches_match_the_scalar_profile() {
     let source = include_str!(
-        "../../../docs/report/spec-gap-validation-evidence/ods-formula-elementary-math/native/cached-results.json"
+        "../../../test-data/odf/formula-goldens/elementary-math/native/cached-results.json"
     );
     let observations: serde_json::Value =
         serde_json::from_str(source).expect("cached observations");

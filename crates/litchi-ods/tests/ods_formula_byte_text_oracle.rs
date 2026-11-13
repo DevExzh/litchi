@@ -9,8 +9,9 @@ use std::num::{NonZeroU64, NonZeroUsize};
 #[test]
 fn byte_functions_match_independent_utf8_boundary_oracle() {
     let document: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../docs/report/spec-gap-validation-evidence/ods-formula-byte-text-functions/byte-goldens.json"
-    )).expect("byte oracle");
+        "../../../test-data/odf/formula-goldens/byte-text-functions/byte-goldens.json"
+    ))
+    .expect("byte oracle");
     let rows = document["observations"].as_array().expect("observations");
     assert_eq!(rows.len(), 1376);
     check_rows(rows);
@@ -71,8 +72,9 @@ fn check_rows(rows: &[serde_json::Value]) {
 #[test]
 fn native_observations_preserve_the_documented_profile_divergences() {
     let rows: Vec<serde_json::Value> = serde_json::from_str(include_str!(
-        "../../../docs/report/spec-gap-validation-evidence/ods-formula-byte-text-functions/native/native-results.json"
-    )).expect("native observations");
+        "../../../test-data/odf/formula-goldens/byte-text-functions/native/native-results.json"
+    ))
+    .expect("native observations");
     assert_eq!(rows.len(), 19);
     let mut divergences = 0;
     let mut ascii_matches = 0;

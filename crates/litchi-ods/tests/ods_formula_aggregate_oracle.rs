@@ -57,7 +57,7 @@ impl Resolver for NoCells {
 #[test]
 fn seeded_binary64_aggregates_match_exact_rational_observations() {
     let document: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../docs/report/spec-gap-validation-evidence/ods-formula-aggregates/differential-goldens.json"
+        "../../../test-data/odf/formula-goldens/aggregates/differential-goldens.json"
     ))
     .expect("retained oracle JSON");
     let rows = document["observations"].as_array().expect("oracle rows");
@@ -111,7 +111,7 @@ fn seeded_binary64_aggregates_match_exact_rational_observations() {
 #[test]
 fn targeted_aggregate_cancellation_matches_retained_exact_rational_goldens() {
     let document: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../docs/report/spec-gap-validation-evidence/ods-formula-aggregates/numeric-goldens.json"
+        "../../../test-data/odf/formula-goldens/aggregates/numeric-goldens.json"
     ))
     .expect("retained targeted oracle JSON");
     let rows = document["observations"].as_array().expect("oracle rows");

@@ -310,7 +310,7 @@ fn conditional_native_receipt_keeps_profile_variances_and_converter_explicit() {
     let selected = observations();
     let rows = selected.as_array().expect("selected observation array");
     let source = include_str!(
-        "../../../docs/report/spec-gap-validation-evidence/ods-formula-conditional-aggregates/native/provenance.json"
+        "../../../test-data/odf/formula-goldens/conditional-aggregates/native/provenance.json"
     );
     let provenance: serde_json::Value = serde_json::from_str(source).expect("provenance receipt");
     assert_eq!(

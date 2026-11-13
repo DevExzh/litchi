@@ -23,7 +23,7 @@ use soapberry_zip::office::ArchiveReader;
 const CORE_NAMESPACE: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const NATIVE_CORPUS: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../docs/report/spec-gap-validation-evidence/xlsx-form-control-properties/native-corpus.json"
+    "/../../test-data/ooxml/xlsx/form-control-properties/native-corpus.json"
 ));
 
 fn empty_root() -> Vec<u8> {

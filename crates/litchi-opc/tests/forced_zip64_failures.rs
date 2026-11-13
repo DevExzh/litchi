@@ -29,9 +29,8 @@ use litchi_opc::{OpcError, PackURI, SourceBackedPackage, SourceLimitKind, Source
 use litchi_opc::{SourceCacheLimits, SourceReadPolicy};
 
 const TARGET_URI: &str = "/word/document.xml";
-const SOURCE_FIXTURE: &[u8] = include_bytes!(
-    "../../../docs/performance/results/change-0416/corpus/opc-local-only-signed.zip"
-);
+const SOURCE_FIXTURE: &[u8] =
+    include_bytes!("../../../test-data/zip/python-zip64/opc-local-only-signed.zip");
 const ZIP32_MAX: u32 = u32::MAX;
 const ZIP_LOCAL_SIGNATURE: u32 = 0x0403_4b50;
 const ZIP_CENTRAL_SIGNATURE: u32 = 0x0201_4b50;

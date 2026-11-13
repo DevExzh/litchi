@@ -24,41 +24,31 @@ use soapberry_zip::{CompressionMethod, PreservationIndex, RECOMMENDED_BUFFER_SIZ
 const ZIP32_MAX: u64 = u32::MAX as u64;
 const DESCRIPTOR_SIGNATURE: u32 = 0x0807_4b50;
 
-const ZIP32: &[u8] = include_bytes!(
-    "../../../docs/performance/results/change-0416/corpus/zip32-signed-store-deflate.zip"
-);
-const LOCAL_ONLY_SIGNED: &[u8] = include_bytes!(
-    "../../../docs/performance/results/change-0416/corpus/zip64-local-only-signed.zip"
-);
-const LOCAL_ONLY_UNSIGNED: &[u8] = include_bytes!(
-    "../../../docs/performance/results/change-0416/corpus/zip64-local-only-unsigned-crc-marker.zip"
-);
-const CENTRAL_LOCAL_SIGNED: &[u8] = include_bytes!(
-    "../../../docs/performance/results/change-0416/corpus/zip64-central-local-signed.zip"
-);
+const ZIP32: &[u8] =
+    include_bytes!("../../../test-data/zip/python-zip64/zip32-signed-store-deflate.zip");
+const LOCAL_ONLY_SIGNED: &[u8] =
+    include_bytes!("../../../test-data/zip/python-zip64/zip64-local-only-signed.zip");
+const LOCAL_ONLY_UNSIGNED: &[u8] =
+    include_bytes!("../../../test-data/zip/python-zip64/zip64-local-only-unsigned-crc-marker.zip");
+const CENTRAL_LOCAL_SIGNED: &[u8] =
+    include_bytes!("../../../test-data/zip/python-zip64/zip64-central-local-signed.zip");
 const SEEKABLE_LOCAL_ONLY: &[u8] = include_bytes!(
-    "../../../docs/performance/results/change-0416/corpus/zip64-local-only-seekable-no-descriptor.zip"
+    "../../../test-data/zip/python-zip64/zip64-local-only-seekable-no-descriptor.zip"
 );
-const MANY_SMALL: &[u8] = include_bytes!(
-    "../../../docs/performance/results/change-0416/corpus/many-small-local-only-signed.zip"
-);
-const MANY_SMALL_ZIP32: &[u8] = include_bytes!(
-    "../../../docs/performance/results/change-0416/corpus/many-small-zip32-signed.zip"
-);
-const MANY_SMALL_CENTRAL_LOCAL: &[u8] = include_bytes!(
-    "../../../docs/performance/results/change-0416/corpus/many-small-central-local-signed.zip"
-);
-const EMPTY_SIGNED: &[u8] = include_bytes!(
-    "../../../docs/performance/results/change-0416/corpus/zip64-local-only-empty-signed.zip"
-);
-const EMPTY_UNSIGNED: &[u8] = include_bytes!(
-    "../../../docs/performance/results/change-0416/corpus/zip64-local-only-empty-unsigned.zip"
-);
-const CENTRAL_LOCAL_ZIP32_TAIL: &[u8] = include_bytes!(
-    "../../../docs/performance/results/change-0416/corpus/zip64-central-local-zip32-tail-signed.zip"
-);
+const MANY_SMALL: &[u8] =
+    include_bytes!("../../../test-data/zip/python-zip64/many-small-local-only-signed.zip");
+const MANY_SMALL_ZIP32: &[u8] =
+    include_bytes!("../../../test-data/zip/python-zip64/many-small-zip32-signed.zip");
+const MANY_SMALL_CENTRAL_LOCAL: &[u8] =
+    include_bytes!("../../../test-data/zip/python-zip64/many-small-central-local-signed.zip");
+const EMPTY_SIGNED: &[u8] =
+    include_bytes!("../../../test-data/zip/python-zip64/zip64-local-only-empty-signed.zip");
+const EMPTY_UNSIGNED: &[u8] =
+    include_bytes!("../../../test-data/zip/python-zip64/zip64-local-only-empty-unsigned.zip");
+const CENTRAL_LOCAL_ZIP32_TAIL: &[u8] =
+    include_bytes!("../../../test-data/zip/python-zip64/zip64-central-local-zip32-tail-signed.zip");
 const MANY_SMALL_CENTRAL_LOCAL_ZIP32_TAIL: &[u8] = include_bytes!(
-    "../../../docs/performance/results/change-0416/corpus/many-small-central-local-zip32-tail-signed.zip"
+    "../../../test-data/zip/python-zip64/many-small-central-local-zip32-tail-signed.zip"
 );
 
 const STORE_PAYLOAD: &[u8] = b"stored payload with a deterministic ZIP descriptor\n";
