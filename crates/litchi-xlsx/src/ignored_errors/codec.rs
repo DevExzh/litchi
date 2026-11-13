@@ -39,6 +39,24 @@ enum Context {
     Extension,
 }
 
+/// How far the worksheet's single `ignoredErrors` collection has been read:
+///
+/// ```text
+/// Absent --ignoredErrors--> Entries
+/// Entries --ignoredError--> Entries        (repeatable)
+/// Entries --extLst--> Extensions           (only after at least one entry)
+/// ```
+///
+/// A second `ignoredErrors` is refused in `Entries` and `Extensions`. In
+/// `Extensions`, another `ignoredError` and a second `extLst` are refused.
+/// The phase never returns to `Absent` once the collection has closed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CollectionPhase {
+    Absent,
+    Entries,
+    Extensions,
+}
+
 struct Capture {
     depth: usize,
     writer: Writer<Vec<u8>>,
@@ -49,10 +67,8 @@ struct Parser {
     stack: Vec<Context>,
     collection: Option<IgnoredErrors>,
     capture: Option<Capture>,
-    seen_collection: bool,
-    seen_extension_list: bool,
     extension_list_start: usize,
-    collection_phase: u8,
+    collection_phase: CollectionPhase,
     retained_extension_bytes: usize,
     root_seen: bool,
     root_closed: bool,
@@ -77,10 +93,8 @@ pub fn parse_worksheet_ignored_errors(xml: &[u8]) -> Result<Option<IgnoredErrors
         stack: Vec::new(),
         collection: None,
         capture: None,
-        seen_collection: false,
-        seen_extension_list: false,
         extension_list_start: 0,
-        collection_phase: 0,
+        collection_phase: CollectionPhase::Absent,
         retained_extension_bytes: 0,
         root_seen: false,
         root_closed: false,
@@ -307,12 +321,11 @@ impl Parser {
     }
 
     fn begin_collection(&mut self, element: &BytesStart<'_>) -> Result<()> {
-        if self.seen_collection {
+        if self.collection_phase != CollectionPhase::Absent {
             return Err(invalid("duplicate worksheet ignoredErrors element"));
         }
         reject_attributes(element, "ignoredErrors")?;
-        self.seen_collection = true;
-        self.collection_phase = 0;
+        self.collection_phase = CollectionPhase::Entries;
         self.collection = Some(IgnoredErrors {
             entries: Vec::new(),
             extensions: Vec::new(),
@@ -337,7 +350,7 @@ impl Parser {
         decoder: Decoder,
         resolver: &NamespaceResolver,
     ) -> Result<()> {
-        if self.collection_phase != 0 {
+        if self.collection_phase == CollectionPhase::Extensions {
             return Err(invalid("ignoredError appears after ignoredErrors extLst"));
         }
         let collection = self
@@ -361,12 +374,11 @@ impl Parser {
         {
             return Err(invalid("ignoredErrors extLst appears before ignoredError"));
         }
-        if self.seen_extension_list {
+        if self.collection_phase == CollectionPhase::Extensions {
             return Err(invalid("duplicate ignoredErrors extLst"));
         }
         reject_attributes(element, "extLst")?;
-        self.seen_extension_list = true;
-        self.collection_phase = 1;
+        self.collection_phase = CollectionPhase::Extensions;
         self.extension_list_start = self
             .collection
             .as_ref()

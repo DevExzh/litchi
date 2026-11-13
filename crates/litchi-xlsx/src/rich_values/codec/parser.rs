@@ -125,6 +125,23 @@ pub fn parse_arrays(xml: &[u8]) -> Result<ArrayData> {
     Ok(value)
 }
 
+/// The last ordered child group a `FeaturePropertyBags` root accepted:
+///
+/// ```text
+/// Start --bagExt--> Start                  (repeatable)
+/// Start | Bags --bag--> Bags               (repeatable)
+/// any stage --extLst--> ExtensionList      (repeatable; the last one is kept)
+/// ```
+///
+/// No child is refused. A `bagExt` after the first `bag` or `extLst`, and a
+/// `bag` after an `extLst`, are retained as opaque children instead.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum BagsStage {
+    Start,
+    Bags,
+    ExtensionList,
+}
+
 /// Parse a `FeaturePropertyBags` part.
 pub fn parse_feature_property_bags(xml: &[u8]) -> Result<Bags> {
     let root = parse_document(xml)?;
@@ -137,20 +154,20 @@ pub fn parse_feature_property_bags(xml: &[u8]) -> Result<Bags> {
     let mut values = Vec::new();
     let mut extension_list = None;
     let mut opaque_values = Vec::new();
-    let mut stage = 0u8;
+    let mut stage = BagsStage::Start;
     for child in &root.children {
         match (child.namespace.as_str(), child.name.as_str()) {
-            (FEATURE_BAG, "bagExt") if stage == 0 => {
+            (FEATURE_BAG, "bagExt") if stage == BagsStage::Start => {
                 push_limit(&bag_extensions, MAX_CHILDREN, LimitKind::ExtensionItems)?;
                 bag_extensions.push(opaque(child)?);
             },
-            (FEATURE_BAG, "bag") if stage <= 1 => {
-                stage = 1;
+            (FEATURE_BAG, "bag") if stage <= BagsStage::Bags => {
+                stage = BagsStage::Bags;
                 push_limit(&values, MAX_CHILDREN, LimitKind::BagItems)?;
                 values.push(parse_bag(child)?);
             },
-            (SPREADSHEETML, "extLst") if stage <= 2 => {
-                stage = 2;
+            (SPREADSHEETML, "extLst") => {
+                stage = BagsStage::ExtensionList;
                 extension_list = Some(opaque(child)?);
             },
             _ => opaque_values.push(opaque(child)?),

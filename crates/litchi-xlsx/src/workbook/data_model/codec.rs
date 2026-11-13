@@ -1136,6 +1136,24 @@ fn decimal_len(value: u8) -> usize {
     }
 }
 
+/// The last child an `x15:dataModel` accepted, in schema order:
+///
+/// ```text
+/// Start --modelTables--> Tables --modelRelationships--> Relationships
+///       --extLst--> ExtensionList
+/// ```
+///
+/// Every later stage may also be entered directly from an earlier one. All
+/// three children are optional and none repeats: a child is only accepted
+/// while the stage is still before it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum DataModelStage {
+    Start,
+    Tables,
+    Relationships,
+    ExtensionList,
+}
+
 pub(crate) fn parse_data_model_node(root: &Node) -> Result<Definition> {
     require(root, X15, "dataModel")?;
     no_attributes(root, &[("", "minVersionLoad")])?;
@@ -1152,19 +1170,21 @@ pub(crate) fn parse_data_model_node(root: &Node) -> Result<Definition> {
     let mut tables = Vec::new();
     let mut relationships = Vec::new();
     let mut extension_list = None;
-    let mut stage = 0u8;
+    let mut stage = DataModelStage::Start;
     for child in &root.children {
         match child.name.as_str() {
-            "modelTables" if child.namespace == X15 && stage == 0 => {
-                stage = 1;
+            "modelTables" if child.namespace == X15 && stage < DataModelStage::Tables => {
+                stage = DataModelStage::Tables;
                 tables = parse_tables(child)?;
             },
-            "modelRelationships" if child.namespace == X15 && stage <= 1 => {
-                stage = 2;
+            "modelRelationships"
+                if child.namespace == X15 && stage < DataModelStage::Relationships =>
+            {
+                stage = DataModelStage::Relationships;
                 relationships = parse_relationships(child)?;
             },
-            "extLst" if child.namespace == X15 && stage <= 2 => {
-                stage = 3;
+            "extLst" if child.namespace == X15 && stage < DataModelStage::ExtensionList => {
+                stage = DataModelStage::ExtensionList;
                 let xml = child
                     .opaque
                     .as_ref()

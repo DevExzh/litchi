@@ -251,6 +251,42 @@ fn append_text(stack: &mut [XmlNode], value: &str) -> Result<()> {
     Ok(())
 }
 
+/// The last child a `queryTable` accepted, in schema order:
+///
+/// ```text
+/// Start --queryTableRefresh--> Refresh --extLst--> ExtensionList
+/// Start --extLst--> ExtensionList
+/// ```
+///
+/// Both children are optional and neither repeats: a child is refused once
+/// the phase has reached or passed it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum QueryTablePhase {
+    Start,
+    Refresh,
+    ExtensionList,
+}
+
+/// The last child a `queryTableRefresh` accepted, in schema order:
+///
+/// ```text
+/// Start --queryTableFields--> Fields --queryTableDeletedFields--> DeletedFields
+///       --sortState--> SortState --extLst--> ExtensionList
+/// ```
+///
+/// Every later phase may also be entered directly from an earlier one, and
+/// no child repeats: a child is refused once the phase has reached or passed
+/// it. `queryTableFields` is required, which is checked after the last
+/// child; the other three are optional.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum RefreshPhase {
+    Start,
+    Fields,
+    DeletedFields,
+    SortState,
+    ExtensionList,
+}
+
 fn parse_query_table_node(node: &XmlNode) -> Result<Table> {
     require_element(node, "queryTable")?;
     require_whitespace(node)?;
@@ -287,22 +323,22 @@ fn parse_query_table_node(node: &XmlNode) -> Result<Table> {
         .transpose()?;
     let mut refresh = None;
     let mut extension_list = None;
-    let mut phase = 0u8;
+    let mut phase = QueryTablePhase::Start;
     for child in &node.children {
         match child.local_name.as_str() {
             "queryTableRefresh" if is_core(child) => {
-                if phase != 0 || refresh.is_some() {
+                if phase >= QueryTablePhase::Refresh {
                     return Err(invalid("duplicate or out-of-order queryTableRefresh"));
                 }
                 refresh = Some(parse_refresh(child)?);
-                phase = 1;
+                phase = QueryTablePhase::Refresh;
             },
             "extLst" if is_core(child) => {
-                if phase > 1 || extension_list.is_some() {
+                if phase >= QueryTablePhase::ExtensionList {
                     return Err(invalid("duplicate or out-of-order queryTable extLst"));
                 }
                 extension_list = Some(parse_extension_list(child)?);
-                phase = 2;
+                phase = QueryTablePhase::ExtensionList;
             },
             _ => {
                 return Err(invalid(format!(
@@ -358,38 +394,38 @@ fn parse_refresh(node: &XmlNode) -> Result<Refresh> {
     let mut deleted_fields = None;
     let mut sort_state = None;
     let mut extension_list = None;
-    let mut phase = 0u8;
+    let mut phase = RefreshPhase::Start;
     for child in &node.children {
         match child.local_name.as_str() {
             "queryTableFields" if is_core(child) => {
-                if phase != 0 || fields.is_some() {
+                if phase >= RefreshPhase::Fields {
                     return Err(invalid("duplicate or out-of-order queryTableFields"));
                 }
                 fields = Some(parse_fields(child)?);
-                phase = 1;
+                phase = RefreshPhase::Fields;
             },
             "queryTableDeletedFields" if is_core(child) => {
-                if phase > 1 || deleted_fields.is_some() {
+                if phase >= RefreshPhase::DeletedFields {
                     return Err(invalid("duplicate or out-of-order queryTableDeletedFields"));
                 }
                 deleted_fields = Some(parse_deleted_fields(child)?);
-                phase = 2;
+                phase = RefreshPhase::DeletedFields;
             },
             "sortState" if is_core(child) => {
-                if phase > 2 || sort_state.is_some() {
+                if phase >= RefreshPhase::SortState {
                     return Err(invalid("duplicate or out-of-order query-table sortState"));
                 }
                 sort_state = Some(parse_sort_state(child)?);
-                phase = 3;
+                phase = RefreshPhase::SortState;
             },
             "extLst" if is_core(child) => {
-                if phase > 3 || extension_list.is_some() {
+                if phase >= RefreshPhase::ExtensionList {
                     return Err(invalid(
                         "duplicate or out-of-order queryTableRefresh extLst",
                     ));
                 }
                 extension_list = Some(parse_extension_list(child)?);
-                phase = 4;
+                phase = RefreshPhase::ExtensionList;
             },
             _ => {
                 return Err(invalid(format!(

@@ -859,6 +859,24 @@ impl NamespaceState {
     }
 }
 
+/// The last XML declaration attribute accepted, in the order XML requires:
+///
+/// ```text
+/// Start --version="1.0"--> Version --encoding (UTF-8)--> Encoding
+/// Version | Encoding --standalone (yes | no)--> Standalone
+/// ```
+///
+/// `version` is required, which is checked after the last attribute;
+/// `encoding` and `standalone` are optional. Any other attribute, value or
+/// order is refused.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DeclarationStage {
+    Start,
+    Version,
+    Encoding,
+    Standalone,
+}
+
 fn validate_declaration(declaration: &BytesDecl<'_>) -> Result<()> {
     let content = str::from_utf8(declaration.as_ref())
         .map_err(|error| invalid(format!("worksheet XML declaration is not UTF-8: {error}")))?;
@@ -866,7 +884,7 @@ fn validate_declaration(declaration: &BytesDecl<'_>) -> Result<()> {
         return Err(invalid("worksheet XML declaration is incomplete"));
     }
     let start = BytesStart::from_content(content, 3);
-    let mut state = 0u8;
+    let mut stage = DeclarationStage::Start;
     let mut attributes = 0usize;
     for attribute in start.checked_attributes() {
         let attribute = attribute
@@ -893,22 +911,33 @@ fn validate_declaration(declaration: &BytesDecl<'_>) -> Result<()> {
             ))
         })?;
         validate_xml_chars(value)?;
-        let next = match (state, key, value) {
-            (0, b"version", "1.0") => 1,
-            (1, b"encoding", value) if value.eq_ignore_ascii_case("UTF-8") => 2,
-            (1 | 2, b"standalone", "yes" | "no") => 3,
-            (0..=3, _, _) => {
+        stage = match (stage, key, value) {
+            (DeclarationStage::Start, b"version", "1.0") => DeclarationStage::Version,
+            (DeclarationStage::Version, b"encoding", value)
+                if value.eq_ignore_ascii_case("UTF-8") =>
+            {
+                DeclarationStage::Encoding
+            },
+            (
+                DeclarationStage::Version | DeclarationStage::Encoding,
+                b"standalone",
+                "yes" | "no",
+            ) => DeclarationStage::Standalone,
+            (
+                DeclarationStage::Start
+                | DeclarationStage::Version
+                | DeclarationStage::Encoding
+                | DeclarationStage::Standalone,
+                _,
+                _,
+            ) => {
                 return Err(invalid(
                     "worksheet XML declaration has a duplicate or out-of-order attribute",
                 ));
             },
-            _ => {
-                return Err(invalid("worksheet XML declaration is invalid"));
-            },
         };
-        state = next;
     }
-    if state == 0 {
+    if stage == DeclarationStage::Start {
         return Err(invalid("worksheet XML declaration is missing version"));
     }
     Ok(())

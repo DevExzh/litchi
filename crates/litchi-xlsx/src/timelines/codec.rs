@@ -24,6 +24,25 @@ fn parse_range(n: &Node) -> Result<Range> {
     empty(n)?;
     Range::new(required(n, "", "startDate")?, required(n, "", "endDate")?)
 }
+
+/// The last child an `x15:state` accepted, in schema order:
+///
+/// ```text
+/// Start --selection--> Selection --bounds--> Bounds --extLst--> ExtensionList
+/// Start --bounds--> Bounds
+/// ```
+///
+/// `selection` is optional and only accepted first. `bounds` is required,
+/// which is checked after the last child. `extLst` is optional and only
+/// accepted directly after `bounds`. No child repeats.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StateStage {
+    Start,
+    Selection,
+    Bounds,
+    ExtensionList,
+}
+
 fn parse_state(n: &Node) -> Result<State> {
     require(n, X15, "state")?;
     whitespace(n)?;
@@ -40,20 +59,22 @@ fn parse_state(n: &Node) -> Result<State> {
     let mut selection = None;
     let mut bounds = None;
     let mut extension_list = None;
-    let mut stage = 0;
+    let mut stage = StateStage::Start;
     for c in &n.children {
         match (c.namespace.as_str(), c.name.as_str()) {
-            (X15, "selection") if stage == 0 => {
+            (X15, "selection") if stage == StateStage::Start => {
                 selection = Some(parse_range(c)?);
-                stage = 1;
+                stage = StateStage::Selection;
             },
-            (X15, "bounds") if stage <= 1 && bounds.is_none() => {
+            (X15, "bounds") if matches!(stage, StateStage::Start | StateStage::Selection) => {
                 bounds = Some(parse_range(c)?);
-                stage = 2;
+                stage = StateStage::Bounds;
             },
-            (ns, "extLst") if stage == 2 && (ns == X15 || ns == SML || ns == STRICT_SML) => {
+            (ns, "extLst")
+                if stage == StateStage::Bounds && (ns == X15 || ns == SML || ns == STRICT_SML) =>
+            {
                 extension_list = Some(opaque_from_node(c)?);
-                stage = 3;
+                stage = StateStage::ExtensionList;
             },
             _ => return Err(invalid("invalid or out-of-order View state child")),
         }
@@ -245,6 +266,28 @@ pub fn parse_timeline_cache_definition(xml: &[u8]) -> Result<CacheDefinition> {
     parse_timeline_cache_definition_limited(xml, &litchi_opc::SourceLimits::default())
 }
 
+/// The last child an `x15:timelineCacheDefinition` accepted, in schema order:
+///
+/// ```text
+/// Start --pivotTables--> PivotTables --state--> State
+/// Start --state--> State
+/// State --timelinePivotFilter--> PivotFilter --extLst--> ExtensionList
+/// State --extLst--> ExtensionList
+/// ```
+///
+/// `pivotTables` is optional and only accepted first. `state` is required,
+/// which is checked after the last child. `timelinePivotFilter` is optional
+/// and only accepted directly after `state`; `extLst` is optional and
+/// accepted after `state` or `timelinePivotFilter`. No child repeats.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CacheStage {
+    Start,
+    PivotTables,
+    State,
+    PivotFilter,
+    ExtensionList,
+}
+
 fn parse_cache_root(root: Node) -> Result<CacheDefinition> {
     require(&root, X15, "timelineCacheDefinition")?;
     whitespace(&root)?;
@@ -256,31 +299,31 @@ fn parse_cache_root(root: Node) -> Result<CacheDefinition> {
     let mut state = None;
     let mut timeline_pivot_filter = None;
     let mut extension_list = None;
-    let mut stage = 0u8;
+    let mut stage = CacheStage::Start;
     for child in &root.children {
         match child.name.as_str() {
-            "pivotTables" if child.namespace == X15 && stage == 0 => {
-                stage = 1;
+            "pivotTables" if child.namespace == X15 && stage == CacheStage::Start => {
+                stage = CacheStage::PivotTables;
                 parse_pivot_tables(child, &mut pivot_tables)?;
             },
-            "state" if child.namespace == X15 && stage <= 1 && state.is_none() => {
-                stage = 2;
+            "state"
+                if child.namespace == X15
+                    && matches!(stage, CacheStage::Start | CacheStage::PivotTables) =>
+            {
+                stage = CacheStage::State;
                 state = Some(parse_state(child)?);
             },
-            "timelinePivotFilter"
-                if child.namespace == X15 && stage == 2 && timeline_pivot_filter.is_none() =>
-            {
-                stage = 3;
+            "timelinePivotFilter" if child.namespace == X15 && stage == CacheStage::State => {
+                stage = CacheStage::PivotFilter;
                 timeline_pivot_filter = Some(parse_timeline_pivot_filter(child)?);
             },
             "extLst"
                 if (child.namespace == X15
                     || child.namespace == SML
                     || child.namespace == STRICT_SML)
-                    && stage >= 2
-                    && extension_list.is_none() =>
+                    && matches!(stage, CacheStage::State | CacheStage::PivotFilter) =>
             {
-                stage = 4;
+                stage = CacheStage::ExtensionList;
                 extension_list = Some(opaque_from_node(child)?);
             },
             _ => {
