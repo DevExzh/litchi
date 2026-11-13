@@ -1746,9 +1746,63 @@ impl BncReferenceCounts {
     }
 }
 
+/// How the tile walk of [`BncReferenceVisitor`] is going.
+///
+/// - `Continue --row counted--> Continue`
+/// - `Continue --malformed row--> Invalid`: the codec keeps walking, so its
+///   own errors and the decode charge still come first; later rows are
+///   skipped.
+/// - `Continue --any other census error--> Failed`: the walk stops.
+/// - `Invalid | Failed --finish--> (consumed)`, with the outcome returned.
+#[derive(Debug, PartialEq, Eq)]
+enum BncVisitState {
+    Continue,
+    Invalid,
+    Failed(NativePopUpError),
+}
+
 struct BncReferenceVisitor<'a> {
     counts: &'a mut BncReferenceCounts,
-    failed: bool,
+    state: BncVisitState,
+}
+
+impl BncReferenceVisitor<'_> {
+    /// Record one row's census result. `Err` stops the codec walk; the cause
+    /// is kept in `state` for [`Self::finish`].
+    fn record(
+        &mut self,
+        result: Result<()>,
+    ) -> std::result::Result<(), storage_codec::DecodeError> {
+        match result {
+            Ok(()) => Ok(()),
+            Err(NativePopUpError::InvalidSource) => {
+                self.state = BncVisitState::Invalid;
+                Ok(())
+            },
+            Err(
+                error @ (NativePopUpError::Allocation
+                | NativePopUpError::UnsupportedDependency
+                | NativePopUpError::Limit { .. }
+                | NativePopUpError::CoreLimit { .. }
+                | NativePopUpError::Codec
+                | NativePopUpError::Archive),
+            ) => {
+                self.state = BncVisitState::Failed(error);
+                Err(storage_codec::DecodeError::allocation(1))
+            },
+        }
+    }
+
+    /// End the walk of one tile. `Err` is the failure that stopped it and
+    /// replaces the codec's result; `Ok(true)` is a malformed row, which the
+    /// caller reports after the codec's result and its charge.
+    fn finish(self) -> Result<bool> {
+        match self.state {
+            BncVisitState::Failed(error) => Err(error),
+            BncVisitState::Invalid => Ok(true),
+            BncVisitState::Continue => Ok(false),
+        }
+    }
 }
 
 impl storage_codec::StorageVisitor for BncReferenceVisitor<'_> {
@@ -1756,10 +1810,12 @@ impl storage_codec::StorageVisitor for BncReferenceVisitor<'_> {
         &mut self,
         row: storage_codec::TileRowInfoSnapshot<'_>,
     ) -> std::result::Result<(), storage_codec::DecodeError> {
-        if census_bnc_row(row, self.counts).is_err() {
-            self.failed = true;
+        match self.state {
+            BncVisitState::Continue => {},
+            BncVisitState::Invalid | BncVisitState::Failed(_) => return Ok(()),
         }
-        Ok(())
+        let result = census_bnc_row(row, self.counts);
+        self.record(result)
     }
 }
 
@@ -1788,18 +1844,19 @@ fn census_bnc_references(
         }
         let mut visitor = BncReferenceVisitor {
             counts: &mut counts,
-            failed: false,
+            state: BncVisitState::Continue,
         };
-        let (_, report) = storage_codec::decode_tile_with_visitor(
+        let decoded = storage_codec::decode_tile_with_visitor(
             &message.data,
             budget.residual_storage_options(&message.data),
             &mut visitor,
-        )
-        .map_err(map_storage_codec_error)?;
+        );
+        let invalid = visitor.finish()?;
+        let (_, report) = decoded.map_err(map_storage_codec_error)?;
         budget
             .charge_storage_decode_report(report, true, path)
             .map_err(map_budget_error)?;
-        if visitor.failed {
+        if invalid {
             return Err(NativePopUpError::InvalidSource);
         }
     }
@@ -3548,10 +3605,38 @@ fn hand_back_last_key(
 
 #[cfg(test)]
 mod tests {
+    use super::{BncReferenceCounts, BncReferenceVisitor, BncVisitState};
     use super::{
         BudgetError, BudgetLimitKind, NativeObjectIndex, NativeObjectIndexEntry, NativePopUpError,
         Path, PopUpMenuRewriteError, map_bnc_error, map_budget_error, sorted_index_work,
     };
+
+    #[test]
+    fn bnc_reference_visitor_stops_on_allocation_failure_and_reports_it() {
+        let mut counts = BncReferenceCounts::default();
+        let mut visitor = BncReferenceVisitor {
+            counts: &mut counts,
+            state: BncVisitState::Continue,
+        };
+        assert!(
+            visitor.record(Err(NativePopUpError::Allocation)).is_err(),
+            "an allocation failure must stop the codec walk"
+        );
+        assert_eq!(visitor.finish(), Err(NativePopUpError::Allocation));
+    }
+
+    #[test]
+    fn bnc_reference_visitor_keeps_walking_after_a_malformed_row() {
+        let mut counts = BncReferenceCounts::default();
+        let mut visitor = BncReferenceVisitor {
+            counts: &mut counts,
+            state: BncVisitState::Continue,
+        };
+        assert!(visitor.record(Ok(())).is_ok());
+        assert_eq!(visitor.state, BncVisitState::Continue);
+        assert!(visitor.record(Err(NativePopUpError::InvalidSource)).is_ok());
+        assert_eq!(visitor.finish(), Ok(true));
+    }
 
     #[test]
     fn native_limit_mapping_keeps_budget_payload() {
