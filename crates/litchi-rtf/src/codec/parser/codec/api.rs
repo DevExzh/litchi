@@ -1,8 +1,8 @@
 use super::{
     Bump, ColorTable, ControlWord, Cow, DrawingStoryCapture, FontTable, HashMap, HashSet,
-    MIN_BODY_BLOCK_RESERVE_SOURCE_BYTES, ParsedDocument, Parser, Range, RefCell, SmallVec,
-    SourceLimits, State, Token, control_symbol_text, disables_body_block_reservation,
-    initial_body_block_capacity,
+    HeaderItem, HeaderItems, MIN_BODY_BLOCK_RESERVE_SOURCE_BYTES, ParsedDocument, Parser, Range,
+    RefCell, SectionPhase, SmallVec, SourceLimits, State, Token, control_symbol_text,
+    disables_body_block_reservation, initial_body_block_capacity,
 };
 
 impl<'a> Parser<'a> {
@@ -52,11 +52,12 @@ impl<'a> Parser<'a> {
             pos: 0,
             states: vec![State::default()],
             font_table: RefCell::new(FontTable::new()),
-            saw_font_table: false,
+            header_items: HeaderItems::default(),
             file_table: None,
             unicode_alternate_depth: 0,
             color_table: RefCell::new(ColorTable::new()),
             blocks: Vec::new(),
+            flushed_body_text: false,
             body_block_capacity_hint: 0,
             arena,
             tables: Vec::new(),
@@ -82,11 +83,8 @@ impl<'a> Parser<'a> {
             form_field_text_bytes: 0,
             generator: None,
             revision_save_ids: Vec::new(),
-            saw_revision_save_table: false,
             revision_save_root: None,
-            saw_revision_save_root: false,
             xml_namespaces: Vec::new(),
-            saw_xml_namespace_table: false,
             xml_namespace_text_bytes: 0,
             custom_xml_tags: Vec::new(),
             open_custom_xml_tags: Vec::new(),
@@ -113,7 +111,6 @@ impl<'a> Parser<'a> {
             editable_region_spans: Vec::new(),
             next_editable_region_order: 0,
             protection_users: Vec::new(),
-            saw_protection_user_table: false,
             protection_user_text_bytes: 0,
             hyphenation: crate::DocumentHyphenation::default(),
             hyphenation_seen: 0,
@@ -127,10 +124,8 @@ impl<'a> Parser<'a> {
             kinsoku: crate::DocumentKinsoku::default(),
             xsl_transform: None,
             xsl_transform_usage: crate::DocumentXslTransformUsage::default(),
-            use_xsl_transform_seen: false,
             style_list_filter: None,
             style_sort_method: None,
-            style_sort_method_seen: false,
             save_preferences: crate::DocumentSavePreferences::default(),
             save_preferences_seen: 0,
             write_reservations: crate::DocumentWriteReservations::default(),
@@ -181,19 +176,15 @@ impl<'a> Parser<'a> {
             word_2003_compatibility: crate::DocumentWord2003Compatibility::default(),
             word_2003_compatibility_seen: 0,
             theme_data: None,
-            saw_theme_data: false,
             color_scheme_mapping: None,
-            saw_color_scheme_mapping: false,
             latent_styles: None,
             data_store: None,
-            saw_data_store: false,
             mail_merge: None,
             math_properties: None,
             default_tab_width_twips: None,
             language_defaults: crate::DocumentLanguageDefaults::default(),
             default_formatting: crate::DocumentDefaultFormatting::default(),
             default_font_selectors_seen: 0,
-            saw_info_group: false,
             document_direction: None,
             gutter_on_right: false,
             objects: Vec::new(),
@@ -205,18 +196,14 @@ impl<'a> Parser<'a> {
             navigation_entry_text_bytes: 0,
             generated_list_markers: Vec::new(),
             generated_list_marker_text_bytes: 0,
-            saw_user_properties: false,
             list_table: super::super::super::list::ListTable::new(),
-            saw_list_table: false,
             list_override_table: super::super::super::list::ListOverrideTable::new(),
-            saw_list_override_table: false,
             legacy_section_numbering: crate::LegacySectionNumbering::new(),
             legacy_paragraph_numbering: Vec::new(),
             paragraph_group_table: None,
             sections: Vec::new(),
             section_properties_active: false,
-            section_note_options_closed: false,
-            root_section_format_run: false,
+            section_phase: SectionPhase::Prefix { format_run: false },
             bookmarks: super::super::super::bookmark::BookmarkTable::new(),
             open_bookmarks: HashMap::new(),
             bookmark_spans: Vec::new(),
@@ -239,7 +226,6 @@ impl<'a> Parser<'a> {
             legacy_drawing_points: 0,
             shape_groups: Vec::new(),
             stylesheet: super::super::super::stylesheet::StyleSheet::new(),
-            saw_stylesheet: false,
             info: super::super::super::info::DocumentInfo::new(),
             annotations: Vec::new(),
             annotation_ranges: HashMap::new(),
@@ -257,7 +243,6 @@ impl<'a> Parser<'a> {
             current_note_separator_drawings: DrawingStoryCapture::default(),
             revisions: Vec::new(),
             revision_authors: Vec::new(),
-            saw_revision_table: false,
             revision_author_text_bytes: 0,
             revision_text_bytes: 0,
             current_header_footer: None,
@@ -600,7 +585,9 @@ impl<'a> Parser<'a> {
         let body_story_events = self.finalize_body_story_events()?;
         self.resolve_document_page_defaults();
 
-        let revision_save = if self.saw_revision_save_table || self.saw_revision_save_root {
+        let revision_save = if self.header_items.has(HeaderItem::RevisionSaveTable)
+            || self.header_items.has(HeaderItem::RevisionSaveRoot)
+        {
             Some(crate::RevisionSaveMetadata::new(
                 self.revision_save_ids,
                 self.revision_save_root,
@@ -625,7 +612,8 @@ impl<'a> Parser<'a> {
             .map(|data| crate::DocumentDataStore::new(Cow::Owned(data)))
             .transpose()?;
         let protection_user_table = self
-            .saw_protection_user_table
+            .header_items
+            .has(HeaderItem::ProtectionUserTable)
             .then(|| crate::ProtectionUserTable::new(self.protection_users))
             .transpose()?;
 
@@ -659,7 +647,7 @@ impl<'a> Parser<'a> {
             generator: self.generator,
             revision_save,
             xml_namespaces: self.xml_namespaces,
-            saw_xml_namespace_table: self.saw_xml_namespace_table,
+            saw_xml_namespace_table: self.header_items.has(HeaderItem::XmlNamespaceTable),
             custom_xml_tags: self.custom_xml_tags,
             smart_tags: self.smart_tags,
             unmatched_move_bookmarks: self.unmatched_move_bookmarks,

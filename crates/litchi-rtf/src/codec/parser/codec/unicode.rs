@@ -238,7 +238,7 @@ impl Parser<'_> {
                             crate::Error::MalformedDocument("RTF body text length overflow".into())
                         })?;
                 self.prepare_body_block_push()?;
-                self.blocks.push(block);
+                self.push_body_block(block);
                 self.append_revision_text(&state, allocated, start, self.body_text_len)?;
             }
 

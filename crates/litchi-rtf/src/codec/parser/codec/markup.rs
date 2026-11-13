@@ -41,6 +41,8 @@ fn require_body_markup(parser: &Parser<'_>, vocabulary: &str) -> crate::Result<(
     if state.destination != Destination::DocumentBody
         || state.in_table
         || state.table_nesting_level >= 2
+        // Shallower than a root child group, that is, directly in the root group;
+        // any deeper group is accepted.
         || parser.states.len() < 3
     {
         return Err(crate::Error::MalformedDocument(format!(

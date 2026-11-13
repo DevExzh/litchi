@@ -6,12 +6,7 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_paragraph_group_table(
         &mut self,
     ) -> crate::Result<crate::ParagraphGroupPropertyTable> {
-        if self.states.len() != 3
-            || self
-                .blocks
-                .iter()
-                .any(|block| !block.text.trim().is_empty())
-        {
+        if !self.in_root_child_group() || self.has_flushed_body_text() {
             return Err(crate::Error::MalformedDocument(
                 "RTF pgptbl must occur at document scope before body text".to_string(),
             ));
@@ -333,11 +328,8 @@ impl<'a> Parser<'a> {
         reason = "remaining variants share the same fallback by design"
     )]
     pub(super) fn parse_legacy_section_numbering_level(&mut self) -> crate::Result<()> {
-        let body_started = self
-            .blocks
-            .iter()
-            .any(|block| !block.text.trim().is_empty());
-        if self.states.len() != 3 {
+        let body_started = self.has_flushed_body_text();
+        if !self.in_root_child_group() {
             return Err(crate::Error::MalformedDocument(
                 "RTF pnseclvl destinations must occur at document scope before body text"
                     .to_string(),

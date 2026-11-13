@@ -4,8 +4,8 @@
     reason = "decoding steps deliberately rebind a working value as it is refined through the parse pipeline"
 )]
 use super::{
-    Alignment, CharacterType, ColorRef, ControlWord, Destination, FontRef, Formatting, Paragraph,
-    ParagraphFontAlignment, ParagraphFrame, ParagraphFrameHorizontalPosition,
+    Alignment, CharacterType, ColorRef, ControlWord, Destination, FontRef, Formatting, HeaderItem,
+    Paragraph, ParagraphFontAlignment, ParagraphFrame, ParagraphFrameHorizontalPosition,
     ParagraphFrameHorizontalReference, ParagraphFrameTextFlow, ParagraphFrameVerticalPosition,
     ParagraphFrameVerticalReference, ParagraphFrameWrap, ParagraphWrapping, Parser,
     RevisionMetadata, State, TextDirection, UnderlineStyle, animated_text,
@@ -120,7 +120,7 @@ impl Parser<'_> {
                 | ControlWord::StylesheetDefaultHighAnsiFont(_)
                 | ControlWord::StylesheetDefaultLowAnsiFont(_)
         ) {
-            if self.states.len() != 2 || self.section_note_options_closed {
+            if !self.at_root_group() || !self.section_prefix_open() {
                 return Err(crate::Error::MalformedDocument(
                     "RTF default-font selectors must occur in the root document header".to_string(),
                 ));
@@ -165,7 +165,7 @@ impl Parser<'_> {
             return Ok(());
         }
         if let ControlWord::DefaultTabWidth(parameter) = control {
-            if self.states.len() != 2 || self.section_note_options_closed {
+            if !self.at_root_group() || !self.section_prefix_open() {
                 return Err(crate::Error::MalformedDocument(
                     "RTF deftab must precede visible text at document root".to_string(),
                 ));
@@ -195,7 +195,7 @@ impl Parser<'_> {
             return Ok(());
         }
         if let ControlWord::KinsokuLanguage(parameter) = control {
-            if self.states.len() != 2 || self.section_note_options_closed {
+            if !self.at_root_group() || !self.section_prefix_open() {
                 return Err(crate::Error::MalformedDocument(
                     "RTF ksulang must precede visible text at document root".to_string(),
                 ));
@@ -223,7 +223,7 @@ impl Parser<'_> {
                 | ControlWord::DefaultSaveFormat(_)
                 | ControlWord::BoilerplateDocument(_)
         ) {
-            if self.states.len() != 2 || self.section_note_options_closed {
+            if !self.at_root_group() || !self.section_prefix_open() {
                 return Err(crate::Error::MalformedDocument(
                     "RTF file-setting flag must precede visible text at document root".to_string(),
                 ));
@@ -261,7 +261,7 @@ impl Parser<'_> {
             control,
             ControlWord::Word97CompatibilityMode(_) | ControlWord::PostScriptOverText(_)
         ) {
-            if self.states.len() != 2 || self.section_note_options_closed {
+            if !self.at_root_group() || !self.section_prefix_open() {
                 return Err(crate::Error::MalformedDocument(
                     "RTF output-setting flag must precede visible text at document root"
                         .to_string(),
@@ -302,7 +302,7 @@ impl Parser<'_> {
                 | ControlWord::ExpandJustification(_)
                 | ControlWord::LineBasedOnGrid(_)
         ) {
-            if self.states.len() != 2 || self.section_note_options_closed {
+            if !self.at_root_group() || !self.section_prefix_open() {
                 return Err(crate::Error::MalformedDocument(
                     "RTF rendering flag must precede visible text at document root".to_string(),
                 ));
@@ -356,7 +356,7 @@ impl Parser<'_> {
                 | ControlWord::AbstractNumberingCleanup(_)
                 | ControlWord::DocumentEventMask(_)
         ) {
-            if self.states.len() != 2 || self.section_note_options_closed {
+            if !self.at_root_group() || !self.section_prefix_open() {
                 return Err(crate::Error::MalformedDocument(
                     "RTF processing property must precede visible text at document root"
                         .to_string(),
@@ -428,7 +428,7 @@ impl Parser<'_> {
                 | ControlWord::DrawingGridHorizontalShow(_)
                 | ControlWord::DrawingGridVerticalShow(_)
         ) {
-            if self.states.len() != 2 || self.section_note_options_closed {
+            if !self.at_root_group() || !self.section_prefix_open() {
                 return Err(crate::Error::MalformedDocument(
                     "RTF drawing-grid property must precede visible text at document root"
                         .to_string(),
@@ -522,7 +522,7 @@ impl Parser<'_> {
                 | ControlWord::ParallelGutter(_)
                 | ControlWord::PrintTwoOnOne(_)
         ) {
-            if self.states.len() != 2 || self.section_note_options_closed {
+            if !self.at_root_group() || !self.section_prefix_open() {
                 return Err(crate::Error::MalformedDocument(
                     "RTF print-layout setting must precede visible text at document root"
                         .to_string(),
@@ -601,7 +601,7 @@ impl Parser<'_> {
                 | ControlWord::ThemeLanguageEastAsian(_)
                 | ControlWord::ThemeLanguageComplexScript(_)
         ) {
-            if self.states.len() != 2 || self.section_note_options_closed {
+            if !self.at_root_group() || !self.section_prefix_open() {
                 return Err(crate::Error::MalformedDocument(
                     "RTF theme language must precede visible text at document root".to_string(),
                 ));
@@ -645,7 +645,7 @@ impl Parser<'_> {
                 | ControlWord::SaveInvalidXml(_)
                 | ControlWord::ShowXmlErrors(_)
         ) {
-            if self.states.len() != 2 || self.section_note_options_closed {
+            if !self.at_root_group() || !self.section_prefix_open() {
                 return Err(crate::Error::MalformedDocument(
                     "RTF XML policy must precede visible text at document root".to_string(),
                 ));
@@ -699,7 +699,7 @@ impl Parser<'_> {
             control,
             ControlWord::DoNotEmbedSystemFonts(_) | ControlWord::DoNotEmbedLinguisticData(_)
         ) {
-            if self.states.len() != 2 || self.section_note_options_closed {
+            if !self.at_root_group() || !self.section_prefix_open() {
                 return Err(crate::Error::MalformedDocument(
                     "RTF embedding policy must precede visible text at document root".to_string(),
                 ));
@@ -743,7 +743,7 @@ impl Parser<'_> {
             control,
             ControlWord::TrackMoves(_) | ControlWord::TrackFormatting(_)
         ) {
-            if self.states.len() != 2 || self.section_note_options_closed {
+            if !self.at_root_group() || !self.section_prefix_open() {
                 return Err(crate::Error::MalformedDocument(
                     "RTF revision policy must precede visible text at document root".to_string(),
                 ));
@@ -784,7 +784,7 @@ impl Parser<'_> {
                 | ControlWord::UseNormalStyleForLists(_)
                 | ControlWord::UpdateStylesFromTemplate(_)
         ) {
-            if self.states.len() != 2 || self.section_note_options_closed {
+            if !self.at_root_group() || !self.section_prefix_open() {
                 return Err(crate::Error::MalformedDocument(
                     "RTF style policy must precede visible text at document root".to_string(),
                 ));
@@ -831,7 +831,7 @@ impl Parser<'_> {
                 | ControlWord::StyleRestrictionsBackwardCompatibility(_)
                 | ControlWord::AllowAutoFormatOverride(_)
         ) {
-            if self.states.len() != 2 || self.section_note_options_closed {
+            if !self.at_root_group() || !self.section_prefix_open() {
                 return Err(crate::Error::MalformedDocument(
                     "RTF style restriction must precede visible text at document root".to_string(),
                 ));
@@ -883,7 +883,7 @@ impl Parser<'_> {
                 | ControlWord::ReverseBookFold(_)
                 | ControlWord::BookFoldSheets(_)
         ) {
-            if self.states.len() != 2 || self.section_note_options_closed {
+            if !self.at_root_group() || !self.section_prefix_open() {
                 return Err(crate::Error::MalformedDocument(
                     "RTF booklet-printing property must precede visible text at document root"
                         .to_string(),
@@ -933,7 +933,7 @@ impl Parser<'_> {
             control,
             ControlWord::RemovePersonalInformation(_) | ControlWord::RemoveDateTimeInformation(_)
         ) {
-            if self.states.len() != 2 || self.section_note_options_closed {
+            if !self.at_root_group() || !self.section_prefix_open() {
                 return Err(crate::Error::MalformedDocument(
                     "RTF privacy policy must precede visible text at document root".to_string(),
                 ));
@@ -984,7 +984,7 @@ impl Parser<'_> {
                 | ControlWord::DoNotSplitRowsAroundFloatingTables(_)
                 | ControlWord::UseAnsiKerningPairs(_)
         ) {
-            if self.states.len() != 2 || self.section_note_options_closed {
+            if !self.at_root_group() || !self.section_prefix_open() {
                 return Err(crate::Error::MalformedDocument(
                     "RTF Word 2003 compatibility flag must precede visible text at document root"
                         .to_string(),
@@ -1098,7 +1098,7 @@ impl Parser<'_> {
                 | ControlWord::NoFeatureThrottle(_)
                 | ControlWord::ForceCompatibilityUpgrade(_)
         ) {
-            if self.states.len() != 2 || self.section_note_options_closed {
+            if !self.at_root_group() || !self.section_prefix_open() {
                 return Err(crate::Error::MalformedDocument(
                     "RTF compatibility policy must precede visible text at document root"
                         .to_string(),
@@ -1159,7 +1159,7 @@ impl Parser<'_> {
                 | ControlWord::UseAsianLineBreakingRules(_)
                 | ControlWord::CompressPunctuationAtLineStart(_)
         ) {
-            if self.states.len() != 2 || self.section_note_options_closed {
+            if !self.at_root_group() || !self.section_prefix_open() {
                 return Err(crate::Error::MalformedDocument(
                     "RTF Asian grid compatibility flag must precede visible text at document root"
                         .to_string(),
@@ -1219,7 +1219,7 @@ impl Parser<'_> {
                 | ControlWord::PreserveLastTabAlignment(_)
                 | ControlWord::UseWord95AutoSpacing(_)
         ) {
-            if self.states.len() != 2 || self.section_note_options_closed {
+            if !self.at_root_group() || !self.section_prefix_open() {
                 return Err(crate::Error::MalformedDocument(
                     "RTF legacy layout compatibility flag must precede visible text at document root"
                         .to_string(),
@@ -1277,7 +1277,7 @@ impl Parser<'_> {
                 | ControlWord::PreventAutofitGrowthIntoMargins(_)
                 | ControlWord::UseWord2003TableStyleRules(_)
         ) {
-            if self.states.len() != 2 || self.section_note_options_closed {
+            if !self.at_root_group() || !self.section_prefix_open() {
                 return Err(crate::Error::MalformedDocument(
                     "RTF table-layout compatibility flag must precede visible text at document root"
                         .to_string(),
@@ -1357,7 +1357,7 @@ impl Parser<'_> {
                 | ControlWord::DoNotTranslateBackslashToYen(_)
                 | ControlWord::LegacyAsianLineBreakingRules(_)
         ) {
-            if self.states.len() != 2 || self.section_note_options_closed {
+            if !self.at_root_group() || !self.section_prefix_open() {
                 return Err(crate::Error::MalformedDocument(
                     "RTF East Asian compatibility flag must precede visible text at document root"
                         .to_string(),
@@ -1422,7 +1422,7 @@ impl Parser<'_> {
                 | ControlWord::SuppressWordPerfectExtraLineSpacing(_)
                 | ControlWord::SuppressBottomPageExtraSpacing(_)
         ) {
-            if self.states.len() != 2 || self.section_note_options_closed {
+            if !self.at_root_group() || !self.section_prefix_open() {
                 return Err(crate::Error::MalformedDocument(
                     "RTF line-spacing compatibility flag must precede visible text at document root"
                         .to_string(),
@@ -1481,7 +1481,10 @@ impl Parser<'_> {
             return Ok(());
         }
         if matches!(control, ControlWord::FromText(_) | ControlWord::FromHtml(_)) {
-            if self.states.len() != 2 || self.section_note_options_closed || self.saw_font_table {
+            if !self.at_root_group()
+                || !self.section_prefix_open()
+                || self.header_items.has(HeaderItem::FontTable)
+            {
                 return Err(crate::Error::MalformedDocument(
                     "RTF document origin must occur in the header before font tables and visible text"
                         .to_string(),
@@ -1509,7 +1512,7 @@ impl Parser<'_> {
             return Ok(());
         }
         if let ControlWord::DocumentType(parameter) = control {
-            if self.states.len() != 2 || self.section_note_options_closed {
+            if !self.at_root_group() || !self.section_prefix_open() {
                 return Err(crate::Error::MalformedDocument(
                     "RTF document type must precede visible text at document root".to_string(),
                 ));
@@ -1528,7 +1531,7 @@ impl Parser<'_> {
             control,
             ControlWord::ReadOnlyRecommended(_) | ControlWord::SavePreviousPicture(_)
         ) {
-            if self.states.len() != 2 || self.section_note_options_closed {
+            if !self.at_root_group() || !self.section_prefix_open() {
                 return Err(crate::Error::MalformedDocument(
                     "RTF save preference must precede visible text at document root".to_string(),
                 ));
@@ -1565,12 +1568,12 @@ impl Parser<'_> {
             return Ok(());
         }
         if let ControlWord::StyleSortMethod(parameter) = control {
-            if self.states.len() != 2 || self.section_note_options_closed {
+            if !self.at_root_group() || !self.section_prefix_open() {
                 return Err(crate::Error::MalformedDocument(
                     "RTF style-sort method must precede visible text at document root".to_string(),
                 ));
             }
-            if self.style_sort_method_seen {
+            if self.header_items.has(HeaderItem::StyleSortMethod) {
                 return Err(crate::Error::MalformedDocument(
                     "duplicate RTF style-sort method document property".to_string(),
                 ));
@@ -1578,11 +1581,11 @@ impl Parser<'_> {
             self.style_sort_method = Some(crate::DocumentStyleSortMethod::from_rtf_value(
                 parameter.unwrap_or(1),
             )?);
-            self.style_sort_method_seen = true;
+            self.header_items.mark(HeaderItem::StyleSortMethod);
             return Ok(());
         }
         if let ControlWord::UseXslTransform(parameter) = control {
-            if self.states.len() != 2 || self.section_note_options_closed {
+            if !self.at_root_group() || !self.section_prefix_open() {
                 return Err(crate::Error::MalformedDocument(
                     "RTF usexform must precede visible text at document root".to_string(),
                 ));
@@ -1592,12 +1595,11 @@ impl Parser<'_> {
                     "RTF usexform must not have a numeric parameter".to_string(),
                 ));
             }
-            if self.use_xsl_transform_seen {
+            if !self.header_items.claim(HeaderItem::UseXslTransform) {
                 return Err(crate::Error::MalformedDocument(
                     "duplicate RTF usexform document property".to_string(),
                 ));
             }
-            self.use_xsl_transform_seen = true;
             self.xsl_transform_usage = crate::DocumentXslTransformUsage::Requested;
             return Ok(());
         }
@@ -1607,12 +1609,8 @@ impl Parser<'_> {
                 | ControlWord::HideReviewComments(_)
                 | ControlWord::HideReviewInsertionsAndDeletions(_)
         ) {
-            let at_root = self.states.len() == 2
-                && self
-                    .states
-                    .last()
-                    .is_some_and(|state| state.destination == Destination::DocumentBody);
-            if !at_root || self.section_note_options_closed {
+            let at_root = self.at_root_body();
+            if !at_root || !self.section_prefix_open() {
                 return Err(crate::Error::MalformedDocument(
                     "RTF review-display flags must precede visible text at document root"
                         .to_string(),
@@ -1629,12 +1627,8 @@ impl Parser<'_> {
                 | ControlWord::DocumentViewBackgroundShapes(_)
                 | ControlWord::DocumentViewNoPageBoundaries(_)
         ) {
-            let at_root = self.states.len() == 2
-                && self
-                    .states
-                    .last()
-                    .is_some_and(|state| state.destination == Destination::DocumentBody);
-            if !at_root || self.section_note_options_closed {
+            let at_root = self.at_root_body();
+            if !at_root || !self.section_prefix_open() {
                 return Err(crate::Error::MalformedDocument(
                     "RTF document-view controls must precede visible text at document root"
                         .to_string(),
@@ -1650,14 +1644,10 @@ impl Parser<'_> {
                 | ControlWord::HyphenationConsecutiveLines(_)
                 | ControlWord::HyphenationHotZone(_)
         ) {
-            let at_root = self.states.len() == 2
-                && self
-                    .states
-                    .last()
-                    .is_some_and(|state| state.destination == Destination::DocumentBody);
+            let at_root = self.at_root_body();
             // This flag closes as soon as visible body text (including pending text that has
             // not yet been flushed into a StyleBlock) enters the document stream.
-            let body_started = self.section_note_options_closed;
+            let body_started = !self.section_prefix_open();
             if !at_root || body_started {
                 return Err(crate::Error::MalformedDocument(
                     "RTF document hyphenation controls must precede visible text at document root"
@@ -1690,7 +1680,7 @@ impl Parser<'_> {
         }
         match control {
             ControlWord::RevisionSaveRoot(value) => {
-                if self.states.len() != 2 || self.saw_revision_save_root {
+                if !self.at_root_group() || self.header_items.has(HeaderItem::RevisionSaveRoot) {
                     return Err(crate::Error::MalformedDocument(
                         "RTF rsidroot must occur exactly once at document scope".to_string(),
                     ));
@@ -1705,7 +1695,7 @@ impl Parser<'_> {
                         "RTF revision root must be a positive signed integer".to_string(),
                     ));
                 }
-                self.saw_revision_save_root = true;
+                self.header_items.mark(HeaderItem::RevisionSaveRoot);
                 self.revision_save_root = Some(value);
                 return Ok(());
             },
@@ -1739,10 +1729,7 @@ impl Parser<'_> {
             | ControlWord::EndnoteRestart(_)
             | ControlWord::FootnoteNumbering(_)
             | ControlWord::EndnoteNumbering(_)) => {
-                if self.states.len() != 2
-                    || self.note_options_closed
-                    || self.blocks.iter().any(|block| !block.text.is_empty())
-                {
+                if !self.at_root_group() || !self.note_options_window_open() {
                     return Err(crate::Error::MalformedDocument(
                         "RTF note options must precede body text at document root".to_string(),
                     ));

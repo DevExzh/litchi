@@ -364,7 +364,10 @@ impl<'a> Parser<'a> {
     }
 
     pub(super) fn ensure_protection_scope(&self) -> crate::Result<()> {
-        if self.states.len() != 2 || self.body_text_len != 0 {
+        // Protection controls use their own test for "before body content": no
+        // body text has been counted yet. Table-cell text and deleted text are
+        // not counted, so the controls are still accepted after either.
+        if !self.at_root_group() || self.body_text_len != 0 {
             return Err(crate::Error::MalformedDocument(
                 "RTF document protection controls must occur in the root header".to_string(),
             ));

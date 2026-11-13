@@ -1620,13 +1620,17 @@ pub(crate) struct Parser<'a> {
     states: Vec<State>,
     /// Font table
     font_table: RefCell<FontTable<'a>>,
-    saw_font_table: bool,
+    /// Once-only header items already seen.
+    header_items: HeaderItems,
     file_table: Option<crate::FileTable<'a>>,
     unicode_alternate_depth: usize,
     /// Color table
     color_table: RefCell<ColorTable>,
-    /// Parsed style blocks
+    /// Parsed style blocks. Append-only: blocks are added through
+    /// `push_body_block` and never changed or removed while parsing.
     blocks: Vec<StyleBlock<'a>>,
+    /// Whether any block in `blocks` holds non-blank text.
+    flushed_body_text: bool,
     /// Bounded first-allocation hint derived during structural validation.
     body_block_capacity_hint: usize,
     /// Arena for temporary allocations
@@ -1663,11 +1667,8 @@ pub(crate) struct Parser<'a> {
     form_field_text_bytes: usize,
     generator: Option<crate::DocumentGenerator<'a>>,
     revision_save_ids: Vec<u32>,
-    saw_revision_save_table: bool,
     revision_save_root: Option<u32>,
-    saw_revision_save_root: bool,
     xml_namespaces: Vec<crate::XmlNamespace<'a>>,
-    saw_xml_namespace_table: bool,
     xml_namespace_text_bytes: usize,
     custom_xml_tags: Vec<crate::CustomXmlTag<'a>>,
     open_custom_xml_tags: Vec<OpenCustomXmlTag>,
@@ -1686,7 +1687,6 @@ pub(crate) struct Parser<'a> {
     editable_region_spans: Vec<EditableRegionSpan>,
     next_editable_region_order: usize,
     protection_users: Vec<crate::ProtectionUser<'a>>,
-    saw_protection_user_table: bool,
     protection_user_text_bytes: usize,
     hyphenation: crate::DocumentHyphenation,
     hyphenation_seen: u8,
@@ -1700,10 +1700,8 @@ pub(crate) struct Parser<'a> {
     kinsoku: crate::DocumentKinsoku<'a>,
     xsl_transform: Option<crate::DocumentXslTransform<'a>>,
     xsl_transform_usage: crate::DocumentXslTransformUsage,
-    use_xsl_transform_seen: bool,
     style_list_filter: Option<crate::DocumentStyleListFilter>,
     style_sort_method: Option<crate::DocumentStyleSortMethod>,
-    style_sort_method_seen: bool,
     save_preferences: crate::DocumentSavePreferences,
     save_preferences_seen: u8,
     write_reservations: crate::DocumentWriteReservations<'a>,
@@ -1754,19 +1752,15 @@ pub(crate) struct Parser<'a> {
     word_2003_compatibility: crate::DocumentWord2003Compatibility,
     word_2003_compatibility_seen: u16,
     theme_data: Option<Vec<u8>>,
-    saw_theme_data: bool,
     color_scheme_mapping: Option<Vec<u8>>,
-    saw_color_scheme_mapping: bool,
     latent_styles: Option<crate::LatentStyles<'a>>,
     data_store: Option<Vec<u8>>,
-    saw_data_store: bool,
     mail_merge: Option<crate::MailMerge<'a>>,
     math_properties: Option<crate::DocumentMathProperties>,
     default_tab_width_twips: Option<u32>,
     language_defaults: crate::DocumentLanguageDefaults,
     default_formatting: crate::DocumentDefaultFormatting,
     default_font_selectors_seen: u8,
-    saw_info_group: bool,
     document_direction: Option<TextDirection>,
     gutter_on_right: bool,
     /// Embedded and linked objects
@@ -1787,14 +1781,10 @@ pub(crate) struct Parser<'a> {
     generated_list_markers: Vec<crate::GeneratedListMarker<'a>>,
     /// Aggregate decoded generated-marker text.
     generated_list_marker_text_bytes: usize,
-    /// Whether the unique user-properties destination has been seen
-    saw_user_properties: bool,
     /// List table
     list_table: super::super::list::ListTable<'a>,
-    saw_list_table: bool,
     /// List override table
     list_override_table: super::super::list::ListOverrideTable,
-    saw_list_override_table: bool,
     legacy_section_numbering: crate::LegacySectionNumbering<'a>,
     legacy_paragraph_numbering: Vec<crate::LegacyParagraphNumbering<'a>>,
     paragraph_group_table: Option<crate::ParagraphGroupPropertyTable>,
@@ -1802,10 +1792,8 @@ pub(crate) struct Parser<'a> {
     sections: Vec<super::super::section::Section<'a>>,
     /// Whether section-specific properties are currently active.
     section_properties_active: bool,
-    /// Whether header/footer or body content has closed the active section-format prefix.
-    section_note_options_closed: bool,
-    /// Whether the root body is in an explicit late section-format run.
-    root_section_format_run: bool,
+    /// Where the parser is inside the current section of the root body.
+    section_phase: SectionPhase,
     /// Bookmarks
     bookmarks: super::super::bookmark::BookmarkTable<'a>,
     /// Open bookmark ranges, indexed by name.
@@ -1871,8 +1859,6 @@ pub(crate) struct Parser<'a> {
     shape_groups: Vec<super::super::shape::ShapeGroup<'a>>,
     /// Stylesheet
     stylesheet: super::super::stylesheet::StyleSheet<'a>,
-    /// Whether the unique root stylesheet destination was seen.
-    saw_stylesheet: bool,
     /// Document information
     info: super::super::info::DocumentInfo<'a>,
     /// Annotations
@@ -1889,6 +1875,8 @@ pub(crate) struct Parser<'a> {
     /// Footnotes and endnotes
     notes: Vec<super::super::section::Note<'a>>,
     note_options: crate::NoteOptions,
+    /// Whether a body event other than a `\u` character has been seen
+    /// anywhere in the document. Set once, never cleared.
     note_options_closed: bool,
     note_separators: crate::NoteSeparatorTable<'a>,
     current_note_separator_active: bool,
@@ -1898,8 +1886,6 @@ pub(crate) struct Parser<'a> {
     revisions: Vec<super::super::annotation::Revision<'a>>,
     /// Authors referenced by tracked-change author indices
     revision_authors: Vec<super::super::annotation::RevisionAuthor<'a>>,
-    /// Whether the unique revision-author table has been parsed.
-    saw_revision_table: bool,
     /// Aggregate decoded author-table text.
     revision_author_text_bytes: usize,
     /// Aggregate decoded tracked-change text.
@@ -1937,6 +1923,280 @@ pub(crate) struct Parser<'a> {
     current_note_text_tokens: Option<Range<usize>>,
     /// Source provenance of retained destination text stories.
     text_provenance: crate::model::provenance::TextProvenance,
+}
+
+/// Group scope of the parser position.
+///
+/// `states` holds one base entry plus one entry per open group, so the root
+/// `{\rtf1 ...}` group is two entries deep and a group opened directly in it
+/// is three deep. A destination handler runs after its own group was pushed,
+/// which is why root-level destinations test for the child depth while
+/// root-level control words test for the root depth.
+impl Parser<'_> {
+    /// Whether the position is directly in the root group.
+    #[inline]
+    fn at_root_group(&self) -> bool {
+        self.states.len() == 2
+    }
+
+    /// Whether the position is in a group opened directly in the root group.
+    #[inline]
+    fn in_root_child_group(&self) -> bool {
+        self.states.len() == 3
+    }
+
+    /// Whether the position is directly in the root group and that group is
+    /// still the document body, not a destination.
+    #[inline]
+    fn at_root_body(&self) -> bool {
+        self.at_root_group()
+            && self
+                .states
+                .last()
+                .is_some_and(|state| state.destination == Destination::DocumentBody)
+    }
+}
+
+/// A document-level header item that may occur at most once.
+///
+/// Each discriminant is the item's bit in [`HeaderItems`]. The placement
+/// rule and the error message of each item stay at its call site, because
+/// the items differ in scope, in their "before body content" test and in
+/// whether a duplicate and a misplaced item share one message.
+#[derive(Clone, Copy)]
+#[repr(u16)]
+enum HeaderItem {
+    /// `\fonttbl`
+    FontTable = 1 << 0,
+    /// `\stylesheet`
+    Stylesheet = 1 << 1,
+    /// `\info`
+    Info = 1 << 2,
+    /// `\listtable`
+    ListTable = 1 << 3,
+    /// `\listoverridetable`
+    ListOverrideTable = 1 << 4,
+    /// `\revtbl`
+    RevisionTable = 1 << 5,
+    /// `\rsidtbl`
+    RevisionSaveTable = 1 << 6,
+    /// `\rsidroot`
+    RevisionSaveRoot = 1 << 7,
+    /// `\xmlnstbl`
+    XmlNamespaceTable = 1 << 8,
+    /// `\protusertbl`
+    ProtectionUserTable = 1 << 9,
+    /// `\themedata`
+    ThemeData = 1 << 10,
+    /// `\colorschememapping`
+    ColorSchemeMapping = 1 << 11,
+    /// `\datastore`
+    DataStore = 1 << 12,
+    /// `\userprops`
+    UserProperties = 1 << 13,
+    /// `\stylesortmethod`
+    StyleSortMethod = 1 << 14,
+    /// `\usexform`
+    UseXslTransform = 1 << 15,
+}
+
+/// The set of once-only header items already seen.
+///
+/// An item is recorded when its destination or control word has passed its
+/// placement checks, and stays recorded for the rest of the document.
+#[derive(Clone, Copy, Default)]
+struct HeaderItems(u16);
+
+impl HeaderItems {
+    /// Whether `item` has been recorded.
+    fn has(self, item: HeaderItem) -> bool {
+        self.0 & item as u16 != 0
+    }
+
+    /// Record `item`.
+    fn mark(&mut self, item: HeaderItem) {
+        self.0 |= item as u16;
+    }
+
+    /// Record `item`; returns `false` when it was already recorded.
+    fn claim(&mut self, item: HeaderItem) -> bool {
+        let first = !self.has(item);
+        self.mark(item);
+        first
+    }
+}
+
+/// Where the parser is inside the current section of the root body.
+///
+/// `Prefix` is the header window of the section: no body event has been seen
+/// since the document start or the last `\sect`. Document-level header
+/// controls and section note options are accepted in it. `Content` follows
+/// the first body event.
+///
+/// `format_run` is a late section-format run: it starts at a `\sectd`
+/// directly in the root body, and section note options are accepted during
+/// it even in `Content`.
+///
+/// ```text
+/// Prefix { run: false }  --`\sectd` directly in the root body-->  Prefix { run: true }
+/// Content { run: false } --`\sectd` directly in the root body-->  Content { run: true }
+/// * { run: true }        --`\sbk` | child group opens at root-->  * { run: false }
+/// *                      --body event (see `BodyEvent`)-------->  Content { run: false }
+/// *                      --`\sect`----------------------------->  Prefix { run: false }
+/// ```
+///
+/// The document starts in `Prefix { run: false }`. Every event may repeat.
+/// `\sect` is the only way back from `Content` to `Prefix`.
+///
+/// Two inputs of the section-note-options check are not part of the phase:
+/// whether the current section already has a header or footer, and whether
+/// the current group opened with `\sectd` (kept on the group state).
+#[derive(Clone, Copy)]
+enum SectionPhase {
+    /// Before the first body event of the section.
+    Prefix { format_run: bool },
+    /// After the first body event of the section.
+    Content { format_run: bool },
+}
+
+impl SectionPhase {
+    /// The same phase with the late section-format run started or ended.
+    fn with_format_run(self, format_run: bool) -> Self {
+        match self {
+            Self::Prefix { .. } => Self::Prefix { format_run },
+            Self::Content { .. } => Self::Content { format_run },
+        }
+    }
+}
+
+/// Body-story content that ends the header window of the current section.
+///
+/// Blank text, paragraph breaks, tabs, fields and pictures are not body
+/// events: none of them closes a window.
+#[derive(Clone, Copy)]
+enum BodyEvent {
+    /// Non-blank text in a group whose destination is the document body, at
+    /// any group depth. Table-cell text and deleted-revision text count.
+    Text,
+    /// A `\u` character in a group whose destination is the document body,
+    /// at any group depth and whatever the character is.
+    UnicodeChar,
+    /// A soft page, column or line break in the main body story.
+    SoftBreak,
+    /// A `\page` break outside a table.
+    PageBreak,
+    /// A `\column` break outside a table.
+    ColumnBreak,
+}
+
+/// Transitions of the root-body header windows.
+///
+/// Document-level header controls and section note options are accepted
+/// only while a window is open. Every write to `section_phase` and to the
+/// document-wide note-options flag is in this block.
+///
+/// Header items do not share one "before body content" test. Each of the
+/// following is used by the items named and keeps its own formula, so an
+/// item accepted by one test may be rejected by another at the same
+/// position.
+///
+/// - `section_prefix_open`: document-level control words, property
+///   destinations such as `\windowcaption`, and `\defchp` / `\defpap`.
+///   Reopens after every `\sect`.
+/// - `note_options_window_open`: document note options (`\fet`,
+///   `\ftnbj`, ...). Not closed by a `\u` character; closed by any flushed
+///   text, blank text included.
+/// - `has_flushed_body_text`: the header tables (`\fonttbl`,
+///   `\stylesheet`, `\listtable`, `\listoverridetable`, `\filetbl`,
+///   `\pgptbl`, `\docvar`, `\pnseclvl`, note separators). Sees only
+///   non-blank text already flushed into a body block.
+/// - `root_body_started`: the `\passwordhash` destination, next to further
+///   table checks at its call site. Closed by any accepted body content,
+///   structural content included.
+/// - `body_text_len != 0` in `ensure_protection_scope`: protection
+///   controls.
+/// - The section-note-options check in `apply_section_control`: the section
+///   prefix, plus the current section's headers and footers, the late
+///   section-format run and a group that opens with `\sectd`.
+impl Parser<'_> {
+    /// Close the header window of the current section for `event`.
+    ///
+    /// Every event closes the section prefix and ends a late section-format
+    /// run. Every event except [`BodyEvent::UnicodeChar`] also closes the
+    /// document-wide note-options window, which never reopens. A `\u`
+    /// character leaves that window alone, so document note options are
+    /// still accepted after one whose text has not been flushed into a body
+    /// block (inside a table cell or a deleted revision).
+    #[inline]
+    fn on_body_event(&mut self, event: BodyEvent) {
+        match event {
+            BodyEvent::Text
+            | BodyEvent::SoftBreak
+            | BodyEvent::PageBreak
+            | BodyEvent::ColumnBreak => self.note_options_closed = true,
+            BodyEvent::UnicodeChar => {},
+        }
+        self.section_phase = SectionPhase::Content { format_run: false };
+    }
+
+    /// Reopen the section prefix at a `\sect` section break.
+    ///
+    /// The prefix is also what document-level header controls test, so they
+    /// are accepted again after a section break until the next body event.
+    /// The document-wide note-options window and the flushed body text are
+    /// not reset.
+    fn reopen_header_window_on_section_break(&mut self) {
+        self.section_phase = SectionPhase::Prefix { format_run: false };
+    }
+
+    /// Start a late section-format run at a `\sectd` directly in the root
+    /// body. Section note options are accepted during the run even when the
+    /// section prefix is closed.
+    fn start_root_section_format_run(&mut self) {
+        self.section_phase = self.section_phase.with_format_run(true);
+    }
+
+    /// End a late section-format run: at `\sbk`, and when a child group
+    /// opens directly in the root group.
+    fn end_root_section_format_run(&mut self) {
+        self.section_phase = self.section_phase.with_format_run(false);
+    }
+
+    /// Whether no body event has been seen in the current section. This is
+    /// the test document-level header controls use for "before body
+    /// content"; it is open again after every `\sect`.
+    #[inline]
+    fn section_prefix_open(&self) -> bool {
+        matches!(self.section_phase, SectionPhase::Prefix { .. })
+    }
+
+    /// Whether document-wide note options are still accepted: no body event
+    /// other than a `\u` character has been seen anywhere in the document
+    /// and no text, blank text included, has been flushed into a body
+    /// block. Unlike the section prefix this never reopens.
+    fn note_options_window_open(&self) -> bool {
+        !(self.note_options_closed || self.blocks.iter().any(|block| !block.text.is_empty()))
+    }
+
+    /// Whether non-blank text has been flushed into a body block. This is
+    /// the "before body text" test of the header tables. It does not see
+    /// table-cell text, deleted text, paragraph breaks, fields or pictures,
+    /// and it does not see text still pending in the current run, so a
+    /// header table directly after such content is accepted.
+    #[inline]
+    fn has_flushed_body_text(&self) -> bool {
+        self.flushed_body_text
+    }
+
+    /// Whether a late section-format run is active.
+    #[inline]
+    fn section_format_run_active(&self) -> bool {
+        match self.section_phase {
+            SectionPhase::Prefix { format_run } | SectionPhase::Content { format_run } => {
+                format_run
+            },
+        }
+    }
 }
 
 #[derive(Default)]

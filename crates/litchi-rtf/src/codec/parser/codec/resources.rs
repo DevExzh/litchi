@@ -5,18 +5,13 @@
 )]
 use super::{
     Color, ControlWord, Cow, DeferredText, EmbeddedFont, EmbeddedFontFormat, Font, FontCharset,
-    FontFamily, FontPage, FontPitch, FontRef, FontTheme, InfoTextField, InfoTimeField, Parser,
-    RtfEncoding, Token, control_symbol_text,
+    FontFamily, FontPage, FontPitch, FontRef, FontTheme, HeaderItem, InfoTextField, InfoTimeField,
+    Parser, RtfEncoding, Token, control_symbol_text,
 };
 
 impl<'a> Parser<'a> {
     pub(super) fn parse_file_table(&mut self) -> crate::Result<crate::FileTable<'a>> {
-        if self.states.len() != 3
-            || self
-                .blocks
-                .iter()
-                .any(|block| !block.text.trim().is_empty())
-        {
+        if !self.in_root_child_group() || self.has_flushed_body_text() {
             return Err(crate::Error::MalformedDocument(
                 "RTF filetbl must occur at document scope before body text".to_string(),
             ));
@@ -974,12 +969,11 @@ impl<'a> Parser<'a> {
         reason = "remaining variants share the same fallback by design"
     )]
     pub(super) fn parse_info(&mut self) -> crate::Result<()> {
-        if self.saw_info_group {
+        if !self.header_items.claim(HeaderItem::Info) {
             return Err(crate::Error::MalformedDocument(
                 "RTF contains multiple info groups".to_string(),
             ));
         }
-        self.saw_info_group = true;
         self.pos += 1; // `info`
         while self.pos < self.tokens.len() {
             match self.tokens.get(self.pos) {

@@ -348,11 +348,7 @@ impl Parser<'_> {
         {
             return Ok(true);
         }
-        let in_root_document_body = self.states.len() == 2
-            && self
-                .states
-                .last()
-                .is_some_and(|state| state.destination == Destination::DocumentBody);
+        let in_root_document_body = self.at_root_body();
 
         if matches!(
             control,
@@ -418,8 +414,7 @@ impl Parser<'_> {
             }
             self.current_state_mut()?.section_column_number = None;
             self.section_properties_active = false;
-            self.section_note_options_closed = false;
-            self.root_section_format_run = false;
+            self.reopen_header_window_on_section_break();
             return Ok(true);
         }
         let is_section_note_control = matches!(
@@ -437,20 +432,20 @@ impl Parser<'_> {
             return Ok(false);
         }
         if matches!(control, ControlWord::SectionDefault) && in_root_document_body {
-            self.root_section_format_run = true;
+            self.start_root_section_format_run();
         } else if matches!(control, ControlWord::SectionBreak) {
-            self.root_section_format_run = false;
+            self.end_root_section_format_run();
         }
         let in_visible_section_format = self.states.last().is_some_and(|state| {
             state.destination == Destination::DocumentBody && state.visible_section_format
         });
-        let in_root_section_prefix = self.states.len() == 2
-            && !self.section_note_options_closed
+        let in_root_section_prefix = self.at_root_group()
+            && self.section_prefix_open()
             && self
                 .sections
                 .last()
                 .is_none_or(|section| section.headers_footers.is_empty());
-        let in_root_section_format_run = in_root_document_body && self.root_section_format_run;
+        let in_root_section_format_run = in_root_document_body && self.section_format_run_active();
         if is_section_note_control
             && !in_root_section_prefix
             && !in_visible_section_format

@@ -1,5 +1,5 @@
 use super::{
-    ControlWord, Cow, Destination, FontCharset, FontRef, MAX_REVISIONS,
+    BodyEvent, ControlWord, Cow, Destination, FontCharset, FontRef, MAX_REVISIONS,
     MAX_TEXT_INTERMEDIATE_BYTES, ParsedBodyStoryEvent, Parser, RtfEncoding, SmallVec, State,
     StyleBlock, Token, append_transport_bytes, control_symbol_text, parser_classification_error,
     require_parameterless,
@@ -239,8 +239,7 @@ impl<'a> Parser<'a> {
                     .last()
                     .is_some_and(|state| state.destination == Destination::DocumentBody)
                 {
-                    self.section_note_options_closed = true;
-                    self.root_section_format_run = false;
+                    self.on_body_event(BodyEvent::UnicodeChar);
                 }
                 if !text_buffer.is_empty() {
                     self.flush_text_buffer(text_buffer)?;
@@ -478,9 +477,7 @@ impl<'a> Parser<'a> {
                         .is_some_and(|state| state.destination == Destination::DocumentBody)
                         && !text.trim().is_empty()
                     {
-                        self.note_options_closed = true;
-                        self.section_note_options_closed = true;
-                        self.root_section_format_run = false;
+                        self.on_body_event(BodyEvent::Text);
                     }
                     // Check if we're in a table
                     if self.current_state().is_ok_and(|s| {
@@ -562,7 +559,7 @@ impl<'a> Parser<'a> {
             crate::Error::MalformedDocument("RTF body text length overflow".to_string())
         })?;
         self.prepare_body_block_push()?;
-        self.blocks.push(block);
+        self.push_body_block(block);
         if !decoded_str.trim().is_empty() {
             self.current_state_mut()?.paragraph_content_started = true;
         }
@@ -773,7 +770,7 @@ impl<'a> Parser<'a> {
                 crate::Error::MalformedDocument("RTF body text length overflow".to_string())
             })?;
         self.prepare_body_block_push()?;
-        self.blocks.push(StyleBlock::new(
+        self.push_body_block(StyleBlock::new(
             Cow::Borrowed(arena_text),
             state.formatting,
             state.paragraph,
@@ -800,6 +797,16 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
+    /// Append a flushed body block, the only way `blocks` grows, and note
+    /// whether flushed body text is now non-blank.
+    #[inline]
+    pub(super) fn push_body_block(&mut self, block: StyleBlock<'a>) {
+        if !self.flushed_body_text && !block.text.trim().is_empty() {
+            self.flushed_body_text = true;
+        }
+        self.blocks.push(block);
+    }
+
     /// Record a nonrequired (soft) break marker in the body story.
     pub(super) fn record_soft_break(&mut self, kind: crate::SoftBreakKind) -> crate::Result<()> {
         let state = self.current_state()?;
@@ -808,9 +815,7 @@ impl<'a> Parser<'a> {
                 "RTF soft-break controls are supported only in the main body story".to_string(),
             ));
         }
-        self.note_options_closed = true;
-        self.section_note_options_closed = true;
-        self.root_section_format_run = false;
+        self.on_body_event(BodyEvent::SoftBreak);
         self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
             crate::BodyStoryEvent::SoftBreak(crate::SoftBreak::new(kind, self.body_text_len)),
         ));
@@ -840,9 +845,7 @@ impl<'a> Parser<'a> {
                     self.current_cell_text.len(),
                 )));
         } else {
-            self.note_options_closed = true;
-            self.section_note_options_closed = true;
-            self.root_section_format_run = false;
+            self.on_body_event(BodyEvent::PageBreak);
             self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
                 crate::BodyStoryEvent::PageBreak(crate::PageBreak::new(self.body_text_len)),
             ));
@@ -873,9 +876,7 @@ impl<'a> Parser<'a> {
                     self.current_cell_text.len(),
                 )));
         } else {
-            self.note_options_closed = true;
-            self.section_note_options_closed = true;
-            self.root_section_format_run = false;
+            self.on_body_event(BodyEvent::ColumnBreak);
             self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
                 crate::BodyStoryEvent::ColumnBreak(crate::ColumnBreak::new(self.body_text_len)),
             ));

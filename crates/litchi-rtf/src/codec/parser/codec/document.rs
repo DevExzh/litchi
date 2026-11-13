@@ -1,16 +1,15 @@
 use super::{
-    ControlWord, Cow, MAX_REVISION_AUTHOR_BYTES, Parser, Token, control_symbol_text,
+    ControlWord, Cow, HeaderItem, MAX_REVISION_AUTHOR_BYTES, Parser, Token, control_symbol_text,
     duplicate_mail_merge, nonnegative_mail_merge, set_mail_merge_text,
 };
 
 impl<'a> Parser<'a> {
     pub(super) fn parse_revision_table(&mut self) -> crate::Result<()> {
-        if self.saw_revision_table {
+        if !self.header_items.claim(HeaderItem::RevisionTable) {
             return Err(crate::Error::MalformedDocument(
                 "RTF contains multiple revision-author tables".to_string(),
             ));
         }
-        self.saw_revision_table = true;
         self.pos += 1; // `revtbl`
         let mut direct_text = String::new();
         let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
@@ -67,12 +66,11 @@ impl<'a> Parser<'a> {
     }
 
     pub(super) fn parse_revision_save_table(&mut self) -> crate::Result<()> {
-        if self.saw_revision_save_table {
+        if !self.header_items.claim(HeaderItem::RevisionSaveTable) {
             return Err(crate::Error::MalformedDocument(
                 "RTF contains multiple revision-save tables".to_string(),
             ));
         }
-        self.saw_revision_save_table = true;
         self.pos += 1; // rsidtbl
         while self.pos < self.tokens.len() {
             match self.tokens.get(self.pos) {

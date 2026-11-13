@@ -1,6 +1,7 @@
 use super::{
-    ControlWord, Destination, MAX_OBJECTS, MAX_SHAPE_GROUPS, MAX_SHAPES, ParsedBodyStoryEvent,
-    Parser, RootDrawingOwner, Token, parser_classification_error, require_parameterless,
+    ControlWord, Destination, HeaderItem, MAX_OBJECTS, MAX_SHAPE_GROUPS, MAX_SHAPES,
+    ParsedBodyStoryEvent, Parser, RootDrawingOwner, Token, parser_classification_error,
+    require_parameterless,
 };
 
 impl Parser<'_> {
@@ -10,7 +11,7 @@ impl Parser<'_> {
     /// occupy source order even when their text position is still zero.
     fn root_body_started(&self) -> bool {
         self.body_text_len != 0
-            || self.section_note_options_closed
+            || !self.section_prefix_open()
             || !self.body_story_events.is_empty()
             || !self.body_boundaries.is_empty()
             || self.body_paragraph_breaks != 0
@@ -102,20 +103,19 @@ impl Parser<'_> {
                     return Ok(true);
                 },
                 Token::Control(ControlWord::FontTable) => {
-                    let valid_scope = self.states.len() == 3
+                    // Four entries deep is a font table inside one alternative of a root
+                    // `\upr` group, the only place it is accepted below root-child depth.
+                    let valid_scope = self.in_root_child_group()
                         || (self.unicode_alternate_depth == 1 && self.states.len() == 4);
-                    if self.saw_font_table
+                    if self.header_items.has(HeaderItem::FontTable)
                         || !valid_scope
-                        || self
-                            .blocks
-                            .iter()
-                            .any(|block| !block.text.trim().is_empty())
+                        || self.has_flushed_body_text()
                     {
                         return Err(crate::Error::MalformedDocument(
                             "RTF font table must occur exactly once at document scope before body text".to_string(),
                         ));
                     }
-                    self.saw_font_table = true;
+                    self.header_items.mark(HeaderItem::FontTable);
                     // Mark this as font table destination
                     if let Some(state) = self.states.last_mut() {
                         state.destination = Destination::FontTable;
@@ -220,7 +220,7 @@ impl Parser<'_> {
                         self.tokens.get(self.pos + 1),
                         Some(Token::Control(ControlWord::PasswordHash))
                     ) {
-                        if self.states.len() != 3
+                        if !self.in_root_child_group()
                             || self.root_body_started()
                             || self.current_table.is_some()
                             || self.current_row.is_some()
@@ -589,7 +589,7 @@ impl Parser<'_> {
                             // single parsed representation.
                             let in_unicode_alternate = self.unicode_alternate_depth > 0;
                             if !in_unicode_alternate
-                                && (self.states.len() != 3 || self.section_note_options_closed)
+                                && (!self.in_root_child_group() || !self.section_prefix_open())
                             {
                                 return Err(crate::Error::MalformedDocument(
                                     "RTF kinsoku destinations must precede visible text at document root"
@@ -617,7 +617,7 @@ impl Parser<'_> {
                             return Ok(true);
                         },
                         Some(Token::Control(ControlWord::WindowCaption)) => {
-                            if self.states.len() != 3 || self.section_note_options_closed {
+                            if !self.in_root_child_group() || !self.section_prefix_open() {
                                 return Err(crate::Error::MalformedDocument(
                                     "RTF window caption must precede visible text at document root"
                                         .to_string(),
@@ -634,7 +634,7 @@ impl Parser<'_> {
                             return Ok(true);
                         },
                         Some(Token::Control(ControlWord::XslTransform)) => {
-                            if self.states.len() != 3 || self.section_note_options_closed {
+                            if !self.in_root_child_group() || !self.section_prefix_open() {
                                 return Err(crate::Error::MalformedDocument(
                                     "RTF XSL transform must precede visible text at document root"
                                         .to_string(),
@@ -650,7 +650,7 @@ impl Parser<'_> {
                             return Ok(true);
                         },
                         Some(Token::Control(ControlWord::StyleListFilter(parameter))) => {
-                            if self.states.len() != 3 || self.section_note_options_closed {
+                            if !self.in_root_child_group() || !self.section_prefix_open() {
                                 return Err(crate::Error::MalformedDocument(
                                     "RTF style-list filter must precede visible text at document root"
                                         .to_string(),
@@ -670,7 +670,7 @@ impl Parser<'_> {
                             control @ (ControlWord::WriteReservation(_)
                             | ControlWord::WriteReservationHash(_)),
                         )) => {
-                            if self.states.len() != 3 || self.section_note_options_closed {
+                            if !self.in_root_child_group() || !self.section_prefix_open() {
                                 return Err(crate::Error::MalformedDocument(
                                     "RTF write reservation must precede visible text at document root"
                                         .to_string(),
@@ -761,7 +761,7 @@ impl Parser<'_> {
                         Some(Token::Control(
                             control @ (ControlWord::NextFile | ControlWord::DocumentTemplate),
                         )) => {
-                            if self.states.len() != 3 || self.section_note_options_closed {
+                            if !self.in_root_child_group() || !self.section_prefix_open() {
                                 return Err(crate::Error::MalformedDocument(
                                     "RTF external document references must precede visible text at document root"
                                         .to_string(),
@@ -832,7 +832,7 @@ impl Parser<'_> {
                             | ControlWord::DocumentViewBackgroundShapes(_)
                             | ControlWord::DocumentViewNoPageBoundaries(_)),
                         )) => {
-                            if self.states.len() != 3 || self.section_note_options_closed {
+                            if !self.in_root_child_group() || !self.section_prefix_open() {
                                 return Err(crate::Error::MalformedDocument(
                                     "RTF document-view controls must precede visible text at document root"
                                         .to_string(),
@@ -852,12 +852,11 @@ impl Parser<'_> {
                             return Ok(true);
                         },
                         Some(Token::Control(ControlWord::ThemeData)) => {
-                            if self.saw_theme_data {
+                            if !self.header_items.claim(HeaderItem::ThemeData) {
                                 return Err(crate::Error::MalformedDocument(
                                     "RTF contains multiple theme-data destinations".to_string(),
                                 ));
                             }
-                            self.saw_theme_data = true;
                             self.theme_data = Some(self.parse_theme_hex_destination(
                                 ControlWord::ThemeData,
                                 crate::theme::MAX_THEME_DATA_BYTES,
@@ -866,12 +865,11 @@ impl Parser<'_> {
                             return Ok(true);
                         },
                         Some(Token::Control(ControlWord::ColorSchemeMapping)) => {
-                            if self.saw_color_scheme_mapping {
+                            if !self.header_items.claim(HeaderItem::ColorSchemeMapping) {
                                 return Err(crate::Error::MalformedDocument(
                                     "RTF contains multiple color-scheme mappings".to_string(),
                                 ));
                             }
-                            self.saw_color_scheme_mapping = true;
                             self.color_scheme_mapping = Some(self.parse_theme_hex_destination(
                                 ControlWord::ColorSchemeMapping,
                                 crate::theme::MAX_COLOR_SCHEME_MAPPING_BYTES,
@@ -905,12 +903,11 @@ impl Parser<'_> {
                             return Ok(true);
                         },
                         Some(Token::Control(ControlWord::DataStore)) => {
-                            if self.saw_data_store {
+                            if !self.header_items.claim(HeaderItem::DataStore) {
                                 return Err(crate::Error::MalformedDocument(
                                     "RTF contains multiple datastore destinations".to_string(),
                                 ));
                             }
-                            self.saw_data_store = true;
                             self.data_store = Some(self.parse_data_store_destination()?);
                             self.states.pop();
                             return Ok(true);
@@ -1016,7 +1013,7 @@ impl Parser<'_> {
                         },
                         Some(Token::Control(ControlWord::BackgroundDestination(parameter))) => {
                             require_parameterless(*parameter, "background")?;
-                            if self.states.len() != 3 || self.section_note_options_closed {
+                            if !self.in_root_child_group() || !self.section_prefix_open() {
                                 return Err(crate::Error::MalformedDocument(
                                     "RTF background destination must precede visible text at document root".to_string(),
                                 ));
@@ -1082,7 +1079,7 @@ impl Parser<'_> {
                     ));
                 },
                 Token::Control(ControlWord::WindowCaption) => {
-                    if self.states.len() != 3 || self.section_note_options_closed {
+                    if !self.in_root_child_group() || !self.section_prefix_open() {
                         return Err(crate::Error::MalformedDocument(
                             "RTF window caption must precede visible text at document root"
                                 .to_string(),

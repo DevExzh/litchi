@@ -1,5 +1,5 @@
 use super::{
-    ControlWord, Cow, DocumentVariable, MAX_DOCUMENT_VARIABLE_NAME_BYTES,
+    ControlWord, Cow, DocumentVariable, HeaderItem, MAX_DOCUMENT_VARIABLE_NAME_BYTES,
     MAX_DOCUMENT_VARIABLE_TEXT_BYTES, MAX_DOCUMENT_VARIABLE_VALUE_BYTES, MAX_DOCUMENT_VARIABLES,
     MAX_USER_PROPERTIES, MAX_USER_PROPERTY_NAME_BYTES, MAX_USER_PROPERTY_TEXT_BYTES,
     MAX_USER_PROPERTY_VALUE_BYTES, Mbcs, Parser, RtfEncoding, SmallVec, Token, UserProperty,
@@ -11,12 +11,7 @@ impl<'a> Parser<'a> {
         // The destination group is one level below the RTF root. Body text is
         // flushed before nested groups, so a nonzero body length also rejects
         // document variables that appear after body content has begun.
-        if self.states.len() != 3
-            || self
-                .blocks
-                .iter()
-                .any(|block| !block.text.trim().is_empty())
-        {
+        if !self.in_root_child_group() || self.has_flushed_body_text() {
             return Err(crate::Error::MalformedDocument(
                 "RTF docvar destination must occur in the root document header".to_string(),
             ));
@@ -59,12 +54,11 @@ impl<'a> Parser<'a> {
     }
 
     pub(super) fn parse_user_properties_destination(&mut self) -> crate::Result<()> {
-        if self.saw_user_properties {
+        if !self.header_items.claim(HeaderItem::UserProperties) {
             return Err(crate::Error::MalformedDocument(
                 "RTF document contains multiple userprops destinations".to_string(),
             ));
         }
-        self.saw_user_properties = true;
         self.pos += 2; // \* and \userprops
         loop {
             match self.tokens.get(self.pos) {

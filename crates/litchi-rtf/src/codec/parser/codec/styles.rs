@@ -1,19 +1,19 @@
 use super::{
     Alignment, CharacterType, ColorRef, ControlWord, Cow, DeferredText, Destination, FontRef,
-    Formatting, LatentStyleExceptionBuilder, MAX_LIST_LEVELS, MAX_LIST_TABS, MAX_LIST_TEXT_BYTES,
-    MAX_LISTS, MAX_PARAGRAPH_DROP_CAP_LINES, MAX_REVISION_AUTHOR_BYTES, MAX_REVISION_AUTHORS,
-    MAX_STYLE_NAME_BYTES, MAX_STYLES, MAX_TEXT_INTERMEDIATE_BYTES, Paragraph, ParagraphBorderSide,
-    ParagraphDropCap, ParagraphDropCapKind, ParagraphFontAlignment, ParagraphFrame,
-    ParagraphFrameHorizontalPosition, ParagraphFrameHorizontalReference, ParagraphFrameTextFlow,
-    ParagraphFrameVerticalPosition, ParagraphFrameVerticalReference, ParagraphFrameWrap,
-    ParagraphWrapping, Parser, SmallVec, State, TextDirection, Token, UnderlineStyle,
-    animated_text, append_transport_bytes, apply_associated_character_control, associated_font_ref,
-    character_grid, character_style_reference, character_type_selector, complex_script_selector,
-    control_symbol_text, emphasis_mark, fit_text, font_size, nonnegative_author_index,
-    paragraph_style_reference, parser_classification_error, require_parameterless,
-    required_list_spacing, required_paragraph_bool, required_paragraph_indent,
-    required_table_value, section_style_reference, strict_paragraph_selector,
-    strict_paragraph_toggle, table_style_reference,
+    Formatting, HeaderItem, LatentStyleExceptionBuilder, MAX_LIST_LEVELS, MAX_LIST_TABS,
+    MAX_LIST_TEXT_BYTES, MAX_LISTS, MAX_PARAGRAPH_DROP_CAP_LINES, MAX_REVISION_AUTHOR_BYTES,
+    MAX_REVISION_AUTHORS, MAX_STYLE_NAME_BYTES, MAX_STYLES, MAX_TEXT_INTERMEDIATE_BYTES, Paragraph,
+    ParagraphBorderSide, ParagraphDropCap, ParagraphDropCapKind, ParagraphFontAlignment,
+    ParagraphFrame, ParagraphFrameHorizontalPosition, ParagraphFrameHorizontalReference,
+    ParagraphFrameTextFlow, ParagraphFrameVerticalPosition, ParagraphFrameVerticalReference,
+    ParagraphFrameWrap, ParagraphWrapping, Parser, SmallVec, State, TextDirection, Token,
+    UnderlineStyle, animated_text, append_transport_bytes, apply_associated_character_control,
+    associated_font_ref, character_grid, character_style_reference, character_type_selector,
+    complex_script_selector, control_symbol_text, emphasis_mark, fit_text, font_size,
+    nonnegative_author_index, paragraph_style_reference, parser_classification_error,
+    require_parameterless, required_list_spacing, required_paragraph_bool,
+    required_paragraph_indent, required_table_value, section_style_reference,
+    strict_paragraph_selector, strict_paragraph_toggle, table_style_reference,
 };
 use std::mem::size_of;
 
@@ -505,12 +505,11 @@ impl<'a> Parser<'a> {
     }
 
     pub(super) fn parse_xml_namespace_table(&mut self) -> crate::Result<()> {
-        if self.saw_xml_namespace_table {
+        if !self.header_items.claim(HeaderItem::XmlNamespaceTable) {
             return Err(crate::Error::MalformedDocument(
                 "RTF contains multiple XML namespace tables".to_string(),
             ));
         }
-        self.saw_xml_namespace_table = true;
         self.pos += 1; // xmlnstbl
         loop {
             match self.tokens.get(self.pos) {
@@ -1010,12 +1009,11 @@ impl<'a> Parser<'a> {
     }
 
     pub(super) fn parse_protection_user_table(&mut self) -> crate::Result<()> {
-        if self.saw_protection_user_table {
+        if !self.header_items.claim(HeaderItem::ProtectionUserTable) {
             return Err(crate::Error::MalformedDocument(
                 "RTF contains multiple protection-user tables".to_string(),
             ));
         }
-        self.saw_protection_user_table = true;
         self.pos += 1; // protusertbl
         loop {
             match self.tokens.get(self.pos) {
@@ -1366,22 +1364,17 @@ impl<'a> Parser<'a> {
     }
 
     pub(super) fn parse_list_table(&mut self) -> crate::Result<()> {
-        if self.saw_list_table {
+        if self.header_items.has(HeaderItem::ListTable) {
             return Err(crate::Error::MalformedDocument(
                 "RTF document contains multiple list tables".to_string(),
             ));
         }
-        if self.states.len() != 3
-            || self
-                .blocks
-                .iter()
-                .any(|block| !block.text.trim().is_empty())
-        {
+        if !self.in_root_child_group() || self.has_flushed_body_text() {
             return Err(crate::Error::MalformedDocument(
                 "RTF list table must occur in the root header".to_string(),
             ));
         }
-        self.saw_list_table = true;
+        self.header_items.mark(HeaderItem::ListTable);
         self.pos += 1; // `listtable`
         while self.pos < self.tokens.len() {
             match self.tokens.get(self.pos) {
@@ -1884,23 +1877,20 @@ impl<'a> Parser<'a> {
     }
 
     pub(super) fn parse_list_override_table(&mut self) -> crate::Result<()> {
-        if self.saw_list_override_table {
+        if self.header_items.has(HeaderItem::ListOverrideTable) {
             return Err(crate::Error::MalformedDocument(
                 "RTF document contains multiple list override tables".to_string(),
             ));
         }
-        if !self.saw_list_table
-            || self.states.len() != 3
-            || self
-                .blocks
-                .iter()
-                .any(|block| !block.text.trim().is_empty())
+        if !self.header_items.has(HeaderItem::ListTable)
+            || !self.in_root_child_group()
+            || self.has_flushed_body_text()
         {
             return Err(crate::Error::MalformedDocument(
                 "RTF list override table must follow listtable in the root header".to_string(),
             ));
         }
-        self.saw_list_override_table = true;
+        self.header_items.mark(HeaderItem::ListOverrideTable);
         self.pos += 1; // `listoverridetable`
         while self.pos < self.tokens.len() {
             match self.tokens.get(self.pos) {
@@ -2219,8 +2209,8 @@ impl<'a> Parser<'a> {
         &mut self,
         kind: crate::DefaultFormattingDestination,
     ) -> crate::Result<()> {
-        if self.states.len() != 3
-            || self.section_note_options_closed
+        if !self.in_root_child_group()
+            || !self.section_prefix_open()
             || self
                 .states
                 .get(1)
@@ -2476,22 +2466,17 @@ impl<'a> Parser<'a> {
     }
 
     pub(super) fn parse_stylesheet(&mut self) -> crate::Result<()> {
-        if self.saw_stylesheet {
+        if self.header_items.has(HeaderItem::Stylesheet) {
             return Err(crate::Error::MalformedDocument(
                 "RTF document contains multiple stylesheet destinations".to_string(),
             ));
         }
-        if self.states.len() != 3
-            || self
-                .blocks
-                .iter()
-                .any(|block| !block.text.trim().is_empty())
-        {
+        if !self.in_root_child_group() || self.has_flushed_body_text() {
             return Err(crate::Error::MalformedDocument(
                 "RTF stylesheet must occur in the root document header".to_string(),
             ));
         }
-        self.saw_stylesheet = true;
+        self.header_items.mark(HeaderItem::Stylesheet);
         self.pos += 1; // `stylesheet`
         while self.pos < self.tokens.len() {
             match self.tokens.get(self.pos) {

@@ -39,6 +39,7 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::PasswordHash),
             ])
         );
+        // More than the base entry: any open group, the root group included.
         if self.states.len() > 1
             && !is_direct_password_hash
             && self.current_group_contains_password_hash()
@@ -68,8 +69,8 @@ impl<'a> Parser<'a> {
             ));
         }
 
-        if self.states.len() == 2 {
-            self.root_section_format_run = false;
+        if self.at_root_group() {
+            self.end_root_section_format_run();
         }
         let starts_visible_section_format = self
             .states
@@ -263,12 +264,7 @@ impl<'a> Parser<'a> {
         &mut self,
         kind: crate::NoteSeparatorKind,
     ) -> crate::Result<crate::NoteSeparator<'a>> {
-        if self.states.len() != 3
-            || self
-                .blocks
-                .iter()
-                .any(|block| !block.text.trim().is_empty())
-        {
+        if !self.in_root_child_group() || self.has_flushed_body_text() {
             return Err(crate::Error::MalformedDocument(
                 "RTF note separators must occur at document scope before body text".to_string(),
             ));
