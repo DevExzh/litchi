@@ -18,6 +18,7 @@
 use std::sync::Arc;
 
 use litchi_iwa_common::WireLimits;
+use litchi_iwa_common::comment::GENERATED_AUTHOR_NAME;
 use litchi_iwa_common::decode_varint_from_bytes;
 use litchi_iwa_common::wire::{self, WireView};
 use litchi_iwa_core::archive::{
@@ -287,7 +288,6 @@ const COMMENT_STORAGE_MESSAGE_TYPE: u32 = 3_056;
 const ANNOTATION_AUTHOR_MESSAGE_TYPE: u32 = 212;
 const ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE: u32 = 213;
 const COMMENT_LIST_TYPE: u64 = 10;
-const GENERATED_AUTHOR_NAME: &str = "litchi-iwa";
 const MAX_COMMENT_TEXT_BYTES: usize = 64 * 1024 * 1024;
 
 fn map_comment_decode_error(error: comment_codec::DecodeError) -> Fault {

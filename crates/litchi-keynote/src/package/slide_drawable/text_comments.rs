@@ -11,7 +11,7 @@
 //! Annotations are addressed by position (highlights and comments
 //! separately, in text order), replies by position within their comment.
 
-use litchi_iwa_common::comment::{AuthorId, Uuid};
+use litchi_iwa_common::comment::{AuthorId, GENERATED_AUTHOR_NAME, Uuid};
 use litchi_iwa_core::{ArchiveObject, FieldInfo, FieldPath, RawMessage, UnknownFieldRule};
 use litchi_iwa_protos::annotation_author_codec;
 use litchi_iwa_text::date_time::Instant;
@@ -31,7 +31,6 @@ use super::{Error, Refusal, Unsupported, lift};
 const STORAGE_MESSAGE_TYPE: u32 = 2_001;
 const AUTHOR_MESSAGE_TYPE: u32 = 212;
 const AUTHOR_STORAGE_MESSAGE_TYPE: u32 = 213;
-const AUTHOR_NAME: &str = "litchi-iwa";
 const AUTHOR_PUBLIC_ID: &str = "4C495443-4849-4957-8100-000000000001:058e44481db1c6fdeeac88af010136d7f8949f54bde61ef9af3e078562b968b6";
 
 /// One staged annotation change of one storage.
@@ -111,7 +110,7 @@ fn generated_author() -> Result<Vec<u8>, Error> {
     );
     let public_ids = [AUTHOR_PUBLIC_ID];
     let write = annotation_author_codec::AnnotationAuthorWrite::new(
-        Some(AUTHOR_NAME),
+        Some(GENERATED_AUTHOR_NAME),
         Some(color),
         Some(AUTHOR_PUBLIC_ID),
         Some(false),

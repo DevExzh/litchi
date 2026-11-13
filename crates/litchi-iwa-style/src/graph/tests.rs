@@ -116,6 +116,98 @@ fn registry_inspection_work_only_charges_an_uncached_state() {
 }
 
 #[test]
+fn replacing_the_registry_payload_directly_drops_the_cached_inspection() {
+    let source = components();
+    let mut workspace = Workspace::new(&source, Limits::default()).expect("workspace");
+    assert_eq!(workspace.last_object_identifier().expect("last"), Some(9));
+    assert_eq!(workspace.registry_inspection_work(), 0);
+
+    // last_object_identifier = 12, written through the generic object route
+    // rather than the registry setter.
+    workspace
+        .replace_payload(2, 0, vec![0x08, 0x0c])
+        .expect("replace");
+    assert!(workspace.registry_inspection_work() > 0);
+    assert_eq!(workspace.last_object_identifier().expect("last"), Some(12));
+}
+
+#[test]
+fn borrowing_the_registry_object_mutably_drops_the_cached_inspection() {
+    let source = components();
+    let mut workspace = Workspace::new(&source, Limits::default()).expect("workspace");
+    assert_eq!(workspace.last_object_identifier().expect("last"), Some(9));
+
+    workspace
+        .object_mut(2)
+        .expect("registry object")
+        .replace_message(
+            0,
+            RawMessage {
+                type_: 11_006,
+                data: vec![0x08, 0x0c],
+            },
+            Limits::default(),
+        )
+        .expect("replace");
+    assert_eq!(workspace.last_object_identifier().expect("last"), Some(12));
+
+    // Another object leaves the cached inspection alone.
+    workspace.object_mut(7).expect("other object");
+    assert_eq!(workspace.registry_inspection_work(), 0);
+}
+
+#[test]
+fn removing_the_registry_object_drops_the_cached_inspection() {
+    let source = components();
+    let mut workspace = Workspace::new(&source, Limits::default()).expect("workspace");
+    assert_eq!(workspace.last_object_identifier().expect("last"), Some(9));
+
+    workspace.remove(2).expect("removes the registry object");
+    assert!(workspace.last_object_identifier().is_err());
+}
+
+#[test]
+fn a_refused_member_leaves_the_object_index_unchanged() {
+    let source = components();
+    let mut workspace = Workspace::new(&source, Limits::default()).expect("workspace");
+
+    // Object 50 is new; object 7 already lives in the document component.
+    let reused = Archive {
+        objects: vec![object(50, 3, Vec::new()), object(7, 3, Vec::new())],
+    };
+    assert!(
+        workspace
+            .create_member("Index/New.iwa", reused, None)
+            .is_err()
+    );
+    assert!(workspace.object(7).is_ok());
+    assert!(workspace.object(50).is_err());
+    assert_eq!(workspace.max_object_identifier(), 7);
+
+    // An archive that repeats one of its own identifiers is refused whole.
+    let repeated = Archive {
+        objects: vec![object(60, 3, Vec::new()), object(60, 3, Vec::new())],
+    };
+    assert!(
+        workspace
+            .create_member("Index/New.iwa", repeated, None)
+            .is_err()
+    );
+    assert!(workspace.object(60).is_err());
+    assert_eq!(workspace.max_object_identifier(), 7);
+
+    // The refused name and identifiers stay usable.
+    let fresh = Archive {
+        objects: vec![object(50, 3, Vec::new())],
+    };
+    workspace
+        .create_member("Index/New.iwa", fresh, None)
+        .expect("creates the member");
+    assert!(workspace.object(50).is_ok());
+    assert_eq!(workspace.finish().insertions.len(), 1);
+}
+
+#[test]
 fn bounded_finish_admits_name_copies_before_materializing_changes() {
     let source = components();
     let mut workspace = Workspace::new(&source, Limits::default()).expect("workspace");

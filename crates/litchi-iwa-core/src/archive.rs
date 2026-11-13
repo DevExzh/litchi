@@ -102,19 +102,41 @@ struct SourceProvenance {
     headers: Box<[u8]>,
     original_len: usize,
     canonical_len: usize,
-    header_admission: Option<HeaderAdmission>,
-    archive_info_admission: Option<ArchiveInfoAdmission>,
-    admitted_message_bytes: Option<usize>,
-    admitted_metadata_items: Option<usize>,
+    admission: SourceAdmission,
+}
+
+/// What is known about the admission of a retained header.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SourceAdmission {
+    /// The parser admitted the header: its exact totals, and the message and
+    /// metadata limits they were admitted under.
+    Parsed {
+        header: HeaderAdmission,
+        archive_info: ArchiveInfoAdmission,
+        message_bytes: usize,
+        metadata_items: usize,
+    },
+    /// The header was rewritten, cloned or supplied without parsing; no
+    /// totals are retained and every validation walks it again.
+    NotRecorded,
+}
+
+impl SourceAdmission {
+    fn parsed(header: HeaderAdmission, archive_info: ArchiveInfoAdmission, limits: Limits) -> Self {
+        Self::Parsed {
+            header,
+            archive_info,
+            message_bytes: limits.max_message_bytes(),
+            metadata_items: limits.max_metadata_items(),
+        }
+    }
 }
 
 impl SourceProvenance {
     fn from_headers(
         original: &[u8],
         canonical: &[u8],
-        header_admission: Option<HeaderAdmission>,
-        archive_info_admission: Option<ArchiveInfoAdmission>,
-        limits: Option<Limits>,
+        admission: SourceAdmission,
     ) -> Result<Arc<Self>> {
         let total_len = original
             .len()
@@ -130,11 +152,16 @@ impl SourceProvenance {
             headers: headers.into_boxed_slice(),
             original_len: original.len(),
             canonical_len: canonical.len(),
-            header_admission,
-            archive_info_admission,
-            admitted_message_bytes: limits.map(|limits| limits.max_message_bytes()),
-            admitted_metadata_items: limits.map(|limits| limits.max_metadata_items()),
+            admission,
         }))
+    }
+
+    /// The parser's header totals, when the header was admitted by parsing.
+    fn header_admission(&self) -> Option<HeaderAdmission> {
+        match self.admission {
+            SourceAdmission::Parsed { header, .. } => Some(header),
+            SourceAdmission::NotRecorded => None,
+        }
     }
 
     fn original_header(&self) -> &[u8] {
@@ -162,7 +189,7 @@ fn retained_source_provenance(
     retain: bool,
 ) -> Result<Option<Arc<SourceProvenance>>> {
     retain
-        .then(|| SourceProvenance::from_headers(original, canonical, None, None, None))
+        .then(|| SourceProvenance::from_headers(original, canonical, SourceAdmission::NotRecorded))
         .transpose()
 }
 
@@ -2843,7 +2870,9 @@ impl ArchiveObject {
             data_length: 0,
             source_provenance: match (retained_header, retained_canonical) {
                 (Some(original), Some(canonical)) => Some(SourceProvenance::from_headers(
-                    &original, &canonical, None, None, None,
+                    &original,
+                    &canonical,
+                    SourceAdmission::NotRecorded,
                 )?),
                 (None, None) => None,
                 _ => unreachable!("retained header pair is constructed together"),
@@ -2907,7 +2936,7 @@ impl ArchiveObject {
     ) {
         self.source_provenance = match (original, canonical) {
             (Some(original), Some(canonical)) => Some(
-                SourceProvenance::from_headers(&original, &canonical, None, None, None)
+                SourceProvenance::from_headers(&original, &canonical, SourceAdmission::NotRecorded)
                     .expect("test source header allocation"),
             ),
             (None, None) => None,
@@ -2944,17 +2973,17 @@ impl ArchiveObject {
         let Some(provenance) = self.source_provenance.as_deref() else {
             return Ok(None);
         };
-        let Some(admission) = provenance.archive_info_admission else {
-            return Ok(None);
+        let (admission, message_bytes, metadata_items) = match provenance.admission {
+            SourceAdmission::Parsed {
+                archive_info,
+                message_bytes,
+                metadata_items,
+                ..
+            } => (archive_info, message_bytes, metadata_items),
+            SourceAdmission::NotRecorded => return Ok(None),
         };
-        if limits.max_message_bytes()
-            < provenance
-                .admitted_message_bytes
-                .expect("parsed source provenance has message limit")
-            || limits.max_metadata_items()
-                < provenance
-                    .admitted_metadata_items
-                    .expect("parsed source provenance has metadata limit")
+        if limits.max_message_bytes() < message_bytes
+            || limits.max_metadata_items() < metadata_items
         {
             return Ok(None);
         }
@@ -2984,7 +3013,7 @@ impl ArchiveObject {
                 limits,
                 self.source_provenance
                     .as_deref()
-                    .and_then(|provenance| provenance.header_admission),
+                    .and_then(SourceProvenance::header_admission),
             )?;
             header_length
         } else if self.source_header().is_some() {
@@ -3290,9 +3319,7 @@ impl ArchiveObject {
             Some(SourceProvenance::from_headers(
                 &rewritten_header,
                 &canonical_after,
-                None,
-                None,
-                None,
+                SourceAdmission::NotRecorded,
             )?)
         } else {
             None
@@ -3466,9 +3493,7 @@ impl ArchiveObject {
             Some(SourceProvenance::from_headers(
                 &rewritten_header,
                 &canonical_after,
-                None,
-                None,
-                None,
+                SourceAdmission::NotRecorded,
             )?)
         } else {
             None
@@ -4452,9 +4477,7 @@ impl Archive {
                     Some(SourceProvenance::from_headers(
                         header,
                         &canonical_header,
-                        Some(header_admission),
-                        Some(archive_info_admission),
-                        Some(limits),
+                        SourceAdmission::parsed(header_admission, archive_info_admission, limits),
                     )?)
                 }
             } else {
@@ -10057,7 +10080,7 @@ fn retained_header_length_for_object(
             object
                 .source_provenance
                 .as_deref()
-                .and_then(|provenance| provenance.header_admission),
+                .and_then(SourceProvenance::header_admission),
         )?;
         Ok((emitted_length, original.len()))
     } else {
@@ -10879,7 +10902,7 @@ where
                     object
                         .source_provenance
                         .as_deref()
-                        .and_then(|provenance| provenance.header_admission),
+                        .and_then(SourceProvenance::header_admission),
                 )?;
                 original
             },

@@ -21,6 +21,7 @@
 use std::collections::HashSet;
 use std::mem::size_of;
 
+use litchi_iwa_common::comment::GENERATED_AUTHOR_NAME;
 use litchi_iwa_common::{WireLimits, wire::WireView};
 use litchi_iwa_core::{
     Archive, ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence,
@@ -50,7 +51,6 @@ const TSK_ANNOTATION_AUTHOR_STORAGE_FIELD: u32 = 7;
 const REFERENCE_IDENTIFIER_FIELD: u32 = 1;
 
 const METADATA_COMPONENT: &str = "Index/Metadata.iwa";
-const GENERATED_AUTHOR_NAME: &str = "litchi-iwa";
 const GENERATED_AUTHOR_PUBLIC_ID: &str = "4C495443-4849-4957-8100-000000000001:058e44481db1c6fdeeac88af010136d7f8949f54bde61ef9af3e078562b968b6";
 
 /// Native UUID facts retained by an owned metadata plan.

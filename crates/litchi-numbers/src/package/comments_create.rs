@@ -12,6 +12,7 @@
 use std::sync::Arc;
 
 use litchi_iwa_archive::package::{EntryEdit, OwnedExactArtifacts};
+use litchi_iwa_common::comment::GENERATED_AUTHOR_NAME;
 use litchi_iwa_common::{
     WireLimits,
     wire::{
@@ -46,7 +47,6 @@ const COMMENT_STORAGE_MESSAGE_TYPE: u32 = 3_056;
 const COMMENT_LIST_TYPE: i32 = 10;
 const ANNOTATION_AUTHOR_MESSAGE_TYPE: u32 = 212;
 const ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE: u32 = 213;
-const GENERATED_AUTHOR_NAME: &str = "litchi-iwa";
 
 #[derive(Clone, Copy)]
 struct CreationGraph {

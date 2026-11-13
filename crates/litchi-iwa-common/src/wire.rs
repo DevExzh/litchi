@@ -846,8 +846,21 @@ pub struct RawWireFields<'source> {
     limits: RawWireLimits,
     fields: usize,
     work: usize,
-    input_checked: bool,
-    poisoned: Option<Error>,
+    state: RawScanState,
+}
+
+/// Lifecycle of a [`RawWireFields`] scan.
+///
+/// - `Unchecked --first call, before the input limit is checked--> Scanning`
+/// - `Scanning --any error, including the visitor's--> Poisoned`
+/// - `Poisoned` is terminal: every later call returns the stored error.
+///
+/// The end of the input is `Scanning` with the offset at the source length.
+#[derive(Debug)]
+enum RawScanState {
+    Unchecked,
+    Scanning,
+    Poisoned(Error),
 }
 
 impl<'source> RawWireFields<'source> {
@@ -859,8 +872,7 @@ impl<'source> RawWireFields<'source> {
             limits,
             fields: 0,
             work: 0,
-            input_checked: false,
-            poisoned: None,
+            state: RawScanState::Unchecked,
         }
     }
 
@@ -900,13 +912,14 @@ impl<'source> RawWireFields<'source> {
     where
         F: FnMut(RawWireField<'source>) -> Result<()>,
     {
-        if let Some(error) = &self.poisoned {
-            return Err(error.clone());
+        match &self.state {
+            RawScanState::Poisoned(error) => return Err(error.clone()),
+            RawScanState::Unchecked | RawScanState::Scanning => {},
         }
 
         let result = self.next_with_unpoisoned(&mut visitor);
         if let Err(error) = &result {
-            self.poisoned = Some(error.clone());
+            self.state = RawScanState::Poisoned(error.clone());
         }
         result
     }
@@ -943,10 +956,11 @@ impl<'source> RawWireFields<'source> {
     }
 
     fn ensure_input(&mut self) -> Result<()> {
-        if self.input_checked {
-            return Ok(());
+        match &self.state {
+            RawScanState::Unchecked => {},
+            RawScanState::Scanning | RawScanState::Poisoned(_) => return Ok(()),
         }
-        self.input_checked = true;
+        self.state = RawScanState::Scanning;
         if self.source.len() > self.limits.max_input_bytes() {
             return Err(Error::LimitExceeded {
                 kind: LimitKind::InputBytes,

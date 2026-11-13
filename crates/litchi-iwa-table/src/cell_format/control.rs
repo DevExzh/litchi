@@ -1118,10 +1118,25 @@ struct BncReferenceCensus<'budget> {
     number_secondaries: Vec<u32>,
     native_primary_formats: Vec<(u32, NativePrimaryFormatKind)>,
     controls: Vec<(u32, usize)>,
-    invalid: bool,
+    state: BncCensusState,
     budget: &'budget mut TransactionBudget,
     path: Path,
-    failure: Option<Error>,
+}
+
+/// Outcome of the tile walk a [`BncReferenceCensus`] is running.
+///
+/// - `Continue --malformed row or cell--> Invalid`: the codec keeps walking,
+///   every later row is skipped, and `finish_tile` reports
+///   `Error::InvalidSource` after it has mapped the codec result and charged
+///   the decode report.
+/// - `Continue --budget or allocation failure--> Failed`: the walk stops
+///   through the codec's allocation sentinel, and `finish_tile` returns the
+///   stored error before it looks at the codec result.
+/// - `Invalid | Failed --finish_tile--> Continue`, with the error returned.
+enum BncCensusState {
+    Continue,
+    Invalid,
+    Failed(Error),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1137,11 +1152,54 @@ impl<'budget> BncReferenceCensus<'budget> {
             number_secondaries: Vec::new(),
             native_primary_formats: Vec::new(),
             controls: Vec::new(),
-            invalid: false,
+            state: BncCensusState::Continue,
             budget,
             path,
-            failure: None,
         }
+    }
+
+    /// Mark the source malformed; the codec keeps walking.
+    fn invalidate(&mut self) -> Result<(), storage_codec::DecodeError> {
+        self.state = BncCensusState::Invalid;
+        Ok(())
+    }
+
+    /// Count one cell. `Ok(false)` means the cell is malformed and the row is
+    /// abandoned; `Err` stops the walk after recording the failure.
+    fn census_cell(&mut self, source: &[u8]) -> Result<bool, storage_codec::DecodeError> {
+        match self.count_cell(source) {
+            Ok(true) => Ok(true),
+            Ok(false) => {
+                self.state = BncCensusState::Invalid;
+                Ok(false)
+            },
+            Err(error) => {
+                self.state = BncCensusState::Failed(error);
+                Err(storage_codec::DecodeError::allocation(1))
+            },
+        }
+    }
+
+    /// Settle one decoded tile: a recorded failure first, then the codec
+    /// result and its charge, then a malformed row.
+    fn finish_tile(
+        &mut self,
+        decoded: Result<
+            (storage_codec::TileSnapshot, storage_codec::DecodeReport),
+            storage_codec::DecodeError,
+        >,
+    ) -> Result<(), Error> {
+        let invalid = match std::mem::replace(&mut self.state, BncCensusState::Continue) {
+            BncCensusState::Failed(error) => return Err(error),
+            BncCensusState::Invalid => true,
+            BncCensusState::Continue => false,
+        };
+        let (_, report) = decoded.map_err(|error| map_storage_error(error, self.path))?;
+        self.charge_storage_report(report)?;
+        if invalid {
+            return Err(Error::InvalidSource { path: self.path });
+        }
+        Ok(())
     }
 
     fn residual_storage_options(&self, source: &[u8]) -> storage_codec::DecodeOptions {
@@ -1198,8 +1256,9 @@ impl storage_codec::StorageVisitor for BncReferenceCensus<'_> {
         &mut self,
         row: storage_codec::TileRowInfoSnapshot<'_>,
     ) -> Result<(), storage_codec::DecodeError> {
-        if self.invalid {
-            return Ok(());
+        match self.state {
+            BncCensusState::Continue => {},
+            BncCensusState::Invalid | BncCensusState::Failed(_) => return Ok(()),
         }
         let storage = row
             .cell_storage_buffer()
@@ -1217,8 +1276,7 @@ impl storage_codec::StorageVisitor for BncReferenceCensus<'_> {
             // A row that declares no materialized cells cannot carry a hidden
             // BNC payload, regardless of whether its offset table is empty or
             // merely padded with missing-column sentinels.
-            self.invalid = true;
-            return Ok(());
+            return self.invalidate();
         }
         if offsets.is_empty() {
             match row.cell_count() {
@@ -1226,29 +1284,19 @@ impl storage_codec::StorageVisitor for BncReferenceCensus<'_> {
                     return Ok(());
                 },
                 1 => {
-                    if !self.count_cell(storage) {
-                        if self.failure.is_some() {
-                            return Err(storage_codec::DecodeError::allocation(1));
-                        }
-                        self.invalid = true;
-                    }
+                    self.census_cell(storage)?;
                     return Ok(());
                 },
-                _ => {
-                    self.invalid = true;
-                    return Ok(());
-                },
+                _ => return self.invalidate(),
             }
         }
         if !offsets.len().is_multiple_of(2) {
-            self.invalid = true;
-            return Ok(());
+            return self.invalidate();
         }
         let slot_count = offsets.len() / 2;
         let expected = usize::try_from(row.cell_count()).unwrap_or(usize::MAX);
         if expected > slot_count {
-            self.invalid = true;
-            return Ok(());
+            return self.invalidate();
         }
         let unit = if row.has_wide_offsets().unwrap_or(false) {
             4usize
@@ -1263,62 +1311,53 @@ impl storage_codec::StorageVisitor for BncReferenceCensus<'_> {
                 continue;
             }
             let Some(start) = usize::from(raw).checked_mul(unit) else {
-                self.invalid = true;
-                return Ok(());
+                return self.invalidate();
             };
             // Automatic/minimal BNC cells have an empty payload. Adjacent
             // materialized columns may therefore share one offset, including
             // an offset at the end of the packed buffer. Only decreasing or
             // out-of-range starts are structurally invalid.
             if start > storage.len() || previous.is_some_and(|prior| prior > start) {
-                self.invalid = true;
-                return Ok(());
+                return self.invalidate();
             }
             if let Some(prior) = previous {
-                if !self.count_cell(&storage[prior..start]) {
-                    if self.failure.is_some() {
-                        return Err(storage_codec::DecodeError::allocation(1));
-                    }
-                    self.invalid = true;
+                if !self.census_cell(&storage[prior..start])? {
                     return Ok(());
                 }
             }
             let Some(next) = occupied.checked_add(1) else {
-                self.invalid = true;
-                return Ok(());
+                return self.invalidate();
             };
             occupied = next;
             previous = Some(start);
         }
         if let Some(start) = previous {
-            if !self.count_cell(&storage[start..]) {
-                if self.failure.is_some() {
-                    return Err(storage_codec::DecodeError::allocation(1));
-                }
-                self.invalid = true;
+            if !self.census_cell(&storage[start..])? {
                 return Ok(());
             }
         }
         if occupied != expected {
-            self.invalid = true;
+            return self.invalidate();
         }
         Ok(())
     }
 }
 
 impl BncReferenceCensus<'_> {
-    fn count_cell(&mut self, source: &[u8]) -> bool {
+    /// Count the references of one cell. `Ok(false)` means the cell is
+    /// malformed; `Err` is a budget or allocation failure.
+    fn count_cell(&mut self, source: &[u8]) -> Result<bool, Error> {
         let Ok(cell) =
             BncCellView::parse(source, &crate::cell_format::bnc_limits_for_source(source))
         else {
-            return false;
+            return Ok(false);
         };
         if validate_bnc_format_metadata_kind(source, cell.cell_format_kind(), self.path).is_err() {
-            return false;
+            return Ok(false);
         }
         let native_primary = match validate_native_cell_metadata(&cell, self.path) {
             Ok(value) => value,
-            Err(_) => return false,
+            Err(_) => return Ok(false),
         };
         let format = cell.format_identifier();
         let control = cell.control_cell_spec_identifier();
@@ -1327,30 +1366,17 @@ impl BncReferenceCensus<'_> {
         // direction; interactive kind 5 is distinguished later by the strict
         // selected CellSpec, not merely by the presence of a format key.
         if format.is_none() && control.is_some() {
-            return false;
+            return Ok(false);
         }
         if let Some(identifier) = format {
-            match Self::increment(&mut self.formats, identifier, self.budget, self.path) {
-                Ok(true) => {},
-                Ok(false) => return false,
-                Err(error) => {
-                    self.failure = Some(error);
-                    return false;
-                },
+            if !Self::increment(&mut self.formats, identifier, self.budget, self.path)? {
+                return Ok(false);
             }
         }
         if let Some(identifier) = cell.secondary_format_identifier() {
-            if let Err(error) = self.record_number_secondary(identifier) {
-                self.failure = Some(error);
-                return false;
-            }
-            match Self::increment(&mut self.formats, identifier, self.budget, self.path) {
-                Ok(true) => {},
-                Ok(false) => return false,
-                Err(error) => {
-                    self.failure = Some(error);
-                    return false;
-                },
+            self.record_number_secondary(identifier)?;
+            if !Self::increment(&mut self.formats, identifier, self.budget, self.path)? {
+                return Ok(false);
             }
         } else if control.is_none()
             && cell.cell_format_kind() == Some(litchi_numbers_wire::TEXT_CELL_FORMAT_KIND)
@@ -1363,40 +1389,24 @@ impl BncReferenceCensus<'_> {
             let Ok(identifier) =
                 text_secondary_identifier_for_census_view(source, &cell, self.path)
             else {
-                return false;
+                return Ok(false);
             };
             if let Some(identifier) = identifier {
-                if let Err(error) = self.record_number_secondary(identifier) {
-                    self.failure = Some(error);
-                    return false;
-                }
-                match Self::increment(&mut self.formats, identifier, self.budget, self.path) {
-                    Ok(true) => {},
-                    Ok(false) => return false,
-                    Err(error) => {
-                        self.failure = Some(error);
-                        return false;
-                    },
+                self.record_number_secondary(identifier)?;
+                if !Self::increment(&mut self.formats, identifier, self.budget, self.path)? {
+                    return Ok(false);
                 }
             }
         }
         if let Some((identifier, kind)) = native_primary {
-            if let Err(error) = self.record_native_primary_format(identifier, kind) {
-                self.failure = Some(error);
-                return false;
-            }
+            self.record_native_primary_format(identifier, kind)?;
         }
         if let Some(identifier) = control {
-            match Self::increment(&mut self.controls, identifier, self.budget, self.path) {
-                Ok(true) => {},
-                Ok(false) => return false,
-                Err(error) => {
-                    self.failure = Some(error);
-                    return false;
-                },
+            if !Self::increment(&mut self.controls, identifier, self.budget, self.path)? {
+                return Ok(false);
             }
         }
-        true
+        Ok(true)
     }
 
     fn validate_number_format_target(
@@ -1493,10 +1503,22 @@ impl BncReferenceCensus<'_> {
 struct ListVisitor<'budget> {
     entries: Vec<ListEntry>,
     segments: usize,
-    invalid_shape: bool,
+    state: ListWalkState,
     budget: &'budget mut TransactionBudget,
     path: Path,
-    failure: Option<Error>,
+}
+
+/// Outcome of the list walk a [`ListVisitor`] is running.
+///
+/// - `Continue --entry without exactly one payload--> InvalidShape`: the
+///   walk goes on and still collects every entry.
+/// - `Continue | InvalidShape --budget or allocation failure--> Failed`: the
+///   walk stops through the codec's allocation sentinel, and `finish`
+///   returns the stored error before the caller looks at the codec result.
+enum ListWalkState {
+    Continue,
+    InvalidShape,
+    Failed(Error),
 }
 
 impl<'budget> ListVisitor<'budget> {
@@ -1504,20 +1526,28 @@ impl<'budget> ListVisitor<'budget> {
         Self {
             entries: Vec::new(),
             segments: 0,
-            invalid_shape: false,
+            state: ListWalkState::Continue,
             budget,
             path,
-            failure: None,
         }
     }
 
-    fn finish(self) -> (Vec<ListEntry>, usize, bool, Option<Error>) {
-        (
-            self.entries,
-            self.segments,
-            self.invalid_shape,
-            self.failure,
-        )
+    /// Stop the walk after preserving the precise package-layer reason; the
+    /// codec's allocation error is only a control-flow sentinel.
+    fn fail(&mut self, error: Error) -> Result<(), storage_codec::DecodeError> {
+        self.state = ListWalkState::Failed(error);
+        Err(storage_codec::DecodeError::allocation(1))
+    }
+
+    /// The entries, the segment count and whether an entry had an invalid
+    /// shape, or the failure that stopped the walk.
+    fn finish(self) -> Result<(Vec<ListEntry>, usize, bool), Error> {
+        let invalid_shape = match self.state {
+            ListWalkState::Failed(error) => return Err(error),
+            ListWalkState::InvalidShape => true,
+            ListWalkState::Continue => false,
+        };
+        Ok((self.entries, self.segments, invalid_shape))
     }
 }
 
@@ -1531,17 +1561,17 @@ impl storage_codec::StorageVisitor for ListVisitor<'_> {
             (Some(payload), None) => (Some(payload), true),
             (None, Some(payload)) => (Some(payload), false),
             _ => {
-                self.invalid_shape = true;
+                self.state = ListWalkState::InvalidShape;
                 (None, false)
             },
         };
         if let Err(error) = reserve_vec_slot(&mut self.entries, self.budget, self.path) {
-            return visitor_failure(&mut self.failure, error);
+            return self.fail(error);
         }
         let payload = match payload_source {
             Some(payload) => match copy_payload_with_budget(payload, self.budget, self.path) {
                 Ok(payload) => payload,
-                Err(error) => return visitor_failure(&mut self.failure, error),
+                Err(error) => return self.fail(error),
             },
             None => Vec::new(),
         };
@@ -1588,10 +1618,7 @@ fn list_facts_with_input(
     let options = budget.residual_storage_options(source);
     let mut visitor = ListVisitor::new(budget, path);
     let decoded = storage_codec::decode_table_data_list_with_visitor(source, options, &mut visitor);
-    let (entries, segments, invalid_shape, failure) = visitor.finish();
-    if let Some(error) = failure {
-        return Err(error);
-    }
+    let (entries, segments, invalid_shape) = visitor.finish()?;
     let (list, report) = decoded.map_err(|error| map_storage_error(error, path))?;
     if charge_input {
         charge_storage_report(budget, report, path)?;
@@ -2656,14 +2683,7 @@ pub fn validate_format_refcounts(
         let tile_options = census.residual_storage_options(tile_payload);
         let decoded =
             storage_codec::decode_tile_with_visitor(tile_payload, tile_options, &mut census);
-        if let Some(error) = census.failure {
-            return Err(error);
-        }
-        let (_, report) = decoded.map_err(|error| map_storage_error(error, path))?;
-        census.charge_storage_report(report)?;
-        if census.invalid {
-            return Err(Error::InvalidSource { path });
-        }
+        census.finish_tile(decoded)?;
     }
     census.validate_native_format_targets(formats)?;
     for entry in formats {
@@ -3007,14 +3027,7 @@ fn validate_refcounts(
         let tile_options = census.residual_storage_options(tile_payload);
         let decoded =
             storage_codec::decode_tile_with_visitor(tile_payload, tile_options, &mut census);
-        if let Some(error) = census.failure {
-            return Err(error);
-        }
-        let (_, report) = decoded.map_err(|error| map_storage_error(error, path))?;
-        census.charge_storage_report(report)?;
-        if census.invalid {
-            return Err(Error::InvalidSource { path });
-        }
+        census.finish_tile(decoded)?;
     }
     census.validate_native_format_targets(formats)?;
 

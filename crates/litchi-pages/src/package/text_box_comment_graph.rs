@@ -4,7 +4,7 @@
 //! as the host editor's `comments` module keeps them.
 
 use litchi_iwa_common::WireLimits;
-use litchi_iwa_common::comment::{AuthorId, Uuid};
+use litchi_iwa_common::comment::{AuthorId, GENERATED_AUTHOR_NAME, Uuid};
 use litchi_iwa_core::{ArchiveObject, FieldInfo, FieldPath, RawMessage, UnknownFieldRule};
 use litchi_iwa_text::date_time::Instant;
 use litchi_iwa_text_wire::annotation::{self as engine, COMMENT_STORAGE_MESSAGE_TYPE};
@@ -19,8 +19,8 @@ use super::text_box_structure::{
 const AUTHOR_MESSAGE_TYPE: u32 = 212;
 /// `TSK.AnnotationAuthorStorageArchive`.
 const AUTHOR_STORAGE_MESSAGE_TYPE: u32 = 213;
-/// The generated author's name and public identifier (the host editor's).
-const AUTHOR_NAME: &str = "litchi-iwa";
+/// The generated author's public identifier (the host editor's); its name is
+/// [`GENERATED_AUTHOR_NAME`].
 const AUTHOR_PUBLIC_ID: &str = "4C495443-4849-4957-8100-000000000001:058e44481db1c6fdeeac88af010136d7f8949f54bde61ef9af3e078562b968b6";
 const APPLE_EPOCH_UNIX_OFFSET_SECONDS: f64 = 978_307_200.0;
 
@@ -78,7 +78,7 @@ fn generated_author(public: bool) -> Vec<u8> {
         }
         out.extend_from_slice(payload);
     };
-    bytes(&mut output, 1, AUTHOR_NAME.as_bytes());
+    bytes(&mut output, 1, GENERATED_AUTHOR_NAME.as_bytes());
     bytes(&mut output, 2, &color);
     if public {
         bytes(&mut output, 3, AUTHOR_PUBLIC_ID.as_bytes());

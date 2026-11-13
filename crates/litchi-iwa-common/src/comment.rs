@@ -87,6 +87,13 @@ pub enum Error {
 /// Result type for comment-value validation.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Display name of the comment author the iWork writers generate when a
+/// package has no usable commenting author.
+///
+/// The name is persisted in written documents and is how a later edit finds
+/// the generated author again, so its value must never change.
+pub const GENERATED_AUTHOR_NAME: &str = "litchi-iwa";
+
 nonzero_id!(DrawableId, u64, NonZeroU64, "drawable");
 nonzero_id!(StorageId, u64, NonZeroU64, "comment-storage");
 nonzero_id!(AuthorId, u64, NonZeroU64, "comment-author");

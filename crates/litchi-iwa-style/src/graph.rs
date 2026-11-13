@@ -787,6 +787,17 @@ fn fingerprint_bytes(first: &mut u64, second: &mut u64, bytes: &[u8]) {
     }
 }
 
+/// A fact derived lazily from the current registry payload.
+///
+/// - `Unloaded --first read--> Loaded(fact)`; the fact is `None` when the
+///   package has no registry.
+/// - `Loaded --registry object borrowed mutably, replaced or removed-->
+///   Unloaded`, through [`Workspace::invalidate_registry_caches`] only.
+enum RegistryCacheState<T> {
+    Unloaded,
+    Loaded(Option<T>),
+}
+
 /// The staged state of one graph edit.
 pub struct Workspace<'s> {
     source: &'s dyn Components,
@@ -798,8 +809,8 @@ pub struct Workspace<'s> {
     ambiguous: HashSet<u64>,
     /// `(component, object, message)` of the registry payload.
     registry: Option<(usize, u64, usize)>,
-    registry_requirements: RefCell<Option<Option<registry_codec::RewriteReport>>>,
-    registry_root: RefCell<Option<Option<Root>>>,
+    registry_requirements: RefCell<RegistryCacheState<registry_codec::RewriteReport>>,
+    registry_root: RefCell<RegistryCacheState<Root>>,
     finish: FinishLedger,
     uuid_seed: u64,
     source_work: usize,
@@ -1129,8 +1140,8 @@ impl<'s> Workspace<'s> {
             index,
             ambiguous,
             registry,
-            registry_requirements: RefCell::new(None),
-            registry_root: RefCell::new(None),
+            registry_requirements: RefCell::new(RegistryCacheState::Unloaded),
+            registry_root: RefCell::new(RegistryCacheState::Unloaded),
             finish: FinishLedger::default(),
             uuid_seed: 0,
             source_work: 0,
@@ -1190,8 +1201,8 @@ impl<'s> Workspace<'s> {
             index,
             ambiguous,
             registry,
-            registry_requirements: RefCell::new(None),
-            registry_root: RefCell::new(None),
+            registry_requirements: RefCell::new(RegistryCacheState::Unloaded),
+            registry_root: RefCell::new(RegistryCacheState::Unloaded),
             finish: FinishLedger::default(),
             uuid_seed: 0,
             source_work,
@@ -1216,8 +1227,8 @@ impl<'s> Workspace<'s> {
             index: self.index.clone(),
             ambiguous: self.ambiguous.clone(),
             registry: self.registry,
-            registry_requirements: RefCell::new(None),
-            registry_root: RefCell::new(None),
+            registry_requirements: RefCell::new(RegistryCacheState::Unloaded),
+            registry_root: RefCell::new(RegistryCacheState::Unloaded),
             finish: self.finish,
             uuid_seed: self.uuid_seed,
             source_work: self.source_work,
@@ -1453,6 +1464,7 @@ impl<'s> Workspace<'s> {
     /// Mutably borrow object `identifier`, cloning its component first.
     pub(crate) fn object_mut(&mut self, identifier: u64) -> Result<&mut ArchiveObject> {
         let location = self.locate(identifier)?;
+        self.invalidate_registry_caches_for(identifier, location);
         self.archive_mut(location)?
             .object_mut(identifier)
             .ok_or(Error::MissingObject(identifier))
@@ -1528,6 +1540,7 @@ impl<'s> Workspace<'s> {
     /// Remove object `identifier` from its component.
     pub(crate) fn remove(&mut self, identifier: u64) -> Result<ArchiveObject> {
         let location = self.locate(identifier)?;
+        self.invalidate_registry_caches_for(identifier, location);
         let removed = self
             .archive_mut(location)?
             .remove_object(identifier)
@@ -1546,19 +1559,21 @@ impl<'s> Workspace<'s> {
         if self.has_member(name) {
             return Err(Error::Invalid("a new member name is taken"));
         }
-        let position = self.created.len();
+        // Check every identifier before the index changes, so a refused
+        // member leaves the workspace as it was.
+        let mut identifiers = HashSet::with_capacity(archive.objects.len());
         for object in &archive.objects {
             let identifier = object
                 .archive_info
                 .identifier
                 .ok_or(Error::Invalid("a new object has no identifier"))?;
-            if self
-                .index
-                .insert(identifier, Location::Created(position))
-                .is_some()
-            {
+            if self.index.contains_key(&identifier) || !identifiers.insert(identifier) {
                 return Err(Error::Invalid("a new object reuses an identifier"));
             }
+        }
+        let position = self.created.len();
+        for identifier in identifiers {
+            self.index.insert(identifier, Location::Created(position));
         }
         self.created.push(Insertion {
             name: name.to_owned(),
@@ -1654,9 +1669,25 @@ impl<'s> Workspace<'s> {
         ))
     }
 
+    /// Forget every fact derived from the registry payload. Each route that
+    /// can change that payload calls this before it does.
+    fn invalidate_registry_caches(&mut self) {
+        *self.registry_requirements.get_mut() = RegistryCacheState::Unloaded;
+        *self.registry_root.get_mut() = RegistryCacheState::Unloaded;
+    }
+
+    /// Invalidate the registry caches when `identifier` at `location` is the
+    /// registry object.
+    fn invalidate_registry_caches_for(&mut self, identifier: u64, location: Location) {
+        if self.registry.is_some_and(|(position, object, _)| {
+            object == identifier && location == Location::Source(position)
+        }) {
+            self.invalidate_registry_caches();
+        }
+    }
+
     fn set_registry_payload(&mut self, data: Vec<u8>) -> Result<()> {
-        self.registry_requirements.borrow_mut().take();
-        self.registry_root.borrow_mut().take();
+        self.invalidate_registry_caches();
         let (position, object, message) = self
             .registry
             .ok_or(Error::Invalid("the package has no registry"))?;
@@ -1707,11 +1738,11 @@ impl<'s> Workspace<'s> {
     }
 
     fn inspect(&self) -> Result<Option<Root>> {
-        if let Some(cached) = self.registry_root.borrow().as_ref() {
+        if let RegistryCacheState::Loaded(cached) = &*self.registry_root.borrow() {
             return Ok(cached.clone());
         }
         let Some(payload) = self.registry_payload()? else {
-            *self.registry_root.borrow_mut() = Some(None);
+            *self.registry_root.borrow_mut() = RegistryCacheState::Loaded(None);
             return Ok(None);
         };
         let mut root = Root::default();
@@ -1722,7 +1753,7 @@ impl<'s> Workspace<'s> {
         )?;
         root.last_object_identifier = inspection.last_object_identifier();
         root.save_token = inspection.save_token();
-        *self.registry_root.borrow_mut() = Some(Some(root.clone()));
+        *self.registry_root.borrow_mut() = RegistryCacheState::Loaded(Some(root.clone()));
         Ok(Some(root))
     }
 
@@ -1829,18 +1860,18 @@ impl<'s> Workspace<'s> {
     pub(crate) fn registry_inspection_requirements(
         &self,
     ) -> Result<Option<registry_codec::RewriteReport>> {
-        if let Some(cached) = self.registry_requirements.borrow().as_ref() {
+        if let RegistryCacheState::Loaded(cached) = &*self.registry_requirements.borrow() {
             return Ok(*cached);
         }
         let Some(payload) = self.registry_payload()? else {
-            *self.registry_requirements.borrow_mut() = Some(None);
+            *self.registry_requirements.borrow_mut() = RegistryCacheState::Loaded(None);
             return Ok(None);
         };
         let report = registry_codec::inspect_package_metadata_requirements(
             payload,
             self.registry_options(),
         )?;
-        *self.registry_requirements.borrow_mut() = Some(Some(report));
+        *self.registry_requirements.borrow_mut() = RegistryCacheState::Loaded(Some(report));
         Ok(Some(report))
     }
 
@@ -1849,10 +1880,11 @@ impl<'s> Workspace<'s> {
         // Callers use this as the admission for the next `inspect`-backed
         // lookup.  Once that lookup has populated the root cache, charging
         // the full two-pass codec report again would account preparation as
-        // work that is not performed.  `set_registry_payload` clears both
-        // caches, so every changed registry state is admitted again.
-        if self.registry_root.borrow().is_some() {
-            return 0;
+        // work that is not performed.  `invalidate_registry_caches` clears
+        // both caches, so every changed registry state is admitted again.
+        match &*self.registry_root.borrow() {
+            RegistryCacheState::Loaded(_) => return 0,
+            RegistryCacheState::Unloaded => {},
         }
         self.registry_inspection_requirements()
             .ok()
