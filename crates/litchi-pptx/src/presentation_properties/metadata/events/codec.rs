@@ -1774,3 +1774,195 @@ mod tests {
         assert_eq!(package.get_part(&slide_name).unwrap().blob(), before);
     }
 }
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What each show-event slide reader accepts before, around and after `p:sld`, and the exact error reported otherwise. Each expected
+    //! line is the row label followed by the result.
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&[u8]) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(xml.as_bytes())))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    /// The show-event scan of one slide.
+    #[test]
+    fn show_event_scan_envelope() {
+        let root = Root {
+            open: r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">"#,
+            body: r"<p:cSld><p:spTree/></p:cSld>",
+            close: r"</p:sld>",
+            empty: r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"unterminated or missing PresentationML slide root\")",
+                "whitespace only: Invalid(\"unterminated or missing PresentationML slide root\")",
+                "declaration only: Invalid(\"unterminated or missing PresentationML slide root\")",
+                "empty-element root: Ok(0)",
+                "start and end root: Ok(0)",
+                "root then whitespace: Ok(0)",
+                "root then comment: Ok(0)",
+                "root then PI: Invalid(\"slide XML must not contain a processing instruction\")",
+                "root then text: Ok(0)",
+                "root then second root: Invalid(\"slide XML must have one PresentationML sld root element\")",
+                "root then foreign start: Invalid(\"slide XML must have one PresentationML sld root element\")",
+                "root then foreign empty: Invalid(\"slide XML must have one PresentationML sld root element\")",
+                "declaration after root: Ok(0)",
+                "two declarations: Ok(0)",
+                "comment before declaration: Ok(0)",
+                "text before root: Ok(0)",
+                "unterminated root: Invalid(\"unterminated or missing PresentationML slide root\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"slide XML must not contain a DTD\")",
+                "top-level CDATA: Ok(0)",
+                "declaration then root: Ok(0)",
+                "whitespace before declaration: Ok(0)",
+                "PI before declaration: Invalid(\"slide XML must not contain a processing instruction\")",
+                "comment then root: Ok(0)",
+                "PI then root: Invalid(\"slide XML must not contain a processing instruction\")",
+                "root then text then second root: Invalid(\"slide XML must have one PresentationML sld root element\")",
+                "empty-element root then root: Invalid(\"slide XML must have one PresentationML sld root element\")",
+                "declaration after empty-element root: Ok(0)",
+            ],
+            |xml| {
+                outcome(
+                    super::scan_slide_show_events(
+                        0,
+                        xml,
+                        super::Limits::DEFAULT,
+                        &mut super::LoadLimits::default(),
+                    ),
+                    |values| values.len().to_string(),
+                )
+            },
+        );
+    }
+
+    /// The location of the raw show-event list of one slide.
+    #[test]
+    fn show_event_location_envelope() {
+        let root = Root {
+            open: r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main">"#,
+            body: r#"<p:extLst><p:ext uri="{E180D4A7-C9FB-4DFB-919C-405C955672EB}"><p14:showEvtLst><p14:nullEvt time="3" objId="5"/></p14:showEvtLst></p:ext></p:extLst>"#,
+            close: r"</p:sld>",
+            empty: r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"unterminated or missing PresentationML slide root\")",
+                "whitespace only: Invalid(\"unterminated or missing PresentationML slide root\")",
+                "declaration only: Invalid(\"unterminated or missing PresentationML slide root\")",
+                "empty-element root: Invalid(\"validated slide-show events have no extension source\")",
+                "start and end root: Invalid(\"validated slide-show events have no extension source\")",
+                "root then whitespace: Ok(0)",
+                "root then comment: Ok(0)",
+                "root then PI: Invalid(\"slide XML must not contain a DTD or processing instruction\")",
+                "root then text: Ok(0)",
+                "root then second root: Invalid(\"slide XML must have one PresentationML sld root element\")",
+                "root then foreign start: Invalid(\"slide XML must have one PresentationML sld root element\")",
+                "root then foreign empty: Invalid(\"slide XML must have one PresentationML sld root element\")",
+                "declaration after root: Ok(0)",
+                "two declarations: Ok(0)",
+                "comment before declaration: Ok(0)",
+                "text before root: Ok(0)",
+                "unterminated root: Invalid(\"unterminated or missing PresentationML slide root\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"slide XML must not contain a DTD or processing instruction\")",
+                "top-level CDATA: Ok(0)",
+                "declaration then root: Ok(0)",
+                "whitespace before declaration: Ok(0)",
+                "PI before declaration: Invalid(\"slide XML must not contain a DTD or processing instruction\")",
+                "comment then root: Ok(0)",
+                "PI then root: Invalid(\"slide XML must not contain a DTD or processing instruction\")",
+                "root then text then second root: Invalid(\"slide XML must have one PresentationML sld root element\")",
+                "empty-element root then root: Invalid(\"slide XML must have one PresentationML sld root element\")",
+                "declaration after empty-element root: Invalid(\"validated slide-show events have no extension source\")",
+            ],
+            |xml| {
+                outcome(super::locate_raw(xml, super::Limits::DEFAULT), |located| {
+                    located.events.len().to_string()
+                })
+            },
+        );
+    }
+}

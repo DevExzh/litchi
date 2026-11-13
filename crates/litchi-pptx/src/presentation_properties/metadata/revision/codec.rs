@@ -1242,3 +1242,141 @@ mod tests {
         assert_eq!(mce.max_choices_per_alternate, 19);
     }
 }
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the revision-information reader accepts before, around and after `p1510:revInfo`, and the exact error reported otherwise. Each expected
+    //! line is the row label followed by the result.
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&[u8]) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(xml.as_bytes())))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    /// The reader of one revision-information part.
+    #[test]
+    fn revision_information_envelope() {
+        let root = Root {
+            open: r#"<p1510:revInfo xmlns:p1510="http://schemas.microsoft.com/office/powerpoint/2015/10/main">"#,
+            body: r"<p1510:revLst/>",
+            close: r"</p1510:revInfo>",
+            empty: r#"<p1510:revInfo xmlns:p1510="http://schemas.microsoft.com/office/powerpoint/2015/10/main"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"unterminated Revision Information part\")",
+                "whitespace only: Invalid(\"unterminated Revision Information part\")",
+                "declaration only: Invalid(\"unterminated Revision Information part\")",
+                "empty-element root: Ok()",
+                "start and end root: Ok()",
+                "root then whitespace: Ok()",
+                "root then comment: Ok()",
+                "root then PI: Invalid(\"DTD, processing instructions, and general references are rejected\")",
+                "root then text: Invalid(\"unexpected Revision Information text\")",
+                "root then second root: Invalid(\"Revision Information has multiple roots\")",
+                "root then foreign start: Invalid(\"Revision Information has multiple roots\")",
+                "root then foreign empty: Invalid(\"Revision Information has multiple roots\")",
+                "declaration after root: Ok()",
+                "two declarations: Ok()",
+                "comment before declaration: Ok()",
+                "text before root: Invalid(\"unexpected Revision Information text\")",
+                "unterminated root: Invalid(\"unterminated Revision Information part\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"DTD, processing instructions, and general references are rejected\")",
+                "top-level CDATA: Invalid(\"unexpected Revision Information CDATA\")",
+                "declaration then root: Ok()",
+                "whitespace before declaration: Ok()",
+                "PI before declaration: Invalid(\"DTD, processing instructions, and general references are rejected\")",
+                "comment then root: Ok()",
+                "PI then root: Invalid(\"DTD, processing instructions, and general references are rejected\")",
+                "root then text then second root: Invalid(\"unexpected Revision Information text\")",
+                "empty-element root then root: Invalid(\"Revision Information has multiple roots\")",
+                "declaration after empty-element root: Ok()",
+            ],
+            |xml| {
+                outcome(
+                    super::parse_revision_information(xml, super::Limits::default()),
+                    |_| String::new(),
+                )
+            },
+        );
+    }
+}

@@ -847,3 +847,190 @@ fn escape(value: &str) -> String {
     }
     result
 }
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What each control source reader accepts before, around and after its root, and the exact error reported otherwise. Each expected
+    //! line is the row label followed by the result.
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&[u8]) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(xml.as_bytes())))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    /// The location of every control of one slide.
+    #[test]
+    fn control_location_envelope() {
+        let root = Root {
+            open: r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">"#,
+            body: r"<p:cSld><p:spTree/></p:cSld>",
+            close: r"</p:sld>",
+            empty: r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"unterminated PresentationML control slide\")",
+                "whitespace only: Invalid(\"unterminated PresentationML control slide\")",
+                "declaration only: Invalid(\"unterminated PresentationML control slide\")",
+                "empty-element root: Ok(0)",
+                "start and end root: Ok(0)",
+                "root then whitespace: Ok(0)",
+                "root then comment: Ok(0)",
+                "root then PI: Invalid(\"control XML rejects DTDs and processing instructions\")",
+                "root then text: Ok(0)",
+                "root then second root: Invalid(\"control XML must have one PresentationML sld root\")",
+                "root then foreign start: Invalid(\"control XML must have one PresentationML sld root\")",
+                "root then foreign empty: Invalid(\"control XML must have one PresentationML sld root\")",
+                "declaration after root: Ok(0)",
+                "two declarations: Ok(0)",
+                "comment before declaration: Ok(0)",
+                "text before root: Ok(0)",
+                "unterminated root: Invalid(\"unterminated PresentationML control slide\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"control XML rejects DTDs and processing instructions\")",
+                "top-level CDATA: Ok(0)",
+                "declaration then root: Ok(0)",
+                "whitespace before declaration: Ok(0)",
+                "PI before declaration: Invalid(\"control XML rejects DTDs and processing instructions\")",
+                "comment then root: Ok(0)",
+                "PI then root: Invalid(\"control XML rejects DTDs and processing instructions\")",
+                "root then text then second root: Invalid(\"control XML must have one PresentationML sld root\")",
+                "empty-element root then root: Invalid(\"control XML must have one PresentationML sld root\")",
+                "declaration after empty-element root: Ok(0)",
+            ],
+            |xml| {
+                outcome(super::locate_controls(xml), |values| {
+                    values.len().to_string()
+                })
+            },
+        );
+    }
+
+    /// The ActiveX descriptor reader. Only the first top-level element is the
+    /// descriptor; later ones are skipped.
+    #[test]
+    fn descriptor_location_envelope() {
+        let root = Root {
+            open: r#"<ax:ocx xmlns:ax="http://schemas.microsoft.com/office/2006/activeX" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ax:classid="first" ax:persistence="persistStream" r:id="rId1">"#,
+            body: r"<ax:ocxPr/>",
+            close: r"</ax:ocx>",
+            empty: r#"<ax:ocx xmlns:ax="http://schemas.microsoft.com/office/2006/activeX" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ax:classid="first" ax:persistence="persistStream" r:id="rId1"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"unterminated ActiveX control descriptor\")",
+                "whitespace only: Invalid(\"unterminated ActiveX control descriptor\")",
+                "declaration only: Invalid(\"unterminated ActiveX control descriptor\")",
+                "empty-element root: Ok(Some(\"first\"))",
+                "start and end root: Ok(Some(\"first\"))",
+                "root then whitespace: Ok(Some(\"first\"))",
+                "root then comment: Ok(Some(\"first\"))",
+                "root then PI: Invalid(\"control descriptor rejects DTDs and processing instructions\")",
+                "root then text: Ok(Some(\"first\"))",
+                "root then second root: Ok(Some(\"first\"))",
+                "root then foreign start: Ok(Some(\"first\"))",
+                "root then foreign empty: Ok(Some(\"first\"))",
+                "declaration after root: Ok(Some(\"first\"))",
+                "two declarations: Ok(Some(\"first\"))",
+                "comment before declaration: Ok(Some(\"first\"))",
+                "text before root: Ok(Some(\"first\"))",
+                "unterminated root: Invalid(\"unterminated ActiveX control descriptor\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"control descriptor rejects DTDs and processing instructions\")",
+                "top-level CDATA: Ok(Some(\"first\"))",
+                "declaration then root: Ok(Some(\"first\"))",
+                "whitespace before declaration: Ok(Some(\"first\"))",
+                "PI before declaration: Invalid(\"control descriptor rejects DTDs and processing instructions\")",
+                "comment then root: Ok(Some(\"first\"))",
+                "PI then root: Invalid(\"control descriptor rejects DTDs and processing instructions\")",
+                "root then text then second root: Ok(Some(\"first\"))",
+                "empty-element root then root: Ok(Some(\"first\"))",
+                "declaration after empty-element root: Ok(Some(\"first\"))",
+            ],
+            |xml| {
+                outcome(super::locate_descriptor(xml), |value| {
+                    format!("{:?}", value.class_id.map(|attribute| attribute.value))
+                })
+            },
+        );
+    }
+}

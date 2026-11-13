@@ -9114,6 +9114,157 @@ mod tests {
         ));
         assert!(SourceBackedPresentation::open(&path).is_err());
     }
+
+    mod envelope_tests {
+        //! What the picture-relationship scan accepts before, around and
+        //! after `p:sld`, and the exact error reported otherwise. Each
+        //! expected line is the row label followed by the result.
+
+        use super::{
+            Arc, CountingSource, SourceBackedPackage, SourceCacheLimits, SourceLimits,
+            source_backed_pptx,
+        };
+
+        const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+        /// One reader's root element in the forms the rows are built from.
+        struct Root<'a> {
+            /// The start tag.
+            open: &'a str,
+            /// Content that makes the element valid for its reader.
+            body: &'a str,
+            /// The end tag.
+            close: &'a str,
+            /// The element as one empty-element tag.
+            empty: &'a str,
+        }
+
+        fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+            let Root {
+                open,
+                body,
+                close,
+                empty,
+            } = *root;
+            let document = format!("{open}{body}{close}");
+            let d = document.as_str();
+            vec![
+                ("empty input", String::new()),
+                ("whitespace only", " \n".to_owned()),
+                ("declaration only", DECLARATION.to_owned()),
+                ("empty-element root", empty.to_owned()),
+                ("start and end root", format!("{open}{close}")),
+                ("root then whitespace", format!("{d}\n ")),
+                ("root then comment", format!("{d}<!--c-->")),
+                ("root then PI", format!("{d}<?pi x?>")),
+                ("root then text", format!("{d}text")),
+                ("root then second root", format!("{d}{d}")),
+                ("root then foreign start", format!("{d}<foreign></foreign>")),
+                ("root then foreign empty", format!("{d}<foreign/>")),
+                ("declaration after root", format!("{d}{DECLARATION}")),
+                ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+                (
+                    "comment before declaration",
+                    format!("<!--c-->{DECLARATION}{d}"),
+                ),
+                ("text before root", format!("text{d}")),
+                ("unterminated root", format!("{open}{body}")),
+                ("stray end tag", format!("{d}</foreign>")),
+                ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+                ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+                ("declaration then root", format!("{DECLARATION}{d}")),
+                (
+                    "whitespace before declaration",
+                    format!(" {DECLARATION}{d}"),
+                ),
+                ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+                ("comment then root", format!("<!--c-->{d}")),
+                ("PI then root", format!("<?pi x?>{d}")),
+                ("root then text then second root", format!("{d}text{d}")),
+                ("empty-element root then root", format!("{empty}{d}")),
+                (
+                    "declaration after empty-element root",
+                    format!("{empty}{DECLARATION}"),
+                ),
+            ]
+        }
+
+        fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&[u8]) -> String) {
+            let actual = rows(root)
+                .into_iter()
+                .map(|(label, xml)| format!("{label}: {}", read(xml.as_bytes())))
+                .collect::<Vec<_>>();
+            assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+        }
+
+        fn outcome<T, E: std::fmt::Debug>(
+            result: Result<T, E>,
+            summary: impl Fn(T) -> String,
+        ) -> String {
+            match result {
+                Ok(value) => format!("Ok({})", summary(value)),
+                Err(error) => format!("{error:?}"),
+            }
+        }
+
+        /// The scan of one whole slide replacement.
+        #[test]
+        fn picture_relationship_scan_envelope() {
+            let package = SourceBackedPackage::from_read_at(
+                Arc::new(CountingSource::new(source_backed_pptx())),
+                SourceLimits::default(),
+                SourceCacheLimits::default(),
+                litchi_opc::SourceReadPolicy::exact(),
+                None,
+            )
+            .unwrap();
+            let root = Root {
+                open: r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">"#,
+                body: r"<p:cSld><p:spTree/></p:cSld>",
+                close: r"</p:sld>",
+                empty: r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#,
+            };
+            assert_matrix(
+                &root,
+                &[
+                    "empty input: Invalid(\"source slide picture scan is not one closed root\")",
+                    "whitespace only: Invalid(\"source slide picture scan is not one closed root\")",
+                    "declaration only: Invalid(\"source slide picture scan is not one closed root\")",
+                    "empty-element root: Ok()",
+                    "start and end root: Ok()",
+                    "root then whitespace: Ok()",
+                    "root then comment: Ok()",
+                    "root then PI: Ok()",
+                    "root then text: Invalid(\"source slide picture scan contains text outside its root\")",
+                    "root then second root: Invalid(\"source slide picture scan contains more than one root\")",
+                    "root then foreign start: Invalid(\"source slide picture scan contains more than one root\")",
+                    "root then foreign empty: Invalid(\"source slide picture scan contains more than one root\")",
+                    "declaration after root: Ok()",
+                    "two declarations: Ok()",
+                    "comment before declaration: Ok()",
+                    "text before root: Invalid(\"source slide picture scan contains text outside its root\")",
+                    "unterminated root: Invalid(\"source slide picture scan is not one closed root\")",
+                    "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                    "DOCTYPE: Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed picture inventory\", reason: \"DOCTYPE content is refused\" })",
+                    "top-level CDATA: Ok()",
+                    "declaration then root: Ok()",
+                    "whitespace before declaration: Ok()",
+                    "PI before declaration: Ok()",
+                    "comment then root: Ok()",
+                    "PI then root: Ok()",
+                    "root then text then second root: Invalid(\"source slide picture scan contains text outside its root\")",
+                    "empty-element root then root: Invalid(\"source slide picture scan contains more than one root\")",
+                    "declaration after empty-element root: Ok()",
+                ],
+                |xml| {
+                    outcome(
+                        super::super::validate_full_slide_picture_relationships(&package, xml),
+                        |()| String::new(),
+                    )
+                },
+            );
+        }
+    }
 }
 
 #[cfg(test)]

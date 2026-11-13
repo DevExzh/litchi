@@ -3013,3 +3013,230 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What each semantic-text pass accepts before, around and after `p:sld`, and the exact error reported otherwise. Each expected
+    //! line is the row label followed by the result.
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&[u8]) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(xml.as_bytes())))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    /// The raw validation pass on its own.
+    #[test]
+    fn raw_text_scan_envelope() {
+        let root = Root {
+            open: r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">"#,
+            body: r"<p:cSld><p:spTree/></p:cSld>",
+            close: r"</p:sld>",
+            empty: r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"semantic slide XML lacks an element root\")",
+                "whitespace only: Invalid(\"semantic slide XML lacks an element root\")",
+                "declaration only: Invalid(\"semantic slide XML lacks an element root\")",
+                "empty-element root: Ok()",
+                "start and end root: Ok()",
+                "root then whitespace: Ok()",
+                "root then comment: Ok()",
+                "root then PI: Ok()",
+                "root then text: Invalid(\"semantic slide XML has text outside its root\")",
+                "root then second root: Invalid(\"semantic slide XML has multiple roots\")",
+                "root then foreign start: Invalid(\"semantic slide XML has multiple roots\")",
+                "root then foreign empty: Invalid(\"semantic slide XML has multiple roots\")",
+                "declaration after root: Invalid(\"XML declarations must be the first document event\")",
+                "two declarations: Invalid(\"XML declarations must be the first document event\")",
+                "comment before declaration: Invalid(\"XML declarations must be the first document event\")",
+                "text before root: Invalid(\"semantic slide XML has text outside its root\")",
+                "unterminated root: Invalid(\"semantic slide XML has unbalanced elements\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"DTD declarations are not permitted in slide text\")",
+                "top-level CDATA: Invalid(\"slide XML has CDATA outside its document root\")",
+                "declaration then root: Ok()",
+                "whitespace before declaration: Invalid(\"XML declarations must be the first document event\")",
+                "PI before declaration: Invalid(\"XML declarations must be the first document event\")",
+                "comment then root: Ok()",
+                "PI then root: Ok()",
+                "root then text then second root: Invalid(\"semantic slide XML has text outside its root\")",
+                "empty-element root then root: Invalid(\"semantic slide XML has multiple roots\")",
+                "declaration after empty-element root: Invalid(\"XML declarations must be the first document event\")",
+            ],
+            |xml| outcome(super::scan_raw_semantic_text_xml(xml), |_| String::new()),
+        );
+    }
+
+    /// The semantic pass on its own.
+    #[test]
+    fn semantic_text_pass_envelope() {
+        let root = Root {
+            open: r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">"#,
+            body: r"<p:cSld><p:spTree/></p:cSld>",
+            close: r"</p:sld>",
+            empty: r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"semantic slide XML has unbalanced elements\")",
+                "whitespace only: Invalid(\"semantic slide XML has unbalanced elements\")",
+                "declaration only: Invalid(\"semantic slide XML has unbalanced elements\")",
+                "empty-element root: Ok()",
+                "start and end root: Ok()",
+                "root then whitespace: Ok()",
+                "root then comment: Ok()",
+                "root then PI: Ok()",
+                "root then text: Invalid(\"semantic slide XML has text outside its root\")",
+                "root then second root: Invalid(\"semantic slide XML has an invalid root\")",
+                "root then foreign start: Invalid(\"semantic slide XML has an invalid root\")",
+                "root then foreign empty: Invalid(\"semantic slide XML has an invalid root\")",
+                "declaration after root: Invalid(\"XML declarations must be the first document event\")",
+                "two declarations: Invalid(\"XML declarations must be the first document event\")",
+                "comment before declaration: Invalid(\"XML declarations must be the first document event\")",
+                "text before root: Invalid(\"semantic slide XML has text outside its root\")",
+                "unterminated root: Invalid(\"semantic slide XML has unbalanced elements\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"DTD declarations are not permitted in slide text\")",
+                "top-level CDATA: Invalid(\"slide XML has CDATA outside its document root\")",
+                "declaration then root: Ok()",
+                "whitespace before declaration: Invalid(\"XML declarations must be the first document event\")",
+                "PI before declaration: Invalid(\"XML declarations must be the first document event\")",
+                "comment then root: Ok()",
+                "PI then root: Ok()",
+                "root then text then second root: Invalid(\"semantic slide XML has text outside its root\")",
+                "empty-element root then root: Invalid(\"semantic slide XML has an invalid root\")",
+                "declaration after empty-element root: Invalid(\"XML declarations must be the first document event\")",
+            ],
+            |xml| outcome(super::parse_semantic_text(xml, "\n"), |(text, _)| text),
+        );
+    }
+
+    /// Both passes as a slide part runs them.
+    #[test]
+    fn semantic_text_envelope() {
+        let root = Root {
+            open: r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">"#,
+            body: r"<p:cSld><p:spTree/></p:cSld>",
+            close: r"</p:sld>",
+            empty: r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"semantic slide XML lacks an element root\")",
+                "whitespace only: Invalid(\"semantic slide XML lacks an element root\")",
+                "declaration only: Invalid(\"semantic slide XML lacks an element root\")",
+                "empty-element root: Ok()",
+                "start and end root: Ok()",
+                "root then whitespace: Ok()",
+                "root then comment: Ok()",
+                "root then PI: Ok()",
+                "root then text: Invalid(\"semantic slide XML has text outside its root\")",
+                "root then second root: Invalid(\"semantic slide XML has multiple roots\")",
+                "root then foreign start: Invalid(\"semantic slide XML has multiple roots\")",
+                "root then foreign empty: Invalid(\"semantic slide XML has multiple roots\")",
+                "declaration after root: Invalid(\"XML declarations must be the first document event\")",
+                "two declarations: Invalid(\"XML declarations must be the first document event\")",
+                "comment before declaration: Invalid(\"XML declarations must be the first document event\")",
+                "text before root: Invalid(\"semantic slide XML has text outside its root\")",
+                "unterminated root: Invalid(\"semantic slide XML has unbalanced elements\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"DTD declarations are not permitted in slide text\")",
+                "top-level CDATA: Invalid(\"slide XML has CDATA outside its document root\")",
+                "declaration then root: Ok()",
+                "whitespace before declaration: Invalid(\"XML declarations must be the first document event\")",
+                "PI before declaration: Invalid(\"XML declarations must be the first document event\")",
+                "comment then root: Ok()",
+                "PI then root: Ok()",
+                "root then text then second root: Invalid(\"semantic slide XML has text outside its root\")",
+                "empty-element root then root: Invalid(\"semantic slide XML has multiple roots\")",
+                "declaration after empty-element root: Invalid(\"XML declarations must be the first document event\")",
+            ],
+            |xml| {
+                outcome(super::semantic_text_and_repairs(xml, "\n"), |(text, _)| {
+                    text
+                })
+            },
+        );
+    }
+}

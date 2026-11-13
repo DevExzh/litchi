@@ -6626,3 +6626,140 @@ mod payload_guard_tests;
 #[cfg(test)]
 #[path = "source_cross_copy/registered_layout_limits.rs"]
 mod registered_layout_limits;
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the copy validator accepts before, around and after `p:sld`, and the exact error reported otherwise. Each expected
+    //! line is the row label followed by the result.
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&[u8]) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(xml.as_bytes())))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    /// The validation of an existing destination slide.
+    #[test]
+    fn anchor_validation_envelope() {
+        let root = Root {
+            open: r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">"#,
+            body: r"<p:cSld><p:spTree/></p:cSld>",
+            close: r"</p:sld>",
+            empty: r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Xml(\"slide is not one closed root\")",
+                "whitespace only: Xml(\"slide is not one closed root\")",
+                "declaration only: Xml(\"slide is not one closed root\")",
+                "empty-element root: Ok(Transitional)",
+                "start and end root: Ok(Transitional)",
+                "root then whitespace: Ok(Transitional)",
+                "root then comment: Ok(Transitional)",
+                "root then PI: Refused(Refusal { kind: UnsupportedContent, operation: \"slide_copy\", reason: \"the selected slide cannot be copied losslessly because it contains markup-compatibility content\" })",
+                "root then text: Xml(\"slide contains text outside its root\")",
+                "root then second root: Xml(\"slide contains more than one root element\")",
+                "root then foreign start: Xml(\"slide contains more than one root element\")",
+                "root then foreign empty: Xml(\"slide contains more than one root element\")",
+                "declaration after root: Xml(\"slide contains a misplaced or repeated XML declaration\")",
+                "two declarations: Xml(\"slide contains a misplaced or repeated XML declaration\")",
+                "comment before declaration: Xml(\"slide contains a misplaced or repeated XML declaration\")",
+                "text before root: Xml(\"slide contains text outside its root\")",
+                "unterminated root: Xml(\"slide is not one closed root\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Refused(Refusal { kind: UnsupportedContent, operation: \"slide_copy\", reason: \"the selected slide cannot be copied losslessly because it contains markup-compatibility content\" })",
+                "top-level CDATA: Xml(\"slide contains character data outside its root\")",
+                "declaration then root: Ok(Transitional)",
+                "whitespace before declaration: Xml(\"slide contains a misplaced or repeated XML declaration\")",
+                "PI before declaration: Refused(Refusal { kind: UnsupportedContent, operation: \"slide_copy\", reason: \"the selected slide cannot be copied losslessly because it contains markup-compatibility content\" })",
+                "comment then root: Ok(Transitional)",
+                "PI then root: Refused(Refusal { kind: UnsupportedContent, operation: \"slide_copy\", reason: \"the selected slide cannot be copied losslessly because it contains markup-compatibility content\" })",
+                "root then text then second root: Xml(\"slide contains text outside its root\")",
+                "empty-element root then root: Xml(\"slide contains more than one root element\")",
+                "declaration after empty-element root: Xml(\"slide contains a misplaced or repeated XML declaration\")",
+            ],
+            |xml| {
+                outcome(super::validate_anchor_xml(xml, "slide", None), |value| {
+                    format!("{value:?}")
+                })
+            },
+        );
+    }
+}

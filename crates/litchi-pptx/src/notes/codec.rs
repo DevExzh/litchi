@@ -1887,3 +1887,148 @@ mod tests {
         assert!(refused > 0 && refused < compared);
     }
 }
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the notes-family scan accepts before, around and after its root, and the exact error reported otherwise. Each expected
+    //! line is the row label followed by the result.
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&[u8]) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(xml.as_bytes())))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    /// The scan of a slide already past markup compatibility. A later top-level
+    /// element is read as content of the same document.
+    #[test]
+    fn processed_scan_envelope() {
+        let root = Root {
+            open: r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">"#,
+            body: r"<p:cSld><p:spTree/></p:cSld>",
+            close: r"</p:sld>",
+            empty: r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"missing or unterminated XML root\")",
+                "whitespace only: Invalid(\"missing or unterminated XML root\")",
+                "declaration only: Invalid(\"missing or unterminated XML root\")",
+                "empty-element root: Ok()",
+                "start and end root: Ok()",
+                "root then whitespace: Ok()",
+                "root then comment: Ok()",
+                "root then PI: Invalid(\"DTDs and processing instructions are rejected\")",
+                "root then text: Ok()",
+                "root then second root: Ok()",
+                "root then foreign start: Ok()",
+                "root then foreign empty: Ok()",
+                "declaration after root: Ok()",
+                "two declarations: Ok()",
+                "comment before declaration: Ok()",
+                "text before root: Ok()",
+                "unterminated root: Invalid(\"missing or unterminated XML root\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"DTDs and processing instructions are rejected\")",
+                "top-level CDATA: Invalid(\"CDATA is rejected\")",
+                "declaration then root: Ok()",
+                "whitespace before declaration: Ok()",
+                "PI before declaration: Invalid(\"DTDs and processing instructions are rejected\")",
+                "comment then root: Ok()",
+                "PI then root: Invalid(\"DTDs and processing instructions are rejected\")",
+                "root then text then second root: Ok()",
+                "empty-element root then root: Ok()",
+                "declaration after empty-element root: Ok()",
+            ],
+            |xml| {
+                outcome(
+                    super::scan_processed_xml(
+                        xml,
+                        xml.len(),
+                        crate::notes::MAX_SLIDE_XML,
+                        super::Conformance::Transitional,
+                        "sld",
+                    ),
+                    |_| String::new(),
+                )
+            },
+        );
+    }
+}

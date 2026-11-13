@@ -844,3 +844,136 @@ fn xml_position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize>
         .offset(reader.buffer_position())
         .ok_or_else(|| invalid("table-style XML offset exceeds usize"))
 }
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the table-style list reader accepts before, around and after `a:tblStyleLst`, and the exact error reported otherwise. Each expected
+    //! line is the row label followed by the result.
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&[u8]) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(xml.as_bytes())))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    /// The reader of the table-style part.
+    #[test]
+    fn table_style_list_envelope() {
+        let root = Root {
+            open: r#"<a:tblStyleLst xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" def="{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}">"#,
+            body: r#"<a:tblStyle styleId="{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}" styleName="x"/>"#,
+            close: r"</a:tblStyleLst>",
+            empty: r#"<a:tblStyleLst xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" def="{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"table-style XML root is missing or unterminated\")",
+                "whitespace only: Invalid(\"table-style XML root is missing or unterminated\")",
+                "declaration only: Invalid(\"table-style XML root is missing or unterminated\")",
+                "empty-element root: Ok()",
+                "start and end root: Ok()",
+                "root then whitespace: Ok()",
+                "root then comment: Ok()",
+                "root then PI: Invalid(\"table-style XML must not contain a DTD or processing instruction\")",
+                "root then text: Invalid(\"table-style root or definition contains text content\")",
+                "root then second root: Invalid(\"table-style part must contain one tblStyleLst root\")",
+                "root then foreign start: Invalid(\"table-style part must contain one tblStyleLst root\")",
+                "root then foreign empty: Invalid(\"table-style part must contain one tblStyleLst root\")",
+                "declaration after root: Ok()",
+                "two declarations: Ok()",
+                "comment before declaration: Ok()",
+                "text before root: Invalid(\"table-style root or definition contains text content\")",
+                "unterminated root: Invalid(\"table-style XML root is missing or unterminated\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"table-style XML must not contain a DTD or processing instruction\")",
+                "top-level CDATA: Invalid(\"table-style XML must not contain CDATA\")",
+                "declaration then root: Ok()",
+                "whitespace before declaration: Ok()",
+                "PI before declaration: Invalid(\"table-style XML must not contain a DTD or processing instruction\")",
+                "comment then root: Ok()",
+                "PI then root: Invalid(\"table-style XML must not contain a DTD or processing instruction\")",
+                "root then text then second root: Invalid(\"table-style root or definition contains text content\")",
+                "empty-element root then root: Invalid(\"table-style part must contain one tblStyleLst root\")",
+                "declaration after empty-element root: Ok()",
+            ],
+            |xml| outcome(super::scan(xml), |_| String::new()),
+        );
+    }
+}

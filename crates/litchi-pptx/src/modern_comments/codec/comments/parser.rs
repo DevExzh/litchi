@@ -763,3 +763,140 @@ fn is_namespace_attribute(value: &str) -> bool {
 fn xml_error(error: impl std::fmt::Display) -> Error {
     Error::Xml(error.to_string())
 }
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the comment-list reader accepts before, around and after `p188:cmLst`, and the exact error reported otherwise. Each expected
+    //! line is the row label followed by the result.
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&[u8]) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(xml.as_bytes())))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    /// The reader of a comment part already past markup compatibility.
+    #[test]
+    fn comment_list_envelope() {
+        let root = Root {
+            open: r#"<p188:cmLst xmlns:p188="http://schemas.microsoft.com/office/powerpoint/2018/8/main">"#,
+            body: r"",
+            close: r"</p188:cmLst>",
+            empty: r#"<p188:cmLst xmlns:p188="http://schemas.microsoft.com/office/powerpoint/2018/8/main"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"unterminated modern Comment part\")",
+                "whitespace only: Invalid(\"unterminated modern Comment part\")",
+                "declaration only: Invalid(\"unterminated modern Comment part\")",
+                "empty-element root: Ok(0)",
+                "start and end root: Ok(0)",
+                "root then whitespace: Ok(0)",
+                "root then comment: Ok(0)",
+                "root then PI: Invalid(\"DTD and processing instructions are rejected\")",
+                "root then text: Invalid(\"unexpected text in modern Comment metadata\")",
+                "root then second root: Invalid(\"modern Comment root must be p188:cmLst\")",
+                "root then foreign start: Invalid(\"modern Comment root must be p188:cmLst\")",
+                "root then foreign empty: Invalid(\"modern Comment root must be p188:cmLst\")",
+                "declaration after root: Ok(0)",
+                "two declarations: Ok(0)",
+                "comment before declaration: Ok(0)",
+                "text before root: Invalid(\"unexpected text in modern Comment metadata\")",
+                "unterminated root: Invalid(\"unterminated modern Comment part\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"DTD and processing instructions are rejected\")",
+                "top-level CDATA: Invalid(\"unexpected CDATA in modern Comment metadata\")",
+                "declaration then root: Ok(0)",
+                "whitespace before declaration: Ok(0)",
+                "PI before declaration: Invalid(\"DTD and processing instructions are rejected\")",
+                "comment then root: Ok(0)",
+                "PI then root: Invalid(\"DTD and processing instructions are rejected\")",
+                "root then text then second root: Invalid(\"unexpected text in modern Comment metadata\")",
+                "empty-element root then root: Invalid(\"modern Comment root must be p188:cmLst\")",
+                "declaration after empty-element root: Ok(0)",
+            ],
+            |xml| {
+                outcome(super::parse_processed_comment_list(xml), |value| {
+                    value.comments.len().to_string()
+                })
+            },
+        );
+    }
+}

@@ -1760,3 +1760,136 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the picture-layout reader accepts before, around and after `p:sld`, and the exact error reported otherwise. Each expected
+    //! line is the row label followed by the result.
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&[u8]) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(xml.as_bytes())))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    /// The location of every picture layout of one slide.
+    #[test]
+    fn picture_layout_envelope() {
+        let root = Root {
+            open: r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">"#,
+            body: r"<p:cSld><p:spTree/></p:cSld>",
+            close: r"</p:sld>",
+            empty: r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"source-backed SVG owner: slide XML has an incomplete p:sld root\")",
+                "whitespace only: Invalid(\"source-backed SVG owner: slide XML has an incomplete p:sld root\")",
+                "declaration only: Invalid(\"source-backed SVG owner: slide XML has an incomplete p:sld root\")",
+                "empty-element root: Invalid(\"source-backed SVG owner: slide root p:sld cannot be empty\")",
+                "start and end root: Ok(0)",
+                "root then whitespace: Ok(0)",
+                "root then comment: Ok(0)",
+                "root then PI: Ok(0)",
+                "root then text: Invalid(\"source-backed SVG owner: non-whitespace text appears outside the slide root\")",
+                "root then second root: Invalid(\"source-backed SVG owner: slide XML contains a second root element\")",
+                "root then foreign start: Invalid(\"source-backed SVG owner: slide XML contains a second root element\")",
+                "root then foreign empty: Invalid(\"source-backed SVG owner: slide XML contains a second root element\")",
+                "declaration after root: Invalid(\"source-backed SVG owner: XML declaration is not at the beginning of the slide\")",
+                "two declarations: Invalid(\"source-backed SVG owner: XML declaration is not at the beginning of the slide\")",
+                "comment before declaration: Invalid(\"source-backed SVG owner: XML declaration is not at the beginning of the slide\")",
+                "text before root: Invalid(\"source-backed SVG owner: non-whitespace text appears outside the slide root\")",
+                "unterminated root: Invalid(\"source-backed SVG owner: slide XML has an incomplete p:sld root\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"source-backed SVG owner: DOCTYPE is forbidden in slide XML\")",
+                "top-level CDATA: Invalid(\"source-backed SVG owner: CDATA appears outside the slide root\")",
+                "declaration then root: Ok(0)",
+                "whitespace before declaration: Invalid(\"source-backed SVG owner: XML declaration is not at the beginning of the slide\")",
+                "PI before declaration: Invalid(\"source-backed SVG owner: XML declaration is not at the beginning of the slide\")",
+                "comment then root: Ok(0)",
+                "PI then root: Ok(0)",
+                "root then text then second root: Invalid(\"source-backed SVG owner: non-whitespace text appears outside the slide root\")",
+                "empty-element root then root: Invalid(\"source-backed SVG owner: slide root p:sld cannot be empty\")",
+                "declaration after empty-element root: Invalid(\"source-backed SVG owner: slide root p:sld cannot be empty\")",
+            ],
+            |xml| outcome(super::locate_all(xml), |values| values.len().to_string()),
+        );
+    }
+}
