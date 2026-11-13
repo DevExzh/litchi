@@ -405,3 +405,24 @@ fn capabilities_report_the_write_surface() {
     let paragraph = capabilities.element("paragraph").unwrap();
     assert!(paragraph.property("text").unwrap().set());
 }
+
+#[test]
+fn an_eagerly_opened_path_handle_saves_back_to_its_origin() {
+    use litchi_ops::{OpenOptions, SourceMode};
+    let file = litchi_ops::create(FileFormat::Odt).unwrap();
+    let file = file
+        .add("/body", NewNode::new("p").prop("text", "saved"))
+        .unwrap()
+        .file;
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("out.odt");
+    file.save_as(&path).unwrap();
+    let options = OpenOptions::new().source_mode(SourceMode::Eager);
+    let reopened = litchi_ops::open_with(&path, &options).unwrap();
+    let edited = reopened
+        .set("/body/p[1]", props! { "text" => "again" })
+        .unwrap();
+    edited.save().unwrap();
+    let again = litchi_ops::open_with(&path, &options).unwrap();
+    assert_eq!(text(&again, "/body/p[1]"), "again");
+}

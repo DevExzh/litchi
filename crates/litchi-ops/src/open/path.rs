@@ -69,6 +69,54 @@ pub(crate) fn stable_origin(path: &Path) -> Result<Arc<Path>> {
     Ok(Arc::from(absolute.into_boxed_path()))
 }
 
+/// Whether an eagerly read path handle remembers the path it was opened from,
+/// so that `save()` can write back to it: every format with a save owner, and
+/// a locked file, whose unlocked handle inherits the origin.
+#[cfg(any(
+    feature = "doc",
+    feature = "docx",
+    feature = "ppt",
+    feature = "xlsx",
+    feature = "pptx",
+    feature = "xls",
+    feature = "xlsb",
+    feature = "rtf",
+    feature = "ods",
+    feature = "odp",
+    feature = "odt",
+    odf_objects,
+    feature = "iwork-adapter"
+))]
+fn keeps_origin(file: &File) -> bool {
+    use litchi_core::FileFormat as Format;
+    matches!(
+        file.format(),
+        Some(
+            Format::Doc
+                | Format::Docx
+                | Format::Xls
+                | Format::Xlsx
+                | Format::Xlsb
+                | Format::Ppt
+                | Format::Pptx
+                | Format::Rtf
+                | Format::Odt
+                | Format::Oth
+                | Format::Odm
+                | Format::Ods
+                | Format::Odp
+                | Format::Odg
+                | Format::Odc
+                | Format::Odi
+                | Format::Odb
+                | Format::Odf
+                | Format::Pages
+                | Format::Keynote
+                | Format::Numbers
+        )
+    ) || matches!(file, File::Locked(_))
+}
+
 /// Open `path` through the route the content selects.
 #[cfg(any(unix, windows))]
 pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> Result<File> {
@@ -137,25 +185,7 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
             odf_objects,
             feature = "iwork-adapter"
         ))]
-        let file = if matches!(
-            file.format(),
-            Some(
-                litchi_core::FileFormat::Xls
-                    | litchi_core::FileFormat::Doc
-                    | litchi_core::FileFormat::Docx
-                    | litchi_core::FileFormat::Ppt
-                    | litchi_core::FileFormat::Xlsx
-                    | litchi_core::FileFormat::Pptx
-                    | litchi_core::FileFormat::Rtf
-                    | litchi_core::FileFormat::Xlsb
-                    | litchi_core::FileFormat::Ods
-                    | litchi_core::FileFormat::Odp
-                    | litchi_core::FileFormat::Pages
-                    | litchi_core::FileFormat::Keynote
-                    | litchi_core::FileFormat::Numbers
-            )
-        ) || matches!(&file, File::Locked(_))
-        {
+        let file = if keeps_origin(&file) {
             super::attach_origin(file, stable_origin(path)?)
         } else {
             file
@@ -250,32 +280,7 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
         odf_objects,
         feature = "iwork-adapter"
     ))]
-    let opened = if matches!(
-        opened.format(),
-        Some(
-            litchi_core::FileFormat::Xls
-                | litchi_core::FileFormat::Doc
-                | litchi_core::FileFormat::Docx
-                | litchi_core::FileFormat::Ppt
-                | litchi_core::FileFormat::Xlsx
-                | litchi_core::FileFormat::Pptx
-                | litchi_core::FileFormat::Rtf
-                | litchi_core::FileFormat::Xlsb
-                | litchi_core::FileFormat::Ods
-                | litchi_core::FileFormat::Odp
-                | litchi_core::FileFormat::Oth
-                | litchi_core::FileFormat::Odm
-                | litchi_core::FileFormat::Odg
-                | litchi_core::FileFormat::Odc
-                | litchi_core::FileFormat::Odi
-                | litchi_core::FileFormat::Odb
-                | litchi_core::FileFormat::Odf
-                | litchi_core::FileFormat::Pages
-                | litchi_core::FileFormat::Keynote
-                | litchi_core::FileFormat::Numbers
-        )
-    ) || matches!(&opened, File::Locked(_))
-    {
+    let opened = if keeps_origin(&opened) {
         super::attach_origin(opened, stable_origin(path)?)
     } else {
         opened
