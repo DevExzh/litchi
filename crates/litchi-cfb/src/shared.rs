@@ -319,78 +319,185 @@ impl std::fmt::Debug for SharedOleStreamCursor<'_> {
 const MINIFAT_UNHINTED_SID: u32 = u32::MAX;
 const MINIFAT_DIRECT_READ_MAX_BYTES: u64 = 4095;
 const MINIFAT_DIRECT_ROOT_SIZE_RATIO: u64 = 2;
-// Keep the direct target SID, flight epoch, waiter intent, and state in one
-// atomic word. The high 32 bits carry the target SID; bits 10..31 carry a
-// bounded 22-bit epoch; bit 8 announces waiter intent; bit 9 records slot
-// presence; the low byte carries the state. The epoch prevents a delayed
-// owner from releasing a later same-SID flight after an ABA transition.
-const MINIFAT_STATE_MASK: u64 = 0xFF;
-const MINIFAT_INTENT_BIT: u64 = 1 << 8;
-const MINIFAT_SLOT_PRESENT_BIT: u64 = 1 << 9;
-const MINIFAT_EPOCH_SHIFT: u32 = 10;
-const MINIFAT_EPOCH_MASK: u64 = ((1 << 22) - 1) << MINIFAT_EPOCH_SHIFT;
-const MINIFAT_SID_SHIFT: u32 = 32;
+/// The SID recorded in the policy word once the root Mini Stream cache has
+/// taken over. A CFB directory can never contain `u32::MAX` entries.
 const MINIFAT_CACHE_SID: u32 = u32::MAX;
-const MINIFAT_DIRECT_UNCLAIMED: u8 = 0;
-const MINIFAT_DIRECT_IN_FLIGHT: u8 = 1;
-const MINIFAT_DIRECT_DONE: u8 = 2;
-const MINIFAT_CACHE_IN_FLIGHT: u8 = 3;
-const MINIFAT_CACHE_READY: u8 = 4;
-const MINIFAT_CACHE_RETRY: u8 = 5;
-const MINIFAT_CACHE_REQUESTED: u8 = 6;
 
-const fn minifat_state(sid: u32, state: u8) -> u64 {
-    ((sid as u64) << MINIFAT_SID_SHIFT) | state as u64
+/// The lifecycle held in the low byte of a [`MiniFATPolicyWord`].
+///
+/// Direct side (one bounded positional read of one target SID at a time):
+///
+/// | From                  | Event                                     | To                    |
+/// |-----------------------|-------------------------------------------|-----------------------|
+/// | `DirectUnclaimed`     | claim for `sid` (epoch + 1)               | `DirectInFlight(sid)` |
+/// | `DirectDone(sid)`     | claim for the same `sid` (epoch + 1)      | `DirectInFlight(sid)` |
+/// | `DirectInFlight(sid)` | owner dropped after a published success   | `DirectDone(sid)`     |
+/// | `DirectInFlight(sid)` | owner dropped otherwise (failure, unwind) | `DirectUnclaimed`     |
+///
+/// Cache side (permanent for the reader's lifetime; the SID field becomes
+/// [`MINIFAT_CACHE_SID`], and the epoch, intent and slot bits are carried
+/// over unchanged):
+///
+/// | From                                       | Event                            | To               |
+/// |--------------------------------------------|----------------------------------|------------------|
+/// | any direct state, `CacheRetry`             | `request_ministream_cache`       | `CacheRequested` |
+/// | any state but `CacheInFlight`/`CacheReady` | `begin_ministream_cache`         | `CacheInFlight`  |
+/// | `CacheInFlight`                            | `finish_ministream_cache(true)`  | `CacheReady`     |
+/// | `CacheInFlight`                            | `finish_ministream_cache(false)` | `CacheRetry`     |
+///
+/// No transition leaves the cache side, and a claim whose epoch cannot be
+/// advanced selects it. Readers treat the four cache states alike
+/// ([`MiniFATPolicyWord::is_cache`]); only `request_ministream_cache` tells
+/// `CacheRetry` apart.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+enum MiniFATPolicyState {
+    DirectUnclaimed = 0,
+    DirectInFlight = 1,
+    DirectDone = 2,
+    CacheInFlight = 3,
+    CacheReady = 4,
+    CacheRetry = 5,
+    CacheRequested = 6,
 }
 
-const fn minifat_state_with_meta(sid: u32, state: u8, epoch: u32, intent: bool) -> u64 {
-    minifat_state_with_slot(sid, state, epoch, intent, false)
-}
-
-const fn minifat_state_with_slot(
-    sid: u32,
-    state: u8,
-    epoch: u32,
-    intent: bool,
-    slot_present: bool,
-) -> u64 {
-    ((sid as u64) << MINIFAT_SID_SHIFT)
-        | (((epoch as u64) << MINIFAT_EPOCH_SHIFT) & MINIFAT_EPOCH_MASK)
-        | if intent { MINIFAT_INTENT_BIT } else { 0 }
-        | if slot_present {
-            MINIFAT_SLOT_PRESENT_BIT
-        } else {
-            0
+impl MiniFATPolicyState {
+    /// Decodes the low byte of a policy word. No code path stores a byte
+    /// outside the table; callers send `None` to the root cache.
+    const fn from_bits(bits: u8) -> Option<Self> {
+        match bits {
+            0 => Some(Self::DirectUnclaimed),
+            1 => Some(Self::DirectInFlight),
+            2 => Some(Self::DirectDone),
+            3 => Some(Self::CacheInFlight),
+            4 => Some(Self::CacheReady),
+            5 => Some(Self::CacheRetry),
+            6 => Some(Self::CacheRequested),
+            _ => None,
         }
-        | state as u64
+    }
 }
 
-const fn minifat_state_sid(value: u64) -> u32 {
-    (value >> MINIFAT_SID_SHIFT) as u32
-}
+/// One value of `SharedOleFile::minifat_direct_state`: the direct target
+/// SID, flight epoch, waiter intent, slot presence and lifecycle state in
+/// one atomic word.
+///
+/// | Bits    | Field                                                    |
+/// |---------|----------------------------------------------------------|
+/// | 32..=63 | target SID                                               |
+/// | 10..=31 | bounded 22-bit flight epoch                              |
+/// | 9       | a handoff slot is present (changed under the slot mutex) |
+/// | 8       | a waiter announced intent                                |
+/// | 0..=7   | [`MiniFATPolicyState`]                                   |
+///
+/// The epoch prevents a delayed owner from releasing a later same-SID
+/// flight after an ABA transition. The wrapper keeps the raw word, so a
+/// value that was loaded and is handed back to a compare-exchange is
+/// bit-identical.
+#[derive(Clone, Copy)]
+struct MiniFATPolicyWord(u64);
 
-const fn minifat_state_kind(value: u64) -> u8 {
-    (value & MINIFAT_STATE_MASK) as u8
-}
+impl MiniFATPolicyWord {
+    const STATE_MASK: u64 = 0xFF;
+    const INTENT_BIT: u64 = 1 << 8;
+    const SLOT_PRESENT_BIT: u64 = 1 << 9;
+    const EPOCH_SHIFT: u32 = 10;
+    const EPOCH_MAX: u32 = (1 << 22) - 1;
+    const EPOCH_MASK: u64 = (Self::EPOCH_MAX as u64) << Self::EPOCH_SHIFT;
+    const SID_SHIFT: u32 = 32;
 
-const fn minifat_state_epoch(value: u64) -> u32 {
-    ((value & MINIFAT_EPOCH_MASK) >> MINIFAT_EPOCH_SHIFT) as u32
-}
+    /// The word of a freshly opened file: no target, epoch zero.
+    const INITIAL: Self = Self::new(0, MiniFATPolicyState::DirectUnclaimed, 0, false, false);
 
-const fn minifat_state_intent(value: u64) -> bool {
-    value & MINIFAT_INTENT_BIT != 0
-}
+    const fn new(
+        sid: u32,
+        state: MiniFATPolicyState,
+        epoch: u32,
+        intent: bool,
+        slot_present: bool,
+    ) -> Self {
+        Self(
+            ((sid as u64) << Self::SID_SHIFT)
+                | (((epoch as u64) << Self::EPOCH_SHIFT) & Self::EPOCH_MASK)
+                | if intent { Self::INTENT_BIT } else { 0 }
+                | if slot_present {
+                    Self::SLOT_PRESENT_BIT
+                } else {
+                    0
+                }
+                | state as u64,
+        )
+    }
 
-const fn minifat_state_slot_present(value: u64) -> bool {
-    value & MINIFAT_SLOT_PRESENT_BIT != 0
-}
+    const fn decode(value: u64) -> Self {
+        Self(value)
+    }
 
-const fn next_minifat_epoch(value: u64) -> Option<u32> {
-    let epoch = minifat_state_epoch(value);
-    if epoch == (1 << 22) - 1 {
-        None
-    } else {
-        Some(epoch + 1)
+    const fn encode(self) -> u64 {
+        self.0
+    }
+
+    const fn sid(self) -> u32 {
+        (self.0 >> Self::SID_SHIFT) as u32
+    }
+
+    const fn state(self) -> Option<MiniFATPolicyState> {
+        MiniFATPolicyState::from_bits((self.0 & Self::STATE_MASK) as u8)
+    }
+
+    const fn is(self, state: MiniFATPolicyState) -> bool {
+        self.0 & Self::STATE_MASK == state as u64
+    }
+
+    const fn is_cache(self) -> bool {
+        matches!(
+            self.state(),
+            Some(
+                MiniFATPolicyState::CacheRequested
+                    | MiniFATPolicyState::CacheInFlight
+                    | MiniFATPolicyState::CacheReady
+                    | MiniFATPolicyState::CacheRetry
+            )
+        )
+    }
+
+    const fn epoch(self) -> u32 {
+        ((self.0 & Self::EPOCH_MASK) >> Self::EPOCH_SHIFT) as u32
+    }
+
+    /// The epoch of the next flight, or `None` once the bounded epoch is
+    /// exhausted.
+    const fn next_epoch(self) -> Option<u32> {
+        let epoch = self.epoch();
+        if epoch == Self::EPOCH_MAX {
+            None
+        } else {
+            Some(epoch + 1)
+        }
+    }
+
+    const fn intent(self) -> bool {
+        self.0 & Self::INTENT_BIT != 0
+    }
+
+    const fn with_intent(self) -> Self {
+        Self(self.0 | Self::INTENT_BIT)
+    }
+
+    const fn without_intent(self) -> Self {
+        Self(self.0 & !Self::INTENT_BIT)
+    }
+
+    const fn slot_present(self) -> bool {
+        self.0 & Self::SLOT_PRESENT_BIT != 0
+    }
+
+    const fn with_slot_present(self) -> Self {
+        Self(self.0 | Self::SLOT_PRESENT_BIT)
+    }
+
+    const fn without_slot_present(self) -> Self {
+        Self(self.0 & !Self::SLOT_PRESENT_BIT)
     }
 }
 
@@ -466,28 +573,37 @@ enum MiniFATDirectClaim<'file> {
     Cache,
 }
 
+/// The terminal state an owner's drop owes the policy word for its flight.
+#[derive(Clone, Copy)]
+enum MiniFATDirectRelease {
+    /// No successful publication (failure, early return or unwind): the
+    /// flight returns to `DirectUnclaimed` and waiters are told to retry.
+    Unclaimed,
+    /// `publish_success` completed: the flight ends as `DirectDone(sid)`.
+    Done,
+}
+
+/// The claimant that performs the direct read. Dropping it always ends the
+/// flight it claimed; `release` selects the terminal state.
 struct MiniFATDirectOwner<'file> {
     file: &'file SharedOleFile,
     sid: u32,
     epoch: u32,
-    published: bool,
-    success: bool,
+    release: MiniFATDirectRelease,
 }
 
 impl MiniFATDirectOwner<'_> {
     fn publish_success(&mut self, payload: &[u8]) -> Result<(), OleError> {
         self.file
             .publish_minifat_direct(self.sid, self.epoch, payload, true)?;
-        self.published = true;
-        self.success = true;
+        self.release = MiniFATDirectRelease::Done;
         Ok(())
     }
 
     fn publish_failure(&mut self) -> Result<(), OleError> {
         self.file
             .publish_minifat_direct(self.sid, self.epoch, &[], false)?;
-        self.published = true;
-        self.success = false;
+        self.release = MiniFATDirectRelease::Unclaimed;
         Ok(())
     }
 }
@@ -495,16 +611,19 @@ impl MiniFATDirectOwner<'_> {
 impl Drop for MiniFATDirectOwner<'_> {
     fn drop(&mut self) {
         self.file
-            .release_minifat_direct(self.sid, self.epoch, self.published, self.success);
+            .release_minifat_direct(self.sid, self.epoch, self.release);
     }
 }
 
+/// A caller registered in the handoff slot of another caller's flight.
+///
+/// A waiter is only constructed after it announced intent (one count in
+/// `waiter_intent`) and was counted in the slot's `waiters`; dropping it
+/// owes exactly one release of each.
 struct MiniFATDirectWaiter<'file> {
     file: &'file SharedOleFile,
     sid: u32,
     epoch: u32,
-    registered: bool,
-    intent: bool,
 }
 
 impl MiniFATDirectWaiter<'_> {
@@ -557,11 +676,7 @@ impl MiniFATDirectWaiter<'_> {
 
 impl Drop for MiniFATDirectWaiter<'_> {
     fn drop(&mut self) {
-        if self.intent {
-            self.file
-                .release_minifat_waiter(self.sid, self.epoch, self.registered);
-            self.intent = false;
-        }
+        self.file.release_minifat_waiter(self.sid, self.epoch);
     }
 }
 
@@ -736,7 +851,7 @@ impl SharedOleFile {
             limits,
             index: Arc::new(index),
             ministream: Mutex::new(None),
-            minifat_direct_state: AtomicU64::new(minifat_state(0, MINIFAT_DIRECT_UNCLAIMED)),
+            minifat_direct_state: AtomicU64::new(MiniFATPolicyWord::INITIAL.encode()),
             minifat_singleflight: MiniFATSingleFlight::new(),
         })
     }
@@ -814,7 +929,7 @@ impl SharedOleFile {
             limits,
             index: Arc::new(index),
             ministream: Mutex::new(None),
-            minifat_direct_state: AtomicU64::new(minifat_state(0, MINIFAT_DIRECT_UNCLAIMED)),
+            minifat_direct_state: AtomicU64::new(MiniFATPolicyWord::INITIAL.encode()),
             minifat_singleflight: MiniFATSingleFlight::new(),
         })
     }
@@ -1523,6 +1638,12 @@ impl SharedOleFile {
         root.size >= direct_threshold
     }
 
+    /// Loads the MiniFAT direct-read policy word.
+    #[inline]
+    fn minifat_policy(&self) -> MiniFATPolicyWord {
+        MiniFATPolicyWord::decode(self.minifat_direct_state.load(AtomicOrdering::Acquire))
+    }
+
     fn announce_singleflight_waiter(&self) -> bool {
         let intent = &self.minifat_singleflight.waiter_intent;
         let mut observed = intent.load(AtomicOrdering::Acquire);
@@ -1545,13 +1666,13 @@ impl SharedOleFile {
         // generation; the count remains live until the waiter is registered
         // or its guard is dropped.
         loop {
-            let state = self.minifat_direct_state.load(AtomicOrdering::Acquire);
-            let desired = state | MINIFAT_INTENT_BIT;
+            let state = self.minifat_policy();
+            let desired = state.with_intent();
             if self
                 .minifat_direct_state
                 .compare_exchange(
-                    state,
-                    desired,
+                    state.encode(),
+                    desired.encode(),
                     AtomicOrdering::AcqRel,
                     AtomicOrdering::Acquire,
                 )
@@ -1572,7 +1693,7 @@ impl SharedOleFile {
             return;
         }
         loop {
-            let state = self.minifat_direct_state.load(AtomicOrdering::Acquire);
+            let state = self.minifat_policy();
             if self
                 .minifat_singleflight
                 .waiter_intent
@@ -1583,12 +1704,12 @@ impl SharedOleFile {
                 // while this last old waiter was clearing the bit. Reassert
                 // the same-word intent before returning so count>0 cannot be
                 // left with an unmarked state.
-                let desired = state | MINIFAT_INTENT_BIT;
+                let desired = state.with_intent();
                 if self
                     .minifat_direct_state
                     .compare_exchange(
-                        state,
-                        desired,
+                        state.encode(),
+                        desired.encode(),
                         AtomicOrdering::AcqRel,
                         AtomicOrdering::Acquire,
                     )
@@ -1606,14 +1727,14 @@ impl SharedOleFile {
                 }
                 continue;
             }
-            if !minifat_state_intent(state) {
+            if !state.intent() {
                 return;
             }
             if self
                 .minifat_direct_state
                 .compare_exchange(
-                    state,
-                    state & !MINIFAT_INTENT_BIT,
+                    state.encode(),
+                    state.without_intent().encode(),
                     AtomicOrdering::AcqRel,
                     AtomicOrdering::Acquire,
                 )
@@ -1641,15 +1762,15 @@ impl SharedOleFile {
             return false;
         }
         loop {
-            let state = self.minifat_direct_state.load(AtomicOrdering::Acquire);
-            if minifat_state_intent(state) {
+            let state = self.minifat_policy();
+            if state.intent() {
                 return true;
             }
             if self
                 .minifat_direct_state
                 .compare_exchange(
-                    state,
-                    state | MINIFAT_INTENT_BIT,
+                    state.encode(),
+                    state.with_intent().encode(),
                     AtomicOrdering::AcqRel,
                     AtomicOrdering::Acquire,
                 )
@@ -1665,21 +1786,21 @@ impl SharedOleFile {
     /// may consume and drop before the owner itself unwinds.
     fn mark_singleflight_slot_present(&self, sid: u32, epoch: u32) -> bool {
         loop {
-            let state = self.minifat_direct_state.load(AtomicOrdering::Acquire);
-            if minifat_state_kind(state) != MINIFAT_DIRECT_IN_FLIGHT
-                || minifat_state_sid(state) != sid
-                || minifat_state_epoch(state) != epoch
+            let state = self.minifat_policy();
+            if !state.is(MiniFATPolicyState::DirectInFlight)
+                || state.sid() != sid
+                || state.epoch() != epoch
             {
                 return false;
             }
-            if minifat_state_slot_present(state) {
+            if state.slot_present() {
                 return true;
             }
             if self
                 .minifat_direct_state
                 .compare_exchange(
-                    state,
-                    state | MINIFAT_SLOT_PRESENT_BIT,
+                    state.encode(),
+                    state.with_slot_present().encode(),
                     AtomicOrdering::AcqRel,
                     AtomicOrdering::Acquire,
                 )
@@ -1695,15 +1816,15 @@ impl SharedOleFile {
     /// mutex merely because waiter intent has already reached zero.
     fn clear_singleflight_slot_present(&self) {
         loop {
-            let state = self.minifat_direct_state.load(AtomicOrdering::Acquire);
-            if !minifat_state_slot_present(state) {
+            let state = self.minifat_policy();
+            if !state.slot_present() {
                 return;
             }
             if self
                 .minifat_direct_state
                 .compare_exchange(
-                    state,
-                    state & !MINIFAT_SLOT_PRESENT_BIT,
+                    state.encode(),
+                    state.without_slot_present().encode(),
                     AtomicOrdering::AcqRel,
                     AtomicOrdering::Acquire,
                 )
@@ -1723,25 +1844,26 @@ impl SharedOleFile {
             self.request_ministream_cache();
             return Ok(MiniFATDirectClaim::Cache);
         }
-        let observed = self.minifat_direct_state.load(AtomicOrdering::Acquire);
-        let observed_sid = minifat_state_sid(observed);
-        let observed_kind = minifat_state_kind(observed);
-        match observed_kind {
-            MINIFAT_CACHE_REQUESTED
-            | MINIFAT_CACHE_IN_FLIGHT
-            | MINIFAT_CACHE_READY
-            | MINIFAT_CACHE_RETRY => {
+        let observed = self.minifat_policy();
+        let observed_sid = observed.sid();
+        match observed.state() {
+            Some(
+                MiniFATPolicyState::CacheRequested
+                | MiniFATPolicyState::CacheInFlight
+                | MiniFATPolicyState::CacheReady
+                | MiniFATPolicyState::CacheRetry,
+            ) => {
                 return Ok(MiniFATDirectClaim::Cache);
             },
-            MINIFAT_DIRECT_IN_FLIGHT if observed_sid != sid => {
+            Some(MiniFATPolicyState::DirectInFlight) if observed_sid != sid => {
                 self.request_ministream_cache();
                 return Ok(MiniFATDirectClaim::Cache);
             },
-            MINIFAT_DIRECT_DONE if observed_sid != sid => {
+            Some(MiniFATPolicyState::DirectDone) if observed_sid != sid => {
                 self.request_ministream_cache();
                 return Ok(MiniFATDirectClaim::Cache);
             },
-            MINIFAT_DIRECT_IN_FLIGHT => {
+            Some(MiniFATPolicyState::DirectInFlight) => {
                 if self.minifat_singleflight.slot.is_poisoned() {
                     return Err(minifat_singleflight_poisoned());
                 }
@@ -1751,13 +1873,12 @@ impl SharedOleFile {
                 }
                 return self.claim_minifat_direct_slow(sid, true);
             },
-            MINIFAT_DIRECT_UNCLAIMED | MINIFAT_DIRECT_DONE
-                if observed_kind == MINIFAT_DIRECT_UNCLAIMED || observed_sid == sid =>
-            {
+            // `DirectDone` for another SID was routed to the cache above.
+            Some(MiniFATPolicyState::DirectUnclaimed | MiniFATPolicyState::DirectDone) => {
                 if self.minifat_singleflight.slot.is_poisoned() {
                     return Err(minifat_singleflight_poisoned());
                 }
-                let Some(epoch) = next_minifat_epoch(observed) else {
+                let Some(epoch) = observed.next_epoch() else {
                     // The bounded epoch is deliberately fail-closed. A
                     // wrapped generation could let a delayed owner mutate
                     // a later same-SID flight, so select the permanent
@@ -1770,16 +1891,21 @@ impl SharedOleFile {
                     .waiter_intent
                     .load(AtomicOrdering::Acquire)
                     == 0
-                    && !minifat_state_intent(observed)
-                    && !minifat_state_slot_present(observed)
+                    && !observed.intent()
+                    && !observed.slot_present()
                 {
-                    let desired =
-                        minifat_state_with_meta(sid, MINIFAT_DIRECT_IN_FLIGHT, epoch, false);
+                    let desired = MiniFATPolicyWord::new(
+                        sid,
+                        MiniFATPolicyState::DirectInFlight,
+                        epoch,
+                        false,
+                        false,
+                    );
                     if self
                         .minifat_direct_state
                         .compare_exchange(
-                            observed,
-                            desired,
+                            observed.encode(),
+                            desired.encode(),
                             AtomicOrdering::AcqRel,
                             AtomicOrdering::Acquire,
                         )
@@ -1792,14 +1918,13 @@ impl SharedOleFile {
                             file: self,
                             sid,
                             epoch,
-                            published: false,
-                            success: false,
+                            release: MiniFATDirectRelease::Unclaimed,
                         }));
                     }
                 }
                 return self.claim_minifat_direct_slow(sid, false);
             },
-            _ => {
+            None => {
                 self.request_ministream_cache();
                 return Ok(MiniFATDirectClaim::Cache);
             },
@@ -1825,29 +1950,22 @@ impl SharedOleFile {
             },
         };
         loop {
-            let observed = self.minifat_direct_state.load(AtomicOrdering::Acquire);
-            let observed_sid = minifat_state_sid(observed);
-            let observed_kind = minifat_state_kind(observed);
-            match observed_kind {
-                MINIFAT_CACHE_REQUESTED
-                | MINIFAT_CACHE_IN_FLIGHT
-                | MINIFAT_CACHE_READY
-                | MINIFAT_CACHE_RETRY => {
+            let observed = self.minifat_policy();
+            let observed_sid = observed.sid();
+            match observed.state() {
+                Some(
+                    MiniFATPolicyState::CacheRequested
+                    | MiniFATPolicyState::CacheInFlight
+                    | MiniFATPolicyState::CacheReady
+                    | MiniFATPolicyState::CacheRetry,
+                ) => {
                     drop(slot);
                     if announced {
                         self.release_singleflight_intent();
                     }
                     return Ok(MiniFATDirectClaim::Cache);
                 },
-                MINIFAT_DIRECT_IN_FLIGHT if observed_sid != sid => {
-                    drop(slot);
-                    if announced {
-                        self.release_singleflight_intent();
-                    }
-                    self.request_ministream_cache();
-                    return Ok(MiniFATDirectClaim::Cache);
-                },
-                MINIFAT_DIRECT_DONE if observed_sid != sid => {
+                Some(MiniFATPolicyState::DirectInFlight) if observed_sid != sid => {
                     drop(slot);
                     if announced {
                         self.release_singleflight_intent();
@@ -1855,8 +1973,16 @@ impl SharedOleFile {
                     self.request_ministream_cache();
                     return Ok(MiniFATDirectClaim::Cache);
                 },
-                MINIFAT_DIRECT_IN_FLIGHT => {
-                    let epoch = minifat_state_epoch(observed);
+                Some(MiniFATPolicyState::DirectDone) if observed_sid != sid => {
+                    drop(slot);
+                    if announced {
+                        self.release_singleflight_intent();
+                    }
+                    self.request_ministream_cache();
+                    return Ok(MiniFATDirectClaim::Cache);
+                },
+                Some(MiniFATPolicyState::DirectInFlight) => {
+                    let epoch = observed.epoch();
                     if let Some(current) = slot.as_ref()
                         && (current.sid != sid || current.epoch != epoch)
                     {
@@ -1883,20 +2009,20 @@ impl SharedOleFile {
                         // A cache takeover may race with the intent CAS while
                         // this caller still owns the slot mutex. Re-evaluate
                         // before creating a handoff marker for a cache flight.
-                        let current_state = self.minifat_direct_state.load(AtomicOrdering::Acquire);
-                        if minifat_state_kind(current_state) != MINIFAT_DIRECT_IN_FLIGHT
-                            || minifat_state_sid(current_state) != sid
-                            || minifat_state_epoch(current_state) != epoch
+                        let current_state = self.minifat_policy();
+                        if !current_state.is(MiniFATPolicyState::DirectInFlight)
+                            || current_state.sid() != sid
+                            || current_state.epoch() != epoch
                         {
                             continue;
                         }
                         if !self.mark_singleflight_slot_present(sid, epoch) {
                             continue;
                         }
-                        let current_state = self.minifat_direct_state.load(AtomicOrdering::Acquire);
-                        if minifat_state_kind(current_state) != MINIFAT_DIRECT_IN_FLIGHT
-                            || minifat_state_sid(current_state) != sid
-                            || minifat_state_epoch(current_state) != epoch
+                        let current_state = self.minifat_policy();
+                        if !current_state.is(MiniFATPolicyState::DirectInFlight)
+                            || current_state.sid() != sid
+                            || current_state.epoch() != epoch
                         {
                             self.clear_singleflight_slot_present();
                             continue;
@@ -1913,6 +2039,18 @@ impl SharedOleFile {
                         && current.sid == sid
                         && current.epoch == epoch
                     {
+                        // A caller that lost the lock-free claim arrives here
+                        // unannounced when another waiter already created the
+                        // slot. Its guard releases one intent on drop, so it
+                        // must take its own before registering.
+                        if !announced {
+                            if !self.announce_singleflight_waiter() {
+                                drop(slot);
+                                self.request_ministream_cache();
+                                return Ok(MiniFATDirectClaim::Cache);
+                            }
+                            announced = true;
+                        }
                         if !self.mark_singleflight_slot_present(sid, epoch) {
                             drop(slot);
                             if announced {
@@ -1924,10 +2062,10 @@ impl SharedOleFile {
                             drop(slot);
                             return Ok(MiniFATDirectClaim::Cache);
                         }
-                        let current_state = self.minifat_direct_state.load(AtomicOrdering::Acquire);
-                        if minifat_state_kind(current_state) != MINIFAT_DIRECT_IN_FLIGHT
-                            || minifat_state_sid(current_state) != sid
-                            || minifat_state_epoch(current_state) != epoch
+                        let current_state = self.minifat_policy();
+                        if !current_state.is(MiniFATPolicyState::DirectInFlight)
+                            || current_state.sid() != sid
+                            || current_state.epoch() != epoch
                         {
                             drop(slot);
                             if announced {
@@ -1942,8 +2080,6 @@ impl SharedOleFile {
                                 file: self,
                                 sid,
                                 epoch,
-                                registered: true,
-                                intent: true,
                             }));
                         }
                         drop(slot);
@@ -1960,7 +2096,7 @@ impl SharedOleFile {
                     self.request_ministream_cache();
                     return Ok(MiniFATDirectClaim::Cache);
                 },
-                MINIFAT_DIRECT_UNCLAIMED | MINIFAT_DIRECT_DONE => {
+                Some(MiniFATPolicyState::DirectUnclaimed | MiniFATPolicyState::DirectDone) => {
                     if let Some(current) = slot.as_ref()
                         && current.sid != sid
                         && (current.owner_active || current.waiters > 0)
@@ -1988,7 +2124,7 @@ impl SharedOleFile {
                                     | MiniFATSingleFlightStatus::CompletedNoHandoff
                             )
                         {
-                            let Some(epoch) = next_minifat_epoch(observed) else {
+                            let Some(epoch) = observed.next_epoch() else {
                                 drop(slot);
                                 if announced {
                                     self.release_singleflight_intent();
@@ -1999,14 +2135,15 @@ impl SharedOleFile {
                             if self
                                 .minifat_direct_state
                                 .compare_exchange(
-                                    observed,
-                                    minifat_state_with_slot(
+                                    observed.encode(),
+                                    MiniFATPolicyWord::new(
                                         sid,
-                                        MINIFAT_DIRECT_IN_FLIGHT,
+                                        MiniFATPolicyState::DirectInFlight,
                                         epoch,
-                                        minifat_state_intent(observed),
+                                        observed.intent(),
                                         true,
-                                    ),
+                                    )
+                                    .encode(),
                                     AtomicOrdering::AcqRel,
                                     AtomicOrdering::Acquire,
                                 )
@@ -2029,8 +2166,7 @@ impl SharedOleFile {
                                     file: self,
                                     sid,
                                     epoch,
-                                    published: false,
-                                    success: false,
+                                    release: MiniFATDirectRelease::Unclaimed,
                                 }));
                             }
                             continue;
@@ -2048,10 +2184,9 @@ impl SharedOleFile {
                                 drop(slot);
                                 return Ok(MiniFATDirectClaim::Cache);
                             }
-                            let current_state =
-                                self.minifat_direct_state.load(AtomicOrdering::Acquire);
-                            if minifat_state_kind(current_state) != MINIFAT_DIRECT_DONE
-                                && minifat_state_kind(current_state) != MINIFAT_DIRECT_UNCLAIMED
+                            let current_state = self.minifat_policy();
+                            if !current_state.is(MiniFATPolicyState::DirectDone)
+                                && !current_state.is(MiniFATPolicyState::DirectUnclaimed)
                             {
                                 drop(slot);
                                 if announced {
@@ -2067,8 +2202,6 @@ impl SharedOleFile {
                                     file: self,
                                     sid,
                                     epoch: current_epoch,
-                                    registered: true,
-                                    intent: true,
                                 }));
                             }
                             drop(slot);
@@ -2088,7 +2221,7 @@ impl SharedOleFile {
                         slot.take();
                         self.clear_singleflight_slot_present();
                     }
-                    let Some(epoch) = next_minifat_epoch(observed) else {
+                    let Some(epoch) = observed.next_epoch() else {
                         drop(slot);
                         if announced {
                             self.release_singleflight_intent();
@@ -2096,7 +2229,7 @@ impl SharedOleFile {
                         self.request_ministream_cache();
                         return Ok(MiniFATDirectClaim::Cache);
                     };
-                    let intent = minifat_state_intent(observed)
+                    let intent = observed.intent()
                         || self
                             .minifat_singleflight
                             .waiter_intent
@@ -2105,8 +2238,15 @@ impl SharedOleFile {
                     if self
                         .minifat_direct_state
                         .compare_exchange(
-                            observed,
-                            minifat_state_with_meta(sid, MINIFAT_DIRECT_IN_FLIGHT, epoch, intent),
+                            observed.encode(),
+                            MiniFATPolicyWord::new(
+                                sid,
+                                MiniFATPolicyState::DirectInFlight,
+                                epoch,
+                                intent,
+                                false,
+                            )
+                            .encode(),
                             AtomicOrdering::AcqRel,
                             AtomicOrdering::Acquire,
                         )
@@ -2120,12 +2260,11 @@ impl SharedOleFile {
                             file: self,
                             sid,
                             epoch,
-                            published: false,
-                            success: false,
+                            release: MiniFATDirectRelease::Unclaimed,
                         }));
                     }
                 },
-                _ => {
+                None => {
                     drop(slot);
                     if announced {
                         self.release_singleflight_intent();
@@ -2147,10 +2286,10 @@ impl SharedOleFile {
         payload: &[u8],
         success: bool,
     ) -> Result<(), OleError> {
-        let observed = self.minifat_direct_state.load(AtomicOrdering::Acquire);
-        if minifat_state_kind(observed) != MINIFAT_DIRECT_IN_FLIGHT
-            || minifat_state_sid(observed) != sid
-            || minifat_state_epoch(observed) != epoch
+        let observed = self.minifat_policy();
+        if !observed.is(MiniFATPolicyState::DirectInFlight)
+            || observed.sid() != sid
+            || observed.epoch() != epoch
         {
             return Ok(());
         }
@@ -2162,7 +2301,7 @@ impl SharedOleFile {
             .waiter_intent
             .load(AtomicOrdering::Acquire)
             == 0
-            && !minifat_state_intent(observed)
+            && !observed.intent()
         {
             return Ok(());
         }
@@ -2174,10 +2313,10 @@ impl SharedOleFile {
             .slot
             .lock()
             .map_err(|_error| minifat_singleflight_poisoned())?;
-        let current_state = self.minifat_direct_state.load(AtomicOrdering::Acquire);
-        if minifat_state_kind(current_state) != MINIFAT_DIRECT_IN_FLIGHT
-            || minifat_state_sid(current_state) != sid
-            || minifat_state_epoch(current_state) != epoch
+        let current_state = self.minifat_policy();
+        if !current_state.is(MiniFATPolicyState::DirectInFlight)
+            || current_state.sid() != sid
+            || current_state.epoch() != epoch
         {
             return Ok(());
         }
@@ -2199,32 +2338,33 @@ impl SharedOleFile {
         Ok(())
     }
 
-    fn release_minifat_direct(&self, sid: u32, epoch: u32, published: bool, success: bool) {
-        let state = self.minifat_direct_state.load(AtomicOrdering::Acquire);
-        if minifat_state_kind(state) == MINIFAT_DIRECT_IN_FLIGHT
-            && minifat_state_sid(state) == sid
-            && minifat_state_epoch(state) == epoch
+    fn release_minifat_direct(&self, sid: u32, epoch: u32, release: MiniFATDirectRelease) {
+        let succeeded = matches!(release, MiniFATDirectRelease::Done);
+        let state = self.minifat_policy();
+        if state.is(MiniFATPolicyState::DirectInFlight)
+            && state.sid() == sid
+            && state.epoch() == epoch
             && self
                 .minifat_singleflight
                 .waiter_intent
                 .load(AtomicOrdering::Acquire)
                 == 0
-            && !minifat_state_intent(state)
-            && !minifat_state_slot_present(state)
+            && !state.intent()
+            && !state.slot_present()
             && !self.minifat_singleflight.slot.is_poisoned()
         {
-            let target_kind = if published && success {
-                MINIFAT_DIRECT_DONE
+            let target_kind = if succeeded {
+                MiniFATPolicyState::DirectDone
             } else {
-                MINIFAT_DIRECT_UNCLAIMED
+                MiniFATPolicyState::DirectUnclaimed
             };
-            let target_sid = if published && success { sid } else { 0 };
-            let target = minifat_state_with_meta(target_sid, target_kind, epoch, false);
+            let target_sid = if succeeded { sid } else { 0 };
+            let target = MiniFATPolicyWord::new(target_sid, target_kind, epoch, false, false);
             if self
                 .minifat_direct_state
                 .compare_exchange(
-                    state,
-                    target,
+                    state.encode(),
+                    target.encode(),
                     AtomicOrdering::AcqRel,
                     AtomicOrdering::Acquire,
                 )
@@ -2242,23 +2382,17 @@ impl SharedOleFile {
             .slot
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let observed = self.minifat_direct_state.load(AtomicOrdering::Acquire);
-        let state_matches = minifat_state_kind(observed) == MINIFAT_DIRECT_IN_FLIGHT
-            && minifat_state_sid(observed) == sid
-            && minifat_state_epoch(observed) == epoch;
-        let cache_state = matches!(
-            minifat_state_kind(observed),
-            MINIFAT_CACHE_REQUESTED
-                | MINIFAT_CACHE_IN_FLIGHT
-                | MINIFAT_CACHE_READY
-                | MINIFAT_CACHE_RETRY
-        );
+        let observed = self.minifat_policy();
+        let state_matches = observed.is(MiniFATPolicyState::DirectInFlight)
+            && observed.sid() == sid
+            && observed.epoch() == epoch;
+        let cache_state = observed.is_cache();
         let slot_matches = slot
             .as_ref()
             .is_some_and(|current| current.sid == sid && current.epoch == epoch);
 
         if slot_matches && (state_matches || cache_state) {
-            if !published || !success {
+            if !succeeded {
                 if let Some(current) = slot.as_mut() {
                     current.status = MiniFATSingleFlightStatus::Failed;
                 }
@@ -2300,39 +2434,39 @@ impl SharedOleFile {
         }
         let mut state_terminal = false;
         if state_matches {
-            let target_kind = if published && success {
-                MINIFAT_DIRECT_DONE
+            let target_kind = if succeeded {
+                MiniFATPolicyState::DirectDone
             } else {
-                MINIFAT_DIRECT_UNCLAIMED
+                MiniFATPolicyState::DirectUnclaimed
             };
-            let target_sid = if published && success { sid } else { 0 };
+            let target_sid = if succeeded { sid } else { 0 };
             // A late waiter announces intent without taking the slot mutex.
             // Reload after every failed CAS so that this owner cannot unlock
             // with an ownerless IN_FLIGHT marker when that bit changes after
             // the first state load. Cache takeover is allowed to win; its
             // state is handled by the cleanup below.
             loop {
-                let current_state = self.minifat_direct_state.load(AtomicOrdering::Acquire);
-                if minifat_state_kind(current_state) != MINIFAT_DIRECT_IN_FLIGHT
-                    || minifat_state_sid(current_state) != sid
-                    || minifat_state_epoch(current_state) != epoch
+                let current_state = self.minifat_policy();
+                if !current_state.is(MiniFATPolicyState::DirectInFlight)
+                    || current_state.sid() != sid
+                    || current_state.epoch() != epoch
                 {
                     break;
                 }
-                let intent = minifat_state_intent(current_state)
+                let intent = current_state.intent()
                     || self
                         .minifat_singleflight
                         .waiter_intent
                         .load(AtomicOrdering::Acquire)
                         != 0;
-                let slot_present = minifat_state_slot_present(current_state) || slot.is_some();
+                let slot_present = current_state.slot_present() || slot.is_some();
                 let target =
-                    minifat_state_with_slot(target_sid, target_kind, epoch, intent, slot_present);
+                    MiniFATPolicyWord::new(target_sid, target_kind, epoch, intent, slot_present);
                 if self
                     .minifat_direct_state
                     .compare_exchange(
-                        current_state,
-                        target,
+                        current_state.encode(),
+                        target.encode(),
                         AtomicOrdering::AcqRel,
                         AtomicOrdering::Acquire,
                     )
@@ -2344,14 +2478,8 @@ impl SharedOleFile {
             }
         }
 
-        let state_after = self.minifat_direct_state.load(AtomicOrdering::Acquire);
-        let cache_after = matches!(
-            minifat_state_kind(state_after),
-            MINIFAT_CACHE_REQUESTED
-                | MINIFAT_CACHE_IN_FLIGHT
-                | MINIFAT_CACHE_READY
-                | MINIFAT_CACHE_RETRY
-        );
+        let state_after = self.minifat_policy();
+        let cache_after = state_after.is_cache();
         if slot_matches {
             let mut remove_slot = false;
             if let Some(current) = slot.as_ref() {
@@ -2370,12 +2498,12 @@ impl SharedOleFile {
         drop(slot);
     }
 
-    fn release_minifat_waiter(&self, sid: u32, epoch: u32, registered: bool) {
+    fn release_minifat_waiter(&self, sid: u32, epoch: u32) {
         // Waiter Drop must remain cleanup-only even after a peer panic. The
         // explicit claim/wait operations report poison as OleError; this
         // recovery is solely to prevent a leaked waiter from stranding the
         // bounded flight marker.
-        if registered {
+        {
             let mut slot = self
                 .minifat_singleflight
                 .slot
@@ -2400,26 +2528,29 @@ impl SharedOleFile {
 
     fn request_ministream_cache(&self) {
         loop {
-            let observed = self.minifat_direct_state.load(AtomicOrdering::Acquire);
-            let kind = minifat_state_kind(observed);
+            let observed = self.minifat_policy();
             if matches!(
-                kind,
-                MINIFAT_CACHE_REQUESTED | MINIFAT_CACHE_IN_FLIGHT | MINIFAT_CACHE_READY
+                observed.state(),
+                Some(
+                    MiniFATPolicyState::CacheRequested
+                        | MiniFATPolicyState::CacheInFlight
+                        | MiniFATPolicyState::CacheReady
+                )
             ) {
                 return;
             }
-            let desired = minifat_state_with_slot(
+            let desired = MiniFATPolicyWord::new(
                 MINIFAT_CACHE_SID,
-                MINIFAT_CACHE_REQUESTED,
-                minifat_state_epoch(observed),
-                minifat_state_intent(observed),
-                minifat_state_slot_present(observed),
+                MiniFATPolicyState::CacheRequested,
+                observed.epoch(),
+                observed.intent(),
+                observed.slot_present(),
             );
             if self
                 .minifat_direct_state
                 .compare_exchange(
-                    observed,
-                    desired,
+                    observed.encode(),
+                    desired.encode(),
                     AtomicOrdering::AcqRel,
                     AtomicOrdering::Acquire,
                 )
@@ -2432,64 +2563,63 @@ impl SharedOleFile {
 
     fn begin_ministream_cache(&self) -> u64 {
         loop {
-            let state = self.minifat_direct_state.load(AtomicOrdering::Acquire);
-            let kind = minifat_state_kind(state);
-            if kind == MINIFAT_CACHE_READY {
-                return state;
+            let state = self.minifat_policy();
+            if state.is(MiniFATPolicyState::CacheReady) {
+                return state.encode();
             }
-            if kind == MINIFAT_CACHE_IN_FLIGHT {
+            if state.is(MiniFATPolicyState::CacheInFlight) {
                 // Cache initialization is serialized by `ministream`; a
                 // second caller cannot observe this state after acquiring the
                 // mutex unless an earlier initializer left it stranded. Do
                 // not spin while holding the mutex.
-                return state;
+                return state.encode();
             }
-            let desired = minifat_state_with_slot(
+            let desired = MiniFATPolicyWord::new(
                 MINIFAT_CACHE_SID,
-                MINIFAT_CACHE_IN_FLIGHT,
-                minifat_state_epoch(state),
-                minifat_state_intent(state),
-                minifat_state_slot_present(state),
+                MiniFATPolicyState::CacheInFlight,
+                state.epoch(),
+                state.intent(),
+                state.slot_present(),
             );
             if self
                 .minifat_direct_state
                 .compare_exchange(
-                    state,
-                    desired,
+                    state.encode(),
+                    desired.encode(),
                     AtomicOrdering::AcqRel,
                     AtomicOrdering::Acquire,
                 )
                 .is_ok()
             {
-                return state;
+                return state.encode();
             }
         }
     }
 
     fn finish_ministream_cache(&self, _previous: u64, success: bool) {
-        let in_flight = self.minifat_direct_state.load(AtomicOrdering::Acquire);
-        if minifat_state_kind(in_flight) != MINIFAT_CACHE_IN_FLIGHT {
+        let in_flight = self.minifat_policy();
+        if !in_flight.is(MiniFATPolicyState::CacheInFlight) {
             return;
         }
         let target_kind = if success {
-            MINIFAT_CACHE_READY
+            MiniFATPolicyState::CacheReady
         } else {
             // Once a caller has selected the root cache, a failed cache load
             // must remain retryable through that cache. Returning to the
             // direct state could reintroduce a second bounded read after a
             // concurrent/different target already observed this path.
-            MINIFAT_CACHE_RETRY
+            MiniFATPolicyState::CacheRetry
         };
-        let target = minifat_state_with_slot(
+        let target = MiniFATPolicyWord::new(
             MINIFAT_CACHE_SID,
             target_kind,
-            minifat_state_epoch(in_flight),
-            minifat_state_intent(in_flight),
-            minifat_state_slot_present(in_flight),
+            in_flight.epoch(),
+            in_flight.intent(),
+            in_flight.slot_present(),
         );
         let _ = self.minifat_direct_state.compare_exchange(
-            in_flight,
-            target,
+            in_flight.encode(),
+            target.encode(),
             AtomicOrdering::AcqRel,
             AtomicOrdering::Acquire,
         );
@@ -4410,7 +4540,7 @@ mod tests {
             limits: SharedOleFileLimits::default(),
             index: Arc::new(index),
             ministream: Mutex::new(None),
-            minifat_direct_state: AtomicU64::new(minifat_state(0, MINIFAT_DIRECT_UNCLAIMED)),
+            minifat_direct_state: AtomicU64::new(MiniFATPolicyWord::INITIAL.encode()),
             minifat_singleflight: MiniFATSingleFlight::new(),
         };
         (file, source, physical_start, present)
@@ -5014,8 +5144,9 @@ mod tests {
         assert_eq!(file.open_stream(&["Mini"]).unwrap(), expected);
         assert!(file.mini_stream_is_materialized());
         assert_eq!(
-            minifat_state_kind(file.minifat_direct_state.load(AtomicOrdering::SeqCst)),
-            MINIFAT_CACHE_READY
+            MiniFATPolicyWord::decode(file.minifat_direct_state.load(AtomicOrdering::SeqCst))
+                .state(),
+            Some(MiniFATPolicyState::CacheReady)
         );
         let after_first_cached = source.reads.load(AtomicOrdering::SeqCst);
         assert_eq!(file.open_stream(&["Mini"]).unwrap().len(), 4095);
@@ -5058,8 +5189,9 @@ mod tests {
         assert_eq!(range, expected[31..48]);
         assert!(!file.mini_stream_is_materialized());
         assert_eq!(
-            minifat_state_kind(file.minifat_direct_state.load(AtomicOrdering::SeqCst)),
-            MINIFAT_DIRECT_UNCLAIMED
+            MiniFATPolicyWord::decode(file.minifat_direct_state.load(AtomicOrdering::SeqCst))
+                .state(),
+            Some(MiniFATPolicyState::DirectUnclaimed)
         );
 
         assert_eq!(file.open_stream(&["Selected"]).unwrap(), expected);
@@ -5220,15 +5352,17 @@ mod tests {
         assert!(matches!(file.open_stream(&["Other"]), Err(OleError::Io(_))));
         assert!(!file.mini_stream_is_materialized());
         assert_eq!(
-            minifat_state_kind(file.minifat_direct_state.load(AtomicOrdering::SeqCst)),
-            MINIFAT_CACHE_RETRY
+            MiniFATPolicyWord::decode(file.minifat_direct_state.load(AtomicOrdering::SeqCst))
+                .state(),
+            Some(MiniFATPolicyState::CacheRetry)
         );
 
         assert_eq!(file.open_stream(&["Other"]).unwrap(), vec![0xD3; 4095]);
         assert!(file.mini_stream_is_materialized());
         assert_eq!(
-            minifat_state_kind(file.minifat_direct_state.load(AtomicOrdering::SeqCst)),
-            MINIFAT_CACHE_READY
+            MiniFATPolicyWord::decode(file.minifat_direct_state.load(AtomicOrdering::SeqCst))
+                .state(),
+            Some(MiniFATPolicyState::CacheReady)
         );
         let after_retry = source.reads.load(AtomicOrdering::SeqCst);
         assert_eq!(file.open_stream(&["Selected"]).unwrap(), selected);
@@ -5564,7 +5698,8 @@ mod tests {
             status: MiniFATSingleFlightStatus::CompletedNoHandoff,
         });
         file.minifat_direct_state.store(
-            minifat_state_with_slot(entry.sid, MINIFAT_DIRECT_DONE, 0, false, true),
+            MiniFATPolicyWord::new(entry.sid, MiniFATPolicyState::DirectDone, 0, false, true)
+                .encode(),
             AtomicOrdering::SeqCst,
         );
 
@@ -5594,7 +5729,8 @@ mod tests {
             .waiter_intent
             .store(1, AtomicOrdering::SeqCst);
         file.minifat_direct_state.store(
-            minifat_state_with_slot(entry.sid, MINIFAT_DIRECT_DONE, 1, true, true),
+            MiniFATPolicyWord::new(entry.sid, MiniFATPolicyState::DirectDone, 1, true, true)
+                .encode(),
             AtomicOrdering::SeqCst,
         );
 
@@ -5608,8 +5744,6 @@ mod tests {
             file: &file,
             sid: entry.sid,
             epoch: 1,
-            registered: true,
-            intent: true,
         };
         let MiniFATDirectClaim::Waiter(mut new_waiter) = file
             .claim_minifat_direct_mode(entry.sid, entry.size)
@@ -5642,7 +5776,14 @@ mod tests {
         let entry = file.find_entry(&["Selected"]).unwrap();
         let max_epoch = (1_u32 << 22) - 1;
         file.minifat_direct_state.store(
-            minifat_state_with_meta(entry.sid, MINIFAT_DIRECT_DONE, max_epoch, false),
+            MiniFATPolicyWord::new(
+                entry.sid,
+                MiniFATPolicyState::DirectDone,
+                max_epoch,
+                false,
+                false,
+            )
+            .encode(),
             AtomicOrdering::SeqCst,
         );
 
@@ -5652,8 +5793,9 @@ mod tests {
             MiniFATDirectClaim::Cache
         ));
         assert_eq!(
-            minifat_state_kind(file.minifat_direct_state.load(AtomicOrdering::SeqCst)),
-            MINIFAT_CACHE_REQUESTED
+            MiniFATPolicyWord::decode(file.minifat_direct_state.load(AtomicOrdering::SeqCst))
+                .state(),
+            Some(MiniFATPolicyState::CacheRequested)
         );
     }
 
@@ -5667,33 +5809,53 @@ mod tests {
             .waiter_intent
             .store(1, AtomicOrdering::SeqCst);
         file.minifat_direct_state.store(
-            minifat_state_with_meta(entry.sid, MINIFAT_DIRECT_DONE, epoch, true),
+            MiniFATPolicyWord::new(
+                entry.sid,
+                MiniFATPolicyState::DirectDone,
+                epoch,
+                true,
+                false,
+            )
+            .encode(),
             AtomicOrdering::SeqCst,
         );
 
         file.request_ministream_cache();
         let requested = file.minifat_direct_state.load(AtomicOrdering::SeqCst);
-        assert_eq!(minifat_state_kind(requested), MINIFAT_CACHE_REQUESTED);
-        assert_eq!(minifat_state_epoch(requested), epoch);
-        assert!(minifat_state_intent(requested));
+        assert_eq!(
+            MiniFATPolicyWord::decode(requested).state(),
+            Some(MiniFATPolicyState::CacheRequested)
+        );
+        assert_eq!(MiniFATPolicyWord::decode(requested).epoch(), epoch);
+        assert!(MiniFATPolicyWord::decode(requested).intent());
 
         let previous = file.begin_ministream_cache();
-        assert_eq!(minifat_state_kind(previous), MINIFAT_CACHE_REQUESTED);
+        assert_eq!(
+            MiniFATPolicyWord::decode(previous).state(),
+            Some(MiniFATPolicyState::CacheRequested)
+        );
         let in_flight = file.minifat_direct_state.load(AtomicOrdering::SeqCst);
-        assert_eq!(minifat_state_kind(in_flight), MINIFAT_CACHE_IN_FLIGHT);
-        assert_eq!(minifat_state_epoch(in_flight), epoch);
-        assert!(minifat_state_intent(in_flight));
+        assert_eq!(
+            MiniFATPolicyWord::decode(in_flight).state(),
+            Some(MiniFATPolicyState::CacheInFlight)
+        );
+        assert_eq!(MiniFATPolicyWord::decode(in_flight).epoch(), epoch);
+        assert!(MiniFATPolicyWord::decode(in_flight).intent());
 
         file.finish_ministream_cache(previous, true);
         let ready = file.minifat_direct_state.load(AtomicOrdering::SeqCst);
-        assert_eq!(minifat_state_kind(ready), MINIFAT_CACHE_READY);
-        assert_eq!(minifat_state_epoch(ready), epoch);
-        assert!(minifat_state_intent(ready));
+        assert_eq!(
+            MiniFATPolicyWord::decode(ready).state(),
+            Some(MiniFATPolicyState::CacheReady)
+        );
+        assert_eq!(MiniFATPolicyWord::decode(ready).epoch(), epoch);
+        assert!(MiniFATPolicyWord::decode(ready).intent());
 
         file.release_singleflight_intent();
-        assert!(!minifat_state_intent(
-            file.minifat_direct_state.load(AtomicOrdering::SeqCst)
-        ));
+        assert!(
+            !MiniFATPolicyWord::decode(file.minifat_direct_state.load(AtomicOrdering::SeqCst))
+                .intent()
+        );
     }
 
     #[test]
@@ -5705,14 +5867,16 @@ mod tests {
             .waiter_intent
             .store(1, AtomicOrdering::SeqCst);
         file.minifat_direct_state.store(
-            minifat_state_with_meta(entry.sid, MINIFAT_DIRECT_DONE, 9, false),
+            MiniFATPolicyWord::new(entry.sid, MiniFATPolicyState::DirectDone, 9, false, false)
+                .encode(),
             AtomicOrdering::SeqCst,
         );
 
         assert!(file.reassert_singleflight_intent());
-        assert!(minifat_state_intent(
-            file.minifat_direct_state.load(AtomicOrdering::SeqCst)
-        ));
+        assert!(
+            MiniFATPolicyWord::decode(file.minifat_direct_state.load(AtomicOrdering::SeqCst))
+                .intent()
+        );
         file.release_singleflight_intent();
         assert_eq!(
             file.minifat_singleflight
@@ -5720,18 +5884,21 @@ mod tests {
                 .load(AtomicOrdering::SeqCst),
             0
         );
-        assert!(!minifat_state_intent(
-            file.minifat_direct_state.load(AtomicOrdering::SeqCst)
-        ));
+        assert!(
+            !MiniFATPolicyWord::decode(file.minifat_direct_state.load(AtomicOrdering::SeqCst))
+                .intent()
+        );
 
         assert!(file.announce_singleflight_waiter());
-        assert!(minifat_state_intent(
-            file.minifat_direct_state.load(AtomicOrdering::SeqCst)
-        ));
+        assert!(
+            MiniFATPolicyWord::decode(file.minifat_direct_state.load(AtomicOrdering::SeqCst))
+                .intent()
+        );
         file.release_singleflight_intent();
-        assert!(!minifat_state_intent(
-            file.minifat_direct_state.load(AtomicOrdering::SeqCst)
-        ));
+        assert!(
+            !MiniFATPolicyWord::decode(file.minifat_direct_state.load(AtomicOrdering::SeqCst))
+                .intent()
+        );
     }
 
     #[test]
@@ -5894,8 +6061,9 @@ mod tests {
         owner.publish_failure().unwrap();
         drop(owner);
         assert_eq!(
-            minifat_state_kind(file.minifat_direct_state.load(AtomicOrdering::SeqCst)),
-            MINIFAT_CACHE_REQUESTED
+            MiniFATPolicyWord::decode(file.minifat_direct_state.load(AtomicOrdering::SeqCst))
+                .state(),
+            Some(MiniFATPolicyState::CacheRequested)
         );
         assert!(matches!(
             file.claim_minifat_direct_mode(selected.sid, selected.size)
@@ -5967,13 +6135,15 @@ mod tests {
         owner.publish_success(&expected).unwrap();
         assert_eq!(waiter.wait().unwrap().unwrap().unwrap(), expected);
         drop(waiter);
-        assert!(minifat_state_slot_present(
-            file.minifat_direct_state.load(AtomicOrdering::Acquire)
-        ));
+        assert!(
+            MiniFATPolicyWord::decode(file.minifat_direct_state.load(AtomicOrdering::Acquire))
+                .slot_present()
+        );
         drop(owner);
-        assert!(!minifat_state_slot_present(
-            file.minifat_direct_state.load(AtomicOrdering::Acquire)
-        ));
+        assert!(
+            !MiniFATPolicyWord::decode(file.minifat_direct_state.load(AtomicOrdering::Acquire))
+                .slot_present()
+        );
 
         let MiniFATDirectClaim::Owner(mut repeat_owner) = file
             .claim_minifat_direct_mode(entry.sid, entry.size)
@@ -5992,6 +6162,114 @@ mod tests {
         assert_eq!(repeat_waiter.wait().unwrap().unwrap().unwrap(), expected);
         drop(repeat_waiter);
         assert!(!file.minifat_singleflight.slot.lock().unwrap().is_some());
+    }
+
+    #[test]
+    fn unannounced_claimant_joining_an_existing_slot_holds_its_own_intent() {
+        let (bytes, expected) = two_mini_bytes(36);
+        let file = shared(Arc::new(TestSource::new(bytes)));
+        let entry = file.find_entry(&["Selected"]).unwrap();
+        let intent_count = || {
+            file.minifat_singleflight
+                .waiter_intent
+                .load(AtomicOrdering::SeqCst)
+        };
+
+        let MiniFATDirectClaim::Owner(mut owner) = file
+            .claim_minifat_direct_mode(entry.sid, entry.size)
+            .unwrap()
+        else {
+            panic!("first direct caller should own the flight");
+        };
+        assert!(file.announce_singleflight_waiter());
+        let MiniFATDirectClaim::Waiter(mut announced) =
+            file.claim_minifat_direct_slow(entry.sid, true).unwrap()
+        else {
+            panic!("overlapping caller should register as a waiter");
+        };
+        // A caller that loaded the pre-claim word in
+        // `claim_minifat_direct_mode` and lost its claim CAS to `owner`
+        // enters the slow path unannounced; here it arrives after the
+        // announced waiter created the slot.
+        let MiniFATDirectClaim::Waiter(mut late) =
+            file.claim_minifat_direct_slow(entry.sid, false).unwrap()
+        else {
+            panic!("late caller should join the existing slot as a waiter");
+        };
+        let after_late_registration = intent_count();
+
+        owner.publish_success(&expected).unwrap();
+        assert_eq!(announced.wait().unwrap().unwrap().unwrap(), expected);
+        assert_eq!(late.wait().unwrap().unwrap().unwrap(), expected);
+        drop(late);
+        let after_late_drop = intent_count();
+        drop(announced);
+        assert_eq!(
+            (after_late_registration, after_late_drop, intent_count()),
+            (2, 1, 0)
+        );
+        assert!(
+            !MiniFATPolicyWord::decode(file.minifat_direct_state.load(AtomicOrdering::SeqCst))
+                .intent()
+        );
+        drop(owner);
+        let terminal =
+            MiniFATPolicyWord::decode(file.minifat_direct_state.load(AtomicOrdering::SeqCst));
+        assert_eq!(terminal.state(), Some(MiniFATPolicyState::DirectDone));
+        assert!(!terminal.slot_present());
+        assert!(!file.mini_stream_is_materialized());
+    }
+
+    #[test]
+    fn policy_word_layout_round_trips_every_field() {
+        let states = [
+            MiniFATPolicyState::DirectUnclaimed,
+            MiniFATPolicyState::DirectInFlight,
+            MiniFATPolicyState::DirectDone,
+            MiniFATPolicyState::CacheInFlight,
+            MiniFATPolicyState::CacheReady,
+            MiniFATPolicyState::CacheRetry,
+            MiniFATPolicyState::CacheRequested,
+        ];
+        for (bits, state) in states.into_iter().enumerate() {
+            let word = MiniFATPolicyWord::new(0xDEAD_BEEF, state, 0x2A_5A5A, true, false);
+            assert_eq!(
+                word.encode(),
+                (0xDEAD_BEEF_u64 << 32) | (0x2A_5A5A_u64 << 10) | (1 << 8) | bits as u64
+            );
+            let decoded = MiniFATPolicyWord::decode(word.encode());
+            assert_eq!(decoded.state(), Some(state));
+            assert!(decoded.is(state));
+            assert_eq!(decoded.is_cache(), bits >= 3);
+            assert_eq!(decoded.sid(), 0xDEAD_BEEF);
+            assert_eq!(decoded.epoch(), 0x2A_5A5A);
+            assert!(decoded.intent() && !decoded.slot_present());
+            assert_eq!(
+                decoded.without_intent().with_slot_present().encode(),
+                word.encode() ^ (0b11 << 8)
+            );
+            assert_eq!(
+                decoded
+                    .with_slot_present()
+                    .without_slot_present()
+                    .with_intent()
+                    .encode(),
+                word.encode()
+            );
+        }
+        assert_eq!(MiniFATPolicyWord::INITIAL.encode(), 0);
+        assert_eq!(MiniFATPolicyWord::decode(7).state(), None);
+        assert_eq!(MiniFATPolicyWord::decode(0xFF).state(), None);
+        assert!(!MiniFATPolicyWord::decode(0xFF).is_cache());
+        let last = MiniFATPolicyWord::new(
+            1,
+            MiniFATPolicyState::DirectDone,
+            (1 << 22) - 1,
+            false,
+            false,
+        );
+        assert_eq!(last.next_epoch(), None);
+        assert_eq!(MiniFATPolicyWord::INITIAL.next_epoch(), Some(1));
     }
 
     #[test]
@@ -6063,8 +6341,10 @@ mod tests {
                     }
                     thread::yield_now();
                 }
-                let intent_seen =
-                    minifat_state_intent(file.minifat_direct_state.load(AtomicOrdering::Acquire));
+                let intent_seen = MiniFATPolicyWord::decode(
+                    file.minifat_direct_state.load(AtomicOrdering::Acquire),
+                )
+                .intent();
                 file.minifat_singleflight
                     .release_pause_continue
                     .store(1, AtomicOrdering::SeqCst);
@@ -6082,9 +6362,12 @@ mod tests {
         assert_eq!(claimant_result.unwrap().unwrap(), expected);
         assert!(!file.minifat_singleflight.slot.lock().unwrap().is_some());
         let terminal = file.minifat_direct_state.load(AtomicOrdering::Acquire);
-        assert_eq!(minifat_state_kind(terminal), MINIFAT_DIRECT_DONE);
-        assert_eq!(minifat_state_sid(terminal), entry.sid);
-        assert!(!minifat_state_slot_present(terminal));
+        assert_eq!(
+            MiniFATPolicyWord::decode(terminal).state(),
+            Some(MiniFATPolicyState::DirectDone)
+        );
+        assert_eq!(MiniFATPolicyWord::decode(terminal).sid(), entry.sid);
+        assert!(!MiniFATPolicyWord::decode(terminal).slot_present());
 
         // A repeat after the forced intent race must claim a fresh direct
         // owner, proving that the release did not strand an ownerless flight.
@@ -6170,7 +6453,7 @@ mod tests {
                 let mut intent_seen = false;
                 for _ in 0..100_000 {
                     let state = file.minifat_direct_state.load(AtomicOrdering::Acquire);
-                    if minifat_state_intent(state)
+                    if MiniFATPolicyWord::decode(state).intent()
                         && file
                             .minifat_singleflight
                             .waiter_intent
@@ -6189,13 +6472,13 @@ mod tests {
                 // Capture the terminal metadata before allowing the late
                 // guard to release its intent count.
                 let terminal = file.minifat_direct_state.load(AtomicOrdering::Acquire);
-                let terminal_intent = minifat_state_intent(terminal);
+                let terminal_intent = MiniFATPolicyWord::decode(terminal).intent();
                 let terminal_count = file
                     .minifat_singleflight
                     .waiter_intent
                     .load(AtomicOrdering::Acquire);
-                let terminal_epoch = minifat_state_epoch(terminal);
-                let terminal_sid = minifat_state_sid(terminal);
+                let terminal_epoch = MiniFATPolicyWord::decode(terminal).epoch();
+                let terminal_sid = MiniFATPolicyWord::decode(terminal).sid();
                 late_release.store(1, AtomicOrdering::SeqCst);
                 (
                     release_result,
@@ -6213,14 +6496,14 @@ mod tests {
             assert!(late_result.is_ok());
             assert!(intent_seen);
             assert_eq!(
-                minifat_state_kind(terminal),
+                MiniFATPolicyWord::decode(terminal).state(),
                 if completed_without_handoff {
-                    MINIFAT_DIRECT_DONE
+                    Some(MiniFATPolicyState::DirectDone)
                 } else {
-                    MINIFAT_DIRECT_UNCLAIMED
+                    Some(MiniFATPolicyState::DirectUnclaimed)
                 }
             );
-            assert!(!minifat_state_slot_present(terminal));
+            assert!(!MiniFATPolicyWord::decode(terminal).slot_present());
             assert!(terminal_intent);
             assert_eq!(terminal_count, 1);
             assert_eq!(terminal_epoch, owner_epoch);
@@ -6239,7 +6522,7 @@ mod tests {
                     .load(AtomicOrdering::Acquire),
                 0
             );
-            assert!(!minifat_state_intent(after_late));
+            assert!(!MiniFATPolicyWord::decode(after_late).intent());
             file.minifat_singleflight
                 .release_pause
                 .store(0, AtomicOrdering::SeqCst);
@@ -6400,8 +6683,9 @@ mod tests {
         assert_eq!(cached.unwrap(), vec![0xD3; 4095]);
         assert!(file.mini_stream_is_materialized());
         assert_eq!(
-            minifat_state_kind(file.minifat_direct_state.load(AtomicOrdering::SeqCst)),
-            MINIFAT_CACHE_READY
+            MiniFATPolicyWord::decode(file.minifat_direct_state.load(AtomicOrdering::SeqCst))
+                .state(),
+            Some(MiniFATPolicyState::CacheReady)
         );
         let ranges = source.read_ranges();
         assert_eq!(
@@ -6438,15 +6722,17 @@ mod tests {
         assert!(matches!(other_result, Err(OleError::Io(_))));
         assert!(!file.mini_stream_is_materialized());
         assert_eq!(
-            minifat_state_kind(file.minifat_direct_state.load(AtomicOrdering::SeqCst)),
-            MINIFAT_CACHE_RETRY
+            MiniFATPolicyWord::decode(file.minifat_direct_state.load(AtomicOrdering::SeqCst))
+                .state(),
+            Some(MiniFATPolicyState::CacheRetry)
         );
 
         assert_eq!(file.open_stream(&["Other"]).unwrap(), vec![0xD3; 4095]);
         assert!(file.mini_stream_is_materialized());
         assert_eq!(
-            minifat_state_kind(file.minifat_direct_state.load(AtomicOrdering::SeqCst)),
-            MINIFAT_CACHE_READY
+            MiniFATPolicyWord::decode(file.minifat_direct_state.load(AtomicOrdering::SeqCst))
+                .state(),
+            Some(MiniFATPolicyState::CacheReady)
         );
         let ranges = source.read_ranges();
         assert_eq!(
@@ -6597,7 +6883,7 @@ mod tests {
             limits: SharedOleFileLimits::default(),
             index: Arc::new(index),
             ministream: Mutex::new(None),
-            minifat_direct_state: AtomicU64::new(minifat_state(0, MINIFAT_DIRECT_UNCLAIMED)),
+            minifat_direct_state: AtomicU64::new(MiniFATPolicyWord::INITIAL.encode()),
             minifat_singleflight: MiniFATSingleFlight::new(),
         };
 
@@ -6821,7 +7107,7 @@ mod tests {
             limits: SharedOleFileLimits::default(),
             index: Arc::new(index),
             ministream: Mutex::new(None),
-            minifat_direct_state: AtomicU64::new(minifat_state(0, MINIFAT_DIRECT_UNCLAIMED)),
+            minifat_direct_state: AtomicU64::new(MiniFATPolicyWord::INITIAL.encode()),
             minifat_singleflight: MiniFATSingleFlight::new(),
         };
 
@@ -6903,7 +7189,7 @@ mod tests {
             limits: SharedOleFileLimits::default(),
             index: Arc::new(index),
             ministream: Mutex::new(None),
-            minifat_direct_state: AtomicU64::new(minifat_state(0, MINIFAT_DIRECT_UNCLAIMED)),
+            minifat_direct_state: AtomicU64::new(MiniFATPolicyWord::INITIAL.encode()),
             minifat_singleflight: MiniFATSingleFlight::new(),
         };
 
@@ -8129,7 +8415,7 @@ mod tests {
             limits,
             index: Arc::new(index),
             ministream: Mutex::new(None),
-            minifat_direct_state: AtomicU64::new(minifat_state(0, MINIFAT_DIRECT_UNCLAIMED)),
+            minifat_direct_state: AtomicU64::new(MiniFATPolicyWord::INITIAL.encode()),
             minifat_singleflight: MiniFATSingleFlight::new(),
         };
         (file, chain, payload)
@@ -8714,7 +9000,7 @@ mod tests {
             limits: SharedOleFileLimits::default(),
             index: Arc::new(index),
             ministream: Mutex::new(None),
-            minifat_direct_state: AtomicU64::new(minifat_state(0, MINIFAT_DIRECT_UNCLAIMED)),
+            minifat_direct_state: AtomicU64::new(MiniFATPolicyWord::INITIAL.encode()),
             minifat_singleflight: MiniFATSingleFlight::new(),
         };
 
@@ -9728,8 +10014,9 @@ mod tests {
         ));
         assert_eq!(source.reads.load(AtomicOrdering::SeqCst), 0);
         assert_eq!(
-            minifat_state_kind(file.minifat_direct_state.load(AtomicOrdering::SeqCst)),
-            MINIFAT_DIRECT_UNCLAIMED
+            MiniFATPolicyWord::decode(file.minifat_direct_state.load(AtomicOrdering::SeqCst))
+                .state(),
+            Some(MiniFATPolicyState::DirectUnclaimed)
         );
 
         let (cancel, token) = CancellationSource::pair();
@@ -9741,8 +10028,9 @@ mod tests {
         ));
         assert_eq!(source.reads.load(AtomicOrdering::SeqCst), 0);
         assert_eq!(
-            minifat_state_kind(file.minifat_direct_state.load(AtomicOrdering::SeqCst)),
-            MINIFAT_DIRECT_UNCLAIMED
+            MiniFATPolicyWord::decode(file.minifat_direct_state.load(AtomicOrdering::SeqCst))
+                .state(),
+            Some(MiniFATPolicyState::DirectUnclaimed)
         );
 
         let (_cancel, token) = CancellationSource::pair();

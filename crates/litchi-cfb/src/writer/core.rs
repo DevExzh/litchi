@@ -251,24 +251,6 @@ struct IndexedStream<'a> {
     canonical: CanonicalPath,
 }
 
-/// Represents a pending stream write operation
-#[derive(Debug, Clone)]
-#[allow(dead_code, reason = "reserved for future implementation")]
-struct StreamWrite {
-    /// Path to the stream
-    path: Vec<String>,
-    /// Stream data
-    data: Vec<u8>,
-}
-
-/// Represents a pending storage creation operation  
-#[derive(Debug, Clone)]
-#[allow(dead_code, reason = "reserved for future implementation")]
-struct StorageCreate {
-    /// Path to the storage
-    path: Vec<String>,
-}
-
 /// Directory entry for writing
 #[derive(Debug, Clone)]
 #[allow(dead_code, reason = "reserved for future implementation")]
