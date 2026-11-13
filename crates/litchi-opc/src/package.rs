@@ -5218,6 +5218,39 @@ mod tests {
     }
 
     #[test]
+    fn content_types_source_memo_moves_between_unknown_valid_and_invalid() {
+        let state = ContentTypesSourceState::unknown();
+        assert_eq!(state.load(), None);
+        assert_eq!(state.clone().load(), None);
+
+        state.store(true);
+        assert_eq!(state.load(), Some(true));
+        state.store(false);
+        assert_eq!(state.load(), Some(false));
+        state.store(true);
+        assert_eq!(state.load(), Some(true));
+
+        // A clone starts from the memo it was taken from and then moves on
+        // its own.
+        let valid = state.clone();
+        assert_eq!(valid.load(), Some(true));
+        state.reset();
+        assert_eq!(state.load(), None);
+        assert_eq!(valid.load(), Some(true));
+
+        state.store(false);
+        let invalid = state.clone();
+        state.reset();
+        assert_eq!(state.load(), None);
+        assert_eq!(invalid.load(), Some(false));
+        invalid.reset();
+        assert_eq!(invalid.load(), None);
+        // Resetting an unknown memo keeps it unknown.
+        invalid.reset();
+        assert_eq!(invalid.load(), None);
+    }
+
+    #[test]
     fn content_types_source_state_is_clone_local_and_tracks_mutation_routes() {
         let source = create_minimal_docx();
         let document = PackURI::new("/word/document.xml").unwrap();

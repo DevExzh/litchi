@@ -3814,4 +3814,152 @@ mod tests {
             Err(Error::Blocked(BlockReason::MarkupCompatibility))
         ));
     }
+
+    /// Extended properties whose `HeadingPairs` lists `groups` in order and
+    /// whose `TitlesOfParts` lists `titles`.
+    fn heading_group_source(groups: &[(&str, usize)], titles: &[&str]) -> String {
+        let mut pairs = String::new();
+        for (label, count) in groups {
+            pairs.push_str(&format!(
+                "<v:variant><v:lpstr>{label}</v:lpstr></v:variant><v:variant><v:i4>{count}</v:i4></v:variant>"
+            ));
+        }
+        let mut parts = String::new();
+        for title in titles {
+            parts.push_str(&format!("<v:lpstr>{title}</v:lpstr>"));
+        }
+        format!(
+            r#"<p:Properties xmlns:p="{EXTENDED_PROPERTIES_NAMESPACE}" xmlns:v="{PROPERTY_TYPES_NAMESPACE}"><p:HeadingPairs><v:vector size="{}" baseType="variant">{pairs}</v:vector></p:HeadingPairs><p:TitlesOfParts><v:vector size="{}" baseType="lpstr">{parts}</v:vector></p:TitlesOfParts></p:Properties>"#,
+            groups.len() * 2,
+            titles.len()
+        )
+    }
+
+    fn heading_group_outcome(
+        groups: &[(&str, usize)],
+        titles: &[&str],
+    ) -> std::result::Result<(), String> {
+        let source = heading_group_source(groups, titles);
+        match insert_title(source.as_bytes(), &["One", "Two"], 2, "New", equivalent) {
+            Ok(Some(_)) => Ok(()),
+            Ok(None) => Err("no metadata".to_owned()),
+            Err(Error::Invalid(message)) => Err(message),
+            Err(Error::Blocked(reason)) => Err(format!("blocked: {reason:?}")),
+            Err(other) => Err(format!("other: {other:?}")),
+        }
+    }
+
+    #[test]
+    fn heading_groups_are_accepted_only_as_sheets_then_named_ranges() {
+        const SHEET_ORDER: &str =
+            "extended-properties HeadingPairs sheet category is out of order or duplicated";
+        const NAMED_ORDER: &str =
+            "extended-properties HeadingPairs named-range category is out of order or duplicated";
+        const SHEET_COUNT: &str =
+            "extended-properties sheet category count does not match the catalog";
+        const NAMED_COUNT: &str =
+            "extended-properties named-range category count does not match trailing titles";
+        const TWO: &[&str] = &["One", "Two"];
+        const THREE: &[&str] = &["One", "Two", "Two!Print_Area"];
+        type Case<'a> = (
+            &'a [(&'a str, usize)],
+            &'a [&'a str],
+            std::result::Result<(), &'a str>,
+        );
+        let cases: &[Case<'_>] = &[
+            (&[("Sheet", 2)], TWO, Ok(())),
+            (&[("Worksheets", 2)], TWO, Ok(())),
+            (&[("Worksheets", 2), ("Named Ranges", 0)], TWO, Ok(())),
+            (&[("Sheet", 2), ("Named Range", 1)], THREE, Ok(())),
+            (&[("Worksheets", 2), ("Named Ranges", 1)], THREE, Ok(())),
+            // The named-range group needs the sheet group before it.
+            (&[("Named Ranges", 1)], THREE, Err(NAMED_ORDER)),
+            (
+                &[("Named Ranges", 1), ("Sheet", 2)],
+                THREE,
+                Err(NAMED_ORDER),
+            ),
+            (
+                &[("Named Range", 0), ("Worksheets", 2)],
+                TWO,
+                Err(NAMED_ORDER),
+            ),
+            // Either group appears at most once, under either of its labels.
+            (&[("Sheet", 2), ("Sheet", 2)], TWO, Err(SHEET_ORDER)),
+            (&[("Sheet", 2), ("Worksheets", 2)], TWO, Err(SHEET_ORDER)),
+            (
+                &[("Sheet", 2), ("Named Ranges", 1), ("Named Range", 1)],
+                THREE,
+                Err(NAMED_ORDER),
+            ),
+            (
+                &[("Sheet", 2), ("Named Ranges", 1), ("Worksheets", 2)],
+                THREE,
+                Err(SHEET_ORDER),
+            ),
+            // Ordering is reported before a count mismatch of the same pair.
+            (&[("Sheet", 2), ("Sheet", 7)], TWO, Err(SHEET_ORDER)),
+            (&[("Named Ranges", 7)], THREE, Err(NAMED_ORDER)),
+            // A count mismatch of an earlier pair is reported before the
+            // ordering of a later one.
+            (&[("Sheet", 1), ("Sheet", 2)], TWO, Err(SHEET_COUNT)),
+            (&[("Sheet", 3)], TWO, Err(SHEET_COUNT)),
+            (
+                &[("Sheet", 2), ("Named Ranges", 2)],
+                THREE,
+                Err(NAMED_COUNT),
+            ),
+            (
+                &[("Sheet", 2), ("Named Ranges", 2), ("Named Ranges", 1)],
+                THREE,
+                Err(NAMED_COUNT),
+            ),
+            (
+                &[("Sheet", 2)],
+                THREE,
+                Err("extended-properties trailing titles have no matching named-range category"),
+            ),
+            (
+                &[],
+                TWO,
+                Err("extended-properties HeadingPairs has no Sheet or Worksheets category"),
+            ),
+            (
+                &[("Sheet", 2), ("Charts", 0)],
+                TWO,
+                Err("blocked: UnmodeledReference"),
+            ),
+        ];
+        for (groups, titles, expected) in cases {
+            assert_eq!(
+                heading_group_outcome(groups, titles),
+                expected.map_err(str::to_owned),
+                "{groups:?} {titles:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn title_removal_applies_the_same_heading_group_order() {
+        let reversed = heading_group_source(
+            &[("Named Ranges", 1), ("Sheet", 2)],
+            &["One", "Two", "Two!Print_Area"],
+        );
+        let duplicated = heading_group_source(&[("Sheet", 2), ("Worksheets", 2)], &["One", "Two"]);
+        for (source, expected) in [
+            (
+                reversed,
+                "extended-properties HeadingPairs named-range category is out of order or duplicated",
+            ),
+            (
+                duplicated,
+                "extended-properties HeadingPairs sheet category is out of order or duplicated",
+            ),
+        ] {
+            match remove_titles(source.as_bytes(), &["One", "Two"], &[0], equivalent) {
+                Err(Error::Invalid(message)) => assert_eq!(message, expected),
+                other => panic!("unexpected removal outcome: {other:?}"),
+            }
+        }
+    }
 }
