@@ -1,5 +1,5 @@
 //! Paired ODT timing: the leaf `litchi_odt` API against the unified
-//! `litchi_ops` API on the same generated document (record 0276).
+//! `litchi_ops` API on the same generated document.
 //!
 //! Scenarios, each timed as leaf and unified legs in ABBA order:
 //!
@@ -7,7 +7,7 @@
 //!   (the body index is built inside the clock on both sides);
 //! - `query_all`: every paragraph's text from a warm handle (leaf: the body
 //!   index walk; unified: `query("p")` with a path per match);
-//! - `query_all_owned` (record 0280): the same unified leg against a fair
+//! - `query_all_owned`: the same unified leg against a fair
 //!   leaf equivalent that also keeps each match's handle and positional
 //!   address;
 //! - `single_set`: replace one mid-document paragraph's text and commit;

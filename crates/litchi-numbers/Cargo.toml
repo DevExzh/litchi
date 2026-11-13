@@ -37,14 +37,6 @@ prost    = { workspace = true }
 tempfile = { workspace = true }
 
 [[example]]
-name = "numbers_mac_queue_caption_routes"
-path = "examples/mac_queue_caption_routes.rs"
-
-[[example]]
-name = "mac_queue_native_routes"
-path = "examples/mac_queue_native_routes.rs"
-
-[[example]]
 name = "numbers_edit_chart_arrangement"
 path = "examples/edit_chart_arrangement.rs"
 

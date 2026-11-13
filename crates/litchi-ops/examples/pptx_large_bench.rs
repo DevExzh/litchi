@@ -1,7 +1,7 @@
-//! Large-slide PPTX edit-and-write timing (record 0317): one slide of 1,000
+//! Large-slide PPTX edit-and-write timing: one slide of 1,000
 //! text boxes, shape 501. A source-backed PPTX owner keeps an edited slide as
 //! an overlay and audits it when it writes the package, against the physical
-//! slide (records 0311, 0313 and 0317), so each leg edits and then writes the
+//! slide, so each leg edits and then writes the
 //! deck to a sink:
 //!
 //! - `leaf_set_write` / `unified_set_write`: `Edit::set_shape_text` + commit

@@ -1,5 +1,5 @@
 //! Formula-evaluation parity against the cached results stored in the
-//! spreadsheet corpus (record 0266).
+//! spreadsheet corpus.
 //!
 //! Every XLSX, XLSM, XLSB and XLS file under the corpus root is opened and
 //! recalculated with `File::recalculate`; each formula's computed value is

@@ -235,121 +235,15 @@ required-features = [
     "odg",
 ]
 
-[[example]]
-name = "query_walk_bench"
-required-features = ["test-support"]
-
-# Prints the corpus query digests, to compare two builds (record 0262).
+# Prints the corpus query digests, to compare two builds.
 [[example]]
 name              = "query_corpus_digest"
 required-features = ["xlsx", "docx", "pptx", "xls", "xlsb", "ods"]
 
-# Writes the File-route packages of the macOS queue (record 0430).
-[[example]]
-name              = "mac_queue_file_routes"
-required-features = ["pages", "keynote", "numbers"]
-
-# Formula-evaluation parity against the corpus' cached results (record 0266).
-[[example]]
-name              = "sheet_features_bench"
-required-features = ["xls", "ods"]
-
+# Formula-evaluation parity against the corpus' cached results.
 [[example]]
 name              = "eval_parity"
 required-features = ["xlsx", "xlsb", "xls", "eval"]
-
-# Paired leaf-vs-unified import and evaluation measurements (record 0266).
-[[example]]
-name              = "m4_bench"
-required-features = ["xlsx", "xlsb", "xls", "eval"]
-
-# XLS CSV-import scaling across row counts (record 0359fa).
-[[example]]
-name              = "xls_import_scaling"
-required-features = ["xls"]
-
-# Sheet-trait static-dispatch measurements: evaluation and per-cell reads (record 0353).
-[[example]]
-name              = "sheet_dispatch_bench"
-required-features = ["xlsx", "xlsb", "xls", "eval"]
-
-# Paired leaf-vs-unified template merge measurements (record 0274).
-[[example]]
-name              = "merge_bench"
-required-features = ["docx"]
-
-# Paired leaf-vs-unified find/replace measurements (record 0273).
-[[example]]
-name              = "find_replace_bench"
-required-features = ["docx", "pptx"]
-
-# Paired leaf-vs-unified measurements of the remaining ODF formats (record 0282).
-[[example]]
-name              = "odf_leaves_bench"
-required-features = ["oth", "odm", "odg", "odc", "odi", "odb", "odf-formula"]
-
-# Untimed correctness and bounded phase protocol for the shared-triad ODF
-# qualification lane (record 0362uw).  Keep this example out of no-default
-# and single-format all-targets checks: it deliberately pairs all four
-# changed families.
-[[example]]
-name              = "odf_shared_triad_qualification"
-required-features = ["odc", "odi", "oth", "odm"]
-
-# Paired leaf-vs-unified field refresh measurements (record 0279).
-[[example]]
-name              = "refresh_bench"
-required-features = ["docx", "xlsx", "eval"]
-
-# Paired leaf-vs-unified iWork measurements (record 0296).
-[[example]]
-name              = "iwork_bench"
-required-features = ["pages", "keynote", "numbers"]
-
-# Paired leaf-vs-unified iWork directory and open-option routes (record 0306).
-[[example]]
-name              = "iwork_directory_bench"
-required-features = ["pages", "keynote", "numbers"]
-
-# Paired leaf-vs-unified Numbers measurements (record 0297).
-[[example]]
-name              = "numbers_unified_bench"
-required-features = ["numbers"]
-
-# Paired leaf-vs-unified Pages write measurements (record 0299).
-[[example]]
-name              = "pages_bench"
-required-features = ["pages"]
-
-# Paired leaf-vs-unified Keynote measurements (record 0298).
-[[example]]
-name              = "keynote_bench"
-required-features = ["keynote"]
-
-# Paired leaf-vs-unified find, merge and import on more formats (record 0295).
-[[example]]
-name              = "m4_formats_bench"
-required-features = ["odt", "doc", "ods"]
-
-# Paired leaf-vs-unified XLSX worksheet feature measurements (record 0320).
-[[example]]
-name              = "xlsx_features_bench"
-required-features = ["xlsx"]
-
-# Paired leaf-vs-unified OOXML write follow-up measurements (record 0325).
-[[example]]
-name              = "ooxml_followups_bench"
-required-features = ["docx", "pptx", "xlsx"]
-
-# Paired leaf-vs-unified XLSB worksheet feature measurements (record 0322).
-[[example]]
-name              = "xlsb_features_bench"
-required-features = ["xlsb"]
-
-# `File::dump` against a read-only traversal (record 0336).
-[[example]]
-name              = "dump_bench"
-required-features = ["docx", "xlsx", "pptx"]
 
 [lints]
 workspace = true

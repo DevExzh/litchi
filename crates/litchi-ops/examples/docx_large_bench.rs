@@ -1,9 +1,9 @@
-//! Large-document DOCX single-op timing (record 0305): the middle paragraph
-//! of a 1,000-paragraph document (record 0307's fixture shape), the leaf
+//! Large-document DOCX single-op timing: the middle paragraph of a generated
+//! 1,000-paragraph document, the leaf
 //! `Edit::replace_paragraph_text` / `insert_paragraph` + commit against the
 //! unified `set` / `add` on a default (`SourceMode::Auto`, source-backed)
-//! owner and on an eager owner, and (record 0311, `committed_*`) on a handle
-//! already committed from the default owner, and (record 0313, `fresh_*`) the
+//! owner and on an eager owner, and (`committed_*`) on a handle
+//! already committed from the default owner, and (`fresh_*`) the
 //! first add on a handle opened for that call, so the overlay audits the
 //! original and the insertion as a pair. Each leg: two warm-ups, nine samples of
 //! `DOCX_LARGE_LOOPS` calls (default 20), the median in µs per call.
@@ -74,7 +74,7 @@ mod bench {
         )
         .unwrap();
         let path = "/body/p[501]";
-        // A handle already committed from the default owner (record 0311):
+        // A handle already committed from the default owner:
         // its next edit reads the effective revision, not the physical one.
         let committed = auto
             .set("/body/p[2]", props! {"text" => "Committed earlier"})

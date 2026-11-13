@@ -3,7 +3,6 @@
 //! Run with `cargo run --release -p litchi-ops --no-default-features --features ppt
 //! --example ppt_read_bench`. Opening, fixture generation, path/query compilation,
 //! and correctness validation are outside timing. Samples alternate AB/BA order.
-//! This exploratory probe does not replace the frozen performance harness gates.
 
 #[cfg(feature = "ppt")]
 mod enabled {

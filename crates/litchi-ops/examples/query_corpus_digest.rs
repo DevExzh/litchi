@@ -1,6 +1,6 @@
 //! Prints the digests of representative queries over the OOXML corpus
 //! (`tests/support/query_corpus.rs`) as JSON, for comparing two builds and
-//! for blessing `tests/golden/query_corpus/digests.json` (record 0262).
+//! for blessing `tests/golden/query_corpus/digests.json`.
 //!
 //! ```text
 //! cargo run --release -p litchi-ops --features "xlsx docx pptx xls xlsb" \

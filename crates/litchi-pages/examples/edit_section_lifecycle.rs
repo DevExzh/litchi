@@ -1,4 +1,4 @@
-//! Add a Pages section after another one, or remove a section (record 0312).
+//! Add a Pages section after another one, or remove a section.
 //!
 //! ```text
 //! cargo run -p litchi-pages --example edit_section_lifecycle -- \
