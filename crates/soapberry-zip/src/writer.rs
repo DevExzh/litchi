@@ -102,7 +102,6 @@ struct DirectorySpool {
     saw_zip64: bool,
     limits: DirectorySpoolLimits,
     replay_buffer: Vec<u8>,
-    poisoned: bool,
 }
 
 impl std::fmt::Debug for DirectorySpool {
@@ -114,7 +113,6 @@ impl std::fmt::Debug for DirectorySpool {
             .field("entries", &self.entries)
             .field("saw_zip64", &self.saw_zip64)
             .field("limits", &self.limits)
-            .field("poisoned", &self.poisoned)
             .finish()
     }
 }
@@ -161,18 +159,7 @@ impl DirectorySpool {
             saw_zip64: false,
             limits,
             replay_buffer,
-            poisoned: false,
         })
-    }
-
-    fn healthy(&self) -> Result<(), Error> {
-        if self.poisoned {
-            return Err(ErrorKind::InvalidInput {
-                msg: "central-directory spool is poisoned after a prior failure".to_string(),
-            }
-            .into());
-        }
-        Ok(())
     }
 
     fn capacity_for(&self, additional: u64) -> Result<u64, Error> {
@@ -193,7 +180,6 @@ impl DirectorySpool {
     }
 
     fn check_capacity(&self, additional: u64) -> Result<(), Error> {
-        self.healthy()?;
         self.capacity_for(additional).map(|_| ())
     }
 
@@ -227,41 +213,21 @@ impl DirectorySpool {
         Ok(bytes)
     }
 
+    /// Appends one finalized central record. Any failure leaves the spool
+    /// in an unknown state; the owning archive poisons itself on `Err` and
+    /// never calls the spool again.
     fn append_record(&mut self, file: &FileHeader, name: &[u8]) -> Result<(), Error> {
-        self.healthy()?;
-        let record_len = match Self::record_len(file, name) {
-            Ok(length) => length,
-            Err(error) => {
-                self.poisoned = true;
-                return Err(error);
-            },
-        };
-        if let Err(error) = self.capacity_for(record_len) {
-            self.poisoned = true;
-            return Err(error);
-        }
-        let bytes = match Self::record_bytes(file, name) {
-            Ok(bytes) => bytes,
-            Err(error) => {
-                self.poisoned = true;
-                return Err(error);
-            },
-        };
-        if let Err(error) = self.write_bytes(&bytes) {
-            self.poisoned = true;
-            return Err(error);
-        }
+        let record_len = Self::record_len(file, name)?;
+        self.capacity_for(record_len)?;
+        let bytes = Self::record_bytes(file, name)?;
+        self.write_bytes(&bytes)?;
         self.extent += record_len;
-        self.entries = match self.entries.checked_add(1) {
-            Some(entries) => entries,
-            None => {
-                self.poisoned = true;
-                return Err(ErrorKind::InvalidInput {
-                    msg: "central-directory entry count overflows u64".to_string(),
-                }
-                .into());
-            },
-        };
+        self.entries = self
+            .entries
+            .checked_add(1)
+            .ok_or_else(|| ErrorKind::InvalidInput {
+                msg: "central-directory entry count overflows u64".to_string(),
+            })?;
         self.saw_zip64 |= file.needs_zip64();
         Ok(())
     }
@@ -309,13 +275,11 @@ impl DirectorySpool {
     }
 
     fn replay_into<W: Write>(&mut self, output: &mut W) -> Result<u64, Error> {
-        self.healthy()?;
         loop {
             match self.store.flush() {
                 Ok(()) => break,
                 Err(source) if source.kind() == io::ErrorKind::Interrupted => continue,
                 Err(source) => {
-                    self.poisoned = true;
                     return Err(ErrorKind::CentralDirectorySpool {
                         operation: "flush before replay",
                         source,
@@ -328,7 +292,6 @@ impl DirectorySpool {
             match self.store.seek(SeekFrom::Start(self.base_offset)) {
                 Ok(offset) if offset == self.base_offset => break,
                 Ok(offset) => {
-                    self.poisoned = true;
                     return Err(ErrorKind::CentralDirectorySpool {
                         operation: "seek for replay",
                         source: io::Error::new(
@@ -343,7 +306,6 @@ impl DirectorySpool {
                 },
                 Err(source) if source.kind() == io::ErrorKind::Interrupted => continue,
                 Err(source) => {
-                    self.poisoned = true;
                     return Err(ErrorKind::CentralDirectorySpool {
                         operation: "seek for replay",
                         source,
@@ -361,7 +323,6 @@ impl DirectorySpool {
                     Ok(read) => break read,
                     Err(source) if source.kind() == io::ErrorKind::Interrupted => continue,
                     Err(source) => {
-                        self.poisoned = true;
                         return Err(ErrorKind::CentralDirectorySpool {
                             operation: "read for replay",
                             source,
@@ -371,7 +332,6 @@ impl DirectorySpool {
                 }
             };
             if read == 0 {
-                self.poisoned = true;
                 return Err(ErrorKind::CentralDirectorySpool {
                     operation: "read for replay",
                     source: io::Error::new(
@@ -382,7 +342,6 @@ impl DirectorySpool {
                 .into());
             }
             if read > requested {
-                self.poisoned = true;
                 return Err(ErrorKind::CentralDirectorySpool {
                     operation: "read for replay",
                     source: io::Error::new(
@@ -523,8 +482,7 @@ impl ZipArchiveWriterBuilder {
             reusable_deflate: None,
             reusable_crc_stage: CrcStage::default(),
             directory_spool: None,
-            pending_borrowed_entry: false,
-            poisoned: false,
+            state: ArchiveState::Ready,
         }
     }
 
@@ -556,8 +514,7 @@ impl ZipArchiveWriterBuilder {
             reusable_deflate: None,
             reusable_crc_stage: CrcStage::default(),
             directory_spool,
-            pending_borrowed_entry: false,
-            poisoned: false,
+            state: ArchiveState::Ready,
         })
     }
 }
@@ -598,8 +555,33 @@ pub struct ZipArchiveWriter<W> {
     /// entry finishes, so a many-member archive allocates it once.
     reusable_crc_stage: CrcStage,
     directory_spool: Option<Box<DirectorySpool>>,
-    pending_borrowed_entry: bool,
-    poisoned: bool,
+    state: ArchiveState,
+}
+
+/// Lifecycle of a [`ZipArchiveWriter`].
+///
+/// ```text
+/// Ready             --borrowed entry started (`new_file`)--> BorrowedEntryOpen
+/// BorrowedEntryOpen --`ZipEntryWriter::finish` succeeded---> Ready
+/// Ready             --`poison`-----------------------------> Poisoned
+/// BorrowedEntryOpen --`poison`-----------------------------> Poisoned
+/// ```
+///
+/// `Poisoned` is terminal. An owned entry holds the archive by value, so the
+/// archive stays `Ready` (or becomes `Poisoned`) while one is open. Members
+/// are started and the archive is finished only from `Ready`
+/// (`ZipArchiveWriter::ensure_ready`). A central-directory spool has no
+/// state of its own: the archive is poisoned whenever a spool call fails, and
+/// a poisoned archive never reaches its spool again.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ArchiveState {
+    /// No entry is open and every earlier operation succeeded.
+    Ready,
+    /// A borrowed [`ZipEntryWriter`] wrote its local header and has not
+    /// finished.
+    BorrowedEntryOpen,
+    /// A failure left the output or the central directory unusable.
+    Poisoned,
 }
 
 struct SizedLocalHeader {
@@ -1319,24 +1301,33 @@ impl<W> ZipArchiveWriter<W>
 where
     W: Write,
 {
+    /// Refuses a poisoned archive. An entry that is finishing uses this: its
+    /// own archive is `Ready` (owned entry) or `BorrowedEntryOpen`.
     fn ensure_usable(&self) -> Result<(), Error> {
-        if self.poisoned {
-            return Err(ErrorKind::InvalidInput {
-                msg: "ZIP archive is poisoned after a prior failure".to_string(),
-            }
-            .into());
+        match self.state {
+            ArchiveState::Ready | ArchiveState::BorrowedEntryOpen => Ok(()),
+            ArchiveState::Poisoned => Err(Self::poisoned_error()),
         }
-        Ok(())
     }
 
-    fn ensure_no_pending_borrowed_entry(&self) -> Result<(), Error> {
-        if self.pending_borrowed_entry {
-            return Err(ErrorKind::InvalidInput {
+    fn poisoned_error() -> Error {
+        ErrorKind::InvalidInput {
+            msg: "ZIP archive is poisoned after a prior failure".to_string(),
+        }
+        .into()
+    }
+
+    /// Refuses every operation that starts a member or finishes the archive
+    /// unless the archive is `Ready`.
+    fn ensure_ready(&self) -> Result<(), Error> {
+        match self.state {
+            ArchiveState::Ready => Ok(()),
+            ArchiveState::BorrowedEntryOpen => Err(ErrorKind::InvalidInput {
                 msg: "ZIP archive has an unfinished borrowed entry".to_string(),
             }
-            .into());
+            .into()),
+            ArchiveState::Poisoned => Err(Self::poisoned_error()),
         }
-        Ok(())
     }
 
     fn has_directory_spool(&self) -> bool {
@@ -1423,7 +1414,7 @@ where
             match spool.append_record(&file, name) {
                 Ok(()) => Ok(()),
                 Err(error) => {
-                    self.poisoned = true;
+                    self.state = ArchiveState::Poisoned;
                     Err(error)
                 },
             }
@@ -1433,11 +1424,10 @@ where
         }
     }
 
-    fn poison_directory_spool(&mut self) {
-        self.poisoned = true;
-        if let Some(spool) = self.directory_spool.as_mut() {
-            spool.poisoned = true;
-        }
+    /// Moves the archive to `Poisoned` after a failure that left the sink or
+    /// the central directory in an unknown state.
+    fn poison(&mut self) {
+        self.state = ArchiveState::Poisoned;
     }
 
     fn publish_prepared_member(&mut self, prepared: PreparedSizedMember<'_>) -> Result<(), Error> {
@@ -1448,7 +1438,7 @@ where
             match spool.append_record(&file_header, path.as_ref().as_bytes()) {
                 Ok(()) => Ok(()),
                 Err(error) => {
-                    self.poisoned = true;
+                    self.state = ArchiveState::Poisoned;
                     Err(error)
                 },
             }
@@ -1489,8 +1479,7 @@ where
         data: &[u8],
         accounting: &mut ZipOperationAccounting,
     ) -> Result<(), Error> {
-        self.ensure_usable()?;
-        self.ensure_no_pending_borrowed_entry()?;
+        self.ensure_ready()?;
         let path = sized_member_path(name)?;
         let crc32 = crc::crc32(data);
         let size_u64 = usize_to_u64(data.len(), "stored payload length")?;
@@ -1506,7 +1495,7 @@ where
         self.check_directory_spool_file(&prepared.file_header, prepared.name_bytes())?;
         self.reserve_member_metadata(prepared.name_bytes())?;
         if let Err(error) = prepared.write_local(&mut self.writer) {
-            self.poison_directory_spool();
+            self.poison();
             return Err(error);
         }
         if let Err(error) = write_all_counted(
@@ -1515,7 +1504,7 @@ where
             accounting,
             AccountingWriteKind::Stored,
         ) {
-            self.poison_directory_spool();
+            self.poison();
             return Err(error);
         }
         self.publish_prepared_member(prepared)?;
@@ -1607,8 +1596,7 @@ where
         accounting: &mut ZipOperationAccounting,
         accounting_kind: AccountingWriteKind,
     ) -> Result<(), Error> {
-        self.ensure_usable()?;
-        self.ensure_no_pending_borrowed_entry()?;
+        self.ensure_ready()?;
         if !matches!(
             compression_method,
             CompressionMethod::Store | CompressionMethod::Deflate
@@ -1630,13 +1618,13 @@ where
         self.check_directory_spool_file(&prepared.file_header, prepared.name_bytes())?;
         self.reserve_member_metadata(prepared.name_bytes())?;
         if let Err(error) = prepared.write_local(&mut self.writer) {
-            self.poison_directory_spool();
+            self.poison();
             return Err(error);
         }
         if let Err(error) =
             write_all_counted(&mut self.writer, compressed, accounting, accounting_kind)
         {
-            self.poison_directory_spool();
+            self.poison();
             return Err(error);
         }
         self.publish_prepared_member(prepared)?;
@@ -1754,8 +1742,7 @@ where
         name: &str,
         mut options: ZipEntryOptions,
     ) -> Result<(), Error> {
-        self.ensure_usable()?;
-        self.ensure_no_pending_borrowed_entry()?;
+        self.ensure_ready()?;
         let file_path = ZipFilePath::from_str(name);
         if !file_path.is_dir() {
             return Err(Error::from(ErrorKind::InvalidInput {
@@ -1797,7 +1784,7 @@ where
         if let Err(error) =
             self.write_local_header(&file_path, flags, CompressionMethod::Store, &mut options)
         {
-            self.poison_directory_spool();
+            self.poison();
             return Err(error);
         }
 
@@ -1816,11 +1803,11 @@ where
         };
         let mut file_header = file_header;
         if let Err(error) = file_header.finalize_extra_fields() {
-            self.poison_directory_spool();
+            self.poison();
             return Err(error);
         }
         if let Err(error) = self.check_directory_spool_file(&file_header, name_bytes) {
-            self.poison_directory_spool();
+            self.poison();
             return Err(error);
         }
         self.publish_file_header(name_bytes, file_header)?;
@@ -1866,8 +1853,7 @@ where
         name: &str,
         mut options: ZipEntryOptions,
     ) -> Result<ZipEntryWriter<'_, W>, Error> {
-        self.ensure_usable()?;
-        self.ensure_no_pending_borrowed_entry()?;
+        self.ensure_ready()?;
         let file_path = ZipFilePath::from_str(name.trim_end_matches('/'));
 
         if file_path.len() > u16::MAX as usize {
@@ -1895,10 +1881,10 @@ where
         if let Err(error) =
             self.write_local_header(&file_path, flags, options.compression_method, &mut options)
         {
-            self.poison_directory_spool();
+            self.poison();
             return Err(error);
         }
-        self.pending_borrowed_entry = true;
+        self.state = ArchiveState::BorrowedEntryOpen;
 
         Ok(ZipEntryWriter {
             inner: self,
@@ -1934,8 +1920,7 @@ where
         name: &str,
         compression_method: CompressionMethod,
     ) -> Result<ZipOwnedEntryWriter<W>, Error> {
-        self.ensure_usable()?;
-        self.ensure_no_pending_borrowed_entry()?;
+        self.ensure_ready()?;
         if !matches!(
             compression_method,
             CompressionMethod::Store | CompressionMethod::Deflate
@@ -1966,8 +1951,7 @@ where
         name: &str,
         compression_method: CompressionMethod,
     ) -> Result<ZipOwnedEntryWriter<W>, Error> {
-        self.ensure_usable()?;
-        self.ensure_no_pending_borrowed_entry()?;
+        self.ensure_ready()?;
         if !matches!(
             compression_method,
             CompressionMethod::Store | CompressionMethod::Deflate
@@ -1992,8 +1976,7 @@ where
         name: &str,
         mut options: ZipEntryOptions,
     ) -> Result<ZipOwnedEntryWriter<W>, Error> {
-        self.ensure_usable()?;
-        self.ensure_no_pending_borrowed_entry()?;
+        self.ensure_ready()?;
         let file_path = ZipFilePath::from_str(name.trim_end_matches('/'));
         if file_path.len() > u16::MAX as usize {
             return Err(Error::from(ErrorKind::InvalidInput {
@@ -2016,7 +1999,7 @@ where
         if let Err(error) =
             self.write_local_header(&file_path, flags, options.compression_method, &mut options)
         {
-            self.poison_directory_spool();
+            self.poison();
             return Err(error);
         }
 
@@ -2072,11 +2055,7 @@ where
         };
 
         Ok(ZipOwnedEntryWriter {
-            inner: Some(ZipDataWriter::with_crc32_stage(
-                compressor,
-                Crc32Option::default(),
-                crc_stage,
-            )),
+            inner: ZipDataWriter::with_crc32_stage(compressor, Crc32Option::default(), crc_stage),
         })
     }
 
@@ -2088,8 +2067,7 @@ where
     where
         W: Write,
     {
-        self.ensure_usable()?;
-        self.ensure_no_pending_borrowed_entry()?;
+        self.ensure_ready()?;
         let central_directory_offset = self.writer.count();
         let (total_entries, needs_zip64_before_central_directory, central_directory_size) =
             if let Some(mut spool) = self.directory_spool.take() {
@@ -2261,7 +2239,7 @@ impl<'a, W> ZipEntryWriter<'a, W> {
         };
         if let Err(error) = file_header.finalize_extra_fields() {
             if !zip_error_is_interrupted(&error) {
-                self.inner.poison_directory_spool();
+                self.inner.poison();
             }
             return Err(error);
         }
@@ -2273,13 +2251,13 @@ impl<'a, W> ZipEntryWriter<'a, W> {
             self.zip64,
         ) {
             if !zip_error_is_interrupted(&error) {
-                self.inner.poison_directory_spool();
+                self.inner.poison();
             }
             return Err(error);
         }
         let name = self.name.unwrap_or_default();
         self.inner.publish_file_header(&name, file_header)?;
-        self.inner.pending_borrowed_entry = false;
+        self.inner.state = ArchiveState::Ready;
 
         Ok(self.compressed_bytes)
     }
@@ -2297,7 +2275,7 @@ where
                     io::ErrorKind::InvalidInput,
                     "ZIP compressed byte count does not fit in u64",
                 );
-                self.inner.poison_directory_spool();
+                self.inner.poison();
                 return Err(error);
             },
         };
@@ -2306,27 +2284,27 @@ where
                 io::ErrorKind::InvalidInput,
                 "ZIP compressed byte count overflows u64",
             );
-            self.inner.poison_directory_spool();
+            self.inner.poison();
             return Err(error);
         }
         let bytes_written = match self.inner.writer.write(buf) {
             Ok(bytes_written) => bytes_written,
             Err(error) => {
                 if !io_error_is_interrupted(&error) {
-                    self.inner.poison_directory_spool();
+                    self.inner.poison();
                 }
                 return Err(error);
             },
         };
         if bytes_written > buf.len() {
-            self.inner.poison_directory_spool();
+            self.inner.poison();
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "ZIP compressed sink returned more bytes than requested",
             ));
         }
         if !buf.is_empty() && bytes_written == 0 {
-            self.inner.poison_directory_spool();
+            self.inner.poison();
             return Err(io::Error::new(
                 io::ErrorKind::WriteZero,
                 "ZIP compressed sink accepted no bytes",
@@ -2339,7 +2317,7 @@ where
                     io::ErrorKind::InvalidData,
                     "ZIP compressed byte count does not fit in u64",
                 );
-                self.inner.poison_directory_spool();
+                self.inner.poison();
                 return Err(error);
             },
         };
@@ -2350,7 +2328,7 @@ where
                     io::ErrorKind::InvalidInput,
                     "ZIP compressed byte count overflows u64",
                 );
-                self.inner.poison_directory_spool();
+                self.inner.poison();
                 return Err(error);
             },
         };
@@ -2362,7 +2340,7 @@ where
             Ok(()) => Ok(()),
             Err(error) => {
                 if !io_error_is_interrupted(&error) {
-                    self.inner.poison_directory_spool();
+                    self.inner.poison();
                 }
                 Err(error)
             },
@@ -2424,7 +2402,7 @@ impl<W> OwnedCompressedEntry<W> {
         };
         if let Err(error) = file_header.finalize_extra_fields() {
             if !zip_error_is_interrupted(&error) {
-                archive.poison_directory_spool();
+                archive.poison();
             }
             return Err(error);
         }
@@ -2436,7 +2414,7 @@ impl<W> OwnedCompressedEntry<W> {
             self.state.zip64,
         ) {
             if !zip_error_is_interrupted(&error) {
-                archive.poison_directory_spool();
+                archive.poison();
             }
             return Err(error);
         }
@@ -2993,7 +2971,7 @@ impl<W: Write> OwnedCompressor<W> {
     /// before any byte (such as a chunk the failed call left staged) can
     /// reach a sink that has since recovered.
     fn ensure_writable(&self) -> io::Result<()> {
-        if self.archive().poisoned {
+        if self.archive().state == ArchiveState::Poisoned {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "ZIP archive is poisoned after a prior failure",
@@ -3054,7 +3032,7 @@ impl<W: Write> Write for OwnedCompressor<W> {
                 let result = compressor.state.write_owned(&mut compressor.entry, buffer);
                 if let Err(error) = &result {
                     if !io_error_is_interrupted(error) {
-                        compressor.entry.archive.poison_directory_spool();
+                        compressor.entry.archive.poison();
                     }
                 }
                 result
@@ -3070,7 +3048,7 @@ impl<W: Write> Write for OwnedCompressor<W> {
                 let result = compressor.state.flush_owned(&mut compressor.entry);
                 if let Err(error) = &result {
                     if !io_error_is_interrupted(error) {
-                        compressor.entry.archive.poison_directory_spool();
+                        compressor.entry.archive.poison();
                     }
                 }
                 result
@@ -3171,20 +3149,20 @@ impl<W: Write> Write for OwnedCompressedEntry<W> {
             Ok(written) => written,
             Err(error) => {
                 if !io_error_is_interrupted(&error) {
-                    self.archive.poison_directory_spool();
+                    self.archive.poison();
                 }
                 return Err(error);
             },
         };
         if written > buffer.len() {
-            self.archive.poison_directory_spool();
+            self.archive.poison();
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "ZIP compressed sink returned more bytes than requested",
             ));
         }
         if written == 0 {
-            self.archive.poison_directory_spool();
+            self.archive.poison();
             return Err(io::Error::new(
                 io::ErrorKind::WriteZero,
                 "ZIP compressed sink accepted no bytes",
@@ -3210,7 +3188,7 @@ impl<W: Write> Write for OwnedCompressedEntry<W> {
             Ok(()) => Ok(()),
             Err(error) => {
                 if !io_error_is_interrupted(&error) {
-                    self.archive.poison_directory_spool();
+                    self.archive.poison();
                 }
                 Err(error)
             },
@@ -3243,7 +3221,7 @@ impl<W: Write> Write for OwnedCompressedEntry<W> {
 /// archive value.
 #[derive(Debug)]
 pub struct ZipOwnedEntryWriter<W: Write> {
-    inner: Option<ZipDataWriter<OwnedCompressor<W>>>,
+    inner: ZipDataWriter<OwnedCompressor<W>>,
 }
 
 impl<W: Write> ZipOwnedEntryWriter<W> {
@@ -3251,19 +3229,14 @@ impl<W: Write> ZipOwnedEntryWriter<W> {
     /// archive sink.
     #[must_use]
     pub fn with_compressed_limit(mut self, maximum: u64) -> Self {
-        if let Some(inner) = self.inner.as_mut() {
-            inner.inner.set_compressed_limit(maximum);
-        }
+        self.inner.inner.set_compressed_limit(maximum);
         self
     }
 
     /// Number of uncompressed bytes accepted by this entry.
     #[must_use]
     pub fn uncompressed_bytes(&self) -> u64 {
-        self.inner
-            .as_ref()
-            .map(|inner| inner.uncompressed_bytes)
-            .unwrap_or(0)
+        self.inner.uncompressed_bytes
     }
 
     /// Number of compressed payload bytes accepted by this entry.
@@ -3273,10 +3246,7 @@ impl<W: Write> ZipOwnedEntryWriter<W> {
     /// the codec's own buffering.
     #[must_use]
     pub fn compressed_bytes(&self) -> u64 {
-        self.inner
-            .as_ref()
-            .map(|inner| inner.inner.compressed_bytes())
-            .unwrap_or(0)
+        self.inner.inner.compressed_bytes()
     }
 
     /// Finishes the entry and recovers the parent archive writer.
@@ -3288,14 +3258,11 @@ impl<W: Write> ZipOwnedEntryWriter<W> {
     /// write, so an interruption neither ends the entry nor changes its
     /// bytes. Any other failure consumes the entry and its archive, and a
     /// poisoned archive is refused before its sink sees another byte.
-    pub fn finish(mut self) -> Result<ZipArchiveWriter<W>, Error>
+    pub fn finish(self) -> Result<ZipArchiveWriter<W>, Error>
     where
         W: Write,
     {
-        let inner = self.inner.take().ok_or_else(|| ErrorKind::InvalidInput {
-            msg: "owned ZIP entry writer was already finished".to_string(),
-        })?;
-        let (compressor, descriptor, crc_stage) = inner.into_parts_with_crc_stage();
+        let (compressor, descriptor, crc_stage) = self.inner.into_parts_with_crc_stage();
         let mut archive = compressor.finish(descriptor)?;
         archive.restore_reusable_crc_stage(crc_stage);
         Ok(archive)
@@ -3304,17 +3271,11 @@ impl<W: Write> ZipOwnedEntryWriter<W> {
 
 impl<W: Write> Write for ZipOwnedEntryWriter<W> {
     fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
-        self.inner
-            .as_mut()
-            .ok_or_else(|| io::Error::other("owned ZIP entry finished"))?
-            .write(buffer)
+        self.inner.write(buffer)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.inner
-            .as_mut()
-            .ok_or_else(|| io::Error::other("owned ZIP entry finished"))?
-            .flush()
+        self.inner.flush()
     }
 }
 

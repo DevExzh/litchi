@@ -1586,6 +1586,11 @@ where
     D: std::io::Read,
 {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        // `Ok(0)` for an empty destination says nothing about the stream, so
+        // it must not be taken for the end of the member and verified.
+        if buf.is_empty() {
+            return Ok(0);
+        }
         let read = validate_read_count(self.reader.read(buf)?, buf.len())?;
         self.crc = crc32_chunk(&buf[..read], self.crc);
         let read_u64 = u64::try_from(read).map_err(|_| {
@@ -2489,6 +2494,11 @@ where
     Reader: ReaderAt,
 {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        // `Ok(0)` for an empty destination says nothing about the stream, so
+        // it must not be taken for the end of the member and verified.
+        if buf.is_empty() {
+            return Ok(0);
+        }
         let read = validate_read_count(self.reader.read(buf)?, buf.len())?;
         self.crc = crc32_chunk(&buf[..read], self.crc);
         let read_u64 = u64::try_from(read).map_err(|_| {

@@ -1435,9 +1435,28 @@ struct ReplaySink<W> {
     accepted: u64,
     expected: Option<u64>,
     overreported: bool,
-    flush_started: bool,
-    flush_completed: bool,
+    flush: ReplayFlushState,
     first_error: Option<io::Error>,
+}
+
+/// How far a [`ReplaySink`] has flushed the bytes it has accepted so far.
+///
+/// ```text
+/// Unflushed | Attempted | Completed --`flush` called----------> Attempted
+/// Attempted                         --that `flush` returned Ok-> Completed
+/// Attempted | Completed             --non-empty `write`-------> Unflushed
+/// ```
+///
+/// A flush covers only the bytes accepted before it, so any later non-empty
+/// write returns to `Unflushed`, whether or not the sink accepts it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReplayFlushState {
+    /// No flush has been attempted since the last non-empty write.
+    Unflushed,
+    /// A flush was attempted and did not succeed.
+    Attempted,
+    /// The last flush succeeded.
+    Completed,
 }
 
 impl<W> ReplaySink<W> {
@@ -1447,8 +1466,7 @@ impl<W> ReplaySink<W> {
             accepted: 0,
             expected: None,
             overreported: false,
-            flush_started: false,
-            flush_completed: false,
+            flush: ReplayFlushState::Unflushed,
             first_error: None,
         }
     }
@@ -1471,18 +1489,16 @@ impl<W> ReplaySink<W> {
         } else if self.accepted == 0 {
             ReplayProgress::Untouched
         } else if self.expected == Some(self.accepted) {
-            if self.flush_completed {
-                ReplayProgress::Complete {
+            match self.flush {
+                ReplayFlushState::Completed => ReplayProgress::Complete {
                     bytes: self.accepted,
-                }
-            } else if self.flush_started {
-                ReplayProgress::CompleteUnflushed {
+                },
+                ReplayFlushState::Attempted => ReplayProgress::CompleteUnflushed {
                     bytes: self.accepted,
-                }
-            } else {
-                ReplayProgress::Prefix {
+                },
+                ReplayFlushState::Unflushed => ReplayProgress::Prefix {
                     accepted: self.accepted,
-                }
+                },
             }
         } else {
             ReplayProgress::Prefix {
@@ -1504,10 +1520,9 @@ impl<W: Write> Write for ReplaySink<W> {
     fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
         if !buffer.is_empty() {
             // A successful flush only covers bytes accepted before this write.
-            // Clear both markers before touching the destination so an error
-            // after an early callback flush cannot be reported as complete.
-            self.flush_started = false;
-            self.flush_completed = false;
+            // Forget it before touching the destination so an error after an
+            // early callback flush cannot be reported as complete.
+            self.flush = ReplayFlushState::Unflushed;
         }
         let written = match self.inner.write(buffer) {
             Ok(written) => written,
@@ -1559,14 +1574,13 @@ impl<W: Write> Write for ReplaySink<W> {
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.flush_started = true;
+        self.flush = ReplayFlushState::Attempted;
         match self.inner.flush() {
             Ok(()) => {
-                self.flush_completed = true;
+                self.flush = ReplayFlushState::Completed;
                 Ok(())
             },
             Err(error) => {
-                self.flush_completed = false;
                 let kind = error.kind();
                 let message = error.to_string();
                 self.remember_error(error);

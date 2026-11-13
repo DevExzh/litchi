@@ -206,3 +206,54 @@ fn a_corrupt_descriptor_still_fails_the_verified_read() {
         .expect_err("a corrupt descriptor must fail the verified read");
     assert_eq!(error.kind(), io::ErrorKind::InvalidData);
 }
+
+#[test]
+fn an_empty_destination_buffer_is_not_the_end_of_a_verified_member() {
+    let name = "payload.bin";
+    let payload: Vec<u8> = (0..4096_u32).map(|index| (index % 251) as u8).collect();
+    let raw = deflate_archive_with_descriptor(name, &payload);
+
+    let archive = open(raw.clone());
+    let (wayfinder, compressed, _) = only_entry(&archive);
+    let descriptor_offset = 30 + name.len() as u64 + compressed;
+    let entry = archive.get_entry(wayfinder).unwrap();
+    let decoder = flate2::read::DeflateDecoder::new(entry.reader());
+    let mut verifier = entry.verifying_reader(decoder);
+
+    archive.get_ref().clear();
+    // Before any payload byte and in the middle of the member, an empty read
+    // returns nothing, verifies nothing and resolves no descriptor.
+    assert_eq!(verifier.read(&mut []).unwrap(), 0);
+    let mut head = [0_u8; 100];
+    verifier.read_exact(&mut head).unwrap();
+    assert_eq!(verifier.read(&mut []).unwrap(), 0);
+    assert_eq!(archive.get_ref().reads_at(descriptor_offset), 0);
+
+    let mut output = head.to_vec();
+    verifier.read_to_end(&mut output).unwrap();
+    assert_eq!(output, payload);
+    assert_eq!(verifier.read(&mut []).unwrap(), 0);
+    assert_eq!(archive.get_ref().reads_at(descriptor_offset), 1);
+}
+
+#[test]
+fn an_empty_destination_buffer_is_not_the_end_of_a_verified_slice_member() {
+    let payload: Vec<u8> = (0..4096_u32).map(|index| (index % 251) as u8).collect();
+    let raw = deflate_archive_with_descriptor("payload.bin", &payload);
+
+    let archive = ZipArchive::from_slice(&raw).unwrap();
+    let wayfinder = archive.entries().next_entry().unwrap().unwrap().wayfinder();
+    let entry = archive.get_entry(wayfinder).unwrap();
+    let decoder = flate2::read::DeflateDecoder::new(entry.data());
+    let mut verifier = entry.verifying_reader(decoder);
+
+    assert_eq!(verifier.read(&mut []).unwrap(), 0);
+    let mut head = [0_u8; 100];
+    verifier.read_exact(&mut head).unwrap();
+    assert_eq!(verifier.read(&mut []).unwrap(), 0);
+
+    let mut output = head.to_vec();
+    verifier.read_to_end(&mut output).unwrap();
+    assert_eq!(output, payload);
+    assert_eq!(verifier.read(&mut []).unwrap(), 0);
+}

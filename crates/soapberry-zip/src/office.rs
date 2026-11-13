@@ -6893,7 +6893,7 @@ pub struct StreamingArchiveWriter<W: Write> {
 /// on highly compressible input holds back megabytes of input, and batching
 /// adds up to one more 16 KiB chunk.
 pub struct StreamingArchiveEntry<W: Write> {
-    entry: Option<crate::ZipOwnedEntryWriter<BoundedOutput<W>>>,
+    entry: crate::ZipOwnedEntryWriter<BoundedOutput<W>>,
     limits: StreamingArchiveLimits,
     entries: usize,
     metadata_bytes: u64,
@@ -6903,10 +6903,45 @@ pub struct StreamingArchiveEntry<W: Write> {
     normalized_name: String,
     uncompressed_bytes: u64,
     output_bytes: u64,
-    poisoned: bool,
-    last_limit: Option<StreamingLimitExceeded>,
-    failure: Option<Error>,
+    state: StreamingEntryState,
     output_counter: Arc<AtomicU64>,
+}
+
+/// Lifecycle of a [`StreamingArchiveEntry`].
+///
+/// ```text
+/// Active --write or flush failed, other than `Interrupted`--> Poisoned
+/// ```
+///
+/// `Poisoned` is terminal: `write` and `flush` are refused, and `finish`
+/// reports the recorded failure. An interrupted `write` or `flush` leaves the
+/// entry `Active`. `finish` consumes the entry from either state, so a
+/// finished entry has no state of its own.
+enum StreamingEntryState {
+    /// Every payload and sink operation so far succeeded or can be retried.
+    Active,
+    /// The first failure, kept for `finish`, with the byte limit behind it
+    /// when it was a streaming limit.
+    Poisoned {
+        failure: Error,
+        limit: Option<StreamingLimitExceeded>,
+    },
+}
+
+/// The failure of an entry that can no longer be finished.
+fn poisoned_entry_failure(
+    output_counter: &AtomicU64,
+    error: Error,
+    limit: Option<StreamingLimitExceeded>,
+) -> StreamingArchiveFailure {
+    StreamingArchiveFailure {
+        error,
+        progress: StreamingArchiveProgress {
+            output_bytes: output_counter.load(Ordering::Acquire),
+            poisoned: true,
+        },
+        limit,
+    }
 }
 
 impl<W: Write> StreamingArchiveEntry<W> {
@@ -6919,10 +6954,7 @@ impl<W: Write> StreamingArchiveEntry<W> {
     /// Number of compressed payload bytes accepted by this entry.
     #[must_use]
     pub fn compressed_bytes(&self) -> u64 {
-        self.entry
-            .as_ref()
-            .map(crate::ZipOwnedEntryWriter::compressed_bytes)
-            .unwrap_or(0)
+        self.entry.compressed_bytes()
     }
 
     /// Content-free progress for the active entry.
@@ -6930,14 +6962,14 @@ impl<W: Write> StreamingArchiveEntry<W> {
     pub fn progress(&self) -> StreamingArchiveProgress {
         StreamingArchiveProgress {
             output_bytes: self.output_counter.load(Ordering::Acquire),
-            poisoned: self.poisoned,
+            poisoned: self.is_poisoned(),
         }
     }
 
     /// Whether a payload or sink failure permanently invalidated this entry.
     #[must_use]
     pub const fn is_poisoned(&self) -> bool {
-        self.poisoned
+        matches!(self.state, StreamingEntryState::Poisoned { .. })
     }
 
     fn refresh_output_bytes(&mut self) {
@@ -6946,22 +6978,22 @@ impl<W: Write> StreamingArchiveEntry<W> {
 
     fn capture_io_failure(&mut self, error: std::io::Error) -> std::io::Error {
         let limit = streaming_limit_from_io_error(&error);
-        self.last_limit = limit;
         self.refresh_output_bytes();
 
-        let returned = if let Some((resource, actual, maximum)) =
+        let (failure, returned) = if let Some((resource, actual, maximum)) =
             streaming_payload_limit_from_io_error(&error)
         {
-            self.failure = Some(limit_error(resource, actual, maximum));
-            error
+            (limit_error(resource, actual, maximum), error)
         } else if let Some(StreamingLimitExceeded {
             resource: StreamingLimitResource::CompressedBytes,
             actual,
             maximum,
         }) = limit
         {
-            self.failure = Some(limit_error(LimitResource::CompressedSize, actual, maximum));
-            error
+            (
+                limit_error(LimitResource::CompressedSize, actual, maximum),
+                error,
+            )
         } else {
             let kind = error.kind();
             let message = error.to_string();
@@ -6973,27 +7005,10 @@ impl<W: Write> StreamingArchiveEntry<W> {
             // Move the original error into the typed failure.  Rebuilding the
             // error from its display text here would erase nested/custom
             // sources before `finish_with_progress` can report them.
-            self.failure = Some(Error::from(error));
-            returned
+            (Error::from(error), returned)
         };
-        self.poisoned = true;
+        self.state = StreamingEntryState::Poisoned { failure, limit };
         returned
-    }
-
-    fn failure(self) -> StreamingArchiveFailure {
-        StreamingArchiveFailure {
-            error: self.failure.unwrap_or_else(|| {
-                ErrorKind::InvalidInput {
-                    msg: "streaming ZIP entry was poisoned".to_string(),
-                }
-                .into()
-            }),
-            progress: StreamingArchiveProgress {
-                output_bytes: self.output_counter.load(Ordering::Acquire),
-                poisoned: self.poisoned,
-            },
-            limit: self.last_limit,
-        }
     }
 
     /// Finishes the entry and recovers the bounded archive writer.
@@ -7004,63 +7019,58 @@ impl<W: Write> StreamingArchiveEntry<W> {
 
     /// Finishes the entry while preserving output progress on failure.
     pub fn finish_with_progress(
-        mut self,
+        self,
     ) -> Result<(StreamingArchiveWriter<W>, StreamingArchiveProgress), StreamingArchiveFailure>
     {
-        if self.poisoned {
-            return Err(self.failure());
+        let Self {
+            entry,
+            limits,
+            entries,
+            metadata_bytes,
+            metadata_charge,
+            total_uncompressed_bytes,
+            name_policy,
+            normalized_name,
+            uncompressed_bytes,
+            output_bytes,
+            state,
+            output_counter,
+        } = self;
+        match state {
+            StreamingEntryState::Active => {},
+            StreamingEntryState::Poisoned { failure, limit } => {
+                return Err(poisoned_entry_failure(&output_counter, failure, limit));
+            },
         }
 
-        let next_entries = match self.entries.checked_add(1) {
-            Some(entries) => entries,
-            None => {
-                self.poisoned = true;
-                self.failure = Some(accounting_overflow("streaming ZIP entry count"));
-                return Err(self.failure());
-            },
+        let Some(next_entries) = entries.checked_add(1) else {
+            return Err(poisoned_entry_failure(
+                &output_counter,
+                accounting_overflow("streaming ZIP entry count"),
+                None,
+            ));
         };
-        let next_metadata_bytes = match self.metadata_bytes.checked_add(self.metadata_charge) {
-            Some(metadata_bytes) => metadata_bytes,
-            None => {
-                self.poisoned = true;
-                self.failure = Some(accounting_overflow(
-                    "streaming ZIP aggregate metadata bytes",
-                ));
-                return Err(self.failure());
-            },
+        let Some(next_metadata_bytes) = metadata_bytes.checked_add(metadata_charge) else {
+            return Err(poisoned_entry_failure(
+                &output_counter,
+                accounting_overflow("streaming ZIP aggregate metadata bytes"),
+                None,
+            ));
         };
-        let next_total_uncompressed_bytes = match self
-            .total_uncompressed_bytes
-            .checked_add(self.uncompressed_bytes)
-        {
-            Some(total) => total,
-            None => {
-                self.poisoned = true;
-                self.failure = Some(accounting_overflow(
-                    "streaming ZIP aggregate uncompressed bytes",
-                ));
-                return Err(self.failure());
-            },
+        let Some(next_total_uncompressed_bytes) =
+            total_uncompressed_bytes.checked_add(uncompressed_bytes)
+        else {
+            return Err(poisoned_entry_failure(
+                &output_counter,
+                accounting_overflow("streaming ZIP aggregate uncompressed bytes"),
+                None,
+            ));
         };
 
-        let entry = match self.entry.take() {
-            Some(entry) => entry,
-            None => {
-                self.poisoned = true;
-                self.failure = Some(
-                    ErrorKind::InvalidInput {
-                        msg: "streaming ZIP entry writer was already finished".to_string(),
-                    }
-                    .into(),
-                );
-                return Err(self.failure());
-            },
-        };
         let archive = match entry.finish() {
             Ok(archive) => archive,
             Err(error) => {
-                self.poisoned = true;
-                let limit = streaming_limit_from_error(&error).or(self.last_limit);
+                let limit = streaming_limit_from_error(&error);
                 let error = match limit {
                     Some(StreamingLimitExceeded {
                         resource: StreamingLimitResource::CompressedBytes,
@@ -7069,25 +7079,23 @@ impl<W: Write> StreamingArchiveEntry<W> {
                     }) => limit_error(LimitResource::CompressedSize, actual, maximum),
                     _ => error,
                 };
-                self.failure = Some(error);
-                self.last_limit = limit;
-                return Err(self.failure());
+                return Err(poisoned_entry_failure(&output_counter, error, limit));
             },
         };
 
         let mut writer = StreamingArchiveWriter {
             archive,
-            limits: self.limits,
+            limits,
             entries: next_entries,
             metadata_bytes: next_metadata_bytes,
             total_uncompressed_bytes: next_total_uncompressed_bytes,
-            output_bytes: self.output_bytes,
+            output_bytes,
             poisoned: false,
-            name_policy: self.name_policy,
+            name_policy,
             last_limit: None,
-            output_counter: self.output_counter,
+            output_counter,
         };
-        if let Err(error) = writer.name_policy.record(self.normalized_name) {
+        if let Err(error) = writer.name_policy.record(normalized_name) {
             let error = writer.poison(error);
             return Err(StreamingArchiveFailure {
                 error,
@@ -7103,7 +7111,7 @@ impl<W: Write> StreamingArchiveEntry<W> {
 
 impl<W: Write> Write for StreamingArchiveEntry<W> {
     fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
-        if self.poisoned {
+        if self.is_poisoned() {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 "streaming ZIP entry writer is poisoned",
@@ -7157,12 +7165,7 @@ impl<W: Write> Write for StreamingArchiveEntry<W> {
             return Err(self.capture_io_failure(error));
         }
 
-        let result = self
-            .entry
-            .as_mut()
-            .ok_or_else(|| std::io::Error::other("streaming ZIP entry finished"))
-            .and_then(|entry| entry.write(buffer));
-        match result {
+        match self.entry.write(buffer) {
             Ok(0) => {
                 let error = std::io::Error::new(
                     std::io::ErrorKind::WriteZero,
@@ -7207,19 +7210,21 @@ impl<W: Write> Write for StreamingArchiveEntry<W> {
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
-        if self.poisoned {
+        if self.is_poisoned() {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 "streaming ZIP entry writer is poisoned",
             ));
         }
-        let result = self
-            .entry
-            .as_mut()
-            .ok_or_else(|| std::io::Error::other("streaming ZIP entry finished"))
-            .and_then(Write::flush);
-        match result {
+        match self.entry.flush() {
             Ok(()) => Ok(()),
+            // An interrupted flush is as retryable as an interrupted write:
+            // the owned entry keeps its staged and pending output for the
+            // retry and leaves the archive usable.
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {
+                self.refresh_output_bytes();
+                Err(error)
+            },
             Err(error) => Err(self.capture_io_failure(error)),
         }
     }
@@ -7961,7 +7966,7 @@ impl<W: Write> StreamingArchiveWriter<W> {
         };
 
         Ok(StreamingArchiveEntry {
-            entry: Some(entry),
+            entry,
             limits,
             entries,
             metadata_bytes,
@@ -7971,9 +7976,7 @@ impl<W: Write> StreamingArchiveWriter<W> {
             normalized_name: admission.normalized_name,
             uncompressed_bytes: 0,
             output_bytes,
-            poisoned: false,
-            last_limit: None,
-            failure: None,
+            state: StreamingEntryState::Active,
             output_counter,
         })
     }
@@ -8642,10 +8645,24 @@ impl LazyCacheState {
     }
 }
 
+/// Outcome of one [`LazyFlight`], behind the flight's mutex.
+///
+/// ```text
+/// Loading --loader returned the member-----------> Succeeded
+/// Loading --loader returned an error or unwound--> Failed
+/// ```
+///
+/// Both outcomes are final and wake every waiter. A waiter of a `Failed`
+/// flight retries the read itself.
 #[derive(Debug, Default)]
-struct LazyFlightState {
-    complete: bool,
-    data: Option<Arc<Vec<u8>>>,
+enum LazyFlightState {
+    /// The loader is still reading the member.
+    #[default]
+    Loading,
+    /// The member's bytes, shared with every waiter.
+    Succeeded(Arc<Vec<u8>>),
+    /// The loader produced no bytes; the flight carries no error.
+    Failed,
 }
 
 #[derive(Debug)]
@@ -8670,26 +8687,58 @@ impl LazyFlight {
 
     fn complete_success(&self, data: Arc<Vec<u8>>) {
         let mut state = lock_lazy_cache(&self.state);
-        state.data = Some(data);
-        state.complete = true;
+        *state = LazyFlightState::Succeeded(data);
         self.completed.notify_all();
     }
 
     fn complete_failure(&self) {
         let mut state = lock_lazy_cache(&self.state);
-        state.complete = true;
+        match &*state {
+            LazyFlightState::Loading | LazyFlightState::Failed => {
+                *state = LazyFlightState::Failed;
+            },
+            LazyFlightState::Succeeded(_) => {},
+        }
         self.completed.notify_all();
     }
 
     fn wait(&self) -> Option<Arc<Vec<u8>>> {
         let mut state = lock_lazy_cache(&self.state);
-        while !state.complete {
-            state = self
-                .completed
-                .wait(state)
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
+        loop {
+            match &*state {
+                LazyFlightState::Loading => {
+                    state = self
+                        .completed
+                        .wait(state)
+                        .unwrap_or_else(std::sync::PoisonError::into_inner);
+                },
+                LazyFlightState::Succeeded(data) => return Some(Arc::clone(data)),
+                LazyFlightState::Failed => return None,
+            }
         }
-        state.data.as_ref().map(Arc::clone)
+    }
+}
+
+/// Fails a flight whose loader unwinds instead of returning.
+///
+/// Without it the flight would stay registered and `Loading`: its waiters
+/// and every later reader of the member would wait forever, and it would
+/// keep its share of the active-flight budget.
+struct LazyFlightUnwindGuard<'a> {
+    cache: &'a std::sync::Mutex<LazyCacheState>,
+    name: &'a str,
+    flight: &'a Arc<LazyFlight>,
+    armed: bool,
+}
+
+impl Drop for LazyFlightUnwindGuard<'_> {
+    fn drop(&mut self) {
+        if !self.armed {
+            return;
+        }
+        let mut cache = lock_lazy_cache(self.cache);
+        self.flight.complete_failure();
+        finish_lazy_flight(&mut cache, self.name, self.flight);
     }
 }
 
@@ -8991,7 +9040,14 @@ impl<'data> LazyArchiveReader<'data> {
                     }
                 },
                 LazyCacheLookup::Load(flight) => {
+                    let mut unwind_guard = LazyFlightUnwindGuard {
+                        cache: &self.cache,
+                        name: &normalized,
+                        flight: &flight,
+                        armed: true,
+                    };
                     let result = read_member(&normalized, accounting).map(Arc::new);
+                    unwind_guard.armed = false;
                     match result {
                         Ok(data) => {
                             let mut cache = lock_lazy_cache(&self.cache);
@@ -12229,6 +12285,43 @@ mod tests {
             first_failure_count + 1
         );
         assert_eq!(reader.cache_size(), 0);
+    }
+
+    #[test]
+    fn lazy_shared_panicking_loader_releases_its_flight() {
+        let bytes: &'static [u8] =
+            Box::leak(fixture(&[FixtureEntry::stored(b"one", b"one")]).into_boxed_slice());
+        let reader = Arc::new(
+            LazyArchiveReader::new(
+                bytes,
+                ArchiveLimits::default(),
+                LazyArchiveCacheLimits::default(),
+            )
+            .unwrap(),
+        );
+
+        let unwound = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let mut accounting = ZipOperationAccounting::default();
+            let mut loader = |_: &str, _: &mut ZipOperationAccounting| -> Result<Vec<u8>, Error> {
+                panic!("the lazy loader panics")
+            };
+            reader.read_shared_with_reader("one", &mut accounting, &mut loader)
+        }));
+        assert!(unwound.is_err());
+
+        // A reader that arrives after the panic must load the member itself
+        // instead of waiting on the flight the unwound loader left behind.
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let later = Arc::clone(&reader);
+        std::thread::spawn(move || {
+            let _ = sender.send(later.read_shared("one").map(|data| data.to_vec()));
+        });
+        let read = receiver
+            .recv_timeout(std::time::Duration::from_secs(20))
+            .expect("a later reader must not wait on an abandoned flight");
+        assert_eq!(read.unwrap(), b"one");
+        assert_eq!(reader.active_flight_count(), 0);
+        assert_eq!(reader.active_flight_key_bytes(), 0);
     }
 
     fn register_lazy_test_flight(reader: &LazyArchiveReader<'_>, name: &str) -> Arc<LazyFlight> {
