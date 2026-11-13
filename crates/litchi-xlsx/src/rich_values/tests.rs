@@ -235,3 +235,211 @@ fn rich_relationship_and_style_fragment_writers_close_their_start_tags() {
         dxf
     );
 }
+
+/// Every sequence of at most `max_len` child indices below `count`,
+/// shortest first.
+fn sequences(count: usize, max_len: usize) -> Vec<Vec<usize>> {
+    let mut all = vec![Vec::new()];
+    let mut start = 0;
+    for _ in 0..max_len {
+        let end = all.len();
+        for index in start..end {
+            for child in 0..count {
+                let mut next = all[index].clone();
+                next.push(child);
+                all.push(next);
+            }
+        }
+        start = end;
+    }
+    all
+}
+
+fn assert_rows(actual: &[(String, String)], expected: &[(&str, &str)]) {
+    let same = actual.len() == expected.len()
+        && actual.iter().zip(expected).all(
+            |((label, outcome), (expected_label, expected_outcome))| {
+                label == expected_label && outcome == expected_outcome
+            },
+        );
+    let observed: String = actual
+        .iter()
+        .map(|(label, outcome)| format!("({label:?}, {outcome:?}),\n"))
+        .collect();
+    assert!(same, "observed rows:\n{observed}");
+}
+
+#[test]
+fn feature_property_bag_child_order_matrix_is_stable() {
+    let children = [
+        ("bagExt", "<fpb:bagExt/>"),
+        ("bag", "<fpb:bag type=\"Checkbox\"/>"),
+        ("extLst", "<x:extLst/>"),
+    ];
+    let marked = (
+        "marked extLst",
+        "<x:extLst><x:ext uri=\"urn:second\"/></x:extLst>",
+    );
+    let mut cases: Vec<Vec<(&str, &str)>> = sequences(children.len(), 3)
+        .into_iter()
+        .map(|sequence| sequence.into_iter().map(|index| children[index]).collect())
+        .collect();
+    cases.push(vec![("unknown", "<fpb:unknown/>")]);
+    cases.push(vec![
+        ("unknown", "<fpb:unknown/>"),
+        children[0],
+        children[1],
+        children[2],
+    ]);
+    cases.push(vec![("core bag", "<x:bag/>")]);
+    cases.push(vec![children[2], marked]);
+    cases.push(vec![marked, children[2]]);
+    let actual: Vec<(String, String)> = cases
+        .iter()
+        .map(|case| {
+            let label = case.iter().map(|(name, _)| *name).collect::<Vec<_>>();
+            let body: String = case.iter().map(|(_, xml)| *xml).collect();
+            let xml = format!(
+                "<fpb:FeaturePropertyBags xmlns:fpb=\"{FEATURE_BAG}\" xmlns:x=\"{SPREADSHEETML}\">{body}</fpb:FeaturePropertyBags>"
+            );
+            let outcome = match parse_feature_property_bags(xml.as_bytes()) {
+                Ok(bags) => {
+                    let extension_list = match &bags.extension_list {
+                        None => "none",
+                        Some(list) if String::from_utf8_lossy(&list.xml).contains("urn:second") => {
+                            "marked"
+                        },
+                        Some(_) => "plain",
+                    };
+                    format!(
+                        "ok bagExt={} bag={} extLst={extension_list} opaque={}",
+                        bags.bag_extensions.len(),
+                        bags.values.len(),
+                        bags.opaque.len()
+                    )
+                },
+                Err(error) => format!("{error:?}"),
+            };
+            (label.join(","), outcome)
+        })
+        .collect();
+    assert_rows(
+        &actual,
+        &[
+            ("", "ok bagExt=0 bag=0 extLst=none opaque=0"),
+            ("bagExt", "ok bagExt=1 bag=0 extLst=none opaque=0"),
+            ("bag", "ok bagExt=0 bag=1 extLst=none opaque=0"),
+            ("extLst", "ok bagExt=0 bag=0 extLst=plain opaque=0"),
+            ("bagExt,bagExt", "ok bagExt=2 bag=0 extLst=none opaque=0"),
+            ("bagExt,bag", "ok bagExt=1 bag=1 extLst=none opaque=0"),
+            ("bagExt,extLst", "ok bagExt=1 bag=0 extLst=plain opaque=0"),
+            ("bag,bagExt", "ok bagExt=0 bag=1 extLst=none opaque=1"),
+            ("bag,bag", "ok bagExt=0 bag=2 extLst=none opaque=0"),
+            ("bag,extLst", "ok bagExt=0 bag=1 extLst=plain opaque=0"),
+            ("extLst,bagExt", "ok bagExt=0 bag=0 extLst=plain opaque=1"),
+            ("extLst,bag", "ok bagExt=0 bag=0 extLst=plain opaque=1"),
+            ("extLst,extLst", "ok bagExt=0 bag=0 extLst=plain opaque=0"),
+            (
+                "bagExt,bagExt,bagExt",
+                "ok bagExt=3 bag=0 extLst=none opaque=0",
+            ),
+            (
+                "bagExt,bagExt,bag",
+                "ok bagExt=2 bag=1 extLst=none opaque=0",
+            ),
+            (
+                "bagExt,bagExt,extLst",
+                "ok bagExt=2 bag=0 extLst=plain opaque=0",
+            ),
+            (
+                "bagExt,bag,bagExt",
+                "ok bagExt=1 bag=1 extLst=none opaque=1",
+            ),
+            ("bagExt,bag,bag", "ok bagExt=1 bag=2 extLst=none opaque=0"),
+            (
+                "bagExt,bag,extLst",
+                "ok bagExt=1 bag=1 extLst=plain opaque=0",
+            ),
+            (
+                "bagExt,extLst,bagExt",
+                "ok bagExt=1 bag=0 extLst=plain opaque=1",
+            ),
+            (
+                "bagExt,extLst,bag",
+                "ok bagExt=1 bag=0 extLst=plain opaque=1",
+            ),
+            (
+                "bagExt,extLst,extLst",
+                "ok bagExt=1 bag=0 extLst=plain opaque=0",
+            ),
+            (
+                "bag,bagExt,bagExt",
+                "ok bagExt=0 bag=1 extLst=none opaque=2",
+            ),
+            ("bag,bagExt,bag", "ok bagExt=0 bag=2 extLst=none opaque=1"),
+            (
+                "bag,bagExt,extLst",
+                "ok bagExt=0 bag=1 extLst=plain opaque=1",
+            ),
+            ("bag,bag,bagExt", "ok bagExt=0 bag=2 extLst=none opaque=1"),
+            ("bag,bag,bag", "ok bagExt=0 bag=3 extLst=none opaque=0"),
+            ("bag,bag,extLst", "ok bagExt=0 bag=2 extLst=plain opaque=0"),
+            (
+                "bag,extLst,bagExt",
+                "ok bagExt=0 bag=1 extLst=plain opaque=1",
+            ),
+            ("bag,extLst,bag", "ok bagExt=0 bag=1 extLst=plain opaque=1"),
+            (
+                "bag,extLst,extLst",
+                "ok bagExt=0 bag=1 extLst=plain opaque=0",
+            ),
+            (
+                "extLst,bagExt,bagExt",
+                "ok bagExt=0 bag=0 extLst=plain opaque=2",
+            ),
+            (
+                "extLst,bagExt,bag",
+                "ok bagExt=0 bag=0 extLst=plain opaque=2",
+            ),
+            (
+                "extLst,bagExt,extLst",
+                "ok bagExt=0 bag=0 extLst=plain opaque=1",
+            ),
+            (
+                "extLst,bag,bagExt",
+                "ok bagExt=0 bag=0 extLst=plain opaque=2",
+            ),
+            ("extLst,bag,bag", "ok bagExt=0 bag=0 extLst=plain opaque=2"),
+            (
+                "extLst,bag,extLst",
+                "ok bagExt=0 bag=0 extLst=plain opaque=1",
+            ),
+            (
+                "extLst,extLst,bagExt",
+                "ok bagExt=0 bag=0 extLst=plain opaque=1",
+            ),
+            (
+                "extLst,extLst,bag",
+                "ok bagExt=0 bag=0 extLst=plain opaque=1",
+            ),
+            (
+                "extLst,extLst,extLst",
+                "ok bagExt=0 bag=0 extLst=plain opaque=0",
+            ),
+            ("unknown", "ok bagExt=0 bag=0 extLst=none opaque=1"),
+            (
+                "unknown,bagExt,bag,extLst",
+                "ok bagExt=1 bag=1 extLst=plain opaque=1",
+            ),
+            ("core bag", "ok bagExt=0 bag=0 extLst=none opaque=1"),
+            (
+                "extLst,marked extLst",
+                "ok bagExt=0 bag=0 extLst=marked opaque=0",
+            ),
+            (
+                "marked extLst,extLst",
+                "ok bagExt=0 bag=0 extLst=plain opaque=0",
+            ),
+        ],
+    );
+}

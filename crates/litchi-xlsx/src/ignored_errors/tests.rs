@@ -218,3 +218,236 @@ fn retained_extension_markup_resolves_standalone() {
             .contains(r#"xmlns:p="urn:payload""#)
     );
 }
+
+fn collection_outcome(body: &str) -> String {
+    match parse(body) {
+        Ok(Some(value)) => format!(
+            "ok entries={} extensions={}",
+            value.entries.len(),
+            value.extensions.len()
+        ),
+        Ok(None) => "none".to_owned(),
+        Err(error) => format!("{error:?}"),
+    }
+}
+
+#[test]
+fn collection_child_order_matrix_is_stable() {
+    let error = ("error", r#"<ignoredError sqref="A1" evalError="1"/>"#);
+    let open_error = (
+        "open error",
+        r#"<ignoredError sqref="B2" evalError="1"></ignoredError>"#,
+    );
+    let list = ("extLst", r#"<extLst><ext uri="urn:a"/></extLst>"#);
+    let open_list = (
+        "open extLst",
+        r#"<extLst><ext uri="urn:b"><y:data xmlns:y="urn:y"/></ext></extLst>"#,
+    );
+    let empty_list = ("empty extLst", "<extLst/>");
+    let unknown = ("unknown", "<unknown/>");
+    let children = [error, open_error, list, open_list];
+    let mut cases: Vec<Vec<(&str, &str)>> = vec![Vec::new()];
+    for first in children {
+        cases.push(vec![first]);
+    }
+    for first in children {
+        for second in children {
+            cases.push(vec![first, second]);
+        }
+    }
+    // Every pair again behind one entry, so that an accepted order is not
+    // hidden by the refusal of an extension list without entries.
+    for second in children {
+        for third in children {
+            cases.push(vec![error, second, third]);
+        }
+    }
+    cases.push(vec![empty_list]);
+    cases.push(vec![error, empty_list]);
+    cases.push(vec![error, list, empty_list]);
+    cases.push(vec![unknown]);
+    cases.push(vec![error, unknown]);
+    cases.push(vec![error, list, unknown]);
+    cases.push(vec![(
+        "foreign error",
+        r#"<q:ignoredError xmlns:q="urn:other" sqref="A1"/>"#,
+    )]);
+    let mut actual: Vec<(String, String)> = cases
+        .iter()
+        .map(|case| {
+            let label = case.iter().map(|(name, _)| *name).collect::<Vec<_>>();
+            let body: String = case.iter().map(|(_, xml)| *xml).collect();
+            (
+                label.join(","),
+                collection_outcome(&format!("<ignoredErrors>{body}</ignoredErrors>")),
+            )
+        })
+        .collect();
+    // A second collection is refused whatever the first one reached.
+    for (label, body) in [
+        ("empty collection", "<ignoredErrors/>".to_owned()),
+        (
+            "two collections",
+            format!(
+                "<ignoredErrors>{0}</ignoredErrors><ignoredErrors>{0}</ignoredErrors>",
+                error.1
+            ),
+        ),
+        (
+            "collection with extLst, then collection",
+            format!(
+                "<ignoredErrors>{}{}</ignoredErrors><ignoredErrors>{}</ignoredErrors>",
+                error.1, list.1, error.1
+            ),
+        ),
+    ] {
+        actual.push((label.to_owned(), collection_outcome(&body)));
+    }
+    let expected: &[(&str, &str)] = &[
+        (
+            "",
+            "Invalid(\"ignoredErrors requires at least one ignoredError\")",
+        ),
+        ("error", "ok entries=1 extensions=0"),
+        ("open error", "ok entries=1 extensions=0"),
+        (
+            "extLst",
+            "Invalid(\"ignoredErrors extLst appears before ignoredError\")",
+        ),
+        (
+            "open extLst",
+            "Invalid(\"ignoredErrors extLst appears before ignoredError\")",
+        ),
+        ("error,error", "ok entries=2 extensions=0"),
+        ("error,open error", "ok entries=2 extensions=0"),
+        ("error,extLst", "ok entries=1 extensions=1"),
+        ("error,open extLst", "ok entries=1 extensions=1"),
+        ("open error,error", "ok entries=2 extensions=0"),
+        ("open error,open error", "ok entries=2 extensions=0"),
+        ("open error,extLst", "ok entries=1 extensions=1"),
+        ("open error,open extLst", "ok entries=1 extensions=1"),
+        (
+            "extLst,error",
+            "Invalid(\"ignoredErrors extLst appears before ignoredError\")",
+        ),
+        (
+            "extLst,open error",
+            "Invalid(\"ignoredErrors extLst appears before ignoredError\")",
+        ),
+        (
+            "extLst,extLst",
+            "Invalid(\"ignoredErrors extLst appears before ignoredError\")",
+        ),
+        (
+            "extLst,open extLst",
+            "Invalid(\"ignoredErrors extLst appears before ignoredError\")",
+        ),
+        (
+            "open extLst,error",
+            "Invalid(\"ignoredErrors extLst appears before ignoredError\")",
+        ),
+        (
+            "open extLst,open error",
+            "Invalid(\"ignoredErrors extLst appears before ignoredError\")",
+        ),
+        (
+            "open extLst,extLst",
+            "Invalid(\"ignoredErrors extLst appears before ignoredError\")",
+        ),
+        (
+            "open extLst,open extLst",
+            "Invalid(\"ignoredErrors extLst appears before ignoredError\")",
+        ),
+        ("error,error,error", "ok entries=3 extensions=0"),
+        ("error,error,open error", "ok entries=3 extensions=0"),
+        ("error,error,extLst", "ok entries=2 extensions=1"),
+        ("error,error,open extLst", "ok entries=2 extensions=1"),
+        ("error,open error,error", "ok entries=3 extensions=0"),
+        ("error,open error,open error", "ok entries=3 extensions=0"),
+        ("error,open error,extLst", "ok entries=2 extensions=1"),
+        ("error,open error,open extLst", "ok entries=2 extensions=1"),
+        (
+            "error,extLst,error",
+            "Invalid(\"ignoredError appears after ignoredErrors extLst\")",
+        ),
+        (
+            "error,extLst,open error",
+            "Invalid(\"ignoredError appears after ignoredErrors extLst\")",
+        ),
+        (
+            "error,extLst,extLst",
+            "Invalid(\"duplicate ignoredErrors extLst\")",
+        ),
+        (
+            "error,extLst,open extLst",
+            "Invalid(\"duplicate ignoredErrors extLst\")",
+        ),
+        (
+            "error,open extLst,error",
+            "Invalid(\"ignoredError appears after ignoredErrors extLst\")",
+        ),
+        (
+            "error,open extLst,open error",
+            "Invalid(\"ignoredError appears after ignoredErrors extLst\")",
+        ),
+        (
+            "error,open extLst,extLst",
+            "Invalid(\"duplicate ignoredErrors extLst\")",
+        ),
+        (
+            "error,open extLst,open extLst",
+            "Invalid(\"duplicate ignoredErrors extLst\")",
+        ),
+        (
+            "empty extLst",
+            "Invalid(\"ignoredErrors extLst appears before ignoredError\")",
+        ),
+        (
+            "error,empty extLst",
+            "Invalid(\"ignoredErrors extLst requires at least one ext\")",
+        ),
+        (
+            "error,extLst,empty extLst",
+            "Invalid(\"duplicate ignoredErrors extLst\")",
+        ),
+        (
+            "unknown",
+            "Invalid(\"unexpected ignoredErrors element 'unknown'\")",
+        ),
+        (
+            "error,unknown",
+            "Invalid(\"unexpected ignoredErrors element 'unknown'\")",
+        ),
+        (
+            "error,extLst,unknown",
+            "Invalid(\"unexpected ignoredErrors element 'unknown'\")",
+        ),
+        (
+            "foreign error",
+            "Invalid(\"unexpected ignoredErrors element 'ignoredError'\")",
+        ),
+        (
+            "empty collection",
+            "Invalid(\"ignoredErrors requires at least one ignoredError\")",
+        ),
+        (
+            "two collections",
+            "Invalid(\"duplicate worksheet ignoredErrors element\")",
+        ),
+        (
+            "collection with extLst, then collection",
+            "Invalid(\"duplicate worksheet ignoredErrors element\")",
+        ),
+    ];
+    let same = actual.len() == expected.len()
+        && actual.iter().zip(expected).all(
+            |((label, outcome), (expected_label, expected_outcome))| {
+                label == expected_label && outcome == expected_outcome
+            },
+        );
+    let observed: String = actual
+        .iter()
+        .map(|(label, outcome)| format!("({label:?}, {outcome:?}),\n"))
+        .collect();
+    assert!(same, "observed rows:\n{observed}");
+}

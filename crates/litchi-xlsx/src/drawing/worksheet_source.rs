@@ -1082,4 +1082,246 @@ mod tests {
             "duplicated attribute"
         ));
     }
+
+    #[test]
+    fn declaration_attribute_order_matrix_is_stable() {
+        let attributes = [
+            ("version", "version=\"1.0\""),
+            ("encoding", "encoding=\"utf-8\""),
+            ("standalone", "standalone=\"no\""),
+        ];
+        let mut cases: Vec<Vec<(&str, &str)>> = vec![Vec::new()];
+        for first in attributes {
+            cases.push(vec![first]);
+        }
+        for first in attributes {
+            for second in attributes {
+                cases.push(vec![first, second]);
+            }
+        }
+        for first in attributes {
+            for second in attributes {
+                for third in attributes {
+                    cases.push(vec![first, second, third]);
+                }
+            }
+        }
+        let version = attributes[0];
+        cases.push(vec![("unknown", "unknown=\"1\"")]);
+        cases.push(vec![version, ("unknown", "unknown=\"1\"")]);
+        cases.push(vec![("version 1.1", "version=\"1.1\"")]);
+        cases.push(vec![version, ("encoding latin1", "encoding=\"latin1\"")]);
+        cases.push(vec![version, ("standalone maybe", "standalone=\"maybe\"")]);
+        cases.push(vec![version, ("standalone yes", "standalone=\"yes\"")]);
+        cases.push(vec![
+            version,
+            attributes[1],
+            attributes[2],
+            ("unknown", "unknown=\"1\""),
+        ]);
+        let actual: Vec<(String, String)> = cases
+            .iter()
+            .map(|case| {
+                let label = case.iter().map(|(name, _)| *name).collect::<Vec<_>>();
+                let mut declaration = String::from("<?xml");
+                for (_, attribute) in case {
+                    declaration.push(' ');
+                    declaration.push_str(attribute);
+                }
+                declaration.push_str("?>");
+                let outcome = match scan(&format!("{declaration}{}", worksheet("")), MAX_ATTRIBUTES)
+                {
+                    Ok(_) => "ok".to_owned(),
+                    Err(error) => format!("{error:?}"),
+                };
+                (label.join(","), outcome)
+            })
+            .collect();
+        let expected: &[(&str, &str)] = &[
+            (
+                "",
+                "Invalid(\"worksheet XML declaration is missing version\")",
+            ),
+            ("version", "ok"),
+            (
+                "encoding",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            (
+                "standalone",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            (
+                "version,version",
+                "Invalid(\"worksheet XML declaration is invalid: position 18: duplicated attribute, previous declaration at position 4\")",
+            ),
+            ("version,encoding", "ok"),
+            ("version,standalone", "ok"),
+            (
+                "encoding,version",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            (
+                "encoding,encoding",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            (
+                "encoding,standalone",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            (
+                "standalone,version",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            (
+                "standalone,encoding",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            (
+                "standalone,standalone",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            (
+                "version,version,version",
+                "Invalid(\"worksheet XML declaration is invalid: position 18: duplicated attribute, previous declaration at position 4\")",
+            ),
+            (
+                "version,version,encoding",
+                "Invalid(\"worksheet XML declaration is invalid: position 18: duplicated attribute, previous declaration at position 4\")",
+            ),
+            (
+                "version,version,standalone",
+                "Invalid(\"worksheet XML declaration is invalid: position 18: duplicated attribute, previous declaration at position 4\")",
+            ),
+            (
+                "version,encoding,version",
+                "Invalid(\"worksheet XML declaration is invalid: position 35: duplicated attribute, previous declaration at position 4\")",
+            ),
+            (
+                "version,encoding,encoding",
+                "Invalid(\"worksheet XML declaration is invalid: position 35: duplicated attribute, previous declaration at position 18\")",
+            ),
+            ("version,encoding,standalone", "ok"),
+            (
+                "version,standalone,version",
+                "Invalid(\"worksheet XML declaration is invalid: position 34: duplicated attribute, previous declaration at position 4\")",
+            ),
+            (
+                "version,standalone,encoding",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            (
+                "version,standalone,standalone",
+                "Invalid(\"worksheet XML declaration is invalid: position 34: duplicated attribute, previous declaration at position 18\")",
+            ),
+            (
+                "encoding,version,version",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            (
+                "encoding,version,encoding",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            (
+                "encoding,version,standalone",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            (
+                "encoding,encoding,version",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            (
+                "encoding,encoding,encoding",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            (
+                "encoding,encoding,standalone",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            (
+                "encoding,standalone,version",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            (
+                "encoding,standalone,encoding",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            (
+                "encoding,standalone,standalone",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            (
+                "standalone,version,version",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            (
+                "standalone,version,encoding",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            (
+                "standalone,version,standalone",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            (
+                "standalone,encoding,version",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            (
+                "standalone,encoding,encoding",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            (
+                "standalone,encoding,standalone",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            (
+                "standalone,standalone,version",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            (
+                "standalone,standalone,encoding",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            (
+                "standalone,standalone,standalone",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            (
+                "unknown",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            (
+                "version,unknown",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            (
+                "version 1.1",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            (
+                "version,encoding latin1",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            (
+                "version,standalone maybe",
+                "Invalid(\"worksheet XML declaration has a duplicate or out-of-order attribute\")",
+            ),
+            ("version,standalone yes", "ok"),
+            (
+                "version,encoding,standalone,unknown",
+                "Invalid(\"worksheet XML declaration has too many attributes\")",
+            ),
+        ];
+        let same = actual.len() == expected.len()
+            && actual.iter().zip(expected).all(
+                |((label, outcome), (expected_label, expected_outcome))| {
+                    label == expected_label && outcome == expected_outcome
+                },
+            );
+        let observed: String = actual
+            .iter()
+            .map(|(label, outcome)| format!("({label:?}, {outcome:?}),\n"))
+            .collect();
+        assert!(same, "observed rows:\n{observed}");
+    }
 }

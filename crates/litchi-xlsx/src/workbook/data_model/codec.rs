@@ -3490,4 +3490,245 @@ mod tests {
             assert_eq!(attribute.value, index.to_string());
         }
     }
+
+    /// Every sequence of at most `max_len` child indices below `count`,
+    /// shortest first.
+    fn sequences(count: usize, max_len: usize) -> Vec<Vec<usize>> {
+        let mut all = vec![Vec::new()];
+        let mut start = 0;
+        for _ in 0..max_len {
+            let end = all.len();
+            for index in start..end {
+                for child in 0..count {
+                    let mut next = all[index].clone();
+                    next.push(child);
+                    all.push(next);
+                }
+            }
+            start = end;
+        }
+        all
+    }
+
+    fn assert_rows(actual: &[(String, String)], expected: &[(&str, &str)]) {
+        let same = actual.len() == expected.len()
+            && actual.iter().zip(expected).all(
+                |((label, outcome), (expected_label, expected_outcome))| {
+                    label == expected_label && outcome == expected_outcome
+                },
+            );
+        let observed: String = actual
+            .iter()
+            .map(|(label, outcome)| format!("({label:?}, {outcome:?}),\n"))
+            .collect();
+        assert!(same, "observed rows:\n{observed}");
+    }
+
+    #[test]
+    fn data_model_child_order_matrix_is_stable() {
+        let children = [
+            (
+                "tables",
+                "<m:modelTables><m:modelTable id=\"a\" name=\"A\" connection=\"c\"/><m:modelTable id=\"b\" name=\"B\" connection=\"c\"/></m:modelTables>",
+            ),
+            (
+                "relationships",
+                "<m:modelRelationships><m:modelRelationship fromTable=\"A\" fromColumn=\"k\" toTable=\"B\" toColumn=\"k\"/></m:modelRelationships>",
+            ),
+            ("extLst", "<m:extLst/>"),
+        ];
+        let mut cases: Vec<Vec<(&str, &str)>> = sequences(children.len(), 3)
+            .into_iter()
+            .map(|sequence| sequence.into_iter().map(|index| children[index]).collect())
+            .collect();
+        cases.push(vec![("unknown", "<m:unknown/>")]);
+        cases.push(vec![children[0], ("unknown", "<m:unknown/>")]);
+        cases.push(vec![(
+            "foreign tables",
+            "<q:modelTables xmlns:q=\"urn:other\"/>",
+        )]);
+        let actual: Vec<(String, String)> = cases
+            .iter()
+            .map(|case| {
+                let label = case.iter().map(|(name, _)| *name).collect::<Vec<_>>();
+                let body: String = case.iter().map(|(_, xml)| *xml).collect();
+                let xml = format!("<m:dataModel xmlns:m='{X15}'>{body}</m:dataModel>");
+                let outcome = match parse_data_model(xml.as_bytes(), &SourceLimits::default()) {
+                    Ok(value) => format!(
+                        "ok tables={} relationships={} extLst={}",
+                        value.tables.len(),
+                        value.relationships.len(),
+                        value.extension_list.is_some()
+                    ),
+                    Err(error) => format!("{error:?}"),
+                };
+                (label.join(","), outcome)
+            })
+            .collect();
+        assert_rows(
+            &actual,
+            &[
+                ("", "ok tables=0 relationships=0 extLst=false"),
+                ("tables", "ok tables=2 relationships=0 extLst=false"),
+                (
+                    "relationships",
+                    "Invalid(\"relationship references unknown fromTable 'A'\")",
+                ),
+                ("extLst", "ok tables=0 relationships=0 extLst=true"),
+                (
+                    "tables,tables",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "tables,relationships",
+                    "ok tables=2 relationships=1 extLst=false",
+                ),
+                ("tables,extLst", "ok tables=2 relationships=0 extLst=true"),
+                (
+                    "relationships,tables",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "relationships,relationships",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "relationships,extLst",
+                    "Invalid(\"relationship references unknown fromTable 'A'\")",
+                ),
+                (
+                    "extLst,tables",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "extLst,relationships",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "extLst,extLst",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "tables,tables,tables",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "tables,tables,relationships",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "tables,tables,extLst",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "tables,relationships,tables",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "tables,relationships,relationships",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "tables,relationships,extLst",
+                    "ok tables=2 relationships=1 extLst=true",
+                ),
+                (
+                    "tables,extLst,tables",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "tables,extLst,relationships",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "tables,extLst,extLst",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "relationships,tables,tables",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "relationships,tables,relationships",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "relationships,tables,extLst",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "relationships,relationships,tables",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "relationships,relationships,relationships",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "relationships,relationships,extLst",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "relationships,extLst,tables",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "relationships,extLst,relationships",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "relationships,extLst,extLst",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "extLst,tables,tables",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "extLst,tables,relationships",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "extLst,tables,extLst",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "extLst,relationships,tables",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "extLst,relationships,relationships",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "extLst,relationships,extLst",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "extLst,extLst,tables",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "extLst,extLst,relationships",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "extLst,extLst,extLst",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "unknown",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "tables,unknown",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+                (
+                    "foreign tables",
+                    "Invalid(\"unexpected or out-of-order dataModel child\")",
+                ),
+            ],
+        );
+    }
 }

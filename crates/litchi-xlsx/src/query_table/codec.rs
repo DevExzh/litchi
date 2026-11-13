@@ -1225,4 +1225,326 @@ mod tests {
         }
         assert!(parse_query_table(&vec![b' '; MAX_PART_BYTES + 1]).is_err());
     }
+
+    /// Every sequence of at most `max_len` child indices below `count`,
+    /// shortest first.
+    fn sequences(count: usize, max_len: usize) -> Vec<Vec<usize>> {
+        let mut all = vec![Vec::new()];
+        let mut start = 0;
+        for _ in 0..max_len {
+            let end = all.len();
+            for index in start..end {
+                for child in 0..count {
+                    let mut next = all[index].clone();
+                    next.push(child);
+                    all.push(next);
+                }
+            }
+            start = end;
+        }
+        all
+    }
+
+    fn assert_rows(actual: &[(String, String)], expected: &[(&str, &str)]) {
+        let same = actual.len() == expected.len()
+            && actual.iter().zip(expected).all(
+                |((label, outcome), (expected_label, expected_outcome))| {
+                    label == expected_label && outcome == expected_outcome
+                },
+            );
+        let observed: String = actual
+            .iter()
+            .map(|(label, outcome)| format!("({label:?}, {outcome:?}),\n"))
+            .collect();
+        assert!(same, "observed rows:\n{observed}");
+    }
+
+    fn outcome<T>(result: Result<T>) -> String {
+        match result {
+            Ok(_) => "ok".to_owned(),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    const CORE: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+    const REFRESH: &str = "<queryTableRefresh><queryTableFields/></queryTableRefresh>";
+
+    #[test]
+    fn query_table_child_order_matrix_is_stable() {
+        let children = [("refresh", REFRESH), ("extLst", "<extLst/>")];
+        let mut cases: Vec<Vec<(&str, &str)>> = sequences(children.len(), 3)
+            .into_iter()
+            .map(|sequence| sequence.into_iter().map(|index| children[index]).collect())
+            .collect();
+        cases.push(vec![("unknown", "<unknown/>")]);
+        cases.push(vec![children[0], ("unknown", "<unknown/>")]);
+        cases.push(vec![(
+            "foreign refresh",
+            "<queryTableRefresh xmlns=\"urn:other\"/>",
+        )]);
+        let actual: Vec<(String, String)> = cases
+            .iter()
+            .map(|case| {
+                let label = case.iter().map(|(name, _)| *name).collect::<Vec<_>>();
+                let body: String = case.iter().map(|(_, xml)| *xml).collect();
+                let xml = format!(
+                    "<queryTable xmlns=\"{CORE}\" name=\"x\" connectionId=\"1\">{body}</queryTable>"
+                );
+                (label.join(","), outcome(parse_query_table(xml.as_bytes())))
+            })
+            .collect();
+        assert_rows(
+            &actual,
+            &[
+                ("", "ok"),
+                ("refresh", "ok"),
+                ("extLst", "ok"),
+                (
+                    "refresh,refresh",
+                    "Invalid(\"duplicate or out-of-order queryTableRefresh\")",
+                ),
+                ("refresh,extLst", "ok"),
+                (
+                    "extLst,refresh",
+                    "Invalid(\"duplicate or out-of-order queryTableRefresh\")",
+                ),
+                (
+                    "extLst,extLst",
+                    "Invalid(\"duplicate or out-of-order queryTable extLst\")",
+                ),
+                (
+                    "refresh,refresh,refresh",
+                    "Invalid(\"duplicate or out-of-order queryTableRefresh\")",
+                ),
+                (
+                    "refresh,refresh,extLst",
+                    "Invalid(\"duplicate or out-of-order queryTableRefresh\")",
+                ),
+                (
+                    "refresh,extLst,refresh",
+                    "Invalid(\"duplicate or out-of-order queryTableRefresh\")",
+                ),
+                (
+                    "refresh,extLst,extLst",
+                    "Invalid(\"duplicate or out-of-order queryTable extLst\")",
+                ),
+                (
+                    "extLst,refresh,refresh",
+                    "Invalid(\"duplicate or out-of-order queryTableRefresh\")",
+                ),
+                (
+                    "extLst,refresh,extLst",
+                    "Invalid(\"duplicate or out-of-order queryTableRefresh\")",
+                ),
+                (
+                    "extLst,extLst,refresh",
+                    "Invalid(\"duplicate or out-of-order queryTable extLst\")",
+                ),
+                (
+                    "extLst,extLst,extLst",
+                    "Invalid(\"duplicate or out-of-order queryTable extLst\")",
+                ),
+                (
+                    "unknown",
+                    "Invalid(\"unexpected queryTable child 'unknown'\")",
+                ),
+                (
+                    "refresh,unknown",
+                    "Invalid(\"unexpected queryTable child 'unknown'\")",
+                ),
+                (
+                    "foreign refresh",
+                    "Invalid(\"unexpected queryTable child 'queryTableRefresh'\")",
+                ),
+            ],
+        );
+    }
+
+    #[test]
+    fn query_table_refresh_child_order_matrix_is_stable() {
+        let children = [
+            ("fields", "<queryTableFields/>"),
+            (
+                "deleted",
+                "<queryTableDeletedFields><deletedField name=\"Old\"/></queryTableDeletedFields>",
+            ),
+            ("sortState", "<sortState ref=\"A1:B9\"/>"),
+            ("extLst", "<extLst/>"),
+        ];
+        let pairs = sequences(children.len(), 2);
+        let mut cases: Vec<Vec<(&str, &str)>> = pairs
+            .iter()
+            .map(|sequence| sequence.iter().map(|index| children[*index]).collect())
+            .collect();
+        // The same pairs again behind the required first child, so that an
+        // accepted order is not hidden by the missing-fields refusal.
+        for sequence in pairs.iter().filter(|sequence| sequence.len() == 2) {
+            let mut case = vec![children[0]];
+            case.extend(sequence.iter().map(|index| children[*index]));
+            cases.push(case);
+        }
+        cases.push(children.to_vec());
+        cases.push(vec![("unknown", "<unknown/>")]);
+        cases.push(vec![children[0], ("unknown", "<unknown/>")]);
+        cases.push(vec![(
+            "foreign fields",
+            "<queryTableFields xmlns=\"urn:other\"/>",
+        )]);
+        let actual: Vec<(String, String)> = cases
+            .iter()
+            .map(|case| {
+                let label = case.iter().map(|(name, _)| *name).collect::<Vec<_>>();
+                let body: String = case.iter().map(|(_, xml)| *xml).collect();
+                let xml = format!(
+                    "<queryTable xmlns=\"{CORE}\" name=\"x\" connectionId=\"1\"><queryTableRefresh>{body}</queryTableRefresh></queryTable>"
+                );
+                (label.join(","), outcome(parse_query_table(xml.as_bytes())))
+            })
+            .collect();
+        assert_rows(
+            &actual,
+            &[
+                (
+                    "",
+                    "Invalid(\"queryTableRefresh requires queryTableFields\")",
+                ),
+                ("fields", "ok"),
+                (
+                    "deleted",
+                    "Invalid(\"queryTableRefresh requires queryTableFields\")",
+                ),
+                (
+                    "sortState",
+                    "Invalid(\"queryTableRefresh requires queryTableFields\")",
+                ),
+                (
+                    "extLst",
+                    "Invalid(\"queryTableRefresh requires queryTableFields\")",
+                ),
+                (
+                    "fields,fields",
+                    "Invalid(\"duplicate or out-of-order queryTableFields\")",
+                ),
+                ("fields,deleted", "ok"),
+                ("fields,sortState", "ok"),
+                ("fields,extLst", "ok"),
+                (
+                    "deleted,fields",
+                    "Invalid(\"duplicate or out-of-order queryTableFields\")",
+                ),
+                (
+                    "deleted,deleted",
+                    "Invalid(\"duplicate or out-of-order queryTableDeletedFields\")",
+                ),
+                (
+                    "deleted,sortState",
+                    "Invalid(\"queryTableRefresh requires queryTableFields\")",
+                ),
+                (
+                    "deleted,extLst",
+                    "Invalid(\"queryTableRefresh requires queryTableFields\")",
+                ),
+                (
+                    "sortState,fields",
+                    "Invalid(\"duplicate or out-of-order queryTableFields\")",
+                ),
+                (
+                    "sortState,deleted",
+                    "Invalid(\"duplicate or out-of-order queryTableDeletedFields\")",
+                ),
+                (
+                    "sortState,sortState",
+                    "Invalid(\"duplicate or out-of-order query-table sortState\")",
+                ),
+                (
+                    "sortState,extLst",
+                    "Invalid(\"queryTableRefresh requires queryTableFields\")",
+                ),
+                (
+                    "extLst,fields",
+                    "Invalid(\"duplicate or out-of-order queryTableFields\")",
+                ),
+                (
+                    "extLst,deleted",
+                    "Invalid(\"duplicate or out-of-order queryTableDeletedFields\")",
+                ),
+                (
+                    "extLst,sortState",
+                    "Invalid(\"duplicate or out-of-order query-table sortState\")",
+                ),
+                (
+                    "extLst,extLst",
+                    "Invalid(\"duplicate or out-of-order queryTableRefresh extLst\")",
+                ),
+                (
+                    "fields,fields,fields",
+                    "Invalid(\"duplicate or out-of-order queryTableFields\")",
+                ),
+                (
+                    "fields,fields,deleted",
+                    "Invalid(\"duplicate or out-of-order queryTableFields\")",
+                ),
+                (
+                    "fields,fields,sortState",
+                    "Invalid(\"duplicate or out-of-order queryTableFields\")",
+                ),
+                (
+                    "fields,fields,extLst",
+                    "Invalid(\"duplicate or out-of-order queryTableFields\")",
+                ),
+                (
+                    "fields,deleted,fields",
+                    "Invalid(\"duplicate or out-of-order queryTableFields\")",
+                ),
+                (
+                    "fields,deleted,deleted",
+                    "Invalid(\"duplicate or out-of-order queryTableDeletedFields\")",
+                ),
+                ("fields,deleted,sortState", "ok"),
+                ("fields,deleted,extLst", "ok"),
+                (
+                    "fields,sortState,fields",
+                    "Invalid(\"duplicate or out-of-order queryTableFields\")",
+                ),
+                (
+                    "fields,sortState,deleted",
+                    "Invalid(\"duplicate or out-of-order queryTableDeletedFields\")",
+                ),
+                (
+                    "fields,sortState,sortState",
+                    "Invalid(\"duplicate or out-of-order query-table sortState\")",
+                ),
+                ("fields,sortState,extLst", "ok"),
+                (
+                    "fields,extLst,fields",
+                    "Invalid(\"duplicate or out-of-order queryTableFields\")",
+                ),
+                (
+                    "fields,extLst,deleted",
+                    "Invalid(\"duplicate or out-of-order queryTableDeletedFields\")",
+                ),
+                (
+                    "fields,extLst,sortState",
+                    "Invalid(\"duplicate or out-of-order query-table sortState\")",
+                ),
+                (
+                    "fields,extLst,extLst",
+                    "Invalid(\"duplicate or out-of-order queryTableRefresh extLst\")",
+                ),
+                ("fields,deleted,sortState,extLst", "ok"),
+                (
+                    "unknown",
+                    "Invalid(\"unexpected queryTableRefresh child 'unknown'\")",
+                ),
+                (
+                    "fields,unknown",
+                    "Invalid(\"unexpected queryTableRefresh child 'unknown'\")",
+                ),
+                (
+                    "foreign fields",
+                    "Invalid(\"unexpected queryTableRefresh child 'queryTableFields'\")",
+                ),
+            ],
+        );
+    }
 }

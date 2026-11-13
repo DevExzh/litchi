@@ -443,3 +443,691 @@ mod xsd_datetime_full_lexical_tests {
         assert_eq!(range.end_date(), "12345-12-31T24:00:00");
     }
 }
+
+#[cfg(test)]
+mod child_order_tests {
+    use super::*;
+
+    /// Every sequence of at most `max_len` child indices below `count`,
+    /// shortest first.
+    fn sequences(count: usize, max_len: usize) -> Vec<Vec<usize>> {
+        let mut all = vec![Vec::new()];
+        let mut start = 0;
+        for _ in 0..max_len {
+            let end = all.len();
+            for index in start..end {
+                for child in 0..count {
+                    let mut next = all[index].clone();
+                    next.push(child);
+                    all.push(next);
+                }
+            }
+            start = end;
+        }
+        all
+    }
+
+    fn assert_rows(actual: &[(String, String)], expected: &[(&str, &str)]) {
+        let same = actual.len() == expected.len()
+            && actual.iter().zip(expected).all(
+                |((label, outcome), (expected_label, expected_outcome))| {
+                    label == expected_label && outcome == expected_outcome
+                },
+            );
+        let observed: String = actual
+            .iter()
+            .map(|(label, outcome)| format!("({label:?}, {outcome:?}),\n"))
+            .collect();
+        assert!(same, "observed rows:\n{observed}");
+    }
+
+    fn outcome<T>(result: Result<T>) -> String {
+        match result {
+            Ok(_) => "ok".to_owned(),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    const BOUNDS: &str =
+        "<x15:bounds startDate=\"2024-01-01T00:00:00Z\" endDate=\"2024-12-31T23:59:59Z\"/>";
+
+    #[test]
+    fn state_child_order_matrix_is_stable() {
+        let children = [
+            (
+                "selection",
+                "<x15:selection startDate=\"2024-01-02T00:00:00Z\" endDate=\"2024-01-31T23:59:59Z\"/>",
+            ),
+            ("bounds", BOUNDS),
+            ("extLst", "<x15:extLst/>"),
+        ];
+        let mut cases: Vec<Vec<(&str, &str)>> = sequences(children.len(), 3)
+            .into_iter()
+            .map(|sequence| sequence.into_iter().map(|index| children[index]).collect())
+            .collect();
+        cases.push(vec![("unknown", "<x15:unknown/>")]);
+        cases.push(vec![children[1], ("unknown", "<x15:unknown/>")]);
+        cases.push(vec![children[1], ("core extLst", "<x:extLst/>")]);
+        cases.push(vec![("core bounds", "<x:bounds/>")]);
+        let actual: Vec<(String, String)> = cases
+            .iter()
+            .map(|case| {
+                let label = case.iter().map(|(name, _)| *name).collect::<Vec<_>>();
+                let body: String = case.iter().map(|(_, xml)| *xml).collect();
+                let xml = format!(
+                    "<x15:timelineCacheDefinition xmlns:x15=\"{X15}\" xmlns:x=\"{SML}\" name=\"View_Date\" sourceName=\"Date\"><x15:state minimalRefreshVersion=\"6\" lastRefreshVersion=\"6\" pivotCacheId=\"1\" filterType=\"dateBetween\">{body}</x15:state></x15:timelineCacheDefinition>"
+                );
+                (
+                    label.join(","),
+                    outcome(parse_timeline_cache_definition(xml.as_bytes())),
+                )
+            })
+            .collect();
+        assert_rows(
+            &actual,
+            &[
+                ("", "Invalid(\"View state requires bounds\")"),
+                ("selection", "Invalid(\"View state requires bounds\")"),
+                ("bounds", "ok"),
+                (
+                    "extLst",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "selection,selection",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                ("selection,bounds", "ok"),
+                (
+                    "selection,extLst",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "bounds,selection",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "bounds,bounds",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                ("bounds,extLst", "ok"),
+                (
+                    "extLst,selection",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "extLst,bounds",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "extLst,extLst",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "selection,selection,selection",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "selection,selection,bounds",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "selection,selection,extLst",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "selection,bounds,selection",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "selection,bounds,bounds",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                ("selection,bounds,extLst", "ok"),
+                (
+                    "selection,extLst,selection",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "selection,extLst,bounds",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "selection,extLst,extLst",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "bounds,selection,selection",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "bounds,selection,bounds",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "bounds,selection,extLst",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "bounds,bounds,selection",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "bounds,bounds,bounds",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "bounds,bounds,extLst",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "bounds,extLst,selection",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "bounds,extLst,bounds",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "bounds,extLst,extLst",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "extLst,selection,selection",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "extLst,selection,bounds",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "extLst,selection,extLst",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "extLst,bounds,selection",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "extLst,bounds,bounds",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "extLst,bounds,extLst",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "extLst,extLst,selection",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "extLst,extLst,bounds",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "extLst,extLst,extLst",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "unknown",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                (
+                    "bounds,unknown",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+                ("bounds,core extLst", "ok"),
+                (
+                    "core bounds",
+                    "Invalid(\"invalid or out-of-order View state child\")",
+                ),
+            ],
+        );
+    }
+
+    #[test]
+    fn cache_definition_child_order_matrix_is_stable() {
+        let state = format!(
+            "<x15:state minimalRefreshVersion=\"6\" lastRefreshVersion=\"6\" pivotCacheId=\"1\" filterType=\"thisMonth\">{BOUNDS}</x15:state>"
+        );
+        let children = [
+            (
+                "pivotTables",
+                "<x15:pivotTables><x15:pivotTable tabId=\"1\" name=\"PivotTable1\"/></x15:pivotTables>",
+            ),
+            ("state", state.as_str()),
+            ("filter", "<x15:timelinePivotFilter fld=\"0\" id=\"1\"/>"),
+            ("extLst", "<x15:extLst/>"),
+        ];
+        let mut cases: Vec<Vec<(&str, &str)>> = sequences(children.len(), 3)
+            .into_iter()
+            .map(|sequence| sequence.into_iter().map(|index| children[index]).collect())
+            .collect();
+        // Every pair again behind the required state, so that an accepted
+        // order is not hidden by the missing-state refusal.
+        for sequence in sequences(children.len(), 2)
+            .into_iter()
+            .filter(|sequence| sequence.len() == 2)
+        {
+            let mut case = vec![children[0], children[1]];
+            case.extend(sequence.into_iter().map(|index| children[index]));
+            cases.push(case);
+        }
+        cases.push(vec![("unknown", "<x15:unknown/>")]);
+        cases.push(vec![children[1], ("unknown", "<x15:unknown/>")]);
+        cases.push(vec![children[1], ("core extLst", "<x:extLst/>")]);
+        cases.push(vec![("core state", "<x:state/>")]);
+        let actual: Vec<(String, String)> = cases
+            .iter()
+            .map(|case| {
+                let label = case.iter().map(|(name, _)| *name).collect::<Vec<_>>();
+                let body: String = case.iter().map(|(_, xml)| *xml).collect();
+                let xml = format!(
+                    "<x15:timelineCacheDefinition xmlns:x15=\"{X15}\" xmlns:x=\"{SML}\" name=\"View_Date\" sourceName=\"Date\">{body}</x15:timelineCacheDefinition>"
+                );
+                (
+                    label.join(","),
+                    outcome(parse_timeline_cache_definition(xml.as_bytes())),
+                )
+            })
+            .collect();
+        assert_rows(
+            &actual,
+            &[
+                (
+                    "",
+                    "Invalid(\"View Cache requires exactly one state element\")",
+                ),
+                (
+                    "pivotTables",
+                    "Invalid(\"View Cache requires exactly one state element\")",
+                ),
+                ("state", "ok"),
+                (
+                    "filter",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'timelinePivotFilter'\")",
+                ),
+                (
+                    "extLst",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'extLst'\")",
+                ),
+                (
+                    "pivotTables,pivotTables",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'pivotTables'\")",
+                ),
+                ("pivotTables,state", "ok"),
+                (
+                    "pivotTables,filter",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'timelinePivotFilter'\")",
+                ),
+                (
+                    "pivotTables,extLst",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'extLst'\")",
+                ),
+                (
+                    "state,pivotTables",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'pivotTables'\")",
+                ),
+                (
+                    "state,state",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'state'\")",
+                ),
+                ("state,filter", "ok"),
+                ("state,extLst", "ok"),
+                (
+                    "filter,pivotTables",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'timelinePivotFilter'\")",
+                ),
+                (
+                    "filter,state",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'timelinePivotFilter'\")",
+                ),
+                (
+                    "filter,filter",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'timelinePivotFilter'\")",
+                ),
+                (
+                    "filter,extLst",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'timelinePivotFilter'\")",
+                ),
+                (
+                    "extLst,pivotTables",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'extLst'\")",
+                ),
+                (
+                    "extLst,state",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'extLst'\")",
+                ),
+                (
+                    "extLst,filter",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'extLst'\")",
+                ),
+                (
+                    "extLst,extLst",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'extLst'\")",
+                ),
+                (
+                    "pivotTables,pivotTables,pivotTables",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'pivotTables'\")",
+                ),
+                (
+                    "pivotTables,pivotTables,state",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'pivotTables'\")",
+                ),
+                (
+                    "pivotTables,pivotTables,filter",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'pivotTables'\")",
+                ),
+                (
+                    "pivotTables,pivotTables,extLst",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'pivotTables'\")",
+                ),
+                (
+                    "pivotTables,state,pivotTables",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'pivotTables'\")",
+                ),
+                (
+                    "pivotTables,state,state",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'state'\")",
+                ),
+                ("pivotTables,state,filter", "ok"),
+                ("pivotTables,state,extLst", "ok"),
+                (
+                    "pivotTables,filter,pivotTables",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'timelinePivotFilter'\")",
+                ),
+                (
+                    "pivotTables,filter,state",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'timelinePivotFilter'\")",
+                ),
+                (
+                    "pivotTables,filter,filter",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'timelinePivotFilter'\")",
+                ),
+                (
+                    "pivotTables,filter,extLst",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'timelinePivotFilter'\")",
+                ),
+                (
+                    "pivotTables,extLst,pivotTables",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'extLst'\")",
+                ),
+                (
+                    "pivotTables,extLst,state",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'extLst'\")",
+                ),
+                (
+                    "pivotTables,extLst,filter",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'extLst'\")",
+                ),
+                (
+                    "pivotTables,extLst,extLst",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'extLst'\")",
+                ),
+                (
+                    "state,pivotTables,pivotTables",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'pivotTables'\")",
+                ),
+                (
+                    "state,pivotTables,state",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'pivotTables'\")",
+                ),
+                (
+                    "state,pivotTables,filter",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'pivotTables'\")",
+                ),
+                (
+                    "state,pivotTables,extLst",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'pivotTables'\")",
+                ),
+                (
+                    "state,state,pivotTables",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'state'\")",
+                ),
+                (
+                    "state,state,state",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'state'\")",
+                ),
+                (
+                    "state,state,filter",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'state'\")",
+                ),
+                (
+                    "state,state,extLst",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'state'\")",
+                ),
+                (
+                    "state,filter,pivotTables",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'pivotTables'\")",
+                ),
+                (
+                    "state,filter,state",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'state'\")",
+                ),
+                (
+                    "state,filter,filter",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'timelinePivotFilter'\")",
+                ),
+                ("state,filter,extLst", "ok"),
+                (
+                    "state,extLst,pivotTables",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'pivotTables'\")",
+                ),
+                (
+                    "state,extLst,state",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'state'\")",
+                ),
+                (
+                    "state,extLst,filter",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'timelinePivotFilter'\")",
+                ),
+                (
+                    "state,extLst,extLst",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'extLst'\")",
+                ),
+                (
+                    "filter,pivotTables,pivotTables",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'timelinePivotFilter'\")",
+                ),
+                (
+                    "filter,pivotTables,state",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'timelinePivotFilter'\")",
+                ),
+                (
+                    "filter,pivotTables,filter",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'timelinePivotFilter'\")",
+                ),
+                (
+                    "filter,pivotTables,extLst",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'timelinePivotFilter'\")",
+                ),
+                (
+                    "filter,state,pivotTables",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'timelinePivotFilter'\")",
+                ),
+                (
+                    "filter,state,state",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'timelinePivotFilter'\")",
+                ),
+                (
+                    "filter,state,filter",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'timelinePivotFilter'\")",
+                ),
+                (
+                    "filter,state,extLst",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'timelinePivotFilter'\")",
+                ),
+                (
+                    "filter,filter,pivotTables",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'timelinePivotFilter'\")",
+                ),
+                (
+                    "filter,filter,state",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'timelinePivotFilter'\")",
+                ),
+                (
+                    "filter,filter,filter",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'timelinePivotFilter'\")",
+                ),
+                (
+                    "filter,filter,extLst",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'timelinePivotFilter'\")",
+                ),
+                (
+                    "filter,extLst,pivotTables",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'timelinePivotFilter'\")",
+                ),
+                (
+                    "filter,extLst,state",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'timelinePivotFilter'\")",
+                ),
+                (
+                    "filter,extLst,filter",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'timelinePivotFilter'\")",
+                ),
+                (
+                    "filter,extLst,extLst",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'timelinePivotFilter'\")",
+                ),
+                (
+                    "extLst,pivotTables,pivotTables",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'extLst'\")",
+                ),
+                (
+                    "extLst,pivotTables,state",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'extLst'\")",
+                ),
+                (
+                    "extLst,pivotTables,filter",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'extLst'\")",
+                ),
+                (
+                    "extLst,pivotTables,extLst",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'extLst'\")",
+                ),
+                (
+                    "extLst,state,pivotTables",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'extLst'\")",
+                ),
+                (
+                    "extLst,state,state",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'extLst'\")",
+                ),
+                (
+                    "extLst,state,filter",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'extLst'\")",
+                ),
+                (
+                    "extLst,state,extLst",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'extLst'\")",
+                ),
+                (
+                    "extLst,filter,pivotTables",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'extLst'\")",
+                ),
+                (
+                    "extLst,filter,state",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'extLst'\")",
+                ),
+                (
+                    "extLst,filter,filter",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'extLst'\")",
+                ),
+                (
+                    "extLst,filter,extLst",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'extLst'\")",
+                ),
+                (
+                    "extLst,extLst,pivotTables",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'extLst'\")",
+                ),
+                (
+                    "extLst,extLst,state",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'extLst'\")",
+                ),
+                (
+                    "extLst,extLst,filter",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'extLst'\")",
+                ),
+                (
+                    "extLst,extLst,extLst",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'extLst'\")",
+                ),
+                (
+                    "pivotTables,state,pivotTables,pivotTables",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'pivotTables'\")",
+                ),
+                (
+                    "pivotTables,state,pivotTables,state",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'pivotTables'\")",
+                ),
+                (
+                    "pivotTables,state,pivotTables,filter",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'pivotTables'\")",
+                ),
+                (
+                    "pivotTables,state,pivotTables,extLst",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'pivotTables'\")",
+                ),
+                (
+                    "pivotTables,state,state,pivotTables",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'state'\")",
+                ),
+                (
+                    "pivotTables,state,state,state",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'state'\")",
+                ),
+                (
+                    "pivotTables,state,state,filter",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'state'\")",
+                ),
+                (
+                    "pivotTables,state,state,extLst",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'state'\")",
+                ),
+                (
+                    "pivotTables,state,filter,pivotTables",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'pivotTables'\")",
+                ),
+                (
+                    "pivotTables,state,filter,state",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'state'\")",
+                ),
+                (
+                    "pivotTables,state,filter,filter",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'timelinePivotFilter'\")",
+                ),
+                ("pivotTables,state,filter,extLst", "ok"),
+                (
+                    "pivotTables,state,extLst,pivotTables",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'pivotTables'\")",
+                ),
+                (
+                    "pivotTables,state,extLst,state",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'state'\")",
+                ),
+                (
+                    "pivotTables,state,extLst,filter",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'timelinePivotFilter'\")",
+                ),
+                (
+                    "pivotTables,state,extLst,extLst",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'extLst'\")",
+                ),
+                (
+                    "unknown",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'unknown'\")",
+                ),
+                (
+                    "state,unknown",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'unknown'\")",
+                ),
+                ("state,core extLst", "ok"),
+                (
+                    "core state",
+                    "Invalid(\"unexpected or out-of-order View Cache child 'state'\")",
+                ),
+            ],
+        );
+    }
+}
