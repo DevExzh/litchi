@@ -2340,6 +2340,29 @@ impl RunsRead {
     }
 }
 
+/// Which element of a string item the run reader is inside. This is a
+/// nesting context, not a child order:
+///
+/// ```text
+/// Item --<r>--> Run
+/// Run --<rPr>--> RunProperties --</rPr>--> Run
+/// Run --<t>--> Text --</t>--> Run
+/// Run --</r>--> Item                       (the run is kept)
+/// ```
+///
+/// A run may hold any number of `rPr` and `t` children in any order. A
+/// self-closing `rPr` or `t` in `Run` and any self-closing element in
+/// `RunProperties` leave the place unchanged. Every other start or
+/// self-closing tag makes the item one whose runs are not kept, and the
+/// place is not consulted again for that item.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RunPlace {
+    Item,
+    Run,
+    RunProperties,
+    Text,
+}
+
 fn read_runs(reader: &mut quick_xml::Reader<&[u8]>, consume_invalid: bool) -> Result<RunsRead> {
     use quick_xml::events::Event;
     let attributes = |element: &quick_xml::events::BytesStart<'_>| -> Result<Box<str>> {
@@ -2355,10 +2378,9 @@ fn read_runs(reader: &mut quick_xml::Reader<&[u8]>, consume_invalid: bool) -> Re
     let mut runs: Vec<crate::RichRun> = Vec::new();
     let mut properties: Option<Vec<(Box<str>, Box<str>)>> = None;
     let mut text = String::new();
-    // Depth below the item and where the reader is: 0 the item, 1 a run,
-    // 2 its `rPr`, 3 its `t`.
+    // Depth below the item, and the element the reader is inside.
     let mut depth = 0usize;
-    let mut place = 0u8;
+    let mut place = RunPlace::Item;
     let mut valid = true;
     loop {
         let event = match reader.read_event() {
@@ -2376,16 +2398,16 @@ fn read_runs(reader: &mut quick_xml::Reader<&[u8]>, consume_invalid: bool) -> Re
                     continue;
                 }
                 match (depth, element.local_name().as_ref(), place) {
-                    (1, b"r", 0) => {
-                        place = 1;
+                    (1, b"r", RunPlace::Item) => {
+                        place = RunPlace::Run;
                         properties = None;
                         text.clear();
                     },
-                    (2, b"rPr", 1) => {
-                        place = 2;
+                    (2, b"rPr", RunPlace::Run) => {
+                        place = RunPlace::RunProperties;
                         properties = Some(Vec::new());
                     },
-                    (2, b"t", 1) => place = 3,
+                    (2, b"t", RunPlace::Run) => place = RunPlace::Text,
                     // A plain `t` beside runs, `rPh`, `phoneticPr` or
                     // children with content are not kept by a run rewrite.
                     _ if consume_invalid => valid = false,
@@ -2400,30 +2422,30 @@ fn read_runs(reader: &mut quick_xml::Reader<&[u8]>, consume_invalid: bool) -> Re
                     continue;
                 }
                 match (depth, place) {
-                    (2, 2) => {
+                    (2, RunPlace::RunProperties) => {
                         if let Some(properties) = properties.as_mut() {
                             properties.push((local(&element)?, attributes(&element)?));
                         }
                     },
-                    (1, 1) if element.local_name().as_ref() == b"rPr" => {
+                    (1, RunPlace::Run) if element.local_name().as_ref() == b"rPr" => {
                         properties = Some(Vec::new());
                     },
-                    (1, 1) if element.local_name().as_ref() == b"t" => {},
+                    (1, RunPlace::Run) if element.local_name().as_ref() == b"t" => {},
                     _ if consume_invalid => valid = false,
                     _ => return Ok(RunsRead::Complete(None)),
                 }
             },
-            Event::Text(value) if valid && place == 3 => text.push_str(
+            Event::Text(value) if valid && place == RunPlace::Text => text.push_str(
                 &value
                     .decode()
                     .map_err(|error| invalid(format!("string text: {error}")))?,
             ),
-            Event::CData(value) if valid && place == 3 => text.push_str(
+            Event::CData(value) if valid && place == RunPlace::Text => text.push_str(
                 &value
                     .decode()
                     .map_err(|error| invalid(format!("string text: {error}")))?,
             ),
-            Event::GeneralRef(reference) if valid && place == 3 => {
+            Event::GeneralRef(reference) if valid && place == RunPlace::Text => {
                 text.push_str(&litchi_ooxml_common::xml::decode_xml_reference(&reference)?);
             },
             Event::End(_) => {
@@ -2440,14 +2462,14 @@ fn read_runs(reader: &mut quick_xml::Reader<&[u8]>, consume_invalid: bool) -> Re
                     continue;
                 }
                 match (depth, place) {
-                    (2, 2 | 3) => place = 1,
-                    (1, 1) => {
+                    (2, RunPlace::RunProperties | RunPlace::Text) => place = RunPlace::Run,
+                    (1, RunPlace::Run) => {
                         let decoded = raw::strings::decode_spreadsheet_text(&text)?;
                         runs.push(crate::RichRun::with_properties(
                             properties.take().map(Vec::into_boxed_slice),
                             decoded,
                         ));
-                        place = 0;
+                        place = RunPlace::Item;
                     },
                     _ => {},
                 }

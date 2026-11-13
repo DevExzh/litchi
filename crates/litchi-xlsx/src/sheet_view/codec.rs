@@ -65,6 +65,47 @@ struct SheetViewCapture {
     writer: Writer<Vec<u8>>,
 }
 
+/// How far the worksheet's single `sheetViews` collection has been read:
+///
+/// ```text
+/// Absent --sheetViews--> Views
+/// Views --sheetView--> Views               (repeatable)
+/// Views --extLst--> Extensions             (optional)
+/// ```
+///
+/// A second `sheetViews` is refused in `Views` and `Extensions`. In
+/// `Extensions`, a `sheetView` and a second `extLst` are refused. The phase
+/// never returns to `Absent` once the collection has closed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SheetViewsPhase {
+    Absent,
+    Views,
+    Extensions,
+}
+
+/// The last ordered child the current `sheetView` accepted, in schema order:
+///
+/// ```text
+/// Start --pane--> Start
+/// Start | Selections --selection--> Selections         (repeatable)
+/// Start | Selections | PivotSelections
+///     --pivotSelection--> PivotSelections              (repeatable)
+/// Start | Selections | PivotSelections
+///     --extLst--> ExtensionList
+/// ```
+///
+/// Every child is optional. `pane` is only accepted in `Start` and does not
+/// leave it; a second `pane` is refused by the view that already holds one.
+/// Nothing is accepted after `extLst`. Each `sheetView` begins at `Start`,
+/// whatever the previous view reached.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ViewPhase {
+    Start,
+    Selections,
+    PivotSelections,
+    ExtensionList,
+}
+
 struct Parser {
     stack: Vec<Context>,
     collection: Option<Collection>,
@@ -72,9 +113,8 @@ struct Parser {
     current_pivot: Option<PivotBuilder>,
     capture: Option<Capture>,
     sheet_view_capture: Option<SheetViewCapture>,
-    seen_collection: bool,
-    sheet_views_phase: u8,
-    view_phase: u8,
+    sheet_views_phase: SheetViewsPhase,
+    view_phase: ViewPhase,
     retained: usize,
 }
 struct PivotBuilder {
@@ -112,9 +152,8 @@ pub fn parse_worksheet_views(xml: &[u8]) -> Result<Option<Collection>> {
         current_pivot: None,
         capture: None,
         sheet_view_capture: None,
-        seen_collection: false,
-        sheet_views_phase: 0,
-        view_phase: 0,
+        sheet_views_phase: SheetViewsPhase::Absent,
+        view_phase: ViewPhase::Start,
         retained: 0,
     };
     loop {
@@ -362,11 +401,10 @@ impl Parser {
     }
 
     fn begin_collection(&mut self) -> Result<()> {
-        if self.seen_collection {
+        if self.sheet_views_phase != SheetViewsPhase::Absent {
             return Err(invalid("duplicate worksheet sheetViews element"));
         }
-        self.seen_collection = true;
-        self.sheet_views_phase = 0;
+        self.sheet_views_phase = SheetViewsPhase::Views;
         self.collection = Some(Collection {
             entries: Vec::new(),
             extensions: Vec::new(),
@@ -384,7 +422,7 @@ impl Parser {
         Ok(())
     }
     fn begin_view(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
-        if self.sheet_views_phase > 0 {
+        if self.sheet_views_phase == SheetViewsPhase::Extensions {
             return Err(invalid("sheetView appears after sheetViews extLst"));
         }
         if self.current_view.is_some() {
@@ -397,7 +435,7 @@ impl Parser {
         if collection.entries.len() >= MAX_VIEWS {
             return Err(invalid("too many worksheet views"));
         }
-        self.view_phase = 0;
+        self.view_phase = ViewPhase::Start;
         self.current_view = Some(parse_view(element, decoder)?);
         Ok(())
     }
@@ -468,22 +506,22 @@ impl Parser {
     fn begin_ext_list(&mut self, owner: Owner) -> Result<()> {
         match owner {
             Owner::Collection => {
-                if self.sheet_views_phase > 0 {
+                if self.sheet_views_phase == SheetViewsPhase::Extensions {
                     return Err(invalid("duplicate sheetViews extLst"));
                 }
-                self.sheet_views_phase = 1;
+                self.sheet_views_phase = SheetViewsPhase::Extensions;
             },
             Owner::View => {
-                if self.view_phase > 2 {
+                if self.view_phase == ViewPhase::ExtensionList {
                     return Err(invalid("duplicate sheetView extLst"));
                 }
-                self.view_phase = 3;
+                self.view_phase = ViewPhase::ExtensionList;
             },
         }
         Ok(())
     }
     fn add_pane(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
-        if self.view_phase != 0 {
+        if self.view_phase != ViewPhase::Start {
             return Err(invalid("pane is out of schema order"));
         }
         let view = self
@@ -497,10 +535,13 @@ impl Parser {
         Ok(())
     }
     fn add_selection(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
-        if self.view_phase > 1 {
+        if matches!(
+            self.view_phase,
+            ViewPhase::PivotSelections | ViewPhase::ExtensionList
+        ) {
             return Err(invalid("selection is out of schema order"));
         }
-        self.view_phase = 1;
+        self.view_phase = ViewPhase::Selections;
         let view = self
             .current_view
             .as_mut()
@@ -519,10 +560,10 @@ impl Parser {
         decoder: Decoder,
         resolver: &NamespaceResolver,
     ) -> Result<()> {
-        if self.view_phase > 2 {
+        if self.view_phase == ViewPhase::ExtensionList {
             return Err(invalid("pivotSelection is out of schema order"));
         }
-        self.view_phase = 2;
+        self.view_phase = ViewPhase::PivotSelections;
         let view = self
             .current_view
             .as_ref()

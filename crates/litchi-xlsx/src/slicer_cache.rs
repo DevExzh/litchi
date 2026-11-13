@@ -233,6 +233,50 @@ impl BoundedXml {
     }
 }
 
+/// The last child an `x14:slicerCacheDefinition` accepted, in schema order:
+///
+/// ```text
+/// Start --pivotTables--> PivotTables
+/// Start | PivotTables --data--> Data
+/// Start | PivotTables | Data --extLst--> ExtensionList
+/// ```
+///
+/// Every child is optional and none repeats; nothing is accepted after
+/// `extLst`. A self-closing `extLst` takes the same transition as an open
+/// one. A self-closing `pivotTables` or `data` never advances the stage: where
+/// the open form would be accepted it is refused as empty, elsewhere it is
+/// refused as out of order like the open form.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DefinitionStage {
+    Start,
+    PivotTables,
+    Data,
+    ExtensionList,
+}
+
+impl DefinitionStage {
+    const fn accepts_pivot_tables(self) -> bool {
+        match self {
+            Self::Start => true,
+            Self::PivotTables | Self::Data | Self::ExtensionList => false,
+        }
+    }
+
+    const fn accepts_data(self) -> bool {
+        match self {
+            Self::Start | Self::PivotTables => true,
+            Self::Data | Self::ExtensionList => false,
+        }
+    }
+
+    const fn accepts_extension_list(self) -> bool {
+        match self {
+            Self::Start | Self::PivotTables | Self::Data => true,
+            Self::ExtensionList => false,
+        }
+    }
+}
+
 pub fn parse(xml: &[u8]) -> Result<Definition> {
     if xml.len() > MAX_PART_BYTES {
         return Err(limit("part bytes"));
@@ -246,7 +290,7 @@ pub fn parse(xml: &[u8]) -> Result<Definition> {
     let mut root_seen = false;
     let mut root_closed = false;
     let mut definition: Option<Definition> = None;
-    let mut stage = 0u8;
+    let mut stage = DefinitionStage::Start;
     let mut in_pivots = false;
     let mut open_pivot: Option<(usize, PivotTable)> = None;
     let mut capture: Option<Capture> = None;
@@ -313,12 +357,14 @@ pub fn parse(xml: &[u8]) -> Result<Definition> {
                     definition = Some(parse_root_attributes(&element, &resolver, decoder)?);
                 } else if depth == 1 {
                     match element.local_name().as_ref() {
-                        b"pivotTables" if exact(&namespace, X14) && stage == 0 => {
+                        b"pivotTables"
+                            if exact(&namespace, X14) && stage.accepts_pivot_tables() =>
+                        {
                             reject_attributes(&element, &resolver, decoder, &[])?;
                             in_pivots = true;
-                            stage = 1;
+                            stage = DefinitionStage::PivotTables;
                         },
-                        b"data" if exact(&namespace, X14) && stage <= 1 => {
+                        b"data" if exact(&namespace, X14) && stage.accepts_data() => {
                             reject_attributes(&element, &resolver, decoder, &[])?;
                             capture = Some(Capture {
                                 kind: CaptureKind::Data,
@@ -326,16 +372,16 @@ pub fn parse(xml: &[u8]) -> Result<Definition> {
                                 parent_depth: depth,
                                 data_kind: None,
                             });
-                            stage = 2;
+                            stage = DefinitionStage::Data;
                         },
-                        b"extLst" if exact(&namespace, X14) && stage <= 2 => {
+                        b"extLst" if exact(&namespace, X14) && stage.accepts_extension_list() => {
                             capture = Some(Capture {
                                 kind: CaptureKind::Extension,
                                 start,
                                 parent_depth: depth,
                                 data_kind: None,
                             });
-                            stage = 3;
+                            stage = DefinitionStage::ExtensionList;
                         },
                         _ => return Err(invalid("unexpected or out-of-order Slicer Cache child")),
                     }
@@ -368,19 +414,21 @@ pub fn parse(xml: &[u8]) -> Result<Definition> {
                     return Err(invalid("Slicer Cache root cannot be empty"));
                 } else if depth == 1 {
                     match element.local_name().as_ref() {
-                        b"pivotTables" if exact(&namespace, X14) && stage == 0 => {
+                        b"pivotTables"
+                            if exact(&namespace, X14) && stage.accepts_pivot_tables() =>
+                        {
                             return Err(invalid("pivotTables cannot be empty"));
                         },
-                        b"data" if exact(&namespace, X14) && stage <= 1 => {
+                        b"data" if exact(&namespace, X14) && stage.accepts_data() => {
                             return Err(invalid("data cannot be empty"));
                         },
-                        b"extLst" if exact(&namespace, X14) && stage <= 2 => {
+                        b"extLst" if exact(&namespace, X14) && stage.accepts_extension_list() => {
                             let bytes = retained(xml, start, end, &mut total_inert)?;
                             let definition = definition
                                 .as_mut()
                                 .ok_or_else(|| invalid("missing Slicer Cache definition"))?;
                             definition.extension_list = Some(ExtensionList(bytes));
-                            stage = 3;
+                            stage = DefinitionStage::ExtensionList;
                         },
                         _ => return Err(invalid("unexpected or out-of-order Slicer Cache child")),
                     }

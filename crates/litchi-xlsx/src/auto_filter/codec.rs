@@ -732,6 +732,45 @@ fn icon(v: IconSet) -> &'static str {
         NoIcons => "NoIcons",
     }
 }
+
+/// Which direct children of the `autoFilter` root are still accepted:
+///
+/// ```text
+/// Columns --filterColumn--> Columns        (optional, repeatable)
+/// Columns --sortState--> Sorted            (optional)
+/// ```
+///
+/// In `Sorted`, a `filterColumn` and a second `sortState` are refused. The
+/// self-closing and the open form of a child take the same transition. The
+/// phase belongs to the fragment, not to one root element: it does not go
+/// back to `Columns` when the root closes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Columns,
+    Sorted,
+}
+
+impl RootPhase {
+    /// Accept a `filterColumn` child of the root.
+    fn filter_column(self) -> Result<()> {
+        match self {
+            Self::Columns => Ok(()),
+            Self::Sorted => Err(invalid("filterColumn must precede sortState")),
+        }
+    }
+
+    /// Accept the `sortState` child of the root.
+    fn sort_state(&mut self) -> Result<()> {
+        match self {
+            Self::Columns => {
+                *self = Self::Sorted;
+                Ok(())
+            },
+            Self::Sorted => Err(invalid("duplicate sortState")),
+        }
+    }
+}
+
 fn parse_fragment(fragment: &[u8]) -> Result<Definition> {
     let wrapped = wrap(fragment);
     let mut reader = NsReader::from_reader(wrapped.as_slice());
@@ -748,7 +787,7 @@ fn parse_fragment(fragment: &[u8]) -> Result<Definition> {
     let mut sort: Option<(usize, SortBuilder)> = None;
     let mut sort_state = None;
     let mut payload_depth = None;
-    let mut phase = 0u8;
+    let mut phase = RootPhase::Columns;
     loop {
         let decoder = reader.decoder();
         let event = reader.read_event().map_err(xml_error)?.into_owned();
@@ -770,9 +809,7 @@ fn parse_fragment(fragment: &[u8]) -> Result<Definition> {
                     && name.as_ref() == b"filterColumn"
                     && root == Some(depth)
                 {
-                    if phase > 0 {
-                        return Err(invalid("filterColumn must precede sortState"));
-                    }
+                    phase.filter_column()?;
                     let builder = parse_column(&e, decoder, width)?;
                     depth += 1;
                     column = Some((depth, builder));
@@ -925,10 +962,7 @@ fn parse_fragment(fragment: &[u8]) -> Result<Definition> {
                     && name.as_ref() == b"sortState"
                     && root == Some(depth)
                 {
-                    if phase > 0 || sort_state.is_some() {
-                        return Err(invalid("duplicate sortState"));
-                    }
-                    phase = 1;
+                    phase.sort_state()?;
                     depth += 1;
                     sort = Some((depth, parse_sort_state(&e, decoder)?));
                     opaque_mut(&mut root_opaque).push_order(ChildOrder::SortState)?;
@@ -997,9 +1031,7 @@ fn parse_fragment(fragment: &[u8]) -> Result<Definition> {
                     && name.as_ref() == b"filterColumn"
                     && root == Some(depth)
                 {
-                    if phase > 0 {
-                        return Err(invalid("filterColumn must precede sortState"));
-                    }
+                    phase.filter_column()?;
                     let b = parse_column(&e, decoder, width)?;
                     columns.push(finish_column(b)?);
                     opaque_mut(&mut root_opaque)
@@ -1130,10 +1162,7 @@ fn parse_fragment(fragment: &[u8]) -> Result<Definition> {
                     && name.as_ref() == b"sortState"
                     && root == Some(depth)
                 {
-                    if phase > 0 || sort_state.is_some() {
-                        return Err(invalid("duplicate sortState"));
-                    }
-                    phase = 1;
+                    phase.sort_state()?;
                     sort_state = Some(finish_sort(parse_sort_state(&e, decoder)?));
                     opaque_mut(&mut root_opaque).push_order(ChildOrder::SortState)?;
                 } else if spreadsheet(&namespace)
