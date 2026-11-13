@@ -629,11 +629,31 @@ pub struct PackageWriter<W: Write = io::Cursor<Vec<u8>>> {
     archive_entry_count: usize,
     manifest_version: String,
     preserved_manifest: Option<PreservedManifest>,
-    wrote_any_entry: bool,
-    wrote_mimetype: bool,
-    wrote_payload_entry: bool,
+    phase: WriterPhase,
     encryption: Option<WriterEncryption>,
     document_signer: Option<crate::signature::DocumentSigner>,
+}
+
+/// How far a [`PackageWriter`] has published its package.
+///
+/// ```text
+/// Empty    --set_mimetype / set_mimetype_streaming--> Mimetype
+/// Mimetype --first member outside META-INF/---------> Payload
+/// ```
+///
+/// - `Empty`: nothing is written. Only the `mimetype` entry may be written,
+///   so it is always the first entry of the archive.
+/// - `Mimetype`: members and manifest entries may be added; encryption and
+///   signing may still be configured. `META-INF/` members keep this phase.
+/// - `Payload`: a payload member is written; encryption and signing are
+///   fixed.
+///
+/// Finishing consumes the writer and requires `Mimetype` or `Payload`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum WriterPhase {
+    Empty,
+    Mimetype,
+    Payload,
 }
 
 struct WriterEncryption {
@@ -736,9 +756,7 @@ impl PackageWriter<io::Cursor<Vec<u8>>> {
             archive_entry_count: 0,
             manifest_version: "1.3".to_string(),
             preserved_manifest: None,
-            wrote_any_entry: false,
-            wrote_mimetype: false,
-            wrote_payload_entry: false,
+            phase: WriterPhase::Empty,
             encryption: None,
             document_signer: None,
         }
@@ -772,9 +790,7 @@ impl<W: Write> PackageWriter<W> {
             archive_entry_count: 0,
             manifest_version: "1.3".to_string(),
             preserved_manifest: None,
-            wrote_any_entry: false,
-            wrote_mimetype: false,
-            wrote_payload_entry: false,
+            phase: WriterPhase::Empty,
             encryption: None,
             document_signer: None,
         }
@@ -786,11 +802,7 @@ impl<W: Write> PackageWriter<W> {
     ///
     /// Returns an error when payload entries have already been written.
     pub fn set_document_signer(&mut self, signer: crate::signature::DocumentSigner) -> Result<()> {
-        if self.wrote_payload_entry {
-            return Err(Error::InvalidFormat(
-                "ODF signing must be configured before payload entries".to_string(),
-            ));
-        }
+        self.require_no_payload("ODF signing must be configured before payload entries")?;
         self.document_signer = Some(signer);
         Ok(())
     }
@@ -801,11 +813,7 @@ impl<W: Write> PackageWriter<W> {
     ///
     /// Returns an error when payload entries have already been written.
     pub fn clear_document_signer(&mut self) -> Result<()> {
-        if self.wrote_payload_entry {
-            return Err(Error::InvalidFormat(
-                "ODF signing cannot be changed after payload entries".to_string(),
-            ));
-        }
+        self.require_no_payload("ODF signing cannot be changed after payload entries")?;
         self.document_signer = None;
         Ok(())
     }
@@ -818,11 +826,7 @@ impl<W: Write> PackageWriter<W> {
     ///
     /// Returns an error when payload entries have already been written.
     pub fn set_encryption(&mut self, password: impl Into<String>, profile: Profile) -> Result<()> {
-        if self.wrote_payload_entry {
-            return Err(Error::InvalidFormat(
-                "ODF encryption must be configured before payload entries".to_string(),
-            ));
-        }
+        self.require_no_payload("ODF encryption must be configured before payload entries")?;
         // Profiles can only be constructed after validation; evaluate the password before
         // mutating state so a late call remains atomic.
         let secret = Zeroizing::new(password.into());
@@ -839,11 +843,7 @@ impl<W: Write> PackageWriter<W> {
     ///
     /// Returns an error when payload entries have already been written.
     pub fn clear_encryption(&mut self) -> Result<()> {
-        if self.wrote_payload_entry {
-            return Err(Error::InvalidFormat(
-                "ODF encryption cannot be changed after payload entries".to_string(),
-            ));
-        }
+        self.require_no_payload("ODF encryption cannot be changed after payload entries")?;
         self.encryption = None;
         Ok(())
     }
@@ -879,8 +879,7 @@ impl<W: Write> PackageWriter<W> {
             .map_err(|e| Error::ZipError(e.to_string()))?;
 
         self.mimetype = Some(mimetype.to_string());
-        self.wrote_any_entry = true;
-        self.wrote_mimetype = true;
+        self.phase = WriterPhase::Mimetype;
         self.archive_entry_count += 1;
         self.member_paths.insert("mimetype".to_string());
         self.record_manifest_entry(entry, entry_bytes);
@@ -912,24 +911,37 @@ impl<W: Write> PackageWriter<W> {
         }
 
         self.mimetype = Some(mimetype.to_string());
-        self.wrote_any_entry = true;
-        self.wrote_mimetype = true;
+        self.phase = WriterPhase::Mimetype;
         self.archive_entry_count += 1;
         self.member_paths.insert("mimetype".to_string());
         self.record_manifest_entry(entry, entry_bytes);
         Ok(())
     }
 
-    fn validate_mimetype_publication(&self, mimetype: &str) -> PackageWriterResult<()> {
-        if self.wrote_mimetype {
-            return Err(PackageWriterError::Core(Error::InvalidFormat(
-                "MIME type already set".to_string(),
-            )));
+    /// Members and manifest entries need the `mimetype` entry before them.
+    fn require_mimetype(&self) -> Result<()> {
+        match self.phase {
+            WriterPhase::Empty => Err(Error::InvalidFormat("MIME type not set".to_string())),
+            WriterPhase::Mimetype | WriterPhase::Payload => Ok(()),
         }
-        if self.wrote_any_entry {
-            return Err(PackageWriterError::Core(Error::InvalidFormat(
-                "Cannot set MIME type after writing other files".to_string(),
-            )));
+    }
+
+    /// Encryption and signing are fixed once a payload member is written.
+    fn require_no_payload(&self, message: &str) -> Result<()> {
+        match self.phase {
+            WriterPhase::Empty | WriterPhase::Mimetype => Ok(()),
+            WriterPhase::Payload => Err(Error::InvalidFormat(message.to_string())),
+        }
+    }
+
+    fn validate_mimetype_publication(&self, mimetype: &str) -> PackageWriterResult<()> {
+        match self.phase {
+            WriterPhase::Empty => {},
+            WriterPhase::Mimetype | WriterPhase::Payload => {
+                return Err(PackageWriterError::Core(Error::InvalidFormat(
+                    "MIME type already set".to_string(),
+                )));
+            },
         }
         Self::validate_media_type(mimetype, false, "MIME type")
             .map_err(PackageWriterError::Core)?;
@@ -1217,10 +1229,15 @@ impl<W: Write> PackageWriter<W> {
         self.manifest_entries.push(entry);
     }
 
+    /// Account for a member just written after `mimetype`; the first one
+    /// outside `META-INF/` starts the payload.
     fn record_member_path(&mut self, path: &str) {
         let inserted = self.member_paths.insert(path.to_string());
         debug_assert!(inserted);
         self.archive_entry_count += 1;
+        if !path.starts_with("META-INF/") {
+            self.phase = WriterPhase::Payload;
+        }
     }
 
     /// Publish a complete authored XML member while retaining typed transport
@@ -1251,11 +1268,7 @@ impl<W: Write> PackageWriter<W> {
             return Err(self.map_archive_error(error));
         }
         self.record_manifest_entry(entry, entry_bytes);
-        self.wrote_any_entry = true;
         self.record_member_path(path);
-        if !path.starts_with("META-INF/") {
-            self.wrote_payload_entry = true;
-        }
         Ok(())
     }
 
@@ -1301,11 +1314,7 @@ impl<W: Write> PackageWriter<W> {
 
         let report = reader.report();
         self.record_manifest_entry(entry, entry_bytes);
-        self.wrote_any_entry = true;
         self.record_member_path(path);
-        if !path.starts_with("META-INF/") {
-            self.wrote_payload_entry = true;
-        }
         Ok(report)
     }
 
@@ -1314,11 +1323,7 @@ impl<W: Write> PackageWriter<W> {
         path: &str,
         media_type: &str,
     ) -> PackageWriterResult<()> {
-        if !self.wrote_mimetype {
-            return Err(PackageWriterError::Core(Error::InvalidFormat(
-                "MIME type not set".to_string(),
-            )));
-        }
+        self.require_mimetype().map_err(PackageWriterError::Core)?;
         self.validate_member_path(path, false)
             .map_err(PackageWriterError::Core)?;
         if Self::is_reserved_admin_path(path) {
@@ -1372,9 +1377,7 @@ impl<W: Write> PackageWriter<W> {
                 "mimetype is written via set_mimetype()".to_string(),
             ));
         }
-        if !self.wrote_mimetype {
-            return Err(Error::InvalidFormat("MIME type not set".to_string()));
-        }
+        self.require_mimetype()?;
 
         // Determine media type based on file extension
         let media_type = Self::guess_media_type(path);
@@ -1405,9 +1408,7 @@ impl<W: Write> PackageWriter<W> {
                 "mimetype is written via set_mimetype()".to_string(),
             ));
         }
-        if !self.wrote_mimetype {
-            return Err(Error::InvalidFormat("MIME type not set".to_string()));
-        }
+        self.require_mimetype()?;
 
         self.write_file(path, content, media_type, PayloadOrigin::AuthoredOrChanged)
     }
@@ -1471,21 +1472,13 @@ impl<W: Write> PackageWriter<W> {
         }
 
         self.record_manifest_entry(entry, entry_bytes);
-        self.wrote_any_entry = true;
         self.record_member_path(path);
-        if !path.starts_with("META-INF/") {
-            self.wrote_payload_entry = true;
-        }
         Ok(())
     }
 
     fn validate_reader_publication(&self, path: &str, media_type: &str) -> PackageWriterResult<()> {
         self.validate_reader_path(path)?;
-        if !self.wrote_mimetype {
-            return Err(PackageWriterError::Core(Error::InvalidFormat(
-                "MIME type not set".to_string(),
-            )));
-        }
+        self.require_mimetype().map_err(PackageWriterError::Core)?;
         Self::validate_media_type(media_type, false, "manifest media type")
             .map_err(PackageWriterError::Core)?;
         if xml_minifier::audit::package::is_xml_part(path, media_type) {
@@ -1518,6 +1511,7 @@ impl<W: Write> PackageWriter<W> {
         media_type: &str,
         origin: PayloadOrigin,
     ) -> Result<()> {
+        self.require_mimetype()?;
         self.validate_member_path(path, false)?;
         if Self::is_reserved_write_path(path) {
             return Err(Error::InvalidFormat(format!(
@@ -1570,11 +1564,7 @@ impl<W: Write> PackageWriter<W> {
                 .map_err(|e| Error::ZipError(e.to_string()))?;
         };
         self.record_manifest_entry(entry, entry_bytes);
-        self.wrote_any_entry = true;
         self.record_member_path(path);
-        if !path.starts_with("META-INF/") {
-            self.wrote_payload_entry = true;
-        }
         Ok(())
     }
 
@@ -1594,9 +1584,7 @@ impl<W: Write> PackageWriter<W> {
     /// Returns an error when no MIME type is configured, the checked part
     /// cannot be assembled, or the archive write fails.
     pub fn add_spliced_xml(&mut self, publication: XmlSplicePublication) -> Result<()> {
-        if !self.wrote_mimetype {
-            return Err(Error::InvalidFormat("MIME type not set".to_string()));
-        }
+        self.require_mimetype()?;
         let (path, content, media_type) = publication.assemble()?;
         self.write_file(&path, &content, &media_type, PayloadOrigin::CheckedSplice)
     }
@@ -1669,9 +1657,7 @@ impl<W: Write> PackageWriter<W> {
     /// Returns an error when no MIME type is configured or the path is
     /// reserved or empty.
     pub fn add_manifest_entry(&mut self, path: &str, media_type: &str) -> Result<()> {
-        if !self.wrote_mimetype {
-            return Err(Error::InvalidFormat("MIME type not set".to_string()));
-        }
+        self.require_mimetype()?;
         if path.is_empty() || path == "mimetype" {
             return Err(Error::InvalidFormat(
                 "Invalid manifest-only path".to_string(),
@@ -2088,11 +2074,7 @@ impl<W: Write> PackageWriter<W> {
     }
 
     fn validate_finish_publication(&self) -> PackageWriterResult<()> {
-        if !self.wrote_mimetype {
-            return Err(PackageWriterError::Core(Error::InvalidFormat(
-                "MIME type not set".to_string(),
-            )));
-        }
+        self.require_mimetype().map_err(PackageWriterError::Core)?;
         let manifest_bytes = if let Some(raw_manifest) = self.preserved_manifest_if_equivalent() {
             u64::try_from(raw_manifest.len()).map_err(|error| {
                 PackageWriterError::Core(Error::InvalidFormat(format!(
@@ -2546,15 +2528,14 @@ mod tests {
     #[test]
     fn test_package_writer_new() {
         let writer = PackageWriter::new(StreamingArchiveLimits::default());
-        assert!(!writer.wrote_mimetype);
-        assert!(!writer.wrote_any_entry);
+        assert_eq!(writer.phase, WriterPhase::Empty);
         assert!(writer.mimetype.is_none());
     }
 
     #[test]
     fn test_package_writer_selected_limits() {
         let writer = PackageWriter::new(StreamingArchiveLimits::default());
-        assert!(!writer.wrote_mimetype);
+        assert_eq!(writer.phase, WriterPhase::Empty);
     }
 
     #[test]
@@ -2578,7 +2559,7 @@ mod tests {
                 .set_mimetype("application/vnd.oasis.opendocument.text")
                 .is_ok()
         );
-        assert!(writer.wrote_mimetype);
+        assert_eq!(writer.phase, WriterPhase::Mimetype);
         assert_eq!(
             writer.mimetype,
             Some("application/vnd.oasis.opendocument.text".to_string())
@@ -2742,6 +2723,56 @@ mod tests {
         let archive =
             ArchiveReader::new(&output, soapberry_zip::office::ArchiveLimits::default()).unwrap();
         assert_eq!(archive.read("manifest.rdf").unwrap(), source_rdf);
+    }
+
+    #[test]
+    fn copying_auxiliary_files_requires_the_mimetype_before_any_payload() {
+        let mut source_bytes = Vec::new();
+        {
+            let mut zip = zip::ZipWriter::new(Cursor::new(&mut source_bytes));
+            let options = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored);
+            zip.start_file("mimetype", options).unwrap();
+            zip.write_all(b"application/vnd.oasis.opendocument.text")
+                .unwrap();
+            zip.start_file("Pictures/a.png", options).unwrap();
+            zip.write_all(b"image").unwrap();
+            zip.start_file("META-INF/manifest.xml", options).unwrap();
+            zip.write_all(br#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.text"/><manifest:file-entry manifest:full-path="Pictures/a.png" manifest:media-type="image/png"/></manifest:manifest>"#).unwrap();
+            zip.finish().unwrap();
+        }
+        let source = OwnedPackage::from_bytes(source_bytes).unwrap();
+        let not_set = |error: Error| {
+            assert!(
+                matches!(&error, Error::InvalidFormat(message) if message == "MIME type not set"),
+                "{error}"
+            );
+        };
+
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
+        not_set(writer.copy_auxiliary_files_from(&source).unwrap_err());
+        not_set(
+            writer
+                .copy_auxiliary_files_from_except(&source, &[], &[])
+                .unwrap_err(),
+        );
+        not_set(
+            writer
+                .copy_source_files_from_except(&source, &HashSet::new())
+                .unwrap_err(),
+        );
+
+        // Nothing was emitted: the same writer still publishes a package
+        // whose first entry is `mimetype`.
+        writer
+            .set_mimetype("application/vnd.oasis.opendocument.text")
+            .unwrap();
+        writer.copy_auxiliary_files_from(&source).unwrap();
+        let output = writer.finish().unwrap();
+        assert_eq!(&output[30..38], b"mimetype");
+        let archive =
+            ArchiveReader::new(&output, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+        assert_eq!(archive.read("Pictures/a.png").unwrap(), b"image");
     }
 
     #[test]
