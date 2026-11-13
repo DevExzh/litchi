@@ -9,6 +9,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::mem::size_of;
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 
 use litchi_core::Position;
@@ -6834,9 +6835,10 @@ fn validate_package_metadata(
         .count();
     let partial_storage_authority =
         bound_storage_targets != 0 && bound_storage_targets != storage_targets;
-    let incomplete_data_reference = visitor
-        .active_data_reference
-        .is_some_and(|reference| reference.remaining_owners != 0);
+    let incomplete_data_reference = match visitor.owner_run {
+        OwnerRunState::Idle => false,
+        OwnerRunState::Expecting { .. } => true,
+    };
     if visitor.unknown
         || visitor
             .external_component_identifiers
@@ -6875,11 +6877,30 @@ fn metadata_component_matches_physical(metadata: &str, physical: &str) -> bool {
     canonical(metadata) == canonical(physical)
 }
 
+/// The run of owner records that package metadata lists after a data
+/// reference. A reference announces how many owners follow; each owner must
+/// belong to that reference.
+///
+/// ```text
+/// Idle      --data reference with owners------> Expecting
+/// Idle      --data reference without owners---> Idle       (authority invalid)
+/// Idle      --owner---------------------------> Idle       (authority invalid)
+/// Expecting --valid owner, more remain--------> Expecting  (one fewer remaining)
+/// Expecting --valid owner, the last one-------> Idle
+/// Expecting --invalid owner-------------------> Expecting  (authority invalid)
+/// Expecting --data reference------------------> as from Idle (authority invalid)
+/// ```
+///
+/// A run that is still `Expecting` when inspection ends is an incomplete
+/// data reference.
 #[derive(Clone, Copy)]
-struct ActiveDataReference {
-    component_identifier: u64,
-    data_identifier: u64,
-    remaining_owners: usize,
+enum OwnerRunState {
+    Idle,
+    Expecting {
+        component_identifier: u64,
+        data_identifier: u64,
+        remaining_owners: NonZeroUsize,
+    },
 }
 
 struct StrictPackageMetadataVisitor<'a> {
@@ -6897,7 +6918,7 @@ struct StrictPackageMetadataVisitor<'a> {
     uuid_pairs: HashSet<(u64, u64)>,
     object_bindings: HashMap<(u64, u64), (u64, u64)>,
     object_components: HashMap<u64, u64>,
-    active_data_reference: Option<ActiveDataReference>,
+    owner_run: OwnerRunState,
     seen_data_owners: HashSet<(u64, u64)>,
     saw_data_metadata_map: bool,
 }
@@ -6946,7 +6967,7 @@ impl<'a> StrictPackageMetadataVisitor<'a> {
             uuid_pairs,
             object_bindings,
             object_components,
-            active_data_reference: None,
+            owner_run: OwnerRunState::Idle,
             seen_data_owners,
             saw_data_metadata_map: false,
         })
@@ -7060,20 +7081,25 @@ impl package_metadata_codec::PackageMetadataVisitor for StrictPackageMetadataVis
         &mut self,
         reference: package_metadata_codec::DataReferenceDescriptor<'_>,
     ) -> std::result::Result<(), package_metadata_codec::RewriteError> {
-        if self
-            .active_data_reference
-            .is_some_and(|active| active.remaining_owners != 0)
+        let previous_run_incomplete = match self.owner_run {
+            OwnerRunState::Idle => false,
+            OwnerRunState::Expecting { .. } => true,
+        };
+        if previous_run_incomplete
             || !reference.component().is_current()
             || reference.has_unknown_fields()
             || reference.owner_count() == 0
         {
             self.authority_invalid = true;
         }
-        self.active_data_reference = Some(ActiveDataReference {
-            component_identifier: reference.component().identifier(),
-            data_identifier: reference.data_identifier(),
-            remaining_owners: reference.owner_count(),
-        });
+        self.owner_run = match NonZeroUsize::new(reference.owner_count()) {
+            Some(remaining_owners) => OwnerRunState::Expecting {
+                component_identifier: reference.component().identifier(),
+                data_identifier: reference.data_identifier(),
+                remaining_owners,
+            },
+            None => OwnerRunState::Idle,
+        };
         Ok(())
     }
 
@@ -7081,9 +7107,16 @@ impl package_metadata_codec::PackageMetadataVisitor for StrictPackageMetadataVis
         &mut self,
         owner: package_metadata_codec::DataReferenceOwnerDescriptor<'_>,
     ) -> std::result::Result<(), package_metadata_codec::RewriteError> {
-        let Some(active) = self.active_data_reference else {
-            self.authority_invalid = true;
-            return Ok(());
+        let (component_identifier, data_identifier, remaining_owners) = match self.owner_run {
+            OwnerRunState::Idle => {
+                self.authority_invalid = true;
+                return Ok(());
+            },
+            OwnerRunState::Expecting {
+                component_identifier,
+                data_identifier,
+                remaining_owners,
+            } => (component_identifier, data_identifier, remaining_owners),
         };
         let key = (owner.object_identifier(), owner.data_identifier());
         let reported_count = usize::try_from(owner.count()).ok();
@@ -7093,9 +7126,8 @@ impl package_metadata_codec::PackageMetadataVisitor for StrictPackageMetadataVis
             .any(|target| target.identifier == owner.object_identifier());
         let valid = owner.component().is_current()
             && !owner.has_unknown_fields()
-            && owner.component().identifier() == active.component_identifier
-            && owner.data_identifier() == active.data_identifier
-            && active.remaining_owners != 0
+            && owner.component().identifier() == component_identifier
+            && owner.data_identifier() == data_identifier
             && self
                 .physical_identifiers
                 .contains(&owner.object_identifier())
@@ -7110,10 +7142,15 @@ impl package_metadata_codec::PackageMetadataVisitor for StrictPackageMetadataVis
             // together: the visitor is single-threaded, so disagreement can
             // only indicate an internal invariant violation.
             self.authority_invalid = true;
-        } else if let Some(active) = self.active_data_reference.as_mut() {
-            active.remaining_owners -= 1;
         } else {
-            self.authority_invalid = true;
+            self.owner_run = match NonZeroUsize::new(remaining_owners.get() - 1) {
+                Some(remaining_owners) => OwnerRunState::Expecting {
+                    component_identifier,
+                    data_identifier,
+                    remaining_owners,
+                },
+                None => OwnerRunState::Idle,
+            };
         }
         Ok(())
     }

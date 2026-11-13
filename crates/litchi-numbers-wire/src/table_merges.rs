@@ -823,11 +823,42 @@ impl Decoder {
     }
 }
 
+/// How far the events of a merge formula have matched the only accepted
+/// shape: one root array holding one range and the merge function.
+///
+/// ```text
+/// Start     --BeginArray { depth: 1 }--> ArrayOpen
+/// ArrayOpen --ColonTract---------------> Range
+/// Range     --Function-----------------> Function
+/// Function  --EndArray-----------------> Complete
+/// any stage --any other event----------> Unsupported
+/// ```
+///
+/// No event is optional or repeatable. `Complete` and `Unsupported` leave
+/// only to `Unsupported`, so an event after the closing one refuses the
+/// formula and nothing recovers a refused one. The function is compared with
+/// the merge function when the visitor finishes, not when it is seen.
+#[derive(Debug, Default, Clone, Copy)]
+enum MergeStage {
+    #[default]
+    Start,
+    ArrayOpen,
+    Range(FormulaRenderColonTract),
+    Function {
+        range: FormulaRenderColonTract,
+        /// The function identifier and its argument count.
+        function: (u32, u32),
+    },
+    Complete {
+        range: FormulaRenderColonTract,
+        function: (u32, u32),
+    },
+    Unsupported,
+}
+
 #[derive(Debug, Default)]
 struct MergeFormulaVisitor {
-    step: u8,
-    range: Option<FormulaRenderColonTract>,
-    function: Option<(u32, u32)>,
+    stage: MergeStage,
 }
 
 impl FormulaRenderVisitor for MergeFormulaVisitor {
@@ -835,39 +866,50 @@ impl FormulaRenderVisitor for MergeFormulaVisitor {
         &mut self,
         event: FormulaRenderEvent<'_>,
     ) -> Result<(), numbers_formula_codec::DecodeError> {
-        match (self.step, event) {
-            (0, FormulaRenderEvent::BeginArray { depth: 1 }) => self.step = 1,
-            (1, FormulaRenderEvent::ColonTract(range)) => {
-                self.range = Some(range);
-                self.step = 2;
+        self.stage = match self.stage {
+            MergeStage::Start => match event {
+                FormulaRenderEvent::BeginArray { depth: 1 } => MergeStage::ArrayOpen,
+                _ => MergeStage::Unsupported,
             },
-            (
-                2,
+            MergeStage::ArrayOpen => match event {
+                FormulaRenderEvent::ColonTract(range) => MergeStage::Range(range),
+                _ => MergeStage::Unsupported,
+            },
+            MergeStage::Range(range) => match event {
                 FormulaRenderEvent::Function {
                     identifier,
                     argument_count,
+                } => MergeStage::Function {
+                    range,
+                    function: (identifier, argument_count),
                 },
-            ) => {
-                self.function = Some((identifier, argument_count));
-                self.step = 3;
+                _ => MergeStage::Unsupported,
             },
-            (3, FormulaRenderEvent::EndArray) => self.step = 4,
-            _ => self.step = u8::MAX,
-        }
+            MergeStage::Function { range, function } => match event {
+                FormulaRenderEvent::EndArray => MergeStage::Complete { range, function },
+                _ => MergeStage::Unsupported,
+            },
+            MergeStage::Complete { .. } | MergeStage::Unsupported => MergeStage::Unsupported,
+        };
         Ok(())
     }
 }
 
 impl MergeFormulaVisitor {
     fn finish(self, expected_table: [u32; 4]) -> Result<Region, Error> {
-        if self.step != 4
-            || self.function != Some((NATIVE_MERGE_FUNCTION_INDEX, NATIVE_MERGE_FUNCTION_ARGUMENTS))
-        {
+        let (range, function) = match self.stage {
+            MergeStage::Complete { range, function } => (range, function),
+            MergeStage::Start
+            | MergeStage::ArrayOpen
+            | MergeStage::Range(_)
+            | MergeStage::Function { .. }
+            | MergeStage::Unsupported => {
+                return Err(invalid("iWork table contains an unsupported merge formula"));
+            },
+        };
+        if function != (NATIVE_MERGE_FUNCTION_INDEX, NATIVE_MERGE_FUNCTION_ARGUMENTS) {
             return Err(invalid("iWork table contains an unsupported merge formula"));
         }
-        let range = self
-            .range
-            .ok_or_else(|| invalid("iWork table contains an unsupported merge formula"))?;
         if range.cross_table_extra.map(|extra| extra.table_id)
             != Some(expected_cfuuid(expected_table))
             || !range.sticky.begin_row_is_absolute

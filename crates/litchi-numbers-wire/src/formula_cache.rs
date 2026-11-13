@@ -2936,12 +2936,96 @@ struct Stage {
     components: Vec<dependency::ExpandedEdgeComponent>,
     records: Vec<CapturedRecord>,
     ranges: Vec<CapturedRange>,
-    allocation: Option<usize>,
-    limit: Option<(usize, usize, LimitKind)>,
-    unsupported_formula: bool,
+    failure: FailureState,
     retained_bytes: usize,
     allocations: usize,
     limits: CacheLimits,
+}
+
+/// The failure a dependency capture [`Stage`] reports once its decode pass
+/// has returned. The visitor never fails the decoder; it records what went
+/// wrong here and keeps the failure that ranks highest: an allocation over
+/// an unsupported formula over a limit.
+///
+/// ```text
+/// Clear       --limit--------> Limit
+/// Clear       --unsupported--> Unsupported { stores_stopped: false }
+/// Limit       --limit--------> Limit                (the later limit replaces the earlier)
+/// Limit       --unsupported--> Unsupported { stores_stopped: true }
+/// Unsupported --limit--------> Unsupported { stores_stopped: true }
+/// Unsupported --unsupported--> Unsupported          (unchanged)
+/// any state   --allocation---> Allocation
+/// Allocation  --limit | unsupported--> Allocation   (unchanged)
+/// ```
+///
+/// `Limit`, `Unsupported { stores_stopped: true }` and `Allocation` stop
+/// [`Stage::push`], which is the only source of allocation failures and of
+/// every limit except a range precedent without coordinates. A limit seen
+/// by `push` therefore never replaces an earlier limit, and no allocation
+/// failure follows a limit.
+#[derive(Clone, Copy)]
+enum FailureState {
+    Clear,
+    Limit {
+        observed: usize,
+        maximum: usize,
+        kind: LimitKind,
+    },
+    /// An unsupported formula; `stores_stopped` records that a limit was
+    /// also reached.
+    Unsupported {
+        stores_stopped: bool,
+    },
+    /// The requested amount of the allocation that failed.
+    Allocation(usize),
+}
+
+impl FailureState {
+    /// Whether [`Stage::push`] no longer stores values.
+    const fn stops_stores(self) -> bool {
+        match self {
+            Self::Clear
+            | Self::Unsupported {
+                stores_stopped: false,
+            } => false,
+            Self::Limit { .. }
+            | Self::Unsupported {
+                stores_stopped: true,
+            }
+            | Self::Allocation(_) => true,
+        }
+    }
+
+    fn limit(&mut self, observed: usize, maximum: usize, kind: LimitKind) {
+        *self = match *self {
+            Self::Clear | Self::Limit { .. } => Self::Limit {
+                observed,
+                maximum,
+                kind,
+            },
+            Self::Unsupported { .. } => Self::Unsupported {
+                stores_stopped: true,
+            },
+            Self::Allocation(amount) => Self::Allocation(amount),
+        };
+    }
+
+    fn unsupported(&mut self) {
+        *self = match *self {
+            Self::Clear => Self::Unsupported {
+                stores_stopped: false,
+            },
+            Self::Limit { .. } => Self::Unsupported {
+                stores_stopped: true,
+            },
+            Self::Unsupported { stores_stopped } => Self::Unsupported { stores_stopped },
+            Self::Allocation(amount) => Self::Allocation(amount),
+        };
+    }
+
+    fn allocation(&mut self, amount: usize) {
+        *self = Self::Allocation(amount);
+    }
 }
 
 #[derive(Debug)]
@@ -2971,9 +3055,7 @@ impl Stage {
             components: Vec::new(),
             records: Vec::new(),
             ranges: Vec::new(),
-            allocation: None,
-            limit: None,
-            unsupported_formula: false,
+            failure: FailureState::Clear,
             retained_bytes: 0,
             allocations: 0,
             limits,
@@ -2985,13 +3067,12 @@ impl Stage {
         value: T,
         maximum: usize,
         kind: LimitKind,
-        allocation: &mut Option<usize>,
-        limit: &mut Option<(usize, usize, LimitKind)>,
+        failure: &mut FailureState,
         retained_bytes: &mut usize,
         allocations: &mut usize,
         limits: CacheLimits,
     ) {
-        if allocation.is_some() || limit.is_some() {
+        if failure.stops_stores() {
             return;
         }
         let length = slot.len();
@@ -2999,45 +3080,45 @@ impl Stage {
         let observed = match length.checked_add(1) {
             Some(value) => value,
             None => {
-                *limit = Some((usize::MAX, maximum, kind));
+                failure.limit(usize::MAX, maximum, kind);
                 return;
             },
         };
         if observed > maximum {
-            *limit = Some((observed, maximum, kind));
+            failure.limit(observed, maximum, kind);
             return;
         }
         let bytes = match retained_bytes.checked_add(size_of::<T>()) {
             Some(value) => value,
             None => {
-                *limit = Some((usize::MAX, limits.scratch_bytes, LimitKind::ScratchBytes));
+                failure.limit(usize::MAX, limits.scratch_bytes, LimitKind::ScratchBytes);
                 return;
             },
         };
         if bytes > limits.scratch_bytes {
-            *limit = Some((bytes, limits.scratch_bytes, LimitKind::ScratchBytes));
+            failure.limit(bytes, limits.scratch_bytes, LimitKind::ScratchBytes);
             return;
         }
         if length == capacity {
             let next_allocations = match allocations.checked_add(1) {
                 Some(value) => value,
                 None => {
-                    *limit = Some((usize::MAX, limits.allocations, LimitKind::Allocations));
+                    failure.limit(usize::MAX, limits.allocations, LimitKind::Allocations);
                     return;
                 },
             };
             if next_allocations > limits.allocations {
-                *limit = Some((next_allocations, limits.allocations, LimitKind::Allocations));
+                failure.limit(next_allocations, limits.allocations, LimitKind::Allocations);
                 return;
             }
             *allocations = next_allocations;
         }
         if slot.try_reserve_exact(1).is_err() {
-            *allocation = Some(1);
+            failure.allocation(1);
             return;
         }
         if size_of::<T>() != 0 && slot.capacity() != observed {
-            *allocation = Some(observed);
+            failure.allocation(observed);
             return;
         }
         *retained_bytes = bytes;
@@ -3045,18 +3126,22 @@ impl Stage {
     }
 
     fn ensure_complete(&self) -> Result<(), Error> {
-        match self.allocation {
-            Some(amount) => Err(Error::Allocation { amount }),
-            None if self.unsupported_formula => {
+        match self.failure {
+            FailureState::Allocation(amount) => Err(Error::Allocation { amount }),
+            FailureState::Unsupported { .. } => {
                 Err(Error::UnsupportedDependency(Unsupported::Formula))
             },
-            None if let Some((observed, maximum, kind)) = self.limit => Err(Error::Limit {
+            FailureState::Limit {
+                observed,
+                maximum,
+                kind,
+            } => Err(Error::Limit {
                 kind,
                 observed: usize_to_u64_saturating(observed),
                 maximum: usize_to_u64_saturating(maximum),
             }),
-            None if !self.components.is_empty() => Err(Error::InvalidSource),
-            None => Ok(()),
+            FailureState::Clear if !self.components.is_empty() => Err(Error::InvalidSource),
+            FailureState::Clear => Ok(()),
         }
     }
 }
@@ -3071,8 +3156,7 @@ impl dependency::DependencyVisitor for Stage {
             reference.reference().identifier(),
             self.limits.wire_references,
             LimitKind::WireReferences,
-            &mut self.allocation,
-            &mut self.limit,
+            &mut self.failure,
             &mut self.retained_bytes,
             &mut self.allocations,
             self.limits,
@@ -3089,8 +3173,7 @@ impl dependency::DependencyVisitor for Stage {
             reference.reference().identifier(),
             self.limits.wire_references,
             LimitKind::WireReferences,
-            &mut self.allocation,
-            &mut self.limit,
+            &mut self.failure,
             &mut self.retained_bytes,
             &mut self.allocations,
             self.limits,
@@ -3107,8 +3190,7 @@ impl dependency::DependencyVisitor for Stage {
             reference.reference().identifier(),
             self.limits.wire_references,
             LimitKind::WireReferences,
-            &mut self.allocation,
-            &mut self.limit,
+            &mut self.failure,
             &mut self.retained_bytes,
             &mut self.allocations,
             self.limits,
@@ -3125,8 +3207,7 @@ impl dependency::DependencyVisitor for Stage {
             component,
             self.limits.graph_edges.saturating_mul(5),
             LimitKind::GraphEdges,
-            &mut self.allocation,
-            &mut self.limit,
+            &mut self.failure,
             &mut self.retained_bytes,
             &mut self.allocations,
             self.limits,
@@ -3144,17 +3225,20 @@ impl dependency::DependencyVisitor for Stage {
         let size = rect.size();
         let values = (from.row(), from.column(), origin.row(), origin.column());
         let (Some(target_row), Some(target_column), Some(top), Some(left)) = values else {
-            self.limit = Some((usize::MAX, self.limits.graph_edges, LimitKind::GraphEdges));
+            self.failure
+                .limit(usize::MAX, self.limits.graph_edges, LimitKind::GraphEdges);
             return Ok(());
         };
         let rows = size.num_rows().unwrap_or(1);
         let columns = size.num_columns().unwrap_or(1);
         let Some(bottom) = top.checked_add(rows.saturating_sub(1)) else {
-            self.limit = Some((usize::MAX, self.limits.graph_edges, LimitKind::GraphEdges));
+            self.failure
+                .limit(usize::MAX, self.limits.graph_edges, LimitKind::GraphEdges);
             return Ok(());
         };
         let Some(right) = left.checked_add(columns.saturating_sub(1)) else {
-            self.limit = Some((usize::MAX, self.limits.graph_edges, LimitKind::GraphEdges));
+            self.failure
+                .limit(usize::MAX, self.limits.graph_edges, LimitKind::GraphEdges);
             return Ok(());
         };
         Self::push(
@@ -3172,8 +3256,7 @@ impl dependency::DependencyVisitor for Stage {
             },
             self.limits.graph_edges,
             LimitKind::GraphEdges,
-            &mut self.allocation,
-            &mut self.limit,
+            &mut self.failure,
             &mut self.retained_bytes,
             &mut self.allocations,
             self.limits,
@@ -3189,11 +3272,11 @@ impl dependency::DependencyVisitor for Stage {
             // The caller cannot bind a UUID-only range without table-registry
             // authority. Preserve the strict decode, then fail closed after
             // the visitor returns rather than guessing an internal owner.
-            self.unsupported_formula = true;
+            self.failure.unsupported();
             return Ok(());
         };
         if record.decoded_range_reference().is_some() {
-            self.unsupported_formula = true;
+            self.failure.unsupported();
             return Ok(());
         }
         let range = reference.range();
@@ -3212,8 +3295,7 @@ impl dependency::DependencyVisitor for Stage {
             },
             self.limits.graph_edges,
             LimitKind::GraphEdges,
-            &mut self.allocation,
-            &mut self.limit,
+            &mut self.failure,
             &mut self.retained_bytes,
             &mut self.allocations,
             self.limits,
@@ -3239,8 +3321,7 @@ impl dependency::DependencyVisitor for Stage {
             captured,
             self.limits.graph_nodes,
             LimitKind::GraphNodes,
-            &mut self.allocation,
-            &mut self.limit,
+            &mut self.failure,
             &mut self.retained_bytes,
             &mut self.allocations,
             self.limits,
