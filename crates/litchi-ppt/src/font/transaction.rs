@@ -429,9 +429,12 @@ pub(crate) struct Commit {
     patch: Patch,
 }
 
-#[allow(
-    dead_code,
-    reason = "record-level accessors the unit tests exercise; the public family is the package-level Edit (record 0357)"
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "record-level accessors the unit tests exercise; the public family is the package-level Edit (record 0357)"
+    )
 )]
 impl Commit {
     #[must_use]
@@ -454,15 +457,6 @@ impl Commit {
     /// its exact base source.
     pub(crate) fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.patch.undo(current)
-    }
-    /// Re-apply the committed patch against an exact current snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `current` is neither the base source nor the exact
-    /// already-applied target of the patch.
-    pub(crate) fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
-        self.patch.redo(current)
     }
     #[must_use]
     pub(crate) fn into_parts(self) -> (Snapshot, Patch) {

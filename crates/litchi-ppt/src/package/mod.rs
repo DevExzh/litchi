@@ -7,9 +7,12 @@ pub(crate) use model::Reader;
 pub use owner::Package;
 pub mod edit;
 pub mod metadata;
-#[allow(
-    dead_code,
-    reason = "the property-set owner behind package::metadata; its full surface stays exercised by the unit tests (record 0357)"
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "the property-set owner behind package::metadata; its full surface stays exercised by the unit tests (record 0357)"
+    )
 )]
 pub(crate) mod property_set;
 mod source;

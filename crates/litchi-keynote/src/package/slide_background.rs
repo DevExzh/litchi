@@ -2146,32 +2146,6 @@ fn new_style_data_from_style(
     )
 }
 
-#[allow(
-    dead_code,
-    reason = "Kept as a compact fallback for future synthetic style producers."
-)]
-fn new_style_data(parent: u64, stylesheet: u64, fill: &[u8]) -> Result<Vec<u8>, Error> {
-    let mut super_payload = Vec::new();
-    append_length(
-        &mut super_payload,
-        STYLE_PARENT_FIELD,
-        &encode_reference(parent),
-    )?;
-    append_varint(&mut super_payload, STYLE_VARIATION_FIELD, 1)?;
-    append_length(
-        &mut super_payload,
-        STYLE_STYLESHEET_FIELD,
-        &encode_reference(stylesheet),
-    )?;
-    let mut properties = Vec::new();
-    append_length(&mut properties, PROPERTIES_FILL_FIELD, fill)?;
-    let mut output = Vec::new();
-    append_length(&mut output, STYLE_SUPER_FIELD, &super_payload)?;
-    append_varint(&mut output, STYLE_OVERRIDE_COUNT_FIELD, 1)?;
-    append_length(&mut output, STYLE_PROPERTIES_FIELD, &properties)?;
-    Ok(output)
-}
-
 fn encode_background(
     package: &Package,
     inherited: &[u8],

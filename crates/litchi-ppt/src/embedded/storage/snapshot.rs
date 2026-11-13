@@ -201,11 +201,8 @@ impl Storage {
     }
 }
 
-#[allow(
-    dead_code,
-    reason = "resolver retained for pending embedded-storage call sites"
-)]
 impl<'a> Ref<'a> {
+    #[cfg(any(test, feature = "vba-inspection"))]
     pub(crate) const fn snapshot(self) -> Snapshot<'a> {
         Snapshot::from_parts(
             self.kind,

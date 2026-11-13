@@ -1,7 +1,5 @@
 //! XML codec and lossless mutation for ODF variable declarations.
 
-#![cfg_attr(test, allow(dead_code))]
-
 use super::{
     Body, DateValue, Declaration, Declarations, Group, HeaderFooter, Kind, MAX_AGGREGATE_BYTES,
     MAX_DECLARATIONS, MAX_DEPTH, MAX_GROUPS, MAX_NAME_BYTES, MAX_VALUE_BYTES, MAX_XML_BYTES,
@@ -137,22 +135,6 @@ pub(crate) fn set_xml_with_limit_and_xml_limits(
 ) -> Result<String> {
     set_xml_with_limit_and_budget_and_xml_limits(xml, group, maximum, None, xml_limits)
         .map(ChargedXml::into_string)
-}
-
-#[cfg(test)]
-pub(crate) fn set_xml_with_limit_and_budget(
-    xml: &str,
-    group: &Group,
-    maximum: usize,
-    budget: Option<&FlatMutationBudget>,
-) -> Result<ChargedXml> {
-    set_xml_with_limit_and_budget_and_xml_limits(
-        xml,
-        group,
-        maximum,
-        budget,
-        XmlStreamLimits::default(),
-    )
 }
 
 pub(crate) fn set_xml_with_limit_and_budget_and_xml_limits(
@@ -322,24 +304,6 @@ pub(crate) fn remove_xml_with_limit_and_xml_limits(
 ) -> Result<String> {
     remove_xml_with_limit_and_budget_and_xml_limits(xml, scope, kind, maximum, None, xml_limits)
         .map(ChargedXml::into_string)
-}
-
-#[cfg(test)]
-pub(crate) fn remove_xml_with_limit_and_budget(
-    xml: &str,
-    scope: &Scope,
-    kind: Kind,
-    maximum: usize,
-    budget: Option<&FlatMutationBudget>,
-) -> Result<ChargedXml> {
-    remove_xml_with_limit_and_budget_and_xml_limits(
-        xml,
-        scope,
-        kind,
-        maximum,
-        budget,
-        XmlStreamLimits::default(),
-    )
 }
 
 pub(crate) fn remove_xml_with_limit_and_budget_and_xml_limits(

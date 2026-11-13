@@ -32,36 +32,14 @@ pub(crate) struct Patch {
     pub(crate) limits: PackageLimits,
 }
 
-#[allow(
-    dead_code,
-    reason = "record-level accessors the unit tests exercise; the public family is the package-level Edit (record 0357)"
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "record-level accessors the unit tests exercise; the public family is the package-level Edit (record 0357)"
+    )
 )]
 impl Patch {
-    #[must_use]
-    pub(crate) const fn base(&self) -> Revision {
-        self.base
-    }
-    #[must_use]
-    pub(crate) const fn target(&self) -> Revision {
-        self.target
-    }
-    #[must_use]
-    pub(crate) fn before_bytes(&self) -> &[u8] {
-        &self.before
-    }
-    #[must_use]
-    pub(crate) fn after_bytes(&self) -> &[u8] {
-        &self.after
-    }
-    #[must_use]
-    pub(crate) fn changes(&self) -> &[Change] {
-        &self.changes
-    }
-    #[must_use]
-    pub(crate) fn is_empty(&self) -> bool {
-        self.before == self.after
-    }
-
     /// Apply once, or accept an exact already-applied target for retry safety.
     ///
     /// # Errors
@@ -77,16 +55,6 @@ impl Patch {
             ));
         }
         Snapshot::from_arc(self.after.clone(), self.limits)
-    }
-
-    /// Re-apply this patch; equivalent to [`Self::apply`].
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `current` is neither the base source nor the exact
-    /// already-applied target of this patch.
-    pub(crate) fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
-        self.apply(current)
     }
 
     /// Revert to the base source, or accept the exact base for retry safety.
@@ -105,19 +73,5 @@ impl Patch {
             ));
         }
         Snapshot::from_arc(self.before.clone(), self.limits)
-    }
-
-    #[must_use]
-    pub(crate) fn inverse(&self) -> Self {
-        let mut changes = self.changes.clone();
-        changes.reverse();
-        Self {
-            base: self.target,
-            target: self.base,
-            before: self.after.clone(),
-            after: self.before.clone(),
-            changes,
-            limits: self.limits,
-        }
     }
 }

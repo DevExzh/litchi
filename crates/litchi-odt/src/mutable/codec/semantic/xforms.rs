@@ -5,11 +5,6 @@ use crate::xforms::{self, Model};
 use litchi_core::{Position, Result};
 
 impl MutableDocument {
-    /// Inspect inert XForms model declarations in `office:forms`.
-    pub(crate) fn xforms_models(&self) -> Result<Vec<Model>> {
-        self.with_content_xml(|xml| xforms::parse_models_with_xml_limits(xml, self.xml_limits))
-    }
-
     /// Insert a model at the end of the existing `office:forms` container.
     pub(crate) fn insert_xforms_model(&mut self, model: &Model) -> Result<()> {
         let updated = self.with_content_xml(|xml| {

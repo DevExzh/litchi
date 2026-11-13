@@ -16,10 +16,6 @@ pub use document_info::DocumentInfo;
 pub use payload::RecordPayload;
 pub(crate) use record::PayloadStore;
 pub use record::Record;
-#[allow(
-    unused_imports,
-    reason = "re-export consumed by codec modules in configurations where it is currently unused"
-)]
 pub(crate) use record::RecordParseSession;
 pub use slide_atoms_set::SlideAtomsSet;
 pub use slide_info::SlideInfo;

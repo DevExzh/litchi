@@ -4,9 +4,12 @@
 //! records such as `ClientData` remain on `UserShapeData`, so a group can reuse
 //! the same typed shape authoring path without duplicating shape properties.
 
-#![allow(
-    dead_code,
-    reason = "typed shape authoring helpers retained for pending call sites"
+#![cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "typed shape authoring helpers retained for pending call sites"
+    )
 )]
 
 use super::{ChildAnchor, EscherSpgrData, UserShapeData};
@@ -80,11 +83,6 @@ impl GroupShape {
     /// coordinate system.
     pub(crate) fn push_group(&mut self, group: GroupShape) {
         self.children.push(GroupChild::Group(group));
-    }
-
-    /// Returns the group identifier.
-    pub(crate) const fn id(&self) -> u32 {
-        self.id
     }
 
     /// Returns the immediate children in record order.

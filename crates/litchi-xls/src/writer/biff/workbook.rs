@@ -271,16 +271,6 @@ pub(super) fn write_refresh_all<W: Write>(writer: &mut W, refresh_all: bool) -> 
     Ok(())
 }
 
-/// Write BOOKBOOL record.
-///
-/// Record type: 0x00DA
-#[allow(dead_code, reason = "retained as a BIFF compatibility building block")] // Compatibility implementation for the former fixed-bit API.
-pub(super) fn write_book_bool<W: Write>(writer: &mut W, save_link_values: bool) -> Result<()> {
-    write_record_header(writer, 0x00DA, 2)?;
-    writer.write_all(&(u16::from(save_link_values)).to_le_bytes())?;
-    Ok(())
-}
-
 pub(super) fn write_book_bool_raw<W: Write>(writer: &mut W, bits: u16) -> Result<()> {
     write_record_header(writer, 0x00DA, 2)?;
     writer.write_all(&bits.to_le_bytes())?;
@@ -607,17 +597,6 @@ pub(super) fn write_builtin_styles<W: Write>(writer: &mut W) -> Result<()> {
         write_style_builtin(writer, xf_index, builtin_id)?;
     }
 
-    Ok(())
-}
-
-/// Write `UseSelFS` (Use Natural Language Formulas) record.
-///
-/// Record type: 0x0160, Length: 2
-/// A value of 0 disables natural language formulas (modern Excel default).
-#[allow(dead_code, reason = "retained as a BIFF compatibility building block")] // Compatibility implementation for the former fixed-value API.
-pub(super) fn write_usesel_fs<W: Write>(writer: &mut W) -> Result<()> {
-    write_record_header(writer, 0x0160, 2)?;
-    writer.write_all(&0u16.to_le_bytes())?;
     Ok(())
 }
 

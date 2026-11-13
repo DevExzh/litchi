@@ -998,7 +998,6 @@ macro_rules! family {
             }
         }
 
-        #[allow(dead_code, reason = "not every family replays through the shared engine")]
         pub(crate) fn commit_of(
             (package, patch): (crate::Package, crate::part_edit::PartPatch),
         ) -> Commit {

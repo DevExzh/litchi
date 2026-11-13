@@ -98,34 +98,18 @@ impl Snapshot {
 
 /// A transactional semantic edit of one main-master design name.
 #[derive(Debug, Clone)]
-#[allow(
-    dead_code,
-    reason = "the record-level design-name editor; master::metadata::Edit::set_template_name is the public route and this surface stays exercised by the unit tests (record 0357)"
-)]
 pub(crate) struct RecordEdit {
     inner: metadata::RecordEdit,
 }
 
-#[allow(
-    dead_code,
-    reason = "the record-level design-name editor; master::metadata::Edit::set_template_name is the public route and this surface stays exercised by the unit tests (record 0357)"
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "the record-level design-name editor; master::metadata::Edit::set_template_name is the public route and this surface stays exercised by the unit tests (record 0357)"
+    )
 )]
 impl RecordEdit {
-    /// The contextual master kind being edited.
-    #[must_use]
-    pub(crate) const fn context(&self) -> Context {
-        Context::Main
-    }
-
-    /// Read the candidate design name.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub(crate) fn name(&self) -> Result<Option<Name>> {
-        codec::read(self.context(), self.inner.record())
-    }
-
     /// The current structural change set.
     #[must_use]
     pub(crate) fn changes(&self) -> &[Change] {
@@ -166,30 +150,23 @@ impl RecordEdit {
 
 /// A successful semantic commit.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(
-    dead_code,
-    reason = "the record-level design-name editor; master::metadata::Edit::set_template_name is the public route and this surface stays exercised by the unit tests (record 0357)"
-)]
 pub(crate) struct RecordCommit {
     snapshot: Snapshot,
     changes: crate::master_layout::RecordPatch,
 }
 
-#[allow(
-    dead_code,
-    reason = "the record-level design-name editor; master::metadata::Edit::set_template_name is the public route and this surface stays exercised by the unit tests (record 0357)"
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "the record-level design-name editor; master::metadata::Edit::set_template_name is the public route and this surface stays exercised by the unit tests (record 0357)"
+    )
 )]
 impl RecordCommit {
     /// The immutable target snapshot.
     #[must_use]
     pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
-    }
-
-    /// The structural patch produced by the semantic edit.
-    #[must_use]
-    pub(crate) const fn changes(&self) -> &crate::master_layout::RecordPatch {
-        &self.changes
     }
 
     /// Undo this patch against its exact target snapshot.
@@ -210,11 +187,5 @@ impl RecordCommit {
     pub(crate) fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         let inner = self.changes.redo(&current.inner.inner)?;
         Snapshot::from_inner(metadata::Snapshot::from_inner(inner)?)
-    }
-
-    /// Split the commit into its target and reusable patch.
-    #[must_use]
-    pub(crate) fn into_parts(self) -> (Snapshot, crate::master_layout::RecordPatch) {
-        (self.snapshot, self.changes)
     }
 }

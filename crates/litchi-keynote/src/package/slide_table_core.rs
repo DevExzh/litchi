@@ -907,7 +907,6 @@ pub(crate) struct StorageRoute {
 /// The key is the native tile coordinate. The object location is an internal
 /// routing detail and never appears in a public Keynote value or error.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(dead_code, reason = "Consumed by the physical table-sort owner.")]
 pub(crate) struct PhysicalTileReference {
     pub(crate) tile_id: u32,
     pub(crate) location: ObjectLocation,
@@ -917,7 +916,6 @@ pub(crate) struct PhysicalTileReference {
 /// bucket; the bucket index is still part of the topology proof because a
 /// moved row must stay within an allocated bucket.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(dead_code, reason = "Consumed by the physical table-sort owner.")]
 pub(crate) struct PhysicalRowHeaderBucket {
     pub(crate) bucket_index: u32,
     pub(crate) location: ObjectLocation,
@@ -927,10 +925,6 @@ pub(crate) struct PhysicalRowHeaderBucket {
 /// Feature admissions that would require a row-affine rewrite beyond the
 /// currently owned physical sort transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-#[allow(
-    dead_code,
-    reason = "Retained on the private topology for diagnostics."
-)]
 pub(crate) struct PhysicalUnsupportedFeatures {
     hidden: bool,
     filter: bool,
@@ -965,7 +959,6 @@ impl PhysicalUnsupportedFeatures {
 /// authority and every writer must revalidate its exact source before
 /// publishing a candidate.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(dead_code, reason = "Consumed by the physical table-sort owner.")]
 pub(crate) struct PhysicalTableTopology {
     tile_size: u32,
     wide_rows: Option<bool>,
@@ -1024,12 +1017,6 @@ impl PhysicalTableTopology {
     }
 
     #[must_use]
-    #[allow(dead_code, reason = "Consumed by future physical table owners.")]
-    pub(crate) const fn stroke_sidecar(&self) -> Option<&ObjectLocation> {
-        self.stroke_sidecar.as_ref()
-    }
-
-    #[must_use]
     pub(crate) const fn mutable_component_count(&self) -> usize {
         self.mutable_component_count
     }
@@ -1065,20 +1052,8 @@ impl PhysicalTableTopology {
     }
 
     #[must_use]
-    #[allow(dead_code, reason = "Consumed by future physical table owners.")]
-    pub(crate) const fn header_columns(&self) -> u32 {
-        self.header_columns
-    }
-
-    #[must_use]
     pub(crate) const fn footer_rows(&self) -> u32 {
         self.footer_rows
-    }
-
-    #[must_use]
-    #[allow(dead_code, reason = "Consumed by future physical table owners.")]
-    pub(crate) const fn unsupported_features(&self) -> PhysicalUnsupportedFeatures {
-        self.unsupported
     }
 }
 
@@ -1089,7 +1064,6 @@ impl PhysicalTableTopology {
 /// deterministic even when a caller derives the allowlist from a map or a
 /// parallel preparation stage.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(dead_code, reason = "Consumed by the physical table-sort owner.")]
 pub(crate) struct LocalityAllowlist {
     changed_components: Vec<Arc<str>>,
     root_preview_deletions: Vec<Arc<str>>,
@@ -2874,10 +2848,6 @@ fn canonical_field_f64(field: litchi_iwa_common::wire::WireFieldView<'_>) -> Res
         .ok_or(Error::InvalidSource)
 }
 
-#[allow(
-    dead_code,
-    reason = "Field 45 is fail-closed until its dependency closure is owned."
-)]
 /// Accept either one canonical 16-byte CFUUID or all four canonical word
 /// fields, but never a mixed, partial, duplicate, or all-zero identity.
 fn validate_cfuuid(payload: &[u8], package: &Package, budget: &mut Budget) -> Result<()> {
@@ -2919,10 +2889,6 @@ fn validate_cfuuid(payload: &[u8], package: &Package, budget: &mut Budget) -> Re
     Ok(())
 }
 
-#[allow(
-    dead_code,
-    reason = "Fields 84 and 93 are fail-closed until their dependency closures are owned."
-)]
 fn validate_dormant_formula_store(
     payload: &[u8],
     package: &Package,

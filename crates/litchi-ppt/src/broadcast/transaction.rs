@@ -46,22 +46,6 @@ impl Change {
             },
         }
     }
-
-    /// Typed projection before this operation.
-    #[must_use]
-    pub(crate) fn before(&self) -> &Broadcast {
-        match self {
-            Self::Replace { before, .. } => before,
-        }
-    }
-
-    /// Typed projection after this operation.
-    #[must_use]
-    pub(crate) fn after(&self) -> &Broadcast {
-        match self {
-            Self::Replace { after, .. } => after,
-        }
-    }
 }
 
 /// Immutable, lossless snapshot of one complete
@@ -177,12 +161,6 @@ pub(crate) struct Transaction {
 }
 
 impl Transaction {
-    /// Immutable source snapshot used for stale-source checks.
-    #[must_use]
-    pub(crate) const fn source(&self) -> &Snapshot {
-        &self.source
-    }
-
     /// Current typed broadcast projection.
     #[must_use]
     pub(crate) const fn broadcast(&self) -> &Broadcast {
@@ -506,30 +484,6 @@ impl Commit {
         &self.patch
     }
 
-    /// Published target typed broadcast projection.
-    #[must_use]
-    pub(crate) const fn broadcast(&self) -> &Broadcast {
-        self.snapshot.broadcast()
-    }
-
-    /// Undo this commit against its exact target snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub(crate) fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
-        self.patch.undo(current)
-    }
-
-    /// Redo this commit against its exact source snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub(crate) fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
-        self.patch.redo(current)
-    }
-
     /// Split the commit into its target and patch.
     #[must_use]
     pub(crate) fn into_parts(self) -> (Snapshot, Patch) {
@@ -548,18 +502,6 @@ pub(crate) struct Patch {
 }
 
 impl Patch {
-    /// Source revision required for forward application.
-    #[must_use]
-    pub(crate) const fn base(&self) -> Revision {
-        self.base
-    }
-
-    /// Target revision produced by forward application.
-    #[must_use]
-    pub(crate) const fn target(&self) -> Revision {
-        self.target
-    }
-
     /// Typed operations represented by this patch.
     #[must_use]
     pub(crate) fn changes(&self) -> &[Change] {
@@ -572,22 +514,10 @@ impl Patch {
         &self.before
     }
 
-    /// Alias for callers that name the source bytes explicitly.
-    #[must_use]
-    pub(crate) fn before_bytes(&self) -> &[u8] {
-        self.before()
-    }
-
     /// Exact target bytes produced by this patch.
     #[must_use]
     pub(crate) fn after(&self) -> &[u8] {
         &self.after
-    }
-
-    /// Alias for callers that name the target bytes explicitly.
-    #[must_use]
-    pub(crate) fn after_bytes(&self) -> &[u8] {
-        self.after()
     }
 
     /// Whether this patch is an exact byte-for-byte no-op.
@@ -620,15 +550,6 @@ impl Patch {
     /// Returns an error if the operation fails.
     pub(crate) fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.inverse().apply(current)
-    }
-
-    /// Reapply this patch to its exact source.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub(crate) fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
-        self.apply(current)
     }
 
     /// Build a source-checked inverse patch.

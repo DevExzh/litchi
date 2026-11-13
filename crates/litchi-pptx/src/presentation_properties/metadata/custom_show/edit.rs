@@ -15,10 +15,6 @@
 )]
 
 use super::Draft;
-#[allow(
-    unused_imports,
-    reason = "the delegated signatures name the module's values"
-)]
 use super::*;
 use crate::part_edit::{Staged, family};
 use crate::{Package, Result};

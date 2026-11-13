@@ -140,24 +140,6 @@ impl SlideCommit {
     pub(crate) fn into_parts(self) -> (SlideSnapshot, SlidePatch) {
         (self.snapshot, self.patch)
     }
-
-    /// Undo against the exact committed slide.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub(crate) fn undo(&self, current: &SlideSnapshot) -> Result<SlideSnapshot> {
-        self.patch.undo(current)
-    }
-
-    /// Redo against the exact source slide.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub(crate) fn redo(&self, current: &SlideSnapshot) -> Result<SlideSnapshot> {
-        self.patch.redo(current)
-    }
 }
 
 /// A source-checked reversible patch for one complete `SlideContainer`.
@@ -172,18 +154,6 @@ pub(crate) struct SlidePatch {
 }
 
 impl SlidePatch {
-    /// Source revision required for forward application.
-    #[must_use]
-    pub(crate) const fn base(&self) -> SlideRevision {
-        self.base
-    }
-
-    /// Target revision produced by forward application.
-    #[must_use]
-    pub(crate) const fn target(&self) -> SlideRevision {
-        self.target
-    }
-
     /// Exact source slide bytes bound to this patch.
     #[must_use]
     pub(crate) fn before(&self) -> &[u8] {
@@ -194,12 +164,6 @@ impl SlidePatch {
     #[must_use]
     pub(crate) fn after(&self) -> &[u8] {
         &self.after
-    }
-
-    /// The nested typed diagram patch represented by this publication.
-    #[must_use]
-    pub(crate) const fn diagram(&self) -> &DiagramPatch {
-        &self.diagram
     }
 
     /// Whether this patch is an exact no-op.

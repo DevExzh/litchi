@@ -9,11 +9,6 @@
 //! keeps every byte, and a changed edit of a signed package is refused with
 //! [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy).
 
-#![allow(
-    unused_imports,
-    reason = "the delegated signatures name the module's values"
-)]
-
 use super::authoring as raw;
 use super::*;
 use crate::part_edit::{Staged, family};

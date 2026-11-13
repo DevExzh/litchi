@@ -397,12 +397,6 @@ impl RecordCommit {
     pub(crate) const fn patch(&self) -> &RecordPatch {
         &self.patch
     }
-
-    /// Split the target and patch.
-    #[must_use]
-    pub(crate) fn into_parts(self) -> (Snapshot, RecordPatch) {
-        (self.snapshot, self.patch)
-    }
 }
 
 /// Reversible, source-checked `BuildList` byte patch.
@@ -418,28 +412,10 @@ pub(crate) struct RecordPatch {
 }
 
 impl RecordPatch {
-    /// Source revision required by [`Self::apply`].
-    #[must_use]
-    pub(crate) const fn base(&self) -> Revision {
-        self.base
-    }
-
-    /// Target revision produced by [`Self::apply`].
-    #[must_use]
-    pub(crate) const fn target(&self) -> Revision {
-        self.target
-    }
-
     /// Ordered semantic operations represented by this patch.
     #[must_use]
     pub(crate) fn changes(&self) -> &[Change] {
         &self.changes
-    }
-
-    /// Exact source `BuildList` bytes.
-    #[must_use]
-    pub(crate) fn before(&self) -> &[u8] {
-        &self.before
     }
 
     /// Exact target `BuildList` bytes.

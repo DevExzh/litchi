@@ -859,7 +859,6 @@ fn revision(
 
 // Keep the codec module in this file's dependency graph even when callers only
 // use the model re-exports.  This avoids leaking the scanner's physical types.
-#[allow(dead_code)]
 fn _codec_namespace_marker() -> &'static [u8] {
     codec::ACTION
 }

@@ -1259,31 +1259,14 @@ pub(crate) struct RecordPatch {
     limits: PictureBulletPackageLimits,
 }
 
-#[allow(
-    dead_code,
-    reason = "the record-level owner behind the package-level Edit; its full surface stays exercised by the unit tests (record 0357)"
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "the record-level owner behind the package-level Edit; its full surface stays exercised by the unit tests (record 0357)"
+    )
 )]
 impl RecordPatch {
-    #[must_use]
-    pub(crate) const fn base(&self) -> PictureBulletRevision {
-        self.base
-    }
-
-    #[must_use]
-    pub(crate) const fn target(&self) -> PictureBulletRevision {
-        self.target
-    }
-
-    #[must_use]
-    pub(crate) fn before_bytes(&self) -> &[u8] {
-        &self.before
-    }
-
-    #[must_use]
-    pub(crate) fn after_bytes(&self) -> &[u8] {
-        &self.after
-    }
-
     #[must_use]
     pub(crate) fn changes(&self) -> &[PictureBulletChange] {
         &self.changes
@@ -1305,11 +1288,6 @@ impl RecordPatch {
             ));
         }
         PictureBulletSnapshot::from_arc(self.after.clone(), self.limits)
-    }
-
-    /// Re-apply this patch.
-    pub(crate) fn redo(&self, current: &PictureBulletSnapshot) -> Result<PictureBulletSnapshot> {
-        self.apply(current)
     }
 
     /// Undo this patch against its exact target.
@@ -1347,9 +1325,12 @@ pub(crate) struct RecordCommit {
     patch: RecordPatch,
 }
 
-#[allow(
-    dead_code,
-    reason = "the record-level owner behind the package-level Edit; its full surface stays exercised by the unit tests (record 0357)"
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "the record-level owner behind the package-level Edit; its full surface stays exercised by the unit tests (record 0357)"
+    )
 )]
 impl RecordCommit {
     #[must_use]
@@ -1369,10 +1350,6 @@ impl RecordCommit {
 
     pub(crate) fn undo(&self, current: &PictureBulletSnapshot) -> Result<PictureBulletSnapshot> {
         self.patch.undo(current)
-    }
-
-    pub(crate) fn redo(&self, current: &PictureBulletSnapshot) -> Result<PictureBulletSnapshot> {
-        self.patch.redo(current)
     }
 }
 
@@ -1396,9 +1373,12 @@ pub type ChangeKind = PictureBulletChangeKind;
 /// Picture-bullet revision under the conventional owner-module name.
 pub type Revision = PictureBulletRevision;
 
-#[allow(
-    dead_code,
-    reason = "the record-level owner behind the package-level Edit; its full surface stays exercised by the unit tests (record 0357)"
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "the record-level owner behind the package-level Edit; its full surface stays exercised by the unit tests (record 0357)"
+    )
 )]
 impl RecordEdit {
     fn new(source: PictureBulletSnapshot) -> Self {

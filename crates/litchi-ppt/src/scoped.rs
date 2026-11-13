@@ -931,10 +931,6 @@ macro_rules! family {
             }
         }
 
-        #[allow(
-            dead_code,
-            reason = "every family publishes through these helpers; a family may use a subset"
-        )]
         fn published(published: $crate::scoped::Published) -> Commit {
             Commit::new(
                 published.package,
@@ -943,10 +939,6 @@ macro_rules! family {
             )
         }
 
-        #[allow(
-            dead_code,
-            reason = "every family replays through this helper; a family may use a subset"
-        )]
         fn apply_patch(package: &$crate::Package, patch: &Patch) -> Result<Commit> {
             Ok(published($crate::scoped::apply(package, &patch.0)?))
         }

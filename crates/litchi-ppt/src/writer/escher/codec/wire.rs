@@ -4,9 +4,12 @@
 //! module keeps the PPT writer's ergonomic builder and the exact source bytes
 //! needed for lossless inspection of producer-specific records.
 
-#![allow(
-    dead_code,
-    reason = "wire helpers cover producer-specific records without a current caller"
+#![cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "wire helpers cover producer-specific records without a current caller"
+    )
 )]
 
 use std::collections::HashSet;
@@ -105,21 +108,6 @@ impl<'data> Drawing<'data> {
             .map_err(map_wire_error)?
             .ok_or_else(|| invalid_data("OfficeArt stream has no container root"))?;
         Ok(Self { data, root })
-    }
-
-    /// Returns the root record kind.
-    pub(crate) const fn root_kind(&self) -> RecordKind {
-        self.root.record().kind()
-    }
-
-    /// Returns the borrowed root container.
-    pub(crate) const fn root(&self) -> &Container<'data> {
-        &self.root
-    }
-
-    /// Returns the original complete stream without normalization.
-    pub(crate) const fn bytes(&self) -> &'data [u8] {
-        self.data
     }
 
     /// Validates the group/shape/container topology and shape atoms.

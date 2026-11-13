@@ -207,10 +207,6 @@ pub(crate) fn effective_page_names(
 }
 
 /// Materialize stable names and insert an empty metadata record for a new page.
-#[allow(
-    dead_code,
-    reason = "used by the pending transactional authoring layer"
-)]
 pub(crate) fn metadata_after_page_insert(
     metadata: Option<&Collection>,
     slide_count: usize,
@@ -265,10 +261,6 @@ pub(crate) fn metadata_after_page_insert(
 }
 
 /// Materialize stable names and remove one page metadata record.
-#[allow(
-    dead_code,
-    reason = "used by the pending transactional authoring layer"
-)]
 pub(crate) fn metadata_after_page_remove(
     metadata: Option<&Collection>,
     slide_count: usize,

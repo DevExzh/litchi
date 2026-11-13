@@ -12,11 +12,6 @@
 //! The VBA project belongs to the presentation part, so the verbs take no
 //! owner.
 
-#![allow(
-    unused_imports,
-    reason = "the delegated signatures name the module's values"
-)]
-
 use super::package as raw;
 use super::*;
 use crate::part_edit::{Staged, family};

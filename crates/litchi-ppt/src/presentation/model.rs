@@ -147,7 +147,6 @@ pub(crate) struct PresentationData {
     /// payloads span it (owned for lifetime management)
     pub(crate) powerpoint_document: Arc<Vec<u8>>,
     /// Parsed record structure (reserved for future advanced parsing)
-    #[allow(dead_code, reason = "reserved for future advanced parsing")]
     pub(crate) parser: RecordParser,
     /// Persist ID to offset mapping
     pub(crate) persist_mapping: PersistMapping,

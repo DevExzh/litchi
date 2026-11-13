@@ -1,10 +1,5 @@
 //! Validation shared by `OfficeArt` shape-family encoders.
 
-#![allow(
-    dead_code,
-    reason = "validators cover shape families without a current caller"
-)]
-
 use std::collections::HashSet;
 use std::io::{Error, ErrorKind};
 

@@ -16,10 +16,6 @@
 
 use super::Draft;
 use super::codec::Limits;
-#[allow(
-    unused_imports,
-    reason = "the delegated signatures name the module's values"
-)]
 use super::*;
 use crate::part_edit::{Staged, family};
 use crate::slide::Selector;

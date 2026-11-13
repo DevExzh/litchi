@@ -34,12 +34,6 @@ pub(super) fn write_u16(out: &mut Vec<u8>, value: u16) {
     out.extend_from_slice(&value.to_le_bytes());
 }
 
-/// Append a little-endian 32-bit value
-#[inline]
-pub(super) fn write_u32(out: &mut Vec<u8>, value: u32) {
-    out.extend_from_slice(&value.to_le_bytes());
-}
-
 /// Append a NUL-terminated string
 pub(super) fn write_cstr(out: &mut Vec<u8>, value: &str) -> Result<(), MtefWriteError> {
     if value.as_bytes().contains(&0) {
@@ -58,23 +52,6 @@ pub(super) fn write_cstr(out: &mut Vec<u8>, value: &str) -> Result<(), MtefWrite
 #[inline]
 pub(super) fn write_end(out: &mut Vec<u8>) {
     write_u8(out, END);
-}
-
-/// Append a nudge (fine positioning offset) as it follows an options byte
-///
-/// Offsets that fit in a byte are stored directly; anything else uses the
-/// escaped 16-bit form introduced by the `128, 128` sentinel pair.
-pub(super) fn write_nudge(out: &mut Vec<u8>, x: i16, y: i16) {
-    let fits = |value: i16| (0..i16::from(NUDGE_ESCAPE)).contains(&value);
-    if fits(x) && fits(y) {
-        write_u8(out, x as u8);
-        write_u8(out, y as u8);
-    } else {
-        write_u8(out, NUDGE_ESCAPE);
-        write_u8(out, NUDGE_ESCAPE);
-        write_u16(out, x as u16);
-        write_u16(out, y as u16);
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -193,36 +170,6 @@ pub(super) fn write_char(out: &mut Vec<u8>, typeface: u8, mtcode: u16) -> usize 
     options_offset
 }
 
-/// Append a CHAR record carrying an explicit font position instead of an MTCode
-///
-/// MathType uses this form for glyphs that only exist in a particular font: the
-/// MTCode is suppressed and the 8- or 16-bit index into the font takes over.
-pub(super) fn write_char_encoded(out: &mut Vec<u8>, typeface: u8, position: FontPosition) -> usize {
-    let flag = match position {
-        FontPosition::Bits8(_) => CHAR_ENC_CHAR_8,
-        FontPosition::Bits16(_) => CHAR_ENC_CHAR_16,
-    };
-
-    write_u8(out, CHAR);
-    let options_offset = out.len();
-    write_u8(out, CHAR_ENC_NO_MTCODE | flag);
-    write_u8(out, typeface);
-    match position {
-        FontPosition::Bits8(value) => write_u8(out, value),
-        FontPosition::Bits16(value) => write_u16(out, value),
-    }
-    options_offset
-}
-
-/// Font-relative character position carried by a CHAR record
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum FontPosition {
-    /// Eight-bit index into the character's font
-    Bits8(u8),
-    /// Sixteen-bit index into the character's font
-    Bits16(u16),
-}
-
 /// Mark a previously written CHAR record as carrying an embellishment list
 #[inline]
 pub(super) fn set_char_embellished(out: &mut [u8], options_offset: usize) {
@@ -300,34 +247,6 @@ mod tests {
     }
 
     #[test]
-    fn characters_can_carry_a_font_position_instead_of_an_mtcode() {
-        let mut out = Vec::new();
-        write_char_encoded(&mut out, TYPEFACE_SYMBOL, FontPosition::Bits8(0xA9));
-        assert_eq!(
-            out,
-            vec![
-                CHAR,
-                CHAR_ENC_NO_MTCODE | CHAR_ENC_CHAR_8,
-                TYPEFACE_SYMBOL,
-                0xA9
-            ]
-        );
-
-        let mut out = Vec::new();
-        write_char_encoded(&mut out, TYPEFACE_MTEXTRA, FontPosition::Bits16(0x1234));
-        assert_eq!(
-            out,
-            vec![
-                CHAR,
-                CHAR_ENC_NO_MTCODE | CHAR_ENC_CHAR_16,
-                TYPEFACE_MTEXTRA,
-                0x34,
-                0x12
-            ]
-        );
-    }
-
-    #[test]
     fn embellished_characters_flag_their_options_byte() {
         let mut out = Vec::new();
         let options = write_char(&mut out, TYPEFACE_VARIABLE, u16::from(b'x'));
@@ -349,20 +268,6 @@ mod tests {
                 END
             ]
         );
-    }
-
-    #[test]
-    fn small_nudges_use_two_bytes() {
-        let mut out = Vec::new();
-        write_nudge(&mut out, 3, 4);
-        assert_eq!(out, vec![3, 4]);
-    }
-
-    #[test]
-    fn large_nudges_use_the_escaped_form() {
-        let mut out = Vec::new();
-        write_nudge(&mut out, -1, 300);
-        assert_eq!(out, vec![128, 128, 0xFF, 0xFF, 0x2C, 0x01]);
     }
 
     #[test]

@@ -1,7 +1,5 @@
 use super::elements::ElementType;
-use crate::ast::{
-    AccentType, Alignment, FunctionName, LargeOperator, Operator, PredefinedSymbol, StyleType,
-};
+use crate::ast::{AccentType, LargeOperator, StyleType};
 use phf::{phf_map, phf_set};
 
 /// Fast element name to type lookup using PHF
@@ -167,89 +165,6 @@ pub static ELEMENT_TYPES: phf::Map<&'static str, ElementType> = phf_map! {
     // Spacing
 };
 
-/// Fast operator character to operator lookup
-#[allow(dead_code)] // Reserved for operator parsing
-pub static OPERATORS: phf::Map<&'static str, Operator> = phf_map! {
-    // Basic operators
-    "+" => Operator::Plus,
-    "−" => Operator::Minus,
-    "±" => Operator::PlusMinus,
-    "∓" => Operator::MinusPlus,
-    "×" => Operator::Multiply,
-    "÷" => Operator::Divide,
-    "⋅" => Operator::Dot,
-    "∘" => Operator::Circle,
-    "∗" => Operator::Star,
-    "⋆" => Operator::Star,
-
-    // Comparison operators
-    "=" => Operator::Equals,
-    "≠" => Operator::NotEquals,
-    "<" => Operator::LessThan,
-    ">" => Operator::GreaterThan,
-    "≤" => Operator::LessThanOrEqual,
-    "≥" => Operator::GreaterThanOrEqual,
-
-    // Set operators
-    "∈" => Operator::In,
-    "∉" => Operator::NotIn,
-    "⊂" => Operator::Subset,
-    "⊃" => Operator::Superset,
-    "⊆" => Operator::SubsetEq,
-    "⊇" => Operator::SupersetEq,
-    "∅" => Operator::EmptySet,
-    "∪" => Operator::Union,
-    "∩" => Operator::Intersection,
-
-    // Relations
-    "∼" => Operator::Approx,
-    "≅" => Operator::Cong,
-    "≡" => Operator::Equiv,
-    "∝" => Operator::Propto,
-    "∥" => Operator::Parallel,
-    "⊥" => Operator::Perpendicular,
-
-    // Arrows
-    "←" => Operator::LeftArrow,
-    "→" => Operator::RightArrow,
-    "↑" => Operator::UpArrow,
-    "↓" => Operator::DownArrow,
-    "↔" => Operator::LeftRightArrow,
-    "↕" => Operator::UpDownArrow,
-
-    // Logical operators
-    "∀" => Operator::ForAll,
-    "∃" => Operator::Exists,
-    "¬" => Operator::Not,
-    "∧" => Operator::And,
-    "∨" => Operator::Or,
-    "⇒" => Operator::Implies,
-    "⇔" => Operator::Iff,
-
-    // Special symbols
-    "∞" => Operator::Infinity,
-    "ℵ" => Operator::Aleph,
-    "′" => Operator::Prime,
-    "″" => Operator::DoublePrime,
-    "‴" => Operator::TriplePrime,
-    "…" => Operator::Ellipsis,
-    "⋯" => Operator::CDots,
-    "⋮" => Operator::VDots,
-    "⋱" => Operator::DDots,
-
-    // Calculus
-    "∇" => Operator::Nabla,
-    "∂" => Operator::Partial,
-    "∫" => Operator::Differential,
-
-    // Miscellaneous
-    "∴" => Operator::Therefore,
-    "∵" => Operator::Because,
-    "□" => Operator::Box,
-    "◆" => Operator::Diamond,
-    "■" => Operator::Square,
-};
-
 /// Fast accent character to accent type lookup
 ///
 /// Includes both standalone accent characters and Unicode combining characters
@@ -310,129 +225,9 @@ pub static LARGE_OPERATORS: phf::Map<&'static str, LargeOperator> = phf_map! {
     "argmin" => LargeOperator::ArgMin,
 };
 
-/// Fast predefined symbol lookup
-#[allow(dead_code)] // Reserved for symbol parsing
-pub static PREDEFINED_SYMBOLS: phf::Map<&'static str, PredefinedSymbol> = phf_map! {
-    // Greek lowercase
-    "α" => PredefinedSymbol::Alpha,
-    "β" => PredefinedSymbol::Beta,
-    "γ" => PredefinedSymbol::Gamma,
-    "δ" => PredefinedSymbol::Delta,
-    "ε" => PredefinedSymbol::Epsilon,
-    "ζ" => PredefinedSymbol::Zeta,
-    "η" => PredefinedSymbol::Eta,
-    "θ" => PredefinedSymbol::Theta,
-    "ι" => PredefinedSymbol::Iota,
-    "κ" => PredefinedSymbol::Kappa,
-    "λ" => PredefinedSymbol::Lambda,
-    "μ" => PredefinedSymbol::Mu,
-    "ν" => PredefinedSymbol::Nu,
-    "ξ" => PredefinedSymbol::Xi,
-    "ο" => PredefinedSymbol::Omicron,
-    "π" => PredefinedSymbol::Pi,
-    "ρ" => PredefinedSymbol::Rho,
-    "σ" => PredefinedSymbol::Sigma,
-    "τ" => PredefinedSymbol::Tau,
-    "υ" => PredefinedSymbol::Upsilon,
-    "φ" => PredefinedSymbol::Phi,
-    "χ" => PredefinedSymbol::Chi,
-    "ψ" => PredefinedSymbol::Psi,
-    "ω" => PredefinedSymbol::Omega,
-
-    // Greek uppercase
-    "Α" => PredefinedSymbol::AlphaCap,
-    "Β" => PredefinedSymbol::BetaCap,
-    "Γ" => PredefinedSymbol::GammaCap,
-    "Δ" => PredefinedSymbol::DeltaCap,
-    "Ε" => PredefinedSymbol::EpsilonCap,
-    "Ζ" => PredefinedSymbol::ZetaCap,
-    "Η" => PredefinedSymbol::EtaCap,
-    "Θ" => PredefinedSymbol::ThetaCap,
-    "Ι" => PredefinedSymbol::IotaCap,
-    "Κ" => PredefinedSymbol::KappaCap,
-    "Λ" => PredefinedSymbol::LambdaCap,
-    "Μ" => PredefinedSymbol::MuCap,
-    "Ν" => PredefinedSymbol::NuCap,
-    "Ξ" => PredefinedSymbol::XiCap,
-    "Ο" => PredefinedSymbol::OmicronCap,
-    "Π" => PredefinedSymbol::PiCap,
-    "Ρ" => PredefinedSymbol::RhoCap,
-    "Σ" => PredefinedSymbol::SigmaCap,
-    "Τ" => PredefinedSymbol::TauCap,
-    "Υ" => PredefinedSymbol::UpsilonCap,
-    "Φ" => PredefinedSymbol::PhiCap,
-    "Χ" => PredefinedSymbol::ChiCap,
-    "Ψ" => PredefinedSymbol::PsiCap,
-    "Ω" => PredefinedSymbol::OmegaCap,
-
-    // Hebrew
-    "ℵ" => PredefinedSymbol::Aleph,
-
-    // Constants
-    "e" => PredefinedSymbol::ExponentialE,
-    "i" => PredefinedSymbol::ImaginaryI,
-
-    // Infinity
-    "∞" => PredefinedSymbol::Infinity,
-};
-
-/// Fast function name lookup
-#[allow(dead_code)] // Reserved for function parsing
-pub static FUNCTIONS: phf::Map<&'static str, FunctionName> = phf_map! {
-    "sin" => FunctionName::Sin,
-    "cos" => FunctionName::Cos,
-    "tan" => FunctionName::Tan,
-    "sec" => FunctionName::Sec,
-    "csc" => FunctionName::Csc,
-    "cot" => FunctionName::Cot,
-    "arcsin" => FunctionName::ArcSin,
-    "arccos" => FunctionName::ArcCos,
-    "arctan" => FunctionName::ArcTan,
-    "arcsec" => FunctionName::ArcSec,
-    "arccsc" => FunctionName::ArcCsc,
-    "arccot" => FunctionName::ArcCot,
-    "sinh" => FunctionName::Sinh,
-    "cosh" => FunctionName::Cosh,
-    "tanh" => FunctionName::Tanh,
-    "sech" => FunctionName::Sech,
-    "csch" => FunctionName::Csch,
-    "coth" => FunctionName::Coth,
-    "log" => FunctionName::Log,
-    "ln" => FunctionName::Ln,
-    "exp" => FunctionName::Exp,
-    "sqrt" => FunctionName::Sqrt,
-    "min" => FunctionName::Min,
-    "max" => FunctionName::Max,
-    "sup" => FunctionName::Sup,
-    "inf" => FunctionName::Inf,
-    "lim" => FunctionName::Lim,
-    "det" => FunctionName::Det,
-    "trace" => FunctionName::Trace,
-    "dim" => FunctionName::Dim,
-    "ker" => FunctionName::Ker,
-    "Im" => FunctionName::Im,
-    "Re" => FunctionName::Re,
-    "arg" => FunctionName::Arg,
-    "mod" => FunctionName::Mod,
-    "gcd" => FunctionName::Gcd,
-    "lcm" => FunctionName::Lcm,
-};
-
 /// Fast attribute value parsing lookup tables
 pub static BOOLEAN_VALUES: phf::Set<&'static str> = phf_set! {
     "1", "true", "on", "yes"
-};
-
-pub static ALIGNMENT_VALUES: phf::Map<&'static str, Alignment> = phf_map! {
-    "left" => Alignment::Left,
-    "center" => Alignment::Center,
-    "right" => Alignment::Right,
-    "top" => Alignment::Top,
-    "bottom" => Alignment::Bottom,
-    "baseline" => Alignment::Baseline,
-    "axis" => Alignment::Axis,
-    "centered" => Alignment::Centered,
-    "match" => Alignment::Match,
 };
 
 pub static STYLE_VALUES: phf::Map<&'static str, StyleType> = phf_map! {
@@ -475,12 +270,6 @@ pub fn get_element_type(name: &str) -> ElementType {
         .unwrap_or(ElementType::Unknown)
 }
 
-/// Get operator from character
-#[allow(dead_code)] // Part of the lookup API
-pub fn get_operator(chr: &str) -> Option<Operator> {
-    OPERATORS.get(chr).copied()
-}
-
 /// Get accent type from character
 pub fn get_accent_type(chr: &str) -> Option<AccentType> {
     ACCENTS.get(chr).copied()
@@ -489,18 +278,6 @@ pub fn get_accent_type(chr: &str) -> Option<AccentType> {
 /// Get large operator from character
 pub fn get_large_operator(chr: &str) -> Option<LargeOperator> {
     LARGE_OPERATORS.get(chr).copied()
-}
-
-/// Get predefined symbol from character
-#[allow(dead_code)] // Part of the lookup API
-pub fn get_predefined_symbol(chr: &str) -> Option<PredefinedSymbol> {
-    PREDEFINED_SYMBOLS.get(chr).copied()
-}
-
-/// Get function name from string
-#[allow(dead_code)] // Part of the lookup API
-pub fn get_function_name(name: &str) -> Option<FunctionName> {
-    FUNCTIONS.get(name).copied()
 }
 
 /// Parse boolean attribute value
@@ -512,11 +289,6 @@ pub fn parse_bool_value(val: &str) -> Option<bool> {
     } else {
         None
     }
-}
-
-/// Parse alignment value
-pub fn parse_alignment_value(val: &str) -> Option<Alignment> {
-    ALIGNMENT_VALUES.get(val).copied()
 }
 
 /// Parse style value

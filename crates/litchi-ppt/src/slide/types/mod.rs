@@ -51,7 +51,6 @@ pub struct Slide<'doc> {
     /// Slide record.
     record: Record,
     /// Where the document stream lives, for lazy speaker-notes parsing.
-    #[allow(dead_code, reason = "reserved for lazy speaker-notes parsing")]
     source: crate::records::PayloadStore<'doc>,
     /// Lazily-loaded shapes stored as owned values, together with the
     /// non-structural defects repaired while they were parsed.

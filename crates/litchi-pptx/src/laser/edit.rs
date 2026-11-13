@@ -9,16 +9,10 @@
 //! keeps every byte, and a changed edit of a signed package is refused with
 //! [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy).
 
-#![allow(
-    unused_imports,
-    reason = "the delegated signatures name the module's values"
-)]
-
 use super::package as raw;
 use super::*;
 use crate::part_edit::{Staged, family};
 use crate::{Package, Result};
-use litchi_opc::Part;
 use litchi_opc::constants::content_type as ct;
 
 family!("laser-pointer trace");
@@ -124,7 +118,7 @@ mod tests {
     use crate::laser::Limits;
     use crate::time::Offset;
     use litchi_drawingml::coordinate::Coordinate;
-    use litchi_opc::{PackURI, Part};
+    use litchi_opc::PackURI;
 
     fn point() -> TracePoint {
         TracePoint::new(

@@ -17,9 +17,12 @@
 //! Its durable patches, patch joins and three-way planning are reached
 //! through `package::edit::Patch::{to_durable, join}` and
 //! `Package::{apply_durable, plan_three_way}` (record 0357a).
-#![allow(
-    dead_code,
-    reason = "crate-private native owner of the primary edit (record 0357); its durable, join and three-way surfaces are public through package::edit (record 0357a), the rest stays exercised by the unit tests"
+#![cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "crate-private native owner of the primary edit (record 0357); its durable, join and three-way surfaces are public through package::edit (record 0357a), the rest stays exercised by the unit tests"
+    )
 )]
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -685,16 +688,6 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Opens an exact PPT artifact under default finite limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the complete package or its live slide directory
-    /// is malformed.
-    pub(crate) fn parse(bytes: &[u8]) -> Result<Self> {
-        Self::from_bytes(bytes.to_vec())
-    }
-
     /// Captures an owned exact PPT artifact under default finite limits.
     ///
     /// # Errors
@@ -1344,18 +1337,6 @@ pub(crate) struct Change {
 }
 
 impl Change {
-    /// Source position resolved against the transaction-local order.
-    #[must_use]
-    pub(crate) const fn from(&self) -> Position {
-        self.from
-    }
-
-    /// Final destination position for the selected slide.
-    #[must_use]
-    pub(crate) const fn destination(&self) -> Position {
-        self.destination
-    }
-
     fn inverse(self) -> Self {
         Self {
             from: self.destination,
@@ -1382,26 +1363,6 @@ pub(crate) struct NotesTextChange {
     slide: Position,
     before: String,
     after: String,
-}
-
-impl NotesTextChange {
-    /// The slide whose notes changed, in the source slide order.
-    #[must_use]
-    pub(crate) const fn slide(&self) -> Position {
-        self.slide
-    }
-
-    /// The notes text before the change.
-    #[must_use]
-    pub(crate) fn before(&self) -> &str {
-        &self.before
-    }
-
-    /// The notes text after the change.
-    #[must_use]
-    pub(crate) fn after(&self) -> &str {
-        &self.after
-    }
 }
 
 /// One contextual shape-text replacement for
@@ -1506,18 +1467,6 @@ impl ShapeTextChange {
     pub(crate) const fn target(&self) -> crate::text_edit::Target {
         self.target
     }
-
-    /// Text required before the replacement.
-    #[must_use]
-    pub(crate) fn before(&self) -> &str {
-        &self.before
-    }
-
-    /// Replacement text.
-    #[must_use]
-    pub(crate) fn after(&self) -> &str {
-        &self.after
-    }
 }
 
 /// One checked shape-geometry formatting replacement.
@@ -1534,26 +1483,6 @@ pub(crate) struct ExternalMediaPathChange {
     id: u32,
     before: Option<String>,
     after: Option<String>,
-}
-
-impl ExternalMediaPathChange {
-    /// External-object identifier retained by the replacement.
-    #[must_use]
-    pub(crate) const fn id(&self) -> u32 {
-        self.id
-    }
-
-    /// Path required before the replacement.
-    #[must_use]
-    pub(crate) fn before(&self) -> Option<&str> {
-        self.before.as_deref()
-    }
-
-    /// Replacement path, or `None` to clear it.
-    #[must_use]
-    pub(crate) fn after(&self) -> Option<&str> {
-        self.after.as_deref()
-    }
 }
 
 /// One checked replacement of external-media playback flags.
@@ -1574,26 +1503,6 @@ pub(crate) struct SlideVisibilityChange {
     after: bool,
 }
 
-impl SlideVisibilityChange {
-    /// Semantic slide position resolved against the transaction-local order.
-    #[must_use]
-    pub(crate) const fn position(self) -> Position {
-        self.position
-    }
-
-    /// Hidden state required before the replacement.
-    #[must_use]
-    pub(crate) const fn before(self) -> bool {
-        self.before
-    }
-
-    /// Replacement hidden state.
-    #[must_use]
-    pub(crate) const fn after(self) -> bool {
-        self.after
-    }
-}
-
 /// One fixed-width replacement of slide-show advance timing and flags.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct SlideAdvanceChange {
@@ -1603,26 +1512,6 @@ pub(crate) struct SlideAdvanceChange {
     after: SlideAdvance,
 }
 
-impl SlideAdvanceChange {
-    /// Semantic source-order slide target.
-    #[must_use]
-    pub(crate) const fn target(self) -> Position {
-        self.target
-    }
-
-    /// Advance state required before replacement.
-    #[must_use]
-    pub(crate) const fn before(self) -> SlideAdvance {
-        self.before
-    }
-
-    /// Replacement advance state.
-    #[must_use]
-    pub(crate) const fn after(self) -> SlideAdvance {
-        self.after
-    }
-}
-
 /// One fixed-width replacement of a slide's visual transition fields.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct SlideTransitionVisualChange {
@@ -1630,66 +1519,6 @@ pub(crate) struct SlideTransitionVisualChange {
     slide_id: u32,
     before: SlideTransitionVisual,
     after: SlideTransitionVisual,
-}
-
-impl SlideTransitionVisualChange {
-    /// Semantic source-order slide target.
-    #[must_use]
-    pub(crate) const fn target(self) -> Position {
-        self.target
-    }
-
-    /// Visual transition required before replacement.
-    #[must_use]
-    pub(crate) const fn before(self) -> SlideTransitionVisual {
-        self.before
-    }
-
-    /// Replacement visual transition.
-    #[must_use]
-    pub(crate) const fn after(self) -> SlideTransitionVisual {
-        self.after
-    }
-}
-
-impl ExternalMediaPlaybackChange {
-    /// External-object identifier retained by the replacement.
-    #[must_use]
-    pub(crate) const fn id(self) -> u32 {
-        self.id
-    }
-
-    /// Playback flags required before the replacement.
-    #[must_use]
-    pub(crate) const fn before(self) -> crate::external_media::Playback {
-        self.before
-    }
-
-    /// Replacement playback flags.
-    #[must_use]
-    pub(crate) const fn after(self) -> crate::external_media::Playback {
-        self.after
-    }
-}
-
-impl ShapeAnchorChange {
-    /// Semantic source-order shape target.
-    #[must_use]
-    pub(crate) const fn target(self) -> crate::text_edit::Target {
-        self.target
-    }
-
-    /// Anchor required before the replacement.
-    #[must_use]
-    pub(crate) const fn before(self) -> crate::Anchor {
-        self.before
-    }
-
-    /// Replacement anchor.
-    #[must_use]
-    pub(crate) const fn after(self) -> crate::Anchor {
-        self.after
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2064,12 +1893,6 @@ impl Transaction {
             })
     }
 
-    /// Immutable source snapshot.
-    #[must_use]
-    pub(crate) const fn source(&self) -> &Snapshot {
-        &self.source
-    }
-
     /// Current number of slides.
     #[must_use]
     pub(crate) fn slide_count(&self) -> usize {
@@ -2084,40 +1907,16 @@ impl Transaction {
         &self.changes
     }
 
-    /// Fixed-width slide visibility changes staged in call order.
-    #[must_use]
-    pub(crate) fn slide_visibility_changes(&self) -> &[SlideVisibilityChange] {
-        &self.visibility_changes
-    }
-
     /// Fixed-width slide advance changes staged in call order.
     #[must_use]
     pub(crate) fn slide_advance_changes(&self) -> &[SlideAdvanceChange] {
         &self.advance_changes
     }
 
-    /// Fixed-width visual transition changes staged in call order.
-    #[must_use]
-    pub(crate) fn slide_transition_visual_changes(&self) -> &[SlideTransitionVisualChange] {
-        &self.transition_visual_changes
-    }
-
     /// Checked shape-text replacements staged in this root transaction.
     #[must_use]
     pub(crate) fn shape_text_changes(&self) -> &[ShapeTextChange] {
         &self.text_changes
-    }
-
-    /// Checked shape-anchor formatting replacements staged in this root.
-    #[must_use]
-    pub(crate) fn shape_anchor_changes(&self) -> &[ShapeAnchorChange] {
-        &self.anchor_changes
-    }
-
-    /// External movie/audio path replacements staged in this root.
-    #[must_use]
-    pub(crate) fn external_media_path_changes(&self) -> &[ExternalMediaPathChange] {
-        &self.media_path_changes
     }
 
     /// External-media playback replacements staged in this root.
@@ -3692,21 +3491,6 @@ impl Patch {
         &self.advance_changes
     }
 
-    /// Visual transition replacements composed into this root patch.
-    #[must_use]
-    pub(crate) fn slide_transition_visual_changes(&self) -> &[SlideTransitionVisualChange] {
-        &self.transition_visual_changes
-    }
-
-    /// Speaker-notes text replacements composed into this root patch, in
-    /// operation order.
-    pub(crate) fn notes_text_changes(&self) -> impl Iterator<Item = &NotesTextChange> {
-        self.formatting.iter().filter_map(|change| match change {
-            FormattingChange::NotesText(change) => Some(change),
-            _ => None,
-        })
-    }
-
     /// Shape-text replacements composed into this root patch.
     #[must_use]
     pub(crate) fn shape_text_changes(&self) -> &[ShapeTextChange] {
@@ -3717,12 +3501,6 @@ impl Patch {
     #[must_use]
     pub(crate) fn shape_anchor_changes(&self) -> &[ShapeAnchorChange] {
         &self.anchor_changes
-    }
-
-    /// External movie/audio path replacements composed into this root patch.
-    #[must_use]
-    pub(crate) fn external_media_path_changes(&self) -> &[ExternalMediaPathChange] {
-        &self.media_path_changes
     }
 
     /// External-media playback replacements composed into this root patch.

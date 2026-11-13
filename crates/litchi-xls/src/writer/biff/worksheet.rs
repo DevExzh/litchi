@@ -293,55 +293,6 @@ pub(super) fn write_def_col_width<W: Write>(writer: &mut W, width_chars: u16) ->
     Ok(())
 }
 
-/// Write INDEX record.
-///
-/// Record type: 0x020B, Length: 16 + 4 * cDbCell
-#[allow(dead_code, reason = "retained as a BIFF compatibility building block")]
-pub(super) fn write_index<W: Write>(
-    writer: &mut W,
-    first_row: u32,
-    last_row_plus1: u32,
-    def_col_width_pos: u32,
-    dbcell_positions: &[u32],
-) -> Result<()> {
-    let data_len = 16u16
-        + u16::try_from(dbcell_positions.len() * 4).map_err(|_error| {
-            Error::InvalidData(
-                "INDEX record DBCell pointer list exceeds BIFF8 size limit".to_string(),
-            )
-        })?;
-    write_record_header(writer, 0x020B, data_len)?;
-    writer.write_all(&0u32.to_le_bytes())?;
-    writer.write_all(&first_row.to_le_bytes())?;
-    writer.write_all(&last_row_plus1.to_le_bytes())?;
-    writer.write_all(&def_col_width_pos.to_le_bytes())?;
-    for position in dbcell_positions {
-        writer.write_all(&position.to_le_bytes())?;
-    }
-    Ok(())
-}
-
-/// Write DBCELL record.
-///
-/// Record type: 0x00D7, Length: 4 + 2 * cOffsets
-#[allow(dead_code, reason = "retained as a BIFF compatibility building block")]
-pub(super) fn write_dbcell<W: Write>(
-    writer: &mut W,
-    row_offset: u32,
-    cell_offsets: &[u16],
-) -> Result<()> {
-    let data_len = 4u16
-        + u16::try_from(cell_offsets.len() * 2).map_err(|_error| {
-            Error::InvalidData("DBCELL row offset list exceeds BIFF8 size limit".to_string())
-        })?;
-    write_record_header(writer, 0x00D7, data_len)?;
-    writer.write_all(&row_offset.to_le_bytes())?;
-    for offset in cell_offsets {
-        writer.write_all(&offset.to_le_bytes())?;
-    }
-    Ok(())
-}
-
 /// Write GUTS, DEFAULTROWHEIGHT, and WSBOOL from typed worksheet settings.
 pub(super) fn write_worksheet_layout<W: Write>(
     writer: &mut W,
@@ -539,7 +490,7 @@ pub(super) fn write_colinfo<W: Write>(
 /// - `x` and `y` are the split positions in terms of columns/rows.
 /// - `topRow` and `leftColumn` are set to the same values.
 /// - `activePane` is derived from which sides are frozen.
-#[allow(dead_code, reason = "retained as a BIFF compatibility building block")]
+#[cfg(test)]
 pub(super) fn write_pane<W: Write>(
     writer: &mut W,
     freeze_rows: u32,
@@ -1082,7 +1033,7 @@ pub(super) fn write_hyperlink<W: Write>(
 /// When `has_freeze_panes` is true, the `FREEZE_PANES` (0x0008) and
 /// `FREEZE_PANES_NO_SPLIT` (0x0100) bits are set in the options field,
 /// mirroring Apache POI's behaviour after `createFreezePane`.
-#[allow(dead_code, reason = "retained as a BIFF compatibility building block")]
+#[cfg(test)]
 pub(super) fn write_window2<W: Write>(writer: &mut W, has_freeze_panes: bool) -> Result<()> {
     write_record_header(writer, 0x023E, 18)?;
 
@@ -1223,7 +1174,7 @@ pub(super) fn write_selection_options<W: Write>(
 }
 
 /// Write the primary selection for a regular worksheet window.
-#[allow(dead_code, reason = "retained as a BIFF compatibility building block")]
+#[cfg(test)]
 pub(super) fn write_default_selection<W: Write>(
     writer: &mut W,
     freeze_rows: u16,

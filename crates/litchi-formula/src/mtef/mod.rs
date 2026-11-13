@@ -4,19 +4,14 @@ mod limits;
 mod templates;
 mod writer;
 
-// Re-exported for `lib.rs`; the allow drops away once the crate root re-exports
-// these alongside `MtefParser`.
+// Re-exported for `lib.rs`.
 pub use limits::{LimitKind, Limits};
-#[allow(unused_imports)]
 pub use writer::{MtefWriteError, MtefWriteOptions, MtefWriter};
 
 use crate::ast::MathNode;
 
 /// MTEF parser using proper binary parsing
 pub struct MtefParser<'arena> {
-    // Arena for lifetime-managed allocations - kept for future use
-    #[allow(dead_code)]
-    arena: &'arena bumpalo::Bump,
     binary_parser: Option<binary::MtefBinaryParser<'arena>>,
     limit_error: Option<MtefError>,
     limits: Limits,
@@ -41,7 +36,6 @@ impl<'arena> MtefParser<'arena> {
             }
         };
         Self {
-            arena,
             binary_parser,
             limit_error,
             limits,
@@ -271,48 +265,6 @@ mod tests {
         // Test non-existent template
         let template = TemplateParser::find_template(255, 0);
         assert!(template.is_none());
-    }
-
-    #[test]
-    fn test_fence_template_conversion() {
-        use crate::mtef::templates::TemplateParser;
-
-        // Test fence type detection
-        let fence = TemplateParser::fence_from_selector(1); // Parentheses
-        assert_eq!(fence, Some(crate::ast::Fence::Paren));
-
-        let fence = TemplateParser::fence_from_selector(2); // Braces
-        assert_eq!(fence, Some(crate::ast::Fence::Brace));
-
-        let fence = TemplateParser::fence_from_selector(3); // Brackets
-        assert_eq!(fence, Some(crate::ast::Fence::Bracket));
-
-        let fence = TemplateParser::fence_from_selector(4); // Pipes
-        assert_eq!(fence, Some(crate::ast::Fence::Pipe));
-
-        let fence = TemplateParser::fence_from_selector(255); // Invalid
-        assert!(fence.is_none());
-    }
-
-    #[test]
-    fn test_large_operator_conversion() {
-        use crate::mtef::templates::TemplateParser;
-
-        // Test large operator type detection
-        let op = TemplateParser::large_op_from_selector(15); // Integrals
-        assert_eq!(op, Some(crate::ast::LargeOperator::Integral));
-
-        let op = TemplateParser::large_op_from_selector(16); // Sum
-        assert_eq!(op, Some(crate::ast::LargeOperator::Sum));
-
-        let op = TemplateParser::large_op_from_selector(17); // Product
-        assert_eq!(op, Some(crate::ast::LargeOperator::Product));
-
-        let op = TemplateParser::large_op_from_selector(21); // Integral (single with limits)
-        assert_eq!(op, Some(crate::ast::LargeOperator::Integral));
-
-        let op = TemplateParser::large_op_from_selector(255); // Invalid
-        assert!(op.is_none());
     }
 
     #[test]

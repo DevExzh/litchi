@@ -5,7 +5,6 @@
 //! without implementing an XForms processor: XPath, expressions, actions,
 //! submissions, network access, and instance evaluation remain strings.
 
-#![cfg_attr(test, allow(dead_code))]
 #![allow(
     clippy::arbitrary_source_item_ordering,
     clippy::cast_possible_truncation,
@@ -562,11 +561,6 @@ pub(crate) fn parse_models(xml: &str) -> Result<Vec<Model>> {
     parse_models_with_xml_limits(xml, XmlStreamLimits::default())
 }
 
-#[cfg(test)]
-fn parse_models_inner(xml: &str, budget: Option<&FlatMutationBudget>) -> Result<Vec<Model>> {
-    parse_models_inner_with_limits(xml, budget, XmlStreamLimits::default())
-}
-
 /// Parse XForms models under the raw XML policy retained by an opened owner.
 pub(crate) fn parse_models_with_xml_limits(
     xml: &str,
@@ -757,25 +751,6 @@ fn parse_models_inner_with_limits(
     Ok(output)
 }
 
-/// Parse models while charging the parser's owned projection before it starts.
-///
-/// The ordinary parser deliberately owns strings and vectors because the
-/// public model outlives the XML event stream.  A flat mutation therefore
-/// cannot charge `xml.len()` and call that parser memory: the projection also
-/// owns attribute values, namespace scopes, opaque instance/extension spans,
-/// vector slots, and validation sets.  This plan walks the same borrowed
-/// events without allocating and counts each of those categories.  The
-/// reservation is retained until the returned projection is dropped by the
-/// caller.  It is an upper bound for allocator capacities, rather than a
-/// document-size or output-byte limit.
-#[cfg(test)]
-pub(crate) fn parse_models_with_budget(
-    xml: &str,
-    budget: &FlatMutationBudget,
-) -> Result<(Vec<Model>, MemoryLease)> {
-    parse_models_with_budget_and_xml_limits(xml, budget, XmlStreamLimits::default())
-}
-
 pub(crate) fn parse_models_with_budget_and_xml_limits(
     xml: &str,
     budget: &FlatMutationBudget,
@@ -941,11 +916,6 @@ impl XFormsMemoryPlan {
             })
             .ok_or_else(|| Error::InvalidFormat("XForms parser memory plan overflow".to_string()))
     }
-}
-
-#[cfg(test)]
-fn xforms_parser_memory_plan(xml: &str, budget: Option<&FlatMutationBudget>) -> Result<usize> {
-    xforms_parser_memory_plan_with_xml_limits(xml, budget, XmlStreamLimits::default())
 }
 
 fn xforms_parser_memory_plan_with_xml_limits(
@@ -3202,20 +3172,6 @@ fn utf8(value: &[u8], description: &str) -> Result<String> {
         .map_err(|_| Error::InvalidFormat(format!("invalid UTF-8 {description}")))
 }
 
-/// Find direct model spans for the mutable XML editor.
-#[cfg(test)]
-pub(crate) fn model_spans(xml: &str) -> Result<Vec<(usize, usize)>> {
-    model_spans_with_optional_budget(xml, None)
-}
-
-#[cfg(test)]
-fn model_spans_with_optional_budget(
-    xml: &str,
-    budget: Option<&FlatMutationBudget>,
-) -> Result<Vec<(usize, usize)>> {
-    model_spans_with_optional_budget_and_xml_limits(xml, budget, XmlStreamLimits::default())
-}
-
 fn model_spans_with_optional_budget_and_xml_limits(
     xml: &str,
     budget: Option<&FlatMutationBudget>,
@@ -3342,14 +3298,6 @@ fn model_spans_with_optional_budget_and_xml_limits(
     Ok(output)
 }
 
-#[cfg(test)]
-fn model_spans_with_budget(
-    xml: &str,
-    budget: Option<&FlatMutationBudget>,
-) -> Result<(Vec<(usize, usize)>, Option<MemoryLease>)> {
-    model_spans_with_budget_and_xml_limits(xml, budget, XmlStreamLimits::default())
-}
-
 fn model_spans_with_budget_and_xml_limits(
     xml: &str,
     budget: Option<&FlatMutationBudget>,
@@ -3381,14 +3329,6 @@ fn model_spans_with_budget_and_xml_limits(
     }
 }
 
-#[cfg(test)]
-fn parse_models_optional_budget(
-    xml: &str,
-    budget: Option<&FlatMutationBudget>,
-) -> Result<(Vec<Model>, Option<MemoryLease>)> {
-    parse_models_optional_budget_and_xml_limits(xml, budget, XmlStreamLimits::default())
-}
-
 fn parse_models_optional_budget_and_xml_limits(
     xml: &str,
     budget: Option<&FlatMutationBudget>,
@@ -3401,11 +3341,6 @@ fn parse_models_optional_budget_and_xml_limits(
     }
 }
 
-#[cfg(test)]
-fn validate_models_optional_budget(xml: &str, budget: Option<&FlatMutationBudget>) -> Result<()> {
-    validate_models_optional_budget_and_xml_limits(xml, budget, XmlStreamLimits::default())
-}
-
 fn validate_models_optional_budget_and_xml_limits(
     xml: &str,
     budget: Option<&FlatMutationBudget>,
@@ -3415,11 +3350,6 @@ fn validate_models_optional_budget_and_xml_limits(
     drop(models);
     drop(memory);
     Ok(())
-}
-
-#[cfg(test)]
-pub(crate) fn validate_models_with_budget(xml: &str, budget: &FlatMutationBudget) -> Result<()> {
-    validate_models_optional_budget(xml, Some(budget))
 }
 
 pub(crate) fn validate_models_with_budget_and_xml_limits(
@@ -3442,40 +3372,6 @@ pub(crate) fn replace_model_with_xml_limits(
     xml_limits: XmlStreamLimits,
 ) -> Result<String> {
     replace_model_with_limit_and_xml_limits(xml, position, model, MAX_XML_BYTES, xml_limits)
-}
-
-#[cfg(test)]
-pub(crate) fn replace_model_with_limit(
-    xml: &str,
-    position: usize,
-    model: &Model,
-    maximum: usize,
-) -> Result<String> {
-    replace_model_with_limit_and_xml_limits(
-        xml,
-        position,
-        model,
-        maximum,
-        XmlStreamLimits::default(),
-    )
-}
-
-#[cfg(test)]
-pub(crate) fn replace_model_with_limit_and_budget(
-    xml: &str,
-    position: usize,
-    model: &Model,
-    maximum: usize,
-    budget: Option<&FlatMutationBudget>,
-) -> Result<ChargedXml> {
-    replace_model_with_limit_and_budget_and_xml_limits(
-        xml,
-        position,
-        model,
-        maximum,
-        budget,
-        XmlStreamLimits::default(),
-    )
 }
 
 pub(crate) fn replace_model_with_limit_and_xml_limits(
@@ -3553,15 +3449,6 @@ pub(crate) fn remove_model_with_xml_limits(
     remove_model_with_limit_and_xml_limits(xml, position, MAX_XML_BYTES, xml_limits)
 }
 
-#[cfg(test)]
-pub(crate) fn remove_model_with_limit(
-    xml: &str,
-    position: usize,
-    maximum: usize,
-) -> Result<String> {
-    remove_model_with_limit_and_xml_limits(xml, position, maximum, XmlStreamLimits::default())
-}
-
 pub(crate) fn remove_model_with_limit_and_xml_limits(
     xml: &str,
     position: usize,
@@ -3570,22 +3457,6 @@ pub(crate) fn remove_model_with_limit_and_xml_limits(
 ) -> Result<String> {
     remove_model_with_limit_and_budget_and_xml_limits(xml, position, maximum, None, xml_limits)
         .map(ChargedXml::into_string)
-}
-
-#[cfg(test)]
-pub(crate) fn remove_model_with_limit_and_budget(
-    xml: &str,
-    position: usize,
-    maximum: usize,
-    budget: Option<&FlatMutationBudget>,
-) -> Result<ChargedXml> {
-    remove_model_with_limit_and_budget_and_xml_limits(
-        xml,
-        position,
-        maximum,
-        budget,
-        XmlStreamLimits::default(),
-    )
 }
 
 pub(crate) fn remove_model_with_limit_and_budget_and_xml_limits(
@@ -3615,22 +3486,12 @@ pub(crate) fn remove_model_with_limit_and_budget_and_xml_limits(
     Ok(candidate)
 }
 
-#[cfg(test)]
-pub(crate) fn insert_model(xml: &str, model: &Model) -> Result<String> {
-    insert_model_with_xml_limits(xml, model, XmlStreamLimits::default())
-}
-
 pub(crate) fn insert_model_with_xml_limits(
     xml: &str,
     model: &Model,
     xml_limits: XmlStreamLimits,
 ) -> Result<String> {
     insert_model_with_limit_and_xml_limits(xml, model, MAX_XML_BYTES, xml_limits)
-}
-
-#[cfg(test)]
-pub(crate) fn insert_model_with_limit(xml: &str, model: &Model, maximum: usize) -> Result<String> {
-    insert_model_with_limit_and_xml_limits(xml, model, maximum, XmlStreamLimits::default())
 }
 
 pub(crate) fn insert_model_with_limit_and_xml_limits(
@@ -3641,22 +3502,6 @@ pub(crate) fn insert_model_with_limit_and_xml_limits(
 ) -> Result<String> {
     insert_model_with_limit_and_budget_and_xml_limits(xml, model, maximum, None, xml_limits)
         .map(ChargedXml::into_string)
-}
-
-#[cfg(test)]
-pub(crate) fn insert_model_with_limit_and_budget(
-    xml: &str,
-    model: &Model,
-    maximum: usize,
-    budget: Option<&FlatMutationBudget>,
-) -> Result<ChargedXml> {
-    insert_model_with_limit_and_budget_and_xml_limits(
-        xml,
-        model,
-        maximum,
-        budget,
-        XmlStreamLimits::default(),
-    )
 }
 
 pub(crate) fn insert_model_with_limit_and_budget_and_xml_limits(
@@ -3797,16 +3642,6 @@ fn model_has_direct_lexical_material(
         ));
     }
     Ok(false)
-}
-
-#[cfg(test)]
-fn container_span(
-    xml: &str,
-    namespace: &str,
-    local: &str,
-    budget: Option<&FlatMutationBudget>,
-) -> Result<Option<(usize, usize)>> {
-    container_span_with_xml_limits(xml, namespace, local, budget, XmlStreamLimits::default())
 }
 
 fn container_span_with_xml_limits(

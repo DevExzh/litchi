@@ -56,23 +56,8 @@ pub(crate) struct RecordPatch {
 
 impl RecordPatch {
     #[must_use]
-    pub(crate) const fn base(&self) -> Revision {
-        self.base
-    }
-
-    #[must_use]
-    pub(crate) const fn target(&self) -> Revision {
-        self.target
-    }
-
-    #[must_use]
     pub(crate) fn changes(&self) -> &[Change] {
         &self.changes
-    }
-
-    #[must_use]
-    pub(crate) fn is_empty(&self) -> bool {
-        self.changes.is_empty()
     }
 
     /// Apply the inverse operations to the exact committed target snapshot.

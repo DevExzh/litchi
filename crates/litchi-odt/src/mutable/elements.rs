@@ -19,12 +19,8 @@ impl MutableDocument {
             .collect()
     }
 
-    /// Get all top-level paragraphs as owned values.
-    pub(crate) fn paragraphs_owned(&self) -> Vec<Paragraph> {
-        self.paragraphs().into_iter().cloned().collect()
-    }
-
     /// Get all top-level headings in document order.
+    #[cfg(test)]
     pub(crate) fn headings(&self) -> Vec<&Heading> {
         self.elements
             .iter()
@@ -36,6 +32,7 @@ impl MutableDocument {
     }
 
     /// Get all top-level lists in document order.
+    #[cfg(test)]
     pub(crate) fn lists(&self) -> Vec<&List> {
         self.elements
             .iter()
@@ -47,6 +44,7 @@ impl MutableDocument {
     }
 
     /// Get all top-level tables in document order.
+    #[cfg(test)]
     pub(crate) fn tables(&self) -> Vec<&Table> {
         self.elements
             .iter()
@@ -55,11 +53,6 @@ impl MutableDocument {
                 _ => None,
             })
             .collect()
-    }
-
-    /// Get all top-level tables as owned values.
-    pub(crate) fn tables_owned(&self) -> Vec<Table> {
-        self.tables().into_iter().cloned().collect()
     }
 
     /// Add a new plain paragraph to the end of the document.
@@ -111,24 +104,6 @@ impl MutableDocument {
         Ok(())
     }
 
-    /// Insert a plain paragraph at a top-level structural position.
-    #[deprecated(note = "use insert_paragraph_at with a checked semantic Position")]
-    pub(crate) fn insert_paragraph(&mut self, index: usize, text: &str) -> Result<()> {
-        let mut paragraph = Paragraph::new();
-        paragraph.set_text(text);
-        if index > self.elements.len() {
-            return Err(Error::InvalidFormat(format!(
-                "Index {} out of bounds (length: {})",
-                index,
-                self.elements.len()
-            )));
-        }
-        self.invalidate_content_xml();
-        self.elements
-            .insert(index, DocumentElement::Paragraph(paragraph));
-        Ok(())
-    }
-
     /// Insert a plain paragraph at a checked semantic paragraph position.
     pub(crate) fn insert_paragraph_at(
         &mut self,
@@ -136,12 +111,6 @@ impl MutableDocument {
         text: &str,
     ) -> Result<()> {
         self.insert_semantic_paragraph(position.get(), text)
-    }
-
-    /// Remove one top-level paragraph and return its typed value.
-    #[deprecated(note = "use remove_paragraph_at with a checked semantic Position")]
-    pub(crate) fn remove_paragraph(&mut self, index: usize) -> Result<Paragraph> {
-        self.remove_semantic_paragraph(index)
     }
 
     /// Remove one paragraph selected by a checked semantic position.
@@ -165,12 +134,6 @@ impl MutableDocument {
             DocumentElement::Paragraph(paragraph) => Ok(paragraph),
             _ => unreachable!("paragraph index resolved to a non-paragraph"),
         }
-    }
-
-    /// Replace one top-level paragraph's plain text.
-    #[deprecated(note = "use replace_paragraph_at with a checked semantic Position")]
-    pub(crate) fn update_paragraph(&mut self, index: usize, text: &str) -> Result<()> {
-        self.replace_semantic_paragraph(index, text)
     }
 
     /// Replace one paragraph's content with plain text at a checked position.

@@ -349,26 +349,6 @@ pub(crate) fn parse_cell_reference(ref_str: &str) -> Option<(u32, u32)> {
     Some((row - 1, col)) // Make 0-based
 }
 
-/// Convert serial date to datetime
-#[allow(dead_code, reason = "retained as a BIFF compatibility building block")]
-pub(crate) fn excel_date_to_datetime(serial: f64, is_1904: bool) -> Option<chrono::NaiveDateTime> {
-    use chrono::{Duration, NaiveDate};
-
-    let base_date = if is_1904 {
-        NaiveDate::from_ymd_opt(1904, 1, 1)?
-    } else {
-        NaiveDate::from_ymd_opt(1899, 12, 30)?
-    };
-
-    let days = saturating_f64_to_i64(serial.trunc());
-    let seconds = saturating_f64_to_i64((serial.fract() * 86400.0).round()) * 1_000_000; // microseconds
-
-    let date = base_date + Duration::days(days);
-    let time = Duration::microseconds(seconds);
-
-    Some(date.and_time(chrono::NaiveTime::from_hms_opt(0, 0, 0)?) + time)
-}
-
 /// Preserve Rust's low-bit integer-cast semantics explicitly for BIFF fields.
 pub(crate) const fn truncate_usize_to_u8(value: usize) -> u8 {
     value.to_le_bytes()[0]
@@ -478,15 +458,6 @@ pub(crate) fn saturating_f64_to_u16(value: f64) -> u16 {
 )]
 pub(crate) fn saturating_f64_to_i32(value: f64) -> i32 {
     value as i32
-}
-
-/// Preserve Rust's saturating float-to-integer cast semantics for BIFF values.
-#[expect(
-    clippy::cast_possible_truncation,
-    reason = "Rust's saturating float-to-integer semantics are required here"
-)]
-pub(crate) fn saturating_f64_to_i64(value: f64) -> i64 {
-    value as i64
 }
 
 /// Preserve the intentional lossy conversion used by Excel serial dates.

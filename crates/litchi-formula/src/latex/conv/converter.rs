@@ -136,14 +136,6 @@ impl LatexConverter {
         &self.stats
     }
 
-    /// Get a cached LaTeX command string to avoid repeated allocations
-    #[inline]
-    #[allow(dead_code)]
-    fn get_cached_command(&mut self, cmd: &str) -> &str {
-        let index = self.string_cache.get_or_insert(cmd);
-        self.string_cache.get(index)
-    }
-
     /// Efficiently append a cached LaTeX command to the buffer
     #[inline]
     pub fn append_cached_command(&mut self, cmd: &str) {

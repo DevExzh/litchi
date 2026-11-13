@@ -37,9 +37,12 @@
 //! package over the composed overlay source without materializing it, and
 //! [`Package::apply_text`](crate::Package::apply_text) replays its
 //! [`text_edit::Patch`](crate::text_edit::Patch).
-#![allow(
-    dead_code,
-    reason = "crate-private native text owners (record 0357): the whole-artifact transaction and the source-backed splice owner behind text_edit::Edit keep their full surface exercised by the unit tests"
+#![cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "crate-private native text owners (record 0357): the whole-artifact transaction and the source-backed splice owner behind text_edit::Edit keep their full surface exercised by the unit tests"
+    )
 )]
 
 use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
@@ -289,15 +292,6 @@ pub(crate) struct Snapshot {
 }
 
 impl Snapshot {
-    /// Opens an exact PPT artifact with default package limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the complete package cannot be opened.
-    pub(crate) fn parse(bytes: &[u8]) -> Result<Self> {
-        Self::from_bytes(bytes.to_vec())
-    }
-
     /// Captures an owned exact PPT artifact after validating that it opens.
     ///
     /// # Errors
@@ -781,18 +775,6 @@ impl SourceBackedDiagnostics {
     pub(crate) const fn target_fingerprint(self) -> ArtifactFingerprint {
         self.target_fingerprint
     }
-
-    /// Source version checked before planning.
-    #[must_use]
-    pub(crate) const fn source_version(self) -> SourceVersion {
-        self.source_version
-    }
-
-    /// Composed target version exposed by the positional overlay.
-    #[must_use]
-    pub(crate) const fn target_version(self) -> SourceVersion {
-        self.target_version
-    }
 }
 
 /// A published source-backed PPT target and its reusable overlay plan.
@@ -827,12 +809,6 @@ impl SourceBackedCommit {
         &self.patch
     }
 
-    /// Common validated CFB overlay plan.
-    #[must_use]
-    pub(crate) const fn plan(&self) -> &ValidatedOverlayPlan {
-        &self.plan
-    }
-
     /// Content-free publication diagnostics.
     #[must_use]
     pub(crate) const fn diagnostics(&self) -> SourceBackedDiagnostics {
@@ -848,29 +824,6 @@ impl SourceBackedCommit {
     /// Streams the complete validated target to a sequential sink.
     pub(crate) fn write_to<W: Write>(&self, writer: &mut W) -> Result<PublishReport> {
         self.plan.write_to(writer).map_err(Error::Source)
-    }
-
-    /// Alias emphasizing the forward-only publication boundary.
-    pub(crate) fn publish_to_stream<W: Write>(&self, writer: &mut W) -> Result<PublishReport> {
-        self.write_to(writer)
-    }
-
-    /// Publishes through the common synced sibling-temp/atomic-rename path.
-    pub(crate) fn save<P: AsRef<std::path::Path>>(&self, path: P) -> Result<PublishReport> {
-        self.plan.save(path).map_err(Error::Source)
-    }
-
-    /// Publishes through the common sibling-temp/atomic-rename path at a
-    /// caller-chosen [`Durability`](litchi_core::Durability); see
-    /// [`litchi_cfb::ValidatedOverlayPlan::save_with_durability`].
-    pub(crate) fn save_with_durability<P: AsRef<std::path::Path>>(
-        &self,
-        path: P,
-        durability: litchi_core::Durability,
-    ) -> Result<PublishReport> {
-        self.plan
-            .save_with_durability(path, durability)
-            .map_err(Error::Source)
     }
 }
 
@@ -894,18 +847,6 @@ impl fmt::Debug for SourceBackedPatch {
 }
 
 impl SourceBackedPatch {
-    /// Exact source snapshot required for forward application.
-    #[must_use]
-    pub(crate) const fn source(&self) -> &SourceSnapshot {
-        &self.before
-    }
-
-    /// Exact target snapshot produced by forward application.
-    #[must_use]
-    pub(crate) const fn target(&self) -> &SourceSnapshot {
-        &self.after
-    }
-
     /// Exact source artifact fingerprint required for forward application.
     #[must_use]
     pub(crate) fn source_fingerprint(&self) -> ArtifactFingerprint {
@@ -1290,7 +1231,7 @@ fn ensure_matching_stream_topology(document: &[String], current_user: &[String])
 }
 
 #[cfg(test)]
-#[allow(dead_code, reason = "retained as the owned differential oracle")]
+#[cfg(test)]
 fn read_bounded_stream(
     shared: &SharedOleFile,
     path: &[String],
@@ -1491,7 +1432,7 @@ struct SourceResolved {
 }
 
 #[cfg(test)]
-#[allow(dead_code, reason = "retained as the owned differential oracle")]
+#[cfg(test)]
 fn resolve_source_target_owned(
     shared: &SharedOleFile,
     document_path: &[String],
@@ -1589,7 +1530,7 @@ struct SourceTextAtom {
 }
 
 #[cfg(test)]
-#[allow(dead_code, reason = "retained as the owned differential oracle")]
+#[cfg(test)]
 fn inspect_source_text_atom(
     document: &[u8],
     slide_offset: usize,
@@ -1963,12 +1904,6 @@ impl Transaction {
         &self.resolved.text
     }
 
-    /// The selected semantic target.
-    #[must_use]
-    pub(crate) const fn target(&self) -> Target {
-        self.resolved.target
-    }
-
     /// Stages a replacement after proving that the dependent text ranges stay
     /// valid. Failed validation leaves the staged candidate untouched.
     ///
@@ -2106,12 +2041,6 @@ impl RecordCommit {
         &self.patch
     }
 
-    /// Consumes the commit into its snapshot and patch.
-    #[must_use]
-    pub(crate) fn into_parts(self) -> (Snapshot, RecordPatch) {
-        (self.snapshot, self.patch)
-    }
-
     pub(crate) fn into_root_publication(self) -> Option<RootPublication> {
         let replaced_slide_persist_id = self.replaced_slide_persist_id?;
         Some(RootPublication {
@@ -2225,18 +2154,6 @@ impl RecordPatch {
             after,
             change,
         }
-    }
-
-    /// Exact source bytes required for forward application.
-    #[must_use]
-    pub(crate) fn before(&self) -> &[u8] {
-        self.before.bytes()
-    }
-
-    /// Exact target bytes produced by forward application.
-    #[must_use]
-    pub(crate) fn after(&self) -> &[u8] {
-        self.after.bytes()
     }
 
     /// Whether the patch changes no bytes.

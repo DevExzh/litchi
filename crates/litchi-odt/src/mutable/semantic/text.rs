@@ -13,17 +13,6 @@ const MAX_DEPTH: usize = 4_096;
 const MAX_PARAGRAPHS: usize = 1_000_000;
 
 impl MutableDocument {
-    /// Append an ODF `text:line-break` to a paragraph selected in document
-    /// order, including paragraphs nested in lists, tables, and note bodies.
-    ///
-    /// The operation edits the authoritative XML snapshot instead of rebuilding
-    /// the structural projection, so spans, hyperlinks, fields, and producer
-    /// extensions already inside the paragraph remain byte-for-byte intact.
-    #[deprecated(note = "use append_line_break_at with a checked semantic Position")]
-    pub(crate) fn append_line_break(&mut self, paragraph_index: usize) -> Result<()> {
-        self.append_line_break_at(litchi_core::Position::new(paragraph_index))
-    }
-
     /// Append a line break at a checked semantic paragraph position.
     pub(crate) fn append_line_break_at(&mut self, paragraph: litchi_core::Position) -> Result<()> {
         self.edit_content_xml(|xml| append_line_break_xml(xml, paragraph.get()))

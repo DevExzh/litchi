@@ -8,10 +8,6 @@
 
 mod codec;
 mod model;
-#[allow(
-    dead_code,
-    reason = "detached readers are also used by crate-level round-trip tests"
-)]
 mod p202;
 mod package;
 pub mod properties;
@@ -31,12 +27,7 @@ pub(crate) use package::{load_with_limits, put_with_limits, remove_with_limits};
 mod edit;
 pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 
-#[allow(
-    unused_imports,
-    reason = "staged crate-private host API; public facades deliberately remain unchanged"
-)]
 // Staged crate-private host API; public facades deliberately remain unchanged.
-pub(crate) use properties::apply_properties;
 pub(crate) use properties::{
     load_properties_with_limits_and_shape_limits, load_properties_with_shape_limits,
 };

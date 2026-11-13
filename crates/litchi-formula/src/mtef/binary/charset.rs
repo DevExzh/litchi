@@ -23,49 +23,6 @@ pub struct CharsetAttributes {
     pub use_codepoint: bool,
 }
 
-/// Character set information for each typeface slot
-///
-/// Combines attributes with a descriptive name for debugging and validation.
-/// This structure is kept for future typeface validation and extended debugging features.
-#[allow(dead_code)] // Kept for future typeface validation and debugging infrastructure
-#[derive(Debug, Clone)]
-pub struct CharsetInfo {
-    /// Character set attributes
-    pub attributes: CharsetAttributes,
-    /// Typeface name for debugging
-    pub name: &'static str,
-}
-
-/// Typeface names (index 0-31, corresponding to typeface 129-160)
-///
-/// Based on rtf2latex2e typeFaceName array. These names are used for
-/// debugging and logging purposes via the `get_typeface_name` function.
-const TYPEFACE_NAMES: &[&str] = &[
-    "ZERO", "TEXT", "FUNCTION", "VARIABLE", "LCGREEK", "UCGREEK", "SYMBOL", "VECTOR", "NUMBER",
-    "USER1", "USER2", "MTEXTRA", "UNKNOWN", "UNKNOWN", "UNKNOWN", "UNKNOWN", "UNKNOWN", "UNKNOWN",
-    "UNKNOWN", "UNKNOWN", "UNKNOWN", "TEXT_FE", "EXPAND", "MARKER", "SPACE", "UNKNOWN", "UNKNOWN",
-    "UNKNOWN", "UNKNOWN", "UNKNOWN", "UNKNOWN", "UNKNOWN",
-];
-
-/// Get typeface name for debugging
-///
-/// Returns the descriptive name for a given typeface index (0-31).
-/// Useful for logging and error messages during MTEF parsing.
-///
-/// # Example
-/// ```ignore
-/// let name = get_typeface_name(1); // Returns "TEXT"
-/// eprintln!("Processing typeface: {}", name);
-/// ```
-#[allow(dead_code)] // Kept for debugging and future error reporting
-pub fn get_typeface_name(typeface_index: usize) -> &'static str {
-    if typeface_index < TYPEFACE_NAMES.len() {
-        TYPEFACE_NAMES[typeface_index]
-    } else {
-        "UNKNOWN"
-    }
-}
-
 /// Default character set attributes for each typeface slot
 const DEFAULT_CHARSET_ATTRIBUTES: &[CharsetAttributes] = &[
     CharsetAttributes {

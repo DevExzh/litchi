@@ -3,9 +3,12 @@
 //! This is the bounded missing authoring path for nested `SpgrContainer`
 //! records described by [MS-ODRAW] sections 2.2.14, 2.2.16, 2.2.38, and 2.2.40.
 
-#![allow(
-    dead_code,
-    reason = "encoders cover the full [MS-ODRAW] record surface even where no caller exists yet"
+#![cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "encoders cover the full [MS-ODRAW] record surface even where no caller exists yet"
+    )
 )]
 
 use zerocopy::IntoBytes;

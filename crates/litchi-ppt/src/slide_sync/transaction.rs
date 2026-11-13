@@ -1,7 +1,7 @@
 //! Atomic semantic edits for one slide synchronization container.
 
 use super::codec;
-use super::model::{Limits, Snapshot, Synchronization};
+use super::model::{Snapshot, Synchronization};
 use super::validation;
 use crate::package::{Error, Result};
 use crate::records::Record;
@@ -65,23 +65,8 @@ pub(crate) struct RecordPatch {
 
 impl RecordPatch {
     #[must_use]
-    pub(crate) const fn base(&self) -> Revision {
-        self.base
-    }
-
-    #[must_use]
-    pub(crate) const fn target(&self) -> Revision {
-        self.target
-    }
-
-    #[must_use]
     pub(crate) fn changes(&self) -> &[Change] {
         &self.changes
-    }
-
-    #[must_use]
-    pub(crate) const fn is_empty(&self) -> bool {
-        self.changes.is_empty()
     }
 
     /// Undo this patch against the exact committed target snapshot.
@@ -134,12 +119,6 @@ impl RecordEdit {
         }
     }
 
-    /// Borrow the candidate slide record.
-    #[must_use]
-    pub(crate) const fn record(&self) -> &Record {
-        &self.root
-    }
-
     /// Read the candidate synchronization metadata.
     ///
     /// # Errors
@@ -147,12 +126,6 @@ impl RecordEdit {
     /// Returns an error if the operation fails.
     pub(crate) fn synchronization(&self) -> Result<Option<Synchronization>> {
         codec::read(&self.root)
-    }
-
-    /// Return the source limits used by this transaction.
-    #[must_use]
-    pub(crate) const fn limits(&self) -> Limits {
-        self.source.limits
     }
 
     /// Borrow the semantic changes staged so far.

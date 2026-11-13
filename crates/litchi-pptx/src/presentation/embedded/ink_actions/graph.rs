@@ -153,21 +153,8 @@ pub(crate) struct RelationshipClosure<'index, 'package> {
 }
 
 impl<'index, 'package> RelationshipClosure<'index, 'package> {
-    /// All inbound package and part edges to the target.
-    #[allow(
-        dead_code,
-        reason = "retained for graph diagnostics and future owner lifecycles"
-    )]
-    #[must_use]
-    pub(crate) fn inbound(&self) -> &'index [RelationshipReference<'package>] {
-        self.inbound
-    }
-
     /// All outbound target edges, including unknown edges kept for diagnostics.
-    #[allow(
-        dead_code,
-        reason = "retained for graph diagnostics and future owner lifecycles"
-    )]
+    #[cfg(test)]
     #[must_use]
     pub(crate) fn outbound(&self) -> &'index [RelationshipReference<'package>] {
         self.outbound
@@ -325,7 +312,7 @@ impl<'package> RelationshipIndex<'package> {
     /// Borrow the package-wide inbound set for `target` after canonical OPC
     /// resolution.  This accessor never applies the selected-target outbound
     /// conformance rule; use [`Self::closure`] when reading a typed target.
-    #[allow(dead_code, reason = "retained for generic graph callers")]
+    #[cfg(test)]
     #[must_use]
     pub(crate) fn inbound(&self, target: &PackURI) -> &[RelationshipReference<'package>] {
         let canonical = self.canonical_target(target);
@@ -340,7 +327,7 @@ impl<'package> RelationshipIndex<'package> {
     /// This low-level accessor intentionally does not reject known ECMA edges;
     /// it is useful to preserve a malformed/unsupported source through an
     /// opaque path.  Typed action publication should call [`Self::closure`].
-    #[allow(dead_code, reason = "retained for generic graph callers")]
+    #[cfg(test)]
     #[must_use]
     pub(crate) fn outbound(&self, target: &PackURI) -> &[RelationshipReference<'package>] {
         let canonical = self.canonical_target(target);

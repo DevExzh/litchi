@@ -6,14 +6,13 @@ use crate::package::{Error, Result};
 use crate::records::Record;
 
 use super::model::{Compression, Kind, MAX_DECLARED_BYTES, MAX_STORED_BYTES, Ref, Storage};
-use super::snapshot::{Metadata, Snapshot};
+#[cfg(feature = "vba-inspection")]
+use super::snapshot::Metadata;
+use super::snapshot::Snapshot;
 
-#[allow(
-    dead_code,
-    reason = "resolver retained for pending embedded-storage call sites"
-)]
 impl<'a> Ref<'a> {
     /// Resolve one strict `ExOleObjStg` record directly from presentation bytes.
+    #[cfg(any(test, feature = "vba-inspection"))]
     pub(crate) fn parse_at(document: &'a [u8], offset: usize, kind: Kind) -> Result<Self> {
         let header_end = offset
             .checked_add(8)
@@ -73,11 +72,13 @@ impl<'a> Ref<'a> {
         }
     }
 
+    #[cfg(feature = "vba-inspection")]
     pub(crate) fn metadata(self) -> Metadata {
         self.snapshot().metadata()
     }
 
     /// Reject a caller-specific stored-size ceiling before payload allocation.
+    #[cfg(any(test, feature = "vba-inspection"))]
     pub(crate) fn check_stored_limit(self, maximum: usize) -> Result<Self> {
         if self.data.len() > maximum {
             return corrupted(format!(

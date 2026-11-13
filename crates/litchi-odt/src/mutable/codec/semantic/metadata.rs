@@ -1,22 +1,10 @@
 //! Lossless in-content RDFa and `text:meta` operations.
 
 use super::super::super::model::MutableDocument;
-use crate::content_metadata::{self, ContentMetadata, RdfaAttributes, TextMeta};
+use crate::content_metadata::{self, RdfaAttributes, TextMeta};
 use litchi_core::{Position, Result};
 
 impl MutableDocument {
-    /// Inspect RDFa and inline `text:meta` declarations in the authoritative
-    /// content snapshot.
-    pub(crate) fn in_content_metadata(&self) -> Result<ContentMetadata> {
-        self.with_content_xml(|xml| {
-            content_metadata::parse_part_with_xml_limits(
-                xml,
-                crate::MetadataPart::Content,
-                self.xml_limits,
-            )
-        })
-    }
-
     /// Set or clear RDFa on one paragraph while retaining unrelated XML.
     pub(crate) fn set_paragraph_rdfa(
         &mut self,

@@ -6,7 +6,6 @@
 pub mod charset;
 pub mod converter;
 pub mod converter_v5;
-pub mod headers;
 pub mod objects;
 pub mod parser;
 /// Maps the reader's LaTeX spellings onto semantic AST nodes

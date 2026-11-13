@@ -121,10 +121,6 @@ pub(crate) struct Editor {
     document: DocumentEditor,
 }
 
-#[allow(
-    dead_code,
-    reason = "the record-level owner behind the package-level Edit; its full surface stays exercised by the unit tests (record 0357)"
-)]
 impl Editor {
     /// Read the transaction-local review records.
     pub(crate) fn review(&self) -> Result<super::model::Review> {
@@ -241,49 +237,10 @@ pub(crate) struct Commit {
     patch: Patch,
 }
 
-#[allow(
-    dead_code,
-    reason = "the record-level owner behind the package-level Edit; its full surface stays exercised by the unit tests (record 0357)"
-)]
 impl Commit {
     #[must_use]
     pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
-    }
-
-    #[must_use]
-    pub(crate) const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    #[must_use]
-    pub(crate) fn document(&self) -> &DocumentSnapshot {
-        self.snapshot.document()
-    }
-
-    /// Undo this commit against its exact committed target snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `current` does not match this commit's target
-    /// revision, or if the recovered source bytes fail to parse.
-    pub(crate) fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
-        self.patch.undo(current)
-    }
-
-    /// Redo this commit against its exact source snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `current` does not match this commit's base
-    /// revision, or if the committed target bytes fail to parse.
-    pub(crate) fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
-        self.patch.redo(current)
-    }
-
-    #[must_use]
-    pub(crate) fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
     }
 }
 
@@ -296,67 +253,6 @@ pub(crate) struct Patch {
     after: Arc<[u8]>,
     document: DocumentPatch,
     limits: Limits,
-}
-
-#[allow(
-    dead_code,
-    reason = "the record-level owner behind the package-level Edit; its full surface stays exercised by the unit tests (record 0357)"
-)]
-impl Patch {
-    #[must_use]
-    pub(crate) const fn base(&self) -> Revision {
-        self.base
-    }
-
-    #[must_use]
-    pub(crate) const fn target(&self) -> Revision {
-        self.target
-    }
-
-    #[must_use]
-    pub(crate) fn before_bytes(&self) -> &[u8] {
-        &self.before
-    }
-
-    #[must_use]
-    pub(crate) fn after_bytes(&self) -> &[u8] {
-        &self.after
-    }
-
-    #[must_use]
-    pub(crate) const fn document(&self) -> &DocumentPatch {
-        &self.document
-    }
-
-    /// Undo this patch against its exact committed target snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `current` does not match this patch's target
-    /// revision, or if the recovered source bytes fail to parse.
-    pub(crate) fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
-        if current.revision() != self.target || current.bytes() != self.after.as_ref() {
-            return Err(Error::InvalidFormat(
-                "cannot undo review package edits against a different source".into(),
-            ));
-        }
-        Snapshot::from_bytes_with_limits(self.before.to_vec(), self.limits)
-    }
-
-    /// Redo this patch against its exact source snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `current` does not match this patch's base
-    /// revision, or if the committed target bytes fail to parse.
-    pub(crate) fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
-        if current.revision() != self.base || current.bytes() != self.before.as_ref() {
-            return Err(Error::InvalidFormat(
-                "cannot redo review package edits against a different source".into(),
-            ));
-        }
-        Snapshot::from_bytes_with_limits(self.after.to_vec(), self.limits)
-    }
 }
 
 /// Load the live document-comparison snapshot from an already opened PPT.

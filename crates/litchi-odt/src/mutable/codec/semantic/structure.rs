@@ -1,7 +1,9 @@
 //! Page sequence, declaration, and section semantic snapshot edits.
 
 use super::super::super::model::MutableDocument;
-use crate::page_sequence::{Sequence, parse_page_sequence, set_page_sequence_xml};
+#[cfg(test)]
+use crate::page_sequence::parse_page_sequence;
+use crate::page_sequence::{Sequence, set_page_sequence_xml};
 use crate::variable_declaration::{Declarations, Group, Kind, Part, Scope};
 use litchi_core::Result;
 
@@ -11,6 +13,7 @@ impl MutableDocument {
     /// The model preserves only the ordered `text:master-page-name` values of
     /// the document's `text:page-sequence` (ODF 1.3 §5.3); litchi does not
     /// paginate or resolve the referenced master pages.
+    #[cfg(test)]
     pub(crate) fn page_sequence(&self) -> Result<Option<Sequence>> {
         self.with_content_xml(parse_page_sequence)
     }
@@ -182,6 +185,7 @@ impl MutableDocument {
     }
 
     /// Return typed nested sections from current authoritative content XML.
+    #[cfg(test)]
     pub(crate) fn sections(&self) -> Result<Vec<crate::Section>> {
         self.with_content_xml(crate::parser::Parser::parse_sections)
     }

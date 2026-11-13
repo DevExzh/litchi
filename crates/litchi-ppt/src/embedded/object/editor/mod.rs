@@ -65,10 +65,6 @@ pub(crate) struct Editor {
 impl Editor {
     /// Resolve the exact live clear-text document through the current
     /// UserEdit/PersistDirectory chain without applying a mutation gate.
-    #[allow(
-        dead_code,
-        reason = "used by capability-specific package snapshot paths"
-    )]
     pub(crate) fn inspect_live_document(bytes: &[u8]) -> Result<(u32, Vec<u8>)> {
         lifecycle::inspect_live_document(bytes)
     }

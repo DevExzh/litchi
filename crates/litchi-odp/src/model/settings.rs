@@ -198,10 +198,6 @@ pub(crate) fn validate_page_references(
     Ok(())
 }
 
-#[allow(
-    dead_code,
-    reason = "used by the pending transactional authoring layer"
-)]
 pub(crate) fn settings_reference_page(settings: Option<&Settings>, page_name: &str) -> bool {
     settings.is_some_and(|value| {
         value.start_page.as_deref() == Some(page_name)

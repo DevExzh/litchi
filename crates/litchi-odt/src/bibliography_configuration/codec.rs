@@ -1,7 +1,5 @@
 //! Bounded XML codec and lossless styles.xml mutation.
 
-#![cfg_attr(test, allow(dead_code))]
-
 use super::model::{Configuration, Field, SortKey};
 use super::{
     FO, MAX_AGGREGATE_BYTES, MAX_DEPTH, MAX_SORT_KEYS, MAX_VALUE_BYTES, MAX_XML_BYTES, OFFICE,
@@ -404,11 +402,6 @@ fn event_start(xml: &str, end: usize) -> Result<usize> {
     xml[..end]
         .rfind('<')
         .ok_or_else(|| make_error("invalid bibliography XML event boundary"))
-}
-
-#[cfg(test)]
-fn locate_bibliography_configuration(xml: &str) -> Result<(Option<XmlSpan>, StylesSite)> {
-    locate_bibliography_configuration_with_xml_limits(xml, XmlStreamLimits::default())
 }
 
 fn locate_bibliography_configuration_with_xml_limits(

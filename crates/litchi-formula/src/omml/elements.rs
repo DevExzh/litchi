@@ -66,7 +66,6 @@ pub enum ElementType {
 /// Not all properties are used by all elements; each element type uses only the relevant
 /// properties for its specific purpose.
 #[derive(Debug, Clone, Default)]
-#[allow(dead_code)] // Many fields are used conditionally based on element type
 pub struct ElementProperties {
     // Style and formatting
     pub style: Option<String>,
@@ -97,17 +96,6 @@ pub struct ElementProperties {
     // Size and scaling
     pub min_size: Option<String>,
     pub max_size: Option<String>,
-
-    // Spacing and margins
-    pub left_margin: Option<String>,
-    pub right_margin: Option<String>,
-    pub top_margin: Option<String>,
-    pub bottom_margin: Option<String>,
-
-    // Operator properties
-    pub operator_form: Option<String>, // prefix, infix, postfix
-    pub operator_spacing: Option<String>,
-    pub operator_stretch: Option<String>,
 
     // Fraction properties
     pub fraction_line_thickness: Option<String>,
@@ -212,13 +200,6 @@ impl TextBuffer {
 
     pub fn as_str(&self) -> &str {
         &self.buffer
-    }
-
-    /// Convert into owned String (used for final text extraction)
-    #[inline]
-    #[allow(dead_code)]
-    pub fn into_string(self) -> String {
-        self.buffer
     }
 }
 
@@ -339,108 +320,5 @@ impl<'arena> ElementContext<'arena> {
         self.post_scripts.clear();
         self.spacing_nodes.clear();
         self.character_data = None;
-    }
-
-    /// Check if the context has any content
-    #[inline]
-    #[allow(dead_code)]
-    pub fn has_content(&self) -> bool {
-        !self.children.is_empty()
-            || !self.text.is_empty()
-            || self.base.is_some()
-            || self.numerator.is_some()
-            || self.denominator.is_some()
-            || self.subscript.is_some()
-            || self.superscript.is_some()
-            || self.degree.is_some()
-            || self.lower_limit.is_some()
-            || self.upper_limit.is_some()
-            || self.integrand.is_some()
-            || !self.matrix_rows.is_empty()
-            || !self.matrix_cells.is_empty()
-            || !self.eq_array_rows.is_empty()
-            || self.function_name.is_some()
-            || self.character_data.is_some()
-    }
-
-    /// Get the total number of child nodes across all collections
-    #[inline]
-    #[allow(dead_code)]
-    pub fn total_child_count(&self) -> usize {
-        self.children.len()
-            + self.pre_scripts.len()
-            + self.post_scripts.len()
-            + self.spacing_nodes.len()
-            + self.matrix_cells.len()
-            + self
-                .eq_array_rows
-                .iter()
-                .map(|row| row.len())
-                .sum::<usize>()
-            + self
-                .matrix_rows
-                .iter()
-                .map(|row| row.iter().map(|cell| cell.len()).sum::<usize>())
-                .sum::<usize>()
-    }
-
-    /// Reserve capacity for expected number of children
-    /// Used for performance optimization when the number of children is known in advance
-    #[inline]
-    #[allow(dead_code)]
-    pub fn reserve_children(&mut self, capacity: usize) {
-        self.children.reserve(capacity);
-    }
-
-    /// Reserve capacity for matrix rows
-    /// Used when parsing matrix structures to avoid reallocations
-    #[inline]
-    #[allow(dead_code)]
-    pub fn reserve_matrix_rows(&mut self, capacity: usize) {
-        self.matrix_rows.reserve(capacity);
-    }
-
-    /// Reserve capacity for equation array rows
-    /// Used when parsing equation arrays to avoid reallocations
-    #[inline]
-    #[allow(dead_code)]
-    pub fn reserve_eq_array_rows(&mut self, capacity: usize) {
-        self.eq_array_rows.reserve(capacity);
-    }
-
-    /// Check if this is a structural element (contains other elements)
-    #[inline]
-    #[allow(dead_code)]
-    pub fn is_structural(&self) -> bool {
-        matches!(
-            self.element_type,
-            ElementType::Math
-                | ElementType::Fraction
-                | ElementType::Radical
-                | ElementType::Superscript
-                | ElementType::Subscript
-                | ElementType::SubSup
-                | ElementType::Delimiter
-                | ElementType::Nary
-                | ElementType::Function
-                | ElementType::Matrix
-                | ElementType::Accent
-                | ElementType::Bar
-                | ElementType::Box
-                | ElementType::Phantom
-                | ElementType::GroupChar
-                | ElementType::BorderBox
-                | ElementType::EqArr
-        )
-    }
-
-    /// Check if this is a leaf element (contains only text/symbols)
-    #[inline]
-    #[allow(dead_code)]
-    pub fn is_leaf(&self) -> bool {
-        matches!(
-            self.element_type,
-            ElementType::Text | ElementType::Character | ElementType::Run
-        )
     }
 }

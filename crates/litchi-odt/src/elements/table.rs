@@ -353,14 +353,6 @@ impl TableRow {
             self.element.remove_attribute("table:number-rows-repeated");
         }
     }
-
-    /// Get access to the underlying element for advanced operations.
-    ///
-    /// This is used internally by expansion utilities and other advanced features.
-    #[allow(dead_code)] // Used by table expansion utilities
-    pub(crate) fn element(&self) -> &Element {
-        &self.element
-    }
 }
 
 impl From<TableRow> for Element {
@@ -632,14 +624,6 @@ impl TableCell {
             self.element
                 .remove_attribute("table:number-columns-repeated");
         }
-    }
-
-    /// Get access to the underlying element for advanced operations.
-    ///
-    /// This is used internally by expansion utilities and other advanced features.
-    #[allow(dead_code)] // Used by table expansion utilities
-    pub(crate) fn element(&self) -> &Element {
-        &self.element
     }
 }
 

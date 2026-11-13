@@ -9,7 +9,6 @@ use litchi_core::{Result, xml::escape_xml};
 use litchi_odf_common::package::{
     MAX_CONTENT_REPLACEMENT_BYTES, replace_content_xml, xml_splice_publication,
 };
-use std::path::Path;
 
 impl MutableDocument {
     /// Create a mutable document from an existing Document.
@@ -333,37 +332,6 @@ impl MutableDocument {
             r#"<?xml version="1.0" encoding="UTF-8"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" office:version="1.3"><office:meta><meta:generator>Litchi/0.0.1</meta:generator>{}</office:meta></office:document-meta>"#,
             meta_fields
         )
-    }
-
-    /// Save the modified document to a file.
-    ///
-    /// # Arguments
-    ///
-    /// * `path` - Path where the ODT file should be saved
-    ///
-    /// The bytes are staged in a sibling temporary file and published with
-    /// one rename, so a failed save leaves an existing destination unchanged.
-    ///
-    /// # Errors
-    ///
-    /// Returns serialization or publication failures.
-    pub(crate) fn save<P: AsRef<Path>>(
-        &self,
-        path: P,
-    ) -> std::result::Result<(), litchi_odf_common::Error> {
-        let bytes = self.to_bytes()?;
-        litchi_odf_common::publish::save_bytes(path.as_ref(), &bytes, litchi_core::Durability::Full)
-    }
-
-    /// Serialize the current state into an immutable [`crate::Package`].
-    ///
-    /// # Errors
-    ///
-    /// Returns serialization or archive-validation failures.
-    pub(crate) fn to_package(
-        &self,
-    ) -> std::result::Result<crate::Package, litchi_odf_common::Error> {
-        Ok(crate::Package::from_authored(self.to_bytes()?)?)
     }
 
     /// Publish a content-only edit against the retained package.

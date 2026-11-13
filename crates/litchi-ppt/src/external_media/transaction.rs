@@ -458,24 +458,6 @@ impl RecordCommit {
         &self.patch
     }
 
-    /// Undo this commit against its exact target snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub(crate) fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
-        self.patch.undo(current)
-    }
-
-    /// Redo this commit against its exact source snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub(crate) fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
-        self.patch.redo(current)
-    }
-
     /// Split the commit into its target and patch.
     #[must_use]
     pub(crate) fn into_parts(self) -> (Snapshot, RecordPatch) {
@@ -495,34 +477,10 @@ pub(crate) struct RecordPatch {
 }
 
 impl RecordPatch {
-    /// Source revision required for forward application.
-    #[must_use]
-    pub(crate) const fn base(&self) -> Revision {
-        self.base
-    }
-
-    /// Target revision produced by forward application.
-    #[must_use]
-    pub(crate) const fn target(&self) -> Revision {
-        self.target
-    }
-
     /// Typed operations represented by this patch.
     #[must_use]
     pub(crate) fn changes(&self) -> &[Change] {
         &self.changes
-    }
-
-    /// Exact source bytes bound to this patch.
-    #[must_use]
-    pub(crate) fn before(&self) -> &[u8] {
-        &self.before
-    }
-
-    /// Exact target bytes produced by this patch.
-    #[must_use]
-    pub(crate) fn after(&self) -> &[u8] {
-        &self.after
     }
 
     /// Whether the patch is an exact byte-for-byte no-op.

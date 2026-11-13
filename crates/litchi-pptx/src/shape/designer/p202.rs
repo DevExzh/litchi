@@ -19,6 +19,7 @@ pub(crate) struct PropertiesSource {
     pub(crate) inner_extensions: Option<Vec<u8>>,
 }
 
+#[cfg(test)]
 pub(crate) fn read_properties(xml: &[u8], limits: Limits) -> Result<PropertiesSource> {
     read_properties_with_prefix(xml, limits, None)
 }
@@ -45,6 +46,7 @@ pub(crate) fn read_properties_with_prefix(
     })
 }
 
+#[cfg(test)]
 pub(crate) fn read_tags(xml: &[u8], limits: Limits) -> Result<Tags> {
     read_tags_with_prefix(xml, limits, None)
 }

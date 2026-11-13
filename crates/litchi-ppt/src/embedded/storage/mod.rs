@@ -17,8 +17,4 @@ pub use model::{Compression, Kind, MAX_DECLARED_BYTES, MAX_STORED_BYTES, Storage
 pub use snapshot::{Metadata, Snapshot};
 
 #[cfg(any(test, feature = "vba-inspection"))]
-#[allow(
-    unused_imports,
-    reason = "re-export gated to tests and the vba-inspection feature"
-)]
 pub(crate) use model::Ref;

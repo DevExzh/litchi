@@ -10,7 +10,6 @@
 // This module documents the format, not just the subset the current reader and
 // writer happen to touch: neighbouring tags, flags and selectors are kept so the
 // tables stay readable and reviewable against the specification.
-#![allow(dead_code)]
 
 /// MTEF record tags - these identify different types of equation objects
 pub const END: u8 = 0;
@@ -81,6 +80,10 @@ pub const TAG_ATTRIBUTE_MASK: u8 = 0xF0;
 pub const TAG_ATTRIBUTE_SHIFT: u32 = 4;
 
 /// Sentinel written for both nudge bytes when the extended 16-bit form follows
+#[expect(
+    dead_code,
+    reason = "MTEF specification constant without a reader or writer use"
+)]
 pub const NUDGE_ESCAPE: u8 = 128;
 
 /// Flag marking a template variation byte as the low half of a 15-bit value
@@ -115,6 +118,10 @@ pub const OLE_CLIPBOARD_FORMAT: u16 = 0xC1C6;
 // ---------------------------------------------------------------------------
 
 /// Platform identifier for Macintosh-authored equations
+#[expect(
+    dead_code,
+    reason = "MTEF specification constant without a reader or writer use"
+)]
 pub const PLATFORM_MACINTOSH: u8 = 0;
 /// Platform identifier for Windows-authored equations
 pub const PLATFORM_WINDOWS: u8 = 1;

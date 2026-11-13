@@ -212,18 +212,6 @@ pub(crate) struct RecordPatch {
 }
 
 impl RecordPatch {
-    /// Source revision required by [`Self::apply`].
-    #[must_use]
-    pub(crate) const fn base(&self) -> Revision {
-        self.base
-    }
-
-    /// Target revision produced by [`Self::apply`].
-    #[must_use]
-    pub(crate) const fn target(&self) -> Revision {
-        self.target
-    }
-
     /// Ordered semantic edits represented by this patch.
     #[must_use]
     pub(crate) fn changes(&self) -> &[Change] {
@@ -456,12 +444,6 @@ impl RecordCommit {
     #[must_use]
     pub(crate) const fn patch(&self) -> &RecordPatch {
         &self.patch
-    }
-
-    /// Published target semantic value.
-    #[must_use]
-    pub(crate) const fn client_data(&self) -> &ClientData {
-        self.snapshot.client_data()
     }
 
     /// Split the published target and patch.

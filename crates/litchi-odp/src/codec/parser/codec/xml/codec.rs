@@ -973,7 +973,7 @@ impl Parser {
     }
 
     /// Parse drawing pages while retaining title and text-box frames as shapes.
-    #[allow(dead_code, reason = "reserved for the dedicated ODG facade")]
+    #[cfg(test)]
     pub(crate) fn parse_drawing_pages(
         xml_content: &str,
         styles_xml: Option<&str>,
@@ -993,7 +993,7 @@ impl Parser {
     /// Returns one shape list per top-level `table:table` element, in
     /// document order, retaining text-box frames as shapes. Shapes anchored
     /// inside individual table cells are not collected.
-    #[allow(dead_code, reason = "reserved for the dedicated ODS facade")]
+    #[cfg(test)]
     pub(crate) fn parse_sheet_shape_tables(xml_content: &str) -> Result<Vec<Vec<Shape>>> {
         let tables = Self::parse_pages_with_styles::<false, _>(
             xml_content.as_bytes(),

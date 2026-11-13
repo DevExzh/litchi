@@ -9,9 +9,12 @@
 
 mod codec;
 mod model;
-#[allow(
-    dead_code,
-    reason = "the record-level owner the primary Package::edit drives; its full surface stays exercised by the unit tests (record 0357)"
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "the record-level owner the primary Package::edit drives; its full surface stays exercised by the unit tests (record 0357)"
+    )
 )]
 mod transaction;
 mod validation;
@@ -21,9 +24,4 @@ mod tests;
 
 pub use codec::RECORD_TYPE;
 pub use model::{Anchor, Data, Encoding, Limits, Rect, SmallRect};
-#[allow(
-    unused_imports,
-    reason = "the record-level edit is reached by its unit tests and the slide-order root"
-)]
-pub(crate) use transaction::{Change, Commit, Patch, Transaction};
 pub use transaction::{Revision, Snapshot};

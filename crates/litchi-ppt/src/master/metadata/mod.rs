@@ -121,18 +121,10 @@ impl Snapshot {
 
 /// A transactional semantic edit of one master’s bounded metadata.
 #[derive(Debug, Clone)]
-#[allow(
-    dead_code,
-    reason = "the record-level owner behind the package-level Edit; its full surface stays exercised by the unit tests (record 0357)"
-)]
 pub(crate) struct RecordEdit {
     inner: master_layout::RecordEdit,
 }
 
-#[allow(
-    dead_code,
-    reason = "the record-level owner behind the package-level Edit; its full surface stays exercised by the unit tests (record 0357)"
-)]
 impl RecordEdit {
     /// The contextual master kind being edited.
     #[must_use]
@@ -320,18 +312,17 @@ impl RecordEdit {
 
 /// A successful semantic commit.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(
-    dead_code,
-    reason = "the record-level owner behind the package-level Edit; its full surface stays exercised by the unit tests (record 0357)"
-)]
 pub(crate) struct RecordCommit {
     snapshot: Snapshot,
     changes: master_layout::RecordPatch,
 }
 
-#[allow(
-    dead_code,
-    reason = "the record-level owner behind the package-level Edit; its full surface stays exercised by the unit tests (record 0357)"
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "the record-level owner behind the package-level Edit; its full surface stays exercised by the unit tests (record 0357)"
+    )
 )]
 impl RecordCommit {
     /// The immutable target snapshot.

@@ -6,7 +6,6 @@
 //! inert typed view of those declarations.  RDFa CURIEs and datatypes are
 //! retained as strings; they are never resolved, fetched, or evaluated.
 
-#![cfg_attr(test, allow(dead_code))]
 #![allow(
     clippy::arbitrary_source_item_ordering,
     clippy::cast_possible_truncation,
@@ -51,11 +50,6 @@ const MAX_TEXT_META_BYTES: usize = 16 * 1024 * 1024;
 // Every RDFa lexical field is independently bounded; this ceiling also
 // bounds repeated property tokens before any prefix index is built.
 const MAX_RDFA_CURIE_TOKENS: usize = MAX_TEXT_META_BYTES * 3;
-
-#[cfg(test)]
-fn xml_limits() -> Result<XmlStreamLimits> {
-    xml_limits_with_policy(XmlStreamLimits::default())
-}
 
 fn xml_limits_with_policy(policy: XmlStreamLimits) -> Result<XmlStreamLimits> {
     XmlStreamLimits::new(
@@ -378,7 +372,7 @@ impl TextMeta {
         self.content.validate()
     }
 
-    #[allow(dead_code)]
+    #[cfg(test)]
     fn to_xml_with_context_with_limit(
         &self,
         namespace_declarations: &[String],
@@ -479,14 +473,6 @@ pub(crate) fn parse_parts_with_xml_limits(
         .map(|(metadata, _)| metadata)
 }
 
-#[cfg(test)]
-fn parse_parts_with_optional_budget(
-    parts: &[(&str, MetadataPart)],
-    budget: Option<&FlatMutationBudget>,
-) -> Result<(ContentMetadata, Option<MemoryLease>)> {
-    parse_parts_with_optional_budget_and_limits(parts, budget, XmlStreamLimits::default())
-}
-
 fn parse_parts_with_optional_budget_and_limits(
     parts: &[(&str, MetadataPart)],
     budget: Option<&FlatMutationBudget>,
@@ -517,15 +503,6 @@ fn parse_parts_with_optional_budget_and_limits(
     Ok((output, memory))
 }
 
-/// Parse in-content metadata while charging parser and projection ownership.
-#[cfg(test)]
-pub(crate) fn parse_parts_with_budget(
-    parts: &[(&str, MetadataPart)],
-    budget: &FlatMutationBudget,
-) -> Result<(ContentMetadata, MemoryLease)> {
-    parse_parts_with_budget_and_limits(parts, budget, XmlStreamLimits::default())
-}
-
 pub(crate) fn parse_parts_with_budget_and_limits(
     parts: &[(&str, MetadataPart)],
     budget: &FlatMutationBudget,
@@ -545,6 +522,7 @@ pub(crate) fn parse_part(xml: &str, part: MetadataPart) -> Result<ContentMetadat
 }
 
 /// Parse one XML part under the raw XML policy retained by an opened owner.
+#[cfg(test)]
 pub(crate) fn parse_part_with_xml_limits(
     xml: &str,
     part: MetadataPart,
@@ -2544,24 +2522,6 @@ pub(crate) fn set_paragraph_rdfa_with_limit(
     )
 }
 
-#[cfg(test)]
-pub(crate) fn set_paragraph_rdfa_with_limit_and_budget(
-    xml: &str,
-    position: Position,
-    value: &RdfaAttributes,
-    maximum: usize,
-    budget: Option<&FlatMutationBudget>,
-) -> Result<ChargedXml> {
-    set_paragraph_rdfa_with_limit_and_budget_and_xml_limits(
-        xml,
-        position,
-        value,
-        maximum,
-        budget,
-        XmlStreamLimits::default(),
-    )
-}
-
 pub(crate) fn set_paragraph_rdfa_with_limit_and_xml_limits(
     xml: &str,
     position: Position,
@@ -2608,12 +2568,6 @@ pub(crate) fn set_paragraph_rdfa_with_limit_and_budget_and_xml_limits(
     rewrite_rdfa_with_limit_and_budget(xml, span, value, maximum, budget, xml_limits)
 }
 
-/// Set RDFa on a uniquely named bookmark start.
-#[cfg(test)]
-pub(crate) fn set_bookmark_rdfa(xml: &str, name: &str, value: &RdfaAttributes) -> Result<String> {
-    set_bookmark_rdfa_with_xml_limits(xml, name, value, XmlStreamLimits::default())
-}
-
 pub(crate) fn set_bookmark_rdfa_with_xml_limits(
     xml: &str,
     name: &str,
@@ -2621,41 +2575,6 @@ pub(crate) fn set_bookmark_rdfa_with_xml_limits(
     xml_limits: XmlStreamLimits,
 ) -> Result<String> {
     set_bookmark_rdfa_with_limit_and_xml_limits(xml, name, value, MAX_XML_BYTES, xml_limits)
-}
-
-/// Set RDFa on a uniquely named bookmark start while charging the exact output.
-#[cfg(test)]
-pub(crate) fn set_bookmark_rdfa_with_limit(
-    xml: &str,
-    name: &str,
-    value: &RdfaAttributes,
-    maximum: usize,
-) -> Result<String> {
-    set_bookmark_rdfa_with_limit_and_xml_limits(
-        xml,
-        name,
-        value,
-        maximum,
-        XmlStreamLimits::default(),
-    )
-}
-
-#[cfg(test)]
-pub(crate) fn set_bookmark_rdfa_with_limit_and_budget(
-    xml: &str,
-    name: &str,
-    value: &RdfaAttributes,
-    maximum: usize,
-    budget: Option<&FlatMutationBudget>,
-) -> Result<ChargedXml> {
-    set_bookmark_rdfa_with_limit_and_budget_and_xml_limits(
-        xml,
-        name,
-        value,
-        maximum,
-        budget,
-        XmlStreamLimits::default(),
-    )
 }
 
 pub(crate) fn set_bookmark_rdfa_with_limit_and_xml_limits(
@@ -2728,41 +2647,6 @@ pub(crate) fn set_text_meta_rdfa_with_xml_limits(
     xml_limits: XmlStreamLimits,
 ) -> Result<String> {
     set_text_meta_rdfa_with_limit_and_xml_limits(xml, position, value, MAX_XML_BYTES, xml_limits)
-}
-
-/// Set RDFa on one inline `text:meta` while charging the exact output.
-#[cfg(test)]
-pub(crate) fn set_text_meta_rdfa_with_limit(
-    xml: &str,
-    position: Position,
-    value: &RdfaAttributes,
-    maximum: usize,
-) -> Result<String> {
-    set_text_meta_rdfa_with_limit_and_xml_limits(
-        xml,
-        position,
-        value,
-        maximum,
-        XmlStreamLimits::default(),
-    )
-}
-
-#[cfg(test)]
-pub(crate) fn set_text_meta_rdfa_with_limit_and_budget(
-    xml: &str,
-    position: Position,
-    value: &RdfaAttributes,
-    maximum: usize,
-    budget: Option<&FlatMutationBudget>,
-) -> Result<ChargedXml> {
-    set_text_meta_rdfa_with_limit_and_budget_and_xml_limits(
-        xml,
-        position,
-        value,
-        maximum,
-        budget,
-        XmlStreamLimits::default(),
-    )
 }
 
 pub(crate) fn set_text_meta_rdfa_with_limit_and_xml_limits(
@@ -2840,24 +2724,6 @@ pub(crate) fn insert_text_meta_with_limit(
         paragraph,
         value,
         maximum,
-        XmlStreamLimits::default(),
-    )
-}
-
-#[cfg(test)]
-pub(crate) fn insert_text_meta_with_limit_and_budget(
-    xml: &str,
-    paragraph: Position,
-    value: &TextMeta,
-    maximum: usize,
-    budget: Option<&FlatMutationBudget>,
-) -> Result<ChargedXml> {
-    insert_text_meta_with_limit_and_budget_and_xml_limits(
-        xml,
-        paragraph,
-        value,
-        maximum,
-        budget,
         XmlStreamLimits::default(),
     )
 }
@@ -2969,41 +2835,6 @@ pub(crate) fn replace_text_meta_with_xml_limits(
     replace_text_meta_with_limit_and_xml_limits(xml, position, value, MAX_XML_BYTES, xml_limits)
 }
 
-/// Replace one inline `text:meta` while charging every constructed fragment and output.
-#[cfg(test)]
-pub(crate) fn replace_text_meta_with_limit(
-    xml: &str,
-    position: Position,
-    value: &TextMeta,
-    maximum: usize,
-) -> Result<String> {
-    replace_text_meta_with_limit_and_xml_limits(
-        xml,
-        position,
-        value,
-        maximum,
-        XmlStreamLimits::default(),
-    )
-}
-
-#[cfg(test)]
-pub(crate) fn replace_text_meta_with_limit_and_budget(
-    xml: &str,
-    position: Position,
-    value: &TextMeta,
-    maximum: usize,
-    budget: Option<&FlatMutationBudget>,
-) -> Result<ChargedXml> {
-    replace_text_meta_with_limit_and_budget_and_xml_limits(
-        xml,
-        position,
-        value,
-        maximum,
-        budget,
-        XmlStreamLimits::default(),
-    )
-}
-
 pub(crate) fn replace_text_meta_with_limit_and_xml_limits(
     xml: &str,
     position: Position,
@@ -3108,32 +2939,6 @@ pub(crate) fn remove_text_meta_with_xml_limits(
     xml_limits: XmlStreamLimits,
 ) -> Result<String> {
     remove_text_meta_with_limit_and_xml_limits(xml, position, MAX_XML_BYTES, xml_limits)
-}
-
-/// Remove one inline `text:meta` while charging the exact shortened output.
-#[cfg(test)]
-pub(crate) fn remove_text_meta_with_limit(
-    xml: &str,
-    position: Position,
-    maximum: usize,
-) -> Result<String> {
-    remove_text_meta_with_limit_and_xml_limits(xml, position, maximum, XmlStreamLimits::default())
-}
-
-#[cfg(test)]
-pub(crate) fn remove_text_meta_with_limit_and_budget(
-    xml: &str,
-    position: Position,
-    maximum: usize,
-    budget: Option<&FlatMutationBudget>,
-) -> Result<ChargedXml> {
-    remove_text_meta_with_limit_and_budget_and_xml_limits(
-        xml,
-        position,
-        maximum,
-        budget,
-        XmlStreamLimits::default(),
-    )
 }
 
 pub(crate) fn remove_text_meta_with_limit_and_xml_limits(
@@ -4263,7 +4068,6 @@ fn add_size(total: &mut usize, amount: usize) -> Result<()> {
 
 // Keep the import visible to rustc when this module is compiled with a
 // feature set that does not use the qualified-name helper directly.
-#[allow(dead_code)]
 fn _qualified_name(_: QName<'_>) {}
 
 #[cfg(test)]

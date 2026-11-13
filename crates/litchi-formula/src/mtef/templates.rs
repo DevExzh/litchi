@@ -6,7 +6,7 @@
 //!
 //! Based on rtf2latex2e Profile_TEMPLATES_5 template system.
 
-use crate::ast::{Fence, LargeOperator, MathNode, Operator};
+use crate::ast::{Fence, LargeOperator, MathNode};
 use crate::mtef::{LimitKind, Limits, MtefError};
 use smallvec::SmallVec;
 
@@ -958,21 +958,6 @@ impl TemplateParser {
         }
     }
 
-    /// Parse a slash template (inline fraction)
-    ///
-    /// Public API for potential external use or future MTEF features
-    #[allow(dead_code)] // Part of public template parsing API
-    pub fn parse_slash<'a>(
-        numerator: Vec<MathNode<'a>>,
-        denominator: Vec<MathNode<'a>>,
-    ) -> MathNode<'a> {
-        MathNode::Row(vec![
-            MathNode::Row(numerator),
-            MathNode::Operator(Operator::Divide),
-            MathNode::Row(denominator),
-        ])
-    }
-
     /// Parse a root template
     pub fn parse_root<'a>(
         base: Vec<MathNode<'a>>,
@@ -1013,47 +998,6 @@ impl TemplateParser {
         }
     }
 
-    /// Parse an underscript template
-    ///
-    /// Public API for potential external use or future MTEF features
-    #[allow(dead_code)] // Part of public template parsing API
-    pub fn parse_below<'a>(base: Vec<MathNode<'a>>, script: Vec<MathNode<'a>>) -> MathNode<'a> {
-        MathNode::Under {
-            base,
-            under: script,
-            position: None,
-        }
-    }
-
-    /// Parse an overscript template
-    ///
-    /// Public API for potential external use or future MTEF features
-    #[allow(dead_code)] // Part of public template parsing API
-    pub fn parse_above<'a>(base: Vec<MathNode<'a>>, script: Vec<MathNode<'a>>) -> MathNode<'a> {
-        MathNode::Over {
-            base,
-            over: script,
-            position: None,
-        }
-    }
-
-    /// Parse an underscript-overscript template
-    ///
-    /// Public API for potential external use or future MTEF features
-    #[allow(dead_code)] // Part of public template parsing API
-    pub fn parse_below_above<'a>(
-        base: Vec<MathNode<'a>>,
-        below: Vec<MathNode<'a>>,
-        above: Vec<MathNode<'a>>,
-    ) -> MathNode<'a> {
-        MathNode::UnderOver {
-            base,
-            under: below,
-            over: above,
-            position: None,
-        }
-    }
-
     /// Parse a large operator template
     pub fn parse_large_op<'a>(
         operator: LargeOperator,
@@ -1090,45 +1034,6 @@ impl TemplateParser {
             content,
             close: fence,
             separator: None,
-        }
-    }
-
-    /// Get large operator from template selector
-    ///
-    /// Maps MTEF template selectors to corresponding large operator types.
-    /// Some selectors may map to the same operator type (e.g., multiple integral variants).
-    ///
-    /// Public API for template system, may be used by custom template handlers
-    #[allow(dead_code)] // Part of public template mapping API
-    pub fn large_op_from_selector(selector: u8) -> Option<LargeOperator> {
-        match selector {
-            15 => Some(LargeOperator::Integral), // TMPL_INTOP: integrals (single, double, triple, contour)
-            16 => Some(LargeOperator::Sum),      // TMPL_SUM: summation
-            17 => Some(LargeOperator::Product),  // TMPL_PROD: product
-            18 => Some(LargeOperator::Coproduct), // TMPL_COPROD: coproduct
-            19 => Some(LargeOperator::Union),    // TMPL_UNION: union
-            20 => Some(LargeOperator::Intersection), // TMPL_INTER: intersection
-            21 => Some(LargeOperator::Integral), // TMPL_IINTOP: single integral with limits
-            22 => Some(LargeOperator::Sum),      // TMPL_IIINTOP: single sum with limits
-            23 => Some(LargeOperator::Integral), // TMPL_OINTOP: contour integral / limit template
-            _ => None,
-        }
-    }
-
-    /// Get fence from template selector
-    ///
-    /// Maps MTEF template selectors to corresponding fence types.
-    ///
-    /// Public API for template system, may be used by custom template handlers
-    #[allow(dead_code)] // Part of public template mapping API
-    pub fn fence_from_selector(selector: u8) -> Option<Fence> {
-        match selector {
-            1 => Some(Fence::Paren),      // TMPL_PAREN: parentheses
-            3 => Some(Fence::Bracket),    // TMPL_BRACKET: square brackets
-            2 => Some(Fence::Brace),      // TMPL_BRACE: curly braces
-            4 => Some(Fence::Pipe),       // TMPL_BAR: vertical bars
-            5 => Some(Fence::DoublePipe), // TMPL_DBAR: double vertical bars
-            _ => None,
         }
     }
 }

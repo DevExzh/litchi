@@ -16,7 +16,6 @@ pub struct Document {
 }
 
 /// The parsed parts shared by every clone of one [`Document`].
-#[allow(dead_code)]
 pub(crate) struct State {
     /// ZIP package containing all document files.
     pub(crate) package: OwnedPackage,

@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use crate::package::{Error, Result};
 
-use super::{Anchor, Data, Limits};
+use super::{Anchor, Limits};
 
 /// Deterministic identity of an exact serialized anchor record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -128,16 +128,6 @@ pub(crate) struct Patch {
 
 impl Patch {
     #[must_use]
-    pub(crate) const fn base(&self) -> Revision {
-        self.base
-    }
-
-    #[must_use]
-    pub(crate) const fn target(&self) -> Revision {
-        self.target
-    }
-
-    #[must_use]
     pub(crate) const fn change(&self) -> Option<Change> {
         self.change
     }
@@ -187,21 +177,12 @@ pub(crate) struct Transaction {
 
 impl Transaction {
     #[must_use]
-    pub(crate) const fn anchor(&self) -> Anchor {
-        self.candidate
-    }
-
-    #[must_use]
     pub(crate) fn is_changed(&self) -> bool {
         self.candidate != self.source.anchor
     }
 
     pub(crate) fn set(&mut self, anchor: Anchor) {
         self.candidate = anchor;
-    }
-
-    pub(crate) fn set_data(&mut self, data: Data) {
-        self.set(Anchor::new(data));
     }
 
     /// Replace the candidate with compact `SmallRectStruct` coordinates.
@@ -222,19 +203,6 @@ impl Transaction {
     pub(crate) fn set_full(&mut self, left: i32, top: i32, right: i32, bottom: i32) -> Result<()> {
         self.set(Anchor::full(left, top, right, bottom)?);
         Ok(())
-    }
-
-    /// Materialize the candidate anchor as an immutable snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the serialized candidate fails to re-parse under the
-    /// source snapshot limits.
-    pub(crate) fn snapshot(&self) -> Result<Snapshot> {
-        if !self.is_changed() {
-            return Ok(self.source.clone());
-        }
-        Snapshot::parse_with_limits(self.candidate.to_bytes(), self.source.limits)
     }
 
     /// Publish the candidate as an immutable snapshot plus its reversible patch.

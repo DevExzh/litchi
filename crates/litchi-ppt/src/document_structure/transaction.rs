@@ -32,20 +32,6 @@ impl Revision {
     }
 }
 
-/// Kind of semantic operation staged by a document-structure transaction.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) enum ChangeKind {
-    SlidesReordered,
-    SlideNonOutlineDataChanged,
-    SlideInserted,
-    SlideRemoved,
-    MastersReordered,
-    CustomTableStylesMoved,
-    CustomTableStylesInserted,
-    CustomTableStylesRemoved,
-    CustomTableStylesReplaced,
-}
-
 /// One reversible semantic operation over the document's structural lists.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Change {
@@ -87,22 +73,6 @@ pub(crate) enum Change {
 }
 
 impl Change {
-    /// Semantic category of this operation.
-    #[must_use]
-    pub(crate) const fn kind(&self) -> ChangeKind {
-        match self {
-            Self::SlidesReordered { .. } => ChangeKind::SlidesReordered,
-            Self::SlideNonOutlineDataChanged { .. } => ChangeKind::SlideNonOutlineDataChanged,
-            Self::SlideInserted { .. } => ChangeKind::SlideInserted,
-            Self::SlideRemoved { .. } => ChangeKind::SlideRemoved,
-            Self::MastersReordered { .. } => ChangeKind::MastersReordered,
-            Self::CustomTableStylesMoved { .. } => ChangeKind::CustomTableStylesMoved,
-            Self::CustomTableStylesInserted { .. } => ChangeKind::CustomTableStylesInserted,
-            Self::CustomTableStylesRemoved { .. } => ChangeKind::CustomTableStylesRemoved,
-            Self::CustomTableStylesReplaced { .. } => ChangeKind::CustomTableStylesReplaced,
-        }
-    }
-
     fn inverse(&self) -> Self {
         match self {
             Self::SlidesReordered { before, after } => Self::SlidesReordered {
@@ -325,12 +295,6 @@ pub(crate) struct Transaction {
 }
 
 impl Transaction {
-    /// Immutable source snapshot used for optimistic conflict checks.
-    #[must_use]
-    pub(crate) const fn source(&self) -> &Snapshot {
-        &self.source
-    }
-
     /// Current transaction-local record tree.
     #[must_use]
     pub(crate) const fn record(&self) -> &Record {
@@ -589,22 +553,6 @@ impl Transaction {
         self.reorder_masters(&order)
     }
 
-    /// Move a master selected by its semantic `masterId`.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub(crate) fn move_master_id(&mut self, master_id: u32, destination: usize) -> Result<()> {
-        let index = self
-            .masters()?
-            .iter()
-            .position(|master| master.master_id() == master_id)
-            .ok_or_else(|| {
-                Error::InvalidFormat(format!("master ID {master_id:#010x} was not found"))
-            })?;
-        self.move_master(index, destination)
-    }
-
     /// Reorder all master groups using a checked permutation of current positions.
     ///
     /// # Errors
@@ -747,6 +695,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
+    #[cfg(feature = "performance-diagnostics")]
     pub(crate) fn snapshot(&self) -> Result<Snapshot> {
         let bytes = self.encoded_candidate()?;
         if bytes.as_slice() == self.source.bytes.as_ref() {
@@ -883,30 +832,6 @@ impl Commit {
     pub(crate) const fn patch(&self) -> &Patch {
         &self.patch
     }
-
-    /// Undo this commit against its exact target snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub(crate) fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
-        self.patch.undo(current)
-    }
-
-    /// Redo this commit against its exact source snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub(crate) fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
-        self.patch.redo(current)
-    }
-
-    /// Split the published target and patch.
-    #[must_use]
-    pub(crate) fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
 }
 
 /// A reversible patch bound to the exact source bytes that produced it.
@@ -921,46 +846,10 @@ pub(crate) struct Patch {
 }
 
 impl Patch {
-    /// Source revision required for forward application.
-    #[must_use]
-    pub(crate) const fn base(&self) -> Revision {
-        self.base
-    }
-
-    /// Target revision produced by forward application.
-    #[must_use]
-    pub(crate) const fn target(&self) -> Revision {
-        self.target
-    }
-
     /// Semantic operations represented by this patch.
     #[must_use]
     pub(crate) fn changes(&self) -> &[Change] {
         &self.changes
-    }
-
-    /// Exact source bytes bound to this patch.
-    #[must_use]
-    pub(crate) fn before(&self) -> &[u8] {
-        &self.before
-    }
-
-    /// Exact target bytes bound to this patch.
-    #[must_use]
-    pub(crate) fn after(&self) -> &[u8] {
-        &self.after
-    }
-
-    /// Compatibility-free explicit aliases for byte-oriented callers.
-    #[must_use]
-    pub(crate) fn before_bytes(&self) -> &[u8] {
-        self.before()
-    }
-
-    /// Exact target bytes bound to this patch.
-    #[must_use]
-    pub(crate) fn after_bytes(&self) -> &[u8] {
-        self.after()
     }
 
     /// Whether this patch is an exact byte-for-byte no-op.
@@ -984,24 +873,6 @@ impl Patch {
             return Ok(current.clone());
         }
         Snapshot::parse_with_limits(self.after.as_ref(), self.limits)
-    }
-
-    /// Apply the inverse to the exact committed target.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub(crate) fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
-        self.inverse().apply(current)
-    }
-
-    /// Reapply this patch to its exact source.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub(crate) fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
-        self.apply(current)
     }
 
     /// Build a source-checked inverse patch.

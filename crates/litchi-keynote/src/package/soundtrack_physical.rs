@@ -12,19 +12,13 @@
 //! decode or re-encode an entire package and they never treat the physical
 //! archive index as a substitute for a validated field-level ownership proof.
 
-#![allow(
-    dead_code,
-    reason = "Shared soundtrack primitives are consumed by the order, settings, and item adapters as they migrate to this seam."
-)]
-
 use std::{
     collections::{HashMap, HashSet},
     fmt,
-    ops::Range,
     path::{Component as PathComponent, Path},
 };
 
-use litchi_iwa_archive::{Limits, SourceCatalog};
+use litchi_iwa_archive::SourceCatalog;
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes,
     varint::encoded_len,
@@ -51,18 +45,13 @@ pub(crate) const METADATA_COMPONENT: &str = "Index/Metadata.iwa";
 const LENGTH_DELIMITED_WIRE_TYPE: u8 = 2;
 const DATA_METADATA_MAP_MESSAGE_TYPE: u32 = 11_015;
 
-/// Mutable ZIP-local-header bytes permitted when a selected member is
-/// reassembled.
-pub(crate) const ZIP_LOCAL_CRC_AND_SIZES: Range<usize> = 14..26;
-/// Mutable ZIP-central-directory bytes permitted when a selected member is
-/// reassembled.
-pub(crate) const ZIP_CENTRAL_CRC_AND_SIZES: Range<usize> = 16..28;
-/// Mutable ZIP-central-directory relative local-header offset.
-pub(crate) const ZIP_CENTRAL_LOCAL_OFFSET: Range<usize> = 42..46;
-
 /// Resource category charged by a shared physical soundtrack transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
+#[expect(
+    dead_code,
+    reason = "the soundtrack adapters map every limit kind; the shared primitives do not charge all of them"
+)]
 pub(crate) enum LimitKind {
     /// Input wire or package bytes.
     InputBytes,
@@ -109,6 +98,10 @@ impl fmt::Display for LimitKind {
 /// Content-free failure returned by shared physical validation.
 #[derive(Debug, ThisError)]
 #[non_exhaustive]
+#[expect(
+    dead_code,
+    reason = "`SoundtrackNotFound` is mapped by the soundtrack adapters but not constructed here"
+)]
 pub(crate) enum Error {
     /// The package was produced from a semantic component snapshot and has no
     /// exact ZIP source that can be physically edited.
@@ -191,6 +184,7 @@ impl Budget {
     }
 
     /// Construct a test/adaptor budget from explicit ceilings.
+    #[cfg(test)]
     pub(crate) const fn from_limits(
         max_fields: usize,
         max_work: usize,
@@ -211,24 +205,21 @@ impl Budget {
     }
 
     /// Number of fields already charged.
+    #[cfg(test)]
     #[must_use]
     pub(crate) const fn fields(self) -> usize {
         self.fields
     }
 
     /// Aggregate work already charged.
+    #[cfg(test)]
     #[must_use]
     pub(crate) const fn work(self) -> usize {
         self.work
     }
 
-    /// Number of references already charged.
-    #[must_use]
-    pub(crate) const fn references(self) -> usize {
-        self.references
-    }
-
     /// Number of soundtrack items already charged.
+    #[cfg(test)]
     #[must_use]
     pub(crate) const fn items(self) -> usize {
         self.items
@@ -244,12 +235,6 @@ impl Budget {
     #[must_use]
     pub(crate) const fn remaining_work(self) -> usize {
         self.max_work.saturating_sub(self.work)
-    }
-
-    /// Remaining reference allowance.
-    #[must_use]
-    pub(crate) const fn remaining_references(self) -> usize {
-        self.max_references.saturating_sub(self.references)
     }
 
     /// Charge parsed fields before retaining their span view.
@@ -292,19 +277,6 @@ impl Budget {
         }
         Ok(())
     }
-
-    /// Charge a common preflight report after the caller has admitted its
-    /// shape and before retaining the corresponding `WireView`.
-    pub(crate) fn merge_preflight(&mut self, report: WirePreflight) -> Result<(), Error> {
-        self.charge_fields(report.fields())?;
-        self.charge_work(report.scanned_bytes())?;
-        self.require_depth(
-            report
-                .max_depth()
-                .checked_add(1)
-                .ok_or(Error::InvalidSource)?,
-        )
-    }
 }
 
 fn checked_charge(
@@ -345,6 +317,10 @@ impl ReferenceFacts {
 /// One selected root → show → soundtrack graph with all payload slices tied
 /// to the same immutable package source.
 #[derive(Debug)]
+#[expect(
+    dead_code,
+    reason = "the selection records the whole root, show and soundtrack path; adapters read a subset"
+)]
 pub(crate) struct Selection<'a> {
     /// Normalized component containing the document root object.
     pub(crate) root_component: &'a str,
@@ -799,17 +775,6 @@ pub(crate) fn validate_selected_metadata(
         return Err(Error::InvalidSource);
     }
     Ok(())
-}
-
-/// Prove that one selected object-reference field is the sole owner of its
-/// aggregate identifier and that no second field-local edge aliases it.
-pub(crate) fn validate_object_reference_metadata(
-    object: &ArchiveObject,
-    index: usize,
-    identifier: u64,
-    path: u32,
-) -> Result<(), Error> {
-    validate_object_reference_metadata_with_policy(object, index, identifier, path, true)
 }
 
 fn validate_unmodified_object_reference_metadata(
@@ -1491,132 +1456,6 @@ fn charge_message_info(
     Ok(())
 }
 
-/// Charge the parsed archive-info topology before a rewriter retains any
-/// additional candidate state. This walks metadata only; payload bytes remain
-/// owned by the source catalog and are charged by the operation that decodes
-/// them.
-pub(crate) fn charge_catalog_structure(
-    catalog: &SourceCatalog,
-    budget: &mut Budget,
-) -> Result<(), Error> {
-    for component in catalog.components().iter() {
-        let archive = component.archive();
-        budget.charge_work(archive.objects.len())?;
-        for object in &archive.objects {
-            budget.charge_work(
-                object
-                    .messages
-                    .len()
-                    .checked_add(object.archive_info.message_infos.len())
-                    .ok_or(Error::InvalidSource)?,
-            )?;
-            for info in &object.archive_info.message_infos {
-                let references = info
-                    .object_references
-                    .len()
-                    .checked_add(info.data_references.len())
-                    .ok_or(Error::InvalidSource)?;
-                budget.charge_references(references)?;
-                budget.charge_fields(info.field_infos.len())?;
-                budget.charge_work(
-                    info.versions
-                        .len()
-                        .checked_add(info.diff_merge_version.len())
-                        .and_then(|amount| amount.checked_add(info.diff_read_version.len()))
-                        .and_then(|amount| amount.checked_add(references))
-                        .and_then(|amount| {
-                            amount.checked_add(
-                                info.diff_field_path
-                                    .as_ref()
-                                    .map_or(0, |path| path.path.len()),
-                            )
-                        })
-                        .and_then(|amount| amount.checked_add(info.fields_to_remove.len()))
-                        .ok_or(Error::InvalidSource)?,
-                )?;
-                for field in &info.field_infos {
-                    let field_references = field
-                        .object_references
-                        .len()
-                        .checked_add(field.data_references.len())
-                        .ok_or(Error::InvalidSource)?;
-                    budget.charge_references(field_references)?;
-                    budget.charge_work(
-                        1usize
-                            .checked_add(field.path.path.len())
-                            .and_then(|amount| amount.checked_add(field.known_field_version.len()))
-                            .and_then(|amount| amount.checked_add(field_references))
-                            .and_then(|amount| {
-                                amount.checked_add(
-                                    field
-                                        .known_field_feature_identifier
-                                        .as_ref()
-                                        .map_or(0, String::len),
-                                )
-                            })
-                            .ok_or(Error::InvalidSource)?,
-                    )?;
-                }
-            }
-        }
-    }
-    Ok(())
-}
-
-/// Charge the bounded logical/IWA reopen work for a candidate package. The
-/// optional replacement tuple is `(member name, logical bytes, decoded IWA
-/// bytes)` and lets a rewriter charge its changed member without reopening it
-/// twice just to estimate cost.
-pub(crate) fn charge_catalog_reopen_cost(
-    catalog: &SourceCatalog,
-    raw_package_bytes: usize,
-    replacement: Option<(&str, usize, usize)>,
-    budget: &mut Budget,
-) -> Result<(), Error> {
-    let mut logical_bytes = 0usize;
-    for entry in catalog.package().iter() {
-        let bytes = replacement
-            .filter(|(name, _, _)| *name == entry.name())
-            .map_or(entry.data().len(), |(_, logical, _)| logical);
-        logical_bytes = logical_bytes
-            .checked_add(bytes)
-            .ok_or(Error::InvalidSource)?;
-    }
-    let mut iwa_bytes = 0usize;
-    for component in catalog.components().iter() {
-        let bytes = replacement
-            .filter(|(name, _, _)| *name == component.name())
-            .map_or_else(
-                || archive_stream_extent(component.archive()),
-                |(_, _, decoded)| decoded,
-            );
-        iwa_bytes = iwa_bytes.checked_add(bytes).ok_or(Error::InvalidSource)?;
-    }
-    budget.charge_work(
-        raw_package_bytes
-            .checked_add(logical_bytes.checked_mul(2).ok_or(Error::InvalidSource)?)
-            .and_then(|amount| amount.checked_add(iwa_bytes.checked_mul(2)?))
-            .ok_or(Error::InvalidSource)?,
-    )?;
-    charge_catalog_structure(catalog, budget)
-}
-
-fn archive_stream_extent(archive: &litchi_iwa_core::Archive) -> usize {
-    archive
-        .objects
-        .iter()
-        .filter_map(|object| {
-            let payload = object.messages.iter().try_fold(0usize, |amount, message| {
-                amount.checked_add(message.data.len())
-            })?;
-            usize::try_from(object.data_offset)
-                .ok()?
-                .checked_add(payload)
-        })
-        .max()
-        .unwrap_or(0)
-}
-
 /// Borrow one raw protobuf field while requiring canonical key, length, and
 /// scalar varint framing. The parser has no allocation and keeps all payloads
 /// tied to the supplied source slice.
@@ -1713,22 +1552,6 @@ pub(crate) fn remaining_wire_limits(
         .map_err(map_wire_error)
 }
 
-/// Check a length-preserving or bounded wire replacement before allocating
-/// its output buffer.
-pub(crate) fn check_wire_output_bound(
-    output_bytes: usize,
-    limits: WireLimits,
-) -> Result<(), Error> {
-    if output_bytes > limits.max_output_bytes() {
-        return Err(Error::LimitExceeded {
-            kind: LimitKind::OutputBytes,
-            observed: output_bytes as u64,
-            maximum: limits.max_output_bytes() as u64,
-        });
-    }
-    Ok(())
-}
-
 fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
     match error {
         litchi_iwa_common::Error::LimitExceeded {
@@ -1755,393 +1578,6 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
     }
 }
 
-/// Checked upper bound for ZIP reassembly before a replacement buffer is
-/// allocated. The replacement member may be re-encoded by the archive layer,
-/// so its logical length is doubled with a fixed metadata allowance.
-pub(crate) fn archive_output_upper_bound(
-    source_bytes: usize,
-    replacement_bytes: usize,
-) -> Result<usize, Error> {
-    let replacement_bound = replacement_bytes
-        .checked_mul(2)
-        .and_then(|amount| amount.checked_add(1_024))
-        .ok_or(Error::InvalidSource)?;
-    source_bytes
-        .checked_add(replacement_bound)
-        .ok_or(Error::InvalidSource)
-}
-
-/// Check a ZIP reassembly upper bound against the physical package profile.
-pub(crate) fn check_archive_output_bound(output_bound: usize, limits: Limits) -> Result<(), Error> {
-    let observed = u64::try_from(output_bound).map_err(|_| Error::InvalidSource)?;
-    if observed > limits.max_input_bytes() {
-        return Err(Error::LimitExceeded {
-            kind: LimitKind::OutputBytes,
-            observed,
-            maximum: limits.max_input_bytes(),
-        });
-    }
-    Ok(())
-}
-
-/// Perform the conservative package-output preflight used before decompression
-/// or archive/reassembly allocations.
-pub(crate) fn preflight_rewrite_output(catalog: &SourceCatalog) -> Result<(), Error> {
-    let limits = catalog.limits();
-    let replacement_bound = limits
-        .max_iwa_stream_bytes()
-        .checked_add(32)
-        .ok_or(Error::InvalidSource)?;
-    let output_bound =
-        archive_output_upper_bound(catalog.shared_source().len(), replacement_bound)?;
-    check_archive_output_bound(output_bound, limits)
-}
-
-/// Charge the same upper bound used by [`preflight_rewrite_output`].
-pub(crate) fn charge_output_upper_bound(
-    source_bytes: usize,
-    replacement_bytes: usize,
-    limits: Limits,
-    budget: &mut Budget,
-) -> Result<usize, Error> {
-    let output_bound = archive_output_upper_bound(source_bytes, replacement_bytes)?;
-    check_archive_output_bound(output_bound, limits)?;
-    budget.charge_work(output_bound)?;
-    Ok(output_bound)
-}
-
-/// ZIP fields derived from a decoded entry's current logical payload.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct ZipEntryFields {
-    /// CRC-32 of the logical entry bytes.
-    pub(crate) crc32: u32,
-    /// Compressed member length in the raw record.
-    pub(crate) compressed_size: u32,
-    /// Logical member length.
-    pub(crate) uncompressed_size: u32,
-}
-
-/// Derive the expected ZIP CRC and size triple for one entry.
-pub(crate) fn zip_entry_fields(
-    entry: &litchi_iwa_archive::package::Entry,
-) -> Option<ZipEntryFields> {
-    Some(ZipEntryFields {
-        crc32: zip_crc32(entry.data()),
-        compressed_size: u32::try_from(entry.raw_record().compressed_data().len()).ok()?,
-        uncompressed_size: u32::try_from(entry.data().len()).ok()?,
-    })
-}
-
-/// Verify a retained central-directory record changed only in its relative
-/// local-header offset and that the offset moved by the expected checked
-/// delta.
-pub(crate) fn central_record_preserved_except_offset(
-    before: &[u8],
-    after: &[u8],
-    expected_offset_delta: i128,
-) -> bool {
-    before.len() >= 46
-        && before.len() == after.len()
-        && is_central_record(before)
-        && is_central_record(after)
-        && bytes_equal_outside_ranges(before, after, ZIP_CENTRAL_LOCAL_OFFSET, None)
-        && central_offset_delta(before, after) == Some(expected_offset_delta)
-}
-
-/// Verify the selected local record, including descriptor fields for a
-/// data-descriptor member. Names, flags, timestamps, extras, and all suffix
-/// bytes remain source-exact.
-pub(crate) fn selected_local_record_preserved(
-    before: &litchi_iwa_archive::package::Entry,
-    after: &litchi_iwa_archive::package::Entry,
-    before_fields: ZipEntryFields,
-    after_fields: ZipEntryFields,
-) -> bool {
-    let before_record = before.raw_record().local_record();
-    let after_record = after.raw_record().local_record();
-    if !is_local_record(before_record) || !is_local_record(after_record) {
-        return false;
-    }
-    let Some(before_header_length) = zip_local_header_length(before_record) else {
-        return false;
-    };
-    let Some(after_header_length) = zip_local_header_length(after_record) else {
-        return false;
-    };
-    if before_header_length != after_header_length
-        || !bytes_equal_outside_ranges(
-            &before_record[..before_header_length],
-            &after_record[..after_header_length],
-            ZIP_LOCAL_CRC_AND_SIZES,
-            None,
-        )
-    {
-        return false;
-    }
-    let Some(before_header_fields) = local_header_fields(before_record) else {
-        return false;
-    };
-    let Some(after_header_fields) = local_header_fields(after_record) else {
-        return false;
-    };
-    let flags = before.metadata().local().flags();
-    if flags != after.metadata().local().flags() {
-        return false;
-    }
-    if flags & 0x0008 == 0 {
-        if before_header_fields != before_fields || after_header_fields != after_fields {
-            return false;
-        }
-    } else if before_header_fields != after_header_fields {
-        return false;
-    }
-    let Some(before_payload_end) = before_header_length
-        .checked_add(before.raw_record().compressed_data().len())
-        .filter(|end| *end <= before_record.len())
-    else {
-        return false;
-    };
-    let Some(after_payload_end) = after_header_length
-        .checked_add(after.raw_record().compressed_data().len())
-        .filter(|end| *end <= after_record.len())
-    else {
-        return false;
-    };
-    selected_local_suffix_preserved(
-        flags,
-        &before_record[before_payload_end..],
-        &after_record[after_payload_end..],
-        before_fields,
-        after_fields,
-    )
-}
-
-/// Verify a selected central-directory record, allowing only CRC/size and
-/// relative local-header offset changes.
-pub(crate) fn selected_central_record_preserved(
-    before: &[u8],
-    after: &[u8],
-    before_fields: ZipEntryFields,
-    after_fields: ZipEntryFields,
-    expected_offset_delta: i128,
-) -> bool {
-    before.len() == after.len()
-        && before.len() >= ZIP_CENTRAL_LOCAL_OFFSET.end
-        && is_central_record(before)
-        && is_central_record(after)
-        && bytes_equal_outside_ranges(
-            before,
-            after,
-            ZIP_CENTRAL_CRC_AND_SIZES,
-            Some(ZIP_CENTRAL_LOCAL_OFFSET),
-        )
-        && central_fields(before) == Some(before_fields)
-        && central_fields(after) == Some(after_fields)
-        && central_offset_delta(before, after) == Some(expected_offset_delta)
-}
-
-/// Verify a selected local suffix, including optional data-descriptor values.
-pub(crate) fn selected_local_suffix_preserved(
-    flags: u16,
-    before: &[u8],
-    after: &[u8],
-    before_fields: ZipEntryFields,
-    after_fields: ZipEntryFields,
-) -> bool {
-    if flags & 0x0008 == 0 {
-        return before == after;
-    }
-    let before_descriptor = if before.starts_with(b"PK\x07\x08") {
-        4
-    } else {
-        0
-    };
-    let after_descriptor = if after.starts_with(b"PK\x07\x08") {
-        4
-    } else {
-        0
-    };
-    before_descriptor == after_descriptor
-        && before.len() == after.len()
-        && before.len() >= before_descriptor + 12
-        && before[..before_descriptor] == after[..after_descriptor]
-        && raw_descriptor_fields(before, before_descriptor) == Some(before_fields)
-        && raw_descriptor_fields(after, after_descriptor) == Some(after_fields)
-        && before[before_descriptor + 12..] == after[after_descriptor + 12..]
-}
-
-/// Compare two byte records while ignoring one or two explicit, disjoint
-/// ranges. Invalid or overlapping ranges fail closed.
-pub(crate) fn bytes_equal_outside_ranges(
-    before: &[u8],
-    after: &[u8],
-    first: Range<usize>,
-    second: Option<Range<usize>>,
-) -> bool {
-    if before.len() != after.len() || first.start > first.end || first.end > before.len() {
-        return false;
-    }
-    let second = second.unwrap_or(first.end..first.end);
-    if second.start > second.end || second.end > before.len() || first.end > second.start {
-        return false;
-    }
-    before[..first.start] == after[..first.start]
-        && before[first.end..second.start] == after[first.end..second.start]
-        && before[second.end..] == after[second.end..]
-}
-
-fn is_local_record(record: &[u8]) -> bool {
-    record.get(..4) == Some(b"PK\x03\x04")
-}
-
-fn is_central_record(record: &[u8]) -> bool {
-    record.get(..4) == Some(b"PK\x01\x02")
-}
-
-fn zip_local_header_length(record: &[u8]) -> Option<usize> {
-    if !is_local_record(record) {
-        return None;
-    }
-    let name_length = usize::from(u16::from_le_bytes(record.get(26..28)?.try_into().ok()?));
-    let extra_length = usize::from(u16::from_le_bytes(record.get(28..30)?.try_into().ok()?));
-    30usize
-        .checked_add(name_length)?
-        .checked_add(extra_length)
-        .filter(|length| *length <= record.len())
-}
-
-fn local_header_fields(record: &[u8]) -> Option<ZipEntryFields> {
-    Some(ZipEntryFields {
-        crc32: raw_u32(record, 14)?,
-        compressed_size: raw_u32(record, 18)?,
-        uncompressed_size: raw_u32(record, 22)?,
-    })
-}
-
-fn central_fields(record: &[u8]) -> Option<ZipEntryFields> {
-    Some(ZipEntryFields {
-        crc32: raw_u32(record, 16)?,
-        compressed_size: raw_u32(record, 20)?,
-        uncompressed_size: raw_u32(record, 24)?,
-    })
-}
-
-fn raw_descriptor_fields(record: &[u8], start: usize) -> Option<ZipEntryFields> {
-    Some(ZipEntryFields {
-        crc32: raw_u32(record, start)?,
-        compressed_size: raw_u32(record, start.checked_add(4)?)?,
-        uncompressed_size: raw_u32(record, start.checked_add(8)?)?,
-    })
-}
-
-fn raw_u32(record: &[u8], start: usize) -> Option<u32> {
-    let end = start.checked_add(4)?;
-    Some(u32::from_le_bytes(record.get(start..end)?.try_into().ok()?))
-}
-
-fn central_offset_delta(before: &[u8], after: &[u8]) -> Option<i128> {
-    let before = i128::from(raw_u32(before, 42)?);
-    let after = i128::from(raw_u32(after, 42)?);
-    after.checked_sub(before)
-}
-
-/// Compute the checked physical offset delta between two source-backed raw
-/// records.
-pub(crate) fn record_offset_delta(
-    before_source: &[u8],
-    after_source: &[u8],
-    before_record: &[u8],
-    after_record: &[u8],
-) -> Option<i128> {
-    let before = i128::try_from(raw_slice_offset(before_source, before_record)?).ok()?;
-    let after = i128::try_from(raw_slice_offset(after_source, after_record)?).ok()?;
-    after.checked_sub(before)
-}
-
-/// Compute ZIP CRC-32 without allocating.
-pub(crate) fn zip_crc32(bytes: &[u8]) -> u32 {
-    let mut crc = u32::MAX;
-    for byte in bytes {
-        crc ^= u32::from(*byte);
-        for _ in 0..8 {
-            crc = if crc & 1 == 0 {
-                crc >> 1
-            } else {
-                (crc >> 1) ^ 0xedb8_8320
-            };
-        }
-    }
-    !crc
-}
-
-fn raw_slice_offset(source: &[u8], raw: &[u8]) -> Option<usize> {
-    if raw.is_empty() {
-        return Some(0);
-    }
-    source
-        .windows(raw.len())
-        .enumerate()
-        .find_map(|(offset, slice)| std::ptr::eq(slice.as_ptr(), raw.as_ptr()).then_some(offset))
-}
-
-fn eocd_tail(source: &[u8]) -> Option<&[u8]> {
-    source
-        .windows(22)
-        .enumerate()
-        .rev()
-        .find_map(|(offset, fixed)| {
-            (fixed.get(..4) == Some(b"PK\x05\x06"))
-                .then(|| {
-                    let comment_length =
-                        usize::from(u16::from_le_bytes(fixed.get(20..22)?.try_into().ok()?));
-                    let end = offset.checked_add(22)?.checked_add(comment_length)?;
-                    (end == source.len()).then(|| &source[offset..])
-                })
-                .flatten()
-        })
-}
-
-/// Verify package bytes outside entry records (ZIP prelude and EOCD tail)
-/// remain exact after reassembly.
-pub(crate) fn verify_zip_boundaries(
-    before: &SourceCatalog,
-    after: &SourceCatalog,
-    budget: &mut Budget,
-) -> Result<(), Error> {
-    let before_bytes = before.source_bytes();
-    let after_bytes = after.source_bytes();
-    let before_first = before.package().iter().next().ok_or(Error::InvalidSource)?;
-    let after_first = after.package().iter().next().ok_or(Error::InvalidSource)?;
-    let before_prelude_end =
-        raw_slice_offset(before_bytes, before_first.raw_record().local_record())
-            .ok_or(Error::InvalidSource)?;
-    let after_prelude_end = raw_slice_offset(after_bytes, after_first.raw_record().local_record())
-        .ok_or(Error::InvalidSource)?;
-    budget.charge_work(
-        before_prelude_end
-            .checked_add(after_prelude_end)
-            .ok_or(Error::InvalidSource)?,
-    )?;
-    if before_bytes.get(..before_prelude_end) != after_bytes.get(..after_prelude_end) {
-        return Err(Error::InvalidSource);
-    }
-    let before_tail = eocd_tail(before_bytes).ok_or(Error::InvalidSource)?;
-    let after_tail = eocd_tail(after_bytes).ok_or(Error::InvalidSource)?;
-    budget.charge_work(
-        before_tail
-            .len()
-            .checked_add(after_tail.len())
-            .ok_or(Error::InvalidSource)?,
-    )?;
-    if before_tail.len() != after_tail.len()
-        || before_tail[..16] != after_tail[..16]
-        || before_tail[20..] != after_tail[20..]
-    {
-        return Err(Error::InvalidSource);
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -2149,8 +1585,7 @@ mod tests {
     use litchi_iwa_common::{WireLimits, encode_varint_into};
 
     use super::{
-        Budget, Error, LimitKind, MediaClosureState, SOUNDTRACK_MEDIA_FIELD,
-        bytes_equal_outside_ranges, canonical_int32, selected_local_suffix_preserved,
+        Budget, Error, LimitKind, MediaClosureState, SOUNDTRACK_MEDIA_FIELD, canonical_int32,
         stream_package_metadata, strict_reference, validate_soundtrack_media_references,
     };
 
@@ -2413,45 +1848,6 @@ mod tests {
                 kind: LimitKind::Items,
                 ..
             })
-        ));
-    }
-
-    #[test]
-    fn bytes_equal_outside_ranges_rejects_invalid_or_overlapping_ranges() {
-        let before = b"0123456789";
-        let mut after = before.to_vec();
-        after[4] = b'x';
-        assert!(bytes_equal_outside_ranges(before, &after, 4..5, None));
-        assert!(!bytes_equal_outside_ranges(
-            before,
-            &after,
-            4..7,
-            Some(6..8)
-        ));
-        assert!(!bytes_equal_outside_ranges(before, &after, 11..11, None));
-    }
-
-    #[test]
-    fn descriptor_suffix_requires_exact_descriptor_and_tail() {
-        let fields = super::ZipEntryFields {
-            crc32: 0x0102_0304,
-            compressed_size: 5,
-            uncompressed_size: 9,
-        };
-        let mut before = b"PK\x07\x08".to_vec();
-        before.extend(fields.crc32.to_le_bytes());
-        before.extend(fields.compressed_size.to_le_bytes());
-        before.extend(fields.uncompressed_size.to_le_bytes());
-        before.extend_from_slice(b"tail");
-        let after = before.clone();
-        assert!(selected_local_suffix_preserved(
-            0x0008, &before, &after, fields, fields
-        ));
-
-        let mut changed = after;
-        *changed.last_mut().expect("tail") = b'!';
-        assert!(!selected_local_suffix_preserved(
-            0x0008, &before, &changed, fields, fields
         ));
     }
 

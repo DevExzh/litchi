@@ -3,8 +3,6 @@
 //! Parsing each XML part remains a codec concern; this boundary owns the
 //! document-wide declaration/reference inventory and its cross-part limits.
 
-#![cfg_attr(test, allow(dead_code))]
-
 use super::{Kind, MAX_XML_BYTES, Part, Scope, codec, model::Declarations};
 use crate::core::ResolvedReader;
 use crate::generic::{FlatMutationBudget, MemoryLease};
@@ -27,14 +25,6 @@ pub(crate) fn parse_parts_with_xml_limits(
     xml_limits: XmlStreamLimits,
 ) -> Result<Declarations> {
     parse_parts_with_optional_budget_and_limits(parts, None, xml_limits)
-}
-
-#[cfg(test)]
-fn parse_parts_with_optional_budget(
-    parts: &[(&str, Part)],
-    budget: Option<&FlatMutationBudget>,
-) -> Result<Declarations> {
-    parse_parts_with_optional_budget_and_limits(parts, budget, XmlStreamLimits::default())
 }
 
 fn parse_parts_with_optional_budget_and_limits(
@@ -113,22 +103,6 @@ fn parse_parts_with_optional_budget_and_limits(
         budget.consume_objects(1)?;
     }
     Ok(result)
-}
-
-/// Parse declaration parts with a checked projection-memory reservation.
-///
-/// Variable parsing retains decoded names, attributes, declaration values,
-/// scope frames, and cross-reference sets.  Charging the source XML length
-/// alone misses those owned structures.  The plan below counts event, name,
-/// attribute, text, vector-slot, and set-entry storage from a borrowed event
-/// pass before the allocating parser runs.  It remains independent of the
-/// final edited-document byte limit.
-#[cfg(test)]
-pub(crate) fn parse_parts_with_budget(
-    parts: &[(&str, Part)],
-    budget: &FlatMutationBudget,
-) -> Result<(Declarations, MemoryLease)> {
-    parse_parts_with_budget_and_xml_limits(parts, budget, XmlStreamLimits::default())
 }
 
 pub(crate) fn parse_parts_with_budget_and_xml_limits(

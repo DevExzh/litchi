@@ -106,7 +106,6 @@ pub(super) trait AxisSupportBudget {
         package: &Package,
         mutation_guards: bool,
     ) -> Result<(), AxisSupportError>;
-    #[allow(dead_code)]
     fn charge_input(&mut self, amount: usize) -> Result<(), AxisSupportError>;
     fn charge_wire_vector(&mut self, payload: usize) -> Result<(), AxisSupportError>;
     fn finish_wire_scan(&mut self, fields: usize) -> Result<(), AxisSupportError>;

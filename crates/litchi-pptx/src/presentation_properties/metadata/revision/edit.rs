@@ -12,11 +12,6 @@
 //! The Revision Information part belongs to the presentation part, so the
 //! verbs take no owner.
 
-#![allow(
-    unused_imports,
-    reason = "the delegated signatures name the module's values"
-)]
-
 use super::codec as raw;
 use super::*;
 use crate::part_edit::{Staged, family};

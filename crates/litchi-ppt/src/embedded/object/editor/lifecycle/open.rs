@@ -8,10 +8,6 @@ use std::collections::{BTreeMap, HashSet};
 use std::io::{Cursor, Read, Seek};
 use std::sync::Arc;
 
-#[allow(
-    dead_code,
-    reason = "used by capability-specific package snapshot paths"
-)]
 pub(crate) fn inspect_live_document(bytes: &[u8]) -> Result<(u32, Vec<u8>)> {
     let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())?;
     inspect_live_document_from_ole(&mut ole)

@@ -20,10 +20,6 @@ use super::model::{
 // grammar order: `array(label, field, type, version)` for a record-type
 // array, `opt(label, field, type, instance, version)` for an optional
 // record.
-#[allow(
-    unused_macro_rules,
-    reason = "schema variants use different required/optional field combinations"
-)]
 macro_rules! extension_struct {
     (
         $name:ident, $context:literal,

@@ -6,9 +6,7 @@
 
 use super::{Error, Result};
 use litchi_cfb::{OleError, OleFile, OleFileLimits};
-use litchi_ole_common::property_set::{
-    self, Binding, CodePage, PropertySetReader, Section, Stream, USER_DEFINED_PROPERTIES_FMTID,
-};
+use litchi_ole_common::property_set::{self, Binding, CodePage, PropertySetReader, Stream};
 use std::io::Cursor;
 use std::sync::Arc;
 
@@ -29,15 +27,6 @@ impl Snapshot {
         Ok(Self {
             bytes: Arc::from(bytes.into_boxed_slice()),
         })
-    }
-
-    /// Parses a borrowed PPT artifact while retaining an owned source copy.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub(crate) fn parse(bytes: &[u8]) -> Result<Self> {
-        Self::from_bytes(bytes.to_vec())
     }
 
     /// Returns the exact source artifact bytes.
@@ -76,16 +65,6 @@ impl Snapshot {
         property_set::document_summary::Snapshot::from_stream(&stream)
             .map(Some)
             .map_err(Into::into)
-    }
-
-    /// Returns the generic user-defined section, when present.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub(crate) fn user_defined_properties(&self) -> Result<Option<Section>> {
-        Ok(read_stream(&self.bytes, Binding::UserDefinedProperties)?
-            .and_then(|stream| stream.section(USER_DEFINED_PROPERTIES_FMTID).cloned()))
     }
 
     /// Starts an isolated, source-checked property-set transaction.
@@ -130,58 +109,6 @@ impl Transaction {
     pub(crate) fn editor_mut(&mut self) -> &mut property_set::Edit {
         self.changed = true;
         &mut self.editor
-    }
-
-    /// Whether a successful edit has changed the transaction state.
-    #[must_use]
-    pub(crate) const fn is_changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Projects the current transaction-local `SummaryInformation` section.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub(crate) fn summary_information(
-        &self,
-    ) -> Result<Option<property_set::summary_information::Snapshot>> {
-        let Some(section) = self.editor.property_set(Binding::SummaryInformation)? else {
-            return Ok(None);
-        };
-        property_set::summary_information::Snapshot::from_section(&section)
-            .map(Some)
-            .map_err(Into::into)
-    }
-
-    /// Projects the current transaction-local `DocumentSummaryInformation` section.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub(crate) fn document_summary_information(
-        &self,
-    ) -> Result<Option<property_set::document_summary::Snapshot>> {
-        let Some(section) = self
-            .editor
-            .property_set(Binding::DocumentSummaryInformation)?
-        else {
-            return Ok(None);
-        };
-        property_set::document_summary::Snapshot::from_section(&section)
-            .map(Some)
-            .map_err(Into::into)
-    }
-
-    /// Returns the current transaction-local user-defined section.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub(crate) fn user_defined_properties(&self) -> Result<Option<Section>> {
-        self.editor
-            .property_set(Binding::UserDefinedProperties)
-            .map_err(Into::into)
     }
 
     /// Applies a typed `SummaryInformation` edit through the common PIDSI owner.
@@ -254,51 +181,6 @@ impl Transaction {
         }
         self.editor
             .replace(Binding::DocumentSummaryInformation, commit.into_package())?;
-        self.changed = true;
-        Ok(true)
-    }
-
-    /// Applies a generic user-defined property-section edit.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub(crate) fn edit_user_defined_properties<F>(&mut self, edit: F) -> Result<bool>
-    where
-        F: FnOnce(&mut Section) -> std::result::Result<(), litchi_ole_common::Error>,
-    {
-        let source = self.editor.property_set(Binding::UserDefinedProperties)?;
-        let mut candidate = source
-            .clone()
-            .unwrap_or_else(|| Section::new(USER_DEFINED_PROPERTIES_FMTID));
-        let initial = candidate.clone();
-        edit(&mut candidate)?;
-        if source.as_ref().is_some_and(|value| value == &candidate)
-            || source.is_none() && candidate == initial
-        {
-            return Ok(false);
-        }
-        self.editor
-            .replace(Binding::UserDefinedProperties, candidate)?;
-        self.changed = true;
-        Ok(true)
-    }
-
-    /// Removes the user-defined section while retaining the rest of the
-    /// `DocumentSummaryInformation` stream.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub(crate) fn remove_user_defined_properties(&mut self) -> Result<bool> {
-        if self
-            .editor
-            .property_set(Binding::UserDefinedProperties)?
-            .is_none()
-        {
-            return Ok(false);
-        }
-        self.editor.remove(Binding::UserDefinedProperties)?;
         self.changed = true;
         Ok(true)
     }

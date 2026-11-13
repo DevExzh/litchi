@@ -16,6 +16,7 @@ impl MutableDocument {
     }
 
     /// Return only footnotes from the current content XML.
+    #[cfg(test)]
     pub(crate) fn footnotes(&self) -> Result<Vec<crate::Note>> {
         Ok(self
             .notes()?
@@ -25,6 +26,7 @@ impl MutableDocument {
     }
 
     /// Return only endnotes from the current content XML.
+    #[cfg(test)]
     pub(crate) fn endnotes(&self) -> Result<Vec<crate::Note>> {
         Ok(self
             .notes()?
@@ -188,6 +190,7 @@ impl MutableDocument {
     ///
     /// Linked font resources remain inert metadata. This does not fetch a URI,
     /// load a font, or inspect embedded font data.
+    #[cfg(test)]
     pub(crate) fn content_font_face_declarations(
         &self,
     ) -> Result<Option<crate::font_face::Declarations>> {

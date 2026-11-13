@@ -2,9 +2,13 @@
 
 use super::super::super::model::MutableDocument;
 use crate::core::Structure;
-use crate::header_footer::{Master, read, set_text, set_xml};
+#[cfg(test)]
+use crate::header_footer::read;
+use crate::header_footer::{Master, set_text, set_xml};
 use crate::master_page::{add, insert, remove, replace};
-use crate::page_layout::{PageLayout, parse_page_layouts, set_page_layout_xml};
+#[cfg(test)]
+use crate::page_layout::PageLayout;
+use crate::page_layout::{parse_page_layouts, set_page_layout_xml};
 use litchi_core::Result;
 
 impl MutableDocument {
@@ -50,6 +54,7 @@ impl MutableDocument {
     ///
     /// Linked font resources remain inert metadata. This does not fetch a URI,
     /// load a font, or inspect embedded font data.
+    #[cfg(test)]
     pub(crate) fn styles_font_face_declarations(
         &self,
     ) -> Result<Option<crate::font_face::Declarations>> {
@@ -102,6 +107,7 @@ impl MutableDocument {
     ///
     /// This exposes stored common-style resources only. It does not resolve
     /// style use sites, load external data, or render gradients.
+    #[cfg(test)]
     pub(crate) fn drawing_gradients(
         &self,
     ) -> Result<crate::drawing::resources::gradient::Collection> {
@@ -121,6 +127,7 @@ impl MutableDocument {
     ///
     /// This exposes stored common-style resources only. It does not resolve
     /// style use sites or render hatches.
+    #[cfg(test)]
     pub(crate) fn drawing_hatches(&self) -> Result<crate::drawing::resources::hatch::Collection> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
@@ -135,6 +142,7 @@ impl MutableDocument {
     ///
     /// This exposes stored common-style resources only. It does not resolve
     /// style use sites or render strokes.
+    #[cfg(test)]
     pub(crate) fn drawing_stroke_dashes(
         &self,
     ) -> Result<crate::drawing::resources::stroke_dash::Collection> {
@@ -154,6 +162,7 @@ impl MutableDocument {
     ///
     /// This exposes stored common-style metadata only. It does not resolve
     /// style use sites, follow links, load linked resources, or render images.
+    #[cfg(test)]
     pub(crate) fn drawing_fill_images(
         &self,
     ) -> Result<crate::drawing::resources::fill_image::Collection> {
@@ -173,6 +182,7 @@ impl MutableDocument {
     ///
     /// This exposes stored common-style metadata only. It does not resolve
     /// style use sites or render marker paths.
+    #[cfg(test)]
     pub(crate) fn drawing_markers(&self) -> Result<crate::drawing::resources::marker::Collection> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
@@ -187,6 +197,7 @@ impl MutableDocument {
     ///
     /// This exposes stored common-style metadata only. It does not resolve
     /// style use sites or render opacity gradients.
+    #[cfg(test)]
     pub(crate) fn drawing_opacities(
         &self,
     ) -> Result<crate::drawing::resources::opacity::Collection> {
@@ -216,6 +227,7 @@ impl MutableDocument {
     ///
     /// The result does not apply styles to headings, generate labels, or
     /// update tables of contents.
+    #[cfg(test)]
     pub(crate) fn outline_styles(&self) -> Result<crate::outline_style::Styles> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
@@ -441,6 +453,7 @@ impl MutableDocument {
     }
 
     /// Parse the document's master pages and current header/footer regions.
+    #[cfg(test)]
     pub(crate) fn master_pages(&self) -> Result<Vec<Master>> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Vec::new()),
@@ -449,6 +462,7 @@ impl MutableDocument {
     }
 
     /// Parse automatic page layouts, their properties, and header/footer styles.
+    #[cfg(test)]
     pub(crate) fn page_layouts(&self) -> Result<Vec<PageLayout>> {
         self.styles_xml
             .as_deref()

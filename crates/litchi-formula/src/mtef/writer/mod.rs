@@ -12,10 +12,6 @@
 // - http://rtf2latex2e.sourceforge.net/MTEF5.html
 // - LibreOffice `starmath/source/mathtype.cxx` (MathType import and export)
 
-// Only `mtef::mod` can name these items until `lib.rs` re-exports them at the
-// crate root, so the compiler cannot yet see a user outside the module tree.
-#![allow(dead_code)]
-
 /// AST character, symbol and operator to typeface/MTCode mapping
 mod charmap;
 /// Writer error type

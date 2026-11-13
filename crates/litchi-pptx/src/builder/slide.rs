@@ -482,18 +482,6 @@ impl Slide {
         self.add_text_box(text, x, y, width, height)
             .set_text_format(format)
     }
-
-    #[allow(dead_code, reason = "guard retained for the staged writer API")]
-    fn ensure_positive_bounds(&self) -> Result<()> {
-        if self.shapes.len() > u32::MAX as usize {
-            return Err(Error::Limit {
-                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Shapes),
-                observed: self.shapes.len(),
-                maximum: u32::MAX as usize,
-            });
-        }
-        Ok(())
-    }
 }
 
 #[derive(Debug)]
@@ -515,7 +503,6 @@ impl CollectGlyphs for Slide {
     }
 }
 
-#[allow(dead_code, reason = "documents that XML escaping stays in this layer")]
 fn _escape_is_kept_in_this_layer(value: &str) -> String {
     escape_xml(value)
 }

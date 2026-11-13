@@ -160,147 +160,41 @@ pub mod transaction;
 pub mod variable_declaration;
 pub mod xforms;
 
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes inert concordance metadata"
-)]
 pub(crate) use auto_mark_file::AlphabeticalIndexAutoMarkFile;
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes unambiguous chart property semantics"
-)]
-pub(crate) use chart_properties::{
-    Angle, AxisLabelPosition, AxisPosition, DataLabelNumber, Direction, Double, EmptyCellTreatment,
-    ErrorCategory, Integer, Interpolation, LabelArrangement, LabelPosition, LabelSeparator,
-    PositiveInteger, RegressionType, SeriesSource, SolidType, StylePropertiesSet, StyleRecord,
-    SymbolImage, SymbolName, SymbolType, TickMarkPosition, parse_chart_style_properties,
-    set_chart_style_properties_xml,
-};
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes the canonical shared package types"
-)]
-pub(crate) use core::{
-    AutoReloadMetadata, Cipher, DocumentStatistics, HyperlinkBehaviourMetadata, Kdf, Manifest,
-    ManifestChecksum, ManifestChecksumAlgorithm, ManifestEncryption, ManifestEncryptionAlgorithm,
-    ManifestEntry, ManifestKeyDerivation, ManifestStartKeyGeneration, Metadata, OwnedPackage,
-    PackageWriter, Profile, StartKey, Structure, TemplateMetadata, UserDefinedMetadata,
-    UserDefinedValueType,
-};
-#[allow(unused_imports, reason = "ODT facade exposes document script metadata")]
-pub(crate) use document_scripts::{
-    EmbeddedScript, EventListener, ScriptBinding, ScriptEventListener, Scripts, parse_scripts,
-};
-#[allow(unused_imports, reason = "ODT facade exposes drawing style resources")]
-pub(crate) use drawing_page_properties::{
-    BackgroundSize, Color, Duration, Fill, FillRule, ImageRefPoint, LengthOrPercent,
-    NonNegativeInteger, Percent, Repeat, Sound, SoundShow, StyleNameRef, StyleProperties, Styles,
-    TileDirection, TileRepeatOffset, TransitionDirection, TransitionSpeed, TransitionStyle,
-    TransitionType, Visibility, parse_drawing_page_style_properties,
-    set_drawing_page_style_properties_xml,
-};
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes bookmark mutation primitives"
-)]
+pub(crate) use core::Metadata;
+pub(crate) use document_scripts::Scripts;
 pub(crate) use elements::bookmark::{
-    Bookmark, BookmarkEnd, BookmarkFragments, BookmarkParser, BookmarkRange, BookmarkStart,
     BookmarkTarget, insert_bookmark_xml, parse_bookmark_targets, remove_bookmark_xml,
     replace_bookmark_xml,
 };
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes inert embedded-resource models"
-)]
 pub(crate) use embedded::Object;
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes the canonical document package types"
-)]
 pub(crate) use generic::{Family, FlatDocument, Package as GenericPackage};
-#[allow(unused_imports, reason = "ODT facade exposes graphic style semantics")]
-pub(crate) use graphic_properties::{
-    Child, ChildKind, Kind, Namespace, Properties, Property, Value, parse_graphic_style_properties,
-    set_graphic_style_properties_xml,
-};
-#[allow(unused_imports, reason = "ODT facade exposes shared drawing context")]
-pub(crate) use litchi_odf_common::drawing::{Frame, Part};
-#[allow(unused_imports, reason = "ODT facade exposes package media models")]
+pub(crate) use litchi_odf_common::drawing::Part;
 pub(crate) use media::Image;
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes ODF chart models for embedded charts"
-)]
-pub(crate) use odc::{
-    Attribute, Axis, AxisSpec, AxisUpdate, CachedCell, CachedRow, CachedTable, CachedValue,
-    ChartClass, ChartClassKind, Class, DataLabelSpec, DataPoint, DataPointSpec, Definition,
-    Dimension, DomainSpec, Element, EquationSpec, ExtensionAttribute, ExtensionElement, Extensions,
-    Grid, GridSpec, Labels, Legend, LegendSpec, PlotArea, PlotAreaSpec, RegressionSpec, Series,
-    SeriesSpec, SeriesUpdate, StyleElement, Text, serialize_axis_fragment, serialize_content,
-    serialize_series_fragment,
-};
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes package annotation operations"
-)]
+#[cfg(test)]
+pub(crate) use odc::{ChartClass, Definition, StyleElement};
 pub(crate) use package::annotation::{
-    Annotation, AnnotationAnchor, AnnotationInfo, AnnotationPosition, AnnotationUpdate,
+    Annotation, AnnotationAnchor, AnnotationInfo, AnnotationUpdate,
 };
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes embedded-chart storage policy"
-)]
-pub(crate) use package::charts::EmbeddedChartStorage;
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes inert embedded-resource updates"
-)]
-pub(crate) use package::embedded::{
-    EmbeddedResource, EmbeddedResourceChange, EmbeddedResourceFile, EmbeddedResourceKind,
-    EmbeddedResourceSelector, EmbeddedResourceSource,
-};
-#[allow(unused_imports, reason = "ODT facade exposes authored form operations")]
-pub(crate) use package::forms::{AuthoredForm, AuthoredFormControl, AuthoredFormNode};
 pub use package::scripts::{ScriptResource, ScriptResourceKind, ScriptResourceSpec};
-#[allow(unused_imports, reason = "ODT facade exposes ruby semantics")]
 pub(crate) use ruby_family::{
     insert_ruby_annotation_xml, parse_ruby_annotations, parse_ruby_styles,
     remove_ruby_annotation_xml, remove_ruby_style_xml, replace_ruby_annotation_xml,
     set_ruby_style_xml, wrap_ruby_annotation_xml,
 };
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes common style configurations"
-)]
+pub(crate) use section_properties::SectionStyleProperties;
 pub(crate) use section_properties::{BackgroundRepeat, SectionBackgroundImage};
-#[allow(unused_imports, reason = "ODT facade exposes section style semantics")]
-pub(crate) use section_properties::{
-    SectionStyleProperties, SectionStylePropertiesSet, parse_section_style_properties,
-};
-#[allow(unused_imports, reason = "ODT facade exposes semantic ODF settings")]
-pub(crate) use settings::{
-    ConfigItem, ConfigMap, ConfigMapEntry, ConfigNode, ConfigSet, ConfigValue, Settings,
-};
-#[allow(unused_imports, reason = "ODT facade exposes text style semantics")]
-pub(crate) use style::text::{
-    TextProperty, TextPropertyKind, TextPropertyNamespace, TextPropertyValue, TextStyleProperties,
-    TextStylePropertiesSet, TextStyleRecord, parse_text_style_properties,
-    set_text_style_properties_xml,
-};
+pub(crate) use settings::Settings;
+pub(crate) use style::text::TextProperty;
 pub mod elements;
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes rich field and text element models"
-)]
+#[cfg(test)]
 pub(crate) use elements::field::{
-    MetaFieldAttribute, MetaFieldContent, MetaFieldElement, MetaFieldNode, NoteBodyContent,
+    MetaFieldAttribute, MetaFieldElement, MetaFieldNode, NoteBodyContent,
 };
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes hyperlink element vocabulary"
-)]
-pub(crate) use elements::text::{Hyperlink, TextHyperlinkActuate, TextHyperlinkShow};
+pub(crate) use elements::text::Hyperlink;
 pub use elements::text::{NumberLabel, SoftPageBreak};
+#[cfg(test)]
+pub(crate) use elements::text::{TextHyperlinkActuate, TextHyperlinkShow};
 
 mod builder;
 mod document;
@@ -310,16 +204,8 @@ pub mod header_footer;
 pub mod index;
 #[cfg(test)]
 mod internal_tests;
-#[allow(
-    unused_imports,
-    reason = "internal XML helper used by moved ODF modules"
-)]
 pub(crate) use index::expanded_attributes;
 pub mod index_mark;
-#[allow(
-    dead_code,
-    reason = "record 0358: `MutableDocument` is the crate-private model behind `Builder` and `Edit`; its read views serve the unit regressions"
-)]
 pub(crate) mod mutable;
 pub mod note;
 pub(crate) use note::parse_notes;
@@ -379,8 +265,4 @@ pub use xforms::{
 };
 
 // Re-export ODT-specific types for external use
-#[allow(unused_imports)] // Library public API
-pub(crate) use parser::{
-    ChangeType, Comment, Parser, Section, SectionDdeSource, SectionDisplay, SectionSource,
-    TrackChange, TrackedChanges,
-};
+pub(crate) use parser::{Section, TrackChange, TrackedChanges};

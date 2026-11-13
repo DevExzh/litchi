@@ -313,15 +313,6 @@ pub(crate) fn write_dv<W: Write>(
     validation::write_dv(writer, cfg, ranges)
 }
 
-/// Write `UseSelFS` (Use Natural Language Formulas) record.
-///
-/// Record type: 0x0160, Length: 2
-/// A value of 0 disables natural language formulas (modern Excel default).
-#[allow(dead_code, reason = "retained as a BIFF compatibility building block")] // Compatibility wrapper for the former fixed-value writer API.
-pub(crate) fn write_usesel_fs<W: Write>(writer: &mut W) -> Result<()> {
-    workbook::write_usesel_fs(writer)
-}
-
 pub(crate) fn write_interface_hdr<W: Write>(writer: &mut W, codepage: u16) -> Result<()> {
     workbook::write_interface_hdr(writer, codepage)
 }
@@ -422,10 +413,6 @@ pub(crate) fn write_refresh_all<W: Write>(writer: &mut W, refresh_all: bool) -> 
     workbook::write_refresh_all(writer, refresh_all)
 }
 
-#[allow(dead_code, reason = "retained as a BIFF compatibility building block")] // Compatibility wrapper retained for existing internal callers.
-pub(crate) fn write_book_bool<W: Write>(writer: &mut W, save_link_values: bool) -> Result<()> {
-    workbook::write_book_bool(writer, save_link_values)
-}
 pub(crate) fn write_book_bool_raw<W: Write>(writer: &mut W, bits: u16) -> Result<()> {
     workbook::write_book_bool_raw(writer, bits)
 }
@@ -513,17 +500,6 @@ pub(crate) fn write_pivot_colinfo<W: Write>(
     worksheet::write_pivot_colinfo(writer, first_col, last_col, col_width)
 }
 
-/// Write WINDOW2 record (Worksheet view settings)
-///
-/// Record type: 0x023E, Length: 18 (worksheet and macro sheet)
-///
-/// The `has_freeze_panes` flag controls whether the `FREEZE_PANES` and
-/// `FREEZE_PANES_NO_SPLIT` bits are set in the options field.
-#[allow(dead_code, reason = "retained as a BIFF compatibility building block")]
-pub(crate) fn write_window2<W: Write>(writer: &mut W, has_freeze_panes: bool) -> Result<()> {
-    worksheet::write_window2(writer, has_freeze_panes)
-}
-
 pub(crate) fn write_scl<W: Write>(writer: &mut W, numerator: u16, denominator: u16) -> Result<()> {
     worksheet::write_scl(writer, numerator, denominator)
 }
@@ -547,15 +523,6 @@ pub(crate) fn write_selection_options<W: Write>(
     selection: &crate::writer::view::Selection,
 ) -> Result<()> {
     worksheet::write_selection_options(writer, selection)
-}
-
-#[allow(dead_code, reason = "retained as a BIFF compatibility building block")]
-pub(crate) fn write_default_selection<W: Write>(
-    writer: &mut W,
-    freeze_rows: u16,
-    freeze_cols: u16,
-) -> Result<()> {
-    worksheet::write_default_selection(writer, freeze_rows, freeze_cols)
 }
 
 pub(crate) fn write_pivot_window2<W: Write>(writer: &mut W, selected: bool) -> Result<()> {
@@ -587,18 +554,6 @@ pub(crate) fn write_phonetic_info<W: Write>(
     value: &crate::PhoneticInfo,
 ) -> Result<()> {
     worksheet::write_phonetic_info(writer, value)
-}
-
-/// Write PANE record (freeze panes configuration)
-///
-/// Record type: 0x0041, Length: 10
-#[allow(dead_code, reason = "retained as a BIFF compatibility building block")]
-pub(crate) fn write_pane<W: Write>(
-    writer: &mut W,
-    freeze_rows: u32,
-    freeze_cols: u16,
-) -> Result<()> {
-    worksheet::write_pane(writer, freeze_rows, freeze_cols)
 }
 
 pub(crate) fn write_autofilterinfo<W: Write>(writer: &mut W, c_entries: u16) -> Result<()> {
@@ -763,38 +718,6 @@ pub(crate) fn write_colinfo<W: Write>(
 /// Record type: 0x0055
 pub(crate) fn write_def_col_width<W: Write>(writer: &mut W, width_chars: u16) -> Result<()> {
     worksheet::write_def_col_width(writer, width_chars)
-}
-
-/// Write INDEX record.
-///
-/// Record type: 0x020B
-#[allow(dead_code, reason = "retained as a BIFF compatibility building block")]
-pub(crate) fn write_index<W: Write>(
-    writer: &mut W,
-    first_row: u32,
-    last_row_plus1: u32,
-    def_col_width_pos: u32,
-    dbcell_positions: &[u32],
-) -> Result<()> {
-    worksheet::write_index(
-        writer,
-        first_row,
-        last_row_plus1,
-        def_col_width_pos,
-        dbcell_positions,
-    )
-}
-
-/// Write DBCELL record.
-///
-/// Record type: 0x00D7
-#[allow(dead_code, reason = "retained as a BIFF compatibility building block")]
-pub(crate) fn write_dbcell<W: Write>(
-    writer: &mut W,
-    row_offset: u32,
-    cell_offsets: &[u16],
-) -> Result<()> {
-    worksheet::write_dbcell(writer, row_offset, cell_offsets)
 }
 
 /// Write ROW record (row metrics including height and hidden flag).
@@ -1321,15 +1244,6 @@ mod tests {
         write_refresh_all(&mut buf, false).unwrap();
 
         assert_eq!(&buf[0..2], &[0xB7, 0x01]); // Record type 0x01B7
-    }
-
-    #[test]
-    fn test_write_book_bool() {
-        let mut buf = Vec::new();
-        write_book_bool(&mut buf, true).unwrap();
-
-        assert_eq!(&buf[0..2], &[0xDA, 0x00]); // Record type 0x00DA
-        assert_eq!(u16::from_le_bytes([buf[4], buf[5]]), 1);
     }
 
     #[test]

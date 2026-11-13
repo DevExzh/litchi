@@ -709,29 +709,13 @@ fn write_ppt_container_header<W: std::io::Write>(
     Ok(())
 }
 
-/// Write a PPT container header with custom instance
-#[allow(
-    dead_code,
-    reason = "helper retained for planned hyperlink record support"
-)]
-fn write_ppt_container_header_with_instance<W: std::io::Write>(
-    writer: &mut W,
-    version: u8,
-    instance: u16,
-    rec_type: u16,
-    length: u32,
-) -> Result<(), std::io::Error> {
-    let ver_inst = (u16::from(version) & 0x0F) | ((instance & 0x0FFF) << 4);
-    writer.write_all(&ver_inst.to_le_bytes())?;
-    writer.write_all(&rec_type.to_le_bytes())?;
-    writer.write_all(&length.to_le_bytes())?;
-    Ok(())
-}
-
 /// Build a `CString` record (UTF-16LE string) with instance value
-#[allow(
-    dead_code,
-    reason = "helper retained for planned hyperlink record support"
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "helper retained for planned hyperlink record support"
+    )
 )]
 fn build_cstring(instance: u16, text: &str) -> Vec<u8> {
     // Convert instance to options format (instance << 4)

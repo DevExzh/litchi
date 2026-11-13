@@ -17,10 +17,6 @@
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{OpcPackage, PackURI};
 
-#[allow(
-    unused_imports,
-    reason = "the delegated signatures name the module's values"
-)]
 use super::*;
 use super::{Draft, Prepared, Snapshot};
 use crate::package::signature::{refuse_signed_change, settle_unsigned_change};

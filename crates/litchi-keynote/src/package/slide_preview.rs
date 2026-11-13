@@ -415,10 +415,7 @@ fn is_invalidated_inner(
     Ok(scan.dirty == Some(true))
 }
 
-#[allow(
-    dead_code,
-    reason = "kept for private callers that do not share a transaction budget"
-)]
+#[cfg(test)]
 pub(super) fn exact_invalidation_delta(
     source: &ArchiveObject,
     candidate: &ArchiveObject,
