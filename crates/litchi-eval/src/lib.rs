@@ -17,7 +17,7 @@ use litchi_core::sheet::{
 };
 use parking_lot::{Mutex, RwLock};
 use std::borrow::Cow;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 #[cfg(feature = "web_functions")]
 use std::error::Error;
 
@@ -32,9 +32,91 @@ struct EvalState {
     cache: HashMap<CellRef, CellValue>,
 }
 
+/// Where one cell stands in one evaluation pass.
+///
+/// `Done` values live in the evaluator's cache and are shared by every pass;
+/// `InProgress` cells live in the pass's [`EvalSession`].
+///
+/// ```text
+/// NotStarted --read-----------------------------------> InProgress
+/// InProgress --value computed, no cycle through it----> Done(value)
+/// InProgress --value computed, inside a cycle---------> InProgress (waits for the cycle)
+/// InProgress --the cycle's first cell is computed-----> Done(circular error), whole cycle
+/// InProgress --evaluation fails, or the pass waits----> NotStarted
+///              on a transport response
+/// ```
+///
+/// Reading an `InProgress` cell yields the circular-reference error and
+/// records that the reader is on a cycle with it. Cells that can all reach
+/// one another are finished together, when the first of them that was
+/// started is computed, and every one of them is `Done` with the
+/// circular-reference error, as in LibreOffice (`Err:522`); a cell that only
+/// depends on the cycle is computed from that error. No value computed from
+/// the placeholder is kept for a cell on the cycle, so results do not depend
+/// on which cell is evaluated first.
+///
+/// A cell whose only cycle is a read of itself keeps the value its formula
+/// computes from the error. Several functions read every cell of a range
+/// they only measure (`COLUMNS(A1:C1)` in `B1`), and their result does not
+/// depend on evaluation order.
+enum CellStatus {
+    NotStarted,
+    /// `index` is the cell's position in [`Traversal::open`].
+    InProgress {
+        index: usize,
+    },
+    Done(CellValue),
+}
+
+/// A cell that is [`CellStatus::InProgress`].
+struct OpenCell {
+    key: CellRef,
+    /// The lowest position in [`Traversal::open`] this cell is known to
+    /// reach; below its own position, the cell is on a cycle with that one.
+    lowest: usize,
+}
+
+/// The cells in progress in one pass.
+#[derive(Default)]
+struct Traversal {
+    /// In the order they were started. A cell stays until its cycle closes.
+    open: Vec<OpenCell>,
+    /// The position in `open` of each cell in it.
+    index: HashMap<CellRef, usize>,
+    /// Positions in `open` of the cells whose formula is running, outermost
+    /// first.
+    chain: Vec<usize>,
+}
+
+impl Traversal {
+    /// The running formula read the cell at `index`.
+    fn reach(&mut self, index: usize) {
+        if let Some(reader) = self.chain.last().and_then(|at| self.open.get_mut(*at)) {
+            reader.lowest = reader.lowest.min(index);
+        }
+    }
+
+    /// Remove the cells from `index` onward.
+    fn close(&mut self, index: usize) -> Vec<CellRef> {
+        let cells: Vec<CellRef> = self.open.drain(index..).map(|cell| cell.key).collect();
+        for key in &cells {
+            self.index.remove(key);
+        }
+        cells
+    }
+}
+
+/// What computing a cell's value settled.
+enum Finished {
+    /// The cell is on a cycle that a cell started earlier closes.
+    OnOpenCycle,
+    /// These cells are done: the cell alone, or the cycle it closes.
+    Closed(Vec<CellRef>),
+}
+
 #[derive(Default)]
 struct EvalSession {
-    visiting: Mutex<HashSet<CellRef>>,
+    traversal: Mutex<Traversal>,
     /// URLs this pass needs from the caller's transport, in request order.
     #[cfg(feature = "web_functions")]
     requests: Mutex<Vec<String>>,
@@ -72,11 +154,6 @@ const MISSING_TABLE: SheetError = SheetError::refused(
     "a structured reference requires a registered table",
 );
 
-struct Visit<'a> {
-    session: &'a Mutex<HashSet<CellRef>>,
-    key: CellRef,
-}
-
 impl EvalSession {
     /// Record a URL the pass needs.
     #[cfg(feature = "web_functions")]
@@ -102,25 +179,49 @@ impl EvalSession {
 
     /// The number of formula cells on the current evaluation chain.
     fn depth(&self) -> usize {
-        self.visiting.lock().len()
+        self.traversal.lock().chain.len()
     }
 
-    fn enter(&self, key: CellRef) -> Option<Visit<'_>> {
-        let inserted = {
-            let mut visiting = self.visiting.lock();
-            visiting.insert(key)
-        };
-
-        inserted.then(|| Visit {
-            session: &self.visiting,
-            key,
-        })
+    /// The position of `key` among the cells in progress, if it is one.
+    fn position(&self, key: CellRef) -> Option<usize> {
+        self.traversal.lock().index.get(&key).copied()
     }
-}
 
-impl Drop for Visit<'_> {
-    fn drop(&mut self) {
-        self.session.lock().remove(&self.key);
+    /// `NotStarted -> InProgress`: the formula of `key` starts running.
+    fn begin(&self, key: CellRef) -> usize {
+        let mut traversal = self.traversal.lock();
+        let index = traversal.open.len();
+        traversal.open.push(OpenCell { key, lowest: index });
+        traversal.index.insert(key, index);
+        traversal.chain.push(index);
+        index
+    }
+
+    /// The running formula read the in-progress cell at `index`.
+    fn reach(&self, index: usize) {
+        self.traversal.lock().reach(index);
+    }
+
+    /// The formula of the cell at `index` produced a value.
+    fn finish(&self, index: usize) -> Finished {
+        let mut traversal = self.traversal.lock();
+        traversal.chain.pop();
+        let lowest = traversal.open.get(index).map_or(index, |cell| cell.lowest);
+        if lowest < index {
+            // The cell that read this one is on the same cycle.
+            traversal.reach(lowest);
+            Finished::OnOpenCycle
+        } else {
+            Finished::Closed(traversal.close(index))
+        }
+    }
+
+    /// `InProgress -> NotStarted`: the formula of the cell at `index` failed,
+    /// which also abandons the cells waiting on a cycle through it.
+    fn abandon(&self, index: usize) {
+        let mut traversal = self.traversal.lock();
+        traversal.chain.pop();
+        traversal.close(index);
     }
 }
 
@@ -138,13 +239,18 @@ mod session_tests {
         let first = EvalSession::default();
         let second = EvalSession::default();
 
-        let visit = first.enter(key).unwrap();
-        assert!(first.enter(key).is_none());
-        let independent = second.enter(key).unwrap();
+        let visit = first.begin(key);
+        assert_eq!(first.position(key), Some(visit));
+        assert_eq!(second.position(key), None);
+        let independent = second.begin(key);
 
-        drop(visit);
-        assert!(first.enter(key).is_some());
-        drop(independent);
+        assert!(matches!(first.finish(visit), Finished::Closed(cells) if cells == [key]));
+        assert_eq!(first.position(key), None);
+        assert_eq!(first.depth(), 0);
+        assert_eq!(second.position(key), Some(independent));
+        second.abandon(independent);
+        assert_eq!(second.position(key), None);
+        assert_eq!(second.depth(), 0);
     }
 }
 
@@ -413,10 +519,73 @@ where
             col,
         };
 
-        if let Some(value) = self.eval_state.read().cache.get(&key) {
-            return Ok(value.clone());
-        }
+        let circular = || CellValue::Error("Circular reference detected".to_string());
+        let index = match self.status(session, key) {
+            CellStatus::Done(value) => return Ok(value),
+            CellStatus::InProgress { index } => {
+                self.check_depth(session)?;
+                session.reach(index);
+                return Ok(circular());
+            },
+            CellStatus::NotStarted => {
+                self.check_depth(session)?;
+                session.begin(key)
+            },
+        };
 
+        let result = self
+            .stored(sheet_name, row, col)
+            .and_then(|stored| match stored {
+                // Prefer the cached result embedded in the file.
+                CellValue::Formula {
+                    cached_value: Some(cached),
+                    ..
+                } => Ok(*cached),
+                // No cached value: evaluate the formula text. Any parsing or
+                // semantic issue is reported as `CellValue::Error` rather
+                // than a hard failure.
+                CellValue::Formula { formula, .. } => {
+                    self.evaluate_formula(session, sheet_name, row, col, &formula)
+                },
+                other => Ok(other),
+            });
+        let value = match result {
+            Ok(value) => value,
+            Err(error) => {
+                session.abandon(index);
+                return Err(error);
+            },
+        };
+
+        match session.finish(index) {
+            Finished::OnOpenCycle => Ok(circular()),
+            Finished::Closed(cells) => {
+                let value = if cells.len() > 1 { circular() } else { value };
+                // A value computed while an external fetch is outstanding may
+                // rest on a placeholder; the next pass computes it again.
+                if !session.is_suspended() {
+                    let mut state = self.eval_state.write();
+                    for cell in cells {
+                        state.cache.insert(cell, value.clone());
+                    }
+                }
+                Ok(value)
+            },
+        }
+    }
+
+    fn status(&self, session: &EvalSession, key: CellRef) -> CellStatus {
+        if let Some(value) = self.eval_state.read().cache.get(&key) {
+            return CellStatus::Done(value.clone());
+        }
+        match session.position(key) {
+            Some(index) => CellStatus::InProgress { index },
+            None => CellStatus::NotStarted,
+        }
+    }
+
+    /// Refuse to follow a chain of formula cells longer than `max_depth`.
+    fn check_depth(&self, session: &EvalSession) -> Result<()> {
         let depth = session.depth();
         if depth >= self.max_depth {
             return Err(SheetError::Limit {
@@ -425,33 +594,7 @@ where
                 maximum: self.max_depth,
             });
         }
-        let Some(_visit) = session.enter(key) else {
-            return Ok(CellValue::Error("Circular reference detected".to_string()));
-        };
-
-        let result = match self.stored(sheet_name, row, col)? {
-            // Prefer the cached result embedded in the file.
-            CellValue::Formula {
-                cached_value: Some(cached),
-                ..
-            } => Ok(*cached),
-            // No cached value: evaluate the formula text. Any parsing or
-            // semantic issue is reported as `CellValue::Error` rather than a
-            // hard failure.
-            CellValue::Formula { formula, .. } => {
-                self.evaluate_formula(session, sheet_name, row, col, &formula)
-            },
-            other => Ok(other),
-        };
-
-        // A value computed while an external fetch is outstanding may rest
-        // on a placeholder; the next pass computes it again.
-        if let Ok(value) = &result
-            && !session.is_suspended()
-        {
-            self.eval_state.write().cache.insert(key, value.clone());
-        }
-        result
+        Ok(())
     }
 
     pub fn define_name(&mut self, name: &str, reference: &str) {
@@ -802,12 +945,12 @@ mod transport_tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     #[derive(Debug)]
-    struct Book {
-        names: Vec<String>,
-        cells: HashMap<(u32, u32), CellValue>,
+    pub(super) struct Book {
+        pub(super) names: Vec<String>,
+        pub(super) cells: HashMap<(u32, u32), CellValue>,
     }
 
-    struct Fixed<'a>(u32, u32, &'a CellValue);
+    pub(super) struct Fixed<'a>(u32, u32, &'a CellValue);
 
     impl Cell for Fixed<'_> {
         fn column(&self) -> u32 {
@@ -896,7 +1039,7 @@ mod transport_tests {
         }
     }
 
-    fn formula(text: &str) -> CellValue {
+    pub(super) fn formula(text: &str) -> CellValue {
         CellValue::Formula {
             formula: text.to_owned(),
             cached_value: None,
@@ -1018,6 +1161,132 @@ mod transport_tests {
         assert_eq!(
             offline.evaluate_cell("Sheet1", 1, 1).await.unwrap(),
             CellValue::Error("#CONNECT!".to_owned())
+        );
+    }
+}
+
+#[cfg(all(test, feature = "web_functions"))]
+mod cycle_tests {
+    //! Reference cycles: the result of a cell must not depend on which cell
+    //! of the workbook was evaluated first.
+
+    use super::transport_tests::{Book, formula};
+    use super::*;
+
+    const CIRCULAR: &str = "Circular reference detected";
+
+    fn book(cells: &[((u32, u32), CellValue)]) -> Book {
+        Book {
+            names: vec!["Sheet1".to_owned()],
+            cells: cells.iter().cloned().collect(),
+        }
+    }
+
+    /// Every ordering of `0..count`.
+    fn orders(count: usize) -> Vec<Vec<usize>> {
+        if count == 0 {
+            return vec![Vec::new()];
+        }
+        let mut all = Vec::new();
+        for shorter in orders(count - 1) {
+            for at in 0..=shorter.len() {
+                let mut order = shorter.clone();
+                order.insert(at, count - 1);
+                all.push(order);
+            }
+        }
+        all
+    }
+
+    /// Evaluate row 1 of `book` on a fresh evaluator, one cell at a time in
+    /// each possible order, and require the same row every time.
+    async fn row_in_every_order(book: &Book, columns: usize) -> Vec<CellValue> {
+        let mut expected: Option<Vec<CellValue>> = None;
+        for order in orders(columns) {
+            let evaluator = FormulaEvaluator::new(book);
+            let mut row = vec![CellValue::Empty; columns];
+            for &index in &order {
+                row[index] = evaluator
+                    .evaluate_cell("Sheet1", 1, index as u32 + 1)
+                    .await
+                    .unwrap();
+            }
+            match &expected {
+                Some(first) => assert_eq!(&row, first, "evaluation order {order:?}"),
+                None => expected = Some(row),
+            }
+        }
+        expected.unwrap()
+    }
+
+    #[tokio::test]
+    async fn two_cell_cycle_does_not_depend_on_evaluation_order() {
+        let book = book(&[
+            ((1, 1), formula("IFERROR(B1,0)")),
+            ((1, 2), formula("A1+1")),
+            ((1, 3), formula("IFERROR(A1,7)")),
+        ]);
+        let row = row_in_every_order(&book, 3).await;
+        assert_eq!(
+            row,
+            vec![
+                CellValue::Error(CIRCULAR.to_owned()),
+                CellValue::Error(CIRCULAR.to_owned()),
+                CellValue::Int(7),
+            ]
+        );
+        // One pass over the sheet agrees with cell-by-cell evaluation.
+        assert_eq!(
+            FormulaEvaluator::new(&book)
+                .evaluate_sheet("Sheet1")
+                .await
+                .unwrap(),
+            vec![row]
+        );
+    }
+
+    #[tokio::test]
+    async fn cycle_reached_through_a_finished_cell_does_not_depend_on_order() {
+        // A1 -> B1 -> D1 -> A1 and A1 -> C1 -> D1: C1 reaches the cycle
+        // through D1, which may already be finished when C1 reads it.
+        let book = book(&[
+            ((1, 1), formula("IFERROR(B1,0)+IFERROR(C1,0)")),
+            ((1, 2), formula("D1")),
+            ((1, 3), formula("IFERROR(D1,5)")),
+            ((1, 4), formula("A1")),
+            ((1, 5), formula("IFERROR(C1,9)+F1")),
+            ((1, 6), CellValue::Int(3)),
+        ]);
+        let circular = || CellValue::Error(CIRCULAR.to_owned());
+        assert_eq!(
+            row_in_every_order(&book, 6).await,
+            vec![
+                circular(),
+                circular(),
+                circular(),
+                circular(),
+                CellValue::Float(12.0),
+                CellValue::Int(3),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_cell_that_reads_only_itself_keeps_its_computed_value() {
+        // COLUMNS reads the cells of its range but uses only the shape, so
+        // B1 is not an error although its range contains B1.
+        let book = book(&[
+            ((1, 1), formula("A1+1")),
+            ((1, 2), formula("COLUMNS(A1:C1)")),
+            ((1, 3), formula("IFERROR(C1,4)")),
+        ]);
+        assert_eq!(
+            row_in_every_order(&book, 3).await,
+            vec![
+                CellValue::Error(CIRCULAR.to_owned()),
+                CellValue::Int(3),
+                CellValue::Int(4),
+            ]
         );
     }
 }
