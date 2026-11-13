@@ -465,11 +465,28 @@ enum Op {
 }
 
 /// Where an [`Edit`] is in its life.
+///
+/// ```text
+/// Open       --run fails----------------> Failed
+/// Open       --discard------------------> Discarded
+/// Open       --commit: run succeeds-----> Committing
+/// Committing --the Commit is built------> Committed
+/// Committing --building it fails--------> Open
+/// ```
+///
+/// Only `Open` accepts operations. `Failed`, `Discarded` and `Committed` are
+/// final.
 enum Phase {
-    Open,
+    Open {
+        /// Whether a Rust transaction ran yet: the first run happens even
+        /// with nothing staged, so the file's admission (locked, signed) is
+        /// checked as Rust's `File::edit` checks it.
+        ran: bool,
+    },
     Failed(Failure),
     Discarded,
-    /// Run and closed; its `Commit` is being built.
+    /// Run and closed to operations while its `Commit` is being built with
+    /// the lock released. The patches stay in the state until then.
     Committing,
     Committed(Py<Commit>),
 }
@@ -486,10 +503,6 @@ struct State {
     changed: bool,
     /// The patch of every run so far, in order.
     patches: Vec<litchi::transaction::Patch>,
-    /// Whether a Rust transaction ran yet: the first run happens even with
-    /// nothing staged, so the file's admission (locked, signed) is checked
-    /// as Rust's `File::edit` checks it.
-    ran: bool,
     phase: Phase,
 }
 
@@ -497,7 +510,7 @@ impl State {
     /// Fails unless the transaction is open.
     fn check(&self) -> Result<(), Failure> {
         match &self.phase {
-            Phase::Open => Ok(()),
+            Phase::Open { .. } => Ok(()),
             Phase::Failed(failure) => Err(failure.clone()),
             Phase::Discarded => Err(Failure::new(
                 litchi::Code::InvalidArgument,
@@ -524,7 +537,10 @@ impl State {
     /// poisons the transaction.
     fn run(&mut self, add: Option<&AddArgs>) -> Result<Option<String>, Failure> {
         self.check()?;
-        if self.ran && self.staged.is_empty() && add.is_none() {
+        if matches!(self.phase, Phase::Open { ran: true })
+            && self.staged.is_empty()
+            && add.is_none()
+        {
             return Ok(None);
         }
         let staged = std::mem::take(&mut self.staged);
@@ -551,9 +567,9 @@ impl State {
             }
         });
         let count = staged.len() + usize::from(add.is_some());
-        self.ran = true;
         match result {
             Ok(commit) => {
+                self.phase = Phase::Open { ran: true };
                 self.changed |= commit.diagnostics().changed();
                 let (file, patch, value) = commit.into_parts();
                 self.current = file;
@@ -612,8 +628,7 @@ impl Edit {
                 first: 0,
                 changed: false,
                 patches: Vec::new(),
-                ran: false,
-                phase: Phase::Open,
+                phase: Phase::Open { ran: false },
             }),
         }
     }
@@ -648,20 +663,31 @@ impl Edit {
         let (file, patch, changed, operations) = self.with(py, |state| {
             state.run(None)?;
             state.phase = Phase::Committing;
+            // A clone shares the patches; the state keeps its own until the
+            // Commit exists, so a failed build can reopen the transaction.
             let patch = Patch {
-                steps: std::mem::take(&mut state.patches),
+                steps: state.patches.clone(),
             };
             Ok((state.current.clone(), patch, state.changed, state.first))
         })?;
-        let commit = Py::new(
-            py,
-            Commit::new(py, file, Some(patch), changed, operations, None, value)?,
-        )?;
+        let built = Commit::new(py, file, Some(patch), changed, operations, None, value)
+            .and_then(|commit| Py::new(py, commit));
         // Holding the GIL while locking is safe: no thread holds the lock
         // while it waits for the GIL (`with` locks with the GIL released).
         let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
-        state.phase = Phase::Committed(commit.clone_ref(py));
-        Ok(commit)
+        match built {
+            Ok(commit) => {
+                state.patches = Vec::new();
+                state.phase = Phase::Committed(commit.clone_ref(py));
+                Ok(commit)
+            },
+            Err(error) => {
+                // Nothing was committed: the run stands and commit can be
+                // called again.
+                state.phase = Phase::Open { ran: true };
+                Err(error)
+            },
+        }
     }
 
     /// The commit of a committed transaction.
@@ -676,7 +702,7 @@ impl Edit {
     /// Discards the transaction unless it is already committed or failed.
     pub(crate) fn discard(&self, py: Python<'_>) {
         let _ = self.with(py, |state| {
-            if matches!(state.phase, Phase::Open) {
+            if matches!(state.phase, Phase::Open { .. }) {
                 state.staged.clear();
                 state.phase = Phase::Discarded;
             }
@@ -881,7 +907,7 @@ impl Edit {
     fn __repr__(&self) -> Cow<'static, str> {
         let state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
         match state.phase {
-            Phase::Open => format!("<Edit: {} staged>", state.staged.len()).into(),
+            Phase::Open { .. } => format!("<Edit: {} staged>", state.staged.len()).into(),
             Phase::Failed(_) => "<Edit: failed>".into(),
             Phase::Discarded => "<Edit: discarded>".into(),
             Phase::Committing | Phase::Committed(_) => "<Edit: committed>".into(),
