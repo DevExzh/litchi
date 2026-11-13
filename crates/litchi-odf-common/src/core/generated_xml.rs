@@ -233,18 +233,34 @@ pub(crate) struct GeneratedXmlReader<F> {
     report: GeneratedXmlReport,
     state: ReaderState,
     offset: usize,
-    fragment_ready: bool,
-    first_prefetched: bool,
-    failed: bool,
 }
 
+/// Where the reader is in `prefix + fragments + suffix`:
+///
+/// ```text
+/// Unstarted --first producer call--> Prefix { fragment_ready }
+/// Prefix { fragment_ready: true } --prefix copied--> Fragment
+/// Prefix { fragment_ready: false } --prefix copied--> Suffix
+/// Fragment --fragment copied--> NeedFragment
+/// NeedFragment --producer wrote a fragment--> Fragment
+/// NeedFragment --producer reported the end--> Suffix
+/// Suffix --suffix copied--> Done
+/// Unstarted | NeedFragment --producer call failed--> Failed
+/// ```
+///
+/// `Prefix` records whether the first producer call left a fragment in the
+/// buffer. `Fragment` always has one; every other state has none. `Done`
+/// and `Failed` are final: `Done` reads as end of input and `Failed`
+/// refuses every nonempty read.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ReaderState {
-    Prefix,
+    Unstarted,
+    Prefix { fragment_ready: bool },
     Fragment,
     NeedFragment,
     Suffix,
     Done,
+    Failed,
 }
 
 impl<F> GeneratedXmlReader<F>
@@ -274,11 +290,8 @@ where
             fragment,
             produce,
             report,
-            state: ReaderState::Prefix,
+            state: ReaderState::Unstarted,
             offset: 0,
-            fragment_ready: false,
-            first_prefetched: false,
-            failed: false,
         })
     }
 
@@ -288,11 +301,18 @@ where
     /// admission; direct low-level callers may prefetch when they need a
     /// recoverable preflight boundary.
     pub(crate) fn prefetch_first(&mut self) -> Result<()> {
-        if !self.first_prefetched {
-            self.first_prefetched = true;
-            if let Err(error) = self.fill_fragment() {
-                self.failed = true;
-                return Err(error);
+        if self.state == ReaderState::Unstarted {
+            // The reader counts as started before the producer runs, so the
+            // producer is never called a second time for the first fragment.
+            self.state = ReaderState::Prefix {
+                fragment_ready: false,
+            };
+            match self.fill_fragment() {
+                Ok(fragment_ready) => self.state = ReaderState::Prefix { fragment_ready },
+                Err(error) => {
+                    self.state = ReaderState::Failed;
+                    return Err(error);
+                },
             }
         }
         Ok(())
@@ -302,7 +322,10 @@ where
         self.report
     }
 
-    fn fill_fragment(&mut self) -> Result<()> {
+    /// Asks the producer for the next fragment and audits it. Returns
+    /// whether the buffer now holds a fragment; `false` is the producer's
+    /// end of fragments.
+    fn fill_fragment(&mut self) -> Result<bool> {
         self.fragment.clear();
         let produced = (self.produce)(&mut self.fragment);
 
@@ -320,8 +343,7 @@ where
                     "producer returned EOF after writing a nonempty fragment",
                 ));
             }
-            self.fragment_ready = false;
-            return Ok(());
+            return Ok(false);
         }
         if self.fragment.is_empty() {
             return Err(invalid_generated_xml(
@@ -334,8 +356,7 @@ where
                 .map_err(audit_error)?;
         validate_fragment_shape(self.fragment.as_bytes())?;
         self.add_fragment(fragment_report)?;
-        self.fragment_ready = true;
-        Ok(())
+        Ok(true)
     }
 
     fn add_fragment(&mut self, fragment: xml_minifier::audit::Report) -> Result<()> {
@@ -385,7 +406,7 @@ where
     }
 
     fn fail_io(&mut self, error: Error) -> io::Error {
-        self.failed = true;
+        self.state = ReaderState::Failed;
         io::Error::other(GeneratedXmlIoError(error))
     }
 }
@@ -398,23 +419,22 @@ where
         if output.is_empty() {
             return Ok(0);
         }
-        if self.failed {
-            return Err(io::Error::other("generated XML reader is failed"));
-        }
-        if let Err(error) = self.prefetch_first() {
-            return Err(self.fail_io(error));
-        }
 
         loop {
             match self.state {
-                ReaderState::Prefix => {
+                ReaderState::Unstarted => {
+                    if let Err(error) = self.prefetch_first() {
+                        return Err(self.fail_io(error));
+                    }
+                },
+                ReaderState::Prefix { fragment_ready } => {
                     let bytes = &self.envelope.prefix;
                     let amount = copy_pending(&mut self.offset, output, bytes);
                     if amount != 0 {
                         return Ok(amount);
                     }
                     self.offset = 0;
-                    self.state = if self.fragment_ready {
+                    self.state = if fragment_ready {
                         ReaderState::Fragment
                     } else {
                         ReaderState::Suffix
@@ -427,15 +447,15 @@ where
                         return Ok(amount);
                     }
                     self.offset = 0;
-                    self.fragment_ready = false;
                     self.state = ReaderState::NeedFragment;
                 },
                 ReaderState::NeedFragment => {
-                    if let Err(error) = self.fill_fragment() {
-                        return Err(self.fail_io(error));
-                    }
+                    let fragment_ready = match self.fill_fragment() {
+                        Ok(fragment_ready) => fragment_ready,
+                        Err(error) => return Err(self.fail_io(error)),
+                    };
                     self.offset = 0;
-                    self.state = if self.fragment_ready {
+                    self.state = if fragment_ready {
                         ReaderState::Fragment
                     } else {
                         ReaderState::Suffix
@@ -451,6 +471,9 @@ where
                     self.state = ReaderState::Done;
                 },
                 ReaderState::Done => return Ok(0),
+                ReaderState::Failed => {
+                    return Err(io::Error::other("generated XML reader is failed"));
+                },
             }
         }
     }

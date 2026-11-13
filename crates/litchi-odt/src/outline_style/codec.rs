@@ -287,7 +287,24 @@ struct ActiveOutline {
 struct ActiveLevel {
     depth: usize,
     value: LevelStyle,
-    child_order: u8,
+    stage: LevelChildStage,
+}
+
+/// The last child a `text:outline-level-style` accepted, in schema order:
+///
+/// ```text
+/// Start --style:list-level-properties--> ListLevelProperties
+///       --style:text-properties--> TextProperties
+/// Start --style:text-properties--> TextProperties
+/// ```
+///
+/// Both children are optional and neither repeats: a child is refused once
+/// the stage has reached or passed it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum LevelChildStage {
+    Start,
+    ListLevelProperties,
+    TextProperties,
 }
 
 #[derive(Debug)]
@@ -851,7 +868,7 @@ fn handle_start(
         let active = ActiveLevel {
             depth,
             value,
-            child_order: 0,
+            stage: LevelChildStage::Start,
         };
         if empty {
             finish_level(outline, active)?;
@@ -868,10 +885,12 @@ fn handle_start(
         return invalid("outline level has invalid nested content");
     }
     if current.0 == NamespaceKind::Style && current.1 == b"list-level-properties" {
-        if active_level.child_order != 0 || active_level.value.list_level_properties.is_some() {
+        if active_level.stage >= LevelChildStage::ListLevelProperties
+            || active_level.value.list_level_properties.is_some()
+        {
             return invalid("duplicate or out-of-order style:list-level-properties");
         }
-        active_level.child_order = 1;
+        active_level.stage = LevelChildStage::ListLevelProperties;
         let value = parse_list_properties(reader, version, start, total_attribute_bytes)?;
         if empty {
             active_level.value.list_level_properties = Some(value);
@@ -885,10 +904,12 @@ fn handle_start(
         return Ok(());
     }
     if current.0 == NamespaceKind::Style && current.1 == b"text-properties" {
-        if active_level.child_order > 1 || active_level.value.text_properties.is_some() {
+        if active_level.stage >= LevelChildStage::TextProperties
+            || active_level.value.text_properties.is_some()
+        {
             return invalid("duplicate or out-of-order style:text-properties");
         }
-        active_level.child_order = 2;
+        active_level.stage = LevelChildStage::TextProperties;
         let attributes = attributes(reader, version, start, total_attribute_bytes)?;
         active_level.value.text_properties = Some(TextProperties {
             attributes: attributes

@@ -814,10 +814,8 @@ struct SplicedReader<'source, 'fragment> {
     source: &'source mut dyn BufRead,
     expected_source_length: u64,
     source_remove_length: u64,
-    prefix_remaining: u64,
-    source_remove_remaining: u64,
     fragment: &'fragment [u8],
-    fragment_position: usize,
+    phase: SplicePhase,
     source_sha256: Sha256,
     target_sha256: Sha256,
     source_content_length: u64,
@@ -825,7 +823,42 @@ struct SplicedReader<'source, 'fragment> {
     pending: [u8; COPY_CHUNK_SIZE],
     pending_start: usize,
     pending_end: usize,
-    source_eof: bool,
+}
+
+/// Which part of `prefix + fragment + suffix` the next refill produces:
+///
+/// ```text
+/// Prefix { remaining } --source bytes copied--> Prefix { remaining - read }
+/// Prefix { remaining: 0 } --> Removal { remaining: removed length }
+/// Removal { remaining } --source bytes dropped--> Removal { remaining - read }
+/// Removal { remaining: 0 } --> Fragment { position: 0 }
+/// Fragment { position } --fragment bytes copied--> Fragment { position + count }
+/// Fragment { position: fragment length } --> Suffix
+/// Suffix --source bytes copied--> Suffix
+/// Suffix --declared source length reached, or the source ended--> Done
+/// ```
+///
+/// The phases only move forward, and a phase with nothing left is passed
+/// without touching the source. `Prefix` and `Removal` fail when the source
+/// ends early; the phase stays where it was, so a later refill asks the
+/// source again. `Done` is final: the reader then reports end of input.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SplicePhase {
+    /// Source bytes before the insertion offset are still to be copied.
+    Prefix {
+        remaining: u64,
+    },
+    /// Replaced source bytes are still to be read and dropped.
+    Removal {
+        remaining: u64,
+    },
+    /// The authored fragment is copied from `position` on.
+    Fragment {
+        position: usize,
+    },
+    /// Source bytes after the replaced range are copied.
+    Suffix,
+    Done,
 }
 
 impl<'source, 'fragment> SplicedReader<'source, 'fragment> {
@@ -840,10 +873,8 @@ impl<'source, 'fragment> SplicedReader<'source, 'fragment> {
             source,
             expected_source_length,
             source_remove_length,
-            prefix_remaining: offset,
-            source_remove_remaining: source_remove_length,
             fragment,
-            fragment_position: 0,
+            phase: SplicePhase::Prefix { remaining: offset },
             source_sha256: Sha256::new(),
             target_sha256: Sha256::new(),
             source_content_length: 0,
@@ -851,7 +882,6 @@ impl<'source, 'fragment> SplicedReader<'source, 'fragment> {
             pending: [0; COPY_CHUNK_SIZE],
             pending_start: 0,
             pending_end: 0,
-            source_eof: false,
         }
     }
 
@@ -923,77 +953,102 @@ impl<'source, 'fragment> SplicedReader<'source, 'fragment> {
     fn refill(&mut self) -> io::Result<()> {
         self.pending_start = 0;
         self.pending_end = 0;
-        if self.prefix_remaining != 0 {
-            let request = usize::try_from(self.prefix_remaining)
-                .unwrap_or(COPY_CHUNK_SIZE)
-                .min(COPY_CHUNK_SIZE);
-            let read = self.source.read(&mut self.pending[..request])?;
-            if read == 0 {
-                return Err(io::Error::new(
-                    io::ErrorKind::UnexpectedEof,
-                    "source content ended before insertion offset",
-                ));
+        loop {
+            match self.phase {
+                SplicePhase::Prefix { remaining: 0 } => {
+                    self.phase = SplicePhase::Removal {
+                        remaining: self.source_remove_length,
+                    };
+                },
+                SplicePhase::Prefix { remaining } => {
+                    let request = usize::try_from(remaining)
+                        .unwrap_or(COPY_CHUNK_SIZE)
+                        .min(COPY_CHUNK_SIZE);
+                    let read = self.source.read(&mut self.pending[..request])?;
+                    if read == 0 {
+                        return Err(io::Error::new(
+                            io::ErrorKind::UnexpectedEof,
+                            "source content ended before insertion offset",
+                        ));
+                    }
+                    let consumed = u64::try_from(read).map_err(|_| {
+                        io::Error::new(io::ErrorKind::InvalidData, "source-content prefix overflow")
+                    })?;
+                    self.phase = SplicePhase::Prefix {
+                        remaining: remaining - consumed,
+                    };
+                    self.append_source_pending(read)?;
+                    self.pending_end = read;
+                    return Ok(());
+                },
+                SplicePhase::Removal { remaining: 0 } => {
+                    self.phase = SplicePhase::Fragment { position: 0 };
+                },
+                SplicePhase::Removal { remaining } => {
+                    let request = usize::try_from(remaining)
+                        .unwrap_or(COPY_CHUNK_SIZE)
+                        .min(COPY_CHUNK_SIZE);
+                    let read = self.source.read(&mut self.pending[..request])?;
+                    if read == 0 {
+                        return Err(io::Error::new(
+                            io::ErrorKind::UnexpectedEof,
+                            "source content ended inside replacement range",
+                        ));
+                    }
+                    let consumed = u64::try_from(read).map_err(|_| {
+                        io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "source-content removal overflow",
+                        )
+                    })?;
+                    self.phase = SplicePhase::Removal {
+                        remaining: remaining - consumed,
+                    };
+                    self.append_removed_source(read)?;
+                },
+                SplicePhase::Fragment { position } if position < self.fragment.len() => {
+                    let remaining = self.fragment.len() - position;
+                    let count = remaining.min(COPY_CHUNK_SIZE);
+                    let end = position + count;
+                    self.pending[..count].copy_from_slice(&self.fragment[position..end]);
+                    self.phase = SplicePhase::Fragment { position: end };
+                    self.append_fragment_pending(count)?;
+                    self.pending_end = count;
+                    return Ok(());
+                },
+                SplicePhase::Fragment { .. } => self.phase = SplicePhase::Suffix,
+                SplicePhase::Suffix => {
+                    if self.source_content_length == self.expected_source_length {
+                        self.phase = SplicePhase::Done;
+                        return Ok(());
+                    }
+                    let remaining = self.expected_source_length - self.source_content_length;
+                    let request = usize::try_from(remaining)
+                        .unwrap_or(COPY_CHUNK_SIZE)
+                        .min(COPY_CHUNK_SIZE);
+                    let read = self.source.read(&mut self.pending[..request])?;
+                    if read == 0 {
+                        self.phase = SplicePhase::Done;
+                        return Ok(());
+                    }
+                    self.append_source_pending(read)?;
+                    self.pending_end = read;
+                    return Ok(());
+                },
+                SplicePhase::Done => return Ok(()),
             }
-            self.prefix_remaining -= u64::try_from(read).map_err(|_| {
-                io::Error::new(io::ErrorKind::InvalidData, "source-content prefix overflow")
-            })?;
-            self.append_source_pending(read)?;
-            self.pending_end = read;
-            return Ok(());
         }
-        while self.source_remove_remaining != 0 {
-            let request = usize::try_from(self.source_remove_remaining)
-                .unwrap_or(COPY_CHUNK_SIZE)
-                .min(COPY_CHUNK_SIZE);
-            let read = self.source.read(&mut self.pending[..request])?;
-            if read == 0 {
-                return Err(io::Error::new(
-                    io::ErrorKind::UnexpectedEof,
-                    "source content ended inside replacement range",
-                ));
-            }
-            self.source_remove_remaining -= u64::try_from(read).map_err(|_| {
-                io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "source-content removal overflow",
-                )
-            })?;
-            self.append_removed_source(read)?;
-        }
-        if self.fragment_position < self.fragment.len() {
-            let remaining = self.fragment.len() - self.fragment_position;
-            let count = remaining.min(COPY_CHUNK_SIZE);
-            let end = self.fragment_position + count;
-            self.pending[..count].copy_from_slice(&self.fragment[self.fragment_position..end]);
-            self.fragment_position = end;
-            self.append_fragment_pending(count)?;
-            self.pending_end = count;
-            return Ok(());
-        }
-        if self.source_content_length == self.expected_source_length {
-            self.source_eof = true;
-            return Ok(());
-        }
-        if self.source_eof {
-            return Ok(());
-        }
-        let remaining = self.expected_source_length - self.source_content_length;
-        let request = usize::try_from(remaining)
-            .unwrap_or(COPY_CHUNK_SIZE)
-            .min(COPY_CHUNK_SIZE);
-        let read = self.source.read(&mut self.pending[..request])?;
-        if read == 0 {
-            self.source_eof = true;
-            return Ok(());
-        }
-        self.append_source_pending(read)?;
-        self.pending_end = read;
-        Ok(())
     }
 
     fn finish(self) -> std::result::Result<StreamProof, &'static str> {
-        if self.prefix_remaining != 0
-            || self.source_remove_remaining != 0
+        // Whether source bytes in front of the fragment were never read:
+        // the rest of the prefix or of the replaced range.
+        let source_before_fragment_unread = match self.phase {
+            SplicePhase::Prefix { remaining } => remaining != 0 || self.source_remove_length != 0,
+            SplicePhase::Removal { remaining } => remaining != 0,
+            SplicePhase::Fragment { .. } | SplicePhase::Suffix | SplicePhase::Done => false,
+        };
+        if source_before_fragment_unread
             || self.source_content_length != self.expected_source_length
         {
             return Err("source content length");
@@ -1039,7 +1094,7 @@ impl Read for SplicedReader<'_, '_> {
 
 impl BufRead for SplicedReader<'_, '_> {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
-        if self.pending_start == self.pending_end && !self.source_eof {
+        if self.pending_start == self.pending_end && self.phase != SplicePhase::Done {
             self.refill()?;
         }
         Ok(&self.pending[self.pending_start..self.pending_end])

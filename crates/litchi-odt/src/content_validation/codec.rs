@@ -143,8 +143,31 @@ struct ActiveContainer {
 }
 struct ActiveValidation {
     parent_depth: usize,
-    child_order: u8,
+    stage: ValidationChildStage,
     value: ContentValidation,
+}
+
+/// The last child a `table:content-validation` accepted, in schema order:
+///
+/// ```text
+/// Start --table:help-message--> HelpMessage
+/// Start | HelpMessage --table:error-message | table:error-macro--> FailureAction
+/// FailureAction --office:event-listeners--> EventListeners
+/// ```
+///
+/// Every child is optional and none repeats. `table:error-message` and
+/// `table:error-macro` share one slot. A start-tag `office:event-listeners`
+/// is accepted only directly after that slot, and then only when the slot
+/// holds a macro without listeners. An empty-element
+/// `office:event-listeners` is checked against the macro alone; a macro
+/// without listeners exists only in `FailureAction`, so the transition is
+/// the same and only the refusal message differs.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum ValidationChildStage {
+    Start,
+    HelpMessage,
+    FailureAction,
+    EventListeners,
 }
 #[derive(Clone, Copy)]
 enum MessageKind {
@@ -544,7 +567,7 @@ fn handle_start(
         }
         *validation = Some(ActiveValidation {
             parent_depth: depth,
-            child_order: 0,
+            stage: ValidationChildStage::Start,
             value: parse_validation(attributes)?,
         });
         return Ok(());
@@ -613,7 +636,7 @@ fn handle_empty(
             let mut capture = start_capture(CaptureKind::EventListeners, depth, namespace, local)?;
             write_capture(&mut capture, Event::Empty(element.to_owned()))?;
             finish_capture(capture, None, Some(active))?;
-            active.child_order = 3;
+            active.stage = ValidationChildStage::EventListeners;
             return Ok(());
         }
         let mut local_message = None;
@@ -681,24 +704,30 @@ fn start_validation_child(
     capture: &mut Option<Capture>,
 ) -> Result<()> {
     match (namespace, local) {
-        (NamespaceKind::Table, "help-message") if active.child_order < 1 => {
-            active.child_order = 1;
+        (NamespaceKind::Table, "help-message")
+            if active.stage < ValidationChildStage::HelpMessage =>
+        {
+            active.stage = ValidationChildStage::HelpMessage;
             *message = Some(ActiveMessage {
                 parent_depth: depth,
                 kind: MessageKind::Help,
                 value: parse_message(attributes, false)?,
             });
         },
-        (NamespaceKind::Table, "error-message") if active.child_order < 2 => {
-            active.child_order = 2;
+        (NamespaceKind::Table, "error-message")
+            if active.stage < ValidationChildStage::FailureAction =>
+        {
+            active.stage = ValidationChildStage::FailureAction;
             *message = Some(ActiveMessage {
                 parent_depth: depth,
                 kind: MessageKind::Error,
                 value: parse_message(attributes, true)?,
             });
         },
-        (NamespaceKind::Table, "error-macro") if active.child_order < 2 => {
-            active.child_order = 2;
+        (NamespaceKind::Table, "error-macro")
+            if active.stage < ValidationChildStage::FailureAction =>
+        {
+            active.stage = ValidationChildStage::FailureAction;
             let execute = parse_macro(attributes)?;
             active.value.failure = Some(ValidationFailure::Macro {
                 execute,
@@ -708,9 +737,11 @@ fn start_validation_child(
                 parent_depth: depth,
             });
         },
-        (NamespaceKind::Office, "event-listeners") if active.child_order == 2 => {
+        (NamespaceKind::Office, "event-listeners")
+            if active.stage == ValidationChildStage::FailureAction =>
+        {
             require_macro_events(active)?;
-            active.child_order = 3;
+            active.stage = ValidationChildStage::EventListeners;
             *capture = Some(start_capture(
                 CaptureKind::EventListeners,
                 depth,
