@@ -884,6 +884,27 @@ pub(crate) fn document_paragraph_count(xml: &[u8]) -> Result<usize> {
     Ok(count)
 }
 
+/// Where [`body_block_ranges`] is relative to the single root of the document part.
+///
+/// ```text
+/// Prolog --start tag--> Open
+/// Prolog --empty element--> Closed
+/// Open   --root end tag--> Closed
+/// Open | Closed --another top-level element--> refused
+/// any    --top-level text other than whitespace, or character data--> refused
+/// any    --comment, declaration, DOCTYPE or processing instruction--> unchanged
+/// end of input--> refused in Prolog, or while an element or a body block is open
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No root element has started.
+    Prolog,
+    /// Inside the root element.
+    Open,
+    /// The root element has ended.
+    Closed,
+}
+
 /// Select active direct children of the main document body in source order.
 ///
 /// `DocumentPart::from_part` has already selected MCE branches for this
@@ -908,8 +929,7 @@ pub(crate) fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32, Name
     let mut pending = None::<(usize, usize, NamespaceBindings)>;
     let mut depth = 0usize;
     let mut nodes = 0usize;
-    let mut saw_root = false;
-    let mut root_closed = false;
+    let mut root_phase = RootPhase::Prolog;
 
     loop {
         let start = origin.offset(reader.buffer_position()).ok_or_else(|| {
@@ -937,12 +957,12 @@ pub(crate) fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32, Name
         match event {
             Event::Start(element) => {
                 if depth == 0 {
-                    if saw_root || root_closed {
+                    if root_phase != RootPhase::Prolog {
                         return Err(crate::Error::InvalidFormat(
                             "document XML has multiple roots".into(),
                         ));
                     }
-                    saw_root = true;
+                    root_phase = RootPhase::Open;
                 }
                 depth = depth.checked_add(1).ok_or_else(|| {
                     crate::Error::InvalidFormat("document XML nesting is too deep".into())
@@ -973,13 +993,12 @@ pub(crate) fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32, Name
             },
             Event::Empty(element) => {
                 if depth == 0 {
-                    if saw_root || root_closed {
+                    if root_phase != RootPhase::Prolog {
                         return Err(crate::Error::InvalidFormat(
                             "document XML has multiple roots".into(),
                         ));
                     }
-                    saw_root = true;
-                    root_closed = true;
+                    root_phase = RootPhase::Closed;
                 }
                 let child_depth = depth.checked_add(1).ok_or_else(|| {
                     crate::Error::InvalidFormat("document XML nesting is too deep".into())
@@ -1050,10 +1069,10 @@ pub(crate) fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32, Name
                     crate::Error::InvalidFormat("invalid document XML nesting".into())
                 })?;
                 if depth == 0 {
-                    root_closed = true;
+                    root_phase = RootPhase::Closed;
                 }
             },
-            Event::Eof if !saw_root || depth != 0 || pending.is_some() => {
+            Event::Eof if root_phase == RootPhase::Prolog || depth != 0 || pending.is_some() => {
                 return Err(crate::Error::InvalidFormat(
                     "document XML does not contain exactly one root".into(),
                 ));

@@ -154,6 +154,27 @@ struct Attribute {
     value_end: usize,
 }
 
+/// Where [`read_with_context`] is relative to the single `w:sectPr` root.
+///
+/// ```text
+/// Prolog --`w:sectPr` start tag--> Open
+/// Prolog --`w:sectPr` empty element--> Closed
+/// Open   --root end tag--> Closed
+/// Open | Closed --another top-level element--> refused
+/// any    --top-level text or character data other than whitespace--> refused
+/// any    --comment, declaration, DOCTYPE or processing instruction--> unchanged
+/// end of input--> accepted in Closed only
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No root element has started.
+    Prolog,
+    /// Inside the root element.
+    Open,
+    /// The root element has ended.
+    Closed,
+}
+
 /// Parse a section fragment using namespace state captured from its owning
 /// document part. The supplied context is never serialized into the source
 /// snapshot.
@@ -171,8 +192,7 @@ pub(crate) fn read_with_context(xml: &[u8], context: &Context) -> Result<Parsed>
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
     let mut nodes = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut root_phase = RootPhase::Prolog;
     let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
     let mut root = None;
     let mut extension = None;
@@ -211,15 +231,14 @@ pub(crate) fn read_with_context(xml: &[u8], context: &Context) -> Result<Parsed>
         match event {
             Event::Start(element) => {
                 if depth == 0 {
-                    if root_seen
-                        || root_closed
+                    if root_phase != RootPhase::Prolog
                         || !is_root(&namespace, &element, &mut fragment_prefix)
                     {
                         return Err(Error::InvalidFormat(
                             "section XML has an invalid sectPr root".into(),
                         ));
                     }
-                    root_seen = true;
+                    root_phase = RootPhase::Open;
                     root_ignorable = root_ignorable_value(&element, &resolver, decoder)?
                         .or_else(|| context.ignorable.clone());
                     root = Some(Root {
@@ -289,16 +308,14 @@ pub(crate) fn read_with_context(xml: &[u8], context: &Context) -> Result<Parsed>
             },
             Event::Empty(element) => {
                 if depth == 0 {
-                    if root_seen
-                        || root_closed
+                    if root_phase != RootPhase::Prolog
                         || !is_root(&namespace, &element, &mut fragment_prefix)
                     {
                         return Err(Error::InvalidFormat(
                             "section XML has an invalid sectPr root".into(),
                         ));
                     }
-                    root_seen = true;
-                    root_closed = true;
+                    root_phase = RootPhase::Closed;
                     root_ignorable = root_ignorable_value(&element, &resolver, decoder)?
                         .or_else(|| context.ignorable.clone());
                     root = Some(Root {
@@ -389,12 +406,12 @@ pub(crate) fn read_with_context(xml: &[u8], context: &Context) -> Result<Parsed>
                     extension_depth = None;
                 }
                 if depth == 1 {
-                    if !root_seen || root_closed {
+                    if root_phase != RootPhase::Open {
                         return Err(Error::InvalidFormat(
                             "section XML has an invalid sectPr close".into(),
                         ));
                     }
-                    root_closed = true;
+                    root_phase = RootPhase::Closed;
                     let value = root.as_mut().ok_or_else(|| {
                         Error::InvalidFormat("section XML root state is missing".into())
                     })?;
@@ -428,7 +445,11 @@ pub(crate) fn read_with_context(xml: &[u8], context: &Context) -> Result<Parsed>
         }
     }
 
-    if !root_seen || !root_closed || depth != 0 || extension_depth.is_some() {
+    let complete = match root_phase {
+        RootPhase::Prolog | RootPhase::Open => false,
+        RootPhase::Closed => depth == 0 && extension_depth.is_none(),
+    };
+    if !complete {
         return Err(Error::InvalidFormat(
             "section XML has an incomplete sectPr".into(),
         ));

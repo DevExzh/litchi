@@ -110,6 +110,34 @@ struct PendingAnchor {
     form: Form,
 }
 
+/// Where [`scan`] is relative to the story's single root element.
+///
+/// ```text
+/// Start  --XML declaration--> Prolog
+/// Start | Prolog --comment or whitespace text--> Prolog
+/// Prolog | Open | Closed --XML declaration--> refused
+/// Start | Prolog --root start tag--> Open
+/// Start | Prolog --root empty element--> Closed
+/// Open   --root end tag--> Closed
+/// Open | Closed --another top-level element--> refused
+/// Start | Prolog | Closed --text other than whitespace, character data
+///          or reference--> refused
+/// Open | Closed --comment--> unchanged
+/// any    --DOCTYPE or processing instruction--> refused
+/// end of input--> accepted in Closed only
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// Nothing has been read; an XML declaration is still allowed.
+    Start,
+    /// A declaration, comment or whitespace was read; no root yet.
+    Prolog,
+    /// Inside the root element.
+    Open,
+    /// The root element has ended.
+    Closed,
+}
+
 /// Inventory relationship anchors in one bounded WordprocessingML story.
 ///
 /// This scanner deliberately stops at the story-side grammar. Package
@@ -155,10 +183,7 @@ pub(crate) fn scan(
     let mut stack = Vec::new();
     let mut pending = Vec::new();
     let mut nodes = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
-    let mut declaration_seen = false;
-    let mut prolog_started = false;
+    let mut root_phase = RootPhase::Start;
 
     loop {
         let event = reader
@@ -176,15 +201,10 @@ pub(crate) fn scan(
                     resolver,
                     &stack,
                     max_depth,
-                    &mut root_seen,
-                    root_closed,
-                    &mut prolog_started,
+                    &mut root_phase,
                 )?;
                 let parent = semantic_parent(&stack);
                 let frame = classify_frame(&namespace, &element, parent, resolver, dialect);
-                if is_mce_frame(frame) {
-                    prolog_started = true;
-                }
                 if let Some(form) = classify_anchor(&namespace, &element, word_namespace, parent) {
                     let offset = element_offset(event_position, &element, false, xml)?;
                     push_pending(&mut pending, form, offset, max_nodes)?;
@@ -203,9 +223,7 @@ pub(crate) fn scan(
                     resolver,
                     &stack,
                     max_depth,
-                    &mut root_seen,
-                    &mut root_closed,
-                    &mut prolog_started,
+                    &mut root_phase,
                 )?;
                 let parent = semantic_parent(&stack);
                 if let Some(form) = classify_anchor(&namespace, &element, word_namespace, parent) {
@@ -214,7 +232,7 @@ pub(crate) fn scan(
                 }
             },
             Event::End(element) => {
-                if !root_seen || stack.is_empty() {
+                if matches!(root_phase, RootPhase::Start | RootPhase::Prolog) || stack.is_empty() {
                     return Err(invalid("DOCX story has an unexpected end element"));
                 }
                 validate_qname(element.name().as_ref(), LimitKind::XmlEndQName)?;
@@ -225,16 +243,17 @@ pub(crate) fn scan(
                 }
                 stack.pop();
                 if stack.is_empty() {
-                    root_closed = true;
+                    root_phase = RootPhase::Closed;
                 }
             },
             Event::Text(text) => {
                 bounded(text.as_ref(), MAX_TEXT_BYTES, LimitKind::XmlText)?;
                 let text = super::xml::text(text.as_ref())?;
-                if !root_seen {
-                    prolog_started = true;
+                match root_phase {
+                    RootPhase::Start | RootPhase::Prolog => root_phase = RootPhase::Prolog,
+                    RootPhase::Open | RootPhase::Closed => {},
                 }
-                if !root_seen || root_closed {
+                if root_phase != RootPhase::Open {
                     if !text.as_bytes().iter().all(u8::is_ascii_whitespace) {
                         return Err(invalid(
                             "DOCX story has non-whitespace text outside its root",
@@ -245,15 +264,16 @@ pub(crate) fn scan(
             Event::CData(data) => {
                 bounded(data.as_ref(), MAX_TEXT_BYTES, LimitKind::XmlCdata)?;
                 super::xml::text(data.as_ref())?;
-                if !root_seen || root_closed {
+                if root_phase != RootPhase::Open {
                     return Err(invalid("DOCX story has CDATA outside its root"));
                 }
             },
             Event::Comment(comment) => {
                 bounded(comment.as_ref(), MAX_COMMENT_BYTES, LimitKind::XmlComment)?;
                 super::xml::text(comment.as_ref())?;
-                if !root_seen {
-                    prolog_started = true;
+                match root_phase {
+                    RootPhase::Start | RootPhase::Prolog => root_phase = RootPhase::Prolog,
+                    RootPhase::Open | RootPhase::Closed => {},
                 }
             },
             Event::GeneralRef(reference) => {
@@ -263,7 +283,7 @@ pub(crate) fn scan(
                     LimitKind::XmlReference,
                 )?;
                 super::xml::reference(reference.as_ref())?;
-                if !root_seen || root_closed {
+                if root_phase != RootPhase::Open {
                     return Err(invalid("DOCX story has a reference outside its root"));
                 }
             },
@@ -274,12 +294,14 @@ pub(crate) fn scan(
                     LimitKind::XmlDeclaration,
                 )?;
                 super::xml::declaration(&declaration)?;
-                if declaration_seen || prolog_started || root_seen {
-                    return Err(invalid(
-                        "DOCX story has an XML declaration outside its prolog",
-                    ));
+                match root_phase {
+                    RootPhase::Start => root_phase = RootPhase::Prolog,
+                    RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+                        return Err(invalid(
+                            "DOCX story has an XML declaration outside its prolog",
+                        ));
+                    },
                 }
-                declaration_seen = true;
             },
             Event::DocType(doctype) => {
                 bounded(doctype.as_ref(), MAX_DECLARATION_BYTES, LimitKind::XmlDtd)?;
@@ -294,7 +316,11 @@ pub(crate) fn scan(
                 return Err(invalid("DOCX story rejects processing instructions"));
             },
             Event::Eof => {
-                if !root_seen || !root_closed || !stack.is_empty() {
+                let complete = match root_phase {
+                    RootPhase::Start | RootPhase::Prolog | RootPhase::Open => false,
+                    RootPhase::Closed => stack.is_empty(),
+                };
+                if !complete {
                     return Err(invalid("DOCX story has an unterminated XML root"));
                 }
                 break;
@@ -906,9 +932,7 @@ fn observe_start_envelope(
     resolver: &NamespaceResolver,
     stack: &[Frame],
     max_depth: usize,
-    root_seen: &mut bool,
-    root_closed: bool,
-    prolog_started: &mut bool,
+    root_phase: &mut RootPhase,
 ) -> Result<()> {
     validate_element_envelope(element, namespace, resolver)?;
     let depth = stack
@@ -918,16 +942,15 @@ fn observe_start_envelope(
     if depth > max_depth {
         return Err(limit(LimitKind::XmlDepth, depth, max_depth));
     }
-    if *root_seen && root_closed {
+    if *root_phase == RootPhase::Closed {
         return Err(invalid("DOCX story has more than one XML root"));
     }
     if stack.is_empty() {
-        if *root_seen {
+        if matches!(*root_phase, RootPhase::Open | RootPhase::Closed) {
             return Err(invalid("DOCX story has more than one XML root"));
         }
-        *root_seen = true;
+        *root_phase = RootPhase::Open;
     }
-    *prolog_started = true;
     Ok(())
 }
 
@@ -937,9 +960,7 @@ fn observe_empty_envelope(
     resolver: &NamespaceResolver,
     stack: &[Frame],
     max_depth: usize,
-    root_seen: &mut bool,
-    root_closed: &mut bool,
-    prolog_started: &mut bool,
+    root_phase: &mut RootPhase,
 ) -> Result<()> {
     validate_element_envelope(element, namespace, resolver)?;
     let depth = stack
@@ -950,15 +971,13 @@ fn observe_empty_envelope(
         return Err(limit(LimitKind::XmlDepth, depth, max_depth));
     }
     if stack.is_empty() {
-        if *root_seen {
+        if matches!(*root_phase, RootPhase::Open | RootPhase::Closed) {
             return Err(invalid("DOCX story has more than one XML root"));
         }
-        *root_seen = true;
-        *root_closed = true;
-    } else if *root_closed {
+        *root_phase = RootPhase::Closed;
+    } else if *root_phase == RootPhase::Closed {
         return Err(invalid("DOCX story has markup after its XML root"));
     }
-    *prolog_started = true;
     Ok(())
 }
 

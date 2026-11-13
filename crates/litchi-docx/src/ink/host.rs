@@ -95,6 +95,34 @@ pub(crate) fn capture(xml: &[u8], dialect: StoryDialect, limits: Limits) -> Resu
     capture_selected(xml, dialect, limits, &anchors, &candidates, &selected)
 }
 
+/// Where [`reference_values`] is relative to the story's single root element.
+///
+/// ```text
+/// Start  --XML declaration--> Prolog
+/// Start | Prolog --comment or whitespace text--> Prolog
+/// Prolog | Open | Closed --XML declaration--> refused
+/// Start | Prolog --root start tag--> Open
+/// Start | Prolog --root empty element--> Closed
+/// Open   --root end tag--> Closed
+/// Open | Closed --another top-level element--> refused
+/// Start | Prolog | Closed --text other than whitespace, character data
+///          or reference--> refused
+/// Open | Closed --comment--> unchanged
+/// any    --DOCTYPE or processing instruction--> refused
+/// end of input--> accepted in Closed only
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// Nothing has been read; an XML declaration is still allowed.
+    Start,
+    /// A declaration, comment or whitespace was read; no root yet.
+    Prolog,
+    /// Inside the root element.
+    Open,
+    /// The root element has ended.
+    Closed,
+}
+
 /// Return bounded, unique decoded attribute tokens from a complete story.
 ///
 /// Relationship IDs are normally carried by `r:id`, `r:embed`, `r:link`, or
@@ -111,10 +139,7 @@ pub(crate) fn reference_values(xml: &[u8], limits: Limits) -> Result<Vec<String>
     let mut reader = reader(xml);
     let mut stack_depth = 0usize;
     let mut nodes = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
-    let mut declaration_seen = false;
-    let mut prolog_started = false;
+    let mut root_phase = RootPhase::Start;
     let mut values = HashSet::new();
 
     loop {
@@ -132,9 +157,7 @@ pub(crate) fn reference_values(xml: &[u8], limits: Limits) -> Result<Vec<String>
                     &mut stack_depth,
                     &mut nodes,
                     limits,
-                    &mut root_seen,
-                    root_closed,
-                    &mut prolog_started,
+                    &mut root_phase,
                 )?;
                 collect_attributes(&element, resolver, &mut values, limits)?;
             },
@@ -146,9 +169,7 @@ pub(crate) fn reference_values(xml: &[u8], limits: Limits) -> Result<Vec<String>
                     &mut stack_depth,
                     &mut nodes,
                     limits,
-                    &mut root_seen,
-                    &mut root_closed,
-                    &mut prolog_started,
+                    &mut root_phase,
                 )?;
                 collect_attributes(&element, resolver, &mut values, limits)?;
             },
@@ -159,15 +180,17 @@ pub(crate) fn reference_values(xml: &[u8], limits: Limits) -> Result<Vec<String>
                 super::xml::text(element.name().as_ref())?;
                 stack_depth -= 1;
                 if stack_depth == 0 {
-                    root_closed = true;
+                    root_phase = RootPhase::Closed;
                 }
             },
             Event::Text(text) => {
                 super::xml::text(text.as_ref())?;
-                if !root_seen {
-                    prolog_started = true;
+                match root_phase {
+                    RootPhase::Start | RootPhase::Prolog => root_phase = RootPhase::Prolog,
+                    RootPhase::Open | RootPhase::Closed => {},
                 }
-                if (!root_seen || root_closed) && !text.as_ref().iter().all(u8::is_ascii_whitespace)
+                if root_phase != RootPhase::Open
+                    && !text.as_ref().iter().all(u8::is_ascii_whitespace)
                 {
                     return Err(invalid(
                         "DOCX story has non-whitespace text outside its root",
@@ -176,35 +199,42 @@ pub(crate) fn reference_values(xml: &[u8], limits: Limits) -> Result<Vec<String>
             },
             Event::CData(data) => {
                 super::xml::text(data.as_ref())?;
-                if !root_seen || root_closed {
+                if root_phase != RootPhase::Open {
                     return Err(invalid("DOCX story has CDATA outside its root"));
                 }
             },
             Event::Comment(comment) => {
                 super::xml::text(comment.as_ref())?;
-                if !root_seen {
-                    prolog_started = true;
+                match root_phase {
+                    RootPhase::Start | RootPhase::Prolog => root_phase = RootPhase::Prolog,
+                    RootPhase::Open | RootPhase::Closed => {},
                 }
             },
             Event::GeneralRef(reference) => {
                 super::xml::reference(reference.as_ref())?;
-                if !root_seen || root_closed {
+                if root_phase != RootPhase::Open {
                     return Err(invalid("DOCX story has a reference outside its root"));
                 }
             },
             Event::Decl(declaration) => {
                 super::xml::declaration(&declaration)?;
-                if declaration_seen || prolog_started || root_seen {
-                    return Err(invalid(
-                        "DOCX story has an XML declaration outside its prolog",
-                    ));
+                match root_phase {
+                    RootPhase::Start => root_phase = RootPhase::Prolog,
+                    RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+                        return Err(invalid(
+                            "DOCX story has an XML declaration outside its prolog",
+                        ));
+                    },
                 }
-                declaration_seen = true;
             },
             Event::DocType(_) => return Err(invalid("DOCX story rejects DTDs")),
             Event::PI(_) => return Err(invalid("DOCX story rejects processing instructions")),
             Event::Eof => {
-                if !root_seen || !root_closed || stack_depth != 0 {
+                let complete = match root_phase {
+                    RootPhase::Start | RootPhase::Prolog | RootPhase::Open => false,
+                    RootPhase::Closed => stack_depth == 0,
+                };
+                if !complete {
                     return Err(invalid("DOCX story has an unterminated XML root"));
                 }
                 break;
@@ -1515,9 +1545,7 @@ fn observe_envelope_start(
     depth: &mut usize,
     nodes: &mut usize,
     limits: Limits,
-    root_seen: &mut bool,
-    root_closed: bool,
-    prolog_started: &mut bool,
+    root_phase: &mut RootPhase,
 ) -> Result<()> {
     super::xml::element(element, resolver)?;
     if matches!(namespace, ResolveResult::Unknown(_)) {
@@ -1532,16 +1560,15 @@ fn observe_envelope_start(
     if *depth > limits.max_xml_depth {
         return Err(limit(LimitKind::XmlDepth, *depth, limits.max_xml_depth));
     }
-    if *root_seen && root_closed {
+    if *root_phase == RootPhase::Closed {
         return Err(invalid("DOCX story has more than one XML root"));
     }
     if *depth == 1 {
-        if *root_seen {
+        if matches!(*root_phase, RootPhase::Open | RootPhase::Closed) {
             return Err(invalid("DOCX story has more than one XML root"));
         }
-        *root_seen = true;
+        *root_phase = RootPhase::Open;
     }
-    *prolog_started = true;
     Ok(())
 }
 
@@ -1552,9 +1579,7 @@ fn observe_envelope_empty(
     depth: &mut usize,
     nodes: &mut usize,
     limits: Limits,
-    root_seen: &mut bool,
-    root_closed: &mut bool,
-    prolog_started: &mut bool,
+    root_phase: &mut RootPhase,
 ) -> Result<()> {
     super::xml::element(element, resolver)?;
     if matches!(namespace, ResolveResult::Unknown(_)) {
@@ -1570,15 +1595,13 @@ fn observe_envelope_empty(
         return Err(limit(LimitKind::XmlDepth, next_depth, limits.max_xml_depth));
     }
     if *depth == 0 {
-        if *root_seen {
+        if matches!(*root_phase, RootPhase::Open | RootPhase::Closed) {
             return Err(invalid("DOCX story has more than one XML root"));
         }
-        *root_seen = true;
-        *root_closed = true;
-    } else if *root_closed {
+        *root_phase = RootPhase::Closed;
+    } else if *root_phase == RootPhase::Closed {
         return Err(invalid("DOCX story has markup after its XML root"));
     }
-    *prolog_started = true;
     Ok(())
 }
 

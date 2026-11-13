@@ -122,6 +122,28 @@ pub(crate) fn rewrite(xml: &[u8], next: &OpenType) -> Result<Vec<u8>> {
     ))
 }
 
+/// Where [`locate`] is relative to the single root of a run fragment.
+///
+/// ```text
+/// Prolog --`w:r` or `w:rPr` start tag--> Open
+/// Prolog --`w:r` or `w:rPr` empty element--> Closed
+/// Open   --root end tag--> Closed
+/// Open | Closed --another top-level element--> refused
+/// any    --top-level whitespace or comment--> unchanged
+/// any    --top-level text or character data--> refused
+/// any    --declaration, DOCTYPE or processing instruction--> refused
+/// end of input--> accepted in Closed only
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No root element has started.
+    Prolog,
+    /// Inside the root element.
+    Open,
+    /// The root element has ended.
+    Closed,
+}
+
 fn locate(xml: &[u8]) -> Result<(Layout, OpenType)> {
     if xml.len() > MAX_XML_BYTES {
         return Err(Error::InvalidFormat(format!(
@@ -138,8 +160,7 @@ fn locate(xml: &[u8]) -> Result<(Layout, OpenType)> {
     let mut value = OpenType::default();
     let mut stack = Vec::<Frame>::new();
     let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut root_phase = RootPhase::Prolog;
     let mut rpr_depth = None::<usize>;
     let mut depth = 0usize;
     let mut nodes = 0usize;
@@ -207,7 +228,7 @@ fn locate(xml: &[u8]) -> Result<(Layout, OpenType)> {
                 }
 
                 if child_depth == 1 {
-                    if root_seen
+                    if root_phase != RootPhase::Prolog
                         || !is_word
                         || !matches!(element.local_name().as_ref(), b"r" | b"rPr")
                     {
@@ -215,7 +236,7 @@ fn locate(xml: &[u8]) -> Result<(Layout, OpenType)> {
                             "Word OpenType XML must have one w:r or w:rPr root".into(),
                         ));
                     }
-                    root_seen = true;
+                    root_phase = RootPhase::Open;
                     layout.root_name = element.name().as_ref().to_vec();
                     if element.local_name().as_ref() == b"rPr" {
                         rpr_depth = Some(child_depth);
@@ -271,7 +292,7 @@ fn locate(xml: &[u8]) -> Result<(Layout, OpenType)> {
                     )));
                 }
                 if child_depth == 1 {
-                    if root_seen
+                    if root_phase != RootPhase::Prolog
                         || !is_word
                         || !matches!(element.local_name().as_ref(), b"r" | b"rPr")
                     {
@@ -279,8 +300,7 @@ fn locate(xml: &[u8]) -> Result<(Layout, OpenType)> {
                             "Word OpenType XML must have one w:r or w:rPr root".into(),
                         ));
                     }
-                    root_seen = true;
-                    root_closed = true;
+                    root_phase = RootPhase::Closed;
                     layout.root_name = element.name().as_ref().to_vec();
                     layout.root_empty = Some(ByteRange {
                         start: event_start,
@@ -354,7 +374,7 @@ fn locate(xml: &[u8]) -> Result<(Layout, OpenType)> {
                     rpr_depth = None;
                 }
                 if depth == 1 {
-                    root_closed = true;
+                    root_phase = RootPhase::Closed;
                     layout.root_close_start = Some(event_start);
                 }
                 depth = depth.checked_sub(1).ok_or_else(|| {
@@ -386,7 +406,11 @@ fn locate(xml: &[u8]) -> Result<(Layout, OpenType)> {
         }
     }
 
-    if !root_seen || !root_closed || depth != 0 || !stack.is_empty() {
+    let complete = match root_phase {
+        RootPhase::Prolog | RootPhase::Open => false,
+        RootPhase::Closed => depth == 0 && stack.is_empty(),
+    };
+    if !complete {
         return Err(Error::InvalidFormat(
             "Word OpenType XML is not one complete element".into(),
         ));

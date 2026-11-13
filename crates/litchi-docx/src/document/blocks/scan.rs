@@ -377,6 +377,31 @@ impl Scan<'_> {
     }
 }
 
+/// Where [`index`] is relative to the single root of the fragment.
+///
+/// ```text
+/// Prolog --start tag--> Open
+/// Prolog --empty element--> Closed
+/// Open   --root end tag--> Closed
+/// Open | Closed --another top-level element--> refused
+/// Prolog --declaration at the first byte, or right after a byte-order mark--> Prolog
+/// Prolog --declaration anywhere else--> refused
+/// Open | Closed --declaration--> refused
+/// any    --comment--> unchanged
+/// any    --top-level text other than whitespace, character data or reference--> refused
+/// any    --DOCTYPE or processing instruction--> refused
+/// end of input--> refused in Prolog, or while an element or a block is open
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No root element has started.
+    Prolog,
+    /// Inside the root element.
+    Open,
+    /// The root element has ended.
+    Closed,
+}
+
 /// Index the direct block children of the container `fragment` holds.
 ///
 /// `fragment` is the container element cut from its part at byte `origin`
@@ -420,8 +445,7 @@ pub(crate) fn index(
     };
     let mut depth = 0usize;
     let mut nodes = 0usize;
-    let mut saw_root = false;
-    let mut root_closed = false;
+    let mut root_phase = RootPhase::Prolog;
 
     loop {
         let start = offset(reader_origin, scan.reader.buffer_position())?;
@@ -442,12 +466,12 @@ pub(crate) fn index(
                 });
             }
             if depth == 0 {
-                if saw_root || root_closed {
+                if root_phase != RootPhase::Prolog {
                     return Err(Error::InvalidFormat(
                         "block container has multiple roots".into(),
                     ));
                 }
-                saw_root = true;
+                root_phase = RootPhase::Open;
             }
         }
         match event {
@@ -466,7 +490,7 @@ pub(crate) fn index(
                     return Err(depth_error());
                 }
                 if depth == 0 {
-                    root_closed = true;
+                    root_phase = RootPhase::Closed;
                 }
                 scan.empty(&element, child_depth, (start, end))?;
             },
@@ -476,10 +500,12 @@ pub(crate) fn index(
                     Error::InvalidFormat("invalid block container nesting".into())
                 })?;
                 if depth == 0 {
-                    root_closed = true;
+                    root_phase = RootPhase::Closed;
                 }
             },
-            Event::Eof if !saw_root || depth != 0 || scan.pending.is_some() => {
+            Event::Eof
+                if root_phase == RootPhase::Prolog || depth != 0 || scan.pending.is_some() =>
+            {
                 return Err(Error::InvalidFormat(
                     "block container does not contain exactly one complete root".into(),
                 ));
@@ -535,7 +561,8 @@ pub(crate) fn index(
                 )?;
             },
             Event::Decl(_)
-                if saw_root || (start != 0 && fragment.get(..start) != Some(b"\xEF\xBB\xBF")) =>
+                if root_phase != RootPhase::Prolog
+                    || (start != 0 && fragment.get(..start) != Some(b"\xEF\xBB\xBF")) =>
             {
                 return Err(Error::InvalidFormat(
                     "misplaced block XML declaration".into(),

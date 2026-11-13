@@ -116,6 +116,27 @@ pub(crate) fn write_symbol(value: &Symbol, output: &mut String) -> Result<()> {
     Ok(())
 }
 
+/// Where [`locate`] is relative to the single `w:r` root of a run fragment.
+///
+/// ```text
+/// Prolog --`w:r` start tag--> Open
+/// Prolog --`w:r` empty element--> Closed
+/// Open   --root end tag--> Closed
+/// Open | Closed --another top-level element--> refused
+/// any    --top-level text or character data other than whitespace--> refused
+/// any    --comment, declaration, DOCTYPE or processing instruction--> unchanged
+/// end of input--> accepted in Closed only
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No root element has started.
+    Prolog,
+    /// Inside the root element.
+    Open,
+    /// The root element has ended.
+    Closed,
+}
+
 fn locate(xml: &[u8], initial_resolver: Option<&NamespaceResolver>) -> Result<(Layout, Symbols)> {
     if xml.len() > MAX_XML_BYTES {
         return Err(Error::InvalidFormat(format!(
@@ -136,8 +157,7 @@ fn locate(xml: &[u8], initial_resolver: Option<&NamespaceResolver>) -> Result<(L
     let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
     let mut depth = 0usize;
     let mut nodes = 0usize;
-    let mut saw_root = false;
-    let mut root_closed = false;
+    let mut root_phase = RootPhase::Prolog;
     let mut symbol_depth = None;
     let mut symbol_start = None;
 
@@ -177,7 +197,7 @@ fn locate(xml: &[u8], initial_resolver: Option<&NamespaceResolver>) -> Result<(L
                     validate_root(
                         &mut layout,
                         &mut fragment_prefix,
-                        &mut saw_root,
+                        &mut root_phase,
                         &namespace,
                         &element,
                         None,
@@ -209,7 +229,7 @@ fn locate(xml: &[u8], initial_resolver: Option<&NamespaceResolver>) -> Result<(L
                     validate_root(
                         &mut layout,
                         &mut fragment_prefix,
-                        &mut saw_root,
+                        &mut root_phase,
                         &namespace,
                         &element,
                         Some(ByteRange {
@@ -217,7 +237,7 @@ fn locate(xml: &[u8], initial_resolver: Option<&NamespaceResolver>) -> Result<(L
                             end: event_end,
                         }),
                     )?;
-                    root_closed = true;
+                    root_phase = RootPhase::Closed;
                 } else if symbol_depth.is_some() {
                     return Err(Error::InvalidFormat(
                         "Word symEx cannot contain child elements".into(),
@@ -245,7 +265,7 @@ fn locate(xml: &[u8], initial_resolver: Option<&NamespaceResolver>) -> Result<(L
                     symbol_depth = None;
                 }
                 if depth == 1 {
-                    root_closed = true;
+                    root_phase = RootPhase::Closed;
                     layout.root_close_start = Some(event_start);
                 }
                 depth = depth
@@ -280,7 +300,9 @@ fn locate(xml: &[u8], initial_resolver: Option<&NamespaceResolver>) -> Result<(L
                     ));
                 }
             },
-            Event::Eof if depth != 0 || symbol_depth.is_some() || !root_closed => {
+            Event::Eof
+                if depth != 0 || symbol_depth.is_some() || root_phase != RootPhase::Closed =>
+            {
                 return Err(Error::InvalidFormat("unterminated Word run XML".into()));
             },
             Event::Eof => break,
@@ -294,21 +316,21 @@ fn locate(xml: &[u8], initial_resolver: Option<&NamespaceResolver>) -> Result<(L
         }
     }
 
-    if !saw_root {
-        return Err(Error::InvalidFormat("Word run XML has no root".into()));
+    match root_phase {
+        RootPhase::Prolog => Err(Error::InvalidFormat("Word run XML has no root".into())),
+        RootPhase::Open | RootPhase::Closed => Ok((layout, symbols)),
     }
-    Ok((layout, symbols))
 }
 
 fn validate_root(
     layout: &mut Layout,
     fragment_prefix: &mut Option<Option<Vec<u8>>>,
-    saw_root: &mut bool,
+    root_phase: &mut RootPhase,
     namespace: &ResolveResult<'_>,
     element: &BytesStart<'_>,
     empty: Option<ByteRange>,
 ) -> Result<()> {
-    if *saw_root {
+    if *root_phase != RootPhase::Prolog {
         return Err(Error::InvalidFormat(
             "Word run XML has multiple roots".into(),
         ));
@@ -328,7 +350,7 @@ fn validate_root(
             "Word run XML has an invalid root".into(),
         ));
     }
-    *saw_root = true;
+    *root_phase = RootPhase::Open;
     layout.root_name = element.name().as_ref().to_vec();
     if let Some(empty) = empty {
         layout.root_empty = Some(empty);

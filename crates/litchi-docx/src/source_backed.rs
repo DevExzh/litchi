@@ -2542,6 +2542,31 @@ fn is_index_pressure_error(error: &Error) -> bool {
     )
 }
 
+/// Where [`ensure_source_document_xml`] is relative to the single root element.
+///
+/// ```text
+/// Prolog { declared: false } --declaration--> Prolog { declared: true }
+/// Prolog { declared: true } | Open | Closed --declaration--> refused
+/// Prolog --start tag--> Open
+/// Prolog --empty element--> Closed
+/// Open   --root end tag--> Closed
+/// Open | Closed --another top-level element--> refused
+/// any    --comment--> unchanged (a comment may precede the declaration)
+/// any    --top-level text other than whitespace, or character data--> refused
+/// any    --DOCTYPE or processing instruction--> refused
+/// end of input--> refused in Prolog, or while an element is open
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum DocumentRootPhase {
+    /// No root element has started; `declared` is set once the XML
+    /// declaration has been read.
+    Prolog { declared: bool },
+    /// Inside the root element.
+    Open,
+    /// The root element has ended.
+    Closed,
+}
+
 fn ensure_source_document_xml(xml: &[u8], context: Option<&ExecutionContext>) -> Result<()> {
     if xml.len() > SOURCE_DOCUMENT_SCAN_MAX_BYTES {
         return Err(Error::InvalidFormat(
@@ -2582,9 +2607,7 @@ fn ensure_source_document_xml(xml: &[u8], context: Option<&ExecutionContext>) ->
     let mut open_name_bytes = 0usize;
     let mut events = 0usize;
     let mut depth = 0usize;
-    let mut saw_root = false;
-    let mut root_closed = false;
-    let mut saw_declaration = false;
+    let mut root_phase = DocumentRootPhase::Prolog { declared: false };
     loop {
         events = events
             .checked_add(1)
@@ -2610,12 +2633,12 @@ fn ensure_source_document_xml(xml: &[u8], context: Option<&ExecutionContext>) ->
         match event {
             Event::Start(element) => {
                 if depth == 0 {
-                    if saw_root || root_closed {
+                    if !matches!(root_phase, DocumentRootPhase::Prolog { .. }) {
                         return Err(Error::InvalidFormat(
                             "source-backed document XML has multiple roots".into(),
                         ));
                     }
-                    saw_root = true;
+                    root_phase = DocumentRootPhase::Open;
                 }
                 depth = depth
                     .checked_add(1)
@@ -2635,13 +2658,12 @@ fn ensure_source_document_xml(xml: &[u8], context: Option<&ExecutionContext>) ->
             },
             Event::Empty(element) => {
                 if depth == 0 {
-                    if saw_root || root_closed {
+                    if !matches!(root_phase, DocumentRootPhase::Prolog { .. }) {
                         return Err(Error::InvalidFormat(
                             "source-backed document XML has multiple roots".into(),
                         ));
                     }
-                    saw_root = true;
-                    root_closed = true;
+                    root_phase = DocumentRootPhase::Closed;
                 }
                 let element_depth = depth
                     .checked_add(1)
@@ -2671,11 +2693,11 @@ fn ensure_source_document_xml(xml: &[u8], context: Option<&ExecutionContext>) ->
                     .checked_sub(1)
                     .ok_or_else(|| Error::InvalidFormat("document XML depth underflow".into()))?;
                 if depth == 0 {
-                    root_closed = true;
+                    root_phase = DocumentRootPhase::Closed;
                 }
             },
             Event::Eof => {
-                if !saw_root {
+                if matches!(root_phase, DocumentRootPhase::Prolog { .. }) {
                     return Err(Error::InvalidFormat(
                         "source-backed document XML does not contain exactly one root".into(),
                     ));
@@ -2702,13 +2724,17 @@ fn ensure_source_document_xml(xml: &[u8], context: Option<&ExecutionContext>) ->
                 }
             },
             Event::Comment(_) => {},
-            Event::Decl(_) => {
-                if saw_declaration || saw_root || root_closed {
+            Event::Decl(_) => match root_phase {
+                DocumentRootPhase::Prolog { declared: false } => {
+                    root_phase = DocumentRootPhase::Prolog { declared: true };
+                },
+                DocumentRootPhase::Prolog { declared: true }
+                | DocumentRootPhase::Open
+                | DocumentRootPhase::Closed => {
                     return Err(Error::InvalidFormat(
                         "source-backed document XML declaration is not in the prolog".into(),
                     ));
-                }
-                saw_declaration = true;
+                },
             },
             Event::PI(_) => {
                 return Err(Error::refused(
@@ -2878,6 +2904,32 @@ fn ensure_source_document_name_length(name: &[u8]) -> Result<()> {
     Ok(())
 }
 
+/// Where [`ensure_source_section_inventory_xml`] is relative to the single root element.
+///
+/// ```text
+/// Prolog { declared: false } --declaration--> Prolog { declared: true }
+/// Prolog { declared: true } | Open | Closed --declaration--> refused
+/// Prolog --start tag--> Open
+/// Prolog --empty element--> Closed
+/// Open   --root end tag--> Closed
+/// Open | Closed --another top-level element--> refused
+/// any    --comment--> unchanged (a comment may precede the declaration)
+/// any    --top-level text other than whitespace, or character data--> refused
+/// any    --processing instruction--> unchanged
+/// any    --DOCTYPE--> refused
+/// end of input--> refused in Prolog, or while an element is open
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SectionRootPhase {
+    /// No root element has started; `declared` is set once the XML
+    /// declaration has been read.
+    Prolog { declared: bool },
+    /// Inside the root element.
+    Open,
+    /// The root element has ended.
+    Closed,
+}
+
 /// Keep the source-backed section facade on the exact retained PartData
 /// representation. The general in-memory section parser intentionally
 /// supports MCE branch selection and ignores DTD/entity events because it is
@@ -2900,9 +2952,7 @@ pub(crate) fn ensure_source_section_inventory_xml(
     reader.config_mut().trim_text(false);
     let mut events = 0usize;
     let mut depth = 0usize;
-    let mut saw_root = false;
-    let mut root_closed = false;
-    let mut saw_declaration = false;
+    let mut root_phase = SectionRootPhase::Prolog { declared: false };
     loop {
         events = events
             .checked_add(1)
@@ -2923,12 +2973,12 @@ pub(crate) fn ensure_source_section_inventory_xml(
         match event {
             Event::Start(element) => {
                 if depth == 0 {
-                    if saw_root || root_closed {
+                    if !matches!(root_phase, SectionRootPhase::Prolog { .. }) {
                         return Err(Error::InvalidFormat(
                             "source-backed section XML has multiple roots".into(),
                         ));
                     }
-                    saw_root = true;
+                    root_phase = SectionRootPhase::Open;
                 }
                 depth = depth
                     .checked_add(1)
@@ -2944,13 +2994,12 @@ pub(crate) fn ensure_source_section_inventory_xml(
             },
             Event::Empty(element) => {
                 if depth == 0 {
-                    if saw_root || root_closed {
+                    if !matches!(root_phase, SectionRootPhase::Prolog { .. }) {
                         return Err(Error::InvalidFormat(
                             "source-backed section XML has multiple roots".into(),
                         ));
                     }
-                    saw_root = true;
-                    root_closed = true;
+                    root_phase = SectionRootPhase::Closed;
                 }
                 let element_depth = depth
                     .checked_add(1)
@@ -2969,7 +3018,7 @@ pub(crate) fn ensure_source_section_inventory_xml(
                     .checked_sub(1)
                     .ok_or_else(|| Error::InvalidFormat("section XML depth underflow".into()))?;
                 if depth == 0 {
-                    root_closed = true;
+                    root_phase = SectionRootPhase::Closed;
                 }
             },
             Event::DocType(_) => {
@@ -3013,7 +3062,7 @@ pub(crate) fn ensure_source_section_inventory_xml(
                 }
             },
             Event::Eof => {
-                if !saw_root {
+                if matches!(root_phase, SectionRootPhase::Prolog { .. }) {
                     return Err(Error::InvalidFormat(
                         "source-backed section XML does not contain exactly one root".into(),
                     ));
@@ -3038,13 +3087,17 @@ pub(crate) fn ensure_source_section_inventory_xml(
                 ));
             },
             Event::CData(_) | Event::Comment(_) | Event::PI(_) => {},
-            Event::Decl(_) => {
-                if saw_declaration || saw_root || root_closed {
+            Event::Decl(_) => match root_phase {
+                SectionRootPhase::Prolog { declared: false } => {
+                    root_phase = SectionRootPhase::Prolog { declared: true };
+                },
+                SectionRootPhase::Prolog { declared: true }
+                | SectionRootPhase::Open
+                | SectionRootPhase::Closed => {
                     return Err(Error::InvalidFormat(
                         "source-backed section XML declaration is not in the prolog".into(),
                     ));
-                }
-                saw_declaration = true;
+                },
             },
         }
     }

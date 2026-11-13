@@ -761,6 +761,27 @@ impl SemanticTextXmlBudget {
     }
 }
 
+/// Where [`preflight_semantic_xml`] is relative to the single root element.
+///
+/// ```text
+/// Prolog --start tag--> Open
+/// Prolog --empty element--> Closed
+/// Open   --root end tag--> Closed
+/// Open | Closed --another top-level element--> refused
+/// any    --text, character data, comment, declaration, DOCTYPE,
+///          processing instruction or reference--> unchanged (accepted)
+/// end of input--> refused in Prolog, or while an element is open
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PreflightRootPhase {
+    /// No root element has started.
+    Prolog,
+    /// Inside the root element.
+    Open,
+    /// The root element has ended.
+    Closed,
+}
+
 fn preflight_semantic_xml<F>(xml_bytes: &[u8], operation_check: &mut F) -> Result<()>
 where
     F: FnMut() -> Result<()>,
@@ -769,8 +790,7 @@ where
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let mut budget = SemanticTextXmlBudget::default();
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut root_phase = PreflightRootPhase::Prolog;
 
     loop {
         operation_check()?;
@@ -782,25 +802,24 @@ where
         match event {
             Event::Start(element) => {
                 if budget.depth == 0 {
-                    if root_seen || root_closed {
+                    if root_phase != PreflightRootPhase::Prolog {
                         return Err(Error::InvalidFormat(
                             "semantic DOCX XML has multiple roots".into(),
                         ));
                     }
-                    root_seen = true;
+                    root_phase = PreflightRootPhase::Open;
                 }
                 budget.observe_namespaces(&element)?;
                 budget.start()?;
             },
             Event::Empty(element) => {
                 if budget.depth == 0 {
-                    if root_seen || root_closed {
+                    if root_phase != PreflightRootPhase::Prolog {
                         return Err(Error::InvalidFormat(
                             "semantic DOCX XML has multiple roots".into(),
                         ));
                     }
-                    root_seen = true;
-                    root_closed = true;
+                    root_phase = PreflightRootPhase::Closed;
                 }
                 let empty_depth = budget.depth.checked_add(1).ok_or_else(|| {
                     Error::InvalidFormat("semantic DOCX XML depth counter overflow".into())
@@ -820,7 +839,7 @@ where
                 }
                 budget.end()?;
                 if budget.depth == 0 {
-                    root_closed = true;
+                    root_phase = PreflightRootPhase::Closed;
                 }
             },
             Event::GeneralRef(reference) => {
@@ -831,10 +850,13 @@ where
                 }
             },
             Event::Eof => {
-                if !root_seen {
-                    return Err(Error::InvalidFormat(
-                        "semantic DOCX XML lacks an element root".into(),
-                    ));
+                match root_phase {
+                    PreflightRootPhase::Prolog => {
+                        return Err(Error::InvalidFormat(
+                            "semantic DOCX XML lacks an element root".into(),
+                        ));
+                    },
+                    PreflightRootPhase::Open | PreflightRootPhase::Closed => {},
                 }
                 if budget.depth != 0 {
                     return Err(Error::InvalidFormat(

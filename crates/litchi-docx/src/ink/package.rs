@@ -123,6 +123,28 @@ fn check_catalog(package: PackageRef<'_>, limits: Limits) -> Result<()> {
     Ok(())
 }
 
+/// Where [`validate_content_part`] is relative to the single InkML root.
+///
+/// ```text
+/// Prolog --InkML root start tag--> Open
+/// Prolog --InkML root empty element--> Closed
+/// Prolog --any other element--> refused
+/// Open   --root end tag--> Closed
+/// Closed --any element--> refused
+/// any    --text, character data, comment, declaration, DOCTYPE,
+///          processing instruction or reference--> unchanged (ignored)
+/// end of input--> accepted in Closed only
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No root element has started.
+    Prolog,
+    /// Inside the root element.
+    Open,
+    /// The root element has ended.
+    Closed,
+}
+
 /// Select the MS-ODRAWXML Ink content-part profile before generic typed
 /// projection. This bounded pass does not replace the shared reader: it
 /// supplies the semantic spans that it may decode.
@@ -155,8 +177,7 @@ pub(crate) fn validate_content_part(xml: &[u8]) -> Result<ProfileProjection> {
     let mut formats = Vec::new();
     let mut channel_properties = Vec::new();
     let mut projection = ProfileProjection::default();
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut root_phase = RootPhase::Prolog;
     let mut nodes = 0usize;
 
     loop {
@@ -168,7 +189,7 @@ pub(crate) fn validate_content_part(xml: &[u8]) -> Result<ProfileProjection> {
         let end = position(&reader, origin)?;
         match event {
             Event::Start(element) => {
-                if root_closed {
+                if root_phase == RootPhase::Closed {
                     return Err(Error::Invalid(
                         "DOCX Ink content part has content after its root".into(),
                     ));
@@ -177,13 +198,13 @@ pub(crate) fn validate_content_part(xml: &[u8]) -> Result<ProfileProjection> {
                 increment_profile_nodes(&mut nodes)?;
                 enforce_profile_depth(stack.len().saturating_add(1))?;
                 let kind = profile_kind(&element, &namespace);
-                let frame = if !root_seen {
+                let frame = if root_phase == RootPhase::Prolog {
                     if kind != ProfileKind::Root {
                         return Err(Error::Invalid(
                             "DOCX Ink content part root is not namespace-bound InkML".into(),
                         ));
                     }
-                    root_seen = true;
+                    root_phase = RootPhase::Open;
                     ProfileFrame::recognized(kind, start)
                 } else {
                     observe_profile_element(
@@ -207,7 +228,7 @@ pub(crate) fn validate_content_part(xml: &[u8]) -> Result<ProfileProjection> {
                 stack.push(frame);
             },
             Event::Empty(element) => {
-                if root_closed {
+                if root_phase == RootPhase::Closed {
                     return Err(Error::Invalid(
                         "DOCX Ink content part has content after its root".into(),
                     ));
@@ -216,13 +237,13 @@ pub(crate) fn validate_content_part(xml: &[u8]) -> Result<ProfileProjection> {
                 increment_profile_nodes(&mut nodes)?;
                 enforce_profile_depth(stack.len().saturating_add(1))?;
                 let kind = profile_kind(&element, &namespace);
-                let frame = if !root_seen {
+                let frame = if root_phase == RootPhase::Prolog {
                     if kind != ProfileKind::Root {
                         return Err(Error::Invalid(
                             "DOCX Ink content part root is not namespace-bound InkML".into(),
                         ));
                     }
-                    root_seen = true;
+                    root_phase = RootPhase::Open;
                     ProfileFrame::recognized(kind, start)
                 } else {
                     observe_profile_element(
@@ -247,7 +268,7 @@ pub(crate) fn validate_content_part(xml: &[u8]) -> Result<ProfileProjection> {
                 )?;
                 finish_trace_frame(&frame, end, &mut traces)?;
                 if kind == ProfileKind::Root && stack.is_empty() {
-                    root_closed = true;
+                    root_phase = RootPhase::Closed;
                 }
             },
             Event::End(_) => {
@@ -262,7 +283,7 @@ pub(crate) fn validate_content_part(xml: &[u8]) -> Result<ProfileProjection> {
                 )?;
                 finish_trace_frame(&frame, start, &mut traces)?;
                 if frame.kind == ProfileKind::Root && stack.is_empty() {
-                    root_closed = true;
+                    root_phase = RootPhase::Closed;
                 }
             },
             Event::Eof => break,
@@ -276,7 +297,11 @@ pub(crate) fn validate_content_part(xml: &[u8]) -> Result<ProfileProjection> {
         }
     }
 
-    if !root_seen || !root_closed || !stack.is_empty() {
+    let complete = match root_phase {
+        RootPhase::Prolog | RootPhase::Open => false,
+        RootPhase::Closed => stack.is_empty(),
+    };
+    if !complete {
         return Err(Error::Invalid(
             "DOCX Ink content part root is absent or unterminated".into(),
         ));

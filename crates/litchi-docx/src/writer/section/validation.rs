@@ -15,12 +15,34 @@ use super::model::{
 };
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
+/// Where [`validate_header_footer_xml`] is relative to the single `w:hdr` or `w:ftr` root.
+///
+/// ```text
+/// Prolog --expected root start tag--> Open
+/// Prolog --expected root empty element--> Closed
+/// Open   --root end tag--> Closed
+/// Open | Closed --another top-level element--> refused
+/// Prolog --declaration, comment or processing instruction--> Prolog
+/// Closed --declaration, comment or processing instruction--> refused
+/// any    --top-level text other than whitespace--> refused
+/// any    --top-level character data, DOCTYPE or reference--> refused
+/// end of input--> accepted in Closed only
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No root element has started.
+    Prolog,
+    /// Inside the root element.
+    Open,
+    /// The root element has ended.
+    Closed,
+}
+
 pub(super) fn validate_header_footer_xml(xml: &str, header: bool) -> Result<()> {
     use quick_xml::reader::NsReader;
     let mut reader = NsReader::from_str(xml);
     let mut depth = 0usize;
-    let mut root = false;
-    let mut closed_root = false;
+    let mut root_phase = RootPhase::Prolog;
     let mut stack: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
     loop {
         let (wordprocessing_namespace, event_namespace_unknown, event_namespace, event) = {
@@ -48,8 +70,7 @@ pub(super) fn validate_header_footer_xml(xml: &str, header: bool) -> Result<()> 
                     } else {
                         b"ftr".as_slice()
                     };
-                    if root
-                        || closed_root
+                    if root_phase != RootPhase::Prolog
                         || !wordprocessing_namespace
                         || element.local_name().as_ref() != expected
                     {
@@ -57,7 +78,7 @@ pub(super) fn validate_header_footer_xml(xml: &str, header: bool) -> Result<()> 
                             "section header/footer XML has an invalid root".to_string(),
                         ));
                     }
-                    root = true;
+                    root_phase = RootPhase::Open;
                 }
                 stack.push((element.name().as_ref().to_vec(), event_namespace.clone()));
                 depth += 1;
@@ -74,8 +95,7 @@ pub(super) fn validate_header_footer_xml(xml: &str, header: bool) -> Result<()> 
                 } else {
                     b"ftr".as_slice()
                 };
-                if root
-                    || closed_root
+                if root_phase != RootPhase::Prolog
                     || !wordprocessing_namespace
                     || element.local_name().as_ref() != expected
                 {
@@ -83,8 +103,7 @@ pub(super) fn validate_header_footer_xml(xml: &str, header: bool) -> Result<()> 
                         "section header/footer XML has an invalid root".to_string(),
                     ));
                 }
-                root = true;
-                closed_root = true;
+                root_phase = RootPhase::Closed;
             },
             Event::Empty(element) if depth > 0 => {
                 if event_namespace_unknown {
@@ -112,12 +131,12 @@ pub(super) fn validate_header_footer_xml(xml: &str, header: bool) -> Result<()> 
                     Error::InvalidFormat("invalid header/footer XML nesting".to_string())
                 })?;
                 if depth == 0 {
-                    closed_root = true;
+                    root_phase = RootPhase::Closed;
                 }
             },
             Event::Eof => break,
             Event::Decl(_) | Event::Comment(_) | Event::PI(_) if depth == 0 => {
-                if root {
+                if root_phase != RootPhase::Prolog {
                     return Err(Error::InvalidFormat(
                         "header/footer XML has trailing markup".to_string(),
                     ));
@@ -145,7 +164,11 @@ pub(super) fn validate_header_footer_xml(xml: &str, header: bool) -> Result<()> 
             Event::Empty(_) => {},
         }
     }
-    if !root || !closed_root || depth != 0 || !stack.is_empty() {
+    let complete = match root_phase {
+        RootPhase::Prolog | RootPhase::Open => false,
+        RootPhase::Closed => depth == 0 && stack.is_empty(),
+    };
+    if !complete {
         return Err(Error::InvalidFormat(
             "unterminated section header/footer XML".to_string(),
         ));

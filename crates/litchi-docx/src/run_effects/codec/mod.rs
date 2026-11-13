@@ -38,6 +38,30 @@ const MAX_XML_BYTES: usize = 4 * 1024 * 1024;
 const MAX_DEPTH: usize = 64;
 const MAX_NODES: usize = 8_192;
 
+/// Whether [`parse`] has read the first element of the fragment.
+///
+/// The reader is lenient: only the first element is checked as the root, and
+/// nothing closes the fragment.
+///
+/// ```text
+/// Prolog --first element named `r` or `rPr`--> Rooted
+/// Prolog --any other first element--> refused
+/// Rooted --any element, also a top-level one after the root has ended-->
+///          Rooted (accepted: read like root content, so a later top-level
+///          `rPr` contributes its effects)
+/// any    --text, character data, comment or reference--> unchanged
+///          (text other than whitespace is refused inside the fragment's `rPr`)
+/// any    --declaration, DOCTYPE or processing instruction--> refused
+/// end of input--> accepted in Rooted once every element has ended
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No element has been read.
+    Prolog,
+    /// The first element was accepted as the root.
+    Rooted,
+}
+
 /// Parse a complete `w:r` or `w:rPr` fragment.
 ///
 /// # Errors
@@ -53,7 +77,7 @@ pub fn parse(xml: &[u8]) -> Result<super::model::Effects> {
     let origin = ReaderOrigin::of(xml);
     let mut depth = 0usize;
     let mut nodes = 0usize;
-    let mut root_seen = false;
+    let mut root_phase = RootPhase::Prolog;
     let mut rpr_depth = None::<usize>;
     let mut stack = Vec::<Frame>::new();
     let mut effects = super::model::Effects::new();
@@ -78,13 +102,18 @@ pub fn parse(xml: &[u8]) -> Result<super::model::Effects> {
                     )));
                 }
                 let local = element.local_name().as_ref().to_vec();
-                if !root_seen {
-                    root_seen = true;
-                    if local.as_slice() != b"r" && local.as_slice() != b"rPr" {
-                        return Err(Error::InvalidFormat(
-                            "Word run effects XML must have r or rPr root".into(),
-                        ));
-                    }
+                match root_phase {
+                    RootPhase::Prolog => {
+                        root_phase = RootPhase::Rooted;
+                        if local.as_slice() != b"r" && local.as_slice() != b"rPr" {
+                            return Err(Error::InvalidFormat(
+                                "Word run effects XML must have r or rPr root".into(),
+                            ));
+                        }
+                    },
+                    // A later top-level element is not refused: it is read
+                    // below like any element inside the root.
+                    RootPhase::Rooted => {},
                 }
                 if depth >= MAX_DEPTH {
                     return Err(Error::InvalidFormat(
@@ -118,18 +147,24 @@ pub fn parse(xml: &[u8]) -> Result<super::model::Effects> {
                     )));
                 }
                 let local = element.local_name().as_ref().to_vec();
-                if !root_seen {
-                    root_seen = true;
-                    if local.as_slice() != b"r" && local.as_slice() != b"rPr" {
-                        return Err(Error::InvalidFormat(
-                            "Word run effects XML must have r or rPr root".into(),
-                        ));
-                    }
-                } else if rpr_depth == Some(depth) {
-                    let end = origin.offset(reader.buffer_position()).ok_or_else(|| {
-                        Error::InvalidFormat("Word run effects XML offset overflow".into())
-                    })?;
-                    consume_direct(&mut effects, &local, is_w14, &xml[start..end])?;
+                match root_phase {
+                    RootPhase::Prolog => {
+                        root_phase = RootPhase::Rooted;
+                        if local.as_slice() != b"r" && local.as_slice() != b"rPr" {
+                            return Err(Error::InvalidFormat(
+                                "Word run effects XML must have r or rPr root".into(),
+                            ));
+                        }
+                    },
+                    RootPhase::Rooted if rpr_depth == Some(depth) => {
+                        let end = origin.offset(reader.buffer_position()).ok_or_else(|| {
+                            Error::InvalidFormat("Word run effects XML offset overflow".into())
+                        })?;
+                        consume_direct(&mut effects, &local, is_w14, &xml[start..end])?;
+                    },
+                    // A later top-level empty element is not refused either;
+                    // outside the fragment's `rPr` it carries no effect.
+                    RootPhase::Rooted => {},
                 }
             },
             Event::End(element) => {
@@ -179,7 +214,11 @@ pub fn parse(xml: &[u8]) -> Result<super::model::Effects> {
             Event::Text(_) | Event::CData(_) | Event::Comment(_) | Event::GeneralRef(_) => {},
         }
     }
-    if !root_seen || depth != 0 || !stack.is_empty() {
+    let complete = match root_phase {
+        RootPhase::Prolog => false,
+        RootPhase::Rooted => depth == 0 && stack.is_empty(),
+    };
+    if !complete {
         return Err(Error::InvalidFormat(
             "Word run effects XML is not one complete element".into(),
         ));

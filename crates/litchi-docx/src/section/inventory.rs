@@ -741,6 +741,29 @@ fn parse_inventory(xml: &[u8], limits: &Limits) -> Result<Inventory> {
     scan_visible_document(processed.xml.as_ref(), limits)
 }
 
+/// Where [`scan_visible_document`] is relative to the single `w:document` root.
+///
+/// ```text
+/// Prolog --`w:document` start tag--> Open
+/// Prolog --`w:document` empty element--> refused (the root omits `w:body`)
+/// Open   --`w:document` end tag--> Closed
+/// Open   --another top-level element--> refused
+/// Closed --any element--> refused
+/// Closed --text or character data other than whitespace--> refused
+/// Prolog --text or character data--> unchanged (ignored)
+/// any    --comment, declaration, DOCTYPE or processing instruction--> unchanged
+/// end of input--> accepted in Closed only, and only after a `w:body`
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No root element has started.
+    Prolog,
+    /// Inside the root element.
+    Open,
+    /// The root element has ended.
+    Closed,
+}
+
 fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
@@ -748,11 +771,10 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
     let mut depth = 0usize;
     let mut element_stack = Vec::<BytesStart<'_>>::new();
     let mut events = 0usize;
-    let mut root_seen = false;
+    let mut root_phase = RootPhase::Prolog;
     let mut body_depth = None;
     let mut table_depth = 0usize;
     let mut body_seen = false;
-    let mut root_closed = false;
     let mut paragraphs = Vec::<ParagraphContext>::new();
     let mut capture = None::<Capture>;
     let mut namespace_context = NamespaceContext::default();
@@ -785,7 +807,7 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
 
         match event {
             Event::Start(element) => {
-                if root_closed {
+                if root_phase == RootPhase::Closed {
                     return Err(Error::InvalidFormat(
                         "main-document XML has content after w:document".into(),
                     ));
@@ -826,7 +848,7 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
                     local.as_ref(),
                     false,
                     limits,
-                    &mut root_seen,
+                    &mut root_phase,
                     &mut body_seen,
                     &mut body_depth,
                     &mut table_depth,
@@ -845,7 +867,7 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
                 depth = child_depth;
             },
             Event::Empty(element) => {
-                if root_closed {
+                if root_phase == RootPhase::Closed {
                     return Err(Error::InvalidFormat(
                         "main-document XML has content after w:document".into(),
                     ));
@@ -886,7 +908,7 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
                     local.as_ref(),
                     true,
                     limits,
-                    &mut root_seen,
+                    &mut root_phase,
                     &mut body_seen,
                     &mut body_depth,
                     &mut table_depth,
@@ -941,7 +963,7 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
                             "main-document XML has an invalid root close".into(),
                         ));
                     }
-                    root_closed = true;
+                    root_phase = RootPhase::Closed;
                 }
                 depth = depth
                     .checked_sub(1)
@@ -955,14 +977,16 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
             },
             Event::Eof => break,
             Event::Text(text)
-                if root_closed && text.as_ref().iter().any(|byte| !byte.is_ascii_whitespace()) =>
+                if root_phase == RootPhase::Closed
+                    && text.as_ref().iter().any(|byte| !byte.is_ascii_whitespace()) =>
             {
                 return Err(Error::InvalidFormat(
                     "main-document XML has trailing character data".into(),
                 ));
             },
             Event::CData(text)
-                if root_closed && text.as_ref().iter().any(|byte| !byte.is_ascii_whitespace()) =>
+                if root_phase == RootPhase::Closed
+                    && text.as_ref().iter().any(|byte| !byte.is_ascii_whitespace()) =>
             {
                 return Err(Error::InvalidFormat(
                     "main-document XML has trailing character data".into(),
@@ -978,7 +1002,11 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
         }
     }
 
-    if !root_seen || !root_closed || !body_seen {
+    let complete = match root_phase {
+        RootPhase::Prolog | RootPhase::Open => false,
+        RootPhase::Closed => body_seen,
+    };
+    if !complete {
         return Err(Error::InvalidFormat(
             "main-document section inventory requires one w:document/w:body".into(),
         ));
@@ -1004,7 +1032,7 @@ fn inspect_element(
     local: &[u8],
     empty: bool,
     limits: &Limits,
-    root_seen: &mut bool,
+    root_phase: &mut RootPhase,
     body_seen: &mut bool,
     body_depth: &mut Option<usize>,
     table_depth: &mut usize,
@@ -1014,12 +1042,12 @@ fn inspect_element(
     namespace_bindings: Vec<RelationshipBinding>,
 ) -> Result<()> {
     if child_depth == 1 {
-        if *root_seen || !word || local != b"document" {
+        if *root_phase != RootPhase::Prolog || !word || local != b"document" {
             return Err(Error::InvalidFormat(
                 "section inventory XML has an invalid root".into(),
             ));
         }
-        *root_seen = true;
+        *root_phase = RootPhase::Open;
         if empty {
             return Err(Error::InvalidFormat(
                 "main-document root omits w:body".into(),
@@ -1027,7 +1055,7 @@ fn inspect_element(
         }
     }
     if word && local == b"body" {
-        if *body_seen || child_depth != 2 || !*root_seen {
+        if *body_seen || child_depth != 2 || *root_phase == RootPhase::Prolog {
             return Err(Error::InvalidFormat(
                 "main document has an invalid or duplicate w:body".into(),
             ));

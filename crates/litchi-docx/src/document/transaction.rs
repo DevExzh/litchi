@@ -7787,6 +7787,28 @@ fn preserves_body_child_shape(before: &[u8], after: &[u8]) -> bool {
         && !next.names_body
 }
 
+/// Where [`body_child_shape`] is relative to the single root of the fragment.
+///
+/// ```text
+/// Prolog --start tag at the first byte--> Open
+/// Prolog --empty element at the first byte--> Closed
+/// Prolog --element anywhere else--> declined
+/// Open   --root end tag--> Closed
+/// Closed --any element--> declined
+/// Prolog | Closed --non-empty text, character data, comment or reference--> declined
+/// any    --declaration, DOCTYPE or processing instruction--> declined
+/// end of input--> measured in Closed only
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum BodyChildRootPhase {
+    /// No root element has started.
+    Prolog,
+    /// Inside the root element.
+    Open,
+    /// The root element has ended.
+    Closed,
+}
+
 /// Measure one direct-body child fragment, or decline to measure it.
 ///
 /// `None` means the fragment is not exactly one balanced element spanning all
@@ -7804,58 +7826,56 @@ fn body_child_shape(fragment: &[u8]) -> Option<BodyChildShape> {
         names_body: false,
     };
     let mut depth = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut root_phase = BodyChildRootPhase::Prolog;
     loop {
         let event_start = origin.offset(reader.buffer_position())?;
         let event = reader.read_event().ok()?;
         let event_end = origin.offset(reader.buffer_position())?;
         match event {
             Event::Start(element) => {
-                if root_closed {
+                if root_phase == BodyChildRootPhase::Closed {
                     return None;
                 }
                 shape.names_body |= split_qualified_name(element.name().into_inner()).1 == b"body";
                 depth = depth.checked_add(1)?;
                 shape.nodes = shape.nodes.checked_add(1)?;
                 shape.max_depth = shape.max_depth.max(depth);
-                if !root_seen {
+                if root_phase == BodyChildRootPhase::Prolog {
                     if event_start != 0 {
                         return None;
                     }
                     shape.root_tag_len = event_end;
-                    root_seen = true;
+                    root_phase = BodyChildRootPhase::Open;
                 }
             },
             Event::Empty(element) => {
-                if root_closed {
+                if root_phase == BodyChildRootPhase::Closed {
                     return None;
                 }
                 shape.names_body |= split_qualified_name(element.name().into_inner()).1 == b"body";
                 shape.nodes = shape.nodes.checked_add(1)?;
                 shape.max_depth = shape.max_depth.max(depth.checked_add(1)?);
-                if !root_seen {
+                if root_phase == BodyChildRootPhase::Prolog {
                     if event_start != 0 {
                         return None;
                     }
                     shape.root_tag_len = event_end;
-                    root_seen = true;
-                    root_closed = true;
+                    root_phase = BodyChildRootPhase::Closed;
                 }
             },
             Event::End(_) => {
                 depth = depth.checked_sub(1)?;
                 if depth == 0 {
-                    root_closed = true;
+                    root_phase = BodyChildRootPhase::Closed;
                 }
             },
             Event::Text(text) => {
-                if (!root_seen || root_closed) && !text.is_empty() {
+                if root_phase != BodyChildRootPhase::Open && !text.is_empty() {
                     return None;
                 }
             },
             Event::CData(_) | Event::Comment(_) | Event::GeneralRef(_) => {
-                if !root_seen || root_closed {
+                if root_phase != BodyChildRootPhase::Open {
                     return None;
                 }
             },
@@ -7863,7 +7883,11 @@ fn body_child_shape(fragment: &[u8]) -> Option<BodyChildShape> {
             Event::Eof => break,
         }
     }
-    (root_seen && root_closed && depth == 0).then_some(shape)
+    let complete = match root_phase {
+        BodyChildRootPhase::Prolog | BodyChildRootPhase::Open => false,
+        BodyChildRootPhase::Closed => depth == 0,
+    };
+    complete.then_some(shape)
 }
 
 struct Layout {

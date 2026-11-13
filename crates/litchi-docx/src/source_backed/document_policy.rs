@@ -411,6 +411,31 @@ struct SettingsGuardFacts {
     track_revisions: bool,
 }
 
+/// Where [`guard_settings_source`] is relative to the single root element.
+///
+/// ```text
+/// Prolog { declared: false } --declaration--> Prolog { declared: true }
+/// Prolog { declared: true } | Open | Closed --declaration--> refused
+/// Prolog --start tag--> Open
+/// Prolog --empty element--> Closed
+/// Open   --root end tag--> Closed
+/// Open | Closed --another top-level element--> refused
+/// any    --comment--> unchanged (a comment may precede the declaration)
+/// any    --top-level text other than whitespace, or character data--> refused
+/// any    --DOCTYPE or processing instruction--> refused
+/// end of input--> refused in Prolog, or while an element is open
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SettingsRootPhase {
+    /// No root element has started; `declared` is set once the XML
+    /// declaration has been read.
+    Prolog { declared: bool },
+    /// Inside the root element.
+    Open,
+    /// The root element has ended.
+    Closed,
+}
+
 fn guard_settings_source(
     xml: &[u8],
     context: Option<&ExecutionContext>,
@@ -430,9 +455,7 @@ fn guard_settings_source(
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
     let mut events = 0u64;
-    let mut saw_root = false;
-    let mut root_closed = false;
-    let mut saw_declaration = false;
+    let mut root_phase = SettingsRootPhase::Prolog { declared: false };
     let mut track_revisions = None;
 
     loop {
@@ -453,12 +476,12 @@ fn guard_settings_source(
         match event {
             Event::Start(element) => {
                 if depth == 0 {
-                    if saw_root || root_closed {
+                    if !matches!(root_phase, SettingsRootPhase::Prolog { .. }) {
                         return Err(Error::InvalidFormat(
                             "settings XML has multiple roots".into(),
                         ));
                     }
-                    saw_root = true;
+                    root_phase = SettingsRootPhase::Open;
                 }
                 depth = depth
                     .checked_add(1)
@@ -487,13 +510,12 @@ fn guard_settings_source(
             },
             Event::Empty(element) => {
                 if depth == 0 {
-                    if saw_root || root_closed {
+                    if !matches!(root_phase, SettingsRootPhase::Prolog { .. }) {
                         return Err(Error::InvalidFormat(
                             "settings XML has multiple roots".into(),
                         ));
                     }
-                    saw_root = true;
-                    root_closed = true;
+                    root_phase = SettingsRootPhase::Closed;
                 }
                 let child_depth = depth
                     .checked_add(1)
@@ -525,11 +547,15 @@ fn guard_settings_source(
                     .checked_sub(1)
                     .ok_or_else(|| Error::InvalidFormat("settings XML depth underflow".into()))?;
                 if depth == 0 {
-                    root_closed = true;
+                    root_phase = SettingsRootPhase::Closed;
                 }
             },
             Event::Eof => {
-                if !saw_root || depth != 0 {
+                let complete = match root_phase {
+                    SettingsRootPhase::Prolog { .. } => false,
+                    SettingsRootPhase::Open | SettingsRootPhase::Closed => depth == 0,
+                };
+                if !complete {
                     return Err(Error::InvalidFormat(
                         "settings XML does not contain one complete root".into(),
                     ));
@@ -549,13 +575,17 @@ fn guard_settings_source(
                 ));
             },
             Event::Comment(_) | Event::CData(_) => {},
-            Event::Decl(_) => {
-                if saw_declaration || saw_root || root_closed {
+            Event::Decl(_) => match root_phase {
+                SettingsRootPhase::Prolog { declared: false } => {
+                    root_phase = SettingsRootPhase::Prolog { declared: true };
+                },
+                SettingsRootPhase::Prolog { declared: true }
+                | SettingsRootPhase::Open
+                | SettingsRootPhase::Closed => {
                     return Err(Error::InvalidFormat(
                         "settings XML declaration is not in its prolog".into(),
                     ));
-                }
-                saw_declaration = true;
+                },
             },
             Event::PI(_) => {
                 return Err(Error::refused(

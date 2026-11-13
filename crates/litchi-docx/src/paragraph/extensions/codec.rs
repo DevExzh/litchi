@@ -101,6 +101,28 @@ fn parse_paragraph_start_impl(xml: &[u8], inherited: &[(Option<Vec<u8>>, Vec<u8>
     }
 }
 
+/// Where [`parse_root`] is relative to the single `w:p` or `w:tr` root.
+///
+/// ```text
+/// Prolog --expected root start tag--> Open
+/// Prolog --expected root empty element--> Closed
+/// Open   --root end tag--> Closed
+/// Open | Closed --another top-level element--> refused
+/// any    --declaration or comment--> unchanged (accepted anywhere)
+/// any    --top-level text or character data other than whitespace--> refused
+/// any    --DOCTYPE or processing instruction--> refused
+/// end of input--> accepted in Closed only
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No root element has started.
+    Prolog,
+    /// Inside the root element.
+    Open,
+    /// The root element has ended.
+    Closed,
+}
+
 fn parse_root(
     xml: &[u8],
     root_name: &[u8],
@@ -110,8 +132,7 @@ fn parse_root(
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
-    let mut saw_root = false;
-    let mut root_closed = false;
+    let mut root_phase = RootPhase::Prolog;
     let mut para_id = None;
     let mut text_id = None;
     let mut no_spell_err = None;
@@ -128,7 +149,9 @@ fn parse_root(
         match event {
             Event::Start(element) => {
                 if depth == 0 {
-                    if saw_root || root_closed || !is_word_root(&namespace, &element, root_name) {
+                    if root_phase != RootPhase::Prolog
+                        || !is_word_root(&namespace, &element, root_name)
+                    {
                         return Err(Error::InvalidFormat(format!(
                             "Word extension XML must have one {root_name:?} root"
                         )));
@@ -142,7 +165,7 @@ fn parse_root(
                         &mut text_id,
                         &mut no_spell_err,
                     )?;
-                    saw_root = true;
+                    root_phase = RootPhase::Open;
                     depth = 1;
                 } else {
                     depth = depth.checked_add(1).ok_or_else(|| {
@@ -152,7 +175,9 @@ fn parse_root(
             },
             Event::Empty(element) => {
                 if depth == 0 {
-                    if saw_root || root_closed || !is_word_root(&namespace, &element, root_name) {
+                    if root_phase != RootPhase::Prolog
+                        || !is_word_root(&namespace, &element, root_name)
+                    {
                         return Err(Error::InvalidFormat(format!(
                             "Word extension XML must have one {root_name:?} root"
                         )));
@@ -166,8 +191,7 @@ fn parse_root(
                         &mut text_id,
                         &mut no_spell_err,
                     )?;
-                    saw_root = true;
-                    root_closed = true;
+                    root_phase = RootPhase::Closed;
                 }
             },
             Event::End(_) => {
@@ -175,7 +199,7 @@ fn parse_root(
                     Error::InvalidFormat("Word extension XML has an unexpected end".into())
                 })?;
                 if depth == 0 {
-                    root_closed = true;
+                    root_phase = RootPhase::Closed;
                 }
             },
             Event::Text(text) if depth == 0 => {
@@ -195,7 +219,7 @@ fn parse_root(
                     ));
                 }
             },
-            Event::Decl(_) | Event::Comment(_) if !saw_root => {},
+            Event::Decl(_) | Event::Comment(_) if root_phase == RootPhase::Prolog => {},
             Event::DocType(_) | Event::PI(_) => {
                 return Err(Error::InvalidFormat(
                     "Word extension XML cannot contain a DTD or processing instruction".into(),
@@ -210,7 +234,11 @@ fn parse_root(
         }
     }
 
-    if !saw_root || depth != 0 || !root_closed {
+    let complete = match root_phase {
+        RootPhase::Prolog | RootPhase::Open => false,
+        RootPhase::Closed => depth == 0,
+    };
+    if !complete {
         return Err(Error::InvalidFormat(
             "Word extension XML is missing a complete root".into(),
         ));

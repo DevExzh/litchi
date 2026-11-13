@@ -1000,6 +1000,28 @@ struct OpenRange {
     parent_frame: Option<usize>,
 }
 
+/// Where [`parse`] is relative to the single `w:document` root.
+///
+/// ```text
+/// Prolog --start tag--> Open (then refused unless it is `w:document`)
+/// Prolog --empty element--> Closed (then refused unless it is `w:document`)
+/// Open   --root end tag--> Closed
+/// Open | Closed --another top-level element--> refused
+/// any    --top-level text or character data other than whitespace--> refused
+/// any    --comment, declaration or processing instruction--> unchanged
+/// any    --DOCTYPE or reference--> refused
+/// end of input--> accepted in Closed only
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No root element has started.
+    Prolog,
+    /// Inside the root element.
+    Open,
+    /// The root element has ended.
+    Closed,
+}
+
 fn parse(source: &[u8], limits: Limits) -> Result<Vec<Group>> {
     // Names are resolved on namespace values as written: a binding that
     // spells the markup-compatibility namespace with references would hide
@@ -1026,8 +1048,7 @@ fn parse(source: &[u8], limits: Limits) -> Result<Vec<Group>> {
     let mut events = 0usize;
     let mut metadata_bytes = 0usize;
     let mut depth = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut root_phase = RootPhase::Prolog;
     let mut mce_depth = 0usize;
     let mut order = 0usize;
     let mut frame_id = 0usize;
@@ -1053,14 +1074,14 @@ fn parse(source: &[u8], limits: Limits) -> Result<Vec<Group>> {
         match event {
             Event::Start(element) => {
                 reject_unknown_namespace(&resolved)?;
-                if root_closed {
+                if root_phase == RootPhase::Closed {
                     return Err(invalid("tracked revision XML has multiple root elements"));
                 }
                 if depth == 0 {
-                    if root_seen {
+                    if root_phase != RootPhase::Prolog {
                         return Err(invalid("tracked revision XML has multiple root elements"));
                     }
-                    root_seen = true;
+                    root_phase = RootPhase::Open;
                     if !is_word_namespace(&resolved) || element.local_name().as_ref() != b"document"
                     {
                         return Err(invalid(
@@ -1261,11 +1282,10 @@ fn parse(source: &[u8], limits: Limits) -> Result<Vec<Group>> {
             Event::Empty(element) => {
                 reject_unknown_namespace(&resolved)?;
                 if depth == 0 {
-                    if root_seen {
+                    if root_phase != RootPhase::Prolog {
                         return Err(invalid("tracked revision XML has multiple root elements"));
                     }
-                    root_seen = true;
-                    root_closed = true;
+                    root_phase = RootPhase::Closed;
                     if !is_word_namespace(&resolved) || element.local_name().as_ref() != b"document"
                     {
                         return Err(invalid(
@@ -1586,7 +1606,7 @@ fn parse(source: &[u8], limits: Limits) -> Result<Vec<Group>> {
                     .checked_sub(1)
                     .ok_or_else(|| invalid("tracked revision XML depth underflow"))?;
                 if depth == 0 {
-                    root_closed = true;
+                    root_phase = RootPhase::Closed;
                 }
             },
             Event::Text(text) => {
@@ -1619,10 +1639,13 @@ fn parse(source: &[u8], limits: Limits) -> Result<Vec<Group>> {
                 if !frames.is_empty() || depth != 0 {
                     return Err(invalid("tracked revision XML has unterminated elements"));
                 }
-                if !root_seen || !root_closed {
-                    return Err(invalid(
-                        "tracked revision XML has no complete document root",
-                    ));
+                match root_phase {
+                    RootPhase::Prolog | RootPhase::Open => {
+                        return Err(invalid(
+                            "tracked revision XML has no complete document root",
+                        ));
+                    },
+                    RootPhase::Closed => {},
                 }
                 if !open_ranges.is_empty() {
                     return Err(invalid("tracked revision move range has no end"));

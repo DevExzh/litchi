@@ -539,6 +539,28 @@ pub(crate) fn rewrite(xml: &[u8], next: &Extensions) -> Result<Vec<u8>> {
     Ok(output)
 }
 
+/// Where [`locate_layout`] is relative to the single `w:settings` root.
+///
+/// ```text
+/// Prolog --`w:settings` start tag--> Open
+/// Prolog --`w:settings` empty element--> Closed
+/// Open   --root end tag--> Closed
+/// Open | Closed --another top-level element--> refused
+/// any    --top-level text other than whitespace, character data or reference--> refused
+/// any    --declaration or comment--> unchanged (a declaration is accepted anywhere)
+/// any    --DOCTYPE or processing instruction--> refused
+/// end of input--> accepted in Closed only
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No root element has started.
+    Prolog,
+    /// Inside the root element.
+    Open,
+    /// The root element has ended.
+    Closed,
+}
+
 fn locate_layout(xml: &[u8]) -> Result<Layout> {
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
@@ -549,8 +571,7 @@ fn locate_layout(xml: &[u8]) -> Result<Layout> {
     let mut layout = Layout::default();
     let mut stack = Vec::<Option<(Kind, usize)>>::new();
     let mut depth = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut root_phase = RootPhase::Prolog;
 
     loop {
         let event_start = position(&reader, origin)?;
@@ -567,9 +588,9 @@ fn locate_layout(xml: &[u8]) -> Result<Layout> {
                     validate_root(
                         &resolver.resolve_element(element.name()).0,
                         &element,
-                        root_seen,
+                        root_phase != RootPhase::Prolog,
                     )?;
-                    root_seen = true;
+                    root_phase = RootPhase::Open;
                 }
                 let kind = if depth == 1 {
                     let (namespace, _) = resolver.resolve_element(element.name());
@@ -604,10 +625,9 @@ fn locate_layout(xml: &[u8]) -> Result<Layout> {
                     validate_root(
                         &resolver.resolve_element(element.name()).0,
                         &element,
-                        root_seen,
+                        root_phase != RootPhase::Prolog,
                     )?;
-                    root_seen = true;
-                    root_closed = true;
+                    root_phase = RootPhase::Closed;
                     layout.root_empty = Some(ByteRange {
                         start: event_start,
                         end: event_end,
@@ -643,7 +663,7 @@ fn locate_layout(xml: &[u8]) -> Result<Layout> {
                 }
                 if depth == 1 {
                     layout.root_close_start = Some(event_start);
-                    root_closed = true;
+                    root_phase = RootPhase::Closed;
                 }
                 depth -= 1;
             },
@@ -660,7 +680,7 @@ fn locate_layout(xml: &[u8]) -> Result<Layout> {
             Event::CData(_) | Event::GeneralRef(_) if depth == 0 => {
                 return Err(invalid("settings XML has content outside its root"));
             },
-            Event::Decl(_) if !root_seen => {},
+            Event::Decl(_) if root_phase == RootPhase::Prolog => {},
             Event::DocType(_) | Event::PI(_) => {
                 return Err(invalid(
                     "settings XML cannot contain a DTD or processing instruction",
@@ -675,7 +695,11 @@ fn locate_layout(xml: &[u8]) -> Result<Layout> {
         }
     }
 
-    if !root_seen || !root_closed || depth != 0 || !stack.is_empty() {
+    let complete = match root_phase {
+        RootPhase::Prolog | RootPhase::Open => false,
+        RootPhase::Closed => depth == 0 && stack.is_empty(),
+    };
+    if !complete {
         return Err(invalid("settings XML is not one complete root element"));
     }
     layout.known.sort_by_key(|entry| entry.range.start);
