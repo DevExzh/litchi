@@ -75,6 +75,8 @@ mod relationships_plan;
 pub use read_session::PartReadSession;
 #[cfg(test)]
 mod shared_clone_tests;
+#[cfg(test)]
+mod xml_envelope_tests;
 
 const SOURCE_PUBLICATION_CHUNK_BYTES: usize = 64 * 1024;
 // Central-directory records that exceed this caller-owned workspace spill into

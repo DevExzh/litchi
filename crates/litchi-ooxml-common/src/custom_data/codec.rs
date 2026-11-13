@@ -2492,4 +2492,44 @@ mod tests {
             );
         }
     }
+
+    /// An extension-list fragment has no prolog of its own: a declaration is
+    /// refused even as the first event, and the root is still the only
+    /// top-level element.
+    #[test]
+    fn extension_fragment_envelope() {
+        let fragment = format!(
+            "<x14:extLst xmlns:x14=\"{XML}\"><s:ext xmlns:s=\"{SML}\" uri=\"urn:test\"><v:o xmlns:v=\"urn:v\"/></s:ext></x14:extLst>"
+        );
+        let outcome = |xml: String| match validate_extension_fragment(xml.as_bytes()) {
+            Ok(()) => "Ok".to_owned(),
+            Err(error) => format!("{error:?}"),
+        };
+        let actual = [
+            outcome(fragment.clone()),
+            outcome(format!("<!--c--><?pi x?>{fragment}<!--c--><?pi x?>\n")),
+            outcome(format!("<?xml version=\"1.0\"?>{fragment}")),
+            outcome(format!("{fragment}<?xml version=\"1.0\"?>")),
+            outcome(format!("{fragment}{fragment}")),
+            outcome(format!("{fragment}text")),
+            outcome(format!("<x14:extLst xmlns:x14=\"{XML}\"/>{fragment}")),
+            outcome(format!("<x14:extLst xmlns:x14=\"{XML}\">")),
+            outcome(String::new()),
+        ];
+        assert_eq!(
+            actual,
+            [
+                "Ok",
+                "Ok",
+                "Invalid(\"XML declaration is not at the document prolog\")",
+                "Invalid(\"XML declaration is not at the document prolog\")",
+                "Invalid(\"multiple XML roots\")",
+                "Invalid(\"text outside XML root\")",
+                "Invalid(\"multiple XML roots\")",
+                "Invalid(\"unterminated Custom Data Properties XML\")",
+                "Invalid(\"missing or unterminated Custom Data Properties XML root\")",
+            ],
+            "actual rows:\n{actual:#?}"
+        );
+    }
 }

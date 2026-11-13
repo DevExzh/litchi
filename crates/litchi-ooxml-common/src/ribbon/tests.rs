@@ -817,3 +817,137 @@ fn sign_marker(package: &mut OpcPackage) {
     package.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
     assert!(package.is_signed());
 }
+
+const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+/// One reader's root element in the forms the rows are built from.
+struct Root<'a> {
+    /// The start tag.
+    open: &'a str,
+    /// Content that makes the element valid for its reader.
+    body: &'a str,
+    /// The end tag.
+    close: &'a str,
+    /// The element as one empty-element tag.
+    empty: &'a str,
+}
+
+fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+    let Root {
+        open,
+        body,
+        close,
+        empty,
+    } = *root;
+    let document = format!("{open}{body}{close}");
+    let d = document.as_str();
+    vec![
+        ("empty input", String::new()),
+        ("whitespace only", " \n".to_owned()),
+        ("declaration only", DECLARATION.to_owned()),
+        ("empty-element root", empty.to_owned()),
+        ("start and end root", format!("{open}{close}")),
+        ("root then whitespace", format!("{d}\n ")),
+        ("root then comment", format!("{d}<!--c-->")),
+        ("root then PI", format!("{d}<?pi x?>")),
+        ("root then text", format!("{d}text")),
+        ("root then second root", format!("{d}{d}")),
+        ("root then foreign start", format!("{d}<foreign></foreign>")),
+        ("root then foreign empty", format!("{d}<foreign/>")),
+        ("declaration after root", format!("{d}{DECLARATION}")),
+        ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+        (
+            "comment before declaration",
+            format!("<!--c-->{DECLARATION}{d}"),
+        ),
+        ("text before root", format!("text{d}")),
+        ("unterminated root", format!("{open}{body}")),
+        ("stray end tag", format!("{d}</foreign>")),
+        ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+        ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+        ("declaration then root", format!("{DECLARATION}{d}")),
+        (
+            "whitespace before declaration",
+            format!(" {DECLARATION}{d}"),
+        ),
+        ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+        ("comment then root", format!("<!--c-->{d}")),
+        ("PI then root", format!("<?pi x?>{d}")),
+        ("root then text then second root", format!("{d}text{d}")),
+        ("empty-element root then root", format!("{empty}{d}")),
+        (
+            "declaration after empty-element root",
+            format!("{empty}{DECLARATION}"),
+        ),
+    ]
+}
+
+fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&[u8]) -> String) {
+    let actual = rows(root)
+        .into_iter()
+        .map(|(label, xml)| format!("{label}: {}", read(xml.as_bytes())))
+        .collect::<Vec<_>>();
+    assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+}
+
+fn outcome<T, E: std::fmt::Debug>(
+    result: std::result::Result<T, E>,
+    summary: impl Fn(T) -> String,
+) -> String {
+    match result {
+        Ok(value) => format!("Ok({})", summary(value)),
+        Err(error) => format!("{error:?}"),
+    }
+}
+
+/// What the Ribbon validator accepts before, around and after `customUI`,
+/// and the exact error it reports otherwise. Each expected line is the row
+/// label followed by the result.
+#[test]
+fn custom_ui_envelope() {
+    let root = Root {
+        open: r#"<customUI xmlns="http://schemas.microsoft.com/office/2009/07/customui">"#,
+        body: "<ribbon/>",
+        close: "</customUI>",
+        empty: r#"<customUI xmlns="http://schemas.microsoft.com/office/2009/07/customui"/>"#,
+    };
+    assert_matrix(
+        &root,
+        &[
+            "empty input: Invalid(\"Ribbon XML must contain one complete customUI root\")",
+            "whitespace only: Invalid(\"Ribbon XML must contain one complete customUI root\")",
+            "declaration only: Invalid(\"Ribbon XML must contain one complete customUI root\")",
+            "empty-element root: Ok(V2010)",
+            "start and end root: Ok(V2010)",
+            "root then whitespace: Ok(V2010)",
+            "root then comment: Ok(V2010)",
+            "root then PI: Ok(V2010)",
+            "root then text: Invalid(\"Ribbon XML contains text outside its root\")",
+            "root then second root: Invalid(\"Ribbon XML must contain exactly one root\")",
+            "root then foreign start: Invalid(\"Ribbon XML must contain exactly one root\")",
+            "root then foreign empty: Invalid(\"Ribbon XML must contain exactly one root\")",
+            "declaration after root: Invalid(\"Ribbon XML declaration must be the first event and occur once\")",
+            "two declarations: Invalid(\"Ribbon XML declaration must be the first event and occur once\")",
+            "comment before declaration: Invalid(\"Ribbon XML declaration must be the first event and occur once\")",
+            "text before root: Invalid(\"Ribbon XML contains text outside its root\")",
+            "unterminated root: Invalid(\"Ribbon XML must contain one complete customUI root\")",
+            "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+            "DOCTYPE: Invalid(\"DTD is forbidden in Ribbon XML\")",
+            "top-level CDATA: Invalid(\"Ribbon XML contains CDATA outside its root\")",
+            "declaration then root: Ok(V2010)",
+            "whitespace before declaration: Invalid(\"Ribbon XML declaration must be the first event and occur once\")",
+            "PI before declaration: Invalid(\"Ribbon XML declaration must be the first event and occur once\")",
+            "comment then root: Ok(V2010)",
+            "PI then root: Ok(V2010)",
+            "root then text then second root: Invalid(\"Ribbon XML contains text outside its root\")",
+            "empty-element root then root: Invalid(\"Ribbon XML must contain exactly one root\")",
+            "declaration after empty-element root: Invalid(\"Ribbon XML declaration must be the first event and occur once\")",
+        ],
+        |xml| {
+            outcome(
+                super::codec::validate_xml(xml, Family::Modern, &Limits::standard()),
+                |version| format!("{version:?}"),
+            )
+        },
+    );
+}

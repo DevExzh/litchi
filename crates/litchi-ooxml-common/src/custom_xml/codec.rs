@@ -2392,3 +2392,143 @@ fn is_xml_whitespace(value: &[u8]) -> bool {
         .iter()
         .all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
 }
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the properties reader accepts before, around and after
+    //! `datastoreItem`, and the exact error it reports otherwise. Each
+    //! expected line is the row label followed by the result.
+
+    use super::{SourceLimits, parse_props_xml};
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&[u8]) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(xml.as_bytes())))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    #[test]
+    fn datastore_item_envelope() {
+        let root = Root {
+            open: r#"<ds:datastoreItem ds:itemID="{00000000-0000-0000-0000-000000000001}" xmlns:ds="http://schemas.openxmlformats.org/officeDocument/2006/customXml">"#,
+            body: "<ds:schemaRefs/>",
+            close: "</ds:datastoreItem>",
+            empty: r#"<ds:datastoreItem ds:itemID="{00000000-0000-0000-0000-000000000001}" xmlns:ds="http://schemas.openxmlformats.org/officeDocument/2006/customXml"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"custom XML properties root is incomplete\")",
+                "whitespace only: Invalid(\"custom XML properties root is incomplete\")",
+                "declaration only: Invalid(\"custom XML properties root is incomplete\")",
+                "empty-element root: Ok(Props { id: \"{00000000-0000-0000-0000-000000000001}\", schemas: [] })",
+                "start and end root: Ok(Props { id: \"{00000000-0000-0000-0000-000000000001}\", schemas: [] })",
+                "root then whitespace: Ok(Props { id: \"{00000000-0000-0000-0000-000000000001}\", schemas: [] })",
+                "root then comment: Ok(Props { id: \"{00000000-0000-0000-0000-000000000001}\", schemas: [] })",
+                "root then PI: Invalid(\"processing instructions are forbidden in custom XML properties\")",
+                "root then text: Invalid(\"text is not permitted in custom XML properties\")",
+                "root then second root: Invalid(\"unexpected custom XML properties element {http://schemas.openxmlformats.org/officeDocument/2006/customXml}datastoreItem\")",
+                "root then foreign start: Invalid(\"unexpected custom XML properties element {}foreign\")",
+                "root then foreign empty: Invalid(\"unexpected custom XML properties element {}foreign\")",
+                "declaration after root: Invalid(\"custom XML properties have a late XML declaration\")",
+                "two declarations: Invalid(\"custom XML properties have a late XML declaration\")",
+                "comment before declaration: Invalid(\"custom XML properties have a late XML declaration\")",
+                "text before root: Invalid(\"text is not permitted in custom XML properties\")",
+                "unterminated root: Invalid(\"custom XML properties root is incomplete\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"DTD is forbidden in custom XML properties\")",
+                "top-level CDATA: Invalid(\"CDATA is not permitted outside custom XML properties\")",
+                "declaration then root: Ok(Props { id: \"{00000000-0000-0000-0000-000000000001}\", schemas: [] })",
+                "whitespace before declaration: Invalid(\"custom XML properties have a late XML declaration\")",
+                "PI before declaration: Invalid(\"processing instructions are forbidden in custom XML properties\")",
+                "comment then root: Ok(Props { id: \"{00000000-0000-0000-0000-000000000001}\", schemas: [] })",
+                "PI then root: Invalid(\"processing instructions are forbidden in custom XML properties\")",
+                "root then text then second root: Invalid(\"text is not permitted in custom XML properties\")",
+                "empty-element root then root: Invalid(\"unexpected custom XML properties element {http://schemas.openxmlformats.org/officeDocument/2006/customXml}datastoreItem\")",
+                "declaration after empty-element root: Invalid(\"custom XML properties have a late XML declaration\")",
+            ],
+            |xml| {
+                outcome(
+                    parse_props_xml(xml, super::MAX_DEPTH, &SourceLimits::default()),
+                    |props| format!("{props:?}"),
+                )
+            },
+        );
+    }
+}
