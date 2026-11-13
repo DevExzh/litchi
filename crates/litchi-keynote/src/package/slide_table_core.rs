@@ -7579,6 +7579,8 @@ fn charge_archive_inventory(archive: &Archive, budget: &mut Budget) -> Result<()
 #[cfg(test)]
 mod tests {
     use litchi_iwa_core::RawMessage;
+    use litchi_iwa_protos::tsp;
+    use prost::Message as _;
 
     use super::*;
 
@@ -7684,5 +7686,256 @@ mod tests {
             })
             .expect("reference visitor reports aliases without leaking errors");
         assert!(census.invalid);
+    }
+
+    /// One `(object identifier, count)` owner of a data reference.
+    type Owner = (u64, u32);
+
+    fn data_reference(data_identifier: u64, owners: &[Owner]) -> tsp::ComponentDataReference {
+        tsp::ComponentDataReference {
+            data_identifier,
+            object_reference_list: owners
+                .iter()
+                .map(
+                    |&(object_identifier, count)| tsp::component_data_reference::ObjectReference {
+                        object_identifier,
+                        count,
+                    },
+                )
+                .collect(),
+        }
+    }
+
+    fn component(
+        identifier: u64,
+        data_references: Vec<tsp::ComponentDataReference>,
+    ) -> tsp::ComponentInfo {
+        tsp::ComponentInfo {
+            identifier,
+            preferred_locator: format!("Component-{identifier}"),
+            data_references,
+            ..Default::default()
+        }
+    }
+
+    /// Inspects package metadata whose physical package holds objects 10, 11
+    /// and 12, with object 10 using data 70 twice, object 11 using data 70
+    /// once and object 12 using data 71 once. Object 12 is selected when
+    /// `select_twelve` is set. Returns the authority verdict and how many
+    /// data owners were admitted.
+    fn inspect_data_references(
+        current: Vec<tsp::ComponentInfo>,
+        versioned: Vec<tsp::ComponentInfo>,
+        select_twelve: bool,
+    ) -> (bool, usize) {
+        let physical_identifiers = HashSet::from([10, 11, 12]);
+        let physical_data_references = HashMap::from([((10, 70), 2), ((11, 70), 1), ((12, 71), 1)]);
+        let selected = [MetadataTarget {
+            identifier: 12,
+            component_name: "Index/Component-1.iwa",
+            requires_uuid: false,
+            storage: false,
+        }];
+        let selected_targets: &[MetadataTarget<'_>] = if select_twelve { &selected } else { &[] };
+        let payload = tsp::PackageMetadata {
+            last_object_identifier: 100,
+            components: current,
+            versioned_components: versioned,
+            ..Default::default()
+        }
+        .encode_to_vec();
+        let options = package_metadata_codec::RewriteOptions::new(
+            payload.len(),
+            1 << 20,
+            1 << 20,
+            1 << 20,
+            16,
+            1 << 10,
+            1 << 10,
+            1 << 10,
+        );
+        let mut visitor = StrictPackageMetadataVisitor::new(
+            &physical_identifiers,
+            &physical_data_references,
+            selected_targets,
+        )
+        .expect("visitor allocation");
+        package_metadata_codec::inspect_package_metadata_with_visitor(
+            &payload,
+            options,
+            &mut visitor,
+        )
+        .expect("well-formed package metadata");
+        assert!(!visitor.unknown);
+        (visitor.authority_invalid, visitor.seen_data_owners.len())
+    }
+
+    #[test]
+    fn data_reference_owner_runs_are_admitted_when_complete() {
+        // No data reference at all.
+        assert_eq!(
+            inspect_data_references(vec![component(1, vec![])], vec![], false),
+            (false, 0)
+        );
+        // One reference with one owner.
+        assert_eq!(
+            inspect_data_references(
+                vec![component(1, vec![data_reference(71, &[(12, 1)])])],
+                vec![],
+                false
+            ),
+            (false, 1)
+        );
+        // One reference with two owners: the run stays open until the last.
+        assert_eq!(
+            inspect_data_references(
+                vec![component(1, vec![data_reference(70, &[(10, 2), (11, 1)])])],
+                vec![],
+                false
+            ),
+            (false, 2)
+        );
+        // A completed run allows the next reference, in the same component
+        // and in the next one.
+        assert_eq!(
+            inspect_data_references(
+                vec![component(
+                    1,
+                    vec![
+                        data_reference(70, &[(10, 2), (11, 1)]),
+                        data_reference(71, &[(12, 1)]),
+                    ]
+                )],
+                vec![],
+                false
+            ),
+            (false, 3)
+        );
+        assert_eq!(
+            inspect_data_references(
+                vec![
+                    component(1, vec![data_reference(70, &[(10, 2)])]),
+                    component(2, vec![data_reference(70, &[(11, 1)])]),
+                    component(3, vec![data_reference(71, &[(12, 1)])]),
+                ],
+                vec![],
+                false
+            ),
+            (false, 3)
+        );
+    }
+
+    #[test]
+    fn data_reference_owner_runs_refuse_every_invalid_shape() {
+        // A reference without owners.
+        assert_eq!(
+            inspect_data_references(
+                vec![component(1, vec![data_reference(70, &[])])],
+                vec![],
+                false
+            ),
+            (true, 0)
+        );
+        // A reference without owners between two complete references.
+        assert_eq!(
+            inspect_data_references(
+                vec![component(
+                    1,
+                    vec![
+                        data_reference(70, &[(10, 2)]),
+                        data_reference(72, &[]),
+                        data_reference(71, &[(12, 1)]),
+                    ]
+                )],
+                vec![],
+                false
+            ),
+            (true, 2)
+        );
+        // An owner that is not a physical object.
+        assert_eq!(
+            inspect_data_references(
+                vec![component(1, vec![data_reference(70, &[(13, 1)])])],
+                vec![],
+                false
+            ),
+            (true, 0)
+        );
+        // An owner whose count differs from the physical use count.
+        assert_eq!(
+            inspect_data_references(
+                vec![component(1, vec![data_reference(70, &[(10, 1)])])],
+                vec![],
+                false
+            ),
+            (true, 0)
+        );
+        // An owner of data it does not physically use.
+        assert_eq!(
+            inspect_data_references(
+                vec![component(1, vec![data_reference(71, &[(10, 2)])])],
+                vec![],
+                false
+            ),
+            (true, 0)
+        );
+        // The same owner twice in one reference, and in two references.
+        assert_eq!(
+            inspect_data_references(
+                vec![component(1, vec![data_reference(70, &[(10, 2), (10, 2)])])],
+                vec![],
+                false
+            ),
+            (true, 1)
+        );
+        assert_eq!(
+            inspect_data_references(
+                vec![component(
+                    1,
+                    vec![
+                        data_reference(70, &[(10, 2)]),
+                        data_reference(70, &[(10, 2)]),
+                    ]
+                )],
+                vec![],
+                false
+            ),
+            (true, 1)
+        );
+        // An invalid owner leaves its run open: later valid owners of the
+        // same reference are still admitted, and the verdict stays invalid
+        // through the following reference.
+        assert_eq!(
+            inspect_data_references(
+                vec![component(
+                    1,
+                    vec![
+                        data_reference(70, &[(13, 1), (10, 2), (11, 1)]),
+                        data_reference(71, &[(12, 1)]),
+                    ]
+                )],
+                vec![],
+                false
+            ),
+            (true, 3)
+        );
+        // A selected object may not own data.
+        assert_eq!(
+            inspect_data_references(
+                vec![component(1, vec![data_reference(71, &[(12, 1)])])],
+                vec![],
+                true
+            ),
+            (true, 0)
+        );
+        // A versioned component may not carry data references.
+        assert_eq!(
+            inspect_data_references(
+                vec![component(1, vec![])],
+                vec![component(2, vec![data_reference(71, &[(12, 1)])])],
+                false
+            ),
+            (true, 0)
+        );
     }
 }

@@ -1008,3 +1008,184 @@ fn map_formula_error(error: numbers_formula_codec::DecodeError) -> Error {
         None => invalid("iWork table merge formula is malformed"),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use litchi_iwa_protos::numbers_formula_codec::{
+        FormulaRenderCrossTableExtra, FormulaRenderRangeSummary, FormulaRenderStickyBits,
+    };
+
+    use super::*;
+
+    const TABLE: [u32; 4] = [1, 2, 3, 4];
+    const UNSUPPORTED: &str = "iWork table contains an unsupported merge formula";
+
+    fn summary(
+        count: usize,
+        first_begin: Option<i64>,
+        first_end: Option<i64>,
+    ) -> FormulaRenderRangeSummary {
+        FormulaRenderRangeSummary {
+            count,
+            first_begin,
+            first_end,
+        }
+    }
+
+    /// The range of a merge that covers rows 2..=3 and columns 5..=7.
+    fn tract() -> FormulaRenderColonTract {
+        FormulaRenderColonTract {
+            relative_column: summary(0, None, None),
+            relative_row: summary(0, None, None),
+            absolute_column: summary(1, Some(5), Some(7)),
+            absolute_row: summary(1, Some(2), Some(3)),
+            preserve_rectangular: true,
+            sticky: FormulaRenderStickyBits {
+                begin_row_is_absolute: true,
+                begin_column_is_absolute: true,
+                end_row_is_absolute: true,
+                end_column_is_absolute: true,
+            },
+            cross_table_extra: Some(FormulaRenderCrossTableExtra {
+                table_id: expected_cfuuid(TABLE),
+            }),
+        }
+    }
+
+    const BEGIN: FormulaRenderEvent<'static> = FormulaRenderEvent::BeginArray { depth: 1 };
+    const NESTED_BEGIN: FormulaRenderEvent<'static> = FormulaRenderEvent::BeginArray { depth: 2 };
+    const MERGE: FormulaRenderEvent<'static> = FormulaRenderEvent::Function {
+        identifier: NATIVE_MERGE_FUNCTION_INDEX,
+        argument_count: NATIVE_MERGE_FUNCTION_ARGUMENTS,
+    };
+    const END: FormulaRenderEvent<'static> = FormulaRenderEvent::EndArray;
+    const OTHER: FormulaRenderEvent<'static> = FormulaRenderEvent::Negation;
+
+    fn range() -> FormulaRenderEvent<'static> {
+        FormulaRenderEvent::ColonTract(tract())
+    }
+
+    /// The only event sequence a merge formula may produce.
+    fn accepted() -> [FormulaRenderEvent<'static>; 4] {
+        [BEGIN, range(), MERGE, END]
+    }
+
+    fn run(events: &[FormulaRenderEvent<'static>]) -> Result<Region, Error> {
+        let mut visitor = MergeFormulaVisitor::default();
+        for event in events {
+            visitor
+                .visit(*event)
+                .expect("the merge visitor never fails an event");
+        }
+        visitor.finish(TABLE)
+    }
+
+    fn assert_unsupported(events: &[FormulaRenderEvent<'static>]) {
+        match run(events) {
+            Err(Error::InvalidFormat(message)) => assert_eq!(message, UNSUPPORTED, "{events:?}"),
+            other => panic!("{events:?} must be refused, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn merge_formula_accepts_exactly_the_four_event_sequence() {
+        assert_eq!(
+            run(&accepted()).expect("merge formula"),
+            Region::new(2, 5, 2, 3).expect("region")
+        );
+    }
+
+    #[test]
+    fn merge_formula_refuses_every_proper_prefix() {
+        let accepted = accepted();
+        for length in 0..accepted.len() {
+            assert_unsupported(&accepted[..length]);
+        }
+    }
+
+    #[test]
+    fn merge_formula_refuses_every_event_out_of_place() {
+        let accepted = accepted();
+        let candidates = [BEGIN, NESTED_BEGIN, range(), MERGE, END, OTHER];
+        // `position == accepted.len()` is an event after the closing one.
+        for position in 0..=accepted.len() {
+            for candidate in candidates {
+                if accepted.get(position) != Some(&candidate) {
+                    // The event replaces the expected one.
+                    let mut replaced = accepted[..position].to_vec();
+                    replaced.push(candidate);
+                    replaced.extend_from_slice(accepted.get(position + 1..).unwrap_or(&[]));
+                    assert_unsupported(&replaced);
+                }
+                // The event is inserted before the expected one (or repeats
+                // it).
+                let mut inserted = accepted[..position].to_vec();
+                inserted.push(candidate);
+                inserted.extend_from_slice(&accepted[position..]);
+                assert_unsupported(&inserted);
+                if accepted.get(position) != Some(&candidate) {
+                    // A complete accepted sequence after the stray event does
+                    // not recover the formula.
+                    let mut restarted = accepted[..position].to_vec();
+                    restarted.push(candidate);
+                    restarted.extend_from_slice(&accepted);
+                    assert_unsupported(&restarted);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn merge_formula_refuses_another_function_or_argument_count() {
+        for (identifier, argument_count) in [
+            (
+                NATIVE_MERGE_FUNCTION_INDEX + 1,
+                NATIVE_MERGE_FUNCTION_ARGUMENTS,
+            ),
+            (
+                NATIVE_MERGE_FUNCTION_INDEX,
+                NATIVE_MERGE_FUNCTION_ARGUMENTS + 1,
+            ),
+            (0, 0),
+        ] {
+            assert_unsupported(&[
+                BEGIN,
+                range(),
+                FormulaRenderEvent::Function {
+                    identifier,
+                    argument_count,
+                },
+                END,
+            ]);
+        }
+    }
+
+    #[test]
+    fn merge_formula_refuses_a_range_outside_the_merge_shape() {
+        let mut other_table = tract();
+        other_table.cross_table_extra = Some(FormulaRenderCrossTableExtra {
+            table_id: expected_cfuuid([1, 2, 3, 5]),
+        });
+        let mut local = tract();
+        local.cross_table_extra = None;
+        let mut relative = tract();
+        relative.sticky.end_row_is_absolute = false;
+        let mut reversed = tract();
+        reversed.absolute_row = summary(1, Some(3), Some(2));
+        let mut open = tract();
+        open.absolute_column = summary(1, None, Some(7));
+        let mut single = tract();
+        single.absolute_row = summary(1, Some(2), None);
+        single.absolute_column = summary(1, Some(5), None);
+        for range in [other_table, local, relative, reversed, open, single] {
+            assert_unsupported(&[BEGIN, FormulaRenderEvent::ColonTract(range), MERGE, END]);
+        }
+        let mut one_row = tract();
+        one_row.absolute_row = summary(1, Some(2), None);
+        assert_eq!(
+            run(&[BEGIN, FormulaRenderEvent::ColonTract(one_row), MERGE, END])
+                .expect("one-row range"),
+            Region::new(2, 5, 1, 3).expect("region")
+        );
+    }
+}

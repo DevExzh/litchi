@@ -7380,6 +7380,445 @@ mod tests {
         ));
     }
 
+    /// One event a dependency capture stage can observe.
+    #[derive(Debug, Clone, Copy)]
+    enum Capture {
+        /// A cell record: stored in `records`.
+        Record,
+        /// A tiled cell-record reference: stored in `tile_references`.
+        TileReference,
+        /// A range back dependency with an internal owner: stored in `ranges`.
+        InternalRange,
+        /// A range back dependency without an internal owner: unsupported.
+        ForeignRange,
+        /// A range precedent with coordinates: stored in `ranges`.
+        Precedent,
+        /// A range precedent without coordinates: a graph-edge limit.
+        BrokenPrecedent,
+        /// Spare capacity in `ranges`, so the next stored range reports an
+        /// allocation that did not match its admitted size.
+        SpareRanges,
+        /// Spare capacity in `records`, with the same effect on the next
+        /// stored record.
+        SpareRecords,
+    }
+
+    fn capture(stage: &mut Stage, limits: CacheLimits, event: Capture) {
+        let mut owner = tsce::FormulaOwnerDependenciesArchive {
+            formula_owner_uid: tsp::Uuid {
+                lower: TABLE.uuid_lower,
+                upper: TABLE.uuid_upper,
+            },
+            internal_formula_owner_id: OWNER,
+            ..Default::default()
+        };
+        match event {
+            Capture::Record => {
+                owner.cell_dependencies = Some(tsce::CellDependenciesExpandedArchive {
+                    cell_record: vec![tsce::CellRecordExpandedArchive {
+                        row: 0,
+                        column: 1,
+                        ..Default::default()
+                    }],
+                });
+            },
+            Capture::TileReference => {
+                owner.tiled_cell_dependencies = Some(tsce::CellDependenciesTiledArchive {
+                    cell_record_tiles: vec![tsp::Reference {
+                        identifier: 905_369,
+                        ..Default::default()
+                    }],
+                });
+            },
+            Capture::InternalRange | Capture::ForeignRange => {
+                let internal = matches!(event, Capture::InternalRange);
+                owner.range_dependencies = Some(tsce::RangeDependenciesArchive {
+                    back_dependency: vec![tsce::RangeBackDependencyArchive {
+                        cell_coord_row: 0,
+                        cell_coord_column: 1,
+                        internal_range_reference: internal.then_some(
+                            tsce::InternalRangeReferenceArchive {
+                                owner_id: OWNER,
+                                range: tsce::RangeCoordinateArchive {
+                                    top_left_column: 0,
+                                    top_left_row: 0,
+                                    bottom_right_column: 0,
+                                    bottom_right_row: 0,
+                                },
+                            },
+                        ),
+                        ..Default::default()
+                    }],
+                });
+            },
+            Capture::Precedent | Capture::BrokenPrecedent => {
+                let located = matches!(event, Capture::Precedent);
+                let coordinate = tsce::CellCoordinateArchive {
+                    column: located.then_some(0),
+                    row: located.then_some(0),
+                    ..Default::default()
+                };
+                let tile = tsce::RangePrecedentsTileArchive {
+                    to_owner_id: OWNER,
+                    from_to_range: vec![tsce::range_precedents_tile_archive::FromToRangeArchive {
+                        from_coord: coordinate,
+                        refers_to_rect: tsce::CellRectArchive {
+                            origin: coordinate,
+                            size: tsce::ColumnRowSize {
+                                num_columns: Some(1),
+                                num_rows: Some(1),
+                            },
+                        },
+                    }],
+                }
+                .encode_to_vec();
+                dependency::decode_range_precedents_tile_with_visitor(
+                    &tile,
+                    decode_options(limits),
+                    stage,
+                )
+                .expect("valid range-precedent fixture");
+                return;
+            },
+            Capture::SpareRanges => {
+                stage.ranges.reserve_exact(stage.ranges.len() + 8);
+                return;
+            },
+            Capture::SpareRecords => {
+                stage.records.reserve_exact(stage.records.len() + 8);
+                return;
+            },
+        }
+        dependency::decode_formula_owner_dependencies_with_visitor(
+            &owner.encode_to_vec(),
+            decode_options(limits),
+            stage,
+        )
+        .expect("valid owner fixture");
+    }
+
+    /// Runs the events on one stage and returns what the stage reports and
+    /// how many records, ranges and tile references it kept.
+    fn captured(
+        limits: CacheLimits,
+        events: &[Capture],
+    ) -> (Result<(), Error>, usize, usize, usize) {
+        let mut stage = Stage::new(limits);
+        for event in events {
+            capture(&mut stage, limits, *event);
+        }
+        (
+            stage.ensure_complete(),
+            stage.records.len(),
+            stage.ranges.len(),
+            stage.tile_references.len(),
+        )
+    }
+
+    #[test]
+    fn dependency_stage_reports_each_failure_alone() {
+        use Capture::*;
+        let generous = limits();
+        assert_eq!(captured(generous, &[]), (Ok(()), 0, 0, 0));
+        assert_eq!(
+            captured(
+                generous,
+                &[Record, TileReference, InternalRange, Precedent, Record]
+            ),
+            (Ok(()), 2, 2, 1)
+        );
+        assert_eq!(
+            captured(generous, &[ForeignRange]),
+            (
+                Err(Error::UnsupportedDependency(Unsupported::Formula)),
+                0,
+                0,
+                0
+            )
+        );
+        let graph_edges = Error::Limit {
+            kind: LimitKind::GraphEdges,
+            observed: u64::MAX,
+            maximum: 1 << 10,
+        };
+        assert_eq!(
+            captured(generous, &[BrokenPrecedent]),
+            (Err(graph_edges), 0, 0, 0)
+        );
+        assert_eq!(
+            captured(generous, &[SpareRanges, InternalRange]),
+            (Err(Error::Allocation { amount: 1 }), 0, 0, 0)
+        );
+        assert_eq!(
+            captured(generous, &[Precedent, SpareRanges, InternalRange]),
+            (Err(Error::Allocation { amount: 2 }), 0, 1, 0)
+        );
+
+        let mut no_nodes = generous;
+        no_nodes.graph_nodes = 0;
+        assert_eq!(
+            captured(no_nodes, &[Record]),
+            (
+                Err(Error::Limit {
+                    kind: LimitKind::GraphNodes,
+                    observed: 1,
+                    maximum: 0,
+                }),
+                0,
+                0,
+                0
+            )
+        );
+        let mut no_edges = generous;
+        no_edges.graph_edges = 0;
+        assert_eq!(
+            captured(no_edges, &[InternalRange]),
+            (
+                Err(Error::Limit {
+                    kind: LimitKind::GraphEdges,
+                    observed: 1,
+                    maximum: 0,
+                }),
+                0,
+                0,
+                0
+            )
+        );
+        let mut no_references = generous;
+        no_references.wire_references = 0;
+        assert!(matches!(
+            captured(no_references, &[Record]),
+            (Ok(()), 1, 0, 0)
+        ));
+        let mut no_scratch = generous;
+        no_scratch.scratch_bytes = 0;
+        assert_eq!(
+            captured(no_scratch, &[TileReference]),
+            (
+                Err(Error::Limit {
+                    kind: LimitKind::ScratchBytes,
+                    observed: 8,
+                    maximum: 0,
+                }),
+                0,
+                0,
+                0
+            )
+        );
+        let mut no_allocations = generous;
+        no_allocations.allocations = 0;
+        assert_eq!(
+            captured(no_allocations, &[TileReference]),
+            (
+                Err(Error::Limit {
+                    kind: LimitKind::Allocations,
+                    observed: 1,
+                    maximum: 0,
+                }),
+                0,
+                0,
+                0
+            )
+        );
+    }
+
+    #[test]
+    fn dependency_stage_reports_the_same_failure_for_every_pair() {
+        use Capture::*;
+        let generous = limits();
+        // With no graph nodes admitted, `Record` is a stored-value limit.
+        let mut no_nodes = generous;
+        no_nodes.graph_nodes = 0;
+        let unsupported = Err(Error::UnsupportedDependency(Unsupported::Formula));
+        let allocation = Err(Error::Allocation { amount: 1 });
+        let nodes = Err(Error::Limit {
+            kind: LimitKind::GraphNodes,
+            observed: 1,
+            maximum: 0,
+        });
+        let edges = Err(Error::Limit {
+            kind: LimitKind::GraphEdges,
+            observed: u64::MAX,
+            maximum: 1 << 10,
+        });
+
+        // An unsupported formula wins over either kind of limit, in both
+        // orders.
+        assert_eq!(
+            captured(no_nodes, &[ForeignRange, Record]),
+            (unsupported, 0, 0, 0)
+        );
+        assert_eq!(
+            captured(no_nodes, &[Record, ForeignRange]),
+            (unsupported, 0, 0, 0)
+        );
+        assert_eq!(
+            captured(generous, &[ForeignRange, BrokenPrecedent]),
+            (unsupported, 0, 0, 0)
+        );
+        assert_eq!(
+            captured(generous, &[BrokenPrecedent, ForeignRange]),
+            (unsupported, 0, 0, 0)
+        );
+
+        // An allocation failure wins over an unsupported formula, in both
+        // orders.
+        assert_eq!(
+            captured(generous, &[SpareRanges, InternalRange, ForeignRange]),
+            (allocation, 0, 0, 0)
+        );
+        assert_eq!(
+            captured(generous, &[ForeignRange, SpareRanges, InternalRange]),
+            (allocation, 0, 0, 0)
+        );
+
+        // An allocation failure wins over a later limit. A limit seen first
+        // stops every later store, so no allocation is attempted after it.
+        assert_eq!(
+            captured(generous, &[SpareRanges, InternalRange, BrokenPrecedent]),
+            (allocation, 0, 0, 0)
+        );
+        assert_eq!(
+            captured(no_nodes, &[SpareRanges, InternalRange, Record]),
+            (allocation, 0, 0, 0)
+        );
+        assert_eq!(
+            captured(generous, &[BrokenPrecedent, SpareRanges, InternalRange]),
+            (edges, 0, 0, 0)
+        );
+        assert_eq!(
+            captured(no_nodes, &[Record, SpareRanges, InternalRange]),
+            (nodes, 0, 0, 0)
+        );
+
+        // A stored-value limit is never replaced by another stored-value
+        // limit, but a range precedent without coordinates replaces it.
+        assert_eq!(
+            captured(no_nodes, &[Record, BrokenPrecedent]),
+            (edges, 0, 0, 0)
+        );
+        assert_eq!(
+            captured(no_nodes, &[BrokenPrecedent, Record]),
+            (edges, 0, 0, 0)
+        );
+        let mut no_nodes_or_scratch = no_nodes;
+        no_nodes_or_scratch.scratch_bytes = 0;
+        assert_eq!(
+            captured(no_nodes_or_scratch, &[Record, TileReference]),
+            (nodes, 0, 0, 0)
+        );
+
+        // The first allocation failure is the one reported.
+        assert_eq!(
+            captured(
+                generous,
+                &[Precedent, SpareRanges, InternalRange, SpareRecords, Record]
+            ),
+            (Err(Error::Allocation { amount: 2 }), 0, 1, 0)
+        );
+    }
+
+    #[test]
+    fn dependency_stage_stops_storing_after_a_limit_or_allocation_only() {
+        use Capture::*;
+        let generous = limits();
+        let mut no_nodes = generous;
+        no_nodes.graph_nodes = 0;
+        let unsupported = Err(Error::UnsupportedDependency(Unsupported::Formula));
+
+        // An unsupported formula alone does not stop later stores, so a later
+        // allocation failure is still seen and reported.
+        assert_eq!(
+            captured(
+                generous,
+                &[ForeignRange, Record, InternalRange, TileReference]
+            ),
+            (unsupported, 1, 1, 1)
+        );
+        assert_eq!(
+            captured(generous, &[ForeignRange, SpareRecords, Record]),
+            (Err(Error::Allocation { amount: 1 }), 0, 0, 0)
+        );
+
+        // Once a limit joins the unsupported formula, stores stop and the
+        // unsupported formula stays the reported failure.
+        assert_eq!(
+            captured(
+                no_nodes,
+                &[ForeignRange, Record, SpareRanges, InternalRange]
+            ),
+            (unsupported, 0, 0, 0)
+        );
+        assert_eq!(
+            captured(
+                no_nodes,
+                &[Record, ForeignRange, SpareRanges, InternalRange]
+            ),
+            (unsupported, 0, 0, 0)
+        );
+        assert_eq!(
+            captured(
+                generous,
+                &[ForeignRange, BrokenPrecedent, SpareRanges, InternalRange]
+            ),
+            (unsupported, 0, 0, 0)
+        );
+        assert_eq!(
+            captured(
+                generous,
+                &[BrokenPrecedent, ForeignRange, SpareRecords, Record]
+            ),
+            (unsupported, 0, 0, 0)
+        );
+        assert_eq!(
+            captured(
+                no_nodes,
+                &[ForeignRange, Record, BrokenPrecedent, TileReference]
+            ),
+            (unsupported, 0, 0, 0)
+        );
+
+        // A limit or an allocation failure stops every later store.
+        assert_eq!(
+            captured(
+                generous,
+                &[BrokenPrecedent, Record, InternalRange, TileReference]
+            )
+            .1,
+            0
+        );
+        assert_eq!(
+            captured(
+                generous,
+                &[
+                    Record,
+                    BrokenPrecedent,
+                    Record,
+                    InternalRange,
+                    Precedent,
+                    TileReference
+                ]
+            ),
+            (
+                Err(Error::Limit {
+                    kind: LimitKind::GraphEdges,
+                    observed: u64::MAX,
+                    maximum: 1 << 10,
+                }),
+                1,
+                0,
+                0
+            )
+        );
+        assert_eq!(
+            captured(
+                generous,
+                &[SpareRanges, InternalRange, Record, Precedent, TileReference]
+            ),
+            (Err(Error::Allocation { amount: 1 }), 0, 0, 0)
+        );
+    }
+
     #[test]
     fn expanded_edge_scan_is_authorized_before_scratch_allocation() {
         let (_engine, owner) = encoded_graph(vec![record(3, &[0, 1], false)], false);
