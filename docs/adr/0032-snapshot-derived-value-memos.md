@@ -1,7 +1,6 @@
 # ADR 0032: Snapshot memos of small derived values of payload bytes
 
-- Status: Accepted (2026-09-24, by the owner's decision recorded in
-  change 0758; proposed
+- Status: Accepted (2026-09-24, by the owner's decision; proposed
   2026-09-23)
 - Date: 2026-09-23
 - Supersedes: nothing. Amends: the 2026-09-16 amendment of
@@ -9,8 +8,7 @@
   memos on an opened-presentation snapshot and its facade", by widening the one
   noun it admits. Every other sentence of ADR 0005, and every other accepted
   record, is untouched.
-- Raised by: change 0743,
-  whose commit `99ce9c5e34` implemented such a memo, measured it, and was
+- Raised by: commit `99ce9c5e34`, which implemented such a memo, measured it, and was
   reverted by `07207d2aef` because no accepted record admits it.
 
 ## Context
@@ -33,15 +31,15 @@ repeating the classification of unchanged bytes is not part of that obligation.
 The 2026-09-16 amendment of ADR 0005 already lets an opened-presentation
 snapshot keep a memo over bytes its package holds, under a list of conditions,
 for exactly one kind of value: "a bounded table of **digests** over bytes the owner
-already holds". A notes-root classification is not a digest. Change 0743's
-commit `99ce9c5e34` kept one anyway, as a `SlideRootMemo` on the snapshot, and
+already holds". A notes-root classification is not a digest. Commit
+`99ce9c5e34` kept one anyway, as a `SlideRootMemo` on the snapshot, and
 did not meet one condition: when the table could not be reserved it became
 empty instead of raising the typed resource error the amendment requires. The
 program's charter forbids implementing behaviour an accepted record does not
 admit, so the commit was reverted and this record asks for the admission
 explicitly.
 
-What the memo was worth, measured by change 0743 with the harness's own public
+What the memo was worth, measured with the harness's own public
 calls on the 100 × 100 deck (a probe built at every commit, median of three
 processes, core 8):
 
@@ -110,7 +108,7 @@ propose that.
 
 ### 4. What re-applies
 
-With this record accepted, change 0743's commit `99ce9c5e34` re-applies
+With this record accepted, commit `99ce9c5e34` re-applies
 unchanged except for the rule in section 3: `SlideRootMemo::from_records`
 returns `Result<Self>` and its reservation failure becomes
 `Error::Allocation { resource: "opened-presentation slide-root memo", .. }`,
@@ -149,7 +147,7 @@ Acceptance should require, at minimum:
    memo-assisted and plain recaptures agree over every repository PPTX fixture.
 2. A test that a refused reservation while building the memo returns
    `Error::Allocation` and leaves no partial snapshot.
-3. The existing 0704 MCE-retention tests, including the observation-count test,
+3. The existing MCE-retention tests, including the observation-count test,
    passing with the memo in place.
 4. A re-measurement of the harness's `pptx_semantic_one_edit_save` and
    `pptx_semantic_opened_transaction_phases` against the head without the memo,

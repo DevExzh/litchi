@@ -32,7 +32,7 @@ def report(elements: list[dict], gaps: list[dict] | None = None, get: bool = Tru
         export["pending"] = {
             "supported": False,
             "code": "unsupported_capability",
-            "followUp": "M1 R4a",
+            "followUp": "a read adapter",
             "reason": "the adapter has not landed",
         }
     return export
@@ -162,10 +162,10 @@ class Comparison(unittest.TestCase):
                     {"font.bold": READ, "border.left.color": READ},
                     predicates={"keys": ["style", "text", "type", "value"]},
                 ),
-                element("comment", {}, elementAliases=["note"], gap={"code": "unsupported_capability", "followUp": "L-XLSX-R5", "reason": "r"}),
-                element("mergeCell", {}, gap={"code": "unsupported_capability", "followUp": "R4x", "reason": "r"}),
+                element("comment", {}, elementAliases=["note"], gap={"code": "unsupported_capability", "followUp": "a comment reader", "reason": "r"}),
+                element("mergeCell", {}, gap={"code": "unsupported_capability", "followUp": "a merged-range reader", "reason": "r"}),
             ],
-            gaps=[{"subject": "property", "element": "cell", "key": "computedValue", "code": "unsupported_capability", "followUp": "M4", "reason": "r"}],
+            gaps=[{"subject": "property", "element": "cell", "key": "computedValue", "code": "unsupported_capability", "followUp": "computed values", "reason": "r"}],
         )
         result = delta.compare("xlsx", officecli, litchi)
         elements = {row[0] or row[1]: row[2] for row in result.elements}
@@ -176,11 +176,11 @@ class Comparison(unittest.TestCase):
         properties = {(row[0], row[1]): (row[4], row[5]) for row in result.properties}
         self.assertEqual(properties[("cell", "font.bold")], ("supported", ""))
         self.assertEqual(properties[("cell", "value")], ("supported", "the node's text"))
-        self.assertEqual(properties[("cell", "computedValue")], ("gap", "M4"))
+        self.assertEqual(properties[("cell", "computedValue")], ("gap", "computed values"))
         self.assertEqual(properties[("cell", "image.fileSize")], ("missing", ""))
         self.assertEqual(properties[("cell", "font")], ("write-only", ""))
         self.assertEqual(properties[("cell", "border.left.color")], ("litchi-only", ""))
-        self.assertEqual(properties[("comment", "text")], ("element gap", "L-XLSX-R5"))
+        self.assertEqual(properties[("comment", "text")], ("element gap", "a comment reader"))
         self.assertEqual(properties[("gadget", "size")], ("missing", ""))
 
     def test_native_selection_metadata_is_a_deliberate_policy_difference(self) -> None:
@@ -198,7 +198,7 @@ class Comparison(unittest.TestCase):
                 "element": "paragraph/run",
                 "context": "mixed-paragraph-run-fanout",
                 "code": "unsupported_capability",
-                "followUp": "M2 (homogeneous mutation fanout)",
+                "followUp": "homogeneous mutation fanout",
                 "reason": "one mutation admits one target kind",
             }
         ]
@@ -211,14 +211,14 @@ class Comparison(unittest.TestCase):
                     "paragraph/run",
                     "mixed-paragraph-run-fanout",
                     "one mutation admits one target kind",
-                    "M2 (homogeneous mutation fanout)",
+                    "homogeneous mutation fanout",
                 )
             ],
         )
         rendered = delta.render([result], [], ("cd" * 32, 0), "unknown")
         self.assertIn("### Contextual operation gaps", rendered)
         self.assertIn(
-            "| `set` | `paragraph/run` | `mixed-paragraph-run-fanout` | one mutation admits one target kind | M2 (homogeneous mutation fanout) |",
+            "| `set` | `paragraph/run` | `mixed-paragraph-run-fanout` | one mutation admits one target kind | homogeneous mutation fanout |",
             rendered,
         )
 
@@ -277,18 +277,18 @@ class Comparison(unittest.TestCase):
             self.oc("gadget", {"size": {"type": "int", "get": True}}),
         )
         gaps = [{"subject": "element", "element": "comment", "code": "unsupported_capability",
-                 "followUp": "0248 C11", "reason": "r"}]
+                 "followUp": "a comment reader", "reason": "r"}]
         result = delta.compare("doc", officecli, report([element("paragraph", {})], gaps=gaps))
         elements = {row[0]: (row[2], row[3]) for row in result.elements if row[0]}
-        self.assertEqual(elements["comment"], ("gap", "0248 C11"))
+        self.assertEqual(elements["comment"], ("gap", "a comment reader"))
         self.assertEqual(elements["gadget"], ("missing", ""))
         row = next(row for row in result.properties if row[0] == "comment")
-        self.assertEqual((row[4], row[5], row[7]), ("element gap", "0248 C11", "gap"))
+        self.assertEqual((row[4], row[5], row[7]), ("element gap", "a comment reader", "gap"))
 
     def test_a_pending_adapter_lists_every_schema_as_pending(self) -> None:
         officecli = self.schemas(self.oc("paragraph", {"align": {"type": "enum", "get": True}}))
         result = delta.compare("docx", officecli, report([], get=False))
-        self.assertEqual(result.elements, [("paragraph", "", "pending", "M1 R4a")])
+        self.assertEqual(result.elements, [("paragraph", "", "pending", "a read adapter")])
         self.assertEqual(result.properties[0][4], "pending")
 
     def test_run_subtypes_are_not_reported_as_supported_runs(self) -> None:
@@ -302,7 +302,7 @@ class Comparison(unittest.TestCase):
         self.assertEqual(result.elements[0][:3], ("diagram", "", "missing"))
 
     def test_an_element_matches_its_own_name_before_a_path_word(self) -> None:
-        # Record 0339: `/slidemaster[N]/shape[K]` names `shape` too, but the
+        # `/slidemaster[N]/shape[K]` names `shape` too, but the
         # element is the slide master.
         result = delta.compare("pptx", [self.oc("slidemaster", {"name": READ}, ["shape"])],
                                report([element("shape", {}), element("slideMaster", {"name": READ})]))
@@ -427,23 +427,14 @@ class DispositionFile(unittest.TestCase):
             dispositions([entry("a", ["delta:x:*"], "deferred"), entry("b", ["delta:x:*"], "wontfix")])
 
     def test_entries_are_validated(self) -> None:
-        with self.assertRaises(SystemExit):
-            dispositions([entry("a", ["delta:x:*"], "planned")])  # no work-package or record id
-        with self.assertRaises(SystemExit):
-            dispositions([{"id": "a", "keys": ["delta:x:*"], "disposition": "wontfix"}])  # no reason
+        for value in ("planned", "deferred", "wontfix", "out-of-scope"):
+            with self.assertRaises(SystemExit):
+                dispositions([{"id": "a", "keys": ["delta:x:*"], "disposition": value}])  # no reason
         with self.assertRaises(SystemExit):
             dispositions([entry("a", ["delta:x:*"], "later")])
         with self.assertRaises(SystemExit):
-            dispositions([entry("a", ["delta:x:*"], "deferred", ref="M2")])
-        with self.assertRaises(SystemExit):
             dispositions([entry("a", ["delta:x:*"], "deferred"), entry("a", ["delta:y:*"], "deferred")])
-        dispositions([entry("a", ["delta:x:*"], "planned", ref="WP4"), entry("b", ["delta:y:*"], "planned", ref="0324")])
-
-    def test_milestone_only_follow_ups(self) -> None:
-        for text in ("M2 (validate)", "M1-extended (R4x)", "R4x", "M1-Δ1", "M2 XLSX OfficeCLI input policy"):
-            self.assertTrue(delta.milestone_only(text), text)
-        for text in ("M6 ODT body index (record 0276)", "L-DOCX-W5", "0323-F7 PPT chart series", "design §10", ""):
-            self.assertFalse(delta.milestone_only(text), text)
+        dispositions([entry("a", ["delta:x:*"], "planned"), entry("b", ["delta:y:*"], "planned")])
 
     def test_tiers(self) -> None:
         loaded = dispositions([], tiers=[
@@ -467,68 +458,6 @@ class DispositionFile(unittest.TestCase):
         self.assertEqual(wide.tier("xls", "cell"), "P0")
 
 
-class MilestoneFollowUps(unittest.TestCase):
-    """Record 0344 (audit WP13): every milestone-only follow-up of the
-    registry and capability goldens maps to a current id."""
-
-    def load(self, follow_ups: list[dict]) -> delta.Dispositions:
-        return delta.Dispositions({"tiers": [], "dispositions": [], "followUps": follow_ups}, "test")
-
-    def test_a_format_entry_beats_a_general_one_then_the_longer_pattern(self) -> None:
-        loaded = self.load([
-            {"id": "all", "followUps": ["M2 *"], "ref": "0332", "note": "n"},
-            {"id": "xlsx", "followUps": ["M2 *"], "formats": ["xlsx"], "ref": "0338", "note": "n"},
-            {"id": "exact", "followUps": ["M2 XLSX input policy"], "formats": ["xlsx"], "ref": "WP16", "note": "n"},
-        ])
-        self.assertEqual(loaded.follow_up_entry("docx", "M2 tables")["id"], "all")
-        self.assertEqual(loaded.follow_up_entry("xlsx", "M2 tables")["id"], "xlsx")
-        self.assertEqual(loaded.follow_up_entry("xlsx", "M2 XLSX input policy")["id"], "exact")
-        self.assertIsNone(loaded.follow_up_entry("xlsx", "M1-extended"))
-        self.assertEqual(loaded.current("xlsx", "M2 XLSX input policy"), "M2 XLSX input policy → WP16")
-        # Text that already names a record, and unmapped text, are shown as they are.
-        self.assertEqual(loaded.current("xlsx", "record 0327 follow-up"), "record 0327 follow-up")
-        self.assertEqual(loaded.current("xlsx", "M1-extended"), "M1-extended")
-        self.assertFalse(delta.milestone_only(loaded.current("docx", "M2 tables")))
-
-    def test_entries_are_validated(self) -> None:
-        for bad in ({"id": "a", "followUps": ["M2 *"], "ref": "M3", "note": "n"},
-                    {"id": "a", "followUps": ["M2 *"], "ref": "", "note": "n"},
-                    {"id": "a", "followUps": [], "ref": "0332", "note": "n"},
-                    {"id": "a", "followUps": ["M2 *"], "ref": "0332"}):
-            with self.assertRaises(SystemExit):
-                self.load([bad])
-        with self.assertRaises(SystemExit):
-            self.load([{"id": "a", "followUps": ["x"], "ref": "0332", "note": "n"}] * 2)
-        self.load([{"id": "a", "followUps": ["M2 *"], "ref": "0327/0316", "note": "n"}])
-
-    def test_unmapped_and_stale_entries_fail(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            write(root / delta.GOLDEN_DIR / "xlsx.json", {"gaps": [{"followUp": "M2 (validate)"}]})
-            write(root / delta.CAPABILITY_DIR / "xlsx-encryption.json",
-                  {"elements": [{"gap": {"followUp": "M1-extended (R4x)"}},
-                                {"gap": {"followUp": "record 0338 follow-up"}}]})
-            found = delta.golden_follow_ups(root)
-            self.assertEqual(sorted((fmt, text) for fmt, text, _ in found),
-                             [("xlsx", "M1-extended (R4x)"), ("xlsx", "M2 (validate)"),
-                              ("xlsx", "record 0338 follow-up")])
-            loaded = self.load([
-                {"id": "validate", "followUps": ["M2 (validate)"], "ref": "0336", "note": "n"},
-                {"id": "unused", "followUps": ["M6 *"], "ref": "0328", "note": "n"},
-            ])
-            problems = delta.milestone_problems(found, loaded)
-            self.assertEqual(len(problems), 2, problems)
-            self.assertIn("xlsx: milestone-only follow-up `M1-extended (R4x)`", problems[0])
-            self.assertIn("crates/litchi-ops/tests/golden/capabilities/xlsx-encryption.json", problems[0])
-            self.assertEqual(problems[1], "stale follow-up map `unused`: it maps no golden follow-up")
-
-    def test_the_committed_goldens_have_no_unmapped_milestone(self) -> None:
-        loaded = delta.Dispositions.load(delta.REPO / delta.DISPOSITIONS)
-        found = delta.golden_follow_ups(delta.REPO)
-        self.assertTrue(any(origin.startswith(delta.CAPABILITY_DIR.as_posix()) for _, _, origin in found))
-        self.assertEqual(delta.milestone_problems(found, loaded), [])
-
-
 class ApplyingDispositions(unittest.TestCase):
     def setUp(self) -> None:
         oc = lambda name, props: delta.OcElement(name, name, [], [], {}, props)
@@ -541,7 +470,7 @@ class ApplyingDispositions(unittest.TestCase):
         ]
         self.litchi = report(
             [element("cell", {}),
-             element("comment", {}, gap={"code": "unsupported_capability", "followUp": "M2 (comments)", "reason": "r"})]
+             element("comment", {}, gap={"code": "unsupported_capability", "followUp": "comments", "reason": "r"})]
         )
 
     def apply(self, loaded: delta.Dispositions) -> tuple[delta.FormatDelta, list[str]]:
@@ -550,13 +479,13 @@ class ApplyingDispositions(unittest.TestCase):
 
     def test_rows_resolve_and_missing_becomes_unlisted(self) -> None:
         result, problems = self.apply(dispositions([
-            entry("cells", ["delta:xlsx:cell.*"], "planned", ref="WP16"),
-            entry("later", ["delta:xlsx:gadget", "delta:xlsx:comment"], "deferred", ref="0332"),
+            entry("cells", ["delta:xlsx:cell.*"], "planned"),
+            entry("later", ["delta:xlsx:gadget", "delta:xlsx:comment"], "deferred"),
             entry("gadget-spin", ["delta:xlsx:gadget.spin"], "wontfix"),
         ]))
         self.assertEqual(problems, ["xlsx element comment: a P0 row is `deferred` (later); P0 is supported or planned"])
         elements = {row[0]: (row[2], res.cell() if res else "") for row, res in zip(result.elements, result.element_dispositions)}
-        self.assertEqual(elements["gadget"], ("unlisted", "deferred-P2 0332 (later)"))
+        self.assertEqual(elements["gadget"], ("unlisted", "deferred-P2 (later)"))
         rows = {(row[0], row[1]): (row[4], res) for row, res in zip(result.properties, result.property_dispositions)}
         self.assertEqual(rows[("cell", "fill")][0], "unlisted")
         self.assertEqual(rows[("cell", "fill")][1].disposition, "planned")
@@ -570,8 +499,8 @@ class ApplyingDispositions(unittest.TestCase):
 
     def test_a_format_wide_property_key_does_not_override_a_gap_element(self) -> None:
         result, problems = self.apply(dispositions([
-            entry("all", ["delta:xlsx:*"], "planned", ref="WP16"),
-            entry("breadth", ["delta:xlsx:*.*"], "deferred", ref="0332"),
+            entry("all", ["delta:xlsx:*"], "planned"),
+            entry("breadth", ["delta:xlsx:*.*"], "deferred"),
         ]))
         self.assertEqual(problems, [])
         rows = {(row[0], row[1]): res for row, res in zip(result.properties, result.property_dispositions)}
@@ -580,18 +509,18 @@ class ApplyingDispositions(unittest.TestCase):
         self.assertEqual(rows[("cell", "fill")].disposition, "deferred-P1")
 
     def test_untriaged_rows_stay_missing_and_fail(self) -> None:
-        result, problems = self.apply(dispositions([entry("cells", ["delta:xlsx:cell.*"], "deferred", ref="0332")]))
+        result, problems = self.apply(dispositions([entry("cells", ["delta:xlsx:cell.*"], "deferred")]))
         self.assertIn("xlsx element gadget: no disposition", problems)
         self.assertIn("xlsx element comment: no disposition", problems)
         statuses = {row[0]: row[2] for row in result.elements}
         self.assertEqual(statuses["gadget"], "missing")
         self.assertEqual(result.element_dispositions[[row[0] for row in result.elements].index("gadget")].cell(), "**none**")
 
-    def test_tier_mismatches_and_milestone_follow_ups_fail(self) -> None:
+    def test_tier_mismatches_fail(self) -> None:
         _, problems = self.apply(dispositions([
-            entry("cells", ["delta:xlsx:cell.*"], "deferred-P2", ref="0332"),
-            entry("gadget", ["delta:xlsx:gadget"], "deferred", ref="0332"),
-            entry("comment", ["delta:xlsx:comment"], "planned", ref="WP3"),
+            entry("cells", ["delta:xlsx:cell.*"], "deferred-P2"),
+            entry("gadget", ["delta:xlsx:gadget"], "deferred"),
+            entry("comment", ["delta:xlsx:comment"], "planned"),
         ]))
         self.assertIn("xlsx cell.fill: `deferred-P2` on a P1 row (cells)", problems)
         _, problems = self.apply(dispositions([
@@ -605,10 +534,10 @@ class ApplyingDispositions(unittest.TestCase):
             entry("gadget", ["delta:xlsx:gadget"], "deferred"),
             entry("comment", ["delta:xlsx:comment"], "deferred"),
         ], tiers=[{"tier": "P1", "keys": ["xlsx:*"], "basis": "b"}]))
-        self.assertEqual(problems, ["xlsx element comment: milestone-only follow-up `M2 (comments)` needs a current id (comment)"])
+        self.assertEqual(problems, [])
 
     def test_a_row_without_a_tier_fails(self) -> None:
-        _, problems = self.apply(dispositions([entry("all", ["delta:xlsx:*"], "planned", ref="WP16")],
+        _, problems = self.apply(dispositions([entry("all", ["delta:xlsx:*"], "planned")],
                                               tiers=[{"tier": "P0", "keys": ["xlsx:cell"], "basis": "b"}]))
         self.assertIn("xlsx element gadget: no tier", problems)
 
@@ -620,14 +549,11 @@ class ApplyingDispositions(unittest.TestCase):
                 write(root / "schemas" / "help" / "xlsx" / f"{schema.name}.json",
                       {"element": schema.name, "properties": schema.properties})
             loaded = dispositions([
-                entry("all", ["delta:xlsx:*"], "planned", ref="WP16"),
-                entry("stale", ["delta:xlsx:nothing", "delta:docx:*"], "deferred", ref="0332"),
+                entry("all", ["delta:xlsx:*"], "planned"),
+                entry("stale", ["delta:xlsx:nothing", "delta:docx:*"], "deferred"),
             ], tiers=[{"tier": "P0", "keys": ["xlsx:*"], "basis": "b"}, {"tier": "P1", "keys": ["xlsx:unused"], "basis": "b"}])
             _, _, problems = delta.classified(root, root, loaded)
-            # Record 0344: the fixture's milestone-only follow-up has no current id.
-            self.assertEqual(problems[0], "xlsx: milestone-only follow-up `M2 (comments)` (1 in "
-                             "crates/litchi-ops/tests/golden/registry/xlsx.json) has no current id in `followUps`")
-            self.assertEqual(problems[1:], [
+            self.assertEqual(problems, [
                 "stale disposition key `delta:xlsx:nothing`: it classifies no row",
                 "stale disposition key `delta:docx:*`: it classifies no row",
                 "stale tier key `xlsx:unused`: it classifies no row",
@@ -638,17 +564,17 @@ class ApplyingDispositions(unittest.TestCase):
 
     def test_rendering_shows_dispositions_and_property_pages(self) -> None:
         result, _ = self.apply(dispositions([
-            entry("cells", ["delta:xlsx:cell.*"], "planned", ref="WP16"),
-            entry("later", ["delta:xlsx:gadget", "delta:xlsx:comment"], "planned", ref="WP3"),
+            entry("cells", ["delta:xlsx:cell.*"], "planned"),
+            entry("later", ["delta:xlsx:gadget", "delta:xlsx:comment"], "planned"),
         ]))
-        loaded = dispositions([entry("cells", ["delta:xlsx:cell.*"], "planned", ref="WP16")])
+        loaded = dispositions([entry("cells", ["delta:xlsx:cell.*"], "planned")])
         main = delta.render([result], [], ("cd" * 32, 0), "unknown", loaded)
-        self.assertIn("| gadget |  | unlisted | P2 | planned WP3 (later) |  |", main)
+        self.assertIn("| gadget |  | unlisted | P2 | planned (later) |  |", main)
         self.assertIn("| xlsx | 2 | 0 | 0 | 0 | 0 | 0 |", main)  # element gap rows by disposition
         self.assertIn("officecli-capability-delta/xlsx.md", main)
-        self.assertIn("| cells | planned | WP16 |", main)
+        self.assertIn("| cells | planned | 2 |", main)
         page = delta.render_properties(result)
-        self.assertIn("| cell | `fill` | color | -sg |  | unlisted | gap | P1 | planned WP16 (cells) |  |", page)
+        self.assertIn("| cell | `fill` | color | -sg |  | unlisted | gap | P1 | planned (cells) |  |", page)
         self.assertTrue(all(len(text.encode()) < delta.SIZE_LIMIT for text in (main, page)))
 
     def test_the_committed_inputs_pass_check(self) -> None:

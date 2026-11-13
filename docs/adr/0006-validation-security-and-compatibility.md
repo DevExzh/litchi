@@ -17,27 +17,23 @@ absence of a DTD or DOCTYPE, and its finite budgets, and accepts whatever
 whitespace, XML declaration, line endings and attribute spelling the member
 carries — the producer's for a part the package already holds, and the
 caller's for a part that was authored, replaced or spliced from the source.
-The source-backed replacement route uses this profile under change 0657; the
-eager payload route adopts it under change 0665. Library-authored manifest and
+The source-backed replacement route and the
+eager payload route both use this profile. Library-authored manifest and
 relationship members retain compactness as a debug-checked serializer quality
 property.
 
-> **Amended 2026-09-16** by performance change
-> 0654 under change
-> 0652 decision 2,
+> **Amended 2026-09-16** under the owner's decision
 > *"Original byte contract: loose the audit, accept non-compact XMLs."* Until
 > that amendment the compact output contract was asserted against original part
-> bytes as well, which refused 94 of 95 real OOXML packages at publication
-> (change 0602).
+> bytes as well, which refused 94 of 95 real OOXML packages at publication.
 > "Malformed known payloads fail before publication" below is the surviving
 > rule.
 >
-> **Amended again 2026-09-16** by performance change
-> 0665 under the
-> same decision. Decision 2 names original part bytes; 0665 records its
+> **Amended again 2026-09-16** under the
+> same decision. The decision names original part bytes; this amendment is its
 > implementation interpretation for eager planned payloads, including
-> source-spliced replacements, informed by 0654 and the source-backed
-> replacement precedent in 0657. This is not an additional owner decision.
+> source-spliced replacements, informed by the source-backed
+> replacement precedent. This is not an additional owner decision.
 > Compactness of this library's own serializers remains a quality property,
 > not a publication refusal, so the eager route no longer rejects a payload for
 > spelling. The paragraph above is rewritten to say that. What this amendment
@@ -45,10 +41,10 @@ property.
 > well-formedness, a single document element, character data only inside it,
 > the DTD and DOCTYPE refusal, the attribute grammar, a valid `xml:space` and
 > each finite budget — each still refused with the identical typed error before
-> any byte is emitted. 0665 measured the breadth the eager change admits: its
+> any byte is emitted. Measured breadth that the eager change admits: its
 > 59 `NotCompact` refusals over 180 real `.xlsx` fixtures become 0, and a
 > preserved DOCX main part publishes on 54 of the 55 openable fixtures where
-> change 0660's default policy
+> the earlier default policy
 > had to fall back to whole-document compaction on all 54.
 
 Validation never mutates. It returns a deterministic `Report` of structured

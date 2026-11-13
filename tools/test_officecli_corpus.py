@@ -24,7 +24,7 @@ CHART = {
     "element": "chart",
     "operations": {},
     "properties": {},
-    "gap": {"code": "unsupported_capability", "followUp": "R4x", "reason": "no reader"},
+    "gap": {"code": "unsupported_capability", "followUp": "a chart reader", "reason": "no reader"},
 }
 
 
@@ -66,7 +66,7 @@ class ClassifyTests(unittest.TestCase):
     def test_registry_gap_agrees(self):
         (verdict,) = self.classify([call(kind="chart", result="unsupported_element")])
         self.assertEqual(verdict.kind, "gap")
-        self.assertIn("R4x", verdict.note)
+        self.assertIn("a chart reader", verdict.note)
 
     def test_refused_claimed_property_is_a_bug(self):
         (verdict,) = self.classify([call(result="unsupported_property", detail="align")])
@@ -112,7 +112,7 @@ class ClassifyTests(unittest.TestCase):
         self.assertEqual(bug[1].kind, "bug")
 
     def test_skipped_lists_are_complete(self):
-        # Record 0339: the outcome lists every skipped name; a `head.{...}`
+        # The outcome lists every skipped name; a `head.{...}`
         # group stands for consecutive names sharing a first segment.
         self.assertEqual(corpus.expand_skipped("title.{font,size},fill,a.{b.c,d}"),
                          ["title.font", "title.size", "fill", "a.b.c", "a.d"])
@@ -122,7 +122,7 @@ class ClassifyTests(unittest.TestCase):
             corpus.expand_skipped("style,+2", "word/x.sh:3")
 
     def test_failure_after_skipping_is_a_gap_not_a_bug(self):
-        # Record 0271: a warn-mode add whose data came only from skipped keys
+        # A warn-mode add whose data came only from skipped keys
         # fails with `missing_property`; the skipped keys are the gap.
         (row,) = corpus.parse(
             "@ word/x.sh\n3\tadd\tdocx\tchart\tmissing_property\t"
@@ -234,19 +234,19 @@ class DispositionTests(unittest.TestCase):
         prop = ("paragraph", "align", "enum", "-s-", "missing", "", "", "gap")
         delta = capability_delta.FormatDelta("docx", properties=[prop])
         delta.element_dispositions = []
-        delta.property_dispositions = [capability_delta.Resolution("deferred-P1", "P1", "0332", "breadth")]
-        found = classes([rule("G1|validate", "planned", ref="WP5"),
+        delta.property_dispositions = [capability_delta.Resolution("deferred-P1", "P1", "breadth")]
+        found = classes([rule("G1|validate", "planned"),
                          {"id": "own", "keys": ["corpus:docx|*|paragraph|*|bold"], "disposition": "planned",
-                          "ref": "WP4"},
+                          "reason": "r"},
                          {"id": "fallback", "keys": ["corpus:docx|*|*|*|*"], "disposition": "deferred",
-                          "ref": "0332"}],
+                          "reason": "r"}],
                         deltas=[delta])
         inherited = found.group("docx|set|paragraph|warned|alignment")
         self.assertEqual((inherited.entry, inherited.via), ("breadth", "delta `paragraph.align`"))
         self.assertEqual(found.group("docx|set|paragraph|warned|bold").entry, "own")
         self.assertEqual(found.group("docx|set|paragraph|warned|shade").disposition, "deferred-P1")
         g1 = corpus.RULES_BY_ID["G1"]
-        self.assertEqual(found.rule(g1, call(verb="validate")).ref, "WP5")
+        self.assertEqual(found.rule(g1, call(verb="validate")).entry, "g1|validate")
         self.assertIsNone(found.rule(g1, call(verb="raw-set")).disposition)
 
     def test_problems(self):
@@ -258,10 +258,10 @@ class DispositionTests(unittest.TestCase):
             call(verb="remove", result="invalid_argument", script="word/later.sh"),
             call(script="excel/x.sh"),
         ]
-        found = classes([rule("G1|validate", "planned", ref="WP5"), rule("D5", "planned", ref="WP5"),
+        found = classes([rule("G1|validate", "planned"), rule("D5", "planned"),
                          rule("G4", "deferred-P1"), rule("Z9", "wontfix"),
                          {"id": "p0", "keys": ["corpus:docx|add|paragraph|warned|*"], "disposition": "deferred",
-                          "ref": "0332"}],
+                          "reason": "r"}],
                         tiers=[{"tier": "P0", "keys": ["docx:paragraph", "docx:chart", "docx:paragraph.shade"],
                                 "basis": "b"},
                                {"tier": "P2", "keys": ["corpus:G4"], "basis": "b"},
@@ -286,7 +286,7 @@ class DispositionTests(unittest.TestCase):
             call(kind="chart", result="unsupported_element"),        # no disposition: open
             call(verb="set", result="path_not_found", target="p"),   # cascade of the chart add
         ]
-        found = classes([rule("G1|watch", "planned", ref="WP5"), rule("G1|mark", "planned", ref="WP5"),
+        found = classes([rule("G1|watch", "planned"), rule("G1|mark", "planned"),
                          rule("G4", "deferred"),
                          {"id": "style", "keys": ["corpus:docx|add|paragraph|warned|style"],
                           "disposition": "wontfix", "reason": "r"}])
@@ -297,13 +297,13 @@ class DispositionTests(unittest.TestCase):
         self.assertEqual(states, [("add", "passed"), ("watch", "open"), ("remove", "accounted"),
                                   ("add", "open"), ("add", "open"), ("set", "open")])
         blockers = [corpus.blocker(found_classes) for _, state, found_classes in subset.lines if state == "open"]
-        self.assertEqual(blockers[0], "planned WP5")
+        self.assertEqual(blockers[0], "planned")
         self.assertEqual(blockers[1], "no disposition (`docx|add|paragraph|warned|shade`)")
         self.assertEqual(blockers[2], "no disposition (`docx|add|chart|unsupported_element|`)")
         self.assertEqual(blockers[3], blockers[2])  # the cascade carries its root's class
         rendered = corpus.render(calls, verdicts, "abc", classes=found, subset=subset)
         self.assertIn("**Status: red.** 6 v1 lines: 1 passed, 1 accounted, 4 open.", rendered)
-        self.assertIn("| planned WP5 | 1 |", rendered)
+        self.assertIn("| planned | 1 |", rendered)
         green = corpus.v1_subset(calls[:3:2], corpus.classify(calls[:3:2], found.registries), found,
                                  found.registries)
         self.assertTrue(green.green)

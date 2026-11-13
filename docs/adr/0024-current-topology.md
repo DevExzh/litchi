@@ -4696,7 +4696,7 @@ migration host.
 
 ## 2026-09-24 amendment: inventory after merging the spec-gap branch
 
-Merge record 0759 joins
+The merge joins
 `feat/spec-gap-implementation` (`a67a38abf2`) into
 `feat/office-format-completeness` (`e6cca92db2`). Each branch changed the policy
 independently from the common base (64 packages, 238 declarations): the
@@ -4713,7 +4713,7 @@ migration host.
 
 ## 2026-10-04 amendment: `litchi-ops` unified-operations package
 
-Unified-ops change record 0004 adds
+This amendment adds
 [`litchi-ops`](../../crates/litchi-ops/Cargo.toml), the facade-tier package
 proposed by [ADR 0033](0033-unified-operations-api.md) (Proposed, not
 normative) to hold the unified operations layer: the flat `File` enum, unified
@@ -4737,8 +4737,7 @@ migration host.
 
 ## 2026-10-04 amendment: `litchi-ops` unified error leaf edges
 
-Step S2 of unified-ops record
-0003 implements
+This amendment implements
 `litchi_ops::error`, the unified error whose `From` conversions keep each leaf
 error typed. It adds ten optional normal edges from `litchi-ops`, each enabled
 only by the format features that need it: `litchi-docx`, `litchi-pptx`,
@@ -4750,8 +4749,7 @@ runtime-neutral and iWork-free, so the non-iWork release gate is unchanged.
 
 ## 2026-10-04 amendment: `litchi-ops` open-option edges
 
-Unified-ops M0a step S3 (record
-0003 §2.5) gives `litchi-ops`
+This amendment gives `litchi-ops`
 its `OpenOptions` per-format sub-options, which name leaf limit types. It uses
 four optional normal edges, each owned by the format features that use it:
 `litchi-ops -> litchi-opc` (`docx`, `pptx`, `xlsx`, `xlsb`: OOXML read and
@@ -4767,9 +4765,9 @@ Together with the S2 amendment above, the inventory at this point was 66
 workspace packages, 256 internal dependency declarations and 245 canonical
 edges.
 
-## 2026-10-04 amendment: `litchi-ops` detection edges (M0a step S4)
+## 2026-10-04 amendment: `litchi-ops` detection edges
 
-Unified-ops M0a step S4 moves the facade's smart detection
+This amendment moves the facade's smart detection
 (`crates/litchi/src/detection_smart/`) into `litchi_ops::detect` as a move,
 not a rewrite. Detection needs the OLE, OPC, ODF and RTF probes and the
 source-backed owners that the per-family path detectors hand back, so
@@ -4795,10 +4793,10 @@ workspace packages, 262 internal dependency declarations, 250 canonical edges,
 migration debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one
 migration host.
 
-## 2026-10-04 amendment: `litchi-ops` legacy-handle edge (M0a step S5d)
+## 2026-10-04 amendment: `litchi-ops` legacy-handle edge
 
-Unified-ops M0a step S5d gives `litchi-ops` its `Doc`, `Xls` and `Ppt`
-handles (record 0003 §2.3). Like
+This amendment gives `litchi-ops` its `Doc`, `Xls` and `Ppt`
+handles. Like
 the facade code they port, the handles project OLE property-set metadata and
 fold the property-set repairs into the XLS tolerance report, both of which
 live in `litchi-ole-common`. That adds one optional normal edge,
@@ -4811,12 +4809,11 @@ workspace packages, 263 internal dependency declarations, 251 canonical edges,
 12 development-only edges, 11 ordered migration debts with IDs
 `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.
 
-## 2026-10-05 amendment: `litchi-ops` encryption edge (M0a step S6)
+## 2026-10-05 amendment: `litchi-ops` encryption edge
 
-Unified-ops M0a step S6 opens every input as a `File`, classifies encrypted
+This amendment opens every input as a `File`, classifies encrypted
 inputs as `File::Locked` at open, and adds the consuming `Locked::unlock`
-behind a new `encryption` feature of `litchi-ops` (record
-0003 §2.6). Unlocking an
+behind a new `encryption` feature of `litchi-ops`. Unlocking an
 encrypted OOXML package decrypts it once through the OOXML codec of
 `litchi-crypto` and hands the clear package to the leaf owners'
 decrypted-package constructors, which keep its encryption profile. That adds
@@ -4835,10 +4832,10 @@ Together with the S2 through S5d amendments above, the current inventory is
 edges, 12 development-only edges, 11 ordered migration debts with IDs
 `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.
 
-## 2026-10-05 amendment: `litchi-ops` Markdown edges (M0a step S7)
+## 2026-10-05 amendment: `litchi-ops` Markdown edges
 
-Unified-ops M0a step S7 makes `litchi::open` and the `File` enum the facade's
-entry point (record 0003 §4).
+This amendment makes `litchi::open` and the `File` enum the facade's
+entry point.
 `File` gains Markdown output: `litchi_markdown::ToMarkdown` and `File` are
 both foreign to the facade, so the implementation can only live next to
 `File`, and the facade's Markdown adapter moves into `litchi-ops` behind a
@@ -4858,11 +4855,11 @@ Together with the S2 through S6 amendments above, the inventory at this point
 was 66 workspace packages, 266 internal dependency declarations and 254
 canonical edges.
 
-## 2026-10-05 amendment: `litchi-ops` signature edge (M0a step S6b)
+## 2026-10-05 amendment: `litchi-ops` signature edge
 
-Unified-ops M0a step S6b adds the explicit signature policy of ADR 0006 to
-the unified layer (unified-ops record
-0013). `Signed::unsign` consumes a
+This amendment adds the explicit signature policy of ADR 0006 to
+the unified layer.
+`Signed::unsign` consumes a
 signature, and the first edit of the returned file removes it through the
 owning format's explicit removal. A legacy binary document (DOC, PPT, XLS)
 carries its signature in compound-file storage, and its removal belongs to the
@@ -4882,7 +4879,7 @@ workspace packages, 267 internal dependency declarations, 255 canonical edges,
 
 ## 2026-10-13 amendment: `litchi-cli` command-line package
 
-Unified-ops record 0256 (plan step 15, design
+This amendment (design
 §11) adds [`litchi-cli`](../../crates/litchi-cli/Cargo.toml), the `litchi`
 binary: OfficeCLI's verbs over the public `litchi-ops` API, with no document
 behaviour of its own. It adds two normal edges, `litchi-cli -> litchi-ops`
@@ -4904,8 +4901,8 @@ dependency declarations.
 
 ## 2026-10-13 amendment: `litchi-ops` formula-evaluation edge
 
-Unified-ops record 0266
-(plan step 18, design §13 P0) evaluates spreadsheet formulas through the
+This amendment
+(design §13 P0) evaluates spreadsheet formulas through the
 unified API: `File::evaluate` and `File::recalculate` drive the existing
 `litchi-eval` engine over a snapshot of the workbook's cells. That adds one
 optional normal edge, `litchi-ops -> litchi-eval`, owned by a new `eval`
@@ -4927,13 +4924,13 @@ development-only edges and 11 ordered migration debts with IDs
 migration edges), with one migration host. Cargo metadata lists 271 internal
 dependency declarations.
 
-## 2026-10-15 amendment: `litchi-ops` iWork leaf edges (owner decision D1)
+## 2026-10-15 amendment: `litchi-ops` iWork leaf edges
 
-Unified-ops record 0296 applies
-owner decision D1 (record 0248): the iWork-free constraint on `litchi-ops`
+This amendment applies
+the owner's decision: the iWork-free constraint on `litchi-ops`
 is removed, and the single `File` enum holds Pages, Keynote and Numbers
 packages directly. That adds four optional normal edges, each registered
-with the reason "owner decision D1, record 0296":
+in the boundary policy:
 
 - `litchi-ops -> litchi-pages` (`pages` feature);
 - `litchi-ops -> litchi-keynote` (`keynote` feature);
@@ -4962,10 +4959,10 @@ and 11 ordered migration debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15,
 16, 17]`, with one migration host; `tools/check_crate_boundaries.py`
 reports 67 workspace packages and 282 internal dependency declarations.
 
-## 2026-10-16 amendment: iWork facade reader retired (record 0306)
+## 2026-10-16 amendment: iWork facade reader retired
 
-Unified-ops record 0306
-deletes the facade's read-only `litchi::iwork` module (plan step 28): every
+This amendment
+deletes the facade's read-only `litchi::iwork` module: every
 iWork package and package directory opens through `litchi::open` as a
 `File` variant. Two edges change:
 
@@ -4983,11 +4980,11 @@ features (the `pages`, `keynote` and `numbers` features of `litchi-ops` do).
 `tools/check_crate_boundaries.py` still reports 67 workspace packages and 282
 internal dependency declarations, with the same 11 migration debts.
 
-## 2026-10-20 amendment: `litchi-sheet-text` text-workbook leaf (record 0354)
+## 2026-10-20 amendment: `litchi-sheet-text` text-workbook leaf
 
-Unified-ops record 0354
+This amendment
 moves the facade's `litchi::sheet::text` module (CSV, TSV, PRN, SYLK, DIF and
-fixed-width readers and writers; owner memo item 26, decision 0350) into the
+fixed-width readers and writers) into the
 new leaf package `litchi-sheet-text`. The existing `litchi-sheet` package
 stays the format-neutral vocabulary crate that XLSX and XLSB build on; the
 text readers are concrete formats, so they get their own leaf. Four edges
@@ -5007,9 +5004,9 @@ counts it among its bulk packages (46 to 47). `tools/check_crate_boundaries.py`
 reports 68 workspace packages and 286 internal dependency declarations, with
 the same 11 migration debts.
 
-## 2026-10-26 amendment: `litchi-iwa-style` shared drawing-style engine (record 0375a)
+## 2026-10-26 amendment: `litchi-iwa-style` shared drawing-style engine
 
-Unified-ops record 0375a adds the focused package `litchi-iwa-style`, the
+This amendment adds the focused package `litchi-iwa-style`, the
 shared drawing-style and media engine of the Pages, Numbers and Keynote
 owners. It joins the archive-free values of `litchi-iwa-common`, the bounded
 codecs of `litchi-iwa-protos` and the IWA objects of `litchi-iwa-core`, which
@@ -5018,9 +5015,9 @@ dependencies, and the style-variation graph engine (allocating and
 registering series non-style and shape-style objects, package-metadata
 object UUIDs, identifier bookkeeping) is shared logic that must not be
 copied into three leaves. It also absorbs the `drawing_native` and
-`media_native` field passes record 0375 had placed, identically, in each
-leaf. Decision D6 of record 0363 (no media crate for values that fit existing
-crates) does not apply: this crate carries shared graph logic.
+`media_native` field passes that were placed, identically, in each
+leaf. The rule against a media crate for values that fit existing
+crates does not apply: this crate carries shared graph logic.
 
 Edges, all downward:
 
@@ -5031,25 +5028,25 @@ Edges, all downward:
   paragraph-style font variations of the chart-font engine;
 - `litchi-iwa -> litchi-iwa-style` as migration debt (order 11): the exit
   parity harness drives the engines against the legacy host routes; it goes
-  with the host in W3.
+  with the host.
 
 The leaves consume the crate privately when their families adopt it
-(`litchi-pages -> litchi-iwa-style` first, 2026-10-26: the W1-B body-media
+(`litchi-pages -> litchi-iwa-style` first, 2026-10-26: the body-media
 lifecycle reads its embedded-media inventory through
 `litchi_iwa_style::media`, which replaced the per-leaf `media_native` copy;
-`litchi-keynote -> litchi-iwa-style` next, for the W1-C media-asset
+`litchi-keynote -> litchi-iwa-style` next, for the media-asset
 inventory reads);
 no facade re-exports it (ADR 0028's rule for focused low-level crates). The
 package is runtime-neutral and iWork-only, so the non-iWork release gate
 counts it among the iWork and excluded packages (17 to 18, 20 to 21).
 `tools/check_crate_boundaries.py` reports 69 workspace packages with 12
-migration debts. Reconciled with `litchi-iwa-table` (record 0379, below),
+migration debts. Reconciled with `litchi-iwa-table` (below),
 which landed in parallel: 70 workspace packages, 19 iWork and 22 excluded
 packages for the non-iWork gate.
 
-## 2026-10-26 amendment: `litchi-iwa-table` shared table-family engines (record 0379)
+## 2026-10-26 amendment: `litchi-iwa-table` shared table-family engines
 
-Unified-ops record 0379
+This amendment
 adds the focused package `litchi-iwa-table`. Numbers sheets, Pages body
 tables and Keynote slide tables store the same TST table graph, but the
 table-family engines that edit it (cell formats and controls first; cell
@@ -5085,11 +5082,11 @@ package for the non-iWork release gate (18 iWork packages, 21 excluded).
 internal dependency declarations with 12 explicit debt items, after trunk
 `c4f00f3a35` (which adds `litchi-iwa-style`) was merged.
 
-## 2026-11-03 amendment: `litchi-iwa` deleted (unified-ops record 0429)
+## 2026-11-03 amendment: `litchi-iwa` deleted
 
-Unified-ops record 0429 deletes
-the iWork migration host `crates/litchi-iwa` (ADR 0028 W3); every macOS queue
-row has Mac evidence (record 0434). The workspace now has 69 packages and 303
+This amendment deletes
+the iWork migration host `crates/litchi-iwa` (ADR 0028); every macOS queue
+row has Mac evidence. The workspace now has 69 packages and 303
 internal dependency declarations (`tools/check_crate_boundaries.py`), with no
 migration host and no migration debt: the 12 `litchi-iwa -> *` debt edges
 (orders 1, 2, 4, 8, 10, 11, 12, 13, 14, 15, 16, 17) close together. The
@@ -5108,7 +5105,7 @@ iWork family is now:
 The non-iWork release gate counts 18 iWork packages and 21 excluded
 packages. No boundary rule changes for the remaining crates.
 
-## 2026-11-05 amendment: no `internal-iwork-source` feature (record 0436)
+## 2026-11-05 amendment: no `internal-iwork-source` feature
 
 The feature no longer exists, in the iWork crates or in `litchi-ops`. The
 `pages`, `keynote` and `numbers` features of `litchi-ops` reach the leaves'

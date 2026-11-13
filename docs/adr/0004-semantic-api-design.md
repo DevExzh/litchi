@@ -3721,8 +3721,7 @@ limitations remain explicit in ADR 0008 and ADR 0028.
 
 ## 2026-10-08 amendment: canonical cross-format vocabulary
 
-[ADR 0034](0034-unified-api-glossary-and-default-policies.md), adopted by
-owner instruction in record 0016,
+[ADR 0034](0034-unified-api-glossary-and-default-policies.md)
 supersedes conflicting naming, owner/projection, transaction, error-scope,
 selector and default-policy clauses of this record. The migration proceeds
 in verified waves tracked in [the API glossary](../API_GLOSSARY.md); no aliases

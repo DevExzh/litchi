@@ -61,7 +61,7 @@ manual_saturating_arithmetic = "allow"
 needless_return = "allow"
 # `clippy.toml` disallows quick-xml's checked attribute iteration, whose
 # duplicate check is quadratic on hostile tags. The crates that read untrusted
-# OOXML and OLE2 XML deny it outside their tests (record 0770); others allow it.
+# OOXML and OLE2 XML deny it outside their tests; others allow it.
 disallowed_methods = "allow"
 
 [workspace.dependencies]
@@ -172,7 +172,7 @@ same-file     = "1.0.6"
 serde         = { version = "1.0.229", features = ["derive"] }
 serde-saphyr  = "2.1.1"
 # `float_roundtrip`: correctly rounded decimal-to-f64 parsing, so a JSON number
-# (batch payloads, property values) round-trips exactly (record 0338 F1).
+# (batch payloads, property values) round-trips exactly.
 serde_json    = { version = "1.0.154", features = ["float_roundtrip"] }
 sha1          = { version = "0.11.0", features = ["zeroize"] }
 sha1_legacy   = { package = "sha1", version = "0.10" }

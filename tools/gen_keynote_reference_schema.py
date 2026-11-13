@@ -17,8 +17,8 @@ message.  This tool derives that from the tracked iWork schema in
 The message-type identifiers are the native Keynote registry values.  Each
 was checked against every Keynote package under ``test-data/iwork/keynote``:
 for every object, every identifier listed in its archive ``MessageInfo``
-``object_references`` is found by walking the payload with this schema
-(record 0298).  Re-run with ``--check`` in CI-like contexts to prove the
+``object_references`` is found by walking the payload with this schema.
+Re-run with ``--check`` in CI-like contexts to prove the
 committed file is current.
 
 Usage::

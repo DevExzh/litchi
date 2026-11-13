@@ -1,6 +1,6 @@
 # ADR 0028: Ordered exit of the legacy IWA migration host
 
-- Status: Accepted; host deleted by unified-ops record 0429 (W3); every macOS
+- Status: Accepted; host deleted; every macOS
   queue row has Mac evidence (amendment of 2026-11-03 below)
 - Date: 2026-08-08
 - Amends: ADR 0002, ADR 0010, and the IWA record now stored as
@@ -3191,8 +3191,8 @@ throughput evidence:
 | Shared `PreparedSource` with `SEMANTIC_METADATA` | 1 root inspection + 5 selected-catalog reads = 6 | — | `PENDING — no benchmark run` | `PENDING — no benchmark run` |
 | Windows `SemanticMetadataAny` packaged-file fallback | `PENDING — full-catalog path` | `PENDING — no benchmark run` | `PENDING — no benchmark run` | `PENDING — no benchmark run` |
 
-These are change-record placeholders, not fabricated performance results. A
-future perf-baseline entry may replace the pending cells only after measuring
+These are placeholders, not fabricated performance results. A
+future measurement may replace the pending cells only after measuring
 the same profiles with representative wall-clock, copied-byte/allocation,
 and resident-memory evidence.
 
@@ -12350,33 +12350,31 @@ reported 64 workspace packages, 241 internal dependency declarations, and the
 same 11 explicit migration debt items. Strict workspace library lint passed
 without lint exceptions.
 
-## 2026-11-03 amendment: the host is deleted (unified-ops record 0429, W3)
+## 2026-11-03 amendment: the host is deleted
 
-Unified-ops record 0429 executes
-W3 of the exit plan (0363)
+The deletion was executed
 on branch `uo2/iwa-w3`, brought up to trunk `4d8a3e161f`, the last commit that
-contains `crates/litchi-iwa`. Every row of the macOS queue has Mac evidence
-(owner decision D1; record 0434).
+contains `crates/litchi-iwa`. Every row of the macOS queue has Mac evidence.
 Deletion gate:
 
 1. No manifest depends on `litchi-iwa`: held before the deletion (no
-   workspace crate, fuzz workspace, `tools/perf-baseline` or
+   workspace crate, fuzz workspace or
    `tools/native-resave` manifest named it) and now holds trivially.
 2. Every module, example, test and fixture has an owner: the exit ledger
    had 0 host-only rows, 2,117 migrated and 119 retired when the crate was
    deleted. The host's tests and examples are deleted
    with it; the generated-schema build path no longer reads host sources
    (`crates/litchi-iwa-protos/build.rs`). The 797 inputs the host built for
-   the macOS queue packages (records 0433, 0434) are kept outside the repository and
+   the macOS queue packages are kept outside the repository and
    listed, with SHA-256, in `test-data/iwork/mac-queue/host-built-inputs.tsv`.
 3. Semantic parity: every migrated route has a parity case (Tier A or B) that
    passed at `4d8a3e161f` (1,192 passed, 210 ignored cost probes); the routes without host native
    evidence are the macOS queue. By owner decision of 2026-11-05 the crate is
-   removed without regard to historical debt: parity cases outside record 0429
-   §4 are dropped, not ported.
+   removed without regard to historical debt: the remaining parity cases
+   are dropped, not ported.
 4. Native open/save/reopen for mutation paths: all 767 queue rows have Mac
-   evidence, 0 failed and 0 pending (record 0434 §2). The owner discarded the
-   open by-reference part of the two pivot rows (record 0429).
+   evidence, 0 failed and 0 pending. The owner discarded the
+   open by-reference part of the two pivot rows.
 5. No root-facade re-export, feature alias or type alias of the host: holds.
 6. No host or host debt in the boundary policy: `migration_hosts` and
    `migration_debt` are empty. `tools/check_crate_boundaries.py` reports 69
@@ -12388,10 +12386,10 @@ The Verification section's requirement that the boundary tool report
 `litchi-iwa` as a migration host is superseded: the tool reports no migration
 host.
 
-## 2026-11-05 amendment: the host's seams are removed (record 0436)
+## 2026-11-05 amendment: the host's seams are removed
 
-The `internal-iwork-source` feature and the leaves' hidden host seams are gone,
-as the follow-up of record 0429 §5. Prepared-source ingress, the one seam with a
+The `internal-iwork-source` feature and the leaves' hidden host seams are gone.
+Prepared-source ingress, the one seam with a
 real non-test caller, is now the public `Package::from_prepared_source` of each
 leaf, which `litchi-ops` calls. `tools/check_crate_boundaries.py` rejects the
 feature and the retired seam names in every crate. The `*-full` glossary profiles,

@@ -7,7 +7,7 @@ non-iWork slice: it derives the package and facade-feature sets from Cargo
 metadata, checks every selected dependency tree, and then runs the requested
 Cargo operation with the 47 ordinary packages plus the safe facade feature
 closure.  The unified layer (``litchi-ops`` and the ``litchi-cli`` binary on
-top of it) reads and writes iWork since record 0296 (owner decision D1), so
+top of it) reads and writes iWork, so
 it is excluded from the bulk slice like the iWork packages themselves; the
 facade's safe feature closures still reach it, without its iWork features.  Library tests and the other high-memory modes serialize package
 roots; library tests clean each successful root's artifacts to keep its test
@@ -70,7 +70,7 @@ EXPECTED_EXCLUDED_PACKAGES = 21
 EXPECTED_BULK_PACKAGES = 47
 
 # The unified operations layer depends on the iWork leaves under its
-# `pages`, `keynote` and `numbers` features (owner decision D1, record 0296),
+# `pages`, `keynote` and `numbers` features,
 # and the command line depends on it. Both leave the bulk slice; the facade's
 # safe feature closures may still contain them, because those closures turn
 # on none of their iWork features (the tree checks below prove it).
@@ -317,8 +317,8 @@ MODES = (
 # `litchi`'s default feature set is empty, so `cargo test --package litchi`
 # compiles almost none of the facade's library and integration tests.  These
 # Office leaves cover all eight native corpus families. Encryption enables
-# password fixtures; the closure reaches no iWork package. Change 0629 found
-# a DOCX test hidden by the empty default features; native-fixture coverage
+# password fixtures; the closure reaches no iWork package. The empty default
+# features once hid a DOCX test; native-fixture coverage
 # additionally requires DOC, RTF, XLSB and PPT to run in this gate.
 # Native worksheet trait tests also exercise the generic formula evaluator.
 FACADE_FORMAT_TEST_FEATURES = ("doc", "docx", "encryption", "eval", "ppt", "pptx", "rtf", "xls", "xlsb", "xlsx")
@@ -413,7 +413,7 @@ class WorkspacePlan:
     safe_facade_features: frozenset[str]
     unsafe_facade_features: frozenset[str]
     # Excluded from the bulk slice but allowed in the safe facade trees:
-    # the iWork-capable unified layer (record 0296).
+    # the iWork-capable unified layer.
     unified_packages: frozenset[str] = frozenset()
 
     @property

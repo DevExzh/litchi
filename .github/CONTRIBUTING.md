@@ -95,7 +95,6 @@ and how to run useful scripts.
 
 [author]: https://github.com/DevExzh
 
-[support]: support.md
 
 [coc]: CODE_OF_CONDUCT.md
 

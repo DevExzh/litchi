@@ -1,7 +1,7 @@
 # iWork Feature-Matrix Audit
 
-> **Historical snapshot.** The `litchi-iwa` migration host this audit describes was deleted by
-> record 0429 (last present at commit `4d8a3e161f`).
+> **Historical snapshot.** The `litchi-iwa` migration host this audit describes was deleted
+> (last present at commit `4d8a3e161f`).
 > Statements about it describe the audited baseline, not the current tree.
 
 > Source audit starting at committed `d33f30f41` (2026-09-01) and including the focused
@@ -182,7 +182,7 @@ Exact current and historical results are recorded in [IWORK_PROGRESS_AUDIT.md](I
 | Resource limits | 🟡 | ✅ | 🟡 | Strong framing/wire/ZIP limits; output-overhead/compressed-size, graph/index, and aggregate live-memory/work ceilings remain incomplete |
 | Fresh package creation in focused owners | ❌ | N/A | ❌ | Broad builders remain in the migration host |
 
-Shared implementation references: [archive limits](../crates/litchi-iwa-archive/src/limits.rs#L5), [exact package reassembly](../crates/litchi-iwa-archive/src/package.rs#L1631), [directory boundary](../crates/litchi-iwa-archive/src/directory.rs#L81), [aggregate facade](../crates/litchi/src/iwork/mod.rs#L68).
+Shared implementation references: [archive limits](../crates/litchi-iwa-archive/src/limits.rs#L5), [exact package reassembly](../crates/litchi-iwa-archive/src/package.rs#L1631), [directory boundary](../crates/litchi-iwa-archive/src/directory.rs#L81), aggregate facade.
 
 ## Pages focused owner
 
@@ -320,7 +320,7 @@ The following capability exists broadly in `litchi-iwa`, but must be labeled **l
 | Table cells/formulas/rich formatting/topology | Broad | Broad except physical `Sort Now` | Broad |
 | Focused-owner replacement complete | No | No | No |
 
-“Broad” here is an inventory statement, not a completeness or native-acceptance grade. The host exposes native/raw identities, includes compatibility fallbacks, and is governed by the 11 ordered debts (orders `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`) in the deletion ledger ([host policy](../crates/litchi-iwa/README.md#legacy-editing), [ADR 0028](adr/0028-iwa-monolith-exit.md)). The dedicated raw-ID `litchi_iwa::numbers::Draft` Date & Time and Duration routes are retired; generic source-built/cross-format `DataFormat::DateTime` and `DataFormat::Duration`, broad smart-field lifecycle, and attached Pages/Keynote table compatibility remain host-owned. The authoritative topology is 64 workspace packages, 238 internal dependency declarations, 227 canonical edges, 11 development-only edges, 11 ordered migration debts, and one migration host.
+“Broad” here is an inventory statement, not a completeness or native-acceptance grade. The host exposes native/raw identities, includes compatibility fallbacks, and is governed by the 11 ordered debts (orders `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`) in the deletion ledger (host policy, [ADR 0028](adr/0028-iwa-monolith-exit.md)). The dedicated raw-ID `litchi_iwa::numbers::Draft` Date & Time and Duration routes are retired; generic source-built/cross-format `DataFormat::DateTime` and `DataFormat::Duration`, broad smart-field lifecycle, and attached Pages/Keynote table compatibility remain host-owned. The authoritative topology is 64 workspace packages, 238 internal dependency declarations, 227 canonical edges, 11 development-only edges, 11 ordered migration debts, and one migration host.
 This API-boundary retirement does not alter the workspace topology, ordered-debt count, migration-host count, or deletion-gate status.
 
 The focused Numbers Custom transaction retires the three dedicated legacy host

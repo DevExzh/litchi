@@ -9,16 +9,8 @@ The owner requested this design for the unified-operations refactor on
 2026-10-08. The supplied base-checkout draft was numbered 0033; that number
 already belongs to the accepted unified-operations ADR in this branch. This
 record therefore takes 0034, preserving the existing ADR and its historical
-citations. Record 0016
-records rollout adjustments for already-landed M0a and independently owned
-iWork crates. Acceptance specifies the target contract; it does not claim
+citations. Acceptance specifies the target contract; it does not claim
 that the migration waves or enforcement checker have landed.
-
-This branch briefly tracked a pointer file at the draft's path,
-`docs/adr/0033-unified-api-glossary-and-default-policies.md`. It duplicated
-ADR number 0033 and collided with the untracked draft in the base checkout,
-so record 0334
-removed it. This file is the only copy of the glossary ADR in this branch.
 
 ## Context
 

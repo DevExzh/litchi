@@ -688,7 +688,7 @@ this operation does not sanitize the file.
 
 Each variant exists only when its cargo feature is enabled. An app-authored
 iWork package directory opens as its single-file form, and `save()` writes
-it back as a directory (record 0306).
+it back as a directory.
 
 The examples in this section run inside a function that returns
 `litchi::Result<()>`.
@@ -877,7 +877,7 @@ if let File::Signed(signed) = litchi::open("contract.docx")? {
 
 `file.dump()` writes a document out as an OfficeCLI v2 batch: replaying it
 with `batch` onto `litchi::create(format)` rebuilds the body, sheets or
-slides (record 0336). Content the write verbs cannot rebuild is listed in
+slides. Content the write verbs cannot rebuild is listed in
 `Dump::warnings`, never dropped silently.
 
 ```rust

@@ -24,7 +24,7 @@ OWNER DIRECTION (2026-10-08) — API vocabulary and restart:
   Refactor toward the glossary/default-policy draft supplied at the base
   checkout's docs/adr/0033-unified-api-glossary-and-default-policies.md.
   It is adopted here as ADR 0034 because ADR 0033 already identifies the
-  accepted unified-operations design. See record 0016 and docs/API_GLOSSARY.md.
+  accepted unified-operations design. See docs/API_GLOSSARY.md.
   The glossary governs API shapes and strict default policies; the existing
   design and all-format read/write owner override still govern coverage.
   M0a/M0b have already landed: adapt their consumers with each leaf wave,
@@ -240,7 +240,7 @@ M2b Write handlers for xlsb (tier 1) and legacy OLE doc/xls/ppt (tier 2).
 M6  Delayed tier 3, after M2b: RTF; ODF (odt/ods/odp first, then
     odg/odc/odi/odb/oth/odm/odf); iWork (pages/keynote/numbers, via their
     public edit APIs). Each stream starts from the leaf write-capability
-    inventory (record 0002), closes leaf API gaps in the leaf crate where it
+    inventory, closes leaf API gaps in the leaf crate where it
     owns them, and reports remaining element-level gaps in `capabilities()`.
 M3  Python write bindings, CLI, schema export, capabilities introspection.
 M4  CSV import, formula write/eval, typed chart and SmartArt CRUD, then the

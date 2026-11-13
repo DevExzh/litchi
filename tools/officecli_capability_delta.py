@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Generate the OfficeCLI capability delta table (record 0010 §7.2, item 6).
+"""Generate the OfficeCLI capability delta table.
 
 The table compares OfficeCLI's help schemas (``schemas/help/<format>/*.json``,
 with their ``extends`` bases merged the way OfficeCLI's ``SchemaHelpLoader``
 merges them) with Litchi's property registry export
 (``crates/litchi-ops/tests/golden/registry/<format>.json``, the golden JSON
-of ``litchi_ops::schema(format)``; record 0263) for every format the
+of ``litchi_ops::schema(format)``) for every format the
 registry covers. OfficeCLI describes DOCX, XLSX and PPTX; the other formats
 are compared against the vocabulary of their family as a parity target (not
 a claim of OfficeCLI support for them): DOC and RTF against DOCX, XLS and
@@ -18,7 +18,7 @@ named by ``--output-dir``; the tables are a working report and are not kept
 in the repository.
 
 The OfficeCLI help schemas it reads are vendored, unchanged, under
-``test-data/officecli/`` (record 0257; provenance, license and the pinned
+``test-data/officecli/`` (provenance, license and the pinned
 upstream commit sit next to them), so the script runs anywhere::
 
     python3 tools/officecli_capability_delta.py --output-dir <directory>
@@ -33,19 +33,13 @@ SHA-256 of every registry snapshot it read and of the schema tree. Run
 the table in memory, writes nothing, and fails when the inputs need triage.
 
 Every gap row carries a disposition from the curated
-``tools/officecli_dispositions.json`` (record 0332): ``planned`` (with a work
-package or record id), ``deferred-P1``/``deferred-P2`` (by design §13 tier),
-``wontfix`` or ``out-of-scope`` (with a reason). The property tables are
+``tools/officecli_dispositions.json``: ``planned``,
+``deferred-P1``/``deferred-P2`` (by design §13 tier), ``wontfix`` or
+``out-of-scope``, each with a reason. The property tables are
 long, so each format's sits in its own page under
 ``officecli-capability-delta/`` next to the main table. ``--check`` fails on
 an untriaged (``missing``) row, a gap without a disposition, a P0 row that is
-deferred or wontfix, a milestone-only follow-up without a current id, and a
-disposition or tier key that matches nothing. Record 0344 (audit WP13)
-extends the milestone rule to every ``followUp`` of the registry and
-capability goldens (``crates/litchi-ops/tests/golden/capabilities``): each
-one that names only a milestone must match a ``followUps`` entry of the
-dispositions file, which gives its current record or work-package id (the
-tables show it after the text), and every entry must match one.
+deferred or wontfix, and a disposition or tier key that matches nothing.
 
 The output is deterministic: no timestamps, sorted where OfficeCLI's order is
 not meaningful, so rerunning on the same inputs reproduces it byte for byte.
@@ -74,9 +68,6 @@ OUTPUT = Path("officecli-capability-delta.md")
 # Per-format property tables, next to the main table.
 PROPERTY_DIR = Path("officecli-capability-delta")
 DISPOSITIONS = Path("tools/officecli_dispositions.json")
-# The capability goldens (`File::capabilities()` per format); record 0344
-# reads their follow-ups for the milestone rule.
-CAPABILITY_DIR = Path("crates/litchi-ops/tests/golden/capabilities")
 # Generated files stay below 1 MiB each.
 SIZE_LIMIT = 1 << 20
 # Table order: each OfficeCLI format, then the formats compared against its
@@ -160,7 +151,7 @@ UNMATCHED: dict[str, set[str]] = {
 
 # OfficeCLI elements outside the unified read surface, with the reason.
 OUT_OF_SCOPE: dict[str, str] = {
-    "raw": "the raw XML layer: the `raw`, `raw-set`, `add-part` and `validate` commands (record 0336), not an element (design §12)",
+    "raw": "the raw XML layer: the `raw`, `raw-set`, `add-part` and `validate` commands, not an element (design §12)",
     "sort": "a set-only action that reorders rows, not an element (design §13 P1: sort)",
     "markdown": "an add-time import format, not an element of the document",
 }
@@ -210,7 +201,7 @@ TRIAGED = "unlisted"
 
 
 # ---------------------------------------------------------------------------
-# Dispositions (record 0332)
+# Dispositions
 # ---------------------------------------------------------------------------
 
 DISPOSITION_VALUES = ("planned", "deferred-P1", "deferred-P2", "wontfix", "out-of-scope")
@@ -221,19 +212,6 @@ TIER_VALUES = ("P0", "v1", "P1", "P2")
 V1_TIERS = ("P0", "v1")
 # Dispositions that account for a gap in the v1-scope corpus subset.
 ACCOUNTED = ("wontfix", "deferred-P1", "deferred-P2", "out-of-scope")
-# A current work-package or record id: `WP4`, `0328`, `0324a`.
-REF = re.compile(r"(WP\d+|\d{4}[a-z]?)\b")
-# A follow-up that names only a closed milestone or a step of one
-# ("M2 (validate)", "M1-extended (R4x)", "R4x", "M1-Δ1"): its row's
-# disposition must name a current id (audit WP13).
-MILESTONE = re.compile(r"(^|[\s(])(M\d[\w-]*|R\d+[a-z]*)\b")
-RECORD = re.compile(r"\b(record \d{4}|\d{4}[a-z]?\b|WP\d+|L-[A-Z]+-[A-Z]?\d)")
-
-
-def milestone_only(follow_up: str) -> bool:
-    """Whether a follow-up names a milestone but no record or work item."""
-    return bool(MILESTONE.search(follow_up)) and not RECORD.search(follow_up)
-
 
 def _literal(segment: str) -> int:
     return sum(1 for char in segment if char not in "*?[]")
@@ -324,7 +302,6 @@ class Resolution:
 
     disposition: str | None  # a DISPOSITION_VALUES member, `deferred` unresolved, None: none
     tier: str  # the effective tier, "" when not tiered
-    ref: str = ""
     entry: str = ""
     reason: str = ""
     via: str = ""  # where an inherited disposition comes from
@@ -334,12 +311,10 @@ class Resolution:
         return self.disposition in ACCOUNTED
 
     def cell(self) -> str:
-        """The disposition as a table cell: value, id, entry."""
+        """The disposition as a table cell: value, entry."""
         if self.disposition is None:
             return "**none**"
         parts = [self.disposition]
-        if self.ref:
-            parts.append(self.ref)
         if self.entry:
             parts.append(f"({self.entry})")
         return " ".join(parts)
@@ -378,15 +353,8 @@ class Dispositions:
             value = entry.get("disposition")
             if value not in DISPOSITION_INPUTS:
                 raise SystemExit(f"{origin}: `{label}` has disposition `{value}`")
-            ref = entry.get("ref", "")
-            if value == "planned" and not REF.fullmatch(ref.split(" ", 1)[0]):
-                raise SystemExit(f"{origin}: planned `{label}` needs a work-package or record id, not `{ref}`")
-            if ref and not REF.match(ref):
-                raise SystemExit(f"{origin}: `{label}` ref `{ref}` is not a work-package or record id")
-            if value in ("wontfix", "out-of-scope") and not entry.get("reason"):
+            if not entry.get("reason"):
                 raise SystemExit(f"{origin}: {value} `{label}` needs a reason")
-            if value != "planned" and not ref and not entry.get("reason"):
-                raise SystemExit(f"{origin}: `{label}` needs a reason or a ref")
             entries += [(key, entry) for key in entry.get("keys", [])]
         self.entries = Patterns(entries, f"{origin} dispositions")
         self.scripts = Patterns(
@@ -397,23 +365,6 @@ class Dispositions:
             if entry.get("tier") not in TIER_VALUES or not entry.get("basis"):
                 raise SystemExit(f"{origin}: corpus script entry {entry.get('keys')} needs a tier and a basis")
         self.by_id = {entry["id"]: entry for entry in data.get("dispositions", [])}
-        self.follow_ups = []
-        follow_ids: set[str] = set()
-        for entry in data.get("followUps", []):
-            label = entry.get("id", "")
-            if not label or label in follow_ids:
-                raise SystemExit(f"{origin}: follow-up map id `{label}` is empty or repeated")
-            follow_ids.add(label)
-            ref = entry.get("ref", "")
-            if not REF.fullmatch(ref.split("/", 1)[0]) or milestone_only(ref):
-                raise SystemExit(f"{origin}: follow-up map `{label}` needs a work-package or record id, not `{ref}`")
-            if not entry.get("followUps") or not entry.get("note"):
-                raise SystemExit(f"{origin}: follow-up map `{label}` needs `followUps` and a `note`")
-            self.follow_ups.append(entry)
-        self.follow_up_uses: dict[str, int] = {}
-        # (format, follow-up) of every milestone-only golden follow-up, set
-        # by `classified`.
-        self.milestone_follow_ups: list[tuple[str, str]] = []
 
     @classmethod
     def load(cls, path: Path) -> "Dispositions":
@@ -421,8 +372,7 @@ class Dispositions:
 
     def effective(self, fmt: str, tier: str) -> str:
         """Design §13's v1 boundary binds the formats the goal's definition of
-        done names (``p0Formats``); elsewhere a P0 or v1 feature falls in the
-        P1 wave."""
+        done names (``p0Formats``); elsewhere a P0 or v1 feature is P1."""
         if tier in V1_TIERS and fmt not in self.p0_formats:
             return "P1"
         return tier
@@ -464,41 +414,14 @@ class Dispositions:
         value = entry["disposition"]
         if value == "deferred" and tier in ("P1", "P2"):
             value = f"deferred-{tier}"
-        return Resolution(value, tier, entry.get("ref", ""), entry["id"], entry.get("reason", ""))
-
-    def follow_up_entry(self, fmt: str, text: str, mark: bool = True) -> dict | None:
-        """The follow-up map entry (record 0344, audit WP13) that gives a
-        milestone-only follow-up of ``fmt`` its current id: an entry that
-        names the format beats one that does not, then the pattern with
-        the most literal characters, then the earlier entry."""
-        best, rank = None, None
-        for order, entry in enumerate(self.follow_ups):
-            fmts = entry.get("formats")
-            if fmts and fmt not in fmts:
-                continue
-            for pattern in entry["followUps"]:
-                if fnmatchcase(text, pattern):
-                    key = (bool(fmts), _literal(pattern), -order)
-                    if rank is None or key > rank:
-                        best, rank = entry, key
-        if best is not None and mark:
-            self.follow_up_uses[best["id"]] = self.follow_up_uses.get(best["id"], 0) + 1
-        return best
-
-    def current(self, fmt: str, text: str) -> str:
-        """A follow-up as the tables show it: a milestone-only one gains its
-        current id (`M2 (validate) → 0336`)."""
-        if not text or not milestone_only(text):
-            return text
-        entry = self.follow_up_entry(fmt, text, mark=False)
-        return f"{text} → {entry['ref']}" if entry else text
+        return Resolution(value, tier, entry["id"], entry.get("reason", ""))
 
     def script_tier(self, script: str) -> str | None:
         hit = self.scripts.best(script)
         return hit[1]["tier"] if hit else None
 
 
-def resolution_problems(label: str, resolution: Resolution, follow_up: str = "") -> list[str]:
+def resolution_problems(label: str, resolution: Resolution) -> list[str]:
     """What ``--check`` refuses about one gap row's disposition."""
     if resolution.disposition is None:
         return [f"{label}: no disposition"]
@@ -511,10 +434,6 @@ def resolution_problems(label: str, resolution: Resolution, follow_up: str = "")
         problems.append(f"{label}: `deferred` without a P1/P2 tier ({resolution.entry})")
     elif value.startswith("deferred-") and value != f"deferred-{tier}":
         problems.append(f"{label}: `{value}` on a {tier or 'untiered'} row ({resolution.entry})")
-    # A wontfix or out-of-scope reason supersedes the follow-up.
-    if (follow_up and milestone_only(follow_up) and not resolution.ref
-            and value not in ("wontfix", "out-of-scope")):
-        problems.append(f"{label}: milestone-only follow-up `{follow_up}` needs a current id ({resolution.entry})")
     return problems
 
 
@@ -547,7 +466,7 @@ def apply_dispositions(delta: "FormatDelta", dispositions: Dispositions) -> list
         resolution = dispositions.resolve(element_key(fmt, name), tier) or Resolution(None, tier)
         delta.element_dispositions[index] = resolution
         by_element[name] = resolution
-        problems += resolution_problems(f"{fmt} element {name}", resolution, follow_up)
+        problems += resolution_problems(f"{fmt} element {name}", resolution)
         if status == "missing" and resolution.disposition is not None:
             delta.elements[index] = (name, litchi, TRIAGED, follow_up)
     delta.property_dispositions = [None] * len(delta.properties)
@@ -567,7 +486,7 @@ def apply_dispositions(delta: "FormatDelta", dispositions: Dispositions) -> list
                 tier = dispositions.tier(fmt, name, key) or parent.tier
                 resolution = dispositions.resolve(own_key, tier, **only)
             else:
-                resolution = Resolution(parent.disposition, parent.tier, parent.ref, parent.entry,
+                resolution = Resolution(parent.disposition, parent.tier, parent.entry,
                                         parent.reason, via="element")
         else:
             tier = dispositions.tier(fmt, name, key)
@@ -577,7 +496,7 @@ def apply_dispositions(delta: "FormatDelta", dispositions: Dispositions) -> list
             resolution = dispositions.resolve(own_key, tier) or Resolution(None, tier)
         delta.property_dispositions[index] = resolution
         if resolution.via != "element":
-            problems += resolution_problems(label, resolution, row[5])
+            problems += resolution_problems(label, resolution)
         if row[READ_STATUS] == "missing" and resolution.disposition is not None:
             delta.properties[index] = (*row[:READ_STATUS], TRIAGED, *row[READ_STATUS + 1:])
     return problems
@@ -675,7 +594,7 @@ class OcElement:
         """The names to look a Litchi element up by: the element's own name
         and file stem first, then its aliases and path words, sorted. A path
         word (`shape` in `/slidemaster[N]/shape[K]`) must not win over the
-        element's own name (record 0339)."""
+        element's own name."""
         own = [normalize(self.name), normalize(self.stem)]
         return list(dict.fromkeys([*own, *sorted(self.names() - set(own))]))
 
@@ -1060,7 +979,7 @@ def render(
         "Generated by `tools/officecli_capability_delta.py`; do not edit by hand.",
         "It compares OfficeCLI's help schemas with Litchi's property registry",
         "export (`litchi_ops::schema(format)`, golden snapshots under",
-        "`crates/litchi-ops/tests/golden/registry/`, record 0263), for every",
+        "`crates/litchi-ops/tests/golden/registry/`), for every",
         "format the registry covers. Each property has a read status (Litchi's",
         "`get` against OfficeCLI's) and a write status (Litchi's `add`/`set`",
         "against OfficeCLI's); both sides' add/set/get flags are shown as `asg`.",
@@ -1070,7 +989,7 @@ def render(
         "Operation gaps also include a format's feature-specific encryption",
         "snapshot when it is present.",
         "Every gap row carries a disposition from",
-        f"`{DISPOSITIONS.as_posix()}` (record 0332). Each format's property table is",
+        f"`{DISPOSITIONS.as_posix()}`. Each format's property table is",
         f"a separate page under `{PROPERTY_DIR.as_posix()}/`.",
         "",
         "Rerun the script after blessing the registry snapshots (`LITCHI_BLESS=1`);",
@@ -1217,7 +1136,7 @@ def render_disposition_summary(deltas: list[FormatDelta], dispositions: Disposit
         "",
         "| Disposition | Meaning |",
         "|---|---|",
-        "| planned | to be closed; the id names the work package (`WPn`, coordinator audit 2026-10-17) or record that owns it |",
+        "| planned | to be closed, with the reason |",
         "| deferred-P1 | after v1: design §13 tier P1 (or a P0/v1 feature of a format outside the v1 boundary) |",
         "| deferred-P2 | explicitly later: design §13 tier P2 |",
         "| wontfix | a deliberate difference from OfficeCLI, with the reason |",
@@ -1229,8 +1148,7 @@ def render_disposition_summary(deltas: list[FormatDelta], dispositions: Disposit
         "in the other formats a P0 or v1 feature is P1. A property of a P0 or v1 element "
         f"is formatting breadth, tier {dispositions.breadth_tier}, unless the file names it. "
         "P0 and v1 rows are supported or planned, never deferred or wontfix; a deferred row's "
-        "tier is its row's tier; a row whose follow-up names only a closed milestone carries a "
-        "current work-package or record id (audit WP13). `--check` enforces all of this.",
+        "tier is its row's tier. `--check` enforces all of this.",
         "",
         "Element gap rows:",
         "",
@@ -1276,8 +1194,8 @@ def render_disposition_summary(deltas: list[FormatDelta], dispositions: Disposit
         "Entries (rows counts this table's element and property rows; a gap element's",
         "properties share its entry unless an entry names the property):",
         "",
-        "| Entry | Disposition | Id | Rows | Keys | Reason |",
-        "|---|---|---|---:|---|---|",
+        "| Entry | Disposition | Rows | Keys | Reason |",
+        "|---|---|---:|---|---|",
     ]
     for entry_id, entry in dispositions.by_id.items():
         keys = [key for key in entry.get("keys", []) if key.startswith("delta:")]
@@ -1285,43 +1203,9 @@ def render_disposition_summary(deltas: list[FormatDelta], dispositions: Disposit
             continue
         shown = ", ".join(f"`{key}`" for key in keys)
         lines.append(
-            f"| {entry_id} | {entry['disposition']} | {entry.get('ref', '')} | {uses.get(entry_id, 0)} | "
+            f"| {entry_id} | {entry['disposition']} | {uses.get(entry_id, 0)} | "
             f"{shown} | {entry.get('reason', '')} |"
         )
-    lines += follow_up_lines(dispositions)
-    return lines
-
-
-def follow_up_lines(dispositions: Dispositions) -> list[str]:
-    """The milestone follow-up map (record 0344, audit WP13)."""
-    counts: dict[str, int] = {}
-    formats_of: dict[str, set[str]] = {}
-    for fmt, text in dispositions.milestone_follow_ups:
-        entry = dispositions.follow_up_entry(fmt, text, mark=False)
-        if entry is not None:
-            counts[entry["id"]] = counts.get(entry["id"], 0) + 1
-            formats_of.setdefault(entry["id"], set()).add(fmt)
-    total = len(dispositions.milestone_follow_ups)
-    distinct = len(set(text for _, text in dispositions.milestone_follow_ups))
-    lines = [
-        "",
-        "## Milestone follow-ups",
-        "",
-        f"{total} follow-ups in the registry and capability goldens ({distinct} distinct texts) "
-        "name only a milestone or a step of one (`M2 (validate)`, `M1-extended (R4x)`). "
-        f"`{DISPOSITIONS.as_posix()}` (`followUps`) maps each to the record or work package that owns it "
-        "now; the tables above show the id after the text (`M2 (validate) → 0336`). `--check` fails on "
-        "a milestone-only follow-up without a current id and on a map entry that maps none "
-        "(audit WP13, record 0344).",
-        "",
-        "| Map entry | Follow-ups | Formats | Golden follow-ups | Current id | Now |",
-        "|---|---|---|---:|---|---|",
-    ]
-    for entry in dispositions.follow_ups:
-        shown = ", ".join(f"`{pattern}`" for pattern in entry["followUps"])
-        fmts = ", ".join(sorted(formats_of.get(entry["id"], set())))
-        lines.append(f"| {entry['id']} | {shown} | {fmts} | {counts.get(entry['id'], 0)} | "
-                     f"{entry['ref']} | {entry['note']} |")
     return lines
 
 
@@ -1376,63 +1260,12 @@ def compute_deltas(officecli: Path, repo: Path) -> tuple[list[FormatDelta], list
     return deltas, goldens
 
 
-def golden_follow_ups(repo: Path) -> list[tuple[str, str, str]]:
-    """Every ``followUp`` of the registry and capability goldens, as
-    (format, follow-up, golden path); an ``-encryption`` snapshot counts for
-    its format."""
-    found = []
-    for directory in (GOLDEN_DIR, CAPABILITY_DIR):
-        for path in sorted((repo / directory).glob("*.json")):
-            fmt = path.stem.removesuffix(OPTIONAL_SUFFIX)
-            stack = [json.loads(path.read_text(encoding="utf-8"))]
-            while stack:
-                node = stack.pop()
-                if isinstance(node, dict):
-                    text = node.get("followUp")
-                    if isinstance(text, str) and text:
-                        found.append((fmt, text, (directory / path.name).as_posix()))
-                    stack.extend(node.values())
-                elif isinstance(node, list):
-                    stack.extend(node)
-    return found
-
-
-def milestone_problems(follow_ups: list[tuple[str, str, str]], dispositions: Dispositions) -> list[str]:
-    """Record 0344 (audit WP13): every follow-up of the registry and
-    capability goldens that names only a milestone maps to a current id in
-    the dispositions file's ``followUps``, and every map entry is used."""
-    problems = []
-    unmapped: dict[tuple[str, str], list[str]] = {}
-    for fmt, text, origin in follow_ups:
-        if milestone_only(text) and dispositions.follow_up_entry(fmt, text) is None:
-            unmapped.setdefault((fmt, text), []).append(origin)
-    for (fmt, text), origins in sorted(unmapped.items()):
-        problems.append(f"{fmt}: milestone-only follow-up `{text}` ({len(origins)} in "
-                        f"{', '.join(sorted(set(origins)))}) has no current id in `followUps`")
-    for entry in dispositions.follow_ups:
-        if not dispositions.follow_up_uses.get(entry["id"]):
-            problems.append(f"stale follow-up map `{entry['id']}`: it maps no golden follow-up")
-    return problems
-
-
-def map_follow_ups(delta: FormatDelta, dispositions: Dispositions) -> None:
-    """Show each milestone-only follow-up of a delta with its current id."""
-    fmt = delta.name
-    delta.elements = [(*row[:3], dispositions.current(fmt, row[3])) for row in delta.elements]
-    delta.properties = [(*row[:5], dispositions.current(fmt, row[5]), *row[6:]) for row in delta.properties]
-    delta.operation_gaps = [(*row[:4], dispositions.current(fmt, row[4])) for row in delta.operation_gaps]
-
-
 def classified(officecli: Path, repo: Path, dispositions: Dispositions) -> tuple[list[FormatDelta], list[tuple[str, str]], list[str]]:
     """Every format's delta with its dispositions applied, the golden
     hashes, and the problems (including stale keys)."""
     deltas, goldens = compute_deltas(officecli, repo)
     problems: list[str] = []
-    follow_ups = golden_follow_ups(repo)
-    dispositions.milestone_follow_ups = [(fmt, text) for fmt, text, _ in follow_ups if milestone_only(text)]
-    problems += milestone_problems(follow_ups, dispositions)
     for delta in deltas:
-        map_follow_ups(delta, dispositions)
         problems += apply_dispositions(delta, dispositions)
     problems += [f"stale disposition key `{key}`: it classifies no row"
                  for key in dispositions.entries.unused(prefix="delta:")]

@@ -39,7 +39,7 @@ SYNTHETIC_HOST = "litchi-legacy-host"
 def synthetic_host_raw_policy(raw_policy: dict) -> dict:
     """The checked-in policy plus one synthetic migration host and debt edge.
 
-    The workspace no longer has a migration host (record 0429), but the
+    The workspace no longer has a migration host, but the
     policy keeps the mechanism; these tests exercise it on a synthetic host.
     """
 
@@ -484,7 +484,7 @@ def add_iwa_numbers_wire_formula_names_scaffold(
 def add_keynote_family_module(
     root: Path, family: str, extra: tuple[str, ...] = ()
 ) -> None:
-    """Publish one scaffolded Keynote family from its focused module (record 0298)."""
+    """Publish one scaffolded Keynote family from its focused module."""
 
     path = root / getattr(boundaries, f"KEYNOTE_{family}_FAMILY_SOURCE")
     module = getattr(boundaries, f"KEYNOTE_{family}_FAMILY_MODULE")
@@ -627,7 +627,7 @@ def add_numbers_table_cell_comment_reply_scaffold(
         or "pub mod cell;\n",
         encoding="utf-8",
     )
-    # ADR 0034 W1 (record 0297): the value is published by `cell::comment`.
+    # ADR 0034: the value is published by `cell::comment`.
     comment = root / boundaries.NUMBERS_SOURCE_ROOT / "cell" / "comment.rs"
     comment.parent.mkdir(parents=True, exist_ok=True)
     if not comment.exists():
@@ -3473,7 +3473,7 @@ def add_numbers_formula_canonical_scaffold(root: Path) -> None:
     lib.write_text("pub mod formula;\n", encoding="utf-8")
 
 
-# ADR 0034 W1 Pages transaction families: modules whose canonical re-export is
+# ADR 0034 Pages transaction families: modules whose canonical re-export is
 # the whole file rather than an inline ``pub mod`` (see the Rust sources).
 PAGES_TRANSACTION_FILE_SCOPED_OWNERS = frozenset({"table_lock", "body_table_title"})
 
@@ -3501,7 +3501,7 @@ def _remove_inline_rust_module(source: str, name: str) -> str:
 
 
 def add_pages_transaction_family_scaffold(root: Path, owner: str) -> None:
-    """Install the ADR 0034 W1 layout of one Pages transaction family.
+    """Install the ADR 0034 layout of one Pages transaction family.
 
     ``package.rs`` declares ``pub(crate) mod <owner>;``, the owner defines the
     canonical short names, and only the family's public module re-exports them
@@ -4371,7 +4371,7 @@ class BoundaryPolicyTests(unittest.TestCase):
         self.assertEqual(
             len(all_policy_edges), len(registered_edges) + len(registered_debt)
         )
-        # Record 0429 deleted the last migration host and closed its debt.
+        # The last migration host is deleted and its debt closed.
         self.assertEqual(self.policy.migration_debt, ())
         self.assertEqual(self.policy.migration_hosts, frozenset())
         self.assertNotIn(host_edge, all_policy_edges)
@@ -5234,7 +5234,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             facade = root / boundaries.FACADE_SOURCE_ROOT / "lib.rs"
             facade.parent.mkdir(parents=True)
             original = Path("crates/litchi/src/lib.rs").read_text(encoding="utf-8")
-            # Record 0334 removed the facade's own reader; the namespace now
+            # The facade's own reader is removed; the namespace now
             # holds types only, and `litchi::open` is the Pages ingress.
             self.assertNotIn("litchi_pages::Package::open(path)", original)
             self.assertIn("pub mod semantic", original)
@@ -15853,7 +15853,7 @@ fn rewrite_movie_title_operation(
                 any("missing canonical package type Patch" in item for item in violations),
                 violations,
             )
-            # ADR 0034 W1: a reintroduced prefixed spelling is rejected.
+            # ADR 0034: a reintroduced prefixed spelling is rejected.
             self.assertTrue(
                 any("defines retired name BodyFootnoteEdit" in item for item in violations),
                 violations,
@@ -21628,7 +21628,7 @@ fn rewrite_movie_title_operation(
         """
 
         owner_path = boundaries.KEYNOTE_CHART_LEGEND_OWNER_SOURCE
-        # ADR 0034 W1 (record 0298): the family's public home is the focused
+        # ADR 0034: the family's public home is the focused
         # `chart::legend` module rather than the package/crate-root facades.
         family_path = boundaries.KEYNOTE_CHART_LEGEND_FAMILY_SOURCE
         paths = tuple(boundaries.ROOT / path for path in (owner_path, family_path))
@@ -22669,8 +22669,8 @@ fn rewrite_movie_title_operation(
                         else boundaries.KEYNOTE_TABLE_MERGE_SOURCE
                     )
                 source = source_path.read_text(encoding="utf-8")
-                # Both readers take `OpenOptions` (record 0361 retired the
-                # Pages `*_with_limits` ingress).
+                # Both readers take `OpenOptions` (the
+                # Pages `*_with_limits` ingress is retired).
                 before, after, expected = "options: OpenOptions", "options: ()", "options ingress"
                 method_start = source.index("pub fn open_with_options")
                 parameter_start = source.index(before, method_start)
@@ -23478,7 +23478,7 @@ fn rewrite_movie_title_operation(
             if key in spec
         ]
         if spec.get("transaction_family_owner") is not None:
-            # ADR 0034 W1: the public ``table::merge::transaction`` chain.
+            # ADR 0034: the public ``table::merge::transaction`` chain.
             relatives.extend(
                 (
                     boundaries.PAGES_SOURCE_ROOT / "table" / "mod.rs",

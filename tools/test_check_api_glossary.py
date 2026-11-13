@@ -1025,7 +1025,7 @@ class RustdocTests(unittest.TestCase):
             gate.violations(doc, profile())
 
     def test_a_delegated_external_glob_is_left_to_its_crate_profile(self):
-        # Record 0306: the facade re-exports leaf crates by glob; a profile
+        # The facade re-exports leaf crates by glob; a profile
         # names the crates whose own profiles check those names.
         doc = copy.deepcopy(self.document)
         use = next(v["inner"]["use"] for v in doc["index"].values()
@@ -1111,17 +1111,17 @@ class RustdocTests(unittest.TestCase):
         self.assertEqual(gate.violations(self.document, profile(families=families)), [])
         failures = gate.violations(self.document, profile(families=families, family_methods=True))
         expected = {
-            "fixture::loose::Commit exposes forbidden method snapshot (record 0351)",
-            "fixture::loose::Commit requires method diagnostics (record 0351)",
-            "fixture::loose::Commit requires method into_package (record 0351)",
-            "fixture::loose::Commit requires method into_parts (record 0351)",
-            "fixture::loose::Commit requires method package (record 0351)",
-            "fixture::loose::Commit requires method patch (record 0351)",
-            "fixture::loose::Diagnostics requires method changed (record 0351)",
-            "fixture::loose::Edit exposes forbidden method rollback (record 0351)",
-            "fixture::loose::Edit::commit must return Result<fixture::loose::Commit> (record 0351)",
-            "fixture::loose::Patch requires method inverse (record 0351)",
-            "fixture::loose::Patch requires method is_noop (record 0351)",
+            "fixture::loose::Commit exposes forbidden method snapshot",
+            "fixture::loose::Commit requires method diagnostics",
+            "fixture::loose::Commit requires method into_package",
+            "fixture::loose::Commit requires method into_parts",
+            "fixture::loose::Commit requires method package",
+            "fixture::loose::Commit requires method patch",
+            "fixture::loose::Diagnostics requires method changed",
+            "fixture::loose::Edit exposes forbidden method rollback",
+            "fixture::loose::Edit::commit must return Result<fixture::loose::Commit>",
+            "fixture::loose::Patch requires method inverse",
+            "fixture::loose::Patch requires method is_noop",
         }
         self.assertEqual(set(failures), expected)
 
@@ -1136,7 +1136,7 @@ class RustdocTests(unittest.TestCase):
         failures = gate.violations(self.document, profile(
             families=["fixture::unrelated_commit"], family_methods=True))
         self.assertEqual(failures, [
-            "fixture::unrelated_commit::Edit::commit must return Result<fixture::unrelated_commit::Commit> (record 0351)",
+            "fixture::unrelated_commit::Edit::commit must return Result<fixture::unrelated_commit::Commit>",
         ])
 
     def test_result_shape_uses_alias_substitutions_defaults_and_nominal_identity(self):
@@ -1294,14 +1294,14 @@ class RustdocTests(unittest.TestCase):
         failures = gate.violations(self.document, profile(shared_types=[fake]))
         self.assertEqual(failures, [
             "fixture::shared_core::UnrelatedCommit must resolve nominally to "
-            "litchi_core::edit::Commit (record 0351)",
+            "litchi_core::edit::Commit",
         ])
 
         fake_diagnostics = dict(rows[1], path="fixture::shared_core::FakeDiagnostics")
         failures = gate.violations(self.document, profile(shared_types=[fake_diagnostics]))
         self.assertEqual(failures, [
             "fixture::shared_core::FakeDiagnostics must resolve nominally to "
-            "litchi_core::edit::Diagnostics (record 0351)",
+            "litchi_core::edit::Diagnostics",
         ])
 
         # A format-owned diagnostics type remains valid when it is not
@@ -1320,7 +1320,7 @@ class RustdocTests(unittest.TestCase):
         failures = gate.violations(document, profile(shared_types=rows))
         self.assertEqual(failures, [
             "fixture::shared_core::Commit must resolve nominally to "
-            "litchi_core::edit::Commit (record 0351)",
+            "litchi_core::edit::Commit",
         ])
 
     def test_shared_type_rows_fail_closed_for_unresolved_and_cyclic_aliases(self):
@@ -1342,7 +1342,7 @@ class RustdocTests(unittest.TestCase):
                 continue
             self.assertEqual(gate.violations(document, profile(shared_types=[row])), [
                 "fixture::shared_core::Commit must resolve nominally to "
-                "litchi_core::edit::Commit (record 0351)",
+                "litchi_core::edit::Commit",
             ])
 
     def test_unresolved_and_recursive_result_aliases_fail_closed(self):
@@ -1382,7 +1382,7 @@ class RustdocTests(unittest.TestCase):
         failures = gate.violations(self.document, profile(
             families=["fixture::staged_output"], family_methods=True))
         self.assertEqual(set(failures), {
-            f"fixture::staged_output::Edit exposes forbidden method {name} (record 0351)"
+            f"fixture::staged_output::Edit exposes forbidden method {name}"
             for name in ("put_stream_shared_with_rendered", "put_streams_shared_with_rendered",
                          "write_to", "to_bytes", "save", "publish_to_stream")
         })

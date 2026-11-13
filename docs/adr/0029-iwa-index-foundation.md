@@ -121,7 +121,7 @@ graph-identity compatibility bridge; new semantic code used the bounded
 preserved existing adapter compilation without making the graph snapshot part
 of the supported semantic hand-off.
 
-The compatibility period is closed by record 0362ul157. The public method is
+The compatibility period is closed. The public method is
 now `ObjectIndex::reference_snapshot`, a borrowed immutable typed projection;
 the deprecated `reference_graph` spelling is deleted. Likewise, the graph
 crate's raw-`u64` wrappers are deleted in favor of `ObjectId` methods, so a

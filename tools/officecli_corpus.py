@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""Classify the OfficeCLI example-corpus outcomes and write the delta table
-(unified-ops record 0265).
+"""Classify the OfficeCLI example-corpus outcomes and write the delta table.
 
 ``crates/litchi-cli/tests/officecli_corpus.rs`` replays every OfficeCLI
 example script vendored under ``test-data/officecli/examples/`` through the
@@ -18,10 +17,10 @@ those rows and classifies every call that did not pass:
 - **cascade**: a path that does not exist because an earlier ``add`` or
   ``batch`` in the same script was refused;
 - **warned**: the call applied with ``--unsupported warn`` and skipped the
-  properties it lists (record 0269); each skipped property is cross-checked
+  properties it lists; each skipped property is cross-checked
   like a refused one;
 - a call that still failed after ``--unsupported warn`` skipped properties
-  (detail ``<property>;skipped:<properties>``, record 0271) is classified
+  (detail ``<property>;skipped:<properties>``) is classified
   by its own failure first (deltas, cascades, element refusals); a
   ``missing_property`` that no rule explains is the named gap F3b, because
   the skipped properties are what it lacked; each skipped property is
@@ -30,7 +29,7 @@ those rows and classifies every call that did not pass:
 - **bug**: anything else.
 
 Every delta, named gap and element/property group carries a disposition from
-``tools/officecli_dispositions.json`` (record 0332, shared with
+``tools/officecli_dispositions.json`` (shared with
 ``tools/officecli_capability_delta.py``): a group whose element or property
 OfficeCLI's help schema names inherits the capability delta's disposition
 for that row unless a corpus entry names the property. The file also gives
@@ -41,7 +40,7 @@ carries only wontfix, deferred or out-of-scope classes, red otherwise.
 It writes the table named by ``--output`` (a working report that is not kept
 in the repository): the summary per script family, per format and per script, the v1-scope subset, the deltas,
 the gaps with their registry follow-ups and dispositions, the bugs, and the
-record 0256 follow-ups the corpus hits. ``--check`` builds it in memory,
+follow-ups the corpus hits. ``--check`` builds it in memory,
 writes nothing, and fails when any call is a panic or
 ``internal_error`` (the Rust test refuses those before they can be
 recorded), when a class has no valid disposition (a P0 or v1 class is never
@@ -117,7 +116,7 @@ class Call:
     detail: str
     target: str
     # The properties a call that failed after skipping skipped (the part of
-    # the recorded detail after `;skipped:`, record 0271).
+    # the recorded detail after `;skipped:`).
     after_skip: str = ""
 
     @property
@@ -143,12 +142,12 @@ class Call:
     @property
     def failed_after_skipping(self) -> bool:
         """A refused call whose ``--unsupported warn`` run skipped properties
-        before the rest failed (record 0271)."""
+        before the rest failed."""
         return self.refused and bool(self.after_skip)
 
     def skipped(self) -> list[str]:
         """The properties a warned call, or a call that failed after
-        skipping, skipped. The outcome lists them in full (record 0339);
+        skipping, skipped. The outcome lists them in full;
         ``<head>.{<rest>,...}`` stands for consecutive names sharing a first
         dotted segment."""
         if self.warned:
@@ -168,8 +167,8 @@ def expand_skipped(detail: str, cite: str = "") -> list[str]:
     for char in detail + ",":
         if char == "," and depth == 0:
             if entry.startswith("+"):
-                raise SystemExit(f"{cite}: a truncated skipped list (`{entry}`) predates record "
-                                 "0339; re-record the corpus")
+                raise SystemExit(f"{cite}: a truncated skipped list (`{entry}`) is an old format"
+                                 "; re-record the corpus")
             head, brace, rest = entry.partition(".{")
             if brace and rest.endswith("}"):
                 names += [f"{head}.{name}" for name in rest[:-1].split(",") if name]
@@ -335,7 +334,7 @@ RULES: list[Rule] = [
         "D1", "delta", "Created-path form captured by the script",
         "`add` prints the new paragraph as `/body/p[@paraId=...]`, which the script greps "
         "to address it later",
-        "`add` prints the positional path `/body/p[N]` (record 0256 §3), so the "
+        "`add` prints the positional path `/body/p[N]`, so the "
         "capture is empty and the dependent `set` has no path (`missing_argument`)",
         lambda c, e: c.script == "word/revisions.sh" and c.result == "missing_argument",
     ),
@@ -344,7 +343,7 @@ RULES: list[Rule] = [
         "`add --type num` prints `/numbering/num[@id=N]`, which the script greps for "
         "the new `numId`",
         "`add` prints the positional path `/numbering/num[K]`: a numbering identifier "
-        "is a native identity, addressed only by raw paths (record 0319), so the "
+        "is a native identity, addressed only by raw paths, so the "
         "capture is empty and the dependent `numId=` is `invalid_value`",
         lambda c, e: c.script == "word/numbering.sh" and c.detail == "numId"
         and c.result == "invalid_value" and not failed_add(e, {"num", "abstractnum"}),
@@ -353,7 +352,7 @@ RULES: list[Rule] = [
         "D11", "delta", "Re-adding a built-in style",
         "`add --type style` with the id of a built-in style the document already has "
         "(`Heading1`, `Normal`, ...) replaces that definition (upsert)",
-        "an existing style id is refused (`duplicate_name`, record 0319): `add` never "
+        "an existing style id is refused (`duplicate_name`): `add` never "
         "drops an existing definition; `set /styles/<id>` changes it",
         lambda c, e: c.verb == "add" and c.kind == "style" and c.result == "duplicate_name",
     ),
@@ -361,7 +360,7 @@ RULES: list[Rule] = [
         "D4", "delta", "Bare slide insertion",
         "`add / --type slide` picks the deck's first layout; layout-type words "
         "(`blank`, `title`) also select a layout",
-        "`layout` names a layout exactly (record 0256 D4); the harness adds "
+        "`layout` names a layout exactly; the harness adds "
         "`layout=Title Slide` (the first layout of Litchi's blank deck) or maps `title` "
         "and `blank` to `Title Slide` and `Blank`, and counts the line as translated",
         lambda c, e: c.detail == "translated:D4",
@@ -372,7 +371,7 @@ RULES: list[Rule] = [
         "(`blank`), picks a layout as on the command line",
         "the harness translates only command-line slide insertions (D4), not batch "
         "items, so the batch refuses (`missing_property` layout, or `not_found` for "
-        "`layout=blank`) once its other properties are admitted (record 0269)",
+        "`layout=blank`) once its other properties are admitted",
         lambda c, e: c.verb == "batch" and c.fmt == "pptx" and (
             (c.result == "missing_property" and c.detail == "layout")
             or (c.result == "not_found" and not c.detail)
@@ -381,7 +380,7 @@ RULES: list[Rule] = [
     When(
         "D5", "delta", "Resident mode",
         "`open`/`close` start and stop a resident process that later commands reuse",
-        "absent (record 0256 D5); every command opens and saves the file, so the "
+        "absent; every command opens and saves the file, so the "
         "harness treats both as no-ops (counted as resident, not run)",
         lambda c, e: c.result == "skip",
     ),
@@ -391,7 +390,7 @@ RULES: list[Rule] = [
         "them; the examples pass unquoted values (`--prop categories=Product A,Product B`) "
         "that the shell splits",
         "the argument parser refuses the command line (usage, exit 2): Litchi is "
-        "strict by default (record 0015 D4)",
+        "strict by default",
         lambda c, e: c.result == "usage" and c.verb in LITCHI_VERBS
         and c.detail and not c.detail.startswith("-"),
     ),
@@ -430,7 +429,7 @@ RULES: list[Rule] = [
         "doughnut, radar or stock chart) is reported as unsupported and the chart is "
         "still added (exit 2)",
         "the key is `invalid_value` and the whole `add` is refused, so no chart "
-        "carries a dropped setting (record 0270)",
+        "carries a dropped setting",
         lambda c, e: c.result == "invalid_value" and c.kind.lower() == "chart"
         and c.detail == "labelPos",
     ),
@@ -439,7 +438,7 @@ RULES: list[Rule] = [
         "the later value wins (a shared option array like `DASH` sets `dataLabels=false` "
         "and the line sets `dataLabels=true` again)",
         "`invalid_argument`: one command assigns each property once, so no value is "
-        "silently dropped (records 0270, 0283)",
+        "silently dropped",
         lambda c, e: c.verb == "add" and c.kind.lower() == "chart"
         and c.result == "invalid_argument",
     ),
@@ -448,32 +447,32 @@ RULES: list[Rule] = [
         "an OfficeCLI verb the `litchi` CLI does not have (counted per verb in the "
         "dispositions below)",
         "absent from `litchi-ops`, the CLI and Python. The raw layer (`validate`, `raw`, "
-        "`raw-set`, `add-part`) and `dump` landed in record 0336; `import`, `evaluate`, "
-        "`recalculate` (record 0266), `merge` (record 0274) and `refresh` (record 0279) "
-        "earlier; none of them is in this class",
+        "`raw-set`, `add-part`), `dump`, `import`, `evaluate`, "
+        "`recalculate`, `merge` and `refresh` "
+        "are present; none of them is in this class",
         lambda c, e: c.result == "usage" and c.verb not in LITCHI_VERBS,
     ),
     When(
         "G2", "gap", "Copying an element (`add --from`)",
         "`add <file> <parent> --from <path>` clones an element",
-        "the CLI passes `--from` (record 0265); `File::apply` refuses it: "
-        "\"add-from copying is not integrated\" (record 0256 F6)",
+        "the CLI passes `--from`; `File::apply` refuses it: "
+        "\"add-from copying is not integrated\"",
         lambda c, e: c.verb == "add" and c.kind == "(from)",
     ),
     When(
         "G3", "gap", "Find and replace on `set`",
         "`set --find T --replace R` (or `--prop find=`/`replace=`) rewrites matching text",
-        "the CLI maps the options to `find=`/`replace=` props (record 0265); record 0273 "
-        "integrates the engine for DOCX, PPTX, XLSX and RTF, and record 0285 extends it "
+        "the CLI maps the options to `find=`/`replace=` props; "
+        "the engine is integrated for DOCX, PPTX, XLSX and RTF, and extends "
         "to DOCX headers, footers, notes, comments and field results and PPTX table cells "
-        "and notes; regular expressions (`regex=true`, record 0010 Q3), tracked-change "
+        "and notes; regular expressions (`regex=true`), tracked-change "
         "finds, XLSX rich-text cells and the other formats remain refused",
         lambda c, e: c.verb == "set" and c.detail.lower() in ("find", "replace", "regex"),
     ),
     When(
         "G4", "gap", "Revision-tracked removal (`remove --prop`)",
         "`remove` takes `--prop revision.author=...` to record a tracked deletion",
-        "the CLI passes the props (record 0265); `remove` admits no props "
+        "the CLI passes the props; `remove` admits no props "
         "(invalid_argument)",
         lambda c, e: c.verb == "remove" and c.result == "invalid_argument",
     ),
@@ -481,7 +480,7 @@ RULES: list[Rule] = [
         "G5", "gap", "Path grammar: OfficeCLI-only steps",
         "`cell[R,C]` table-cell steps, `@id`/`@author` revision identities and other "
         "OfficeCLI path forms",
-        "`invalid_path`: the selector grammar (record 0005) has no such step or "
+        "`invalid_path`: the selector grammar has no such step or "
         "identity yet",
         lambda c, e: c.result == "invalid_path",
     ),
@@ -497,7 +496,7 @@ RULES: list[Rule] = [
         "the cell handler takes `text` as another name of `value` "
         "(`ExcelHandler.Set.Cells.cs`, `case \"value\" or \"text\"`); the help schema "
         "lists only `value`",
-        "closed by record 0269: `text` is a registry alias of the cell `value` "
+        "closed: `text` is a registry alias of the cell `value` "
         "(XLSX, XLSB, XLS); a refusal here would be a regression",
         lambda c, e: c.fmt == "xlsx" and c.verb == "set" and c.detail == "text"
         and c.result == "unsupported_property",
@@ -515,7 +514,7 @@ RULES: list[Rule] = [
         "`--unsupported warn` skipped properties, then the rest of the call failed with "
         "`missing_property`, which no other rule explains; the error carries the skipped "
         "properties "
-        "(`Error::warnings`, record 0271), which are the gap (each is listed in the "
+        "(`Error::warnings`), which are the gap (each is listed in the "
         "property gaps with refusal `skipped`)",
         lambda c, e: False,  # a fallback in `classify`, after the other rules
     ),
@@ -600,7 +599,7 @@ def classify(calls: list[Call], registries: dict[str, Registry]) -> list[Verdict
         ):
             verdict = cross_check(call, registries.get(call.fmt))
         if verdict is None and call.failed_after_skipping and call.result == "missing_property":
-            # Record 0271: the skipped properties carried what is missing.
+            # The skipped properties carried what is missing.
             verdict = Verdict("gap", "F3b")
         if verdict is None:
             verdict = Verdict("bug", "untriaged", f"{call.result} {call.detail}".strip())
@@ -690,19 +689,19 @@ def cites(calls: list[Call], limit: int = 3) -> str:
 
 FOLLOW_UPS = [
     ("F3", "property-granularity \"apply the rest and warn\" (OfficeCLI applies the others "
-     "and exits 2): `--unsupported warn` (record 0269); calls it applied without some "
+     "and exits 2): `--unsupported warn`; calls it applied without some "
      "properties", lambda c, v: c.warned),
     ("F3", "calls still refused for an unsupported property (a property the warn policy "
      "cannot drop: an alias of a refused canonical name, or a verb without props)",
      lambda c, v: c.result == "unsupported_property"),
     ("F3", "calls that failed after skipping unsupported properties (named gap F3b; the "
-     "error carries the skipped properties, record 0271)",
+     "error carries the skipped properties)",
      lambda c, v: c.failed_after_skipping),
     ("F4", "view options (`--start`, `--end`, `--max-lines`, ...)",
      lambda c, v: c.verb == "view" and c.result == "usage"),
     ("F6", "`add --from`, find/replace on `set`, `remove --shift`, `get --save`",
      lambda c, v: v.rule in ("G2", "G3")),
-    ("D6", "missing verbs (the raw layer and `dump` landed in record 0336)",
+    ("D6", "missing verbs (the raw layer and `dump` have landed)",
      lambda c, v: v.rule == "G1"),
 ]
 
@@ -760,7 +759,7 @@ Resolution = capability_delta.Resolution
 
 
 class CorpusDispositions:
-    """Dispositions of the corpus gap classes (record 0332).
+    """Dispositions of the corpus gap classes.
 
     A named class (a ``RULES`` entry; ``G1`` per verb) is keyed
     ``corpus:<id>`` (``corpus:G1|<verb>``). An element or property group is
@@ -822,7 +821,7 @@ class CorpusDispositions:
                 inherited = self.elements.get((fmt, schema))
         if inherited is not None and inherited.disposition is not None:
             where = f"{schema}.{canonical}" if canonical else schema
-            resolution = Resolution(inherited.disposition, inherited.tier, inherited.ref,
+            resolution = Resolution(inherited.disposition, inherited.tier,
                                     inherited.entry, inherited.reason, via=f"delta `{where}`")
         else:
             tier = self.tier(key, fmt, schema or element, canonical or prop or None)
@@ -874,7 +873,7 @@ def line_classes(index: int, calls: list[Call], verdicts: list[Verdict],
 
 @dataclass
 class Subset:
-    """The v1-scope corpus subset (record 0332)."""
+    """The v1-scope corpus subset."""
 
     scripts: dict[str, str]  # script -> tier
     lines: list[tuple[int, str, list]]  # (call index, state, classes)
@@ -917,7 +916,7 @@ def blocker(found: list[tuple[str, Resolution | None]]) -> str:
             continue
         if resolution.disposition is None:
             return f"no disposition (`{name}`)"
-        return f"{resolution.disposition} {resolution.ref}".strip()
+        return resolution.disposition
     return "unclassified"
 
 
@@ -1057,7 +1056,7 @@ def render(calls: list[Call], verdicts: list[Verdict], commit: str,
         "# OfficeCLI example-corpus deltas",
         "",
         "Generated by `python3 tools/officecli_corpus.py` from",
-        f"`{OUTCOMES.as_posix()}` (record 0265); do not edit by hand.",
+        f"`{OUTCOMES.as_posix()}`; do not edit by hand.",
         "Regenerate after re-recording the outcomes:",
         "",
         "```sh",
@@ -1084,10 +1083,10 @@ def render(calls: list[Call], verdicts: list[Verdict], commit: str,
         "the same script was refused.",
         "- **warned**: the harness passes `--unsupported warn` to `set`, `add` and `batch`, "
         "because OfficeCLI applies the supported properties of a command and warns about "
-        "the rest by default (record 0269). A warned call applied without the properties "
+        "the rest by default. A warned call applied without the properties "
         "it lists (exit 9); each skipped property is listed in the gap tables below with "
         "refusal `warned`. A call that still failed after skipping is the named gap F3b; "
-        "its skipped properties are listed with refusal `skipped` (record 0271).",
+        "its skipped properties are listed with refusal `skipped`.",
         "- **bug**: a refusal of something the registry claims, or an unexplained failure; "
         "none may be a panic or `internal_error` (the test refuses those).",
         "- **resident**: `open`/`close`, not run (delta D5).",
@@ -1095,9 +1094,9 @@ def render(calls: list[Call], verdicts: list[Verdict], commit: str,
         "`get <file> / --depth 2` on every file the script created.",
         "",
         "Every delta, named gap and element/property group carries a disposition "
-        f"(`{capability_delta.DISPOSITIONS.as_posix()}`, record 0332): `planned` with a work "
-        "package or record id, `deferred-P1`/`deferred-P2` by design §13 tier, `wontfix` or "
-        "`out-of-scope` with a reason. A group OfficeCLI's schema names inherits the "
+        f"(`{capability_delta.DISPOSITIONS.as_posix()}`): `planned`, "
+        "`deferred-P1`/`deferred-P2` by design §13 tier, `wontfix` or "
+        "`out-of-scope`, each with a reason. A group OfficeCLI's schema names inherits the "
         "capability delta's disposition for that row (`via delta`). `--check` fails on a "
         "class without a disposition, on a P0 or v1 class that is deferred or wontfix, and "
         "on a disposition key that matches nothing.",
@@ -1219,7 +1218,7 @@ def render(calls: list[Call], verdicts: list[Verdict], commit: str,
         for key in sorted(groups):
             out.append(f"| {key} | {len(groups[key])} | {cites(groups[key])} |")
 
-    out += ["", "## Record 0256 follow-ups hit by the corpus", "",
+    out += ["", "## Follow-ups hit by the corpus", "",
             "| Follow-up | What | Lines |", "|---|---|---:|"]
     for follow_up, what, test in FOLLOW_UPS:
         out.append(f"| {follow_up} | {what} | {sum(1 for c, v in pairs if test(c, v))} |")

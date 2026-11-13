@@ -1,11 +1,10 @@
 # ADR 0030: Lazy OPC part decode behind the fallible package accessors
 
-- Status: Accepted (2026-09-16, by the owner's decision recorded in change 0652; proposed 2026-09-15)
+- Status: Accepted (2026-09-16, by the owner's decision; proposed 2026-09-15)
 - Date: 2026-09-15
 - Supersedes: nothing. Amends: nothing.
-- Raised by: change 0610,
-  which carries the site enumeration, the predicted retention and the sizing
-  probe. Gate 1 of change 0581
+- Raised by: a site enumeration, a predicted-retention estimate and a sizing
+  probe. An admission gate
   requires this record to exist before candidate C2 or C2′ may be implemented.
 
 ## Context
@@ -19,17 +18,17 @@ which stores it as `Arc<Vec<u8>>` inside an `XmlPart` or a `BlobPart`
 compressed source archive *and* the sum of every decompressed payload at the
 same time.
 
-Change 0581 priced that: 2.00× to 11.19× the archive across a six-fixture real
+Measurement priced that: 2.00× to 11.19× the archive across a six-fixture real
 corpus, 254× the bounded path's peak on a 64 MiB media fixture and 506× at
 128 MiB, and it established that every documented DOCX, XLSX, PPTX and XLSB
-open-then-save example reaches this path. It declined to implement, for one
+open-then-save example reaches this path. The eager path stayed, for one
 reason: `Part::blob(&self) -> &[u8]` is public, infallible and borrowing, so a
 lazy part behind it has no error channel, and deferring the decode would move
 the `ReadResource::PartBytes` and `ReadResource::TotalPartBytes` refusals out of
-`open()`. It froze two candidates — C2, a fallible `Part::blob`, and C3, routing
+`open()`. Two candidates were frozen — C2, a fallible `Part::blob`, and C3, routing
 the format crates onto `SourceBackedPackage` — and six admission gates.
 
-Change 0610 measured how much of the eager decode is wasted, on the real fixture
+A later measurement shows how much of the eager decode is wasted, on the real fixture
 corpus:
 
 - The eager decode inflates **5,077 parts and 45,562,463 bytes** across 334
@@ -97,7 +96,7 @@ from the part map without touching a payload.
 
 ### Refusal relocation: `PartBytes` and `TotalPartBytes`
 
-Gate 2 of 0581 requires that these two typed refusals still fire at `open()`
+An admission gate requires that these two typed refusals still fire at `open()`
 with the same resource, observed value, limit and object path, or that a
 reviewed decision relocate them. **The open-time refusal is retained and does
 not move.** The reader already charges both limits twice, against two different
@@ -175,7 +174,7 @@ no enum change is required and no caller's `match` breaks.
 What does change is the *set* of variants `get_part` and `get_part_mut` can
 return. Today they can only return `OpcError::PartNotFound`; under this record
 they can also return the decode family. Callers that treat a `get_part` error as
-"absent" must be audited; change 0610 enumerates them. Error text is unchanged
+"absent" must be audited. Error text is unchanged
 for every variant, so no diagnostic string moves.
 
 ADR 0005 requires limit errors to "identify the resource, observed value, limit,
@@ -195,7 +194,7 @@ uses interior mutability today.
 `T: Clone`, so both properties survive; `Cell`, `RefCell` and `OnceCell` would
 cost `Sync`, and `RwLock` has no `Clone` impl at all and would break the derive
 outright. `OnceLock<Arc<Vec<u8>>>` is therefore the required primitive, and
-**gate 6 of 0581 is satisfied structurally rather than by test**.
+**the corresponding admission gate is satisfied structurally rather than by test**.
 
 Cloning a package clones each part's cell — a decoded clone stays decoded, an
 undecoded clone stays undecoded — and `Arc`-shares the source handle, preserving
@@ -209,7 +208,7 @@ materialization.
 
 ### The publication plan
 
-Change 0593 made `PublicationPlan::from_package` decide a relationship
+`PublicationPlan::from_package` decides a relationship
 collection pristine by `Arc::ptr_eq` against the preservation provenance
 (`pkgwriter.rs:145-150`, `:170-174`), and decide `[Content_Types].xml` from
 provenance metadata alone (`:139-144`, `:168-169`). Neither decision reads a part
@@ -222,7 +221,7 @@ its payload cannot have been replaced, because no caller ever held it. The plan
 takes `PreservationAction::Copy` for such a member without decoding it and
 without comparing anything. This is not new authority: it is the same
 planning-evidence use of provenance that ADR 0005's 2026-08-21 amendment permits
-and that 0593 already relies on, and it does not touch
+and that the plan already relies on, and it does not touch
 `exact_source_authorized`, does not widen who may take whole-archive
 passthrough, and does not remove the retained source archive.
 
@@ -235,11 +234,11 @@ passthrough, and does not remove the retained source archive.
    output and identical refusal identity.
 2. Make the publication plan treat a never-decoded part as pristine, and stop
    the eager decode for owned-source ingress. This is the step that changes
-   behaviour and must clear every gate in change 0610.
+   behaviour and must clear every admission gate.
 3. Narrow `iter_parts`'s item type to the metadata view and migrate the
    payload-reading sites among the 259 in-scope production `iter_parts()` sites
-   to `try_iter_parts`. Change 0610 brackets that group at 16–88 by two
-   mechanical scopes and puts it at about 25 by an independent full-context
+   to `try_iter_parts`. Estimates bracket that group at 16–88 by two
+   mechanical scopes and put it at about 25 by an independent full-context
    review; the rest need no behavioural change. The narrowed item type makes
    the difference a compile error rather than a review question, so the
    estimate does not have to be exact before the work starts.
@@ -268,15 +267,15 @@ the eager path does not pay today.
 - Cost: the lazy representation adds per-part member identity and a cell to
   every part of an owned-source package, so a package all of whose parts are
   read is slightly *larger* and no faster than today. The design is a bet that
-  the measured working set is small, and change 0610 is the evidence for it.
+  the measured working set is small.
 
 ## Verification
 
-Acceptance requires, beyond the six gates 0581 already states:
+Acceptance requires, beyond the six admission gates:
 
 1. Byte-identical published output for every OOXML fixture in `test-data` across
    every mutation scenario, by whole-stream digest, before and after — the
-   1,344-row oracle shape change 0593 used.
+   1,344-row oracle shape used before.
 2. Every refusal preserved by identity, at open and at first access: the
    corpus's existing open refusals, save refusals, and a constructed archive
    whose central directory under-declares a part, which must refuse with the
@@ -287,5 +286,5 @@ Acceptance requires, beyond the six gates 0581 already states:
    shares rather than duplicates the source allocation, extending
    `package.rs:1666`.
 5. A test that a failed first-access decode is stable across repeated accesses.
-6. Peak-retained-byte and allocation counts on 0581's three axes, showing the
+6. Peak-retained-byte and allocation counts on the three measured axes, showing the
    predicted factors were met and that no axis regressed.

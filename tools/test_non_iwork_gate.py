@@ -326,7 +326,7 @@ def metadata_fixture() -> dict[str, object]:
                 }
             ]
         if name == "litchi-ops":
-            # The unified layer's optional iWork leaf edges (record 0296).
+            # The unified layer's optional iWork leaf edges.
             raw["dependencies"] = [
                 {
                     "name": dependency_name,
@@ -432,7 +432,7 @@ class NonIworkGateTests(unittest.TestCase):
         self.assertEqual(self.plan.iwork_packages, FIXTURE_IWORK_PACKAGES)
         self.assertEqual(len(self.plan.unsafe_facade_dependents), 1)
         self.assertEqual(self.plan.unsafe_facade_dependents, {"litchi-py"})
-        # The unified layer is iWork-capable (record 0296): out of the bulk
+        # The unified layer is iWork-capable: out of the bulk
         # slice, yet allowed in the safe facade trees.
         self.assertEqual(self.plan.unified_packages, {"litchi-cli", "litchi-ops"})
         self.assertEqual(

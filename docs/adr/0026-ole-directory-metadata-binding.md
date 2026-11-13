@@ -37,14 +37,14 @@ snapshot, bytes, and metadata unchanged.
 
 ## Authority and non-goals
 
-The field mapping follows [MS-CFB §2.6 directory entries](../../3rdparty/specs/[MS-CFB]/2%20Structures/2.6%20Compound%20File%20Directory%20Sectors.md),
+The field mapping follows MS-CFB §2.6 directory entries,
 including the `NOSTREAM` terminator, object kinds, CLSID rules, stream size,
 and MiniFAT distinction. The inert object boundary remains compatible with
-[MS-OLEDS §2.3 OLE2.0 structures](../../3rdparty/specs/[MS-OLEDS]/2%20Structures/2.3%20OLE2.0%20Format%20Structures.md),
+MS-OLEDS §2.3 OLE2.0 structures,
 while property-set names and values remain owned by the existing
-[MS-OLEPS binding](../../3rdparty/specs/[MS-OLEPS]/2%20Structures/2.24%20Standard%20Bindings.md)
+MS-OLEPS binding
 and semantic codec. Shared toolbar and envelope vocabulary remains under
-[MS-OSHARED](../../3rdparty/specs/[MS-OSHARED]/2%20Structures/2.3%20Common%20Objects.md).
+MS-OSHARED.
 
 Captured source metadata may retain nonconforming timestamps and stale storage
 starting-sector fields for source-preserving replay. Typed metadata edits require

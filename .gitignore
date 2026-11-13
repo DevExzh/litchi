@@ -83,7 +83,7 @@ Backup of *.doc*
 
 *.log
 *.lock
-# Standalone fuzz workspaces are checked with --locked (record 0365).
+# Standalone fuzz workspaces are checked with --locked.
 !crates/*/fuzz/Cargo.lock
 
 /3rdparty

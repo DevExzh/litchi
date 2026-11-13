@@ -1,7 +1,7 @@
 # iWork Progress Audit
 
-> **Historical snapshot.** The `litchi-iwa` migration host this audit describes was deleted by
-> record 0429 (last present at commit `4d8a3e161f`).
+> **Historical snapshot.** The `litchi-iwa` migration host this audit describes was deleted
+> (last present at commit `4d8a3e161f`).
 > Statements about it describe the audited baseline, not the current tree.
 
 > Audit baseline: 2026-09-01 at committed `d33f30f41` (`feat(numbers): own currency cell formats`). This update evaluates the focused Scientific-, Fraction-, Text-, Date & Time-, Duration-, and Custom-format owner work, plus the bounded Pages body-table hidden-axis owner, from that baseline; it remains scoped verification rather than release certification.
@@ -183,7 +183,7 @@ ADR 0028 defines `litchi-iwa` as the sole legacy migration host and makes deleti
 
 Positive progress:
 
-- The root facade depends on the three concrete owners rather than `litchi-iwa` ([feature wiring](../crates/litchi/Cargo.toml#L60), [facade](../crates/litchi/src/iwork/mod.rs#L1)).
+- The root facade depends on the three concrete owners rather than `litchi-iwa` ([feature wiring](../crates/litchi/Cargo.toml#L60), facade).
 - Recent waves moved narrow Pages table/text/hidden-axis owners, Numbers cells/settings/comments/display-format owners, and Keynote chart/movie/table owners into focused crates.
 - The Keynote lifecycle wave now owns selector-first existing slide-media duplication/removal, exact-source inverse patches, shared-data final-owner reclamation, and operation-wide resource accounting; generic host lifecycle routes remain until their own gates close.
 - `litchi-iwa-index` is a neutral leaf consistent with ADR 0029.
@@ -321,7 +321,7 @@ Strengths include hard ceilings for Snappy, wire fields/depth/work, archive obje
 
 Material follow-ups:
 
-1. The legacy `litchi-iwa` directory and media paths use check-then-open flows without the pinned descriptor/no-follow design already available in `FrozenDirectoryBundle`; this leaves a symlink/TOCTOU window ([bundle path](../crates/litchi-iwa/src/bundle.rs#L745), [safe snapshot](../crates/litchi-iwa-archive/src/directory.rs#L443)).
+1. The legacy `litchi-iwa` directory and media paths use check-then-open flows without the pinned descriptor/no-follow design already available in `FrozenDirectoryBundle`; this leaves a symlink/TOCTOU window (bundle path, [safe snapshot](../crates/litchi-iwa-archive/src/directory.rs#L443)).
 2. `litchi-iwa-graph` insertion/traversal and `litchi-iwa-index` construction lack unified aggregate node/edge/work ceilings. Index buffers use fallible reservation, but graph materialization/traversal still grows collections infallibly.
 3. Archive accounting has no single retained-memory or outer-plus-nested budget; the generic IWA path charges aggregate bytes after decoding, and replacement Deflate output is not checked against the configured compressed-member ceiling.
 4. Encryption/password-protected packages are rejected. Cryptographic signature verification/re-signing is absent.

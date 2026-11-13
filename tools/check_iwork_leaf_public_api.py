@@ -6,7 +6,7 @@ whole-crate dependency scan would therefore reject the package boundary (for
 example its caller-selected archive limits) and would also classify semantic
 names such as ``identifier`` as native IDs.  This gate starts at each crate's
 public semantic projection module -- ``document`` for Numbers and Pages,
-``presentation`` for Keynote (ADR 0034 deck noun, record 0298) -- or at the
+``presentation`` for Keynote (ADR 0034 deck noun) -- or at the
 crate-root re-exports when that implementation module is private, follows the semantic types reachable from that module,
 and checks the resulting rustdoc surface instead.
 
@@ -43,8 +43,8 @@ LEAF_CRATE_NAMES = {package: package.replace("-", "_") for package in LEAF_PACKA
 
 
 # The family-named semantic projection module of each leaf crate (ADR 0034
-# §2): `workbook` for Numbers (record 0297), `document` for Pages and
-# `presentation` for Keynote (record 0298).
+# §2): `workbook` for Numbers, `document` for Pages and
+# `presentation` for Keynote.
 SEMANTIC_MODULES = {
     "litchi_numbers": "workbook",
     "litchi_pages": "document",
@@ -105,8 +105,7 @@ FORBIDDEN_CRATES = frozenset(
 # that Pages, Keynote and Numbers share, so the crate stays forbidden and only
 # these module prefixes are allowed. Each module imports nothing but `std` and
 # its siblings in this list (`tools/test_check_iwork_leaf_public_api.py`
-# verifies that from the sources); record 0300 triaged the 45 Numbers
-# findings to these three modules.
+# verifies that from the sources).
 ALLOWED_SEMANTIC_MODULES: Mapping[tuple[str, ...], str] = {
     ("litchi_iwa_common", "table", "model"): (
         "shared sparse table model (Table, Builder, Cell, Grid, View, "
@@ -308,7 +307,7 @@ def _is_keynote_selector_error_bridge(
 ) -> bool:
     """Ignore Keynote's generated selector-to-package error bridge.
 
-    ``edit::Error::Selector(#[from])`` (``EditError`` before record 0298)
+    ``edit::Error::Selector(#[from])``
     generates an ``automatically_derived``
     ``From<SlideSelectorError> for edit::Error`` implementation.  Rustdoc emits
     that implementation without a path entry, so a semantic graph walk that
@@ -440,7 +439,7 @@ def _document_ids(
     targets.
 
     The projection module is named for its family (ADR 0034 §2): `document`
-    for word processing, `workbook` for spreadsheets (record 0297) and
+    for word processing, `workbook` for spreadsheets and
     `presentation` for decks; each crate is checked at its own family module.
     """
     module_paths = ((crate_name, semantic_module(crate_name)),)

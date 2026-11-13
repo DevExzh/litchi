@@ -17,7 +17,7 @@ from typing import Any, Iterable
 
 ROOT = Path(__file__).resolve().parents[1]
 
-# Record 0368 (decision D4 of record 0363): the archive-free cell data-format
+# The archive-free cell data-format
 # values moved from `litchi-numbers` to `litchi-iwa-common::table`, and each
 # `litchi-numbers` module now re-exports them beside its transactions. The
 # focused Numbers audits below read a data-format module as its semantic
@@ -260,7 +260,7 @@ KEYNOTE_CHART_TITLE_LEGACY_CALL = re.compile(
 KEYNOTE_CHART_LEGEND_OWNER_SOURCE = (
     KEYNOTE_SOURCE_ROOT / "package" / "slide_chart_legend.rs"
 )
-# ADR 0034 W1 (record 0298): focused Keynote families use the unprefixed
+# ADR 0034: focused Keynote families use the unprefixed
 # transaction vocabulary inside their own modules.  These generic names no
 # longer identify one family, so the facade-leak filters of the crate-root and
 # package seams ignore them and look for family-specific names instead.
@@ -271,7 +271,7 @@ KEYNOTE_CHART_LEGEND_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
-# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# ADR 0034: the family's public home is its focused semantic
 # module, which re-exports the unprefixed transaction names.
 KEYNOTE_CHART_LEGEND_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "chart.rs"
 KEYNOTE_CHART_LEGEND_FAMILY_MODULE = 'legend'
@@ -311,7 +311,7 @@ KEYNOTE_CHART_ARRANGEMENT_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
-# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# ADR 0034: the family's public home is its focused semantic
 # module, which re-exports the unprefixed transaction names.
 KEYNOTE_CHART_ARRANGEMENT_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "chart.rs"
 KEYNOTE_CHART_ARRANGEMENT_FAMILY_MODULE = 'arrangement'
@@ -645,7 +645,7 @@ KEYNOTE_CHART_CAPTION_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
-# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# ADR 0034: the family's public home is its focused semantic
 # module, which re-exports the unprefixed transaction names.
 KEYNOTE_CHART_CAPTION_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "chart.rs"
 KEYNOTE_CHART_CAPTION_FAMILY_MODULE = 'caption'
@@ -682,7 +682,7 @@ KEYNOTE_CHART_AXIS_TITLE_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
-# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# ADR 0034: the family's public home is its focused semantic
 # module, which re-exports the unprefixed transaction names.
 KEYNOTE_CHART_AXIS_TITLE_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "chart.rs"
 KEYNOTE_CHART_AXIS_TITLE_FAMILY_MODULE = 'axis_title'
@@ -920,7 +920,7 @@ KEYNOTE_MOVIE_CAPTION_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
-# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# ADR 0034: the family's public home is its focused semantic
 # module, which re-exports the unprefixed transaction names.
 KEYNOTE_MOVIE_CAPTION_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "movie.rs"
 KEYNOTE_MOVIE_CAPTION_FAMILY_MODULE = 'caption'
@@ -1118,7 +1118,7 @@ KEYNOTE_MOVIE_TITLE_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
-# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# ADR 0034: the family's public home is its focused semantic
 # module, which re-exports the unprefixed transaction names.
 KEYNOTE_MOVIE_TITLE_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "movie.rs"
 KEYNOTE_MOVIE_TITLE_FAMILY_MODULE = 'title'
@@ -1340,7 +1340,7 @@ KEYNOTE_MOVIE_PLAYBACK_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
-# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# ADR 0034: the family's public home is its focused semantic
 # module, which re-exports the unprefixed transaction names.
 KEYNOTE_MOVIE_PLAYBACK_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "movie.rs"
 KEYNOTE_MOVIE_PLAYBACK_FAMILY_MODULE = 'playback'
@@ -1594,7 +1594,7 @@ IWA_IMAGE_ADJUSTMENTS_OWNER_MODULES = {
     ecosystem: re.compile(r"(?m)^\s*mod\s+(?:r#)?image_adjustments\s*;")
     for ecosystem in ("Numbers",)
 } | {
-    # ADR 0034 W1: the Pages and Keynote owners are crate-visible so their
+    # ADR 0034: the Pages and Keynote owners are crate-visible so their
     # focused family modules can re-export the short names; ``pub mod``
     # remains rejected.
     ecosystem: re.compile(
@@ -1603,7 +1603,7 @@ IWA_IMAGE_ADJUSTMENTS_OWNER_MODULES = {
     for ecosystem in ("Keynote", "Pages")
 }
 # Ecosystems whose semantic image-adjustment types are published through an
-# ADR 0034 W1 transaction module (checked by the shared Pages family helper)
+# ADR 0034 transaction module (checked by the shared Pages family helper)
 # rather than through the crate root.
 IWA_IMAGE_ADJUSTMENTS_TRANSACTION_FAMILY_OWNERS = {"Pages": "image_adjustments"}
 IWA_IMAGE_ADJUSTMENTS_RETIRED_WRITE_SEAM = (
@@ -1642,7 +1642,7 @@ IWA_IMAGE_ADJUSTMENTS_SEMANTIC_TYPES = {
         "Patch",
         "Diagnostics",
     ),
-    # ADR 0034 W1 short names, published as ``litchi_pages::image::adjustments``.
+    # ADR 0034 short names, published as ``litchi_pages::image::adjustments``.
     "Pages": (
         "Error",
         "Edit",
@@ -1650,7 +1650,7 @@ IWA_IMAGE_ADJUSTMENTS_SEMANTIC_TYPES = {
         "Patch",
         "Diagnostics",
     ),
-    # ADR 0034 W1 (record 0297): short names in `shape::image::adjustments`.
+    # ADR 0034: short names in `shape::image::adjustments`.
     "Numbers": (
         "Error",
         "Edit",
@@ -1712,7 +1712,7 @@ KEYNOTE_MOVIE_GEOMETRY_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
-# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# ADR 0034: the family's public home is its focused semantic
 # module, which re-exports the unprefixed transaction names.
 KEYNOTE_MOVIE_GEOMETRY_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "movie.rs"
 KEYNOTE_MOVIE_GEOMETRY_FAMILY_MODULE = 'geometry'
@@ -2009,7 +2009,7 @@ KEYNOTE_AUDIO_POSITION_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
-# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# ADR 0034: the family's public home is its focused semantic
 # module, which re-exports the unprefixed transaction names.
 KEYNOTE_AUDIO_POSITION_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "audio.rs"
 KEYNOTE_AUDIO_POSITION_FAMILY_MODULE = 'position'
@@ -2175,7 +2175,7 @@ KEYNOTE_MEDIA_PROPERTIES_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
-# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# ADR 0034: the family's public home is its focused semantic
 # module, which re-exports the unprefixed transaction names.
 KEYNOTE_MEDIA_PROPERTIES_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "media" / "properties.rs"
 KEYNOTE_MEDIA_PROPERTIES_FAMILY_MODULE = None
@@ -2368,7 +2368,7 @@ KEYNOTE_SLIDE_MEDIA_DATA_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
-# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# ADR 0034: the family's public home is its focused semantic
 # module, which re-exports the unprefixed transaction names.
 KEYNOTE_SLIDE_MEDIA_DATA_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "media.rs"
 KEYNOTE_SLIDE_MEDIA_DATA_FAMILY_MODULE = 'data'
@@ -2709,7 +2709,7 @@ KEYNOTE_SLIDE_MEDIA_LIFECYCLE_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
-# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# ADR 0034: the family's public home is its focused semantic
 # module, which re-exports the unprefixed transaction names.
 KEYNOTE_SLIDE_MEDIA_LIFECYCLE_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "media.rs"
 KEYNOTE_SLIDE_MEDIA_LIFECYCLE_FAMILY_MODULE = 'lifecycle'
@@ -2734,7 +2734,7 @@ KEYNOTE_SLIDE_MEDIA_LIFECYCLE_SHARED_CHILD_MODULES = frozenset(
     {"budget", "comment_graph"}
 )
 KEYNOTE_SLIDE_MEDIA_LIFECYCLE_SHARED_CHILD_VISIBILITY = "pub(in crate::package)"
-# Record 0361 (W7): the lifecycle is a scoped family. ``Package`` starts the
+# The lifecycle is a scoped family. ``Package`` starts the
 # edit and replays its patch; the selector-first verbs stage on ``Edit``.
 KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PACKAGE_METHODS = frozenset(
     {
@@ -2837,7 +2837,7 @@ KEYNOTE_SLIDE_DRAWABLE_COMMENT_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
-# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# ADR 0034: the family's public home is its focused semantic
 # module, which re-exports the unprefixed transaction names.
 KEYNOTE_SLIDE_DRAWABLE_COMMENT_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "comment.rs"
 KEYNOTE_SLIDE_DRAWABLE_COMMENT_FAMILY_MODULE = 'transaction'
@@ -3519,7 +3519,7 @@ KEYNOTE_SLIDE_TABLE_TITLE_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
-# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# ADR 0034: the family's public home is its focused semantic
 # module, which re-exports the unprefixed transaction names.
 KEYNOTE_SLIDE_TABLE_TITLE_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "table" / "title.rs"
 KEYNOTE_SLIDE_TABLE_TITLE_FAMILY_MODULE = 'transaction'
@@ -3619,7 +3619,7 @@ KEYNOTE_SLIDE_TABLE_SORT_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
-# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# ADR 0034: the family's public home is its focused semantic
 # module, which re-exports the unprefixed transaction names.
 KEYNOTE_SLIDE_TABLE_SORT_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "table" / "sort.rs"
 KEYNOTE_SLIDE_TABLE_SORT_FAMILY_MODULE = 'transaction'
@@ -3801,7 +3801,7 @@ KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
-# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# ADR 0034: the family's public home is its focused semantic
 # module, which re-exports the unprefixed transaction names.
 KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "table" / "physical_sort.rs"
 KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_FAMILY_MODULE = 'transaction'
@@ -4025,7 +4025,7 @@ KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_SHARED_EXECUTOR_MARKERS = (
     re.compile(r"\bUID_ROW_UID_FOR_INDEX_FIELD\b"),
     re.compile(r"\bworking\.publish\s*\("),
 )
-# Owner markers that remain once the rewrite is delegated (record 0421a): the
+# Owner markers that remain once the rewrite is delegated: the
 # owner still verifies the reopened candidate and checks row and header
 # placement against its own scan.
 KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_DELEGATED_GROUPS = {
@@ -4272,7 +4272,7 @@ KEYNOTE_SLIDE_TABLE_LOCK_STATE_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
-# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# ADR 0034: the family's public home is its focused semantic
 # module, which re-exports the unprefixed transaction names.
 KEYNOTE_SLIDE_TABLE_LOCK_STATE_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "table" / "lock.rs"
 KEYNOTE_SLIDE_TABLE_LOCK_STATE_FAMILY_MODULE = 'transaction'
@@ -4375,7 +4375,7 @@ KEYNOTE_SLIDE_TABLE_DIMENSION_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
-# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# ADR 0034: the family's public home is its focused semantic
 # module, which re-exports the unprefixed transaction names.
 KEYNOTE_SLIDE_TABLE_DIMENSION_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "table" / "dimension.rs"
 KEYNOTE_SLIDE_TABLE_DIMENSION_FAMILY_MODULE = 'transaction'
@@ -4512,7 +4512,7 @@ KEYNOTE_SLIDE_TABLE_NAME_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
-# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# ADR 0034: the family's public home is its focused semantic
 # module, which re-exports the unprefixed transaction names.
 KEYNOTE_SLIDE_TABLE_NAME_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "table" / "name.rs"
 KEYNOTE_SLIDE_TABLE_NAME_FAMILY_MODULE = 'transaction'
@@ -4724,7 +4724,7 @@ KEYNOTE_SLIDE_TABLE_HEADERS_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
-# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# ADR 0034: the family's public home is its focused semantic
 # module, which re-exports the unprefixed transaction names.
 KEYNOTE_SLIDE_TABLE_HEADERS_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "table" / "headers.rs"
 KEYNOTE_SLIDE_TABLE_HEADERS_FAMILY_MODULE = 'transaction'
@@ -5013,7 +5013,7 @@ KEYNOTE_SLIDE_TABLE_APPEARANCE_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
-# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# ADR 0034: the family's public home is its focused semantic
 # module, which re-exports the unprefixed transaction names.
 KEYNOTE_SLIDE_TABLE_APPEARANCE_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "table" / "appearance.rs"
 KEYNOTE_SLIDE_TABLE_APPEARANCE_FAMILY_MODULE = 'transaction'
@@ -7137,13 +7137,13 @@ NUMBERS_TABLE_CELL_NUMBER_FORMAT_CODEC_SOURCE = Path(
 NUMBERS_TABLE_CELL_DISPLAY_FORMAT_CODEC_SOURCE = Path(
     "crates/litchi-iwa-protos/src/numbers_table_cell_display_format_codec.rs"
 )
-# Record 0379 moved the shared display-format core into `litchi-iwa-table`;
+# The shared display-format core lives in `litchi-iwa-table`;
 # the Numbers facades reach it through the `table_cell_display_format_native`
 # alias of `package.rs`.
 NUMBERS_TABLE_CELL_DISPLAY_FORMAT_NATIVE_SOURCE = Path(
     "crates/litchi-iwa-table/src/cell_format/display.rs"
 )
-# The format-neutral cell-format engine (record 0379). The Numbers popup and
+# The format-neutral cell-format engine. The Numbers popup and
 # cell-control audits read its markers together with the Numbers facades.
 IWA_TABLE_CELL_FORMAT_ENGINE_SOURCES = (
     Path("crates/litchi-iwa-table/src/cell_format.rs"),
@@ -7157,7 +7157,7 @@ IWA_TABLE_CELL_FORMAT_ENGINE_SOURCES = (
 
 
 def _iwa_table_cell_format_engine_code(root: Path) -> str:
-    """Masked code of the shared cell-format engine (record 0379)."""
+    """Masked code of the shared cell-format engine."""
 
     return "\n".join(
         _mask_rust_non_code(_mask_rust_cfg_test_items(path.read_text(encoding="utf-8")))
@@ -10274,7 +10274,7 @@ NUMBERS_TABLE_CELL_COMMENT_REPLY_PUBLIC_LEAK_PREFIXES = (
 NUMBERS_TABLE_CELL_COMMENT_REPLY_METADATA_TYPES = frozenset(
     {"CommentAuthor", "CommentTimestamp"}
 )
-# ADR 0034 W1 (record 0297): no prefixed root aliases; the values are
+# ADR 0034: no prefixed root aliases; the values are
 # published by `litchi_numbers::cell::comment`.
 NUMBERS_TABLE_CELL_COMMENT_REPLY_METADATA_ROOT_ALIASES: dict[str, str] = {}
 NUMBERS_TABLE_CELL_COMMENT_REPLY_METADATA_ALLOWED_IDENTIFIERS = frozenset(
@@ -10364,7 +10364,7 @@ NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_FUZZ_SOURCE = Path(
 NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_FUZZ_CORPUS = Path(
     "crates/litchi/fuzz/corpus/numbers_table_cell_comment_reply"
 )
-# ADR 0034 W1 (record 0297): the reply family keeps its focused
+# ADR 0034: the reply family keeps its focused
 # `cell::comment::transaction` module and short canonical names; the
 # prefixed root aliases are deleted.
 NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_TYPES = (
@@ -11712,7 +11712,7 @@ PAGES_FOOTNOTE_LIFECYCLE_SEMANTIC_TYPES = (
     "Position",
     "Selector",
 )
-# ADR 0034 W1: canonical short names defined by the owner and re-exported
+# ADR 0034: canonical short names defined by the owner and re-exported
 # only by ``litchi_pages::footnote::body::transaction``.  The deleted prefixed
 # spellings stay focused markers and alias targets; the ``body_footnote`` owner
 # path marks
@@ -11854,7 +11854,7 @@ PAGES_DOCUMENT_PUBLIC_API_SOURCES = (
 PAGES_DOCUMENT_DEDICATED_PUBLIC_API_SOURCES = frozenset(
     {PAGES_SOURCE_ROOT / "document.rs"}
 )
-# ADR 0034 wave W1 (record 0299) replaced the ``DocumentSourceLimits`` /
+# ADR 0034 replaced the ``DocumentSourceLimits`` /
 # ``ReadError`` ingress family with the root ``OpenOptions``, ``SourceLimits``
 # and ``SemanticLimits`` profiles (defined in the private ``limits`` module and
 # re-exported from ``lib.rs``).
@@ -11881,7 +11881,7 @@ PAGES_DOCUMENT_PUBLIC_MARKERS = frozenset(
 )
 PAGES_PACKAGE_SOURCE = PAGES_SOURCE_ROOT / "package.rs"
 
-# ADR 0034 wave W1 (record 0299): every Pages transaction family lives in a
+# ADR 0034: every Pages transaction family lives in a
 # ``pub(crate) mod <owner>;`` under ``package/`` that defines the canonical
 # short names (``Edit``, ``Patch``, ``Commit``, ``Diagnostics``, ``Error``,
 # ``LimitKind`` plus a few family extras), and exactly one public module
@@ -11893,7 +11893,7 @@ PAGES_PACKAGE_SOURCE = PAGES_SOURCE_ROOT / "package.rs"
 # legacy-name overrides)``.  The legacy name of a short name is
 # ``prefix + short`` unless the override map names it.
 PAGES_TRANSACTION_SIX = ("Commit", "Diagnostics", "Edit", "Error", "LimitKind", "Patch")
-# Record 0361: a family may also export its typed refusal reasons (0351 §2.4).
+# A family may also export its typed refusal reasons.
 PAGES_TRANSACTION_OPTIONAL_EXPORTS = frozenset({"Refusal"})
 PAGES_TRANSACTION_FAMILIES: tuple[
     tuple[str, str, tuple[str, ...], tuple[str, ...], dict[str, str]], ...
@@ -12397,7 +12397,7 @@ PAGES_PAGE_LAYOUT_EXPORT_SOURCES = (
     PAGES_SOURCE_ROOT / "lib.rs",
     PAGES_SOURCE_ROOT / "package.rs",
 )
-# ADR 0034 W1 deleted these prefixed spellings (the owner now defines the
+# ADR 0034 deleted these prefixed spellings (the owner now defines the
 # short names, published by ``page_layout::transaction``).  They stay markers
 # so a reintroduced root export is still inspected; the ``page_layout`` path
 # test in ``_is_pages_page_layout_public_declaration`` marks the canonical
@@ -12425,7 +12425,7 @@ PAGES_TABLE_LOCK_EXPORT_SOURCES = (
     PAGES_TABLE_LOCK_PACKAGE_EXPORT_SOURCE,
     PAGES_SOURCE_ROOT / "table" / "mod.rs",
 )
-# ADR 0034 W1: ``table::lock`` publishes ``State`` plus the owner's canonical
+# ADR 0034: ``table::lock`` publishes ``State`` plus the owner's canonical
 # short transaction names; the ``BodyTableLockState`` root alias and the
 # prefixed ``BodyTableLock*`` spellings are deleted (rejected by the shared
 # family helper).  The legacy spellings remain focused markers and alias
@@ -12565,7 +12565,7 @@ PAGES_TABLE_TITLE_EXPORT_SOURCES = (
 )
 PAGES_TABLE_TITLE_SELECTOR_SOURCE = PAGES_SOURCE_ROOT / "selector.rs"
 PAGES_TABLE_TITLE_SEMANTIC_TYPES = ("Settings",)
-# ADR 0034 W1: the owner defines these canonical short names and only
+# ADR 0034: the owner defines these canonical short names and only
 # ``litchi_pages::table::title`` re-exports them (checked by the shared
 # family helper).  The deleted prefixed spellings stay focused markers
 # and alias targets: the short names are too common in ``lib.rs`` and
@@ -12712,7 +12712,7 @@ PAGES_TABLE_HEADERS_EXPORT_SOURCES = (
 )
 PAGES_TABLE_HEADERS_SELECTOR_SOURCE = PAGES_SOURCE_ROOT / "selector.rs"
 PAGES_TABLE_HEADERS_SEMANTIC_TYPES = ("Count", "Error", "Settings")
-# ADR 0034 W1: the owner defines these canonical short names and only
+# ADR 0034: the owner defines these canonical short names and only
 # ``litchi_pages::table::headers::transaction`` re-exports them (checked by the shared
 # family helper).  The deleted prefixed spellings stay focused markers
 # and alias targets: the short names are too common in ``lib.rs`` and
@@ -12851,7 +12851,7 @@ PAGES_TABLE_DIMENSION_EXPORT_SOURCES = (
 )
 PAGES_TABLE_DIMENSION_SELECTOR_SOURCE = PAGES_SOURCE_ROOT / "selector.rs"
 PAGES_TABLE_DIMENSION_SEMANTIC_TYPES = ("Dimension", "Points", "Size")
-# ADR 0034 W1: the owner defines these canonical short names and only
+# ADR 0034: the owner defines these canonical short names and only
 # ``litchi_pages::table::dimension::transaction`` re-exports them (checked by the shared
 # family helper).  The deleted prefixed spellings stay focused markers
 # and alias targets: the short names are too common in ``lib.rs`` and
@@ -12996,7 +12996,7 @@ PAGES_TABLE_SORT_TRANSACTION_TYPES = (
     "Error",
     "LimitKind",
 )
-# ADR 0034 W1: the owner defines these canonical short names and only
+# ADR 0034: the owner defines these canonical short names and only
 # ``litchi_pages::table::sort::transaction`` re-exports them (checked by the shared
 # family helper).  The deleted prefixed spellings stay focused markers
 # and alias targets: the short names are too common in ``lib.rs`` and
@@ -13212,7 +13212,7 @@ PAGES_HEADER_FOOTER_EXPORT_SOURCES = (
 PAGES_HEADER_FOOTER_SELECTOR_SOURCE = PAGES_HEADER_FOOTER_SEMANTIC_SOURCE
 PAGES_HEADER_FOOTER_SEMANTIC_TYPES = ("HeaderFooter", "Template", "Kind")
 PAGES_HEADER_FOOTER_SELECTOR_TYPES = ("HeaderFooterSelector",)
-# ADR 0034 W1: the owner defines the canonical short names and only
+# ADR 0034: the owner defines the canonical short names and only
 # ``litchi_pages::header_footer::text`` re-exports them.  The deleted prefixed
 # spellings stay in the focused-marker and alias-target sets below, so a
 # declaration that reintroduces one outside the owner is still inspected; the
@@ -13350,7 +13350,7 @@ PAGES_SECTION_TEXT_EXPORT_SOURCES = (
 )
 PAGES_SECTION_TEXT_SELECTOR_SOURCE = PAGES_SECTION_TEXT_SEMANTIC_SOURCE
 PAGES_SECTION_TEXT_SEMANTIC_TYPES = ("SectionSelector",)
-# ADR 0034 W1: canonical short names defined by the owner and re-exported
+# ADR 0034: canonical short names defined by the owner and re-exported
 # only by ``litchi_pages::section::text``.  The deleted prefixed spellings
 # remain focused markers/alias targets (they are also flat aliases below); the
 # ``section_text`` owner path marks the canonical re-export.
@@ -13544,7 +13544,7 @@ PAGES_TABLE_APPEARANCE_TRANSACTION_TYPES = (
     "LimitKind",
     "Path",
 )
-# ADR 0034 W1: the owner defines the canonical short names (identical to the
+# ADR 0034: the owner defines the canonical short names (identical to the
 # ``transaction`` re-export set) and only
 # ``litchi_pages::table::appearance::transaction`` publishes them.  The
 # deleted prefixed spellings stay focused markers and alias targets.
@@ -13717,7 +13717,7 @@ PAGES_TABLE_APPEARANCE_OWNER_MARKER_GROUPS = {
     "metadata ownership": ("MetadataFacts", "inspect_package_metadata_with_visitor", "uuid_additions", "SaveTokenBatch", "external_additions"),
     "prepared execution accounting": ("model_requirements", "stylesheet_requirements", "execution_requirements", "execute"),
     "package reassembly": ("prepare_reassembly_with_deletions", "EntryEdit", "execute"),
-    # ADR 0034 W1: the owner's patch is the canonical short ``Patch``.
+    # ADR 0034: the owner's patch is the canonical short ``Patch``.
     "exact artifacts and inverse": ("impl Patch", "source_fingerprint", "inverse", "is_noop", "PatchConflict"),
     "candidate reopen and locality": ("candidate", "Package::from_source_with_options", "verify_candidate_locality", "full_reparse_performed"),
     "preview preservation": ("deleted_previews", "root_preview_deletions"),
@@ -13833,8 +13833,8 @@ PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE = (
 PAGES_TABLE_HIDDEN_AXES_OWNER_HELPER_ROOT = (
     PAGES_SOURCE_ROOT / "package" / "body_table_hidden_axes"
 )
-# Record 0379 moved the hidden-axis engine (graph proof, owner creation,
-# UID-map rewrite) into `litchi-iwa-table`; the Pages owner is its facade.
+# The hidden-axis engine (graph proof, owner creation,
+# UID-map rewrite) lives in `litchi-iwa-table`; the Pages owner is its facade.
 IWA_TABLE_HIDDEN_AXES_ENGINE_SOURCE = Path("crates/litchi-iwa-table/src/hidden_axes.rs")
 PAGES_TABLE_HIDDEN_AXES_IMPLEMENTATION_SOURCES = (
     PAGES_TABLE_HIDDEN_AXES_SEMANTIC_SOURCE,
@@ -13856,7 +13856,7 @@ PAGES_TABLE_HIDDEN_AXES_TRANSACTION_TYPES = (
     "LimitKind",
     "Path",
 )
-# ADR 0034 W1: the owner defines the canonical short names (identical to the
+# ADR 0034: the owner defines the canonical short names (identical to the
 # ``transaction`` re-export set) and only
 # ``litchi_pages::table::hidden_axes::transaction`` publishes them.  The
 # deleted prefixed spellings stay focused markers and alias targets.
@@ -14421,7 +14421,7 @@ FACADE_SOURCE_ROOT = Path("crates/litchi/src")
 # re-export shape and prevents a package alias from being hidden behind a
 # semantic namespace.
 SEMANTIC_FACADE_REQUIRED_EXPORTS = {
-    # ADR 0034 wave W1 (record 0299): the Pages reader returns the leaf's
+    # ADR 0034: the Pages reader returns the leaf's
     # ``PackageError`` and is configured by ``OpenOptions`` with the
     # ``SourceLimits``/``SemanticLimits`` profiles.  The retired
     # ``DocumentSourceLimits``/``ReadError`` family is listed in
@@ -14451,7 +14451,7 @@ SEMANTIC_FACADE_REQUIRED_EXPORTS = {
             "TextSpan",
         }
     ),
-    # ADR 0034 W1 (record 0298): the deck projection is `Presentation`, its
+    # ADR 0034: the deck projection is `Presentation`, its
     # reader errors live in `presentation`, and the ingress envelope is the
     # crate `OpenOptions` with checked source and semantic limits.
     "keynote": frozenset(
@@ -14482,7 +14482,7 @@ SEMANTIC_FACADE_REQUIRED_EXPORTS = {
             "Transition",
         }
     ),
-    # ADR 0034 W1 (record 0297).
+    # ADR 0034.
     "numbers": frozenset(
         {
             "Workbook",
@@ -14535,7 +14535,7 @@ SEMANTIC_FACADE_OWNER_ALLOWED_NAMES = {
     "pages": frozenset({"PackageError"}),
 }
 # Per-owner names that must not reappear in a semantic facade.  For Pages these
-# are the ingress types deleted by ADR 0034 wave W1 (record 0299).
+# are the ingress types deleted by ADR 0034.
 SEMANTIC_FACADE_OWNER_FORBIDDEN_NAMES = {
     "pages": frozenset(
         {
@@ -18187,7 +18187,7 @@ def _keynote_family_view(
 ) -> str:
     """Return the Rust scope that publishes one focused Keynote family.
 
-    ADR 0034 W1 (record 0298) moved every Keynote transaction family into a
+    ADR 0034 moved every Keynote transaction family into a
     focused public module (``chart::arrangement``,
     ``slide::table::sort::transaction``, ...).  ``path`` is either the private
     owner source (returned unchanged) or the semantic module file; for the
@@ -22711,7 +22711,7 @@ def _numbers_table_cell_date_time_format_public_leak(
     """Classify archive, wire, generated, or identifier vocabulary."""
 
     if identifier == "litchi_iwa_common":
-        # The neutral table vocabulary owner (record 0368, decision D4).
+        # The neutral table vocabulary owner.
         return None
     if identifier in NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_RAW_MARKERS:
         return "raw identifier or archive type"
@@ -23095,7 +23095,7 @@ def _numbers_table_cell_duration_format_public_leak(
     """Classify native, archive, wire, generated, or host vocabulary."""
 
     if identifier == "litchi_iwa_common":
-        # The neutral table vocabulary owner (record 0368, decision D4).
+        # The neutral table vocabulary owner.
         return None
     if identifier in NUMBERS_TABLE_CELL_DURATION_FORMAT_RAW_MARKERS:
         return "raw identifier or archive type"
@@ -24444,7 +24444,7 @@ def _numbers_table_cell_display_format_owner_core_route(
         exported: set[str] = set()
         for match in re.finditer(
             r"\bpub(?:[ \t]*\([^()]*\))?[ \t\r\n]+use\b[^;]*"
-            # Record 0379: the seam is the shared engine's `control` module,
+            # The seam is the shared engine's `control` module,
             # which re-exports its sibling `display` core.
             r"\b(?:table_cell_display_format_native|super\s*::\s*display)\s*::\s*"
             r"\{(?P<items>[^}]*)\}",
@@ -24527,7 +24527,7 @@ def _numbers_table_cell_display_format_writer_definitions(
     )
     source_root = root / NUMBERS_SOURCE_ROOT / "package"
     files = sorted(source_root.rglob("*.rs")) if source_root.is_dir() else []
-    # Record 0379: the shared core lives in `litchi-iwa-table`; index it too
+    # The shared core lives in `litchi-iwa-table`; index it too
     # so a second implementation beside it stays a duplicate.
     core_path = root / NUMBERS_TABLE_CELL_DISPLAY_FORMAT_NATIVE_SOURCE
     if core_path.is_file() and core_path not in files:
@@ -27873,7 +27873,7 @@ def _numbers_table_cell_control_public_leak(identifier: str) -> str | None:
     """Classify native vocabulary forbidden in the generic control facade."""
 
     if identifier == "litchi_iwa_common":
-        # The neutral table vocabulary owner (record 0368, decision D4).
+        # The neutral table vocabulary owner.
         return None
     if identifier in NUMBERS_TABLE_CELL_CONTROL_PROTO_ORIGINS:
         return "protobuf type"
@@ -28731,7 +28731,7 @@ def audit_numbers_table_dimension_facade_source_topology(
                     and public_use_or_type
                     and identifier in NUMBERS_TABLE_DIMENSION_TRANSACTION_TYPE_SET
                     # The shared dimension value error keeps its name beside
-                    # the transaction family's own `Error` (record 0297).
+                    # the transaction family's own `Error`.
                     and not (canonical_common_reexport and identifier == "Error")
                 ):
                     violations.append(
@@ -29659,7 +29659,7 @@ def audit_pages_table_sort_facade_source_topology(root: Path = ROOT) -> list[str
                     or "body_table_sort" in target_identifiers
                     or "sort" in target_identifiers
                 ) and alias and alias != target:
-                    # ADR 0034 W1: no rename of the owner's short names and no
+                    # ADR 0034: no rename of the owner's short names and no
                     # prefixed root alias.
                     violations.append(
                         "focused litchi-pages table-sort public API retains "
@@ -32469,7 +32469,7 @@ def audit_iwa_common_formula_render_ownership(
     return sorted(set(violations))
 
 
-# The migration host's feature and hidden seams, removed by record 0436. A leaf
+# The migration host's feature and hidden seams, now removed. A leaf
 # that needs one of these again gets a `pub(crate)` item or a glossary-checked
 # public API instead.
 IWA_RETIRED_HOST_FEATURE = "internal-iwork-source"
@@ -33616,7 +33616,7 @@ def audit_numbers_table_cell_comment_reply_facade_source_topology(
                     f"metadata: {NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
                 )
 
-    # ADR 0034 W1 (record 0297): the value is published by its focused
+    # ADR 0034: the value is published by its focused
     # `cell::comment` module under its canonical name; the prefixed root
     # alias is deleted.
     comment_path = root / NUMBERS_SOURCE_ROOT / "cell" / "comment.rs"
@@ -34080,7 +34080,7 @@ def audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
         owner_paths.update(
             path for path in helper_root.glob("comments_reply*.rs") if path.is_file()
         )
-    # Record 0412d: the Numbers reply transaction delegates its native
+    # The Numbers reply transaction delegates its native
     # transition to the shared copy-on-write reply engine, which owns the
     # prepared reply-reference codec call.
     shared_engine_root = root / NUMBERS_TABLE_CELL_COMMENT_REPLY_SHARED_ENGINE_ROOT
@@ -34351,7 +34351,7 @@ def audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
                         f"re-exports, not type aliases: {location(path, line_number)}"
                     )
         for name in canonical_public_names:
-            # The reply family's short names (record 0297) are defined by the
+            # The reply family's short names are defined by the
             # reply owner; the sibling comment family reuses the same names.
             if (
                 name in {"Edit", "Patch", "Commit", "Diagnostics", "Error", "LimitKind", "Path"}
@@ -36548,7 +36548,7 @@ def _audit_focused_chart_arrangement_owner_source_topology(
 
     ``owner_module_visibility`` is the exact visibility the package owner
     module must carry: ``None`` for a private ``mod``, ``"pub(crate)"`` for
-    the ADR 0034 W1 Pages owners.  A ``pub mod`` owner is always rejected.
+    the ADR 0034 Pages owners.  A ``pub mod`` owner is always rejected.
 
     The ratchet is deliberately limited to the public package seam and a few
     stable ownership markers.  Native graph identifiers and wire helpers may
@@ -36702,7 +36702,7 @@ def audit_numbers_chart_arrangement_owner_source_topology(
         label="litchi-numbers chart-arrangement",
         owner_source=NUMBERS_CHART_ARRANGEMENT_OWNER_SOURCE,
         package_source=NUMBERS_PACKAGE_SOURCE,
-        # ADR 0034 W1 (record 0297): the family is published through the
+        # ADR 0034: the family is published through the
         # focused `sheet::chart::arrangement` module with short names.
         public_source=NUMBERS_SOURCE_ROOT / "sheet" / "chart.rs",
         module_name=NUMBERS_CHART_ARRANGEMENT_PACKAGE_MODULE,
@@ -36762,7 +36762,7 @@ def audit_pages_body_chart_arrangement_owner_source_topology(
         },
         owner_markers=PAGES_BODY_CHART_ARRANGEMENT_OWNER_MARKERS,
         lazy_codec_markers=PAGES_BODY_CHART_ARRANGEMENT_LAZY_CODEC_MARKERS,
-        # ADR 0034 W1: the canonical short names are published only by
+        # ADR 0034: the canonical short names are published only by
         # ``litchi_pages::chart::arrangement``; the shared family check below
         # verifies the owner definitions and that exact re-export.
         canonical_types=(),
@@ -37595,7 +37595,7 @@ KEYNOTE_CHART_AXIS_VALUE_SETTINGS_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
-# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# ADR 0034: the family's public home is its focused semantic
 # module, which re-exports the unprefixed transaction names.
 KEYNOTE_CHART_AXIS_VALUE_SETTINGS_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "chart.rs"
 KEYNOTE_CHART_AXIS_VALUE_SETTINGS_FAMILY_MODULE = 'value_axis'
@@ -43678,7 +43678,7 @@ def audit_keynote_movie_geometry_facade_source_topology(
             "focused litchi-keynote movie-geometry semantic API is missing geometry module: "
             f"{KEYNOTE_MOVIE_GEOMETRY_SEMANTIC_SOURCE}"
         )
-    # ADR 0034 W1 (record 0298): the transaction family moved from
+    # ADR 0034: the transaction family moved from
     # `slide::media::geometry::transaction` to `slide::movie::geometry`.
     if not family.strip():
         violations.append(
@@ -45488,7 +45488,7 @@ def audit_keynote_slide_table_physical_sort_facade_source_topology(
         for path in (owner_path, root / KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_FAMILY_SOURCE):
             # The value-free Diagnostics/Error/LimitKind/Path vocabulary is
             # owned by the semantic module; the package owner defines only the
-            # package-bearing Edit/Patch/Commit (record 0298).
+            # package-bearing Edit/Patch/Commit.
             if path == owner_path and name not in {"Edit", "Patch", "Commit"}:
                 continue
             if name not in _rust_canonical_exports(
@@ -45873,7 +45873,7 @@ def audit_keynote_slide_table_physical_sort_resource_source_topology(
     )
     violations: list[str] = []
 
-    # Record 0421a: the permutation and the tile/header/UID rewrite (and
+    # The permutation and the tile/header/UID rewrite (and
     # their reassembly) moved to the shared executor `litchi_iwa_table::sort`,
     # called with Keynote's same-tile, preview-dropping hooks. The owner keeps
     # admission and candidate verification; the rewrite-affinity groups are
@@ -47801,7 +47801,7 @@ def audit_pages_table_title_facade_source_topology(root: Path = ROOT) -> list[st
                     target in PAGES_TABLE_TITLE_ALIAS_TARGETS
                     or "body_table_title" in target_identifiers
                 ) and alias and alias != target:
-                    # ADR 0034 W1: ``table::title`` re-exports the owner's
+                    # ADR 0034: ``table::title`` re-exports the owner's
                     # short names directly, so no rename is permitted here.
                     violations.append(
                         "focused litchi-pages table-title public API retains "
@@ -48085,7 +48085,7 @@ def audit_pages_table_headers_facade_source_topology(root: Path = ROOT) -> list[
                     or "body_table_headers" in target_identifiers
                     or "headers" in target_identifiers
                 ) and alias and alias != target:
-                    # ADR 0034 W1 deleted the ``BodyTableHeaderSettings`` and
+                    # ADR 0034 deleted the ``BodyTableHeaderSettings`` and
                     # prefixed aliases; the short names are re-exported as-is.
                     violations.append(
                         "focused litchi-pages table-headers public API retains "
@@ -48359,7 +48359,7 @@ def audit_pages_table_dimension_facade_source_topology(
                     or "body_table_dimension" in target_identifiers
                     or "dimension" in target_identifiers
                 ) and alias and alias != target:
-                    # ADR 0034 W1: no rename of the owner's short names.
+                    # ADR 0034: no rename of the owner's short names.
                     violations.append(
                         "focused litchi-pages table-dimension public API retains "
                         f"alternate alias {alias} for {target}: {path.relative_to(root)}:{line_number}"
@@ -50123,7 +50123,7 @@ IWA_TABLE_MERGE_TRANSACTION_SPECS = (
         "library_path": Path("crates/litchi-numbers/src/lib.rs"),
         "module_name": "table_merges",
         "transaction_module": "transaction",
-        # ADR 0034 W1 (record 0297): the family carries short names and is
+        # ADR 0034: the family carries short names and is
         # published through one focused module instead of prefixed aliases.
         "prefix": "",
         "focused_module": Path("crates/litchi-numbers/src/table/merge.rs"),
@@ -50151,7 +50151,7 @@ IWA_TABLE_MERGE_TRANSACTION_SPECS = (
         "module_name": "body_table_merges",
         "transaction_module": "transaction",
         "prefix": "BodyTableMerges",
-        # ADR 0034 W1: canonical short names published only by
+        # ADR 0034: canonical short names published only by
         # ``litchi_pages::table::merge::transaction``.
         "type_names": {
             suffix: suffix for suffix in ("Edit", "Patch", "Commit", "Diagnostics")
@@ -50184,7 +50184,7 @@ IWA_TABLE_MERGE_TRANSACTION_SPECS = (
             "crates/litchi-keynote/src/package/slide_table_merges/transaction.rs"
         ),
         "package_path": KEYNOTE_TABLE_MERGE_PACKAGE_SOURCE,
-        # ADR 0034 W1 (record 0298): the family's public home is
+        # ADR 0034: the family's public home is
         # `slide::table::merge::transaction` with unprefixed names.
         "package_export_path": Path("crates/litchi-keynote/src/slide/table/merge.rs"),
         "library_path": Path("crates/litchi-keynote/src/slide/table/merge.rs"),
@@ -50334,7 +50334,7 @@ IWA_PAGES_BODY_TABLE_DELETION_PACKAGE_SOURCE = Path(
 IWA_PAGES_BODY_TABLE_DELETION_LIBRARY_SOURCE = Path(
     "crates/litchi-pages/src/lib.rs"
 )
-# ADR 0034 W1: the owner defines these canonical short names and only
+# ADR 0034: the owner defines these canonical short names and only
 # ``litchi_pages::table::deletion`` re-exports them; the removed table is the
 # ``table::catalog::Snapshot`` value.
 IWA_PAGES_BODY_TABLE_DELETION_CANONICAL_TYPES = frozenset(
@@ -50347,7 +50347,7 @@ IWA_PAGES_BODY_TABLE_DELETION_CANONICAL_TYPES = frozenset(
         "Patch",
     }
 )
-# Record 0361 (W7): ``Package::edit_body_table_deletion`` starts the scoped
+# ``Package::edit_body_table_deletion`` starts the scoped
 # edit, ``Edit::remove`` stages the selector and ``Edit::commit`` resolves it
 # before any staging or publication helper runs.
 IWA_PAGES_BODY_TABLE_DELETION_PACKAGE_METHODS = (
@@ -52707,7 +52707,7 @@ def _audit_table_merge_transaction_source_topology(
 
     format_name = spec["format_name"]
     prefix = spec["prefix"]
-    # ADR 0034 W1 Pages owners define the canonical short names (``Edit``,
+    # ADR 0034 Pages owners define the canonical short names (``Edit``,
     # ``Patch``, ...); other formats still use ``<prefix><suffix>``.
     type_names = {
         suffix: spec.get("type_names", {}).get(suffix, f"{prefix}{suffix}")
@@ -52829,8 +52829,8 @@ def _audit_table_merge_transaction_source_topology(
             else [(public_file.relative_to(root), public_scope)]
         )
     elif package_source:
-        # A format whose focused family module is the public home (ADR 0034
-        # W1, Keynote record 0298) checks that module instead of the package
+        # A format whose focused family module is the public home (ADR 0034)
+        # checks that module instead of the package
         # facade.
         export_path = spec.get("package_export_path", package_path)
         export_absolute = root / export_path
@@ -53135,7 +53135,7 @@ def _audit_table_merge_transaction_source_topology(
     marker_groups = {
         "source-preserving writer": (
             # The derived entry point takes the new owner UUID from the
-            # table UUID instead of ambient randomness (record 0300).
+            # table UUID instead of ambient randomness.
             ("rewrite_table_merges", "rewrite_table_merges_derived"),
             (
                 "replace_message_preserving_header",
@@ -53541,7 +53541,7 @@ def _audit_pages_body_table_deletion_public_surface(
     # Public re-exports are checked independently from the owner methods: a
     # future facade alias must not reintroduce a physical type through a
     # declaration that never appears in the transaction child itself.  After
-    # ADR 0034 W1 the family is published only by ``table::deletion``; the
+    # ADR 0034 the family is published only by ``table::deletion``; the
     # short names are too common to filter ``package.rs``/``lib.rs``
     # declarations, so the scan covers that public module's scope.
     public_file, public_scope, _ = _pages_public_module_scope(
@@ -56443,7 +56443,7 @@ def _pages_transaction_family_violations(
 
 
 def audit_pages_transaction_family_source_topology(root: Path = ROOT) -> list[str]:
-    """Keep the ADR 0034 W1 Pages transaction modules canonical.
+    """Keep the ADR 0034 Pages transaction modules canonical.
 
     Every family in ``PAGES_TRANSACTION_FAMILIES`` is checked by
     ``_pages_transaction_family_violations``.  Crate-wide, this audit also

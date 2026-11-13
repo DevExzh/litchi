@@ -3,7 +3,7 @@
 
 Rules live in api_glossary.json; each migration explicitly registers its bans
 and completed transaction families. A ban matches a name exactly, or as a
-prefix/suffix when it says so ("match"). Record 0351 adds shape rules:
+prefix/suffix when it says so ("match"). Shape rules:
 "immutable_owners" lists owner types (a format's Package and projections)
 whose public methods must not take `&mut self`, and "family_methods" makes
 every registered family expose the commit-triad accessors and return its
@@ -46,7 +46,7 @@ ROOT = Path(__file__).resolve().parents[1]
 POLICY = ROOT / "tools/api_glossary.json"
 FAMILY_NAMES = frozenset({"Edit", "Patch", "Commit", "Diagnostics", "Error", "LimitKind"})
 BAN_MATCHES = frozenset({"exact", "prefix", "suffix"})
-# Record 0351 family_methods: what each family type must (or must not) expose.
+# family_methods: what each family type must (or must not) expose.
 # Rustdoc does not list a dependency's inherent methods, so a member that is a
 # re-export or alias of another crate's type (litchi_core::edit::Commit, a
 # shared ODF metadata family) is checked where it is defined: by that crate's
@@ -77,7 +77,7 @@ IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z_0-9]*\Z")
 
 
 def is_edit_output(name: str) -> bool:
-    """Known artifact-output verbs that bypass Edit::commit (record 0351)."""
+    """Known artifact-output verbs that bypass Edit::commit."""
     return name in EDIT_OUTPUT_NAMES or name.endswith(("_with_rendered", "_to_stream"))
 
 
@@ -598,7 +598,7 @@ def violations(document: Any, profile: dict[str, Any]) -> list[str]:
         for method, receiver in surface.receivers.items():
             if method[:-1] == path and receiver == "&mut self":
                 failures.add(f"{'::'.join(method)} takes &mut self on an immutable owner; "
-                             "stage it in an Edit that commits a new Package (record 0351)")
+                             "stage it in an Edit that commits a new Package")
     methods: dict[tuple[str, ...], set[str]] = {}
     for method in surface.receivers:
         methods.setdefault(method[:-1], set()).add(method[-1])
@@ -610,8 +610,7 @@ def violations(document: Any, profile: dict[str, Any]) -> list[str]:
         method = tuple(rule["method"].split("::"))
         if surface.exports.get(method) != "function":
             failures.add(
-                f"{rule['method']} must remain a public function with the required limits signature "
-                "(record 0351 §2.5.3)"
+                f"{rule['method']} must remain a public function with the required limits signature"
             )
             continue
         item_id = surface.item_ids.get(method)
@@ -623,7 +622,7 @@ def violations(document: Any, profile: dict[str, Any]) -> list[str]:
         ) else None
         if names != rule["inputs"]:
             failures.add(
-                f"{rule['method']} must take inputs {rule['inputs']} (record 0351 §2.5.3)"
+                f"{rule['method']} must take inputs {rule['inputs']}"
             )
             continue
         limits_index = rule["inputs"].index(rule["limits_argument"])
@@ -647,14 +646,14 @@ def violations(document: Any, profile: dict[str, Any]) -> list[str]:
         if expected_identity is None or actual_identity != expected_identity:
             failures.add(
                 f"{rule['method']} limits argument {rule['limits_argument']} must have type "
-                f"{rule['limits_type']} (record 0351 §2.5.3)"
+                f"{rule['limits_type']}"
             )
     for rule in profile.get("shared_types", []):
         public = tuple(rule["path"].split("::"))
         target = tuple(rule["target"].split("::"))
         if not return_types.matches_shared(public, target):
             failures.add(
-                f"{rule['path']} must resolve nominally to {rule['target']} (record 0351)"
+                f"{rule['path']} must resolve nominally to {rule['target']}"
             )
     for family in profile["families"]:
         path = tuple(family.split("::"))
@@ -674,18 +673,18 @@ def violations(document: Any, profile: dict[str, Any]) -> list[str]:
                 continue
             present = methods.get(member, set())
             for method in sorted(required - present):
-                failures.add(f"{family}::{name} requires method {method} (record 0351)")
+                failures.add(f"{family}::{name} requires method {method}")
             forbidden = FAMILY_FORBIDDEN.get(name, frozenset()) & present
             if name == "Edit":
                 forbidden = forbidden | {method for method in present if is_edit_output(method)}
             for method in sorted(forbidden):
-                failures.add(f"{family}::{name} exposes forbidden method {method} (record 0351)")
+                failures.add(f"{family}::{name} exposes forbidden method {method}")
         commit_method = path + ("Edit", "commit")
         if (commit_method in surface.item_ids and path + ("Edit",) not in surface.foreign
                 and surface.exports.get(path + ("Commit",)) in TYPE_KINDS
                 and (not return_types.is_commit(path + ("Commit",))
                      or not return_types.matches_result(commit_method, path + ("Commit",)))):
-            failures.add(f"{family}::Edit::commit must return Result<{family}::Commit> (record 0351)")
+            failures.add(f"{family}::Edit::commit must return Result<{family}::Commit>")
     for rule in profile.get("result_methods", []):
         method = tuple(rule["method"].split("::"))
         expected = tuple(rule["ok"].split("::"))
@@ -696,7 +695,7 @@ def violations(document: Any, profile: dict[str, Any]) -> list[str]:
                 or not return_types.matches_result(method, expected, args)
                 or ((method[-1] == "apply" or method[-1].startswith("apply_"))
                     and not return_types.matches_owner(method, expected, args))):
-            failures.add(f"{rule['method']} must return Result<{rule['ok']}> (record 0351)")
+            failures.add(f"{rule['method']} must return Result<{rule['ok']}>")
     return sorted(failures)
 
 

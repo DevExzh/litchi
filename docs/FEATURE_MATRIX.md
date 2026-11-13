@@ -60,10 +60,10 @@ map below.
 
 For iWork, the concrete Pages, Keynote, and Numbers matrices own user-facing semantic and package
 claims. Shared `litchi-iwa-*` crates are substrate, not a fourth format. The legacy `litchi-iwa`
-migration host was deleted by record 0429 (last present
+migration host was deleted (last present
 at commit `4d8a3e161f`).
 
-After record 0429 the workspace has 69 packages and 303 internal dependency declarations,
+The workspace has 69 packages and 303 internal dependency declarations,
 with no migration host and no ordered migration debt (`tools/check_crate_boundaries.py`).
 
 The Pages matrix now records a bounded existing body-table hidden-axis owner. Its public surface
@@ -86,7 +86,7 @@ and provide exact source-bound apply/inverse patches. This remains visibility me
 cell/formula, filter/pivot, sorting, or row/column topology support.
 
 The Pages raw-ID hidden-axis route and the shared Numbers/Keynote adapter of the retired migration
-host were deleted with it (record 0429). Focused Pages
+host were deleted with it. Focused Pages
 graph, codec, identity/COW, and concurrency tests cover the E1 source/self-round-trip contract. The
 checked-in [`body-table-visible.pages`](../test-data/iwork/pages/body-table-visible.pages) fixture
 is a native Pages 14.4 baseline: its visible body table is 5 by 4 with a body marker. Disposable
@@ -144,7 +144,7 @@ producer parity, native byte parity, or package-wide performance.
 
 The eight scalar owners and the bounded Custom registry owner do not retire every compatibility path: generic
 source-built or cross-format `DataFormat` mutation remained in the retired migration host until
-its deletion (record 0429). The dedicated raw-ID migration-host routes for Number, Percentage, Currency,
+its deletion. The dedicated raw-ID migration-host routes for Number, Percentage, Currency,
 Scientific, Fraction, Date & Time, Duration, and Custom are retired, and there is no dedicated
 host Text route. Generic source-built/cross-format
 `DataFormat::Custom`, `DataFormat::DateTime`, and `DataFormat::Duration`, the
@@ -192,7 +192,7 @@ stale-patch refusal, candidate reread, locality, unrelated-member preservation,
 and preview invalidation are source-level contracts. The narrow host wrappers
 `replace_slide_movie_data`, `replace_slide_movie_poster`, and
 `replace_slide_audio_data` are retired, and the host's generic `replace_media`
-was deleted with it (record 0429). The checked-in
+was deleted with it. The checked-in
 [`media-replacement-native.key`](../test-data/iwork/keynote/media-replacement-native.key)
 is a 752,060-byte native Audio/Audio/File/File baseline with SHA-256
 `f5763984974612f078486cb2310f408cbcb7cd06ef6adca494aae19eaf62609d`; it was
@@ -290,7 +290,7 @@ the `pages`, `keynote`, and `numbers` feature leaves enable those formats
 independently, and `iwork` is only their aggregate feature. `litchi::open` opens
 all three as `File::Pages`, `File::Keynote`, and `File::Numbers`, which read
 and write through the unified API like every other format; the former
-format-neutral `litchi::iwork::Document` reader was removed (record 0306).
+format-neutral `litchi::iwork::Document` reader was removed.
 
 ## Unified API
 
@@ -322,7 +322,7 @@ give the authoritative status and limitations for each concrete format.
 | Drawing, media, and embedded objects | Typed support varies by format; opaque preservation is not semantic rendering | `litchi-drawingml`, `litchi-odraw`, `litchi-ograph`, format matrices |
 | Formula and equation conversion/evaluation | Shared formula/equation infrastructure with intentionally incomplete host semantics | `litchi-formula`, `litchi-eval`, ODF/XLS/XLSB/XLSX matrices |
 | VBA and macro-enabled packages | Bounded codepage-aware project/module metadata and preservation; VBA is never compiled, interpreted, or executed | `litchi-vba`, OOXML matrices |
-| Conversion and interchange | Markdown, images, RTF, CSV/TSV, and conversion APIs beyond each native format surface are separate from the detailed matrices unless a matrix explicitly includes them. The text workbooks (CSV/TSV/PRN, SYLK, DIF, fixed width) are the `litchi-sheet-text` leaf, re-exported as `litchi::sheet::text` by the facade's `sheet-text` feature; they are not claimed formats and `litchi::open` does not read them. `File::import` tokenizes CSV/TSV with the same crate (record 0354) | `litchi-markdown`, `litchi-imgconv`, `litchi-rtf`, `litchi-pages`, `litchi-keynote`, `litchi-numbers`, `litchi-sheet`, `litchi-sheet-text` |
+| Conversion and interchange | Markdown, images, RTF, CSV/TSV, and conversion APIs beyond each native format surface are separate from the detailed matrices unless a matrix explicitly includes them. The text workbooks (CSV/TSV/PRN, SYLK, DIF, fixed width) are the `litchi-sheet-text` leaf, re-exported as `litchi::sheet::text` by the facade's `sheet-text` feature; they are not claimed formats and `litchi::open` does not read them. `File::import` tokenizes CSV/TSV with the same crate | `litchi-markdown`, `litchi-imgconv`, `litchi-rtf`, `litchi-pages`, `litchi-keynote`, `litchi-numbers`, `litchi-sheet`, `litchi-sheet-text` |
 
 ## Shared specification map
 

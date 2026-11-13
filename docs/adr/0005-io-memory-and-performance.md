@@ -2295,10 +2295,7 @@ claims remain unchanged.
 
 ## 2026-09-16 amendment: retained per-part digest memos on an opened-presentation snapshot and its facade
 
-Authorized by change
-0652 decision 4
-and written by change
-0655. It refines the
+Authorized by the owner's decision. It refines the
 "cache behaviour is semantically invisible" rule above for one shape of
 retained state this ADR did not previously describe: a memo that is not an
 evictable weighted cache of parsed values, but a bounded table of digests over
@@ -2329,10 +2326,7 @@ This amendment does not weaken the eviction rules for semantic payload caches,
 does not permit ambient process-wide state, and changes no other sentence of
 this ADR.
 
-> **Clarified 2026-09-24** by the owner's decision recorded in
-> change 0758 (decision 2),
-> confirming the reading of change
-> 0751: the
+> **Clarified 2026-09-24** by the owner's decision: the
 > adoption sentence above names when a facade must refresh its memo, not the only
 > point at which it may take one. A facade holding no memo may fill the slot
 > from a capture of its current, unmutated graph, provided every kept entry is
@@ -2343,9 +2337,8 @@ this ADR.
 
 ## 2026-09-16 amendment: retained state that is not a cache, and its ceiling
 
-Authorized by change 0652
-decision 5 ("Cross-package copy: add a budget for that") and written by change
-0656, which is the
+Authorized by the owner's decision ("Cross-package copy: add a budget for
+that") for the
 first construct to hold a whole serialized document inside a public value for a
 caller-controlled lifetime.
 
@@ -2391,10 +2384,8 @@ content, and litchi never writes it anywhere automatically.
 
 ## 2026-09-24 clarification: chunked charging through a budget lease
 
-Authorized by owner decision 6 of
-change 0758 ("Accept a
-rough budget lease rather than a precise one"); implemented by
-change 0763. This is a reading of
+Authorized by the owner's decision ("Accept a
+rough budget lease rather than a precise one"). This is a reading of
 "Every operation charges a hierarchical resource budget supplied by an
 execution context", not a new budget system.
 
@@ -2427,10 +2418,8 @@ are not leased.
 
 ## 2026-09-24 amendment: caller-selected save durability
 
-Authorized by the owner's decision recorded in
-change 0758 (decision 5,
-"Accept the opt-in save policy") and written by change
-0761. It amends one phrase of
+Authorized by the owner's decision
+("Accept the opt-in save policy"). It amends one phrase of
 §Output above, "flush/fsync as supported", and nothing else.
 
 Full durability remains the default and is what every ordinary `save` does,

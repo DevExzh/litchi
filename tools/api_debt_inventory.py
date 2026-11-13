@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""List the record 0351 API debt (owner decision 0350 items 14-19) per crate.
+"""List the API debt against the edit-family contract per crate.
 
 Reads all-features rustdoc JSON (one file per crate) and walks it with the
 glossary gate's own Surface class, so it sees exactly the public surface the
@@ -23,11 +23,11 @@ Build the input with, per crate (sequentially; RUSTC_BOOTSTRAP=1):
       --output-format json --document-hidden-items
 then run: tools/api_debt_inventory.py target/doc/litchi_docx.json ... > out.tsv
 A wave is done for a category when its crate has no rows left in it. A
-`Commit` that aliases `litchi_core::edit::Commit` has the triad accessors
-(record 0356 P4), and a type under a `builder` module is an authoring draft,
-whose `&mut self` methods are allowed (0351 §2.1 rule 7; record 0356b).
-Two more shapes are not debt (record 0366): a `raw::Reader`, the mutable
-codec model 0351 §2.1 rule 6 names, and a type that rustdoc places in a
+`Commit` that aliases `litchi_core::edit::Commit` has the triad accessors,
+and a type under a `builder` module is an authoring draft,
+whose `&mut self` methods are allowed.
+Two more shapes are not debt: a `raw::Reader`, the mutable
+codec model, and a type that rustdoc places in a
 build-script output file (the generated IWA wire schema keeps the file
 format's message names, such as `tswp::UndoTransaction`).
 """
@@ -234,7 +234,7 @@ def target_family(method: str) -> str:
     if method in SIGNATURE:
         return "signature verb: &self -> Result<Package>"
     if method == "custom_props_mut":
-        return "delete: metadata::Edit::{set_custom_props, remove_custom_props} (0362ac)"
+        return "delete: metadata::Edit::{set_custom_props, remove_custom_props}"
     if method == "edit_opc":
         return "raw escape: edit_opc(&self) -> opc::Edit committing a Package"
     if method in ("undo_document", "redo_document", "publish_document_commit_with_history"):
@@ -352,7 +352,7 @@ def _rows(document, crate: str, result_rules=None, immutable_owners=None,
                 yield "exhaustive_error", text, kind, "add #[non_exhaustive]; migrate exhaustive consumers"
             members = methods.get(path, set())
             if surface.foreign.get(path) == CORE_COMMIT:
-                # An alias of the shared commit (record 0356 P4): rustdoc lists
+                # An alias of the shared commit: rustdoc lists
                 # its accessors in litchi-core, whose unit tests check them.
                 members = members | CORE_COMMIT_METHODS
             if name.endswith("Commit"):

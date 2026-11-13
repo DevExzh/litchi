@@ -5,12 +5,12 @@ The facade (`litchi`) is checked with `--no-default-features` alone, with each
 format feature alone, and with each format aggregate (`legacy`, `ooxml`,
 `odf`, ...). The format features are derived from `crates/litchi/Cargo.toml`
 the way the facade's build script derives `cfg(litchi_unified)`: a feature
-that turns on a `litchi-ops` format with a plain `"litchi-ops/<format>"` item
-(record 0334). `litchi-cli` and `litchi-py` are checked the same way when
+that turns on a `litchi-ops` format with a plain `"litchi-ops/<format>"` item.
+`litchi-cli` and `litchi-py` are checked the same way when
 their manifests declare per-format features; today both pin every format, so
 each is checked once with its own feature set. `--ops` adds `litchi-ops`
 alone, with each of its format features and with each internal umbrella
-(`odf-objects`, record 0358a).
+(`odf-objects`).
 
 Commands run one at a time, in a fixed order, through whatever `cargo` is
 first on PATH (the coordinator's memory-capped shim on this host). The build
@@ -129,7 +129,7 @@ def plan(include_ops: bool) -> list[Step]:
         ops = ops_format_features(ops_features)
         steps.append(Step("ops", "litchi-ops", (), True))
         steps += [Step("ops", "litchi-ops", (name,), True) for name in ops]
-        # Internal umbrellas must build on their own too (record 0358a).
+        # Internal umbrellas must build on their own too.
         steps += [Step("ops", "litchi-ops", (name,), True)
                   for name in OPS_UMBRELLAS if name in ops_features]
     return steps

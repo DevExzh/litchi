@@ -15903,7 +15903,7 @@ and generic-Number-secondary marker forms, preserves Duration scalar/formula
 cache and opaque tail bytes during metadata-only rewrites, and exercises the
 existing compatibility conversion between spreadsheet-day Numbers and
 second-based Duration values. The source-built host coverage in
-[`cell_data_format.rs`](../../crates/litchi-iwa/src/numbers/editor/cell_data_format.rs)
+`cell_data_format.rs`
 uses `NumbersEditor` to share/reopen/reset a Duration format entry and
 recognizes both native explicit marker shapes. This is wire/host source-built
 coverage; it is not a `litchi_numbers::Package` owner or selector API.

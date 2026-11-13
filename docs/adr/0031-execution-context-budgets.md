@@ -1,16 +1,14 @@
 # ADR 0031: I/O concurrency, CPU task and executor budgets in the execution context
 
-- Status: Accepted (2026-09-16, by the owner's decision recorded in change 0652; proposed 2026-09-15)
+- Status: Accepted (2026-09-16, by the owner's decision; proposed 2026-09-15)
 - Date: 2026-09-15
 - Supersedes: nothing. Amends: the execution paragraph of
   [ADR 0005](0005-io-memory-and-performance.md) only. Every other paragraph of
   that record, and every other accepted record, is untouched.
-- Raised by: change 0615,
-  which carries the capability matrix against `docs/GOAL.md` Workstream F, the
+- Raised by: a capability matrix against `docs/GOAL.md` Workstream F,
   retained scaling evidence, and the coexistence probe whose counts are quoted
-  below. Item CORE-3 of
-  change 0587 ranks this
-  as a prerequisite rather than a speedup.
+  below. This
+  is a prerequisite rather than a speedup.
 
 ## Context
 
@@ -49,14 +47,14 @@ code:
 2. `litchi_cfb::SharedOleBulkRead` — a private Rayon pool built **lazily** on
    the first eligible batch (`shared_bulk.rs:210-225`);
 3. `litchi_opc::SourceBackedPackage::read_parts_ordered` — `std::thread::scope`
-   workers spawned per operation, reused across waves since change 0499
+   workers spawned per operation, reused across waves
    (`source_backed/batch.rs:522`, `:585`).
 
 Each honours its own `ExecutionLimits`. Nothing makes them honour each other.
 `ExecutionLimits` is `Copy` and is re-applied by every session; `Budget` is the
 only part of an `ExecutionContext` that is genuinely **shared**, and it carries
-no dimension for workers, for outstanding reads, or for task count. Change
-0615's probe drives all three sessions from one hierarchical `Budget` root whose
+no dimension for workers, for outstanding reads, or for task count. A
+probe drives all three sessions from one hierarchical `Budget` root whose
 policy says `workers = W`, and counts what the process actually holds:
 
 | `workers` in the policy | session-owned worker threads at peak | concurrent `read_at` calls, process-wide |
@@ -129,7 +127,7 @@ worker starts (`batch.rs:362-470`):
 
 A measured permit costs one `fetch_update` CAS per hierarchy level plus an `Arc`
 clone into a `SmallVec<[_; 4]>`: 44 ns at depth 1 and 99 ns at depth 3 on this
-host (change 0587). It is paid once per wave, not once per read.
+host. It is paid once per wave, not once per read.
 
 ### 3. `Limits` gains the three dimensions additively
 
@@ -149,8 +147,7 @@ The proposal is additive:
 - `Profile::Server`, `Profile::Desktop` and `Profile::TrustedBatch` **must**
   name finite values, because ADR 0005 requires that "production-safe desktop,
   server, and trusted-batch profiles are finite". Choosing those three numbers
-  is a decision this record deliberately leaves to the reviewer; change 0615
-  states the evidence that bears on it and declines to invent them.
+  is a decision this record deliberately leaves to the reviewer.
 
 `Resource` is already `#[non_exhaustive]`, so downstream matches are unaffected;
 the 14 in-workspace `match` sites that name `Resource::Depth` as an arm — ten
@@ -228,7 +225,7 @@ impl ExecutionContext {
 
 | Session | Change |
 | --- | --- |
-| `soapberry_zip::office::ParallelReadSession` | Build the pool **lazily**, on the first batch that qualifies for parallel execution, as `SharedOleBulkRead` already does. This alone removes the eager threads change 0615 measured at `threads_after_zip_session_new` from a session that may never take its parallel branch. Reserve `Workers` permits when the pool is built and hold them for its lifetime; take the caller's facility instead of a pool when one is attached. |
+| `soapberry_zip::office::ParallelReadSession` | Build the pool **lazily**, on the first batch that qualifies for parallel execution, as `SharedOleBulkRead` already does. This alone removes the eager threads measured at `threads_after_zip_session_new` from a session that may never take its parallel branch. Reserve `Workers` permits when the pool is built and hold them for its lifetime; take the caller's facility instead of a pool when one is attached. |
 | `litchi_cfb::SharedOleBulkRead` | Reserve `Workers` when the lazy pool is built; reserve `IoConcurrency` for the batch width at `read_streams` batch admission, before `read_one`; take the caller's facility when attached. `Resource::CpuTasks` is consumed once per stream request. |
 | `litchi_opc::SourceBackedPackage::read_parts_ordered` | Add `Workers` and `IoConcurrency` to the existing `SchedulerAdmission::reserve`, which already reserves worker stacks, channel endpoints and objects before startup. Narrow the wave to the granted width instead of failing. Consume `CpuTasks` once per prepared request. Replace the scoped spawn with the caller's facility when one is attached; keep `thread::scope` otherwise. |
 
@@ -240,9 +237,9 @@ are for every existing caller (§3).
 ### 7. A per-task size floor
 
 `min_parallel_bytes` is an **aggregate** threshold: a batch of sixty-four 16 KiB
-parts totals 1 MiB and clears any realistic value, yet change 0498 measured that
-batch at 94.8 µs serial against 560.0 µs at four workers, and change 0009
-measured 258-task OPC and 256-stream CFB many-small batches at 0.73× and 0.52×.
+parts totals 1 MiB and clears any realistic value, yet that
+batch measured 94.8 µs serial against 560.0 µs at four workers, and
+258-task OPC and 256-stream CFB many-small batches at 0.73× and 0.52×.
 The policy set therefore cannot today express the one threshold the retained
 evidence most clearly justifies.
 
@@ -251,8 +248,8 @@ against `max_in_flight_bytes` in the same way `min_parallel_bytes` already is.
 A batch whose individual tasks are below the floor stays serial even when the
 aggregate clears `min_parallel_bytes`.
 
-This field is not named by survey item CORE-3 or by Workstream F's list; it is
-proposed because the measured evidence in change 0615 points at it more
+This field is not named by Workstream F's list; it is
+proposed because the measured evidence points at it more
 directly than at anything else in this record. A reviewer who wants the record
 narrowed should strike §7 first.
 
@@ -289,8 +286,7 @@ finite numbers must be chosen for each of the three production profiles. Every
 `Budget` node grows by three `AtomicU64`.
 
 **Not claimed.** This record makes no performance claim. It does not make any
-path faster; it makes an existing path bounded. Change 0615 carries
-`performance_claim: none` and registers nothing.
+path faster; it makes an existing path bounded.
 
 **Rejected alternatives.**
 
@@ -314,13 +310,13 @@ Acceptance should require, at minimum:
 
 1. A test that three sessions sharing one budget root with `Workers: N` hold at
    most `N` worker threads between them, counted from `/proc/self/task` — the
-   change 0615 probe, converted into a test and re-run against the
+   coexistence probe, converted into a test and re-run against the
    implementation.
 2. A test that an `IoConcurrency` grant of one forces every session onto its
    serial path and that the resulting bytes are identical.
 3. A test that a zero-permit `IoConcurrency` refusal happens **before** the
    first source read, with zero `read_at` calls observed, mirroring the existing
-   one-byte-under `Memory` boundary case in change 0088.
+   one-byte-under `Memory` boundary case.
 4. A test that a caller-supplied `ScopedWorkers` that runs every task serially
    produces byte-identical results to the private-pool path, and that a caller
    facility never changes an error identity, an ordinal selection, or a
@@ -329,7 +325,7 @@ Acceptance should require, at minimum:
    satisfying `docs/GOAL.md` rule 7.
 6. A crate-boundary check proving `soapberry-zip` still does not depend on
    `litchi-core`.
-7. Re-running the change 0009 and 0498/0499 scaling captures with the new
+7. Re-running the scaling captures with the new
    dimensions set to `u64::MAX`, showing no movement outside the A/A floor — the
    proof that the opt-in default costs nothing.
 8. A decision, with stated reasoning, on the three finite profile values.

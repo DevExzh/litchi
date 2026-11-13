@@ -1,7 +1,6 @@
 # ADR 0033: Unified operations API over the per-format owners
 
-- Status: Accepted (2026-10-04, by the owner's decision recorded in
-  unified-ops record 0006;
+- Status: Accepted (2026-10-04, by the owner's decision;
   proposed 2026-10-04)
 - Date: 2026-10-04
 - Supersedes: nothing. Amends: nothing. It fulfils the outstanding facade
@@ -12,8 +11,7 @@
   [`docs/UNIFIED_OPS_API_DESIGN.md`](../UNIFIED_OPS_API_DESIGN.md) (agreed
   2026-09-20, revised 2026-10-01, migration assessment 2026-10-04), the
   execution goal [`docs/UNIFIED_OPS_GOAL.md`](../UNIFIED_OPS_GOAL.md) including
-  its owner override of 2026-10-04, and unified-ops change record 0004, which
-  drafts this record and scaffolds the `litchi-ops` package.
+  its owner override of 2026-10-04.
 
 ## Context
 
@@ -141,7 +139,7 @@ Topology (ADR 0002, ADR 0024):
   `litchi-ops` like the facade (safe and unsafe feature closures) instead of
   as a bulk root. That reclassification is part of the change that adds the
   first iWork edge.
-  *Done in record 0296 (owner decision D1, 2026-10-15): `litchi-ops` and
+  *Done (2026-10-15): `litchi-ops` and
   `litchi-cli` left the bulk slice as the iWork-capable unified layer; see
   the ADR 0024 amendment of that date.*
 
@@ -258,8 +256,7 @@ taxonomy plus `unsupported_capability`) with `message` and an optional
 
 The unified layer is judged against the direct leaf APIs it wraps. Every
 benchmarked scenario records a paired measurement (leaf leg vs unified leg,
-same corpus, build, and machine) in `tools/perf-baseline` under new route
-names; frozen route-name records are never rewritten. The budgets are review
+same corpus, build, and machine). The budgets are review
 triggers, not claims:
 
 - **Open**: one detection pass and one container index, reusing the prepared
@@ -298,7 +295,7 @@ facade migration blocks the merge until explained or fixed.
 
 - The facade's read-only unified types, wrapper enums, string-flattening error
   mapper, and CSV/TSV trait-object openers are deleted in the migration
-  milestone; every in-tree consumer (facade, `pyo3-litchi`, `perf-baseline`,
+  milestone; every in-tree consumer (facade, `pyo3-litchi`,
   tests, docs) moves in the same change.
 - Write handlers are owed for all 21 claimed formats. Missing leaf write APIs
   are added in the owning leaf crate, except in iWork crates, whose gaps are

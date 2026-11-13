@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Guard: no tracked code under crates/, tools/ or fuzz/ names the untracked
 upstream checkout directory (AGENTS.md, section "Test data: never reference
-..."; record 0257).
+...").
 
 That directory is absent from worktrees, CI and other checkouts, so a test,
 tool or comment that points into it either breaks or misleads. Fixtures are

@@ -423,7 +423,7 @@ The following migration issues were resolved through M0a and subsequent waves.
    carry over mechanically.
 4. Divergent open options converge on the non-exhaustive unified `OpenOptions`
    struct, with common controls and per-format fields. Default `open()` covers
-   the common case; configured opens use the same options contract (0351).
+   the common case; configured opens use the same options contract.
 5. The CSV/TSV trait-object path exits the enum (§16.1).
 6. Sidecar state relocation (§16.2).
 7. Eager/source duality normalizes per format following the sheet adapter
@@ -435,12 +435,10 @@ The following migration issues were resolved through M0a and subsequent waves.
 ### 16.4 Leaf access after migration
 
 - Pages, Keynote and Numbers use `File` and their immutable leaf `Package`
-  owners. The former `litchi::iwork::Document` facade is retired
-  (record 0306).
+  owners. The former `litchi::iwork::Document` facade is retired.
 - CSV/TSV reader/writer tooling lives in the independent `litchi-sheet-text`
   crate, re-exported as `litchi::sheet::text` by the `sheet-text` feature.
-  Unified `import` consumes that leaf
-  (record 0354).
+  Unified `import` consumes that leaf.
 - All leaf re-export modules (`litchi::docx`, `litchi::xlsx`, …) — leaf APIs
   remain reachable for format-specific work.
 
@@ -448,10 +446,6 @@ The following migration issues were resolved through M0a and subsequent waves.
 
 - `crates/pyo3-litchi`: ~30 shallow delegation sites; Python signatures
   unchanged (the read API stays source-compatible).
-- `tools/perf-baseline`: ~80 call sites plus frozen baseline route-name
-  strings (`"litchi::Document"`, …). Frozen performance records are
-  historical evidence and are not rewritten; new routes record under the new
-  names, and the Python policy tests referencing route names are updated.
 - Facade integration tests assert *semantics* (typed wrong-format refusals,
   read-limit enforcement, selector case-insensitivity) — these behaviors must
   carry over verbatim into `litchi-ops`.
@@ -474,8 +468,8 @@ The following migration issues were resolved through M0a and subsequent waves.
   The implemented source-release option is explicit (§16.3).
 - **Unified `OpenOptions` shape**: the non-exhaustive struct carries common
   controls and per-format policies; options enter through configured open
-  and edit entry points (0351).
-- **iWork facade timing**: record 0306 retired `litchi::iwork::Document`;
+  and edit entry points.
+- **iWork facade timing**: `litchi::iwork::Document` is retired;
   `File::{Pages, Keynote, Numbers}` is the unified surface (§16.4).
 
 ## Open micro-decisions (deferred to implementation)
