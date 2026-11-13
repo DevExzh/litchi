@@ -7,6 +7,8 @@ mod cache;
 mod encode;
 mod links;
 mod parse;
+#[cfg(test)]
+mod parse_matrix_tests;
 mod patch;
 mod text;
 mod validate;
