@@ -578,6 +578,33 @@ fn account_xml_node(nodes: &mut usize, limits: &Limits) -> Result<()> {
     Ok(())
 }
 
+/// Where a diagram part reader is relative to its root (`dgm:dataModel` for
+/// the editable data model, `dsp:drawing` for the drawing). Nesting inside
+/// the root is not part of it: the depth counter holds that. The two
+/// readers share this envelope.
+///
+/// ```text
+/// Prolog --root start tag---------------------> Open
+/// Open   --nested content---------------------> Open
+/// Open   --root end tag-----------------------> Closed
+/// Any    --declaration, comment or PI---------> unchanged
+/// ```
+///
+/// An XML declaration is accepted anywhere, inside the root included.
+/// Whitespace outside the root is ignored. Refused: a DOCTYPE anywhere;
+/// an empty-element root; any element after the root; text
+/// other than whitespace, CDATA and entity references outside the root; and
+/// the end of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No element has been read.
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open,
+    /// The root element is complete.
+    Closed,
+}
+
 impl Parsed {
     fn read(xml: &[u8], limits: &Limits) -> Result<Self> {
         let max_input = limits.input_bytes_value().min(MAX_PART_BYTES);
@@ -606,8 +633,7 @@ impl Parsed {
         let mut root_close = None;
         let mut root_prefix = None;
         let mut strict = false;
-        let mut root_seen = false;
-        let mut root_closed = false;
+        let mut phase = RootPhase::Prolog;
         let mut pending_rel: Option<(usize, usize)> = None;
         loop {
             buffer.clear();
@@ -633,17 +659,17 @@ impl Parsed {
                     let local_name = element.local_name();
                     let local = local_name.as_ref().to_vec();
                     let dgm = is_dgm(ns);
-                    if root_closed {
+                    if phase == RootPhase::Closed {
                         return Err(invalid("trailing markup follows the diagram data model"));
                     }
                     if depth == 0 {
-                        if root_seen {
+                        if phase != RootPhase::Prolog {
                             return Err(invalid("the diagram data model has multiple roots"));
                         }
                         if !dgm || local != b"dataModel" {
                             return Err(invalid("the part is not a diagram data model"));
                         }
-                        root_seen = true;
+                        phase = RootPhase::Open;
                         strict = ns == Ns::DgmStrict;
                         root_prefix = prefix_of(element);
                         if empty {
@@ -757,7 +783,7 @@ impl Parsed {
                     stack.pop();
                     depth -= 1;
                     if depth == 0 {
-                        root_closed = true;
+                        phase = RootPhase::Closed;
                         root_close = Some(event_start);
                     }
                     if is_dgm(ns) && local == b"pt" && depth == 2 {
@@ -797,8 +823,11 @@ impl Parsed {
                 _ => {},
             }
         }
-        if !root_seen || !root_closed || depth != 0 || !stack.is_empty() {
-            return Err(invalid("unterminated diagram data model"));
+        match phase {
+            RootPhase::Closed if depth == 0 && stack.is_empty() => {},
+            RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+                return Err(invalid("unterminated diagram data model"));
+            },
         }
         let root_close = root_close.ok_or_else(|| invalid("unterminated diagram data model"))?;
         let document = points
@@ -1421,8 +1450,7 @@ fn read_drawing(xml: &[u8], limits: &Limits) -> Result<(Vec<DrawnShape>, bool)> 
     let mut xml_nodes = 0_usize;
     let mut depth = 0_usize;
     let mut strict = false;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut sp_tree_seen = false;
     let mut shape_count = 0_usize;
     loop {
@@ -1435,7 +1463,7 @@ fn read_drawing(xml: &[u8], limits: &Limits) -> Result<(Vec<DrawnShape>, bool)> 
         let event_end = position(&reader)?;
         match event {
             Event::Start(ref element) => {
-                if root_closed {
+                if phase == RootPhase::Closed {
                     return Err(invalid("trailing markup follows the diagram drawing"));
                 }
                 account_xml_node(&mut xml_nodes, limits)?;
@@ -1453,13 +1481,13 @@ fn read_drawing(xml: &[u8], limits: &Limits) -> Result<(Vec<DrawnShape>, bool)> 
                 let drawing = ns == Ns::Drawing;
                 let local = element.local_name();
                 if depth == 0 {
-                    if root_seen {
+                    if phase != RootPhase::Prolog {
                         return Err(invalid("the diagram drawing has multiple roots"));
                     }
                     if !drawing || local.as_ref() != b"drawing" {
                         return Err(invalid("the part is not a diagram drawing"));
                     }
-                    root_seen = true;
+                    phase = RootPhase::Open;
                 } else if drawing && local.as_ref() == b"drawing" {
                     return Err(invalid("the diagram drawing has a nested root"));
                 }
@@ -1507,7 +1535,7 @@ fn read_drawing(xml: &[u8], limits: &Limits) -> Result<(Vec<DrawnShape>, bool)> 
                 depth = event_depth;
             },
             Event::Empty(ref element) => {
-                if root_closed {
+                if phase == RootPhase::Closed {
                     return Err(invalid("trailing markup follows the diagram drawing"));
                 }
                 account_xml_node(&mut xml_nodes, limits)?;
@@ -1525,7 +1553,7 @@ fn read_drawing(xml: &[u8], limits: &Limits) -> Result<(Vec<DrawnShape>, bool)> 
                 let drawing = ns == Ns::Drawing;
                 let local = element.local_name();
                 if depth == 0 {
-                    if root_seen {
+                    if phase != RootPhase::Prolog {
                         return Err(invalid("the diagram drawing has multiple roots"));
                     }
                     if !drawing || local.as_ref() != b"drawing" {
@@ -1570,7 +1598,7 @@ fn read_drawing(xml: &[u8], limits: &Limits) -> Result<(Vec<DrawnShape>, bool)> 
                 models.pop();
                 depth -= 1;
                 if depth == 0 {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
             },
             Event::Eof => break,
@@ -1593,8 +1621,11 @@ fn read_drawing(xml: &[u8], limits: &Limits) -> Result<(Vec<DrawnShape>, bool)> 
             _ => {},
         }
     }
-    if !root_seen || !root_closed || !sp_tree_seen || depth != 0 || !models.is_empty() {
-        return Err(invalid("unterminated diagram drawing"));
+    match phase {
+        RootPhase::Closed if sp_tree_seen && depth == 0 && models.is_empty() => {},
+        RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("unterminated diagram drawing"));
+        },
     }
     Ok((shapes, strict))
 }

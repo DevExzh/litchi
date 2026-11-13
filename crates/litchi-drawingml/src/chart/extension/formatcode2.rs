@@ -1474,6 +1474,34 @@ fn apply_replacements_to<W: std::io::Write>(
     Ok(())
 }
 
+/// Where the format-code scan is relative to `formatcode2`. Nesting inside
+/// the root is not part of it: the element stack holds that.
+///
+/// ```text
+/// Start          --XML declaration--------------> Prolog
+/// Start | Prolog --comment, PI or whitespace----> Prolog
+/// Start | Prolog --root start tag---------------> Open
+/// Start | Prolog --root empty-element tag-------> Closed
+/// Open           --nested content---------------> Open
+/// Open           --root end tag-----------------> Closed
+/// Closed         --comment, PI or whitespace----> Closed
+/// ```
+///
+/// Refused: an XML declaration anywhere but `Start`; a DOCTYPE anywhere; a
+/// second top-level element; text other than whitespace, CDATA and entity
+/// references outside the root; and the end of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// Nothing has been read.
+    Start,
+    /// A declaration or other prolog content was read; no root yet.
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open,
+    /// The root element is complete.
+    Closed,
+}
+
 fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
     preflight_namespace_limits(xml, limits)?;
     let mut reader = NsReader::from_reader(xml);
@@ -1485,8 +1513,7 @@ fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
         .resolver_mut()
         .set_max_declarations_per_element(limits.max_attributes);
     let mut stack = Vec::<Vec<u8>>::new();
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Start;
     let mut root_start = None;
     let mut root_end = None;
     let mut root_qname = None;
@@ -1496,8 +1523,6 @@ fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
     let mut lexical_value = String::new();
     let max_lexical_value_bytes = limits.max_lexical_value_bytes()?;
     let mut nodes = 0usize;
-    let mut declaration_seen = false;
-    let mut pre_root_event_seen = false;
     let mut root_empty = false;
 
     loop {
@@ -1509,16 +1534,16 @@ fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
         }
         let event = event.into_owned();
         let event_end = position(&reader, origin)?;
-        if !root_seen && !matches!(&event, Event::Decl(_) | Event::Eof) {
-            pre_root_event_seen = true;
+        if phase == RootPhase::Start && !matches!(&event, Event::Decl(_) | Event::Eof) {
+            phase = RootPhase::Prolog;
         }
         match event {
             Event::Decl(declaration) => {
-                if root_seen || declaration_seen || pre_root_event_seen {
+                if phase != RootPhase::Start {
                     return Err(invalid("formatcode2 XML declaration is misplaced"));
                 }
                 validate_declaration(&declaration)?;
-                declaration_seen = true;
+                phase = RootPhase::Prolog;
             },
             Event::Start(element) => {
                 nodes = nodes
@@ -1536,21 +1561,21 @@ fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
                 }
                 validate_element_name(&element, limits.max_namespace_bytes)?;
                 validate_attributes(&element, &reader, limits)?;
-                if root_closed {
+                if phase == RootPhase::Closed {
                     return Err(invalid(
                         "formatcode2 fragment has more than one root element",
                     ));
                 }
                 let local_name = element.local_name();
                 let local = local_name.as_ref();
-                if !root_seen {
+                if matches!(phase, RootPhase::Start | RootPhase::Prolog) {
                     if local != b"formatcode2" || namespace != NAMESPACE.as_bytes() {
                         return Err(invalid("formatcode2 fragment has the wrong root"));
                     }
                     if !only_namespace_attributes(&element)? {
                         return Err(invalid("formatcode2 root has unexpected attributes"));
                     }
-                    root_seen = true;
+                    phase = RootPhase::Open;
                     root_start = Some(event_start);
                     root_qname = Some(element.name().as_ref().to_vec());
                     content_start = Some(event_end);
@@ -1568,12 +1593,12 @@ fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
                 }
                 validate_element_name(&element, limits.max_namespace_bytes)?;
                 validate_attributes(&element, &reader, limits)?;
-                if root_closed {
+                if phase == RootPhase::Closed {
                     return Err(invalid(
                         "formatcode2 fragment has more than one root element",
                     ));
                 }
-                if !root_seen {
+                if matches!(phase, RootPhase::Start | RootPhase::Prolog) {
                     if element.local_name().as_ref() != b"formatcode2"
                         || namespace != NAMESPACE.as_bytes()
                     {
@@ -1582,8 +1607,7 @@ fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
                     if !only_namespace_attributes(&element)? {
                         return Err(invalid("formatcode2 root has unexpected attributes"));
                     }
-                    root_seen = true;
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                     root_empty = true;
                     root_start = Some(event_start);
                     root_end = Some(event_end);
@@ -1600,13 +1624,13 @@ fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
                     ));
                 }
                 if stack.is_empty() {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                     root_end = Some(event_end);
                     content_end = Some(event_start);
                 }
             },
             Event::Text(text) => {
-                if !root_seen || stack.is_empty() {
+                if matches!(phase, RootPhase::Start | RootPhase::Prolog) || stack.is_empty() {
                     if !is_xml_whitespace(text.as_ref())? {
                         return Err(invalid(
                             "formatcode2 has non-whitespace text outside its root",
@@ -1630,7 +1654,7 @@ fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
                 }
             },
             Event::CData(data) => {
-                if !root_seen || stack.is_empty() {
+                if matches!(phase, RootPhase::Start | RootPhase::Prolog) || stack.is_empty() {
                     return Err(invalid("formatcode2 contains data outside its root"));
                 }
                 preflight_lexical_bytes(data.as_ref(), max_lexical_value_bytes)?;
@@ -1647,7 +1671,7 @@ fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
                 });
             },
             Event::GeneralRef(reference) => {
-                if !root_seen || stack.is_empty() {
+                if matches!(phase, RootPhase::Start | RootPhase::Prolog) || stack.is_empty() {
                     return Err(invalid("formatcode2 contains a reference outside its root"));
                 }
                 let character = validate_general_ref(&reference, limits.max_value_bytes)?;
@@ -1665,8 +1689,11 @@ fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
             Event::Eof => break,
         }
     }
-    if !root_seen || !root_closed || !stack.is_empty() {
-        return Err(invalid("formatcode2 fragment has no complete root"));
+    match phase {
+        RootPhase::Closed if stack.is_empty() => {},
+        RootPhase::Start | RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("formatcode2 fragment has no complete root"));
+        },
     }
     if root_empty {
         content_start = None;

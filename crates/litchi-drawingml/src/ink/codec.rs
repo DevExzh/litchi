@@ -503,6 +503,35 @@ fn validate_selected_spans(
     Ok(())
 }
 
+/// Where the InkML scan is relative to `inkml:ink`. Nesting inside the root
+/// is not part of it: the frame stack holds that.
+///
+/// ```text
+/// Start          --XML declaration-------------> Prolog
+/// Start | Prolog --comment or whitespace-------> Prolog
+/// Start | Prolog --root start tag--------------> Open
+/// Start | Prolog --root empty-element tag------> Closed
+/// Open           --nested content--------------> Open
+/// Open           --root end tag----------------> Closed
+/// Closed         --comment or whitespace-------> Closed
+/// ```
+///
+/// Refused: an XML declaration anywhere but `Start`; a DOCTYPE or a
+/// processing instruction anywhere; any element or end tag after the root;
+/// text other than whitespace, CDATA and entity references outside the
+/// root; and the end of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// Nothing has been read.
+    Start,
+    /// A declaration, a comment or whitespace was read; no root yet.
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open,
+    /// The root element is complete.
+    Closed,
+}
+
 fn scan(xml: &[u8], mut projection: Projection<'_>, limits: Limits) -> Result<Parsed> {
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
@@ -516,11 +545,8 @@ fn scan(xml: &[u8], mut projection: Projection<'_>, limits: Limits) -> Result<Pa
     let mut contexts = Vec::new();
     let mut traces = Vec::new();
     let mut brush_properties = Vec::new();
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Start;
     let mut nodes = 0usize;
-    let mut declaration_seen = false;
-    let mut preamble_content_seen = false;
     let mut legacy_fragment = false;
 
     loop {
@@ -528,18 +554,15 @@ fn scan(xml: &[u8], mut projection: Projection<'_>, limits: Limits) -> Result<Pa
         let event = reader.read_event().map_err(xml_error)?;
         let (resolved, event) = reader.resolver().resolve_event(event);
         let end = position(&reader, origin, "InkML")?;
-        let is_declaration = matches!(&event, Event::Decl(_));
         match event {
-            Event::Decl(declaration)
-                if !root_seen && !declaration_seen && !preamble_content_seen =>
-            {
+            Event::Decl(declaration) if phase == RootPhase::Start => {
                 validate_declaration(&declaration)?;
-                declaration_seen = true;
+                phase = RootPhase::Prolog;
             },
-            Event::Start(element) if !root_seen => {
+            Event::Start(element) if matches!(phase, RootPhase::Start | RootPhase::Prolog) => {
                 validate_element(&element, &reader, limits)?;
                 legacy_fragment = require_root(&element, &resolved)?;
-                root_seen = true;
+                phase = RootPhase::Open;
                 increment_nodes(&mut nodes, limits.max_xml_nodes)?;
                 enforce_depth(1, limits.max_xml_depth)?;
                 let frame = frame_for_start(
@@ -558,11 +581,10 @@ fn scan(xml: &[u8], mut projection: Projection<'_>, limits: Limits) -> Result<Pa
                 reserve_one(&mut stack, "InkML XML stack")?;
                 stack.push(frame);
             },
-            Event::Empty(element) if !root_seen => {
+            Event::Empty(element) if matches!(phase, RootPhase::Start | RootPhase::Prolog) => {
                 validate_element(&element, &reader, limits)?;
                 legacy_fragment = require_root(&element, &resolved)?;
-                root_seen = true;
-                root_closed = true;
+                phase = RootPhase::Closed;
                 increment_nodes(&mut nodes, limits.max_xml_nodes)?;
                 enforce_depth(1, limits.max_xml_depth)?;
                 parse_empty(
@@ -579,7 +601,7 @@ fn scan(xml: &[u8], mut projection: Projection<'_>, limits: Limits) -> Result<Pa
                     limits,
                 )?;
             },
-            Event::Start(element) if root_seen && !root_closed => {
+            Event::Start(element) if phase == RootPhase::Open => {
                 validate_element(&element, &reader, limits)?;
                 validate_unknown_prefix(&resolved, &element, legacy_fragment)?;
                 increment_nodes(&mut nodes, limits.max_xml_nodes)?;
@@ -600,7 +622,7 @@ fn scan(xml: &[u8], mut projection: Projection<'_>, limits: Limits) -> Result<Pa
                 reserve_one(&mut stack, "InkML XML stack")?;
                 stack.push(frame);
             },
-            Event::Empty(element) if root_seen && !root_closed => {
+            Event::Empty(element) if phase == RootPhase::Open => {
                 validate_element(&element, &reader, limits)?;
                 validate_unknown_prefix(&resolved, &element, legacy_fragment)?;
                 increment_nodes(&mut nodes, limits.max_xml_nodes)?;
@@ -619,10 +641,10 @@ fn scan(xml: &[u8], mut projection: Projection<'_>, limits: Limits) -> Result<Pa
                     limits,
                 )?;
             },
-            Event::Start(_) | Event::Empty(_) if root_closed => {
+            Event::Start(_) | Event::Empty(_) if phase == RootPhase::Closed => {
                 return Err(invalid("InkML document has more than one root element"));
             },
-            Event::End(element) if root_seen && !root_closed => {
+            Event::End(element) if phase == RootPhase::Open => {
                 let frame = stack
                     .pop()
                     .ok_or_else(|| invalid("InkML XML has an unexpected closing element"))?;
@@ -649,17 +671,17 @@ fn scan(xml: &[u8], mut projection: Projection<'_>, limits: Limits) -> Result<Pa
                     projection.complete(token, SourceSpan::new(frame.start, end))?;
                 }
                 if stack.is_empty() {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
             },
-            Event::End(_) if root_closed => {
+            Event::End(_) if phase == RootPhase::Closed => {
                 return Err(invalid("InkML XML has content after its root"));
             },
             Event::Start(_) | Event::Empty(_) | Event::End(_) => {
                 return Err(invalid("InkML XML has an invalid root transition"));
             },
             Event::Text(text)
-                if (!root_seen || root_closed)
+                if phase != RootPhase::Open
                     && !validate_text(&text, "InkML text")?
                         .bytes()
                         .all(|byte| byte.is_ascii_whitespace()) =>
@@ -671,13 +693,13 @@ fn scan(xml: &[u8], mut projection: Projection<'_>, limits: Limits) -> Result<Pa
             },
             Event::CData(data) => {
                 validate_text(&data, "InkML CDATA")?;
-                if !root_seen || root_closed {
+                if phase != RootPhase::Open {
                     return Err(invalid("InkML CDATA is not allowed outside its root"));
                 }
             },
             Event::GeneralRef(reference) => {
                 validate_reference(&reference)?;
-                if !root_seen || root_closed {
+                if phase != RootPhase::Open {
                     return Err(invalid("InkML has a reference outside its root"));
                 }
             },
@@ -692,13 +714,17 @@ fn scan(xml: &[u8], mut projection: Projection<'_>, limits: Limits) -> Result<Pa
             },
             Event::Eof => break,
         }
-        if !is_declaration {
-            preamble_content_seen = true;
+        match phase {
+            RootPhase::Start => phase = RootPhase::Prolog,
+            RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {},
         }
     }
 
-    if !root_seen || !root_closed || !stack.is_empty() {
-        return Err(invalid("InkML document root is absent or unterminated"));
+    match phase {
+        RootPhase::Closed if stack.is_empty() => {},
+        RootPhase::Start | RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("InkML document root is absent or unterminated"));
+        },
     }
     let (validated_contexts, validated_traces, validated_brush_properties) =
         projection.validation_counts();

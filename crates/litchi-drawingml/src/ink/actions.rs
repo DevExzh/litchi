@@ -696,6 +696,37 @@ impl Actions {
     }
 }
 
+/// Where each of the four action readers is relative to `iact:actions`.
+/// Nesting inside the root is not part of it: each reader's frame stack
+/// holds that.
+///
+/// ```text
+/// Start          --XML declaration-------------> Prolog
+/// Start | Prolog --comment or whitespace-------> Prolog
+/// Start | Prolog --root start tag--------------> Open
+/// Start | Prolog --root empty-element tag------> Closed
+/// Open           --nested content--------------> Open
+/// Open           --root end tag----------------> Closed
+/// Closed         --comment or whitespace-------> Closed
+/// ```
+///
+/// Refused: an XML declaration anywhere but `Start`; a DOCTYPE or a
+/// processing instruction anywhere; any element or end tag after the root;
+/// text other than whitespace, CDATA and entity references outside the
+/// root; and the end of input before `Closed`. The four readers share this
+/// envelope; they differ in what they admit inside the root.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// Nothing has been read.
+    Start,
+    /// A declaration, a comment or whitespace was read; no root yet.
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open,
+    /// The root element is complete.
+    Closed,
+}
+
 /// Read one complete iact:actions element.
 ///
 /// # Errors
@@ -720,15 +751,12 @@ pub fn read(xml: &[u8], limits: Limits) -> Result<Actions> {
         .resolver_mut()
         .set_max_declarations_per_element(MAX_NAMESPACE_DECLARATIONS);
     let mut stack = Vec::new();
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Start;
     let mut nodes = 0usize;
     let mut groups = 0usize;
     let mut actions = Vec::new();
     let mut length_unit = None;
     let mut time_unit = None;
-    let mut declaration_seen = false;
-    let mut preamble_content_seen = false;
     let mut legacy_fragment = false;
 
     loop {
@@ -736,18 +764,15 @@ pub fn read(xml: &[u8], limits: Limits) -> Result<Actions> {
         let event = reader.read_event().map_err(xml_error)?;
         let (resolved, event) = reader.resolver().resolve_event(event);
         let end = pos(&reader, origin)?;
-        let is_declaration = matches!(&event, Event::Decl(_));
         match event {
-            Event::Decl(declaration)
-                if !root_seen && !declaration_seen && !preamble_content_seen =>
-            {
+            Event::Decl(declaration) if phase == RootPhase::Start => {
                 validate_declaration(&declaration)?;
-                declaration_seen = true;
+                phase = RootPhase::Prolog;
             },
-            Event::Start(element) if !root_seen => {
+            Event::Start(element) if matches!(phase, RootPhase::Start | RootPhase::Prolog) => {
                 validate_element(&element, &reader, false, limits)?;
                 legacy_fragment = require_root(&element, &resolved, &reader)?;
-                root_seen = true;
+                phase = RootPhase::Open;
                 increment_nodes(&mut nodes, limits.max_nodes)?;
                 enforce_depth(1, limits.max_depth)?;
                 length_unit = Some(required_attr(&element, b"lengthUnit", &reader, limits)?);
@@ -771,11 +796,10 @@ pub fn read(xml: &[u8], limits: Limits) -> Result<Actions> {
                     payload_start: None,
                 });
             },
-            Event::Empty(element) if !root_seen => {
+            Event::Empty(element) if matches!(phase, RootPhase::Start | RootPhase::Prolog) => {
                 validate_element(&element, &reader, false, limits)?;
                 legacy_fragment = require_root(&element, &resolved, &reader)?;
-                root_seen = true;
-                root_closed = true;
+                phase = RootPhase::Closed;
                 increment_nodes(&mut nodes, limits.max_nodes)?;
                 enforce_depth(1, limits.max_depth)?;
                 length_unit = Some(required_attr(&element, b"lengthUnit", &reader, limits)?);
@@ -791,7 +815,7 @@ pub fn read(xml: &[u8], limits: Limits) -> Result<Actions> {
                     limits.max_scalar_bytes,
                 )?;
             },
-            Event::Start(element) if root_seen && !root_closed => {
+            Event::Start(element) if phase == RootPhase::Open => {
                 validate_element(&element, &reader, false, limits)?;
                 validate_unknown_prefix(&resolved, &element, legacy_fragment)?;
                 increment_nodes(&mut nodes, limits.max_nodes)?;
@@ -828,7 +852,7 @@ pub fn read(xml: &[u8], limits: Limits) -> Result<Actions> {
                     payload_start,
                 });
             },
-            Event::Empty(element) if root_seen && !root_closed => {
+            Event::Empty(element) if phase == RootPhase::Open => {
                 validate_element(&element, &reader, false, limits)?;
                 validate_unknown_prefix(&resolved, &element, legacy_fragment)?;
                 increment_nodes(&mut nodes, limits.max_nodes)?;
@@ -852,7 +876,7 @@ pub fn read(xml: &[u8], limits: Limits) -> Result<Actions> {
                     actions.push(parse_action(&element, start, end, &reader, limits)?);
                 }
             },
-            Event::End(element) if root_seen && !root_closed => {
+            Event::End(element) if phase == RootPhase::Open => {
                 let frame = stack
                     .pop()
                     .ok_or_else(|| invalid("ink actions has an unexpected end"))?;
@@ -870,17 +894,17 @@ pub fn read(xml: &[u8], limits: Limits) -> Result<Actions> {
                     actions[index].source_end = end;
                 }
                 if stack.is_empty() {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
             },
-            Event::Start(_) | Event::Empty(_) | Event::End(_) if root_closed => {
+            Event::Start(_) | Event::Empty(_) | Event::End(_) if phase == RootPhase::Closed => {
                 return Err(invalid("ink actions has content after its root"));
             },
             Event::Start(_) | Event::Empty(_) | Event::End(_) => {
                 return Err(invalid("ink actions has an invalid root transition"));
             },
             Event::Text(text)
-                if (!root_seen || root_closed)
+                if phase != RootPhase::Open
                     && !validate_text(&text, "ink actions text")?
                         .bytes()
                         .all(|byte| byte.is_ascii_whitespace()) =>
@@ -892,13 +916,13 @@ pub fn read(xml: &[u8], limits: Limits) -> Result<Actions> {
             },
             Event::CData(data) => {
                 validate_text(&data, "ink actions CDATA")?;
-                if !root_seen || root_closed {
+                if phase != RootPhase::Open {
                     return Err(invalid("ink actions CDATA is not allowed outside its root"));
                 }
             },
             Event::GeneralRef(reference) => {
                 validate_reference(&reference)?;
-                if !root_seen || root_closed {
+                if phase != RootPhase::Open {
                     return Err(invalid("ink actions has a reference outside its root"));
                 }
             },
@@ -917,13 +941,17 @@ pub fn read(xml: &[u8], limits: Limits) -> Result<Actions> {
             },
             Event::Eof => break,
         }
-        if !is_declaration {
-            preamble_content_seen = true;
+        match phase {
+            RootPhase::Start => phase = RootPhase::Prolog,
+            RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {},
         }
     }
 
-    if !root_seen || !root_closed || !stack.is_empty() {
-        return Err(invalid("ink actions root is absent or unterminated"));
+    match phase {
+        RootPhase::Closed if stack.is_empty() => {},
+        RootPhase::Start | RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("ink actions root is absent or unterminated"));
+        },
     }
     let length_unit = length_unit.ok_or_else(|| invalid("ink actions lengthUnit is missing"))?;
     let time_unit = time_unit.ok_or_else(|| invalid("ink actions timeUnit is missing"))?;
@@ -958,13 +986,10 @@ fn validate_source(xml: &[u8], limits: Limits) -> Result<()> {
         .resolver_mut()
         .set_max_declarations_per_element(MAX_NAMESPACE_DECLARATIONS);
     let mut stack = Vec::new();
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Start;
     let mut nodes = 0usize;
     let mut groups = 0usize;
     let mut actions = 0usize;
-    let mut declaration_seen = false;
-    let mut preamble_content_seen = false;
     let mut legacy_fragment = false;
 
     loop {
@@ -972,18 +997,15 @@ fn validate_source(xml: &[u8], limits: Limits) -> Result<()> {
         let event = reader.read_event().map_err(xml_error)?;
         let (resolved, event) = reader.resolver().resolve_event(event);
         let end = pos(&reader, origin)?;
-        let is_declaration = matches!(&event, Event::Decl(_));
         match event {
-            Event::Decl(declaration)
-                if !root_seen && !declaration_seen && !preamble_content_seen =>
-            {
+            Event::Decl(declaration) if phase == RootPhase::Start => {
                 validate_declaration(&declaration)?;
-                declaration_seen = true;
+                phase = RootPhase::Prolog;
             },
-            Event::Start(element) if !root_seen => {
+            Event::Start(element) if matches!(phase, RootPhase::Start | RootPhase::Prolog) => {
                 validate_element(&element, &reader, false, limits)?;
                 legacy_fragment = require_root(&element, &resolved, &reader)?;
-                root_seen = true;
+                phase = RootPhase::Open;
                 increment_nodes(&mut nodes, limits.max_nodes)?;
                 enforce_depth(1, limits.max_depth)?;
                 let length = required_attr(&element, b"lengthUnit", &reader, limits)?;
@@ -999,11 +1021,10 @@ fn validate_source(xml: &[u8], limits: Limits) -> Result<()> {
                     payload_start: None,
                 });
             },
-            Event::Empty(element) if !root_seen => {
+            Event::Empty(element) if matches!(phase, RootPhase::Start | RootPhase::Prolog) => {
                 validate_element(&element, &reader, false, limits)?;
                 legacy_fragment = require_root(&element, &resolved, &reader)?;
-                root_seen = true;
-                root_closed = true;
+                phase = RootPhase::Closed;
                 increment_nodes(&mut nodes, limits.max_nodes)?;
                 enforce_depth(1, limits.max_depth)?;
                 let length = required_attr(&element, b"lengthUnit", &reader, limits)?;
@@ -1011,7 +1032,7 @@ fn validate_source(xml: &[u8], limits: Limits) -> Result<()> {
                 validate_unit(&length, "lengthUnit", limits.max_scalar_bytes)?;
                 validate_unit(&time, "timeUnit", limits.max_scalar_bytes)?;
             },
-            Event::Start(element) if root_seen && !root_closed => {
+            Event::Start(element) if phase == RootPhase::Open => {
                 validate_element(&element, &reader, false, limits)?;
                 validate_unknown_prefix(&resolved, &element, legacy_fragment)?;
                 increment_nodes(&mut nodes, limits.max_nodes)?;
@@ -1042,7 +1063,7 @@ fn validate_source(xml: &[u8], limits: Limits) -> Result<()> {
                     payload_start,
                 });
             },
-            Event::Empty(element) if root_seen && !root_closed => {
+            Event::Empty(element) if phase == RootPhase::Open => {
                 validate_element(&element, &reader, false, limits)?;
                 validate_unknown_prefix(&resolved, &element, legacy_fragment)?;
                 increment_nodes(&mut nodes, limits.max_nodes)?;
@@ -1065,7 +1086,7 @@ fn validate_source(xml: &[u8], limits: Limits) -> Result<()> {
                     validate_action_attrs(&element, &reader, limits)?;
                 }
             },
-            Event::End(element) if root_seen && !root_closed => {
+            Event::End(element) if phase == RootPhase::Open => {
                 let frame = stack
                     .pop()
                     .ok_or_else(|| invalid("ink actions has an unexpected closing element"))?;
@@ -1080,17 +1101,17 @@ fn validate_source(xml: &[u8], limits: Limits) -> Result<()> {
                     enforce_payload_span(payload_start, end, limits.max_payload_bytes)?;
                 }
                 if stack.is_empty() {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
             },
-            Event::Start(_) | Event::Empty(_) | Event::End(_) if root_closed => {
+            Event::Start(_) | Event::Empty(_) | Event::End(_) if phase == RootPhase::Closed => {
                 return Err(invalid("ink actions has content after its root"));
             },
             Event::Start(_) | Event::Empty(_) | Event::End(_) => {
                 return Err(invalid("ink actions has an invalid root transition"));
             },
             Event::Text(text)
-                if (!root_seen || root_closed)
+                if phase != RootPhase::Open
                     && !validate_text(&text, "ink actions text")?
                         .bytes()
                         .all(|byte| byte.is_ascii_whitespace()) =>
@@ -1102,13 +1123,13 @@ fn validate_source(xml: &[u8], limits: Limits) -> Result<()> {
             },
             Event::CData(data) => {
                 validate_text(&data, "ink actions CDATA")?;
-                if !root_seen || root_closed {
+                if phase != RootPhase::Open {
                     return Err(invalid("ink actions CDATA is not allowed outside its root"));
                 }
             },
             Event::GeneralRef(reference) => {
                 validate_reference(&reference)?;
-                if !root_seen || root_closed {
+                if phase != RootPhase::Open {
                     return Err(invalid("ink actions has a reference outside its root"));
                 }
             },
@@ -1127,13 +1148,17 @@ fn validate_source(xml: &[u8], limits: Limits) -> Result<()> {
             },
             Event::Eof => break,
         }
-        if !is_declaration {
-            preamble_content_seen = true;
+        match phase {
+            RootPhase::Start => phase = RootPhase::Prolog,
+            RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {},
         }
     }
 
-    if !root_seen || !root_closed || !stack.is_empty() {
-        return Err(invalid("ink actions root is absent or unterminated"));
+    match phase {
+        RootPhase::Closed if stack.is_empty() => {},
+        RootPhase::Start | RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("ink actions root is absent or unterminated"));
+        },
     }
     Ok(())
 }
@@ -1196,29 +1221,25 @@ fn read_profile_with_source(
         .set_max_declarations_per_element(MAX_NAMESPACE_DECLARATIONS);
 
     let mut stack = Vec::new();
-    let mut root_closed = false;
+    let mut phase = RootPhase::Start;
     let mut root = None;
     let mut nodes = 0usize;
-    let mut declaration_seen = false;
-    let mut preamble_content_seen = false;
 
     loop {
         let start = pos(&reader, origin)?;
         let event = reader.read_event().map_err(xml_error)?;
         let (resolved, event) = reader.resolver().resolve_event(event);
         let end = pos(&reader, origin)?;
-        let is_declaration = matches!(&event, Event::Decl(_));
         match event {
-            Event::Decl(declaration)
-                if root.is_none() && !declaration_seen && !preamble_content_seen =>
-            {
+            Event::Decl(declaration) if phase == RootPhase::Start => {
                 validate_declaration(&declaration)?;
-                declaration_seen = true;
+                phase = RootPhase::Prolog;
             },
-            Event::Start(element) if root.is_none() => {
+            Event::Start(element) if matches!(phase, RootPhase::Start | RootPhase::Prolog) => {
                 validate_profile_element(&element, &resolved, &reader, limits)?;
                 let root_state = profile_root(&element, &resolved, &reader, limits)?;
                 root = Some(root_state);
+                phase = RootPhase::Open;
                 increment_nodes(&mut nodes, limits.max_nodes)?;
                 enforce_depth(1, limits.max_depth)?;
                 reserve_one(&mut stack, "ink actions profile XML stack")?;
@@ -1227,15 +1248,15 @@ fn read_profile_with_source(
                     kind: ProfileFrameKind::Root,
                 });
             },
-            Event::Empty(element) if root.is_none() => {
+            Event::Empty(element) if matches!(phase, RootPhase::Start | RootPhase::Prolog) => {
                 validate_profile_element(&element, &resolved, &reader, limits)?;
                 let root_state = profile_root(&element, &resolved, &reader, limits)?;
                 root = Some(root_state);
                 increment_nodes(&mut nodes, limits.max_nodes)?;
                 enforce_depth(1, limits.max_depth)?;
-                root_closed = true;
+                phase = RootPhase::Closed;
             },
-            Event::Start(element) if root.is_some() && !root_closed => {
+            Event::Start(element) if phase == RootPhase::Open => {
                 validate_profile_element(&element, &resolved, &reader, limits)?;
                 increment_nodes(&mut nodes, limits.max_nodes)?;
                 enforce_depth(stack.len().saturating_add(1), limits.max_depth)?;
@@ -1253,7 +1274,7 @@ fn read_profile_with_source(
                 reserve_one(&mut stack, "ink actions profile XML stack")?;
                 stack.push(ProfileFrame { namespace, kind });
             },
-            Event::Empty(element) if root.is_some() && !root_closed => {
+            Event::Empty(element) if phase == RootPhase::Open => {
                 validate_profile_element(&element, &resolved, &reader, limits)?;
                 increment_nodes(&mut nodes, limits.max_nodes)?;
                 enforce_depth(stack.len().saturating_add(1), limits.max_depth)?;
@@ -1275,7 +1296,7 @@ fn read_profile_with_source(
                     value,
                 )?;
             },
-            Event::End(element) if root.is_some() && !root_closed => {
+            Event::End(element) if phase == RootPhase::Open => {
                 let frame = stack
                     .pop()
                     .ok_or_else(|| invalid("ink actions profile has an unexpected end"))?;
@@ -1289,7 +1310,7 @@ fn read_profile_with_source(
                     if !matches!(frame.kind, ProfileFrameKind::Root) {
                         return Err(invalid("ink actions profile root frame is invalid"));
                     }
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 } else {
                     let value = profile_finish(frame.kind, end, limits)?;
                     attach_profile_value(
@@ -1300,7 +1321,7 @@ fn read_profile_with_source(
                     )?;
                 }
             },
-            Event::Start(_) | Event::Empty(_) | Event::End(_) if root_closed => {
+            Event::Start(_) | Event::Empty(_) | Event::End(_) if phase == RootPhase::Closed => {
                 return Err(invalid("ink actions profile has content after its root"));
             },
             Event::Start(_) | Event::Empty(_) | Event::End(_) => {
@@ -1315,16 +1336,16 @@ fn read_profile_with_source(
                         "ink actions profile text contains a raw CDATA terminator",
                     ));
                 }
-                if (root.is_none() || root_closed) && !text.bytes().all(is_xml_whitespace) {
+                if phase != RootPhase::Open && !text.bytes().all(is_xml_whitespace) {
                     return Err(invalid("ink actions profile has text outside its root"));
                 }
-                if root.is_some() && !root_closed && !text.is_empty() {
+                if phase == RootPhase::Open && !text.is_empty() {
                     ensure_profile_character_content(&stack, text.bytes().all(is_xml_whitespace))?;
                 }
             },
             Event::CData(data) => {
                 let data = validate_text(&data, "ink actions profile CDATA")?;
-                if root.is_none() || root_closed {
+                if phase != RootPhase::Open {
                     return Err(invalid("ink actions profile has CDATA outside its root"));
                 }
                 if !data.is_empty() {
@@ -1333,7 +1354,7 @@ fn read_profile_with_source(
             },
             Event::GeneralRef(reference) => {
                 validate_reference(&reference)?;
-                if root.is_none() || root_closed {
+                if phase != RootPhase::Open {
                     return Err(invalid(
                         "ink actions profile has a reference outside its root",
                     ));
@@ -1359,15 +1380,19 @@ fn read_profile_with_source(
             },
             Event::Eof => break,
         }
-        if !is_declaration {
-            preamble_content_seen = true;
+        match phase {
+            RootPhase::Start => phase = RootPhase::Prolog,
+            RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {},
         }
     }
 
-    if root.is_none() || !root_closed || !stack.is_empty() {
-        return Err(invalid(
-            "ink actions profile root is absent or unterminated",
-        ));
+    match phase {
+        RootPhase::Closed if stack.is_empty() => {},
+        RootPhase::Start | RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid(
+                "ink actions profile root is absent or unterminated",
+            ));
+        },
     }
     let root = root.ok_or_else(|| invalid("ink actions profile root is missing"))?;
     let source = match owned_source {
@@ -1718,28 +1743,24 @@ fn validate_profile_source(xml: &[u8], limits: Limits) -> Result<()> {
         .set_max_declarations_per_element(MAX_NAMESPACE_DECLARATIONS);
     let mut stack = Vec::new();
     let mut root = None;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Start;
     let mut nodes = 0usize;
-    let mut declaration_seen = false;
-    let mut preamble_content_seen = false;
 
     loop {
         let start = pos(&reader, origin)?;
         let event = reader.read_event().map_err(xml_error)?;
         let (resolved, event) = reader.resolver().resolve_event(event);
         let end = pos(&reader, origin)?;
-        let is_declaration = matches!(&event, Event::Decl(_));
         match event {
-            Event::Decl(declaration)
-                if root.is_none() && !declaration_seen && !preamble_content_seen =>
-            {
+            Event::Decl(declaration) if phase == RootPhase::Start => {
                 validate_declaration(&declaration)?;
-                declaration_seen = true;
+                phase = RootPhase::Prolog;
             },
-            Event::Start(element) if root.is_none() => {
+            Event::Start(element) if matches!(phase, RootPhase::Start | RootPhase::Prolog) => {
                 validate_profile_element(&element, &resolved, &reader, limits)?;
                 let root_state = validation_profile_root(&element, &resolved, &reader, limits)?;
                 root = Some(root_state);
+                phase = RootPhase::Open;
                 increment_nodes(&mut nodes, limits.max_nodes)?;
                 enforce_depth(1, limits.max_depth)?;
                 reserve_one(&mut stack, "ink actions profile XML stack")?;
@@ -1748,15 +1769,15 @@ fn validate_profile_source(xml: &[u8], limits: Limits) -> Result<()> {
                     kind: ValidationFrameKind::Root,
                 });
             },
-            Event::Empty(element) if root.is_none() => {
+            Event::Empty(element) if matches!(phase, RootPhase::Start | RootPhase::Prolog) => {
                 validate_profile_element(&element, &resolved, &reader, limits)?;
                 let _ = validation_profile_root(&element, &resolved, &reader, limits)?;
                 root = Some(ValidationRoot::default());
                 increment_nodes(&mut nodes, limits.max_nodes)?;
                 enforce_depth(1, limits.max_depth)?;
-                root_closed = true;
+                phase = RootPhase::Closed;
             },
-            Event::Start(element) if root.is_some() && !root_closed => {
+            Event::Start(element) if phase == RootPhase::Open => {
                 validate_profile_element(&element, &resolved, &reader, limits)?;
                 increment_nodes(&mut nodes, limits.max_nodes)?;
                 enforce_depth(stack.len().saturating_add(1), limits.max_depth)?;
@@ -1774,7 +1795,7 @@ fn validate_profile_source(xml: &[u8], limits: Limits) -> Result<()> {
                 reserve_one(&mut stack, "ink actions profile XML stack")?;
                 stack.push(ValidationFrame { namespace, kind });
             },
-            Event::Empty(element) if root.is_some() && !root_closed => {
+            Event::Empty(element) if phase == RootPhase::Open => {
                 validate_profile_element(&element, &resolved, &reader, limits)?;
                 increment_nodes(&mut nodes, limits.max_nodes)?;
                 enforce_depth(stack.len().saturating_add(1), limits.max_depth)?;
@@ -1791,7 +1812,7 @@ fn validate_profile_source(xml: &[u8], limits: Limits) -> Result<()> {
                 let value = validation_profile_finish(kind, end, limits)?;
                 validation_profile_attach(stack.last_mut(), value)?;
             },
-            Event::End(element) if root.is_some() && !root_closed => {
+            Event::End(element) if phase == RootPhase::Open => {
                 let frame = stack
                     .pop()
                     .ok_or_else(|| invalid("ink actions profile has an unexpected end"))?;
@@ -1805,13 +1826,13 @@ fn validate_profile_source(xml: &[u8], limits: Limits) -> Result<()> {
                     if !matches!(frame.kind, ValidationFrameKind::Root) {
                         return Err(invalid("ink actions profile root frame is invalid"));
                     }
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 } else {
                     let value = validation_profile_finish(frame.kind, end, limits)?;
                     validation_profile_attach(stack.last_mut(), value)?;
                 }
             },
-            Event::Start(_) | Event::Empty(_) | Event::End(_) if root_closed => {
+            Event::Start(_) | Event::Empty(_) | Event::End(_) if phase == RootPhase::Closed => {
                 return Err(invalid("ink actions profile has content after its root"));
             },
             Event::Start(_) | Event::Empty(_) | Event::End(_) => {
@@ -1826,10 +1847,10 @@ fn validate_profile_source(xml: &[u8], limits: Limits) -> Result<()> {
                         "ink actions profile text contains a raw CDATA terminator",
                     ));
                 }
-                if (root.is_none() || root_closed) && !text.bytes().all(is_xml_whitespace) {
+                if phase != RootPhase::Open && !text.bytes().all(is_xml_whitespace) {
                     return Err(invalid("ink actions profile has text outside its root"));
                 }
-                if root.is_some() && !root_closed && !text.is_empty() {
+                if phase == RootPhase::Open && !text.is_empty() {
                     ensure_validation_character_content(
                         &stack,
                         text.bytes().all(is_xml_whitespace),
@@ -1838,7 +1859,7 @@ fn validate_profile_source(xml: &[u8], limits: Limits) -> Result<()> {
             },
             Event::CData(data) => {
                 let data = validate_text(&data, "ink actions profile CDATA")?;
-                if root.is_none() || root_closed {
+                if phase != RootPhase::Open {
                     return Err(invalid("ink actions profile has CDATA outside its root"));
                 }
                 if !data.is_empty() {
@@ -1850,7 +1871,7 @@ fn validate_profile_source(xml: &[u8], limits: Limits) -> Result<()> {
             },
             Event::GeneralRef(reference) => {
                 validate_reference(&reference)?;
-                if root.is_none() || root_closed {
+                if phase != RootPhase::Open {
                     return Err(invalid(
                         "ink actions profile has a reference outside its root",
                     ));
@@ -1876,15 +1897,19 @@ fn validate_profile_source(xml: &[u8], limits: Limits) -> Result<()> {
             },
             Event::Eof => break,
         }
-        if !is_declaration {
-            preamble_content_seen = true;
+        match phase {
+            RootPhase::Start => phase = RootPhase::Prolog,
+            RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {},
         }
     }
 
-    if root.is_none() || !root_closed || !stack.is_empty() {
-        return Err(invalid(
-            "ink actions profile root is absent or unterminated",
-        ));
+    match phase {
+        RootPhase::Closed if stack.is_empty() => {},
+        RootPhase::Start | RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid(
+                "ink actions profile root is absent or unterminated",
+            ));
+        },
     }
     Ok(())
 }

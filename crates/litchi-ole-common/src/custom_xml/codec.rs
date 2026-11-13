@@ -23,11 +23,38 @@ use super::{
 };
 use crate::xml_attributes::BytesStartExt as _;
 
+/// Where the properties reader is relative to `datastoreItem`. Nesting
+/// inside the root is not part of it: `PropertiesParseState::depth` holds
+/// that.
+///
+/// ```text
+/// Prolog --root start tag---------------------> Open
+/// Prolog --root empty-element tag-------------> Closed
+/// Open   --nested content---------------------> Open
+/// Open   --root end tag-----------------------> Closed
+/// Any    --declaration, comment or PI---------> unchanged
+/// ```
+///
+/// An XML declaration is accepted anywhere, inside the root included.
+/// Whitespace outside the root is ignored. Refused: a DOCTYPE anywhere; a
+/// top-level element that is not `datastoreItem`, or a second one; text and
+/// CDATA other than whitespace, and entity references, outside the root;
+/// and the end of input before `Closed`.
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
+enum RootPhase {
+    /// No element has been read.
+    #[default]
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open,
+    /// The root element is complete.
+    Closed,
+}
+
 #[derive(Default)]
 struct PropertiesParseState {
     depth: usize,
-    root_seen: bool,
-    root_closed: bool,
+    root: RootPhase,
     schema_refs_seen: bool,
     opaque_depth: usize,
     item_id: Option<ItemId>,
@@ -1016,7 +1043,7 @@ pub(crate) fn parse_properties_with_limits(xml: &[u8], limits: &Limits) -> Resul
                     process_properties_element(&reader, &element, limits, &mut state, false)?;
                 }
                 if state.depth == 0 {
-                    state.root_closed = true;
+                    state.root = RootPhase::Closed;
                 }
             },
             Event::End(_) => {
@@ -1028,7 +1055,7 @@ pub(crate) fn parse_properties_with_limits(xml: &[u8], limits: &Limits) -> Resul
                     .checked_sub(1)
                     .ok_or_else(|| invalid("Properties XML has an unexpected closing tag"))?;
                 if state.depth == 0 {
-                    state.root_closed = true;
+                    state.root = RootPhase::Closed;
                 }
             },
             Event::Text(text) if state.opaque_depth == 0 && !is_whitespace(text.as_ref()) => {
@@ -1059,8 +1086,11 @@ pub(crate) fn parse_properties_with_limits(xml: &[u8], limits: &Limits) -> Resul
             | Event::PI(_) => {},
         }
     }
-    if !state.root_seen || !state.root_closed || state.depth != 0 {
-        return Err(invalid("Properties XML has no complete datastoreItem root"));
+    match state.root {
+        RootPhase::Closed if state.depth == 0 => {},
+        RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("Properties XML has no complete datastoreItem root"));
+        },
     }
     let properties = Properties {
         item_id: state
@@ -1082,7 +1112,8 @@ fn process_properties_element(
     let (namespace, local_name) = resolved_element(reader, element)?;
     match (state.depth, local_name.as_slice(), namespace.as_deref()) {
         (0, b"datastoreItem", Some(resolved_namespace))
-            if resolved_namespace == CUSTOM_XML_NAMESPACE.as_bytes() && !state.root_seen =>
+            if resolved_namespace == CUSTOM_XML_NAMESPACE.as_bytes()
+                && state.root == RootPhase::Prolog =>
         {
             state.item_id = Some(
                 required_attribute(reader, element, CUSTOM_XML_NAMESPACE, b"itemID", limits)?
@@ -1094,11 +1125,11 @@ fn process_properties_element(
                 &[(CUSTOM_XML_NAMESPACE, b"itemID")],
                 limits,
             )?;
-            state.root_seen = true;
+            state.root = RootPhase::Open;
         },
         (1, b"schemaRefs", Some(resolved_namespace))
             if resolved_namespace == CUSTOM_XML_NAMESPACE.as_bytes()
-                && state.root_seen
+                && matches!(state.root, RootPhase::Open | RootPhase::Closed)
                 && !state.schema_refs_seen =>
         {
             reject_other_attributes(reader, element, &[], limits)?;

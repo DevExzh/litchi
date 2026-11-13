@@ -15,6 +15,31 @@ use super::{
 };
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
+/// Where the data-model reader is relative to `dgm:dataModel`. Nesting
+/// inside the root is not part of it: the depth counter holds that.
+///
+/// ```text
+/// Prolog --root start tag---------------------> Open
+/// Open   --nested content---------------------> Open
+/// Open   --root end tag-----------------------> Closed
+/// Any    --declaration, comment or PI---------> unchanged
+/// ```
+///
+/// An XML declaration is accepted anywhere, inside the root included.
+/// Whitespace outside the root is ignored. Refused: a DOCTYPE or CDATA
+/// anywhere; an empty-element root; a second top-level element; text other
+/// than whitespace and entity references outside the root; and the end of
+/// input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No element has been read.
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open,
+    /// The root element is complete.
+    Closed,
+}
+
 impl DiagramDataModel {
     /// Parse a `dgm:dataModel` document (transitional or Strict namespace).
     ///
@@ -53,8 +78,7 @@ impl DiagramDataModel {
         let mut buffer = Vec::new();
         let mut depth = 0usize;
         let mut nodes = 0usize;
-        let mut root_seen = false;
-        let mut root_closed = false;
+        let mut phase = RootPhase::Prolog;
         let mut point_list_seen = false;
         let mut point_list_depth: Option<usize> = None;
         let mut connection_list_seen = false;
@@ -85,13 +109,13 @@ impl DiagramDataModel {
                     let namespace = element_namespace(&reader, &element)?;
                     let local = local_name(&element)?;
                     if depth == 1 {
-                        if root_seen || root_closed {
+                        if phase != RootPhase::Prolog {
                             return Err(invalid("multiple data-model roots"));
                         }
                         if !is_dgm(&namespace) || local != "dataModel" {
                             return Err(invalid("invalid data-model root or namespace"));
                         }
-                        root_seen = true;
+                        phase = RootPhase::Open;
                     } else if is_dgm(&namespace) {
                         match local.as_str() {
                             "dataModel" => {
@@ -199,7 +223,7 @@ impl DiagramDataModel {
                     let namespace = element_namespace(&reader, &element)?;
                     let local = local_name(&element)?;
                     if child_depth == 1 {
-                        if root_seen || root_closed {
+                        if phase != RootPhase::Prolog {
                             return Err(invalid("multiple data-model roots"));
                         }
                         if !is_dgm(&namespace) || local != "dataModel" {
@@ -381,7 +405,7 @@ impl DiagramDataModel {
                         return Err(invalid("unexpected data-model closing element"));
                     }
                     if depth == 1 {
-                        if local != "dataModel" || !root_seen {
+                        if local != "dataModel" || phase == RootPhase::Prolog {
                             return Err(invalid("unbalanced data-model root"));
                         }
                         if !point_list_seen {
@@ -389,7 +413,7 @@ impl DiagramDataModel {
                                 "diagram data model lacks its required point list",
                             ));
                         }
-                        root_closed = true;
+                        phase = RootPhase::Closed;
                     }
                     depth -= 1;
                 },
@@ -400,17 +424,18 @@ impl DiagramDataModel {
             }
             buffer.clear();
         }
-        if !root_seen
-            || !root_closed
-            || !point_list_seen
-            || depth != 0
-            || point_list_depth.is_some()
-            || connection_list_depth.is_some()
-            || open_point.is_some()
-            || text_body_depth.is_some()
-            || run_text_depth.is_some()
-        {
-            return Err(invalid("missing or unterminated data-model root"));
+        match phase {
+            RootPhase::Closed
+                if point_list_seen
+                    && depth == 0
+                    && point_list_depth.is_none()
+                    && connection_list_depth.is_none()
+                    && open_point.is_none()
+                    && text_body_depth.is_none()
+                    && run_text_depth.is_none() => {},
+            RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+                return Err(invalid("missing or unterminated data-model root"));
+            },
         }
         Ok(model)
     }

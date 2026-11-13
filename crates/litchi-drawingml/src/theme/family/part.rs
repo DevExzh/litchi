@@ -718,6 +718,35 @@ fn parse_candidate(
     ))
 }
 
+/// Where the theme part scan is relative to `a:theme`. Nesting inside the
+/// root is not part of it: the frame stack holds that.
+///
+/// ```text
+/// Start          --XML declaration--------------> Prolog
+/// Start | Prolog --comment or whitespace--------> Prolog
+/// Start | Prolog --root start tag---------------> Open
+/// Start | Prolog --root empty-element tag-------> Closed
+/// Open           --nested content---------------> Open
+/// Open           --root end tag-----------------> Closed
+/// Closed         --comment or whitespace--------> Closed
+/// ```
+///
+/// Refused: an XML declaration anywhere but `Start`; a DOCTYPE or a
+/// processing instruction anywhere; a second top-level element; text other
+/// than whitespace, CDATA and entity references outside the root; and the
+/// end of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// Nothing has been read.
+    Start,
+    /// A declaration or other prolog content was read; no root yet.
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open,
+    /// The root element is complete.
+    Closed,
+}
+
 fn scan(xml: &[u8]) -> Result<Scanned> {
     // The scan splits off the first byte-order mark itself; a second one,
     // which the reader would drop uncounted, is the parsed slice's origin.
@@ -747,10 +776,7 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
     let mut families = Vec::<FamilyRecord>::new();
     let mut recognized_family_extensions = HashSet::<usize>::new();
     let mut root: Option<Root> = None;
-    let mut root_seen = false;
-    let mut root_closed = false;
-    let mut declaration_seen = false;
-    let mut pre_root_markup = false;
+    let mut phase = RootPhase::Start;
     let mut ext_list_seen = false;
     // Element names are resolved on namespace values as written, so an MCE
     // branch bound through a declaration spelled with references stays
@@ -773,16 +799,16 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
         }
         let namespace = resolved_namespace(&resolved)?;
         let event_end = position(&reader, origin, bom_len)?;
-        if !root_seen && !matches!(&event, Event::Decl(_) | Event::Eof) {
-            pre_root_markup = true;
+        if phase == RootPhase::Start && !matches!(&event, Event::Decl(_) | Event::Eof) {
+            phase = RootPhase::Prolog;
         }
         match event {
             Event::Decl(declaration) => {
-                if root_seen || declaration_seen || pre_root_markup {
+                if phase != RootPhase::Start {
                     return Err(invalid("Theme XML declaration is misplaced"));
                 }
                 family_codec::validate_declaration(&declaration)?;
-                declaration_seen = true;
+                phase = RootPhase::Prolog;
             },
             Event::Start(element) => {
                 bump_nodes(&mut nodes)?;
@@ -815,11 +841,11 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
                 if depth >= MAX_DEPTH {
                     return Err(limit(LimitKind::XmlDepth, stack.len() + 1, MAX_DEPTH));
                 }
-                let kind = if !root_seen {
+                let kind = if matches!(phase, RootPhase::Start | RootPhase::Prolog) {
                     if local != b"theme" || !is_drawingml_namespace(&namespace) {
                         return Err(invalid("Theme XML root must be a DrawingML theme"));
                     }
-                    root_seen = true;
+                    phase = RootPhase::Open;
                     root = Some(Root {
                         namespace: String::from_utf8(namespace.clone()).map_err(xml_error)?,
                         element_prefix: qname_prefix(&qualified_name).to_vec(),
@@ -832,7 +858,7 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
                     });
                     Kind::Root
                 } else {
-                    if root_closed || stack.is_empty() {
+                    if phase == RootPhase::Closed || stack.is_empty() {
                         return Err(invalid("Theme XML has more than one root element"));
                     }
                     let mut classifier = Classifier {
@@ -895,12 +921,11 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
                 if depth >= MAX_DEPTH {
                     return Err(limit(LimitKind::XmlDepth, stack.len() + 1, MAX_DEPTH));
                 }
-                let kind = if !root_seen {
+                let kind = if matches!(phase, RootPhase::Start | RootPhase::Prolog) {
                     if local != b"theme" || !is_drawingml_namespace(&namespace) {
                         return Err(invalid("Theme XML root must be a DrawingML theme"));
                     }
-                    root_seen = true;
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                     root = Some(Root {
                         namespace: String::from_utf8(namespace.clone()).map_err(xml_error)?,
                         element_prefix: qname_prefix(&qualified_name).to_vec(),
@@ -913,7 +938,7 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
                     });
                     Kind::Root
                 } else {
-                    if root_closed || stack.is_empty() {
+                    if phase == RootPhase::Closed || stack.is_empty() {
                         return Err(invalid("Theme XML has more than one root element"));
                     }
                     let mut classifier = Classifier {
@@ -947,7 +972,7 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
                 scope_bytes = scope_bytes_before;
             },
             Event::End(element) => {
-                if !root_seen || root_closed {
+                if phase != RootPhase::Open {
                     return Err(invalid("Theme XML has markup outside its root"));
                 }
                 let Some(frame) = stack.pop() else {
@@ -961,7 +986,7 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
                 }
                 match frame.kind {
                     Kind::Root => {
-                        root_closed = true;
+                        phase = RootPhase::Closed;
                         let root = root
                             .as_mut()
                             .ok_or_else(|| invalid("Theme root state is missing"))?;
@@ -1000,7 +1025,7 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
                         "owned Theme container contains non-whitespace text",
                     ));
                 }
-                if (!root_seen || root_closed) && !is_xml_whitespace(text.as_ref()) {
+                if phase != RootPhase::Open && !is_xml_whitespace(text.as_ref()) {
                     return Err(invalid("Theme XML has text outside its root"));
                 }
             },
@@ -1011,12 +1036,12 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
                         "owned Theme container contains non-whitespace CDATA",
                     ));
                 }
-                if !root_seen || root_closed {
+                if phase != RootPhase::Open {
                     return Err(invalid("Theme XML has CDATA outside its root"));
                 }
             },
             Event::GeneralRef(reference) => {
-                if !root_seen || root_closed {
+                if phase != RootPhase::Open {
                     return Err(invalid("Theme XML has a reference outside its root"));
                 }
                 let character =
@@ -1039,8 +1064,11 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
         }
     }
 
-    if !root_seen || !root_closed || !stack.is_empty() {
-        return Err(invalid("Theme XML is unterminated"));
+    match phase {
+        RootPhase::Closed if stack.is_empty() => {},
+        RootPhase::Start | RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("Theme XML is unterminated"));
+        },
     }
     let mut root = root.ok_or_else(|| invalid("Theme XML has no root"))?;
     let admitted = extensions

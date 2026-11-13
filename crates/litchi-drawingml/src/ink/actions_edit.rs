@@ -1634,6 +1634,31 @@ fn check_payload(
     )
 }
 
+/// Where the payload boundary pass is relative to the payload's one
+/// element. Nesting inside that element is not part of it: the depth
+/// counter holds that.
+///
+/// ```text
+/// Prolog --root start tag---------------------> Open
+/// Prolog --root empty-element tag-------------> Closed
+/// Open   --nested content---------------------> Open
+/// Open   --root end tag-----------------------> Closed
+/// ```
+///
+/// Nothing may stand outside the root, whitespace included. Refused: an XML
+/// declaration, a DOCTYPE or a processing instruction anywhere; any element
+/// after the root; text, CDATA, an entity reference or a comment outside
+/// the root; and the end of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PayloadRootPhase {
+    /// No element has been read.
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open,
+    /// The root element is complete.
+    Closed,
+}
+
 /// Validate an authored opaque value as one complete embedded XML element.
 ///
 /// The strict profile intentionally leaves descendants of admitted payload
@@ -1652,8 +1677,7 @@ fn validate_payload_fragment(
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     reader.config_mut().check_comments = true;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = PayloadRootPhase::Prolog;
     let mut depth = 0usize;
     let mut peak_depth = 0usize;
     let mut nodes = 0usize;
@@ -1663,7 +1687,7 @@ fn validate_payload_fragment(
             .map_err(|error| xml_error(error.to_string()))?;
         match event {
             Event::Start(element) => {
-                if root_closed {
+                if phase == PayloadRootPhase::Closed {
                     return Err(invalid(
                         "ink action opaque payload has content after its root",
                     ));
@@ -1682,12 +1706,13 @@ fn validate_payload_fragment(
                 if depth > limits.max_depth {
                     return Err(limit(LimitKind::Depth, depth, limits.max_depth));
                 }
-                if !root_seen {
-                    root_seen = true;
+                match phase {
+                    PayloadRootPhase::Prolog => phase = PayloadRootPhase::Open,
+                    PayloadRootPhase::Open | PayloadRootPhase::Closed => {},
                 }
             },
             Event::Empty(element) => {
-                if root_closed {
+                if phase == PayloadRootPhase::Closed {
                     return Err(invalid(
                         "ink action opaque payload has content after its root",
                     ));
@@ -1706,11 +1731,12 @@ fn validate_payload_fragment(
                 if nodes > limits.max_nodes {
                     return Err(limit(LimitKind::Nodes, nodes, limits.max_nodes));
                 }
-                if !root_seen {
-                    root_seen = true;
-                    root_closed = true;
-                } else if depth == 0 {
-                    return Err(invalid("ink action opaque payload has multiple roots"));
+                match phase {
+                    PayloadRootPhase::Prolog => phase = PayloadRootPhase::Closed,
+                    PayloadRootPhase::Open | PayloadRootPhase::Closed if depth == 0 => {
+                        return Err(invalid("ink action opaque payload has multiple roots"));
+                    },
+                    PayloadRootPhase::Open | PayloadRootPhase::Closed => {},
                 }
             },
             Event::End(_) => {
@@ -1719,7 +1745,7 @@ fn validate_payload_fragment(
                 }
                 depth -= 1;
                 if depth == 0 {
-                    root_closed = true;
+                    phase = PayloadRootPhase::Closed;
                 }
             },
             Event::Text(text) => {
@@ -1729,7 +1755,7 @@ fn validate_payload_fragment(
                         "ink action opaque payload text contains a raw CDATA terminator",
                     ));
                 }
-                if !root_seen || root_closed {
+                if phase != PayloadRootPhase::Open {
                     return Err(invalid(
                         "ink action opaque payload must contain one complete root element",
                     ));
@@ -1742,7 +1768,7 @@ fn validate_payload_fragment(
                         "ink action opaque payload CDATA contains a raw CDATA terminator",
                     ));
                 }
-                if !root_seen || root_closed {
+                if phase != PayloadRootPhase::Open {
                     return Err(invalid(
                         "ink action opaque payload must contain one complete root element",
                     ));
@@ -1750,7 +1776,7 @@ fn validate_payload_fragment(
             },
             Event::GeneralRef(reference) => {
                 validate_payload_reference(&reference)?;
-                if !root_seen || root_closed {
+                if phase != PayloadRootPhase::Open {
                     return Err(invalid(
                         "ink action opaque payload must contain one complete root element",
                     ));
@@ -1758,7 +1784,7 @@ fn validate_payload_fragment(
             },
             Event::Comment(comment) => {
                 validate_payload_text(&comment, "ink action opaque payload comment")?;
-                if !root_seen || root_closed {
+                if phase != PayloadRootPhase::Open {
                     return Err(invalid(
                         "ink action opaque payload must contain one complete root element",
                     ));
@@ -1772,10 +1798,13 @@ fn validate_payload_fragment(
             Event::Eof => break,
         }
     }
-    if !root_seen || !root_closed || depth != 0 {
-        return Err(invalid(
-            "ink action opaque payload must contain one complete root element",
-        ));
+    match phase {
+        PayloadRootPhase::Closed if depth == 0 => {},
+        PayloadRootPhase::Prolog | PayloadRootPhase::Open | PayloadRootPhase::Closed => {
+            return Err(invalid(
+                "ink action opaque payload must contain one complete root element",
+            ));
+        },
     }
     Ok(PayloadMetrics {
         nodes,
@@ -1879,6 +1908,32 @@ struct PayloadExpandedName {
     local: Box<[u8]>,
 }
 
+/// Where the payload namespace pass is relative to the payload's one
+/// element. Nesting inside that element is not part of it: the name stack
+/// holds that.
+///
+/// ```text
+/// Prolog --root start tag---------------------> Open
+/// Prolog --root empty-element tag-------------> Closed
+/// Open   --nested content---------------------> Open
+/// Open   --root end tag-----------------------> Closed
+/// Any    --text, CDATA, comment or entity reference--> unchanged
+/// ```
+///
+/// Those events are only checked for their characters here, wherever they
+/// stand; the boundary pass refuses them outside the root. Refused: an XML
+/// declaration, a DOCTYPE or a processing instruction anywhere; any element
+/// after the root; and the end of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PayloadGrammarPhase {
+    /// No element has been read.
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open,
+    /// The root element is complete.
+    Closed,
+}
+
 fn validate_payload_namespace_grammar(
     payload: &[u8],
     limits: EditOptions,
@@ -1892,8 +1947,7 @@ fn validate_payload_namespace_grammar(
         .resolver_mut()
         .set_max_declarations_per_element(super::MAX_NAMESPACE_DECLARATIONS);
     let mut stack: Vec<PayloadExpandedName> = Vec::new();
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = PayloadGrammarPhase::Prolog;
     loop {
         let event = reader
             .read_event()
@@ -1901,7 +1955,7 @@ fn validate_payload_namespace_grammar(
         let (resolved, event) = reader.resolver().resolve_event(event);
         match event {
             Event::Start(element) => {
-                if root_closed {
+                if phase == PayloadGrammarPhase::Closed {
                     return Err(invalid(
                         "ink action opaque payload has content after its root",
                     ));
@@ -1919,8 +1973,9 @@ fn validate_payload_namespace_grammar(
                     limits,
                     allow_inherited_namespace,
                 )?;
-                if !root_seen {
-                    root_seen = true;
+                match phase {
+                    PayloadGrammarPhase::Prolog => phase = PayloadGrammarPhase::Open,
+                    PayloadGrammarPhase::Open | PayloadGrammarPhase::Closed => {},
                 }
                 stack
                     .try_reserve(1)
@@ -1928,7 +1983,7 @@ fn validate_payload_namespace_grammar(
                 stack.push(name);
             },
             Event::Empty(element) => {
-                if root_closed {
+                if phase == PayloadGrammarPhase::Closed {
                     return Err(invalid(
                         "ink action opaque payload has content after its root",
                     ));
@@ -1946,11 +2001,12 @@ fn validate_payload_namespace_grammar(
                     limits,
                     allow_inherited_namespace,
                 )?;
-                if !root_seen {
-                    root_seen = true;
-                    root_closed = true;
-                } else if stack.is_empty() {
-                    return Err(invalid("ink action opaque payload has multiple roots"));
+                match phase {
+                    PayloadGrammarPhase::Prolog => phase = PayloadGrammarPhase::Closed,
+                    PayloadGrammarPhase::Open | PayloadGrammarPhase::Closed if stack.is_empty() => {
+                        return Err(invalid("ink action opaque payload has multiple roots"));
+                    },
+                    PayloadGrammarPhase::Open | PayloadGrammarPhase::Closed => {},
                 }
             },
             Event::End(element) => {
@@ -1970,7 +2026,7 @@ fn validate_payload_namespace_grammar(
                     ));
                 }
                 if stack.is_empty() {
-                    root_closed = true;
+                    phase = PayloadGrammarPhase::Closed;
                 }
             },
             Event::Eof => break,
@@ -1991,10 +2047,13 @@ fn validate_payload_namespace_grammar(
             Event::GeneralRef(reference) => validate_payload_reference(&reference)?,
         }
     }
-    if !root_seen || !root_closed || !stack.is_empty() {
-        return Err(invalid(
-            "ink action opaque payload must contain one complete root element",
-        ));
+    match phase {
+        PayloadGrammarPhase::Closed if stack.is_empty() => {},
+        PayloadGrammarPhase::Prolog | PayloadGrammarPhase::Open | PayloadGrammarPhase::Closed => {
+            return Err(invalid(
+                "ink action opaque payload must contain one complete root element",
+            ));
+        },
     }
     Ok(())
 }

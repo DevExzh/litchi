@@ -15,12 +15,36 @@ use quick_xml::events::Event;
 use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
+/// Where the chart fragment check is relative to the fragment's one chart element. Nesting inside the root is not
+/// part of it: the depth counter holds that.
+///
+/// ```text
+/// Prolog --root start tag---------------------> Open
+/// Prolog --root empty-element tag-------------> Closed
+/// Open   --nested content---------------------> Open
+/// Open   --root end tag-----------------------> Closed
+/// Prolog | Closed --comment, PI or whitespace-> unchanged
+/// ```
+///
+/// Refused: an XML declaration or a DOCTYPE anywhere, the first event
+/// included; a top-level element that is not the expected chart element, or
+/// a second one; text other than whitespace, CDATA and entity references
+/// outside the root; and the end of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No element has been read.
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open,
+    /// The root element is complete.
+    Closed,
+}
+
 fn validate_chart_xml_fragment(xml: &[u8], expected_root: &[u8], description: &str) -> Result<()> {
     let mut reader = NsReader::from_reader(xml);
     let mut buffer = Vec::new();
     let mut depth = 0usize;
-    let mut saw_root = false;
-    let mut closed_root = false;
+    let mut phase = RootPhase::Prolog;
     loop {
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
@@ -47,19 +71,21 @@ fn validate_chart_xml_fragment(xml: &[u8], expected_root: &[u8], description: &s
                     }
                 }
                 if depth == 0 {
-                    if saw_root || !has_expected_root {
-                        return Err(Error::Invalid(format!(
-                            "{description} must have one DrawingML chart root"
-                        )));
+                    match phase {
+                        RootPhase::Prolog if has_expected_root => phase = RootPhase::Open,
+                        RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+                            return Err(Error::Invalid(format!(
+                                "{description} must have one DrawingML chart root"
+                            )));
+                        },
                     }
-                    saw_root = true;
                 }
                 if matches!(event, Event::Start(_)) {
                     depth = depth.checked_add(1).ok_or_else(|| {
                         Error::Invalid(format!("{description} XML nesting is too deep"))
                     })?;
                 } else if depth == 0 {
-                    closed_root = true;
+                    phase = RootPhase::Closed;
                 }
             },
             Event::End(ref element) => {
@@ -83,7 +109,7 @@ fn validate_chart_xml_fragment(xml: &[u8], expected_root: &[u8], description: &s
                             "{description} has an invalid root closing element"
                         )));
                     }
-                    closed_root = true;
+                    phase = RootPhase::Closed;
                 }
             },
             Event::Text(ref text)
@@ -117,10 +143,13 @@ fn validate_chart_xml_fragment(xml: &[u8], expected_root: &[u8], description: &s
         }
         buffer.clear();
     }
-    if !saw_root || !closed_root || depth != 0 {
-        return Err(Error::Invalid(format!(
-            "{description} has no complete root"
-        )));
+    match phase {
+        RootPhase::Closed if depth == 0 => {},
+        RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(Error::Invalid(format!(
+                "{description} has no complete root"
+            )));
+        },
     }
     Ok(())
 }

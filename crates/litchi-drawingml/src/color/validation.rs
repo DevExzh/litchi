@@ -221,6 +221,32 @@ pub(crate) fn parse_scaled(value: &str, kind: &'static str) -> Result<i32> {
     })
 }
 
+/// Where the fragment check is relative to the fragment's one element.
+/// Nesting inside that element is not part of it: the element stack holds
+/// that.
+///
+/// ```text
+/// Prolog --root start tag------------------------> Open
+/// Prolog --root empty-element tag----------------> Closed
+/// Open   --nested content------------------------> Open
+/// Open   --root end tag--------------------------> Closed
+/// Prolog | Closed --comment, PI or whitespace----> unchanged
+/// ```
+///
+/// Refused: an XML declaration or a DOCTYPE anywhere, the first event
+/// included; a second top-level element; text other than whitespace, CDATA
+/// and entity references outside the root; and the end of input before
+/// `Closed`.
+#[derive(Clone, Copy)]
+enum RootPhase {
+    /// No element has been read.
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open,
+    /// The root element is complete.
+    Closed,
+}
+
 /// Validate and return the original fragment without allocating a copy.
 pub(crate) fn validated_fragment(xml: &[u8], limits: Limits) -> Result<&[u8]> {
     let limits = limits.validate()?;
@@ -234,8 +260,7 @@ pub(crate) fn validated_fragment(xml: &[u8], limits: Limits) -> Result<&[u8]> {
 
     let mut reader = Reader::from_reader(xml);
     let mut stack: Vec<Vec<u8>> = Vec::new();
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut nodes = 0usize;
     let mut transforms = 0usize;
 
@@ -268,12 +293,14 @@ pub(crate) fn validated_fragment(xml: &[u8], limits: Limits) -> Result<&[u8]> {
                     }
                 }
                 if stack.is_empty() {
-                    if root_seen {
-                        return Err(Error::Invalid(
-                            "DrawingML color fragment contains multiple roots".into(),
-                        ));
+                    match phase {
+                        RootPhase::Prolog => phase = RootPhase::Open,
+                        RootPhase::Open | RootPhase::Closed => {
+                            return Err(Error::Invalid(
+                                "DrawingML color fragment contains multiple roots".into(),
+                            ));
+                        },
                     }
-                    root_seen = true;
                 }
                 if stack.len() >= limits.max_depth {
                     return Err(Error::limit(
@@ -308,13 +335,14 @@ pub(crate) fn validated_fragment(xml: &[u8], limits: Limits) -> Result<&[u8]> {
                     }
                 }
                 if stack.is_empty() {
-                    if root_seen {
-                        return Err(Error::Invalid(
-                            "DrawingML color fragment contains multiple roots".into(),
-                        ));
+                    match phase {
+                        RootPhase::Prolog => phase = RootPhase::Closed,
+                        RootPhase::Open | RootPhase::Closed => {
+                            return Err(Error::Invalid(
+                                "DrawingML color fragment contains multiple roots".into(),
+                            ));
+                        },
                     }
-                    root_seen = true;
-                    root_closed = true;
                 }
                 if stack.len() >= limits.max_depth {
                     return Err(Error::limit(
@@ -336,7 +364,7 @@ pub(crate) fn validated_fragment(xml: &[u8], limits: Limits) -> Result<&[u8]> {
                     ));
                 }
                 if stack.is_empty() {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
             },
             Event::Text(text) if stack.is_empty() => {
@@ -370,10 +398,13 @@ pub(crate) fn validated_fragment(xml: &[u8], limits: Limits) -> Result<&[u8]> {
         }
     }
 
-    if !root_seen || !root_closed || !stack.is_empty() {
-        return Err(Error::Invalid(
-            "DrawingML color fragment must contain one complete root".into(),
-        ));
+    match phase {
+        RootPhase::Closed if stack.is_empty() => {},
+        RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(Error::Invalid(
+                "DrawingML color fragment must contain one complete root".into(),
+            ));
+        },
     }
     Ok(xml)
 }

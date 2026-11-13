@@ -1599,6 +1599,31 @@ fn replacement_semantic_close(
     Ok(())
 }
 
+/// Where the replacement check is relative to the replacement's one
+/// element. Nesting inside that element is not part of it: the frame stack
+/// holds that.
+///
+/// ```text
+/// Prolog --root start tag---------------------> Open
+/// Prolog --root empty-element tag-------------> Closed
+/// Open   --nested content---------------------> Open
+/// Open   --root end tag-----------------------> Closed
+/// Prolog | Closed --comment or whitespace-----> unchanged
+/// ```
+///
+/// Refused: an XML declaration, a DOCTYPE or a processing instruction
+/// anywhere; a second top-level element; CDATA, entity references and text
+/// other than whitespace in any phase; and the end of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ReplacementRootPhase {
+    /// No element has been read.
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open,
+    /// The root element is complete.
+    Closed,
+}
+
 fn validate_replacement_fragment(
     replacement: &[u8],
     target: &[u8],
@@ -1621,8 +1646,7 @@ fn validate_replacement_fragment(
         .set_max_declarations_per_element(limits.max_namespace_declarations);
     let mut stack: Vec<ReplacementFrame> = Vec::new();
     let mut semantics = ReplacementSemantics::default();
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = ReplacementRootPhase::Prolog;
     let mut nodes = 0usize;
     let mut max_depth = 0usize;
     let mut buffer = Vec::new();
@@ -1646,19 +1670,21 @@ fn validate_replacement_fragment(
                 if nodes > limits.max_nodes {
                     return Err(limit(LimitKind::XmlNodes, nodes, limits.max_nodes));
                 }
-                if root_closed || (root_seen && stack.is_empty()) {
+                if phase == ReplacementRootPhase::Closed
+                    || (phase == ReplacementRootPhase::Open && stack.is_empty())
+                {
                     return Err(invalid("theme replacement has more than one root"));
                 }
                 validate_replacement_namespace(
                     &namespace,
                     &element,
-                    !root_seen,
+                    phase == ReplacementRootPhase::Prolog,
                     target,
                     source_namespace,
                     stack
                         .first()
                         .is_some_and(|frame| frame.prefix.as_deref() == Some(b"a".as_slice()))
-                        || (!root_seen
+                        || (phase == ReplacementRootPhase::Prolog
                             && element
                                 .name()
                                 .prefix()
@@ -1668,7 +1694,7 @@ fn validate_replacement_fragment(
                 validate_replacement_attributes(&element, &reader, limits)?;
                 validate_modeled_namespace_binding(
                     &element,
-                    !root_seen,
+                    phase == ReplacementRootPhase::Prolog,
                     target,
                     &namespace,
                     source_namespace,
@@ -1676,7 +1702,7 @@ fn validate_replacement_fragment(
                     stack.last().is_some_and(|frame| frame.opaque),
                 )?;
                 let local = element.local_name().as_ref().to_vec();
-                if !root_seen && local.as_slice() != target {
+                if phase == ReplacementRootPhase::Prolog && local.as_slice() != target {
                     return Err(invalid("theme replacement root does not match target"));
                 }
                 let parent_opaque = stack.last().is_some_and(|frame| frame.opaque);
@@ -1688,7 +1714,7 @@ fn validate_replacement_fragment(
                         stack
                             .first()
                             .is_some_and(|frame| frame.prefix.as_deref() == Some(b"a".as_slice()))
-                            || (!root_seen
+                            || (phase == ReplacementRootPhase::Prolog
                                 && element
                                     .name()
                                     .prefix()
@@ -1704,7 +1730,7 @@ fn validate_replacement_fragment(
                     stack
                         .first()
                         .is_some_and(|frame| frame.prefix.as_deref() == Some(b"a".as_slice()))
-                        || (!root_seen
+                        || (phase == ReplacementRootPhase::Prolog
                             && element
                                 .name()
                                 .prefix()
@@ -1728,7 +1754,7 @@ fn validate_replacement_fragment(
                     ));
                 }
                 max_depth = max_depth.max(stack.len() + 1);
-                root_seen = true;
+                phase = ReplacementRootPhase::Open;
                 stack.push(ReplacementFrame {
                     local,
                     opaque,
@@ -1745,19 +1771,21 @@ fn validate_replacement_fragment(
                 if nodes > limits.max_nodes {
                     return Err(limit(LimitKind::XmlNodes, nodes, limits.max_nodes));
                 }
-                if root_closed || (root_seen && stack.is_empty()) {
+                if phase == ReplacementRootPhase::Closed
+                    || (phase == ReplacementRootPhase::Open && stack.is_empty())
+                {
                     return Err(invalid("theme replacement has more than one root"));
                 }
                 validate_replacement_namespace(
                     &namespace,
                     &element,
-                    !root_seen,
+                    phase == ReplacementRootPhase::Prolog,
                     target,
                     source_namespace,
                     stack
                         .first()
                         .is_some_and(|frame| frame.prefix.as_deref() == Some(b"a".as_slice()))
-                        || (!root_seen
+                        || (phase == ReplacementRootPhase::Prolog
                             && element
                                 .name()
                                 .prefix()
@@ -1767,14 +1795,15 @@ fn validate_replacement_fragment(
                 validate_replacement_attributes(&element, &reader, limits)?;
                 validate_modeled_namespace_binding(
                     &element,
-                    !root_seen,
+                    phase == ReplacementRootPhase::Prolog,
                     target,
                     &namespace,
                     source_namespace,
                     reader.decoder(),
                     stack.last().is_some_and(|frame| frame.opaque),
                 )?;
-                if !root_seen && element.local_name().as_ref() != target {
+                if phase == ReplacementRootPhase::Prolog && element.local_name().as_ref() != target
+                {
                     return Err(invalid("theme replacement root does not match target"));
                 }
                 let parent_opaque = stack.last().is_some_and(|frame| frame.opaque);
@@ -1786,7 +1815,7 @@ fn validate_replacement_fragment(
                         stack
                             .first()
                             .is_some_and(|frame| frame.prefix.as_deref() == Some(b"a".as_slice()))
-                            || (!root_seen
+                            || (phase == ReplacementRootPhase::Prolog
                                 && element
                                     .name()
                                     .prefix()
@@ -1802,7 +1831,7 @@ fn validate_replacement_fragment(
                     stack
                         .first()
                         .is_some_and(|frame| frame.prefix.as_deref() == Some(b"a".as_slice()))
-                        || (!root_seen
+                        || (phase == ReplacementRootPhase::Prolog
                             && element
                                 .name()
                                 .prefix()
@@ -1828,9 +1857,9 @@ fn validate_replacement_fragment(
                     return Err(limit(LimitKind::XmlDepth, 1, limits.max_depth));
                 }
                 max_depth = max_depth.max(stack.len() + 1);
-                if !root_seen {
-                    root_seen = true;
-                    root_closed = true;
+                match phase {
+                    ReplacementRootPhase::Prolog => phase = ReplacementRootPhase::Closed,
+                    ReplacementRootPhase::Open | ReplacementRootPhase::Closed => {},
                 }
             },
             Event::End(element) => {
@@ -1844,7 +1873,7 @@ fn validate_replacement_fragment(
                 }
                 replacement_semantic_close(&semantics, target, &local.local, stack.last())?;
                 if stack.is_empty() {
-                    root_closed = true;
+                    phase = ReplacementRootPhase::Closed;
                 }
             },
             Event::Text(text) => {
@@ -1870,10 +1899,39 @@ fn validate_replacement_fragment(
         }
         buffer.clear();
     }
-    if !root_seen || !root_closed || !stack.is_empty() {
-        return Err(invalid("theme replacement is unterminated"));
+    match phase {
+        ReplacementRootPhase::Closed if stack.is_empty() => {},
+        ReplacementRootPhase::Prolog
+        | ReplacementRootPhase::Open
+        | ReplacementRootPhase::Closed => {
+            return Err(invalid("theme replacement is unterminated"));
+        },
     }
     Ok(XmlStats { nodes, max_depth })
+}
+
+/// Where the source statistics pass is relative to the theme part's root.
+/// Nesting inside the root is not part of it: the name stack holds that.
+///
+/// ```text
+/// Prolog --root start tag---------------------> Open
+/// Prolog --root empty-element tag-------------> Closed
+/// Open   --nested content---------------------> Open
+/// Open   --root end tag-----------------------> Closed
+/// Any    --declaration, comment, text, CDATA or entity reference--> unchanged
+/// ```
+///
+/// Those events are not examined, wherever they stand. Refused: a DOCTYPE
+/// or a processing instruction anywhere; a second top-level element; and
+/// the end of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SourceRootPhase {
+    /// No element has been read.
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open,
+    /// The root element is complete.
+    Closed,
 }
 
 fn source_stats(xml: &[u8], target: &Range<usize>, limits: Limits) -> Result<SourceStats> {
@@ -1885,8 +1943,7 @@ fn source_stats(xml: &[u8], target: &Range<usize>, limits: Limits) -> Result<Sou
         .set_max_declarations_per_element(limits.max_namespace_declarations);
     let mut stack = Vec::<Vec<u8>>::new();
     let mut stats = SourceStats::default();
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = SourceRootPhase::Prolog;
     loop {
         let start = origin
             .offset(reader.buffer_position())
@@ -1901,7 +1958,9 @@ fn source_stats(xml: &[u8], target: &Range<usize>, limits: Limits) -> Result<Sou
         reject_unknown_namespace(&namespace)?;
         match event {
             Event::Start(element) => {
-                if root_closed || (root_seen && stack.is_empty()) {
+                if phase == SourceRootPhase::Closed
+                    || (phase == SourceRootPhase::Open && stack.is_empty())
+                {
                     return Err(invalid("theme XML has multiple root elements"));
                 }
                 validate_replacement_attributes(&element, &reader, limits)?;
@@ -1925,11 +1984,13 @@ fn source_stats(xml: &[u8], target: &Range<usize>, limits: Limits) -> Result<Sou
                 } else {
                     stats.outside_max_depth = stats.outside_max_depth.max(depth);
                 }
-                root_seen = true;
+                phase = SourceRootPhase::Open;
                 stack.push(element.local_name().as_ref().to_vec());
             },
             Event::Empty(element) => {
-                if root_closed || (root_seen && stack.is_empty()) {
+                if phase == SourceRootPhase::Closed
+                    || (phase == SourceRootPhase::Open && stack.is_empty())
+                {
                     return Err(invalid("theme XML has multiple root elements"));
                 }
                 validate_replacement_attributes(&element, &reader, limits)?;
@@ -1953,9 +2014,9 @@ fn source_stats(xml: &[u8], target: &Range<usize>, limits: Limits) -> Result<Sou
                 } else {
                     stats.outside_max_depth = stats.outside_max_depth.max(depth);
                 }
-                if !root_seen {
-                    root_seen = true;
-                    root_closed = true;
+                match phase {
+                    SourceRootPhase::Prolog => phase = SourceRootPhase::Closed,
+                    SourceRootPhase::Open | SourceRootPhase::Closed => {},
                 }
             },
             Event::End(element) => {
@@ -1966,7 +2027,7 @@ fn source_stats(xml: &[u8], target: &Range<usize>, limits: Limits) -> Result<Sou
                     return Err(invalid("theme XML closing element does not match"));
                 }
                 if stack.is_empty() {
-                    root_closed = true;
+                    phase = SourceRootPhase::Closed;
                 }
             },
             Event::DocType(_) | Event::PI(_) => {
@@ -1981,8 +2042,11 @@ fn source_stats(xml: &[u8], target: &Range<usize>, limits: Limits) -> Result<Sou
         }
         let _ = end;
     }
-    if !root_seen || !root_closed || !stack.is_empty() {
-        return Err(invalid("theme XML is unterminated"));
+    match phase {
+        SourceRootPhase::Closed if stack.is_empty() => {},
+        SourceRootPhase::Prolog | SourceRootPhase::Open | SourceRootPhase::Closed => {
+            return Err(invalid("theme XML is unterminated"));
+        },
     }
     if stats.target_nodes == 0 {
         return Err(invalid("theme replacement range has no source nodes"));

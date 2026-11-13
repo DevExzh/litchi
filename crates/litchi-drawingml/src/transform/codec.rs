@@ -64,6 +64,32 @@ impl Default for Limits {
     }
 }
 
+/// Where the transform reader is relative to `xfrm`. The children of the
+/// root are read whole by their own helpers, so there is no deeper nesting
+/// to track.
+///
+/// ```text
+/// Prolog --root start tag---------------------> Open
+/// Prolog --root empty-element tag-------------> Closed
+/// Open   --direct child-----------------------> Open
+/// Open   --root end tag-----------------------> Closed
+/// Prolog | Closed --whitespace----------------> unchanged
+/// ```
+///
+/// Refused: a comment, a processing instruction, an XML declaration or a
+/// DOCTYPE anywhere; a second top-level element; text or CDATA other than
+/// whitespace, and entity references, in any phase; and the end of input
+/// before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No element has been read.
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open,
+    /// The root element is complete.
+    Closed,
+}
+
 /// Read one complete `a:xfrm` element.
 ///
 /// The reader is intentionally fragment-oriented: a host may provide a
@@ -90,9 +116,7 @@ pub fn read(xml: &[u8], limits: &Limits) -> Result<Transform> {
     reader.config_mut().check_comments = true;
     let mut buffer = Vec::new();
     let mut transform = Transform::new();
-    let mut root_seen = false;
-    let mut root_open = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut last_child_order = 0u8;
     let mut nodes = 0usize;
 
@@ -109,19 +133,17 @@ pub fn read(xml: &[u8], limits: &Limits) -> Result<Transform> {
         }
 
         match event {
-            Event::Start(element) if !root_seen => {
+            Event::Start(element) if phase == RootPhase::Prolog => {
                 require_root(&element)?;
                 parse_root_attributes(&element, reader.decoder(), &mut transform)?;
-                root_seen = true;
-                root_open = true;
+                phase = RootPhase::Open;
             },
-            Event::Empty(element) if !root_seen => {
+            Event::Empty(element) if phase == RootPhase::Prolog => {
                 require_root(&element)?;
                 parse_root_attributes(&element, reader.decoder(), &mut transform)?;
-                root_seen = true;
-                root_closed = true;
+                phase = RootPhase::Closed;
             },
-            Event::Start(element) if root_open => {
+            Event::Start(element) if phase == RootPhase::Open => {
                 let order = child_order(element.local_name().as_ref())
                     .ok_or_else(|| unsupported_child(element.local_name().as_ref()))?;
                 if order <= last_child_order {
@@ -140,7 +162,7 @@ pub fn read(xml: &[u8], limits: &Limits) -> Result<Transform> {
                     limits.max_nodes,
                 )?;
             },
-            Event::Empty(element) if root_open => {
+            Event::Empty(element) if phase == RootPhase::Open => {
                 let order = child_order(element.local_name().as_ref())
                     .ok_or_else(|| unsupported_child(element.local_name().as_ref()))?;
                 if order <= last_child_order {
@@ -151,14 +173,13 @@ pub fn read(xml: &[u8], limits: &Limits) -> Result<Transform> {
                 last_child_order = order;
                 parse_child_empty(&element, reader.decoder(), &mut transform)?;
             },
-            Event::End(element) if root_open => {
+            Event::End(element) if phase == RootPhase::Open => {
                 if element.local_name().as_ref() != b"xfrm" {
                     return Err(invalid("DrawingML transform root close tag does not match"));
                 }
-                root_open = false;
-                root_closed = true;
+                phase = RootPhase::Closed;
             },
-            Event::Start(_) | Event::Empty(_) if root_closed => {
+            Event::Start(_) | Event::Empty(_) if phase == RootPhase::Closed => {
                 return Err(invalid("DrawingML transform contains more than one root"));
             },
             Event::Start(_) | Event::Empty(_) => {
@@ -193,11 +214,10 @@ pub fn read(xml: &[u8], limits: &Limits) -> Result<Transform> {
         buffer.clear();
     }
 
-    if !root_seen {
-        return Err(invalid("DrawingML transform has no root element"));
-    }
-    if root_open || !root_closed {
-        return Err(invalid("DrawingML transform root is not closed"));
+    match phase {
+        RootPhase::Prolog => return Err(invalid("DrawingML transform has no root element")),
+        RootPhase::Open => return Err(invalid("DrawingML transform root is not closed")),
+        RootPhase::Closed => {},
     }
     validation::validate(&transform)?;
     Ok(transform)

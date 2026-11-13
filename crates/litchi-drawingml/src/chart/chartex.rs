@@ -824,6 +824,35 @@ fn attribute_name(
     }
 }
 
+/// Where the ChartEx tree reader is relative to `cx:chartSpace`. Nesting
+/// inside the root is not part of it: the node stack holds that.
+///
+/// ```text
+/// Start          --XML declaration--------------> Prolog
+/// Start | Prolog --comment or whitespace--------> Prolog
+/// Start | Prolog --root start tag---------------> Open
+/// Start | Prolog --root empty-element tag-------> Closed
+/// Open           --nested content---------------> Open
+/// Open           --root end tag-----------------> Closed
+/// Closed         --comment or whitespace--------> Closed
+/// ```
+///
+/// Refused: an XML declaration anywhere but `Start`; a DOCTYPE or a
+/// processing instruction anywhere; a second top-level element; text other
+/// than whitespace, CDATA and entity references outside the root; and the
+/// end of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// Nothing has been read.
+    Start,
+    /// A declaration or other prolog content was read; no root yet.
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open,
+    /// The root element is complete.
+    Closed,
+}
+
 fn parse_tree(xml: &[u8], limits: Limits) -> Result<Node> {
     let maximum = limits.max_chartex_bytes.min(MAX_XML_BYTES);
     if xml.len() > maximum {
@@ -838,10 +867,7 @@ fn parse_tree(xml: &[u8], limits: Limits) -> Result<Node> {
     let mut stack: Vec<Node> = Vec::new();
     let mut root = None;
     let mut nodes = 0_usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
-    let mut declaration_seen = false;
-    let mut pre_root_event_seen = false;
+    let mut phase = RootPhase::Start;
     let open = |reader: &NsReader<&[u8]>, element: &BytesStart<'_>| -> Result<Node> {
         let (namespace, local) = reader.resolver().resolve_element(element.name());
         let uri = match namespace {
@@ -900,17 +926,20 @@ fn parse_tree(xml: &[u8], limits: Limits) -> Result<Node> {
     };
     loop {
         let event = reader.read_event()?;
-        if !root_seen && !matches!(&event, Event::Decl(_) | Event::Eof) {
-            pre_root_event_seen = true;
+        if phase == RootPhase::Start && !matches!(&event, Event::Decl(_) | Event::Eof) {
+            phase = RootPhase::Prolog;
         }
         match event {
             Event::Start(element) => {
-                if root_closed {
-                    return Err(Error::Invalid(
-                        "chartex XML contains more than one root element".into(),
-                    ));
+                match phase {
+                    RootPhase::Start | RootPhase::Prolog => phase = RootPhase::Open,
+                    RootPhase::Open => {},
+                    RootPhase::Closed => {
+                        return Err(Error::Invalid(
+                            "chartex XML contains more than one root element".into(),
+                        ));
+                    },
                 }
-                root_seen = true;
                 nodes = nodes.checked_add(1).ok_or_else(|| {
                     Error::limit(
                         crate::LimitKind::ChartexXmlNodes,
@@ -943,12 +972,15 @@ fn parse_tree(xml: &[u8], limits: Limits) -> Result<Node> {
                 stack.push(node);
             },
             Event::Empty(element) => {
-                if root_closed {
-                    return Err(Error::Invalid(
-                        "chartex XML contains more than one root element".into(),
-                    ));
+                match phase {
+                    RootPhase::Start | RootPhase::Prolog => phase = RootPhase::Open,
+                    RootPhase::Open => {},
+                    RootPhase::Closed => {
+                        return Err(Error::Invalid(
+                            "chartex XML contains more than one root element".into(),
+                        ));
+                    },
                 }
-                root_seen = true;
                 nodes = nodes.checked_add(1).ok_or_else(|| {
                     Error::limit(
                         crate::LimitKind::ChartexXmlNodes,
@@ -982,7 +1014,7 @@ fn parse_tree(xml: &[u8], limits: Limits) -> Result<Node> {
                     Some(parent) => parent.children.push(node),
                     None => {
                         root = Some(node);
-                        root_closed = true;
+                        phase = RootPhase::Closed;
                     },
                 }
             },
@@ -994,7 +1026,7 @@ fn parse_tree(xml: &[u8], limits: Limits) -> Result<Node> {
                     Some(parent) => parent.children.push(node),
                     None => {
                         root = Some(node);
-                        root_closed = true;
+                        phase = RootPhase::Closed;
                     },
                 }
             },
@@ -1053,12 +1085,12 @@ fn parse_tree(xml: &[u8], limits: Limits) -> Result<Node> {
                 append_text(node, &text, limits)?;
             },
             Event::Decl(_) => {
-                if root_seen || declaration_seen || pre_root_event_seen {
+                if phase != RootPhase::Start {
                     return Err(Error::Invalid(
                         "chartex XML declaration is misplaced".into(),
                     ));
                 }
-                declaration_seen = true;
+                phase = RootPhase::Prolog;
             },
             Event::DocType(_) => {
                 return Err(Error::Invalid(
@@ -1074,8 +1106,11 @@ fn parse_tree(xml: &[u8], limits: Limits) -> Result<Node> {
             Event::Comment(_) => {},
         }
     }
-    if !root_seen || !root_closed || !stack.is_empty() {
-        return Err(Error::Invalid("chartex XML has no complete root".into()));
+    match phase {
+        RootPhase::Closed if stack.is_empty() => {},
+        RootPhase::Start | RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(Error::Invalid("chartex XML has no complete root".into()));
+        },
     }
     let root = root.ok_or_else(|| Error::Xml("empty chartex XML".into()))?;
     if !(root.cx && root.name == "chartSpace") {

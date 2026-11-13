@@ -21,6 +21,33 @@ use std::io::BufRead;
 pub(super) const IGNORED_NAMESPACE_ELEMENT: &str = "ignoredNamespaceElement";
 pub(super) const INVALID_COLOR_MAPPING_ELEMENT: &str = "invalidColorMappingElement";
 
+/// Where the chart event reader is relative to `c:chartSpace`. Nesting
+/// inside the root is not part of it: the depth counter holds that. The
+/// phase is kept when a read returns an error, so a caller that reads on
+/// continues from it.
+///
+/// ```text
+/// Prolog --root start tag---------------------> Open
+/// Open   --nested content---------------------> Open
+/// Open   --root end tag-----------------------> Closed
+/// Any    --declaration, DOCTYPE, comment or PI-> unchanged
+/// ```
+///
+/// Those events are passed through wherever they stand, as is whitespace
+/// outside the root. Refused: an empty-element root; a top-level element
+/// that is not `c:chartSpace`, or a second one; text other than whitespace,
+/// CDATA and entity references outside the root; and the end of input
+/// before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No element has been read.
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open,
+    /// The root element is complete.
+    Closed,
+}
+
 /// Namespace-aware streaming adapter for the chart model parser.
 ///
 /// Core chart elements are exposed unchanged. `DrawingML` text and color-map choice
@@ -34,8 +61,7 @@ pub(super) struct ChartXmlReader<R: BufRead> {
     nodes: usize,
     depth: usize,
     skipped_depth: usize,
-    saw_root: bool,
-    closed_root: bool,
+    phase: RootPhase,
     series: usize,
     points_in_series: usize,
     total_points: usize,
@@ -51,8 +77,7 @@ impl<R: BufRead> ChartXmlReader<R> {
             nodes: 0,
             depth: 0,
             skipped_depth: 0,
-            saw_root: false,
-            closed_root: false,
+            phase: RootPhase::Prolog,
             series: 0,
             points_in_series: 0,
             total_points: 0,
@@ -354,14 +379,14 @@ impl<R: BufRead> ChartXmlReader<R> {
                 let is_drawing = is_drawing_namespace(&namespace, &element);
 
                 if self.depth == 0 {
-                    if self.saw_root
+                    if self.phase != RootPhase::Prolog
                         || !is_drawingml_chart_name(&namespace, element.name(), b"chartSpace")
                     {
                         return Err(Error::Invalid(
                             "chart XML must have one DrawingML chartSpace root".to_string(),
                         ));
                     }
-                    self.saw_root = true;
+                    self.phase = RootPhase::Open;
                     self.root_namespace_attributes.clear();
                     for attribute in element.checked_attributes() {
                         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
@@ -489,7 +514,7 @@ impl<R: BufRead> ChartXmlReader<R> {
                             "chart XML has an invalid root closing element".to_string(),
                         ));
                     }
-                    self.closed_root = true;
+                    self.phase = RootPhase::Closed;
                 }
                 if is_drawing && !is_preserved_drawing_element(element.local_name().as_ref()) {
                     return Ok(Event::End(BytesEnd::new(IGNORED_NAMESPACE_ELEMENT)));
@@ -518,10 +543,12 @@ impl<R: BufRead> ChartXmlReader<R> {
             Event::CData(_) | Event::GeneralRef(_) if self.depth == 0 => Err(Error::Invalid(
                 "chart XML contains data outside its root".to_string(),
             )),
-            Event::Eof if !self.saw_root || !self.closed_root => Err(Error::Invalid(
-                "chart XML has no complete chartSpace root".to_string(),
-            )),
-            Event::Eof => Ok(Event::Eof),
+            Event::Eof => match self.phase {
+                RootPhase::Closed => Ok(Event::Eof),
+                RootPhase::Prolog | RootPhase::Open => Err(Error::Invalid(
+                    "chart XML has no complete chartSpace root".to_string(),
+                )),
+            },
             Event::Text(_)
             | Event::CData(_)
             | Event::Comment(_)

@@ -2068,6 +2068,32 @@ pub(crate) mod codec {
         Ok(())
     }
 
+    /// Where the contextual child walk is relative to the child's one element.
+    /// Nesting inside that element is not part of it: the depth counter holds
+    /// that.
+    ///
+    /// ```text
+    /// Prolog --root start tag---------------------> Open
+    /// Prolog --root empty-element tag-------------> Closed
+    /// Open   --nested content---------------------> Open
+    /// Open   --root end tag-----------------------> Closed
+    /// Prolog | Closed --whitespace----------------> unchanged
+    /// ```
+    ///
+    /// Refused: an XML declaration, a DOCTYPE or a processing instruction
+    /// anywhere; any element after the root; a comment, CDATA, an entity
+    /// reference or text other than whitespace outside the root; and the end of
+    /// input before `Closed`.
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    enum ChildRootPhase {
+        /// No element has been read.
+        Prolog,
+        /// The root start tag was read and its end tag was not.
+        Open,
+        /// The root element is complete.
+        Closed,
+    }
+
     /// Validate QName bindings in an opaque contextual subtree while keeping
     /// only its direct child byte ranges.  `Reader` is intentionally used for
     /// the raw fragment: unlike a synthetic namespace-completed copy, this
@@ -2087,8 +2113,7 @@ pub(crate) mod codec {
         let mut starts = Vec::<usize>::new();
         let mut depth = 0usize;
         let mut nodes = 0usize;
-        let mut root_seen = false;
-        let mut root_closed = false;
+        let mut phase = ChildRootPhase::Prolog;
         // `ContextResolver::new` has capped the root's declarations; this walk
         // has never capped a descendant's, so it reads them all.
         let descendant_declarations = usize::MAX;
@@ -2102,14 +2127,16 @@ pub(crate) mod codec {
             let end = position(&reader, origin, "SVG contextual child")?;
             match event {
                 Event::Start(element) => {
-                    if root_closed {
+                    if phase == ChildRootPhase::Closed {
                         return Err(invalid("SVG contextual child has markup outside its root"));
                     }
                     if depth == 0 {
-                        if root_seen {
-                            return Err(invalid("SVG contextual child has multiple roots"));
+                        match phase {
+                            ChildRootPhase::Prolog => phase = ChildRootPhase::Open,
+                            ChildRootPhase::Open | ChildRootPhase::Closed => {
+                                return Err(invalid("SVG contextual child has multiple roots"));
+                            },
                         }
-                        root_seen = true;
                     }
                     let local = declarations(&element, reader.decoder(), descendant_declarations)?;
                     scope.push(local)?;
@@ -2135,14 +2162,16 @@ pub(crate) mod codec {
                     starts.push(start);
                 },
                 Event::Empty(element) => {
-                    if root_closed {
+                    if phase == ChildRootPhase::Closed {
                         return Err(invalid("SVG contextual child has markup outside its root"));
                     }
                     if depth == 0 {
-                        if root_seen {
-                            return Err(invalid("SVG contextual child has multiple roots"));
+                        match phase {
+                            ChildRootPhase::Prolog => phase = ChildRootPhase::Open,
+                            ChildRootPhase::Open | ChildRootPhase::Closed => {
+                                return Err(invalid("SVG contextual child has multiple roots"));
+                            },
                         }
-                        root_seen = true;
                     }
                     let local = declarations(&element, reader.decoder(), descendant_declarations)?;
                     scope.push(local)?;
@@ -2155,7 +2184,7 @@ pub(crate) mod codec {
                     }
                     scope.pop();
                     if depth == 0 {
-                        root_closed = true;
+                        phase = ChildRootPhase::Closed;
                     }
                     nodes = nodes
                         .checked_add(1)
@@ -2177,7 +2206,7 @@ pub(crate) mod codec {
                     }
                     depth -= 1;
                     if depth == 0 {
-                        root_closed = true;
+                        phase = ChildRootPhase::Closed;
                     }
                 },
                 Event::Text(text) => {
@@ -2204,8 +2233,11 @@ pub(crate) mod codec {
             }
             buffer.clear();
         }
-        if !root_seen || !root_closed || depth != 0 {
-            return Err(invalid("SVG contextual child is not one complete XML item"));
+        match phase {
+            ChildRootPhase::Closed if depth == 0 => {},
+            ChildRootPhase::Prolog | ChildRootPhase::Open | ChildRootPhase::Closed => {
+                return Err(invalid("SVG contextual child is not one complete XML item"));
+            },
         }
         Ok(())
     }

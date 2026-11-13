@@ -72,6 +72,32 @@ pub fn write_with_external_data_id(
     Ok(output)
 }
 
+/// Where the user-shapes scan is relative to `c:userShapes`. Nesting inside the root is not
+/// part of it: the depth counter holds that.
+///
+/// ```text
+/// Prolog --root start tag---------------------> Open
+/// Prolog --root empty-element tag-------------> Closed
+/// Open   --nested content---------------------> Open
+/// Open   --root end tag-----------------------> Closed
+/// Any    --declaration, comment or PI---------> unchanged
+/// ```
+///
+/// An XML declaration is accepted anywhere, inside the root included.
+/// Whitespace outside the root is ignored. Refused: a DOCTYPE anywhere; a
+/// top-level element that is not `c:userShapes`, or a second one; text other
+/// than whitespace, CDATA and entity references outside the root; and the end
+/// of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No element has been read.
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open,
+    /// The root element is complete.
+    Closed,
+}
+
 /// # Errors
 ///
 /// Returns an error when the user-shapes XML is malformed or has an invalid root.
@@ -86,8 +112,7 @@ pub(crate) fn user_shapes_ids(xml: &[u8]) -> Result<HashSet<String>> {
     let mut reader = NsReader::from_reader(processed_xml.as_ref());
     let mut buffer = Vec::new();
     let mut depth = 0usize;
-    let mut saw_root = false;
-    let mut closed_root = false;
+    let mut phase = RootPhase::Prolog;
     let mut relationship_ids = HashSet::new();
     loop {
         let (namespace, event) = reader
@@ -96,7 +121,7 @@ pub(crate) fn user_shapes_ids(xml: &[u8]) -> Result<HashSet<String>> {
         match event {
             Event::Start(ref element) | Event::Empty(ref element) => {
                 if depth == 0 {
-                    if saw_root
+                    if phase != RootPhase::Prolog
                         || !litchi_ooxml_common::xml::is_drawingml_chart_name(
                             &namespace,
                             element.name(),
@@ -107,7 +132,7 @@ pub(crate) fn user_shapes_ids(xml: &[u8]) -> Result<HashSet<String>> {
                             "chart user-shapes XML must have one chart userShapes root".into(),
                         ));
                     }
-                    saw_root = true;
+                    phase = RootPhase::Open;
                 }
                 for attribute_result in element.checked_attributes() {
                     let attribute =
@@ -136,7 +161,7 @@ pub(crate) fn user_shapes_ids(xml: &[u8]) -> Result<HashSet<String>> {
                         Error::Invalid("chart user-shapes XML nesting is too deep".into())
                     })?;
                 } else if depth == 0 {
-                    closed_root = true;
+                    phase = RootPhase::Closed;
                 }
             },
             Event::End(ref element) => {
@@ -156,7 +181,7 @@ pub(crate) fn user_shapes_ids(xml: &[u8]) -> Result<HashSet<String>> {
                             "chart user-shapes XML has an invalid root closing element".into(),
                         ));
                     }
-                    closed_root = true;
+                    phase = RootPhase::Closed;
                 }
             },
             Event::Text(ref text)
@@ -191,10 +216,13 @@ pub(crate) fn user_shapes_ids(xml: &[u8]) -> Result<HashSet<String>> {
         }
         buffer.clear();
     }
-    if !saw_root || !closed_root || depth != 0 {
-        return Err(Error::Invalid(
-            "chart user-shapes XML has no complete root".into(),
-        ));
+    match phase {
+        RootPhase::Closed if depth == 0 => {},
+        RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(Error::Invalid(
+                "chart user-shapes XML has no complete root".into(),
+            ));
+        },
     }
     Ok(relationship_ids)
 }

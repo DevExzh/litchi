@@ -140,6 +140,31 @@ pub struct SmartArt {
     pub id: Option<String>,
 }
 
+/// Where the SmartArt data reader is relative to `dgm:dataModel`. Nesting
+/// inside the root is not part of it: the depth counter holds that.
+///
+/// ```text
+/// Prolog --root start tag---------------------> Open
+/// Open   --nested content---------------------> Open
+/// Open   --root end tag-----------------------> Closed
+/// Any    --declaration, comment or PI---------> unchanged
+/// ```
+///
+/// An XML declaration is accepted anywhere, inside the root included.
+/// Whitespace outside the root is ignored. Refused: a DOCTYPE anywhere;
+/// an empty-element root; any element after the root; text
+/// other than whitespace, CDATA and entity references outside the root; and
+/// the end of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No element has been read.
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open,
+    /// The root element is complete.
+    Closed,
+}
+
 impl SmartArt {
     /// Create a new `SmartArt` diagram.
     #[must_use]
@@ -210,8 +235,7 @@ impl SmartArt {
         let mut depth = 0_usize;
         let mut xml_nodes = 0_usize;
         let mut stack: Vec<(SmartArtNamespace, Vec<u8>)> = Vec::new();
-        let mut root_seen = false;
-        let mut root_closed = false;
+        let mut phase = RootPhase::Prolog;
         let max_depth = limits.xml_depth_value().min(128);
         let max_xml_nodes = limits.xml_nodes_value().min(200_000);
         let max_points = limits.points_value().min(100_000);
@@ -235,7 +259,7 @@ impl SmartArt {
                     if xml_nodes > max_xml_nodes {
                         return Err(Error::limit(LimitKind::XmlNodes, xml_nodes, max_xml_nodes));
                     }
-                    if root_closed {
+                    if phase == RootPhase::Closed {
                         return Err(Error::Invalid(
                             "trailing markup follows the SmartArt data model".to_owned(),
                         ));
@@ -252,7 +276,7 @@ impl SmartArt {
                     let dml = namespace == SmartArtNamespace::Drawing;
                     let local = element.local_name().as_ref().to_vec();
                     if depth == 1 {
-                        if root_seen {
+                        if phase != RootPhase::Prolog {
                             return Err(Error::Invalid(
                                 "the SmartArt data model has multiple roots".to_owned(),
                             ));
@@ -262,7 +286,7 @@ impl SmartArt {
                                 "the SmartArt data model root is invalid".to_owned(),
                             ));
                         }
-                        root_seen = true;
+                        phase = RootPhase::Open;
                     } else if dgm && local == b"dataModel" {
                         return Err(Error::Invalid(
                             "the SmartArt data model has a nested root".to_owned(),
@@ -369,7 +393,7 @@ impl SmartArt {
                     if xml_nodes > max_xml_nodes {
                         return Err(Error::limit(LimitKind::XmlNodes, xml_nodes, max_xml_nodes));
                     }
-                    if root_closed {
+                    if phase == RootPhase::Closed {
                         return Err(Error::Invalid(
                             "trailing markup follows the SmartArt data model".to_owned(),
                         ));
@@ -384,7 +408,7 @@ impl SmartArt {
                     let dgm = namespace == SmartArtNamespace::Diagram;
                     let local = element.local_name().as_ref().to_vec();
                     if depth == 0 {
-                        if root_seen {
+                        if phase != RootPhase::Prolog {
                             return Err(Error::Invalid(
                                 "the SmartArt data model has multiple roots".to_owned(),
                             ));
@@ -521,7 +545,7 @@ impl SmartArt {
                     stack.pop();
                     depth -= 1;
                     if depth == 0 {
-                        root_closed = true;
+                        phase = RootPhase::Closed;
                     }
                 },
                 Event::Text(text) => {
@@ -583,14 +607,12 @@ impl SmartArt {
             }
         }
 
-        if !root_seen
-            || !root_closed
-            || !point_list_seen
-            || depth != 0
-            || !stack.is_empty()
-            || in_text_body
-        {
-            return Err(Error::Invalid("unterminated SmartArt data XML".to_owned()));
+        match phase {
+            RootPhase::Closed
+                if point_list_seen && depth == 0 && stack.is_empty() && !in_text_body => {},
+            RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+                return Err(Error::Invalid("unterminated SmartArt data XML".to_owned()));
+            },
         }
         let mut point_ids = HashMap::with_capacity(points.len());
         for point in &points {

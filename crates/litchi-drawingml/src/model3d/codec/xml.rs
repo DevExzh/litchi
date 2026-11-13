@@ -20,6 +20,32 @@ use super::super::{
 use super::Limits;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
+/// Where the reader is relative to `m3d:model3d`. Each child of the root is
+/// captured whole, so there is no deeper nesting to track; what the root
+/// declared is kept beside the phase.
+///
+/// ```text
+/// Prolog --root start tag---------------------> Open
+/// Prolog --root empty-element tag-------------> Closed
+/// Open   --direct child-----------------------> Open
+/// Open   --root end tag-----------------------> Closed
+/// Any    --declaration, comment, PI, CDATA or entity reference--> unchanged
+/// ```
+///
+/// Those events are ignored wherever they stand, as is whitespace outside
+/// the root. Refused: a DOCTYPE anywhere; a second top-level element; text
+/// other than whitespace outside the root; and the end of input before
+/// `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No element has been read.
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open,
+    /// The root element is complete.
+    Closed,
+}
+
 /// Read one complete `m3d:model3d` element.
 /// # Errors
 ///
@@ -37,8 +63,7 @@ pub fn read(xml: &[u8], limits: Limits) -> Result<Metadata> {
     reader.config_mut().check_comments = true;
     let mut buffer = Vec::new();
     let mut metadata = None;
-    let mut root_depth = 0usize;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut nodes = 0usize;
 
     loop {
@@ -55,7 +80,7 @@ pub fn read(xml: &[u8], limits: Limits) -> Result<Metadata> {
             .ok_or_else(|| invalid("model3d XML offset exceeds usize"))?;
 
         match event {
-            Event::Start(element) if metadata.is_none() && root_depth == 0 => {
+            Event::Start(element) if phase == RootPhase::Prolog => {
                 count_node(&mut nodes, limits)?;
                 let (local, namespace) = resolved_name(&namespace, &element.name())?;
                 require_root(&local, &namespace)?;
@@ -66,9 +91,9 @@ pub fn read(xml: &[u8], limits: Limits) -> Result<Metadata> {
                     children: Vec::new(),
                     namespaces,
                 });
-                root_depth = 1;
+                phase = RootPhase::Open;
             },
-            Event::Empty(element) if metadata.is_none() && root_depth == 0 => {
+            Event::Empty(element) if phase == RootPhase::Prolog => {
                 count_node(&mut nodes, limits)?;
                 let (local, namespace) = resolved_name(&namespace, &element.name())?;
                 require_root(&local, &namespace)?;
@@ -79,9 +104,9 @@ pub fn read(xml: &[u8], limits: Limits) -> Result<Metadata> {
                     children: Vec::new(),
                     namespaces,
                 });
-                root_closed = true;
+                phase = RootPhase::Closed;
             },
-            Event::Start(element) if metadata.is_some() && root_depth == 1 => {
+            Event::Start(element) if phase == RootPhase::Open => {
                 count_node(&mut nodes, limits)?;
                 let (local, namespace) = resolved_name(&namespace, &element.name())?;
                 let child_start = event_start;
@@ -100,7 +125,7 @@ pub fn read(xml: &[u8], limits: Limits) -> Result<Metadata> {
                     .ok_or_else(|| invalid("model3d root metadata is missing"))?;
                 push_child(metadata, local, namespace, raw, limits)?;
             },
-            Event::Empty(element) if metadata.is_some() && root_depth == 1 => {
+            Event::Empty(element) if phase == RootPhase::Open => {
                 count_node(&mut nodes, limits)?;
                 let (local, namespace) = resolved_name(&namespace, &element.name())?;
                 let raw = xml
@@ -111,15 +136,15 @@ pub fn read(xml: &[u8], limits: Limits) -> Result<Metadata> {
                     .ok_or_else(|| invalid("model3d root metadata is missing"))?;
                 push_child(metadata, local, namespace, raw, limits)?;
             },
-            Event::End(_) if metadata.is_some() && root_depth == 1 => {
-                root_depth = 0;
-                root_closed = true;
+            Event::End(_) if phase == RootPhase::Open => {
+                phase = RootPhase::Closed;
             },
-            Event::Start(_) | Event::Empty(_) if metadata.is_some() && root_depth == 0 => {
+            Event::Start(_) | Event::Empty(_) if phase == RootPhase::Closed => {
                 return Err(invalid("model3d XML has more than one root element"));
             },
             Event::Text(text)
-                if root_depth == 0 && !text.as_ref().iter().all(u8::is_ascii_whitespace) =>
+                if phase != RootPhase::Open
+                    && !text.as_ref().iter().all(u8::is_ascii_whitespace) =>
             {
                 return Err(invalid("model3d XML contains text outside its root"));
             },
@@ -139,8 +164,11 @@ pub fn read(xml: &[u8], limits: Limits) -> Result<Metadata> {
     }
 
     let metadata = metadata.ok_or_else(|| invalid("model3d XML has no root element"))?;
-    if root_depth != 0 || !root_closed {
-        return Err(invalid("model3d XML root is not closed"));
+    match phase {
+        RootPhase::Closed => {},
+        RootPhase::Prolog | RootPhase::Open => {
+            return Err(invalid("model3d XML root is not closed"));
+        },
     }
     crate::model3d::validation::validate(&metadata).map_err(|error| validation_error(&error))?;
     Ok(metadata)

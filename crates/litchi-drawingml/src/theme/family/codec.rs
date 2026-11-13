@@ -356,6 +356,35 @@ pub(crate) fn validate_general_ref(
     Ok(character)
 }
 
+/// Where the theme family scan is relative to `thm15:themeFamily`. Nesting
+/// inside the root is not part of it: the frame stack holds that.
+///
+/// ```text
+/// Start          --XML declaration--------------> Prolog
+/// Start | Prolog --comment or whitespace--------> Prolog
+/// Start | Prolog --root start tag---------------> Open
+/// Start | Prolog --root empty-element tag-------> Closed
+/// Open           --nested content---------------> Open
+/// Open           --root end tag-----------------> Closed
+/// Closed         --comment or whitespace--------> Closed
+/// ```
+///
+/// Refused: an XML declaration anywhere but `Start`; a DOCTYPE or a
+/// processing instruction anywhere; a second top-level element; text other
+/// than whitespace, CDATA and entity references outside the root; and the
+/// end of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// Nothing has been read.
+    Start,
+    /// A declaration or other prolog content was read; no root yet.
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open,
+    /// The root element is complete.
+    Closed,
+}
+
 fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
@@ -368,15 +397,12 @@ fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
 
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Start;
     let mut root_start = None;
     let mut root_end = None;
     let mut parsed = None;
     let mut ext_list_seen = false;
     let mut nodes = 0usize;
-    let mut declaration_seen = false;
-    let mut pre_root_event_seen = false;
 
     loop {
         let event_start = position(&reader, origin, "theme family")?;
@@ -397,16 +423,16 @@ fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
         };
         let event_namespace = resolved_namespace(&resolved, limits)?;
         let event_end = position(&reader, origin, "theme family")?;
-        if !root_seen && !matches!(&event, Event::Decl(_) | Event::Eof) {
-            pre_root_event_seen = true;
+        if phase == RootPhase::Start && !matches!(&event, Event::Decl(_) | Event::Eof) {
+            phase = RootPhase::Prolog;
         }
         match event {
             Event::Decl(declaration) => {
-                if root_seen || declaration_seen || pre_root_event_seen {
+                if phase != RootPhase::Start {
                     return Err(invalid("theme family XML declaration is misplaced"));
                 }
                 validate_declaration(&declaration)?;
-                declaration_seen = true;
+                phase = RootPhase::Prolog;
             },
             Event::Start(element) => {
                 nodes = nodes
@@ -419,15 +445,15 @@ fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
                 validate_element_name(&element, limits)?;
                 validate_element_attributes(&element, &reader, limits)?;
                 let local = element.local_name().as_ref().to_vec();
-                let kind = if !root_seen {
+                let kind = if matches!(phase, RootPhase::Start | RootPhase::Prolog) {
                     require_root(&local, &namespace)?;
                     let root = parse_root_attributes(&element, &reader, limits)?;
-                    root_seen = true;
+                    phase = RootPhase::Open;
                     root_start = Some(event_start);
                     parsed = Some(root);
                     FrameKind::Root
                 } else {
-                    if root_closed || stack.is_empty() {
+                    if phase == RootPhase::Closed || stack.is_empty() {
                         return Err(invalid("theme family fragment has more than one root"));
                     }
                     let kind = classify_child(&local, &namespace, &stack)?;
@@ -466,17 +492,16 @@ fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
                 validate_element_name(&element, limits)?;
                 validate_element_attributes(&element, &reader, limits)?;
                 let local = element.local_name().as_ref().to_vec();
-                let _kind = if !root_seen {
+                let _kind = if matches!(phase, RootPhase::Start | RootPhase::Prolog) {
                     require_root(&local, &namespace)?;
                     let root = parse_root_attributes(&element, &reader, limits)?;
-                    root_seen = true;
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                     root_start = Some(event_start);
                     root_end = Some(event_end);
                     parsed = Some(root);
                     FrameKind::Root
                 } else {
-                    if root_closed || stack.is_empty() {
+                    if phase == RootPhase::Closed || stack.is_empty() {
                         return Err(invalid("theme family fragment has more than one root"));
                     }
                     let kind = classify_child(&local, &namespace, &stack)?;
@@ -491,7 +516,7 @@ fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
                     }
                     kind
                 };
-                if !root_closed && stack.len() >= limits.max_depth {
+                if phase != RootPhase::Closed && stack.len() >= limits.max_depth {
                     return Err(limit(
                         LimitKind::XmlDepth,
                         stack.len() + 1,
@@ -500,7 +525,7 @@ fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
                 }
             },
             Event::End(element) => {
-                if !root_seen || root_closed {
+                if phase != RootPhase::Open {
                     return Err(invalid("theme family has markup outside its root"));
                 }
                 validate_end_name(&element)?;
@@ -514,13 +539,13 @@ fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
                     return Err(invalid("theme family closing element does not match"));
                 }
                 if stack.is_empty() {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                     root_end = Some(event_end);
                 }
             },
             Event::Text(text) => {
                 validate_text_node(text.as_ref(), "theme family text")?;
-                if (!root_seen || root_closed) && !is_xml_whitespace(text.as_ref()) {
+                if phase != RootPhase::Open && !is_xml_whitespace(text.as_ref()) {
                     return Err(invalid("theme family has text outside its root"));
                 }
                 if in_element_only_context(&stack) && !is_xml_whitespace(text.as_ref()) {
@@ -529,7 +554,7 @@ fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
             },
             Event::CData(text) => {
                 validate_event_text(text.as_ref(), "theme family CDATA")?;
-                if !root_seen || root_closed {
+                if phase != RootPhase::Open {
                     return Err(invalid("theme family has CDATA outside its root"));
                 }
                 if in_element_only_context(&stack) && !is_xml_whitespace(text.as_ref()) {
@@ -539,7 +564,7 @@ fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
                 }
             },
             Event::GeneralRef(reference) => {
-                if !root_seen || root_closed {
+                if phase != RootPhase::Open {
                     return Err(invalid("theme family has a reference outside its root"));
                 }
                 let character = validate_general_ref(&reference, limits)?;
@@ -562,8 +587,11 @@ fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
         buffer.clear();
     }
 
-    if !root_seen || !root_closed || !stack.is_empty() {
-        return Err(invalid("theme family fragment is unterminated"));
+    match phase {
+        RootPhase::Closed if stack.is_empty() => {},
+        RootPhase::Start | RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("theme family fragment is unterminated"));
+        },
     }
     let parsed = parsed.ok_or_else(|| invalid("theme family has no root"))?;
     Ok(Parsed {
