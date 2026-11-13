@@ -516,9 +516,9 @@ impl fmt::Display for Number {
     }
 }
 
-/// The rich-text runs of one cell (record 0295): each run's text and its
-/// run properties (`rPr`) exactly as the source item spells them, so a run
-/// text can change while every run keeps its formatting.
+/// The rich-text runs of one cell: each run's text and its run properties
+/// (`rPr`) exactly as the source item spells them, so a run text can
+/// change while every run keeps its formatting.
 ///
 /// Read with [`crate::Worksheet::rich_text`], changed with
 /// [`RichText::set_run_text`], written with
@@ -565,7 +565,7 @@ impl RichText {
         }
     }
 
-    /// The runs `runs`, in order (record 0338). Writing needs at least one.
+    /// The runs `runs`, in order. Writing needs at least one.
     ///
     /// ```
     /// use litchi_xlsx::{FontChange, RichRun, RichText};
@@ -592,7 +592,7 @@ impl RichText {
         &self.runs
     }
 
-    /// The run at `index`, to change it in place (record 0338).
+    /// The run at `index`, to change it in place.
     pub fn run_mut(&mut self, index: usize) -> Option<&mut RichRun> {
         self.runs.get_mut(index)
     }
@@ -683,7 +683,7 @@ impl RichText {
 }
 
 impl RichRun {
-    /// An unformatted run holding `text` (record 0338).
+    /// An unformatted run holding `text`.
     #[must_use]
     pub fn new(text: impl Into<String>) -> Self {
         Self {
@@ -705,7 +705,7 @@ impl RichRun {
         &self.text
     }
 
-    /// Replace the run's text, keeping its properties (record 0338).
+    /// Replace the run's text, keeping its properties.
     pub fn set_text(&mut self, text: impl Into<String>) {
         self.text = text.into();
     }
@@ -716,10 +716,10 @@ impl RichRun {
         self.properties.is_some()
     }
 
-    /// The run's typed font, read from its run properties (record 0338):
-    /// `rFont` is the font name, and an absent property is the default (no
-    /// flag, no value). Properties the [`Font`] model has no field for
-    /// (`outline`, `shadow`, `condense`, `extend`) are not read.
+    /// The run's typed font, read from its run properties: `rFont` is the
+    /// font name, and an absent property is the default (no flag, no
+    /// value). Properties the [`Font`] model has no field for (`outline`,
+    /// `shadow`, `condense`, `extend`) are not read.
     ///
     /// [`Font`]: crate::style::stylesheet::font::Font
     ///
@@ -731,10 +731,10 @@ impl RichRun {
         rich_font::read(self.properties.as_deref().unwrap_or_default())
     }
 
-    /// Apply `change` to the run's properties (record 0338): each property
-    /// the change mentions is replaced (`Some`) or removed (`None`); the
-    /// others, and properties the change has no setter for, keep their
-    /// markup. A new property is placed in Excel's run-property order.
+    /// Apply `change` to the run's properties: each property the change
+    /// mentions is replaced (`Some`) or removed (`None`); the others, and
+    /// properties the change has no setter for, keep their markup. A new
+    /// property is placed in Excel's run-property order.
     ///
     /// # Errors
     ///
@@ -747,8 +747,8 @@ impl RichRun {
     }
 }
 
-/// Typed reads and writes of a rich-text run's `rPr` children (record
-/// 0338), kept as `(local name, raw attributes)` pairs.
+/// Typed reads and writes of a rich-text run's `rPr` children, kept as
+/// `(local name, raw attributes)` pairs.
 mod rich_font {
     use litchi_core::xml::escape_xml;
     use litchi_ooxml_common::xml::attributes::BytesStartExt as _;

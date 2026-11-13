@@ -152,9 +152,9 @@ impl Comment {
     /// Get the XML bytes of this comment.
     ///
     /// The bytes are an XML fragment whose namespace declarations are those in
-    /// scope in `word/comments.xml`, which since change 0653 are not repeated
-    /// on the fragment's own root element. Use
-    /// [`self_contained_xml`](Self::self_contained_xml) to parse it on its own.
+    /// scope in `word/comments.xml`, which are not repeated on the fragment's
+    /// own root element. Use [`self_contained_xml`](Self::self_contained_xml)
+    /// to parse it on its own.
     #[inline]
     #[must_use]
     pub fn xml_bytes(&self) -> &[u8] {
@@ -164,9 +164,9 @@ impl Comment {
     /// The `w14:paraId` of the comment's last paragraph (the last
     /// `w:p` child of `w:comment`), by which Word's modern-comment parts
     /// (`commentsExtended`, `commentsIds`) key the comment ([MS-DOCX]
-    /// `CT_CommentEx`; record 0345). For a one-paragraph comment, the
-    /// common case and every comment OfficeCLI writes, it is the first
-    /// paragraph's. `None` when that paragraph has none.
+    /// `CT_CommentEx`). For a one-paragraph comment, the common case and every
+    /// comment OfficeCLI writes, it is the first paragraph's. `None` when that
+    /// paragraph has none.
     #[must_use]
     pub fn paragraph_id(&self) -> Option<u32> {
         let mut reader = Reader::from_reader(self.xml_bytes());

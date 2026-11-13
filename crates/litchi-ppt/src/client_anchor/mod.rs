@@ -5,7 +5,7 @@
 //! shape's anchor changes through
 //! [`Edit::set_shape_anchor`](crate::package::edit::Edit::set_shape_anchor)
 //! on the primary [`crate::Package::edit`]; the record-level edit, the
-//! binary codec and the validation policy are private layers (record 0357).
+//! binary codec and the validation policy are private layers.
 
 mod codec;
 mod model;
@@ -13,7 +13,7 @@ mod model;
     not(test),
     expect(
         dead_code,
-        reason = "the record-level owner the primary Package::edit drives; its full surface stays exercised by the unit tests (record 0357)"
+        reason = "the record-level owner the primary Package::edit drives; its full surface stays exercised by the unit tests"
     )
 )]
 mod transaction;

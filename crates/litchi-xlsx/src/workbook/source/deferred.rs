@@ -1,5 +1,4 @@
-//! Committed source-backed workbooks (record 0360, the shape of DOCX
-//! record 0355a §1).
+//! Committed source-backed workbooks.
 //!
 //! A source-backed family commit returns a new [`SourceBackedWorkbook`]
 //! without writing anything. Its output is the family's byte-preserving

@@ -242,8 +242,7 @@ pub(super) fn inspect_layout(xml: &[u8], limits: &Limits) -> Result<Layout> {
         return Err(invalid("unterminated workbook XML"));
     }
     // Projection is recognized on namespace values as written; a binding
-    // spelled with references may project either owner all the same
-    // (record 0011).
+    // spelled with references may project either owner all the same.
     let escaped = litchi_ooxml_common::mce::binds_namespace_by_reference(xml);
     Ok(Layout {
         calc,

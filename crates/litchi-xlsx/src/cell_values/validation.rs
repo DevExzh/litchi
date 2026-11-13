@@ -2,12 +2,12 @@
 //!
 //! # The dependency rule
 //!
-//! Change 0602's D4, authorized by decision 7 of change 0652, replaced the
-//! name allow-list this module used to carry with the property that
-//! allow-list was a proxy for. A value-only rewrite composes exactly three
-//! spans: the worksheet's `<dimension>` `ref` attribute, the `<sheetData>`
-//! element, and — on the owner — the workbook's `<calcPr>`. Every other byte
-//! of either part is copied from the source, unread and unaltered.
+//! The name allow-list this module used to carry was replaced with the
+//! property that allow-list was a proxy for. A value-only rewrite composes
+//! exactly three spans: the worksheet's `<dimension>` `ref` attribute, the
+//! `<sheetData>` element, and — on the owner — the workbook's `<calcPr>`.
+//! Every other byte of either part is copied from the source, unread and
+//! unaltered.
 //!
 //! So an element is admitted when one of two things is true:
 //!

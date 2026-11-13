@@ -1,7 +1,6 @@
 //! The irreversible external-hyperlink redaction family of a
-//! source-backed package (record 0355a): unwrap the main document's
-//! hyperlinks to selected target URLs and remove their relationship
-//! records.
+//! source-backed package: unwrap the main document's hyperlinks to selected
+//! target URLs and remove their relationship records.
 //!
 //! The redaction is forward-only: its record patch keeps no removed
 //! content, so its inverse restores the exact source on the commit's

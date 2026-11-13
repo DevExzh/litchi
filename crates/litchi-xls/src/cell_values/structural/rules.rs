@@ -1,19 +1,19 @@
 //! Row and column shifts of the records whose formulas are evaluated at
 //! other cells: conditional formats (`CondFmt`/`CF`, `CondFmt12`/`CF12`,
 //! `CFEx`), data validations (`DV`), array formulas (`Array`) and data
-//! tables (`Table`). Record 0316.
+//! tables (`Table`).
 //!
 //! A conditional-format or validation formula is evaluated at every cell of
 //! its range. Its `PtgRefN`/`PtgAreaN` relative components are offsets from
 //! that cell (`[MS-XLS]` 2.5.198.104 `RgceLocRel`), so they keep naming the
 //! same cells when every cell of the range and the cell it names lie on the
-//! same side of the shift point, the rule shared formulas follow (record
-//! 0308). Absolute components are coordinates and shift like a cell
-//! formula's. A `PtgRef`/`PtgArea` with relative flags is ambiguous here:
-//! `RgceLoc` stores coordinates, while LibreOffice reads the relative parts
-//! of a conditional-format `PtgRef` as offsets; such a reference is admitted
-//! only when no reading of it can reach the shift point. 3-D references
-//! are closed with the workbook's other 3-D references
+//! same side of the shift point, the rule shared formulas follow. Absolute
+//! components are coordinates and shift like a cell formula's. A
+//! `PtgRef`/`PtgArea` with relative flags is ambiguous here: `RgceLoc`
+//! stores coordinates, while LibreOffice reads the relative parts of a
+//! conditional-format `PtgRef` as offsets; such a reference is admitted only
+//! when no reading of it can reach the shift point. 3-D references are
+//! closed with the workbook's other 3-D references
 //! (`patch_rule_3d_references`).
 
 use super::{
@@ -94,7 +94,7 @@ fn axis(shift: AxisShift) -> (u16, u16, bool, u32) {
 /// Whether a relative offset keeps naming the same cell from every cell of
 /// `low..=high` on the shifted axis: each cell and the cell it names lie on
 /// the same side of the shift point, so both move by the same amount or
-/// neither moves (record 0308's shared-formula rule).
+/// neither moves (the shared-formula rule).
 pub(super) fn offset_kept(low: u16, high: u16, offset: i32, shift: AxisShift) -> bool {
     let (start, count, insert, _) = axis(shift);
     let (start, end) = (i32::from(start), i32::from(start) + i32::from(count));

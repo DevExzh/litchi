@@ -21,18 +21,18 @@
 //! `SlideListWithTextContainer` body the reference selects, under the same
 //! rules, by the root transaction's batch publisher.
 //!
-//! The editing owners are crate-private since record 0357: the public text
-//! edits are the [`crate::Package::edit`] verbs (`set_shape_text`,
-//! `set_shape_texts`, `set_notes_text`, `set_run_format`, …), which drive
-//! this module. It keeps public the vocabulary those verbs take
+//! The editing owners are crate-private: the public text edits are the
+//! [`crate::Package::edit`] verbs (`set_shape_text`, `set_shape_texts`,
+//! `set_notes_text`, `set_run_format`, …), which drive this module. It keeps
+//! public the vocabulary those verbs take
 //! ([`Target`](crate::text_edit::Target),
 //! [`RunFormat`](crate::text_edit::RunFormat)), the read views
 //! ([`TextRuns`](crate::text_edit::TextRuns) and the source-backed
 //! [`SourceSnapshot`](crate::text_edit::SourceSnapshot) reader) and the typed
 //! [`Error`](crate::text_edit::Error)/[`Refusal`](crate::text_edit::Refusal).
 //!
-//! The source-backed same-length splice is a scoped family since record
-//! 0357a: [`Package::edit_text`](crate::Package::edit_text) returns a
+//! The source-backed same-length splice is a scoped family:
+//! [`Package::edit_text`](crate::Package::edit_text) returns a
 //! [`text_edit::Edit`](crate::text_edit::Edit) whose commit publishes a new
 //! package over the composed overlay source without materializing it, and
 //! [`Package::apply_text`](crate::Package::apply_text) replays its
@@ -41,7 +41,7 @@
     not(test),
     expect(
         dead_code,
-        reason = "crate-private native text owners (record 0357): the whole-artifact transaction and the source-backed splice owner behind text_edit::Edit keep their full surface exercised by the unit tests"
+        reason = "crate-private native text owners: the whole-artifact transaction and the source-backed splice owner behind text_edit::Edit keep their full surface exercised by the unit tests"
     )
 )]
 
@@ -200,8 +200,8 @@ impl fmt::Display for Refusal {
 }
 
 impl Refusal {
-    /// The shared refusal class of this reason (record 0351 §2.4 rule 2);
-    /// unified callers classify by this kind alone.
+    /// The shared refusal class of this reason; unified callers classify by
+    /// this kind alone.
     #[must_use]
     pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
         use litchi_core::edit::RefusalKind;
@@ -237,10 +237,9 @@ pub enum Error {
     /// rejected a source-backed operation.
     Source(OverlayError),
     /// A [`Patch`] was made from a package with another exact source
-    /// artifact fingerprint (record 0357a).
+    /// artifact fingerprint.
     PatchConflict,
-    /// A changed text splice would invalidate the package signature
-    /// (record 0357a).
+    /// A changed text splice would invalidate the package signature.
     Signed,
 }
 
@@ -1937,8 +1936,7 @@ impl Transaction {
     }
 
     /// [`Self::commit`], also returning the shapes a parse of the published
-    /// slide returns when the readback proved them incrementally (record
-    /// 0264).
+    /// slide returns when the readback proved them incrementally.
     pub(crate) fn commit_verified(
         self,
     ) -> Result<(RecordCommit, Option<(u32, crate::slide::PatchedShapes)>)> {
@@ -1986,7 +1984,7 @@ impl Transaction {
         editor.replace_persisted_record(self.resolved.slide_persist_id, target_slide)?;
         let bytes = editor.finish()?;
         // `Snapshot::from_bytes` validates that the candidate opens; that
-        // open also serves the incremental readback (record 0264).
+        // open also serves the incremental readback.
         let bytes: Arc<[u8]> = Arc::from(bytes.into_boxed_slice());
         let opened = presentation_shared(bytes.clone())?;
         let snapshot = Snapshot {
@@ -2097,8 +2095,7 @@ pub(crate) struct RootBatchPublication {
     /// owns slide-list (outline) text bodies.
     document_changed: bool,
     /// Shapes that parsing each edited slide of `output` returns, proven by
-    /// the incremental readback (record 0264); empty when not proven or not
-    /// requested.
+    /// the incremental readback; empty when not proven or not requested.
     verified: readback::VerifiedSlides,
 }
 
@@ -2308,10 +2305,10 @@ struct Resolved {
     payload: Vec<u8>,
     text: String,
     can_resize: bool,
-    /// The text positions of the body's metacharacter fields (record 0304).
+    /// The text positions of the body's metacharacter fields.
     pins: Vec<usize>,
     /// The source parse of the target's slide, which the commit readback
-    /// verifies the publication against incrementally (record 0264).
+    /// verifies the publication against incrementally.
     source_view: Option<Arc<readback::SourceSlideView>>,
 }
 
@@ -2477,11 +2474,11 @@ fn resolve_shape_target(bytes: &[u8], target: Target) -> Result<(u32, u32)> {
 }
 
 /// Resolve `target` in a published candidate, as [`resolve`] does, proving
-/// its slide's parse incrementally from the source parse when possible
-/// (record 0264). [`resolve`] parses the whole slide to find the target's
-/// persist and shape identifiers; when [`readback::readback_incremental`]
-/// accepts, those identifiers are proven to be the ones that parse yields,
-/// and every later step is the same.
+/// its slide's parse incrementally from the source parse when possible.
+/// [`resolve`] parses the whole slide to find the target's persist and shape
+/// identifiers; when [`readback::readback_incremental`] accepts, those
+/// identifiers are proven to be the ones that parse yields, and every later
+/// step is the same.
 fn resolve_published(
     bytes: &[u8],
     resolved: &Resolved,
@@ -2530,7 +2527,7 @@ fn incremental_published_target(
 /// Resolves one target through a single selected slide of an opened
 /// projection, with the same refusals as
 /// [`resolve_shape_target_in_presentation`], also capturing the slide's
-/// parse (record 0264).
+/// parse.
 fn resolve_shape_target_at_with_view(
     presentation: &Presentation,
     target: Target,
@@ -2678,7 +2675,7 @@ pub(crate) fn replace_shape_texts_batch(
         if let Entry::Vacant(entry) = source_views.entry(slide_persist_id)
             && let Ok(view) = readback::SourceSlideView::capture(slide)
         {
-            // The incremental readback starts from this parse (record 0264).
+            // The incremental readback starts from this parse.
             entry.insert(Arc::new(view));
         }
         let slide_record = match original_slides.get(&slide_persist_id) {
@@ -2935,7 +2932,7 @@ pub(crate) fn replace_shape_texts_batch(
     // One complete reopen validates the publication and supplies all semantic
     // readbacks without reopening the package once per shape. The edited
     // slides are verified incrementally against their source parse when that
-    // is provably equivalent to parsing them again (record 0264).
+    // is provably equivalent to parsing them again.
     let reopened = presentation_shared(output.clone())?;
     let reopened_slides = reopened.slides()?;
     let targets = prepared
@@ -2976,7 +2973,7 @@ pub(crate) fn replace_shape_texts_batch(
 
 /// Publishes a batch through a test hook that may corrupt each staged slide
 /// record, then returns both verifiers' verdicts on the published bytes
-/// (record 0264 differential tests).
+/// (differential tests).
 #[cfg(test)]
 pub(crate) fn differential_readback_for_test(
     source: &[u8],
@@ -3348,7 +3345,7 @@ pub(crate) fn rewrite_shape_text_by_id(
     rewrite_slide(slide, shape_id, atom.kind, &atom.payload, &encoded).map(Some)
 }
 
-/// Give an empty text body its first text atom (record 0323).
+/// Give an empty text body its first text atom.
 ///
 /// The shape's `ClientTextbox` must hold a `TextHeaderAtom` followed only by
 /// at most one each of `StyleTextPropAtom`, `TextSpecialInfoAtom` and
@@ -3685,7 +3682,7 @@ struct TextAtom {
     payload: Vec<u8>,
     text: String,
     can_resize: bool,
-    /// The text positions of the body's metacharacter fields (record 0304).
+    /// The text positions of the body's metacharacter fields.
     pins: Vec<usize>,
 }
 
@@ -3986,9 +3983,9 @@ fn inspect_text_records<'a>(
 }
 
 /// Refuse a replacement whose length change has unmodeled dependent ranges,
-/// or (record 0304) that writes another character at a metacharacter
-/// field's position: the field (`*` for a date, time, slide number,
-/// header or footer) would become plain text without a word.
+/// or that writes another character at a metacharacter field's position: the
+/// field (`*` for a date, time, slide number, header or footer) would become
+/// plain text without a word.
 fn check_replacement(
     kind: TextKind,
     payload: &[u8],
@@ -4207,9 +4204,8 @@ fn rewrite_officeart_grouped(
 
 /// Appends the rewritten record to `output`. Every container is framed again
 /// in place (its length patched after its children), so one drawing pass
-/// writes one buffer instead of allocating a copy per record (record 0264);
-/// the visited records, checks, errors and bytes are those of the
-/// per-record rebuild.
+/// writes one buffer instead of allocating a copy per record; the visited
+/// records, checks, errors and bytes are those of the per-record rebuild.
 fn rewrite_officeart_grouped_into(
     record: &[u8],
     replacements: &BTreeMap<u32, Vec<ShapeTextRewrite<'_>>>,
@@ -4473,7 +4469,7 @@ struct SingleRewrite<'a> {
 
 /// Appends the rewritten record to `output`, framing each container in
 /// place; the same visits, checks, errors and bytes as a per-record rebuild
-/// (record 0264, as [`rewrite_officeart_grouped_into`]).
+/// (as [`rewrite_officeart_grouped_into`]).
 fn rewrite_officeart_into(
     record: &[u8],
     target: &SingleRewrite<'_>,
@@ -5232,8 +5228,8 @@ mod tests {
         }
     }
 
-    /// Change 0589: the text-edit snapshot's identity fence still refuses a
-    /// stable-token mutation placed in every gap between its fence points.
+    /// The text-edit snapshot's identity fence still refuses a stable-token
+    /// mutation placed in every gap between its fence points.
     ///
     /// `SourceSnapshot::open` is one empty-splice identity plan: two complete
     /// source reads, formerly four SHA-256 passes and now two, because with no
@@ -5300,8 +5296,8 @@ mod tests {
         assert_eq!(refused, reads - first_identity);
     }
 
-    /// Change 0589: an empty-splice identity plan reports one digest for both
-    /// identities, and it is the same digest the owned path computes.
+    /// An empty-splice identity plan reports one digest for both identities,
+    /// and it is the same digest the owned path computes.
     #[test]
     fn the_identity_plan_reports_one_digest_for_both_identities() {
         let bytes = fixture("abc");
@@ -6220,8 +6216,8 @@ mod tests {
     }
 
     const fn assert_send_sync<T: Send + Sync>() {}
-    // Risk R3 of unified-ops record 0003: the unified `Ppt` handle retains
-    // these owners behind an `Arc`, so they must stay thread-safe.
+    // The unified `Ppt` handle retains these owners behind an `Arc`, so they
+    // must stay thread-safe.
     const _: () = {
         assert_send_sync::<super::SourceSnapshot>();
         assert_send_sync::<Snapshot>();

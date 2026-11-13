@@ -1,4 +1,4 @@
-//! The typed budgets of the Custom XML family (record 0360).
+//! The typed budgets of the Custom XML family.
 
 /// A Custom XML budget that a read, an edit or a patch exceeded.
 ///

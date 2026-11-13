@@ -1,4 +1,4 @@
-//! The numbering family (record 0355): the numbering definitions part.
+//! The numbering family: the numbering definitions part.
 //!
 //! [`Package::numbering_snapshot`](crate::Package::numbering_snapshot) reads
 //! the source-preserving [`Snapshot`](super::Snapshot);

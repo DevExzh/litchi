@@ -2365,7 +2365,7 @@ pub struct Patch {
     pub(super) authority: Option<PatchAuthority>,
     /// [`Self::retained_bytes`], computed once: a bounded commit checks it
     /// and the caller then reads it again for its own snapshot budget, and
-    /// each computation walks both endpoint workbooks (record 0377a).
+    /// each computation walks both endpoint workbooks.
     pub(super) retained: std::sync::OnceLock<usize>,
 }
 

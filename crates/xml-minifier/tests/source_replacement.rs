@@ -770,12 +770,12 @@ fn position_sensitive_tokens_inside_a_window_are_judged_as_the_complete_audit_ju
     }
 }
 
-/// Change 0750: under the source policy a token's verdict also depends on the
-/// namespace bindings in scope and on whether it is the document's first. A
-/// window starts with the bindings the original's audit had in scope there
-/// and knows it is not at the start of the document, so it reaches the
-/// complete audit's verdict: a proof where the edit is well-formed in its
-/// place, and the complete audit's own error where it is not.
+/// Under the source policy a token's verdict also depends on the namespace
+/// bindings in scope and on whether it is the document's first. A window
+/// starts with the bindings the original's audit had in scope there and knows
+/// it is not at the start of the document, so it reaches the complete audit's
+/// verdict: a proof where the edit is well-formed in its place, and the
+/// complete audit's own error where it is not.
 #[test]
 fn a_window_replays_the_namespace_bindings_and_position_of_its_place() {
     let pad = "<w:pad>padding padding padding padding padding padding padding padding</w:pad>";

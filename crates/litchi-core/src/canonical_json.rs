@@ -4,9 +4,8 @@
 //! enables the `preserve_order` feature, and in sorted key order otherwise.
 //! Cargo unifies features across a workspace, so `serde_json::to_vec` of the
 //! same [`serde_json::Value`] can produce different bytes depending on which
-//! other crates are linked into the binary (record 0349). Durable envelopes,
-//! digests and canonicality checks must instead use this writer, which always
-//! emits:
+//! other crates are linked into the binary. Durable envelopes, digests and
+//! canonicality checks must instead use this writer, which always emits:
 //!
 //! - object members sorted by the byte order of their keys;
 //! - no insignificant whitespace;

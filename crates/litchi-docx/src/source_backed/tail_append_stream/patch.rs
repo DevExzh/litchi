@@ -413,7 +413,7 @@ impl ParagraphStreamPatch {
                 maximum: ABSOLUTE_MAX_PATCH_BYTES as u64,
             })?;
         let mut writer = JsonWriter::new(maximum);
-        // Sorted members whatever `serde_json` features are unified (0349).
+        // Sorted members whatever `serde_json` features are unified.
         litchi_core::canonical_json::to_writer(&mut writer, &self.to_value(reference))
             .map_err(|error| PatchError::Encoding(error.to_string()))?;
         Ok(writer.finish())

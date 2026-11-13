@@ -1,5 +1,4 @@
-//! Byte-level `[MS-PPT]` record helpers shared by the element editors
-//! (record 0323).
+//! Byte-level `[MS-PPT]` record helpers shared by the element editors.
 //!
 //! Element edits rewrite one record path of an exact persisted record and
 //! copy every other record byte for byte. These helpers frame records

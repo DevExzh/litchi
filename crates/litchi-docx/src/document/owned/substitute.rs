@@ -1,4 +1,4 @@
-//! Story text substitution on the package-bound edit (records 0274, 0285).
+//! Story text substitution on the package-bound edit.
 
 use std::sync::Arc;
 

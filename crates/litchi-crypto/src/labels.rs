@@ -1312,9 +1312,9 @@ mod tests {
         assert_eq!(parse(&round_trip).unwrap(), parsed);
     }
 
-    /// Change 0765: a stream that begins with a UTF-8 byte-order mark keeps
-    /// its extension bytes exact and reports errors at byte offsets of the
-    /// stream, three bytes after the reader's uncounted positions.
+    /// A stream that begins with a UTF-8 byte-order mark keeps its extension
+    /// bytes exact and reports errors at byte offsets of the stream, three
+    /// bytes after the reader's uncounted positions.
     #[test]
     fn a_byte_order_marked_stream_parses_and_reports_like_an_unmarked_one() {
         let plain = format!(

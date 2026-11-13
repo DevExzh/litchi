@@ -1,4 +1,4 @@
-//! Differential oracle for the compact planning facts (change 0622).
+//! Differential oracle for the compact planning facts.
 //!
 //! The commit's complete layout scan is only removable if the facts the
 //! planning traversal retained reproduce, byte for byte, the output that scan
@@ -147,8 +147,7 @@ fn clone_payload(payload: &Payload) -> Payload {
 /// large sheet is quadratic and too slow for an ordinary debug `cargo test`.
 /// The bounded form visits every cell of every worksheet with at most
 /// [`STRIDE_LIMIT`] cells and a fixed stride through the rest; setting
-/// `LITCHI_0622_FULL_ORACLE=1` visits every cell of every worksheet, which is
-/// how the retained evidence run was taken.
+/// `LITCHI_0622_FULL_ORACLE=1` visits every cell of every worksheet.
 fn exhaustive() -> bool {
     std::env::var_os("LITCHI_0622_FULL_ORACLE").is_some()
 }
@@ -457,9 +456,7 @@ fn change_0622_retained_records_stay_compact() {
     let cell_fact = std::hint::black_box(codec_sizes::CELL_FACT);
     let row_fact = std::hint::black_box(codec_sizes::ROW_FACT);
     let cell_slot = std::hint::black_box(codec_sizes::CELL_SLOT);
-    println!(
-        "change 0622 sizes: CellFact {cell_fact} B, RowFact {row_fact} B, CellSlot {cell_slot} B"
-    );
+    println!("sizes: CellFact {cell_fact} B, RowFact {row_fact} B, CellSlot {cell_slot} B");
     assert_eq!(cell_fact, 16, "one retained cell must stay 16 bytes");
     assert_eq!(row_fact, 32, "one retained row must stay 32 bytes");
     assert!(
@@ -581,7 +578,7 @@ fn change_0622_oracle_over_test_data_worksheets() {
     // builder declines, so the sweep proves the decline path, not the accept
     // path. The synthetic and dense-grid cases prove the accept path.
     println!(
-        "change 0622 oracle: {worksheets} worksheet parts, {admitted} admitted to the shared \
+        "oracle: {worksheets} worksheet parts, {admitted} admitted to the shared \
          traversal, {editable} accepted by the value-only validator, {with_facts} publishing \
          facts, {compared} comparisons, {accepted} fact-route commits"
     );

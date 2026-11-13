@@ -1702,7 +1702,7 @@ impl super::Package {
     }
 
     /// Check an SVG batch patch against this package and return the
-    /// current and target batches (record 0355a).
+    /// current and target batches.
     pub(crate) fn svg_batch_target(&self, patch: &BatchPatch) -> Result<(Snapshot, Snapshot)> {
         self.physical_package()?.check_execution()?;
         let selectors = patch
@@ -1725,7 +1725,7 @@ impl super::Package {
         Ok((current, target))
     }
 
-    /// Write this package with an SVG batch change (record 0355a).
+    /// Write this package with an SVG batch change.
     pub(crate) fn write_svg_batch(
         &self,
         writer: &mut dyn std::io::Write,

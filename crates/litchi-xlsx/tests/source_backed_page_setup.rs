@@ -604,7 +604,7 @@ fn source_edit_is_send_and_chartsheets_are_refused() {
 }
 
 /// Replay a source-backed patch onto `package` through a source-backed
-/// workbook over its bytes (record 0360: source-backed patches replay onto
+/// workbook over its bytes (source-backed patches replay onto
 /// source-backed workbooks).
 fn replay_patch(
     package: &mut OpcPackage,

@@ -1,5 +1,5 @@
 //! Immutable cross-presentation slide copies into a source-backed
-//! [`Package`] (record 0356b).
+//! [`Package`].
 //!
 //! [`Package::plan_cross_slide_copy`] checks one dependency-free copy of a
 //! slide of another source-backed presentation into this package and returns

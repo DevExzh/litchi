@@ -1,5 +1,5 @@
 //! Paragraph-property, field, bookmark and section primitives of the
-//! revision editor (record 0324).
+//! revision editor.
 //!
 //! Each primitive clones the editor, rewrites only the structures it owns
 //! (a paragraph's PAPX, the main-story text and its `PlcffldMom` markers,

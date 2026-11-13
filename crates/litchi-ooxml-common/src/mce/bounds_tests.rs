@@ -1,5 +1,5 @@
-//! Record 0764: the per-element attribute limit and the bounded namespace and
-//! directive work of both MCE processors on hostile documents.
+//! The per-element attribute limit and the bounded namespace and directive
+//! work of both MCE processors on hostile documents.
 //!
 //! Work is bounded by counting operations rather than by measuring time: each
 //! prefix-index lookup (a logarithmic B-tree operation) and each declaration a

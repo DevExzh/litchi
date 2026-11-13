@@ -1,4 +1,4 @@
-//! The captions edit family (record 0351 §2.3, record 0359).
+//! The captions edit family.
 //!
 //! [`crate::Package::edit_captions`] stages captions edits on an [`Edit`];
 //! [`Edit::commit`] publishes a new [`crate::Package`] with an exact

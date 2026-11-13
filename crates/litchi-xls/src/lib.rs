@@ -507,7 +507,7 @@ pub mod hyperlinks;
 )]
 pub mod comments;
 pub mod compatibility;
-/// Worksheet features of opened workbooks (record 0327).
+/// Worksheet features of opened workbooks.
 pub mod sheet_features;
 
 /// Inert BIFF8 Office Toolbars stream (`XCB`) metadata.

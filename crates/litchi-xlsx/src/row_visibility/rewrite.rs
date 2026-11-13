@@ -18,15 +18,14 @@ const STRICT_SML: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
 
 /// Worksheet elements whose meaning depends on which rows are hidden.
 ///
-/// Change 0657 widened the shared value-only closure so that a worksheet
-/// child outside `<sheetData>` is copied through rather than refused. That
-/// rule is sound for a *cell value* edit, which these constructs address by
-/// coordinate. It is not sound for a *visibility* edit: a sheet protection
-/// forbids one, and an autofilter, a sort state or a custom sheet view
-/// expresses its own state through exactly the `hidden` attribute this module
-/// owns. This module keeps refusing them, which is the contract its own
-/// documentation states, and which was previously enforced for it by the
-/// shared vocabulary.
+/// The shared value-only closure copies a worksheet child outside
+/// `<sheetData>` through rather than refusing it. That rule is sound for a
+/// *cell value* edit, which these constructs address by coordinate. It is not
+/// sound for a *visibility* edit: a sheet protection forbids one, and an
+/// autofilter, a sort state or a custom sheet view expresses its own state
+/// through exactly the `hidden` attribute this module owns. This module keeps
+/// refusing them, which is the contract its own documentation states, and
+/// which was previously enforced for it by the shared vocabulary.
 const VISIBILITY_DEPENDENT: [&[u8]; 4] = [
     b"sheetProtection",
     b"autoFilter",
@@ -157,9 +156,9 @@ fn row_tags(xml: &[u8]) -> Result<Vec<RowTag>> {
     // The cell store this module reuses is built from the *preprocessed*
     // bytes while the rewrite is lexical over the *source* bytes, so the two
     // views must be the same bytes. The shared closure used to refuse the
-    // marker as a foreign attribute; since change 0657 it copies it through,
-    // so the refusal belongs here. A declaration that spells the namespace
-    // with references counts too, as preprocessing applies it (record 0011).
+    // marker as a foreign attribute; it now copies it through, so the
+    // refusal belongs here. A declaration that spells the namespace with
+    // references counts too, as preprocessing applies it.
     if litchi_ooxml_common::mce::mentions_namespace(xml) {
         return Err(invalid(
             "row-visibility edits refuse markup-compatibility content",
@@ -437,8 +436,8 @@ mod tests {
         }
     }
 
-    /// Record 0011: a declaration that spells the namespace with references
-    /// is markup compatibility too.
+    /// A declaration that spells the namespace with references is markup
+    /// compatibility too.
     #[test]
     fn escaped_markup_compatibility_fails_closed() {
         let xml = format!(

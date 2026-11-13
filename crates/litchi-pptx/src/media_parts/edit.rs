@@ -1,4 +1,4 @@
-//! Immutable slide media edits of a [`Package`](crate::Package) (record 0356a).
+//! Immutable slide media edits of a [`Package`](crate::Package).
 //!
 //! [`Package::edit_media`](crate::Package::edit_media) starts an [`Edit`]
 //! over a staged copy of the package; its verbs run on the staged graph.

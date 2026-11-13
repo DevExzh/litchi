@@ -1,4 +1,4 @@
-//! Source-backed slide removal on producer decks (record 0293).
+//! Source-backed slide removal on producer decks.
 //!
 //! PowerPoint writes slides with extension metadata (`p14:creationId`),
 //! hyperlinks and slide jumps, and presentation roots with guide extensions;
@@ -7,7 +7,7 @@
 //! constructs are admitted, and the inverse patch restores the exact source.
 //! A slide's exclusively owned Parts (notes, pictures, diagrams, comments,
 //! VML drawings, embedded objects) leave with it, and the inverse restores
-//! them (record 0303).
+//! them.
 
 use std::sync::Arc;
 
@@ -73,7 +73,7 @@ fn a_bare_markup_compatibility_declaration_is_admitted() {
 /// Removes the slide at `position`, proves the Parts in `owned` leave with
 /// it and the Parts in `kept` stay, and proves that both the local inverse
 /// and the durable inverse replayed on the reopened output restore the
-/// source bytes and Parts (record 0303).
+/// source bytes and Parts.
 fn remove_owned_and_invert(
     bytes: &'static [u8],
     position: usize,

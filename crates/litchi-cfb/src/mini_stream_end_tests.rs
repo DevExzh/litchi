@@ -1,6 +1,6 @@
-//! Record 0769: open-time validation and every reader agree on the mini
-//! streams at the end of a root mini stream whose size is not a multiple of
-//! the 64-byte mini sector.
+//! Open-time validation and every reader agree on the mini streams at the end
+//! of a root mini stream whose size is not a multiple of the 64-byte mini
+//! sector.
 //!
 //! MS-CFB 2.6.1 makes the root entry's stream size the size of the mini
 //! stream and does not require a multiple of 64; MS-CFB 2.7 leaves the tail
@@ -509,7 +509,7 @@ fn root_sizes_around_a_partial_last_mini_sector_follow_the_byte_bound() {
             }
         }
     }
-    eprintln!("0769 root-size matrix: {reached:?}");
+    eprintln!("root-size matrix: {reached:?}");
     // The newly admitted shape (a stream's bytes end inside the partial
     // last mini sector) and the newly refused one (a stream needs bytes of
     // it past the root size, which open used to admit) both occur.
@@ -628,7 +628,7 @@ fn seeded_mini_layouts_follow_the_byte_bound() {
                 .or_default() += 1;
         }
     }
-    eprintln!("0769 seeded layouts: {reached:?}");
+    eprintln!("seeded layouts: {reached:?}");
     for key in [
         (Expected::Admitted, false),
         (Expected::Admitted, true),
@@ -682,8 +682,7 @@ fn repository_root() -> PathBuf {
 /// 180), ends exactly at the root size, 44 bytes into the partial sector.
 const ZVI: &str = "test-data/poi/test-data/poifs/BlockSize512.zvi";
 
-/// The stream's SHA-256, computed from the raw file by an independent
-/// reader (record 0769's census script).
+/// The stream's SHA-256, computed from the raw file by an independent reader.
 const ZVI_SUMMARY_SHA256: &str = "6f74c82ea0b1d6a867de8949a0e85b36a256de14c82ea429785a3f70c0efdbc9";
 
 #[test]
@@ -825,7 +824,7 @@ fn every_admitted_fixture_stream_reads_through_every_reader() {
             },
         }
     }
-    eprintln!("0769 census: {files} compound files, {opened} admitted, {streams} streams");
+    eprintln!("census: {files} compound files, {opened} admitted, {streams} streams");
     assert!(
         files >= 200 && opened >= 200 && streams >= 1_200,
         "{files} / {opened} / {streams}"
@@ -863,7 +862,7 @@ fn root_sizes_around_each_fixture_mini_stream_end_follow_the_byte_bound() {
                 .or_default() += 1;
         }
     }
-    eprintln!("0769 fixture root sizes over {fixtures} fixtures: {reached:?}");
+    eprintln!("fixture root sizes over {fixtures} fixtures: {reached:?}");
     assert!(fixtures >= 60, "{fixtures}");
     for key in [
         (Expected::Admitted, false),
@@ -877,11 +876,11 @@ fn root_sizes_around_each_fixture_mini_stream_end_follow_the_byte_bound() {
     }
 }
 
-/// Record 0767's byte-level fault lane, as a regression test of the
-/// agreement it found missing: seeded faults in FAT and MiniFAT links and in
-/// stream and root directory entries (start sectors and sizes, including the
-/// root size one byte or one mini sector off). Whatever a faulted copy's
-/// open admits, every reader returns every stream it lists.
+/// A byte-level fault lane, as a regression test of an agreement that was once
+/// missing: seeded faults in FAT and MiniFAT links and in stream and root
+/// directory entries (start sectors and sizes, including the root size one
+/// byte or one mini sector off). Whatever a faulted copy's open admits, every
+/// reader returns every stream it lists.
 #[test]
 fn every_stream_of_an_admitted_faulted_file_reads_through_every_reader() {
     let mut rng = Rng::new(0x0769_0002);
@@ -1015,6 +1014,6 @@ fn every_stream_of_an_admitted_faulted_file_reads_through_every_reader() {
             assert_every_reader_returns(&label, &bytes, &contents);
         }
     }
-    eprintln!("0769 faulted copies: {admitted} admitted, {refused} refused");
+    eprintln!("faulted copies: {admitted} admitted, {refused} refused");
     assert!(admitted >= 60 && refused >= 300, "{admitted} / {refused}");
 }

@@ -274,7 +274,7 @@ impl Scene {
     }
     /// Borrow every shape's typed leaf view in depth-first pre-order, as
     /// [`Handle::view`] would for each item of [`Self::iter`], without
-    /// retaining the scene per shape (record 0286).
+    /// retaining the scene per shape.
     ///
     /// ```
     /// use litchi_pptx::shape::owned::Scene;
@@ -363,7 +363,7 @@ impl Handle {
 
     /// The paragraphs and text runs of the cells of the table this
     /// graphic frame holds, as [`crate::table::Table::cell_text_index`]
-    /// gives them, from one pass over the frame when it can (record 0348).
+    /// gives them, from one pass over the frame when it can.
     ///
     /// # Errors
     ///

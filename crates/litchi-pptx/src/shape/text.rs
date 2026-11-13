@@ -220,7 +220,7 @@ pub fn extract(xml_bytes: &[u8], paragraph_separator: Option<char>) -> Result<St
 /// Scan checked byte ranges for `DrawingML` elements with the requested local name.
 ///
 /// Reported starts are byte offsets into `xml_bytes`, counting a leading
-/// UTF-8 byte-order mark (change 0765).
+/// UTF-8 byte-order mark.
 ///
 /// # Errors
 ///

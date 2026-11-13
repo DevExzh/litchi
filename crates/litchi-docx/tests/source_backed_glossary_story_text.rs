@@ -409,9 +409,9 @@ fn fixture(dialect: Dialect, mutation: Mutation) -> Vec<u8> {
 }
 
 /// Rewrites `archive` with `member` holding `bytes`, without the publication
-/// audit. Change 0750: the eager writer refuses to publish XML that is not
-/// well-formed, so a fixture that must carry such XML to a reader is written
-/// with a well-formed stand-in and its bytes are put back here.
+/// audit. The eager writer refuses to publish XML that is not well-formed, so a
+/// fixture that must carry such XML to a reader is written with a well-formed
+/// stand-in and its bytes are put back here.
 fn with_unaudited_member(archive: &[u8], member: &str, bytes: &[u8]) -> Vec<u8> {
     let reader =
         litchi_opc::phys_pkg::PhysPkgReader::new(archive, litchi_opc::SourceLimits::default())

@@ -1,6 +1,5 @@
-//! The external-hyperlink detachment family of a source-backed package
-//! (record 0355a): unwrap the main document's external hyperlink
-//! wrappers, keeping their visible children and the relationship records.
+//! The external-hyperlink detachment family of a source-backed package: unwrap the main document's
+//! external hyperlink wrappers, keeping their visible children and the relationship records.
 //!
 //! [`Package::edit_external_hyperlink_detachment`](crate::source_backed::Package::edit_external_hyperlink_detachment)
 //! stages an [`Edit`] whose commit returns a new source-backed package;

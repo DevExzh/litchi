@@ -1,7 +1,7 @@
-//! Test fixture seams: the families of record 0351 applied in place, so the
-//! crate's source-level tests keep their fixtures compact. Every seam runs
-//! the public family route (edit, verb, commit) and replaces the package
-//! with the committed one; an error leaves the package unchanged.
+//! Test fixture seams: the edit families applied in place, so the crate's
+//! source-level tests keep their fixtures compact. Every seam runs the public
+//! family route (edit, verb, commit) and replaces the package with the
+//! committed one; an error leaves the package unchanged.
 
 use litchi_opc::PackURI;
 

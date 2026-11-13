@@ -1,5 +1,4 @@
-//! Immutable worksheet timeline edits of a [`crate::Package`] (record
-//! 0360).
+//! Immutable worksheet timeline edits of a [`crate::Package`].
 //!
 //! [`crate::Package::edit_timelines`] starts an [`Edit`] that retains the
 //! package metadata and limits without loading the timeline graph; every

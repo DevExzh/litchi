@@ -4,7 +4,7 @@
     reason = "speaker-notes edit tests use panic-driven assertions"
 )]
 
-//! Speaker-notes text through the canonical primary edit (record 0260).
+//! Speaker-notes text through the canonical primary edit.
 
 use litchi_ppt::package::edit::{Error, Position};
 use litchi_ppt::slide_order;

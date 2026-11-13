@@ -1,4 +1,4 @@
-//! Readback verification of shape-text publications (record 0264).
+//! Readback verification of shape-text publications.
 //!
 //! A shape-text publication appends rewritten slide records and must prove,
 //! before adoption, that the published package reads back the requested

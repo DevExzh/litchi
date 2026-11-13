@@ -3,8 +3,7 @@
     clippy::expect_used,
     reason = "test assertions panic on failure by design"
 )]
-//! Legacy and modern comment CRUD through the package comment families
-//! (record 0356a).
+//! Legacy and modern comment CRUD through the package comment families.
 
 use litchi_opc::part::BlobPart;
 use litchi_opc::{PackURI, Part};

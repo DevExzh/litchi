@@ -1,5 +1,4 @@
-//! Immutable conditional-formatting edits of a [`Package`] (unified-ops
-//! record 0320).
+//! Immutable conditional-formatting edits of a [`Package`].
 //!
 //! [`Package::edit_conditional_formats`] starts an [`Edit`] over an immutable
 //! snapshot. [`Edit::formats`] reads a worksheet's complete ordered core

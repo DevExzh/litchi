@@ -4,7 +4,7 @@
     clippy::too_many_lines,
     reason = "one constructed witness per construct of the dependency rule"
 )]
-//! One constructed witness per construct of change 0657's dependency rule.
+//! One constructed witness per construct of the dependency rule.
 //!
 //! Each test builds the smallest package that carries exactly one producer
 //! construct and states the rule's verdict on it: **admitted** (the rewrite
@@ -887,9 +887,9 @@ fn an_unknown_element_inside_a_cell_record_is_refused() {
 
 #[test]
 fn misplaced_merge_markup_is_now_refused_by_the_raw_parser() {
-    // Before change 0657 the value-only vocabulary refused `<mergeCells>`
-    // outright. It is now copied through, so the module that models it owns
-    // the refusal, with its own typed message.
+    // The value-only vocabulary once refused `<mergeCells>` outright. It is
+    // now copied through, so the module that models it owns the refusal,
+    // with its own typed message.
     let source = format!(
         "<worksheet xmlns=\"{SML}\"><dimension ref=\"A1:B1\"/><mergeCells count=\"1\"><mergeCell ref=\"A1:B1\"/></mergeCells><sheetData><row r=\"1\"><c r=\"A1\"><v>1</v></c></row></sheetData></worksheet>"
     );

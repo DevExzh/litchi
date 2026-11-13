@@ -774,7 +774,7 @@ impl<'a> ParagraphFormat<'a> {
     }
 
     /// Custom tab stops in declaration order (`\\txN` with its alignment
-    /// and leader controls, record 0328).
+    /// and leader controls).
     #[must_use]
     pub fn tab_stops(self) -> &'a [crate::TabStop] {
         self.raw.tab_stops.as_slice()

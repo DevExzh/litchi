@@ -7,18 +7,18 @@
 
 //! Differential coverage for the owned streaming Deflate transport.
 //!
-//! Owned (authored) Deflate entries follow the staged protocol of change
-//! 0762: the member is cut into 16 KiB chunks at absolute member offsets, the
-//! codec sees each chunk only once it is complete (or at an explicit flush or
-//! the finish), always with an empty output buffer, and the stream ends with
-//! one `Finish` and no sync flush. The owned entry is compared with a model
-//! of that protocol written against flate2's raw codec, the model is checked
-//! against flate2's own `DeflateEncoder` fed the same chunks, and complete
-//! archives are compared across write splittings and short or interrupted
-//! sinks. Borrowed entries keep the one-codec-call-per-write transport and are
-//! still compared byte for byte with fresh `DeflateEncoder`s. The failure
-//! cases keep the sink small and deterministic so they exercise progress and
-//! limit handling without a large allocation or a long-running traversal.
+//! Owned (authored) Deflate entries follow a staged protocol: the member is
+//! cut into 16 KiB chunks at absolute member offsets, the codec sees each
+//! chunk only once it is complete (or at an explicit flush or the finish),
+//! always with an empty output buffer, and the stream ends with one `Finish`
+//! and no sync flush. The owned entry is compared with a model of that
+//! protocol written against flate2's raw codec, the model is checked against
+//! flate2's own `DeflateEncoder` fed the same chunks, and complete archives
+//! are compared across write splittings and short or interrupted sinks.
+//! Borrowed entries keep the one-codec-call-per-write transport and are still
+//! compared byte for byte with fresh `DeflateEncoder`s. The failure cases keep
+//! the sink small and deterministic so they exercise progress and limit
+//! handling without a large allocation or a long-running traversal.
 
 use flate2::{
     Compress, Compression, FlushCompress, Status, read::DeflateDecoder, write::DeflateEncoder,
@@ -238,7 +238,7 @@ fn member_data(bytes: &[u8]) -> Vec<(CompressionMethod, Vec<u8>)> {
 }
 
 // ---------------------------------------------------------------------------
-// Change 0762: the staged protocol of owned (authored) Deflate entries.
+// The staged protocol of owned (authored) Deflate entries.
 // ---------------------------------------------------------------------------
 
 /// Bytes of one owned Deflate chunk: soapberry-zip's frozen
@@ -251,10 +251,10 @@ const OUTPUT_BUFFER: usize = 32 * 1024;
 /// The level of owned Deflate members.
 const OWNED_LEVEL: u32 = 5;
 
-/// Change 0762's staged protocol for one owned Deflate member, written
-/// against flate2's raw codec: staged bytes reach the codec only when their
-/// chunk is complete, at an explicit flush, or at the finish; every codec
-/// call gets the whole output buffer; a flush is the sync flush of flate2's
+/// The staged protocol for one owned Deflate member, written against
+/// flate2's raw codec: staged bytes reach the codec only when their chunk
+/// is complete, at an explicit flush, or at the finish; every codec call
+/// gets the whole output buffer; a flush is the sync flush of flate2's
 /// writer; the finish is one `Finish` with no sync flush before it.
 struct StagedModel {
     compress: Compress,
@@ -1330,9 +1330,9 @@ fn dropping_incomplete_owned_deflate_does_not_publish_a_complete_archive() {
 }
 
 // ---------------------------------------------------------------------------
-// Change 0618: the Office streaming writer reuses one Deflate state across the
-// members of one archive. Every member must still be the byte-for-byte output
-// of a freshly constructed encoder, including after a refused member.
+// The Office streaming writer reuses one Deflate state across the members of
+// one archive. Every member must still be the byte-for-byte output of a
+// freshly constructed encoder, including after a refused member.
 // ---------------------------------------------------------------------------
 
 /// The streaming writer's own zip64 selection for default limits, mirrored so
@@ -1579,9 +1579,9 @@ fn a_refused_sized_member_leaves_the_next_member_byte_identical() {
 }
 
 // ---------------------------------------------------------------------------
-// Change 0762: owned and borrowed members share one reusable Deflate state.
-// An owned member's stage, level and final block must not reach the borrowed
-// member that follows it, nor the other way round.
+// Owned and borrowed members share one reusable Deflate state. An owned
+// member's stage, level and final block must not reach the borrowed member
+// that follows it, nor the other way round.
 // ---------------------------------------------------------------------------
 
 #[test]

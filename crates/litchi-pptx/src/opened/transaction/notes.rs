@@ -1,4 +1,4 @@
-//! Creating a slide's notes page (record 0252).
+//! Creating a slide's notes page.
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, PackURI, Part as _};

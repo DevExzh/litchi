@@ -5,9 +5,9 @@
 //! the rest of their verbs, and [`Builder::build`] materializes them into a
 //! validated [`crate::Package`]. The drafts reached from it live in this
 //! module without a prefix; worksheet-chart drafts live under
-//! [`chart`] (record 0351 §2.1 rule 7). An opened package
-//! never hydrates into this writer: it changes through
-//! [`crate::Package::edit`] and its scoped `edit_*` families (ADR 0034 §9).
+//! [`chart`]. An opened package never hydrates into this writer: it changes
+//! through [`crate::Package::edit`] and its scoped `edit_*` families
+//! (ADR 0034 §9).
 //!
 //! ```
 //! use litchi_core::sheet::WorkbookTrait as _;

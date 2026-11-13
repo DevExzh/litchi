@@ -4,12 +4,12 @@
     reason = "focused publication assertions intentionally panic on fixture errors"
 )]
 
-//! Change 0754: a part replaced through `Part::set_blob_verified` carries the
-//! proof that its exact allocation passed the source publication audit, and
-//! the eager writer skips its own audit of that part only while the bytes it
-//! publishes are exactly the proof's. A later replacement, a copy, or a custom
-//! part that pairs a borrowed proof with other bytes is audited and refused
-//! exactly as before.
+//! A part replaced through `Part::set_blob_verified` carries the proof that
+//! its exact allocation passed the source publication audit, and the eager
+//! writer skips its own audit of that part only while the bytes it publishes
+//! are exactly the proof's. A later replacement, a copy, or a custom part that
+//! pairs a borrowed proof with other bytes is audited and refused exactly as
+//! before.
 
 use std::sync::Arc;
 
@@ -290,10 +290,9 @@ impl Part for Split {
     }
 }
 
-/// Pre-existing gap, fixed with change 0754's review: the owned-source
-/// preservation route regenerated a changed member from `blob_arc`, while
-/// the plan audited `blob`. Every route must audit exactly the bytes it
-/// publishes.
+/// A gap that was fixed: the owned-source preservation route regenerated
+/// a changed member from `blob_arc`, while the plan audited `blob`. Every
+/// route must audit exactly the bytes it publishes.
 #[test]
 fn every_route_audits_the_bytes_it_publishes() {
     let proven = proof(EDITED);

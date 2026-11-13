@@ -1,4 +1,4 @@
-//! Immutable table-style edits of a [`Package`] (record 0351 §2.3).
+//! Immutable table-style edits of a [`Package`].
 //!
 //! [`Package::edit_styles`] starts an [`Edit`] over the package; [`Edit::set`] replaces the presentation table-style catalog and
 //! [`Edit::remove`] removes it.

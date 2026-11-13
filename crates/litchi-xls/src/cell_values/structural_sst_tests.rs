@@ -528,7 +528,7 @@ fn ext_sst(workbook: &[u8], unique: u32) -> crate::shared_string_index::SharedSt
 fn new_text_across_an_ext_sst_bucket_size_boundary_commits_through_compaction() {
     // 1,023 strings use 8-string buckets; the 1,024th needs 9.  Commit
     // rebuilds the SST and its ExtSST, so staging no longer refuses the
-    // insertion with the tail-append geometry check (record 0359fa).
+    // insertion with the tail-append geometry check.
     let (bytes, texts) = package_with_ext_sst(1_023);
     let source = Snapshot::from_bytes(bytes, litchi_ole_common::object::Limits::default()).unwrap();
     assert_eq!(

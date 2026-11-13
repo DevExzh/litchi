@@ -213,7 +213,7 @@ impl Package {
                     .map_err(Error::from)?
             } else if let Some(proof) = target.publication_proof() {
                 // The commit audited exactly these bytes; the overlay accepts
-                // its proof instead of auditing them again (record 0311).
+                // its proof instead of auditing them again.
                 topology
                     .apply_verified_xml_bytes(&name, current.xml_bytes(), proof.clone())
                     .map_err(Error::from)?
@@ -309,7 +309,7 @@ impl Package {
                 let data = main.data().map_err(Error::from)?;
                 self.admit_main_document(data.as_bytes(), version, operation)?;
                 // A committed handle edited again scans its effective revision
-                // once, as the physical route does (record 0311).
+                // once, as the physical route does.
                 if let Some(snapshot) =
                     self.memoized_main_snapshot(data.as_bytes(), &lineage, version, &name)
                 {
@@ -319,7 +319,7 @@ impl Package {
                 }
                 // The revision's retained proof shares the effective bytes'
                 // allocation, so the snapshot shares it too instead of copying
-                // it, and carries the proof (record 0317).
+                // it, and carries the proof.
                 let retained = main
                     .xml_audit_proof()
                     .filter(|proof| core::ptr::eq(proof.bytes().as_slice(), data.as_bytes()));

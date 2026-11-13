@@ -1,5 +1,4 @@
-//! Immutable edits of the XLSB External Data Connections owner (record
-//! 0360b).
+//! Immutable edits of the XLSB External Data Connections owner.
 //!
 //! [`Package::edit_connections`] starts an [`Edit`] over the workbook's
 //! inert connection catalog; its verbs stage a replacement, one connection

@@ -4,7 +4,7 @@
     reason = "comment edit tests use panic-driven assertions"
 )]
 
-//! Slide comments through the canonical primary edit (record 0323).
+//! Slide comments through the canonical primary edit.
 
 use litchi_ppt::comments::{CommentChange, DateTime, NewComment};
 use litchi_ppt::package::edit::Position;

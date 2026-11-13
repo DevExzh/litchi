@@ -2127,10 +2127,10 @@ mod tests {
     use litchi_opc::part::BlobPart;
     use std::fmt::Write as _;
 
-    // The two semantic-text passes as they stood before change 0743,
-    // verbatim: a complete raw scan, then markup-compatibility processing,
-    // then the semantic pass over the processed bytes. The single-pass route
-    // must return exactly their value and exactly their first refusal.
+    // The two semantic-text passes as they stood before the single-pass route,
+    // verbatim: a complete raw scan, then markup-compatibility processing, then
+    // the semantic pass over the processed bytes. The single-pass route must
+    // return exactly their value and exactly their first refusal.
     use super::{
         Capabilities, Event, MAX_SEMANTIC_TEXT_EVENT_BYTES, MAX_SEMANTIC_TEXT_PROCESSED_XML_BYTES,
         MAX_SEMANTIC_TEXT_RAW_XML_BYTES, MAX_SEMANTIC_TEXT_REFERENCE_BYTES, NsReader, Part, Result,

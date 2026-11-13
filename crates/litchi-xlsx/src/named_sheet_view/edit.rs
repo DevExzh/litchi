@@ -1,4 +1,4 @@
-//! Immutable Named Sheet View edits of a [`crate::Package`] (record 0360).
+//! Immutable Named Sheet View edits of a [`crate::Package`].
 //!
 //! [`crate::Package::edit_named_sheet_views`] starts an [`Edit`] of one worksheet; every operation
 //! runs on a private candidate graph, so an error stages nothing.

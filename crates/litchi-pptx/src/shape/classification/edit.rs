@@ -1,4 +1,4 @@
-//! Immutable shape-classification edits of a [`Package`] (record 0351 §2.3).
+//! Immutable shape-classification edits of a [`Package`].
 //!
 //! [`Package::edit_shape_classification`] starts an [`Edit`] over the package; [`Edit::set`] stores one shape's typed classification outcome and
 //! [`Edit::remove`] removes it.

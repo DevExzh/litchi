@@ -212,8 +212,8 @@ impl PreparedTopology {
             let physical = self.package.part(partname)?;
             let original = physical.data()?;
             // The effective revision's own proof, when it keeps one: the
-            // replacement edits those bytes, not the physical original's
-            // (record 0317).
+            // replacement edits those bytes, not the physical
+            // original's.
             let predecessor = (!self.state.no_op)
                 .then(|| {
                     self.state.effective_data().parts[part.index]

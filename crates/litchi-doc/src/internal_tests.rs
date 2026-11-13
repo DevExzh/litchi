@@ -1,11 +1,10 @@
-//! Regressions of the crate-private body-text engine (record 0359a).
+//! Regressions of the crate-private body-text engine.
 //!
 //! These suites drove `body_text::{Snapshot, Edit, Commit, Patch}` as
-//! integration tests. Record 0359a makes the engine crate-private (the
-//! public route is `Package::edit` and the package-level body routes), so
-//! the suites compile here as unit tests of the same code. The crate is
-//! named `litchi_doc` inside them (`extern crate self`), so their paths are
-//! unchanged.
+//! integration tests. The engine is now crate-private (the public route is
+//! `Package::edit` and the package-level body routes), so the suites compile
+//! here as unit tests of the same code. The crate is named `litchi_doc` inside
+//! them (`extern crate self`), so their paths are unchanged.
 
 #[path = "../tests/common/mod.rs"]
 mod common;

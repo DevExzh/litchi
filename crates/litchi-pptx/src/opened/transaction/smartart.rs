@@ -1,4 +1,4 @@
-//! Typed SmartArt authoring and part replacement (record 0284).
+//! Typed SmartArt authoring and part replacement.
 //!
 //! [`Edit::add_smartart`] stages the five diagram parts of an authored
 //! [`Spec`], their slide relationships and the graphic frame;

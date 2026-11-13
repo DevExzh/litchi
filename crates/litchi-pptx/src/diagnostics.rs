@@ -1,4 +1,4 @@
-//! Shared diagnostics of the scoped PPTX edit families (record 0252).
+//! Shared diagnostics of the scoped PPTX edit families.
 
 /// The outcome of a scoped edit or commit.
 ///

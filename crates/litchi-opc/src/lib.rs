@@ -34,7 +34,7 @@
 
 #![forbid(unsafe_code)]
 // quick-xml's checked attribute iteration is quadratic on hostile tags; see
-// `xml_attributes` and the workspace `clippy.toml` (record 0770).
+// `xml_attributes` and the workspace `clippy.toml`.
 #![cfg_attr(not(test), deny(clippy::disallowed_methods))]
 
 pub mod atomic;

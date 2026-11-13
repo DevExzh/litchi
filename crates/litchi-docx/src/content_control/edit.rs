@@ -1,5 +1,5 @@
-//! The content-control family (record 0355): checksums, data-binding
-//! checksums and formatting exceptions of the package's content controls.
+//! The content-control family: checksums, data-binding checksums and formatting
+//! exceptions of the package's content controls.
 //!
 //! [`Package::content_control_snapshot`](crate::Package::content_control_snapshot)
 //! reads every story's controls;
@@ -18,7 +18,7 @@ graph_family!("content-control", own_limits);
 
 pub use super::limit::LimitKind;
 
-/// Options of a content-control edit (record 0355a).
+/// Options of a content-control edit.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct EditOptions {
     limits: Option<super::PackageLimits>,

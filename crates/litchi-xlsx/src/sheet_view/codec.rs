@@ -707,13 +707,13 @@ impl Parser {
 /// The element that opens a retained fragment, carrying every namespace
 /// declaration it inherits from the part.
 ///
-/// Until change 0653 the shared markup-compatibility writer repeated every
-/// in-scope declaration on every element it emitted, so a retained span
-/// resolved on its own by accident. The writer now declares each namespace
-/// once, where XML requires it, so the inherited declarations are added here,
-/// at the one element that becomes the fragment's root. Declarations the
-/// element already makes itself are left alone, and the elements captured
-/// below the root keep the declarations they carry in the part.
+/// The shared markup-compatibility writer used to repeat every in-scope
+/// declaration on every element it emitted, so a retained span resolved on
+/// its own by accident. The writer now declares each namespace once, where
+/// XML requires it, so the inherited declarations are added here, at the one
+/// element that becomes the fragment's root. Declarations the element already
+/// makes itself are left alone, and the elements captured below the root keep
+/// the declarations they carry in the part.
 fn retained_root<'element>(
     element: &BytesStart<'element>,
     resolver: &NamespaceResolver,

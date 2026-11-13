@@ -404,7 +404,7 @@ impl<P: Clone> Edit<P> {
         Ok(self)
     }
 
-    /// Change the direct properties of the table at `path` (record 0342).
+    /// Change the direct properties of the table at `path`.
     ///
     /// See [`super::raw::Tree::format_table_at`].
     ///
@@ -420,8 +420,7 @@ impl<P: Clone> Edit<P> {
         Ok(self)
     }
 
-    /// Change the direct properties of the table row at `path` (record
-    /// 0342).
+    /// Change the direct properties of the table row at `path`.
     ///
     /// See [`super::raw::Tree::format_row_at`].
     ///
@@ -486,8 +485,7 @@ impl<P: Clone> Edit<P> {
         Ok(self)
     }
 
-    /// Set or remove the screen tip of the hyperlink at `hyperlink` (record
-    /// 0345).
+    /// Set or remove the screen tip of the hyperlink at `hyperlink`.
     ///
     /// See [`super::raw::Tree::set_hyperlink_tooltip_at`].
     ///
@@ -523,7 +521,7 @@ impl<P: Clone> Edit<P> {
     /// Insert a run holding one break of `kind` into the paragraph at
     /// `paragraph`, before its direct run `at` (after its last child for
     /// `None`), and return the run's position among the paragraph's direct
-    /// runs (record 0319).
+    /// runs.
     ///
     /// ```
     /// use litchi_core::Position;
@@ -629,8 +627,7 @@ impl<P: Clone> Edit<P> {
         self.inner_mut()?.insert_row_at(table, at, cells, texts)
     }
 
-    /// Insert a cell into the row at `row`, keeping the table grid in step
-    /// (record 0345).
+    /// Insert a cell into the row at `row`, keeping the table grid in step.
     ///
     /// See [`super::raw::Tree::insert_cell_at`].
     ///
@@ -647,7 +644,7 @@ impl<P: Clone> Edit<P> {
     }
 
     /// Insert a grid column, with a cell in every row, into the table at
-    /// `table` (record 0345).
+    /// `table`.
     ///
     /// See [`super::raw::Tree::insert_column_at`].
     ///
@@ -664,8 +661,7 @@ impl<P: Clone> Edit<P> {
         self.inner_mut()?.insert_column_at(table, at, width, text)
     }
 
-    /// Remove a grid column and its cells from the table at `table`
-    /// (record 0345).
+    /// Remove a grid column and its cells from the table at `table`.
     ///
     /// See [`super::raw::Tree::remove_column_at`].
     ///
@@ -681,8 +677,7 @@ impl<P: Clone> Edit<P> {
         Ok(self)
     }
 
-    /// Set the width of a grid column of the table at `table` (record
-    /// 0345).
+    /// Set the width of a grid column of the table at `table`.
     ///
     /// See [`super::raw::Tree::set_column_width_at`].
     ///

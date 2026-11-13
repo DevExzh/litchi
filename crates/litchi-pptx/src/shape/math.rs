@@ -1,4 +1,4 @@
-//! Office Math equations in slide text (record 0321).
+//! Office Math equations in slide text.
 //!
 //! PowerPoint writes an equation as `a14:m` inside a paragraph of a text
 //! body, in the `mc:Choice Requires="a14"` branch of a markup-compatibility

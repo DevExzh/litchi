@@ -1,5 +1,5 @@
 //! Paragraph and run insertion and removal in slide, table-cell and
-//! notes-page text bodies (record 0333).
+//! notes-page text bodies.
 
 use litchi_core::Position;
 use litchi_opc::PackURI;

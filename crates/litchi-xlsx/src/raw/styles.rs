@@ -57,8 +57,8 @@ pub(crate) fn parse(content: &[u8]) -> Result<Catalog> {
         // Events borrow the processed input, and `NsReader` defers its
         // namespace pop until the next read, so the reader's own resolver
         // answers every event of this iteration. Reading them this way -- the
-        // way change 0546's shared worksheet traversal already does -- drops
-        // an `Event::into_owned()` and a `NamespaceResolver` clone per event:
+        // way the shared worksheet traversal already does -- drops an
+        // `Event::into_owned()` and a `NamespaceResolver` clone per event:
         // three heap copies whose results were discarded unread, one of them
         // of the whole start tag. No event, name, namespace, attribute value
         // or diagnostic changes.

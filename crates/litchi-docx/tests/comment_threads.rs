@@ -1,8 +1,8 @@
-//! Comment replies, resolution and anchors staged with main-document edits
-//! (record 0345): a reply is threaded through `commentsExtended` by the
-//! comment paragraphs' `w14:paraId`, `done` is the entry's `w15:done`, and
-//! the range can start after a run or be a point reference. Each publishes
-//! in one commit and inverts exactly.
+//! Comment replies, resolution and anchors staged with main-document edits: a
+//! reply is threaded through `commentsExtended` by the comment paragraphs'
+//! `w14:paraId`, `done` is the entry's `w15:done`, and the range can start
+//! after a run or be a point reference. Each publishes in one commit and
+//! inverts exactly.
 
 use litchi_core::Position;
 use litchi_docx::document::{CommentChange, ElementPath, ElementStep, NewComment};

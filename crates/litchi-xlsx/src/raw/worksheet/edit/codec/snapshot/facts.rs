@@ -3,8 +3,8 @@
 //! The source-backed value editor visits every row and cell of the touched
 //! worksheet twice: once while planning validates and parses the part, and
 //! again while the commit reconstructs a complete [`Layout`](super::Layout)
-//! from the same bytes. Change 0550 measured the second walk at 53.24-54.94%
-//! of commit instructions.
+//! from the same bytes. The second walk was measured at 53.24-54.94% of
+//! commit instructions.
 //!
 //! This module carries the *few* facts the value-only rewrite actually needs
 //! from the first walk to the second: the `<sheetData>` envelope, one record
@@ -359,10 +359,10 @@ impl FactsBuilder {
             // where the scanner would place a merged-range insertion point,
             // or one that carries a dependency the commit's own
             // `validate_actions` has to weigh — a sheet protection, a data
-            // validation range, a merged range. Change 0657 admitted those
-            // containers to the value-only validator; this route still
-            // declines them, so every worksheet that carries one takes the
-            // complete scan and reaches those guards.
+            // validation range, a merged range. The value-only validator
+            // admits those containers; this route still declines them, so
+            // every worksheet that carries one takes the complete scan and
+            // reaches those guards.
             _ => None,
         }
     }

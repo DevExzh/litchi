@@ -1,4 +1,4 @@
-//! Package-level broadcast edits (record 0357).
+//! Package-level broadcast edits.
 //!
 //! [`Package::edit_broadcast`] stages edits of one `BroadcastDocInfo9Container`
 //! in the live document's `PowerPoint` 9 programmable tag, [`Edit::commit`]

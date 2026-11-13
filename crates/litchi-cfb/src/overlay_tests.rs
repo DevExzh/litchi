@@ -1016,8 +1016,8 @@ fn owned_atomic_save_reads_only_its_emission() {
 }
 
 // ---------------------------------------------------------------------------
-// Change 0748: a sealed plan computes each digest once. These tests pin that
-// the values, the published bytes and every generic-source fence are unchanged.
+// A sealed plan computes each digest once. These tests pin that the values, the
+// published bytes and every generic-source fence are unchanged.
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -1591,9 +1591,9 @@ fn atomic_path_late_stable_token_mutation_leaves_destination_unchanged() {
 }
 
 // ---------------------------------------------------------------------------
-// Change 0589: an exact no-op composes the source, so one digest is both
-// identities. These tests pin the value identity and every fence point that
-// the elided second hasher must not move.
+// An exact no-op composes the source, so one digest is both identities. These
+// tests pin the value identity and every fence point that the elided second
+// hasher must not move.
 // ---------------------------------------------------------------------------
 
 fn noop_overlay() -> SameLengthStreamOverlay {
@@ -1824,7 +1824,7 @@ fn noop_plan_publishes_the_exact_source_bytes() {
 }
 
 // ---------------------------------------------------------------------------
-// Change 0659: the two identity entry points variant B2 of change 0644 needs.
+// The two identity entry points.
 // ---------------------------------------------------------------------------
 
 /// A generic positional source whose complete reads can be counted, so a test

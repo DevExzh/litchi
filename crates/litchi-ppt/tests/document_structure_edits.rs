@@ -5,7 +5,7 @@
 )]
 
 //! Master reordering, custom table-style placement and `fNonOutlineData`
-//! through the primary edit (record 0357a).
+//! through the primary edit.
 
 use std::io::Cursor;
 use std::path::PathBuf;
@@ -346,8 +346,8 @@ fn document_edits_compose_with_slide_moves_and_plan() {
     assert_eq!(master_ids(commit.package()), [ids[1], ids[0]]);
     assert_replays_and_inverts(&source, &commit);
 
-    // These edits have a durable form (record 0357b; the round trips are
-    // in tests/durable_patches.rs).
+    // These edits have a durable form (the round trips are in
+    // tests/durable_patches.rs).
     let durable = commit
         .patch()
         .to_durable(litchi_core::patch::PatchLimits::new(

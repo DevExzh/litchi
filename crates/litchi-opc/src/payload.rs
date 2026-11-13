@@ -14,12 +14,12 @@
 //!
 //! A third representation, [`PartPayload::Transferred`], is a materialized
 //! allocation that also carries a verified compressed representation of the
-//! same bytes, captured from another owned-source package's archive (change
-//! 0742). The targeted writer frames that representation instead of deflating
-//! the decoded bytes again. Replacing the part's payload installs a different
-//! representation, and changing its content type demotes this one to
-//! `Ready`, so neither keeps the capture; relationship changes do not touch
-//! the payload.
+//! same bytes, captured from another owned-source package's archive. The
+//! targeted writer frames that representation instead of deflating the
+//! decoded bytes again. Replacing the part's payload installs a different
+//! representation, and changing its content type demotes this one to `Ready`,
+//! so neither keeps the capture; relationship changes do not touch the
+//! payload.
 //!
 //! See [ADR 0030](../../../../docs/adr/0030-lazy-opc-part-decode.md) for the
 //! contract this implements, in particular which refusals stay at `open()` and
@@ -326,7 +326,7 @@ impl std::fmt::Debug for TransferredPayload {
 /// retained source archive. `Transferred` is a materialized payload that also
 /// carries a verified compressed representation of the same bytes.
 /// `Verified` is a materialized payload whose exact allocation already passed
-/// the source publication audit (change 0754).
+/// the source publication audit.
 #[derive(Debug, Clone)]
 pub(crate) enum PartPayload {
     Ready(Arc<Vec<u8>>),

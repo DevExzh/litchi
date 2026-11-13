@@ -1,4 +1,4 @@
-//! Immutable document math-defaults edits of a [`Package`] (record 0351 §2.3).
+//! Immutable document math-defaults edits of a [`Package`].
 //!
 //! [`Package::edit_math_properties`] starts an [`Edit`] over the package; [`Edit::set`] replaces the document-level math defaults in the
 //! presentation properties and [`Edit::remove`] removes them.

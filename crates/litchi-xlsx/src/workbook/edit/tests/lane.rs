@@ -382,9 +382,9 @@ fn committed_worksheet(
 
 #[test]
 fn byte_order_marked_worksheets_edit_exactly_like_unmarked_ones() {
-    // Change 0765: the edit scanner and the three lanes address document
-    // offsets, so a marked worksheet takes the same routes and publishes the
-    // unmarked worksheet's bytes behind the carried mark.
+    // The edit scanner and the three lanes address document offsets, so a
+    // marked worksheet takes the same routes and publishes the unmarked
+    // worksheet's bytes behind the carried mark.
     let mut random = Lcg(47);
     let plain = dense_sheet(&mut random, 80, 60, "");
     let marked = format!("\u{feff}{plain}");

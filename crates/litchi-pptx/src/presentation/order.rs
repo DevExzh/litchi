@@ -513,7 +513,7 @@ fn validate_for_rewrite(snapshot: &SourceBackedSlideOrderSnapshot) -> Result<()>
     reject_root_features(snapshot.xml.as_bytes(), snapshot.context.as_ref())?;
     // This standalone editor rebuilds each candidate from the source, so it
     // cannot carry the section placement of a sequence of moves; the
-    // primary source editor maintains sections (record 0303).
+    // primary source editor maintains sections.
     if crate::opened::sections::present(snapshot.xml.as_bytes())
         && crate::opened::sections::scan(snapshot.xml.as_bytes())?.is_some()
     {
@@ -720,7 +720,7 @@ fn inspect_metadata_xml(
 ) -> Result<()> {
     // Names are resolved below on namespace values as written; a declaration
     // that spells the markup-compatibility namespace with references binds it
-    // all the same (record 0011).
+    // all the same.
     if litchi_ooxml_common::mce::binds_namespace_by_reference(xml) {
         return Err(metadata_refusal(
             owner,
@@ -783,7 +783,7 @@ fn inspect_presentation_properties_xml(
 ) -> Result<()> {
     // Names are resolved below on namespace values as written; a declaration
     // that spells the markup-compatibility namespace with references binds it
-    // all the same (record 0011).
+    // all the same.
     if litchi_ooxml_common::mce::binds_namespace_by_reference(xml) {
         return Err(metadata_refusal(
             MetadataOwner::PresentationProperties,
@@ -1193,8 +1193,8 @@ fn reject_root_features(xml: &[u8], context: Option<&ExecutionContext>) -> Resul
     let mut nodes = 0usize;
     let mut roots = 0usize;
     // Whether the root's `p:extLst` is open: its `p:ext` children must name
-    // non-positional extensions or the section list (record 0303), whose
-    // membership slide order and removal maintain.
+    // non-positional extensions or the section list, whose membership slide
+    // order and removal maintain.
     let mut extension_list = false;
     let mut section_extension = false;
     let mut sections = false;
@@ -1608,8 +1608,8 @@ pub(super) fn canonical_source_order_xml(
             .then(left.relationship_id.cmp(&right.relationship_id))
     });
     let canonical = reorder_stable_bindings(xml, order, &sorted, context)?;
-    // Section membership follows the order (record 0303); the exact root
-    // preimages guard it, so the order-invariant digest leaves it out.
+    // Section membership follows the order; the exact root preimages guard it,
+    // so the order-invariant digest leaves it out.
     if crate::opened::sections::present(&canonical) {
         if let Some((stripped, _)) = crate::opened::sections::strip(&canonical)? {
             return Ok(stripped);
@@ -1665,9 +1665,9 @@ mod tests {
 
     const FOREIGN_MCE: &[u8] = b"http://purl.oclc.org/ooxml/markup-compatibility/2006";
 
-    /// Record 0011: a declaration that spells the namespace with references
-    /// binds it for preprocessing, so positional metadata refuses it as it
-    /// refuses a literal one.
+    /// A declaration that spells the namespace with references binds it for
+    /// preprocessing, so positional metadata refuses it as it refuses a literal
+    /// one.
     #[test]
     fn escaped_markup_compatibility_is_refused_in_positional_metadata() {
         let xml = format!(

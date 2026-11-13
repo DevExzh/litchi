@@ -320,8 +320,8 @@ impl Patch {
     }
 
     /// Apply to a snapshot with the patch's exact before bytes and
-    /// variables, from any source (record 0355a: a package replay reads the
-    /// snapshot it applies to).
+    /// variables, from any source (a package replay reads the snapshot it
+    /// applies to).
     pub(crate) fn apply_content(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.xml.as_slice() != self.before.xml.as_slice()
             || source.variables != self.before.variables

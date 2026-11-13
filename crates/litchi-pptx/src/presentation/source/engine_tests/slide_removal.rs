@@ -534,7 +534,7 @@ fn final_slide_shared_owner_dependency_unknown_macro_and_signed_sources_refuse_a
         &with_hidden_incoming_relationship(&fixture()),
         SlideRemovalRefusal::UnknownSemanticSurface,
     );
-    // A Part only the removed slide targets leaves with it (record 0303).
+    // A Part only the removed slide targets leaves with it.
     let dependent = with_slide_dependency(&fixture());
     let mut output = Vec::new();
     open(&dependent)

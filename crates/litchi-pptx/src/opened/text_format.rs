@@ -60,8 +60,8 @@ pub enum TextTarget {
     /// Bytes `start..end` of the text of one text run (`a:r`): the run is
     /// split so that the span is a run of its own, each part carrying a copy
     /// of the run's `a:rPr`. The edit's text replaces the span and its run
-    /// properties apply to that run only (record 0273). The span is
-    /// non-empty and lies on character boundaries of the run's text.
+    /// properties apply to that run only. The span is non-empty and lies on
+    /// character boundaries of the run's text.
     RunSpan {
         /// Positional scene index of the shape.
         shape: Position,
@@ -84,7 +84,7 @@ pub enum TextTarget {
         column: Position,
     },
     /// One paragraph of a table cell's text body, as [`Self::Paragraph`]
-    /// is one of a shape's (record 0333).
+    /// is one of a shape's.
     CellParagraph {
         /// Positional scene index of the table frame.
         shape: Position,
@@ -96,7 +96,7 @@ pub enum TextTarget {
         paragraph: Position,
     },
     /// One run (`a:r`, `a:br` or `a:fld`) of a paragraph of a table cell's
-    /// text body, as [`Self::Run`] is one of a shape's (record 0285).
+    /// text body, as [`Self::Run`] is one of a shape's.
     CellRun {
         /// Positional scene index of the table frame.
         shape: Position,
@@ -110,7 +110,7 @@ pub enum TextTarget {
         run: Position,
     },
     /// Bytes `start..end` of the text of one text run of a table cell,
-    /// split out as [`Self::RunSpan`] splits a shape's run (record 0285).
+    /// split out as [`Self::RunSpan`] splits a shape's run.
     CellRunSpan {
         /// Positional scene index of the table frame.
         shape: Position,
@@ -133,8 +133,7 @@ pub enum TextTarget {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Rgb(pub [u8; 3]);
 
-/// A table cell's local fill, the fill choice of its `a:tcPr` (record
-/// 0333).
+/// A table cell's local fill, the fill choice of its `a:tcPr`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum CellFill {
@@ -146,7 +145,7 @@ pub enum CellFill {
     None,
 }
 
-/// One cell inset of `a:tcPr` (record 0333).
+/// One cell inset of `a:tcPr`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CellMargin {
     /// `marL`.
@@ -268,13 +267,13 @@ impl<'a> TextProperties<'a> {
         self.align = Some(value);
         self
     }
-    /// Set or remove `a:rPr@u` on every addressed run (record 0333).
+    /// Set or remove `a:rPr@u` on every addressed run.
     #[must_use]
     pub const fn with_underline(mut self, value: Option<Underline>) -> Self {
         self.underline = Some(value);
         self
     }
-    /// Set or remove `a:rPr@strike` on every addressed run (record 0333).
+    /// Set or remove `a:rPr@strike` on every addressed run.
     #[must_use]
     pub const fn with_strike(mut self, value: Option<Strike>) -> Self {
         self.strike = Some(value);
@@ -288,14 +287,14 @@ impl<'a> TextProperties<'a> {
         self
     }
     /// Set or remove a table cell's vertical anchor (`a:tcPr@anchor`);
-    /// cells only (record 0333).
+    /// cells only.
     #[must_use]
     pub const fn with_cell_anchor(mut self, value: Option<Anchor>) -> Self {
         self.anchor = Some(value);
         self
     }
     /// Set or remove one table cell inset (`a:tcPr@marL`, …), in EMU; cells
-    /// only (record 0333).
+    /// only.
     #[must_use]
     pub const fn with_cell_margin(mut self, margin: CellMargin, value: Option<i64>) -> Self {
         self.margins[margin as usize] = Some(value);
@@ -411,14 +410,13 @@ pub(crate) fn stage_text_properties_with_limits(
 }
 
 /// Stage several already bounded batches of text formatting edits, applied
-/// in order, in one scene read and one read-back (record 0333). Each chunk
-/// keeps the limits of [`stage_text_properties_with_limits`]; the chunk count is bounded
-/// by the scene's shape limit and the total by 100,000 edits.
+/// in order, in one scene read and one read-back. Each chunk keeps the limits
+/// of [`stage_text_properties_with_limits`]; the chunk count is bounded by the
+/// scene's shape limit and the total by 100,000 edits.
 ///
 /// With `changes`, it is cleared and then receives, for each edit in order,
 /// whether that edit changed the bytes of its target element as the earlier
-/// edits left them (record 0348), as one edit applied after the other
-/// reports it.
+/// edits left them, as one edit applied after the other reports it.
 pub(crate) fn stage_text_property_chunks_with_limits(
     xml: &[u8],
     chunks: &[&[TextAssignment<'_>]],
@@ -499,7 +497,7 @@ pub(crate) fn stage_text_property_chunks_with_limits(
 /// edited elements rewritten in order, one splice and one read-back.
 ///
 /// With `changes`, each edit's change (its element's bytes differ after it)
-/// is appended in order (record 0348).
+/// is appended in order.
 fn stage_admitted_text_edits(
     xml: &[u8],
     edits: &[TextAssignment<'_>],
@@ -535,19 +533,18 @@ fn stage_admitted_text_edits(
     // Every target is a leaf element of the original scene (a text shape or
     // a table frame), so their spans are disjoint: each edit rewrites its
     // shape's current element, and the rewritten elements are spliced into
-    // the part once (record 0333). This keeps a batch proportional to the
-    // part plus the edited elements, rather than reading the scene again
-    // for every edit.
+    // the part once. This keeps a batch proportional to the part plus the
+    // edited elements, rather than reading the scene again for every edit.
     let mut elements: Vec<(usize, Range<usize>, Vec<u8>)> = Vec::new();
     let mut slots: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
     // A table frame's cells, located once and rewritten in place, so a
     // batch of cell edits is proportional to the table plus the edited
-    // cells rather than reparsing the frame per edit (record 0346).
+    // cells rather than reparsing the frame per edit.
     let mut tables: std::collections::HashMap<usize, TableCells> = std::collections::HashMap::new();
     // A shape's paragraphs, located once, for paragraph and run edits that
-    // touch nothing outside their paragraph (record 0346): a batch of them
-    // on one body (the notes page's, a long text box's) is proportional to
-    // the body plus the edited paragraphs.
+    // touch nothing outside their paragraph: a batch of them on one body (the
+    // notes page's, a long text box's) is proportional to the body plus the
+    // edited paragraphs.
     let mut bodies: std::collections::HashMap<usize, ShapeParagraphs> =
         std::collections::HashMap::new();
     let mut changed = 0;
@@ -1380,8 +1377,8 @@ fn alignment_token(value: Alignment) -> &'static [u8] {
 
 /// Refuse a text replacement of `range` of `owner` (a paragraph) when one of
 /// its children there is not a run or a line break: a field (`a:fld`) or
-/// any other markup would be lost (record 0304). Paragraph and end-of-
-/// paragraph properties are kept by the rewrites.
+/// any other markup would be lost. Paragraph and end-of- paragraph properties
+/// are kept by the rewrites.
 fn check_replaceable(owner: &[u8], kids: &[Node], range: &Range<usize>) -> Result<()> {
     for kid in kids.iter().filter(|kid| range.contains(&kid.span.start)) {
         if !matches!(kid.local(owner), b"r" | b"br" | b"pPr" | b"endParaRPr") {
@@ -1469,7 +1466,7 @@ pub(super) fn rewrite_run(
                 return Err(invalid("a text run has no a:t element"));
             }
             // A field without a cached result: its a:t follows a:rPr and
-            // a:pPr (record 0279).
+            // a:pPr.
             let mut element = b"<".to_vec();
             element.extend_from_slice(&qualified(&prefix, "t"));
             element.push(b'>');
@@ -1943,8 +1940,8 @@ fn descend(xml: &[u8], node: &Node, local: &[u8]) -> Result<Node> {
 }
 
 /// Rewrite a `p:graphicFrame` holding an `a:tbl` for one cell.
-/// A shape's `a:p` elements, located once (record 0346), and the
-/// paragraphs a batch has rewritten so far.
+/// A shape's `a:p` elements, located once, and the paragraphs a batch has
+/// rewritten so far.
 struct ShapeParagraphs {
     /// The paragraph spans in the shape element.
     spans: Vec<Range<usize>>,
@@ -1994,8 +1991,8 @@ impl ShapeParagraphs {
     }
 }
 
-/// A table frame's `a:tc` elements, located once (record 0346), and the
-/// cells a batch has rewritten so far.
+/// A table frame's `a:tc` elements, located once, and the cells a batch has
+/// rewritten so far.
 struct TableCells {
     /// The cell spans in the frame, by row and position in the row.
     spans: Vec<Vec<Range<usize>>>,
@@ -2117,7 +2114,7 @@ fn rewrite_cell_run(
 }
 
 /// Rewrite one paragraph of a cell's text body, as a shape's paragraph is
-/// rewritten (record 0333).
+/// rewritten.
 fn rewrite_cell_paragraph(
     cell: &[u8],
     paragraph: usize,

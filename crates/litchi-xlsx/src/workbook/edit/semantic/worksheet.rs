@@ -821,8 +821,8 @@ impl Sheet<'_> {
 
     /// Write `text` as the cell's own inline rich string: each run keeps
     /// its run properties (`rPr`) as read by
-    /// [`Worksheet::rich_text`](crate::Worksheet::rich_text) (record 0295).
-    /// The cell's style and other children are kept, as by [`Self::set`].
+    /// [`Worksheet::rich_text`](crate::Worksheet::rich_text). The cell's
+    /// style and other children are kept, as by [`Self::set`].
     ///
     /// # Errors
     ///
@@ -901,7 +901,7 @@ impl Sheet<'_> {
 
     /// Store `value` as the cached result of an existing scalar formula
     /// cell, keeping its formula markup (shared-formula members included)
-    /// byte for byte; the cell type follows the value (record 0279).
+    /// byte for byte; the cell type follows the value.
     ///
     /// ```
     /// # fn main() -> litchi_xlsx::Result<()> {

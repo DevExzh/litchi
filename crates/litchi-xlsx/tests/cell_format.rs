@@ -56,7 +56,7 @@ fn officecli(format: &Format) -> BTreeMap<&'static str, String> {
     if let Some(font) = format.font().filter(|_| !format.has_default_font()) {
         // `OfficeCLI` reports a present `<b val="0"/>` as `true`; the typed
         // value keeps it apart as `Some(false)`, so a node view can emit the
-        // explicit `false` record 0010 §2.3 asks for instead.
+        // explicit `false` instead.
         if font.bold().is_some() {
             keys.insert("font.bold", "true".to_owned());
         }

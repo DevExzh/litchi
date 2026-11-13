@@ -161,7 +161,7 @@ fn a_noop_patch_publishes_nothing_on_a_different_signature_graph() {
     let source = signed_package(Shape::Twice);
     let target = signed_package(Shape::TwiceTampered);
     // An exact no-op patch publishes nothing anywhere: the tampered target is
-    // returned unchanged, its signature graph included (record 0355).
+    // returned unchanged, its signature graph included.
     let commit = source.edit_content_controls().commit().unwrap();
     assert!(commit.patch().is_noop());
     let replayed = target.apply_content_controls(commit.patch()).ok().unwrap();

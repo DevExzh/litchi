@@ -5,9 +5,10 @@
 //! [`crate::Package`] owner. Low-level codec integrations can use
 //! [`crate::raw::encode`] explicitly.
 //!
-//! Drafts reached from the builder live here without a prefix (record 0351
-//! §2.1 rule 7): [`Chart`](crate::builder::Chart) is a standalone Graph chart draft that
-//! [`Builder::add_chart`](crate::builder::Builder::add_chart) places on a slide.
+//! Drafts reached from the builder live here without a prefix:
+//! [`Chart`](crate::builder::Chart) is a standalone Graph chart draft that
+//! [`Builder::add_chart`](crate::builder::Builder::add_chart) places on a
+//! slide.
 
 pub use crate::writer::Builder;
 pub use crate::writer::chart::{Chart, ChartKind, ChartSeries};

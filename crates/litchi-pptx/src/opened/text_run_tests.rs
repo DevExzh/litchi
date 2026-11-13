@@ -1,5 +1,5 @@
-//! Change 0755: malformed DrawingML text-run markup is refused with a typed
-//! error by every reader and opened-transaction verb, never a panic.
+//! Malformed DrawingML text-run markup is refused with a typed error by every
+//! reader and opened-transaction verb, never a panic.
 //!
 //! An empty `a:t` inside an open `a:t` used to pass the scene reader and be
 //! recorded by the text-run locator as a span that starts inside the
@@ -228,10 +228,9 @@ fn no_text_verb_panics_on_mutated_text_run_markup() -> Result<()> {
 }
 
 /// A leading UTF-8 byte-order mark is skipped by quick-xml without being
-/// counted in its positions. Change 0755 pinned that such a slide's text edit
-/// was refused, never corrupted and never a panic; change 0765 converts every
-/// position through the reader origin, so the edit now applies and the slide
-/// keeps its mark.
+/// counted in its positions. Such a slide's text edit used to be refused (never
+/// corrupted and never a panic); every position is now converted through the
+/// reader origin, so the edit applies and the slide keeps its mark.
 #[test]
 fn a_byte_order_marked_slide_is_edited_correctly_and_keeps_its_mark() -> Result<()> {
     let mut package = text_box_package(&["My text"])?;

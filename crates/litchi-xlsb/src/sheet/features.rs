@@ -1,5 +1,5 @@
 //! The worksheet features read from a worksheet stream without decoding its
-//! cells (unified-ops record 0322).
+//! cells.
 
 use crate::conditional_formatting::Formatting;
 use crate::hyperlinks::Hyperlink;

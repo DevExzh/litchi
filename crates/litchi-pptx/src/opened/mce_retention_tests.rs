@@ -1,5 +1,5 @@
-//! Focused correctness and resource tests for the 0704 bounded slide-MCE
-//! projection retention candidate.
+//! Focused correctness and resource tests for the bounded slide-MCE projection
+//! retention candidate.
 //!
 //! This module is included by `opened/mod.rs` only under `#[cfg(test)]`. It
 //! exercises the production policy, observability, and release methods plus

@@ -1,5 +1,5 @@
-//! The glossary family (record 0355): the glossary document (`AutoText`
-//! and other building blocks) and its auxiliary graph.
+//! The glossary family: the glossary document (`AutoText` and other building
+//! blocks) and its auxiliary graph.
 //!
 //! [`Package::glossary`](crate::Package::glossary) reads the typed catalog
 //! and [`Package::glossary_graph`](crate::Package::glossary_graph) the raw

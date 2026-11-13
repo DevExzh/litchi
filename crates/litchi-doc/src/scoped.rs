@@ -1,13 +1,13 @@
-//! Shared plumbing of the scoped DOC edit families (record 0359).
+//! Shared plumbing of the scoped DOC edit families.
 //!
-//! Every scoped family `x` follows the record 0351 §2.3 shape:
-//! `Package::edit_x(&self) -> x::Edit` (and `edit_x_with_options`),
-//! `x::Edit::commit(self) -> x::Commit` publishing a new [`Package`], and
-//! `Package::apply_x(&self, &x::Patch) -> x::Commit`. Dropping an `Edit`
-//! discards it. The families keep their part-level codecs (`x::record`) and
-//! byte-level editors crate-private; this module captures the source
-//! package, republishes a family's rendered bytes as a new package under the
-//! source's open policy, and replays exact byte patches.
+//! Every scoped family `x` follows the same shape: `Package::edit_x(&self) ->
+//! x::Edit` (and `edit_x_with_options`), `x::Edit::commit(self) -> x::Commit`
+//! publishing a new [`Package`], and `Package::apply_x(&self, &x::Patch) ->
+//! x::Commit`. Dropping an `Edit` discards it. The families keep their
+//! part-level codecs (`x::record`) and byte-level editors crate-private; this
+//! module captures the source package, republishes a family's rendered bytes as
+//! a new package under the source's open policy, and replays exact byte
+//! patches.
 //!
 //! A family's patch is exact and whole-artifact: it carries the source and
 //! target package bytes, so `apply_x` refuses a package that is not the

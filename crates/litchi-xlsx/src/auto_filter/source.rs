@@ -8,7 +8,7 @@
 //! raw-copied). An exact no-op returns the source workbook unchanged; a
 //! changed edit of a signed source is refused at commit.
 //! [`SourceBackedWorkbook::apply_auto_filter`] replays a [`Patch`] onto a workbook
-//! holding its before state (record 0360).
+//! holding its before state.
 
 use std::io::Write;
 
@@ -47,7 +47,7 @@ impl crate::workbook::source::deferred::Change for super::Patch {
 
     fn check(&self, package: &SourceBackedPackage) -> Result<()> {
         // A replay compares content: the selected worksheet, its owner and
-        // relationships must hold the before state (record 0360).
+        // relationships must hold the before state.
         let current = Snapshot::load_source_backed(package, self.before().sheet_position())?;
         if !current.same_source(self.before()) {
             return Err(Error::PatchConflict {

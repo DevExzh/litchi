@@ -633,7 +633,7 @@ fn read_serial(
     // one Deflate decoder across it instead of building one per cold member.
     // Store members bypass the decoder, cache hits stay cache-only, and a
     // managed package keeps the one-shot path so that no decoder workspace
-    // outlives a managed load (change 0402).
+    // outlives a managed load.
     let mut session = package.sequential_read_session(requests.len());
     for request in requests {
         let data = match request.declared_bytes {

@@ -1023,10 +1023,8 @@ impl StructuralPrefetch {
     /// package exactly as it would have been without it: nothing is retained,
     /// every member read goes to the source as it does today, and the failure
     /// is observed again by whichever read actually needs those bytes. That is
-    /// invariant 5 of change 0577's frozen design, and it is right here for the
-    /// reason change 0611 gave for refusing it one member wide — this read
-    /// spans several members and belongs to none of them, so abandoning it
-    /// cannot give any member read a second refusal.
+    /// right here because this read spans several members and belongs to none
+    /// of them, so abandoning it cannot give any member read a second refusal.
     ///
     /// A short read is retained as far as it reached. The members it covers in
     /// full are served from it; every other read reaches the source at exactly
@@ -1086,9 +1084,9 @@ impl StructuralPrefetch {
     ///
     /// Only a wholly covered, non-empty read is answered. A partly covered one
     /// would be served in different-sized pieces than the source would have
-    /// delivered, which change 0611 measured moving which of two refusals a
-    /// malformed member reaches; and a zero-length read has nothing to answer
-    /// with, so it keeps the provider trace it has today.
+    /// delivered, which was measured moving which of two refusals a malformed
+    /// member reaches; and a zero-length read has nothing to answer with, so
+    /// it keeps the provider trace it has today.
     pub(super) fn serve(&self, offset: u64, output: &mut [u8]) -> Option<usize> {
         if output.is_empty() || !self.active.load(Ordering::Acquire) {
             return None;

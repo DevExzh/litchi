@@ -40,9 +40,8 @@ mod tests;
 mod transaction;
 
 /// Formatting-preserving text substitution over the text of a story: the
-/// main document, a header, a footer, the notes or the comments
-/// (records 0274 and 0285). It is the one leaf primitive behind template
-/// merge and find/replace.
+/// main document, a header, a footer, the notes or the comments. It is the one
+/// leaf primitive behind template merge and find/replace.
 ///
 /// [`Edit::story`], [`Edit::story_within`] and [`Edit::part_story`] read a
 /// [`substitute::Story`]; [`Edit::substitute`], [`Edit::substitute_part`]
@@ -55,8 +54,7 @@ pub mod substitute {
     };
 }
 
-/// Field results of the main story, indexed and rewritten for field refresh
-/// (record 0279).
+/// Field results of the main story, indexed and rewritten for field refresh.
 ///
 /// [`Edit::fields`] reads a [`fields::Fields`] index; [`Edit::refresh_fields`]
 /// applies [`fields::Update`]s planned over it. Nothing is evaluated here.

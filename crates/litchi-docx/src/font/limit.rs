@@ -1,4 +1,4 @@
-//! Typed budgets of the font-table family (record 0355a).
+//! Typed budgets of the font-table family.
 
 use super::model::{MAX_ALL_FONTS, MAX_DEPTH, MAX_FONT, MAX_FONTS, MAX_NODES, MAX_TEXT, MAX_XML};
 
@@ -122,7 +122,8 @@ impl Default for Limits {
     }
 }
 
-/// The bounded resources of the font-table family, carried by [`crate::Error::FontLimit`] (record 0355a).
+/// The bounded resources of the font-table family, carried by
+/// [`crate::Error::FontLimit`].
 ///
 /// Each variant names one bounded resource; [`std::fmt::Display`] gives its
 /// human-readable name, the one the error messages print.

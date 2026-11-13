@@ -4,8 +4,7 @@
     reason = "run edit tests use panic-driven assertions"
 )]
 
-//! Character runs and text hyperlinks through the canonical primary edit
-//! (record 0323).
+//! Character runs and text hyperlinks through the canonical primary edit.
 
 use litchi_ppt::Package;
 use litchi_ppt::hyperlink::{Click, Target};

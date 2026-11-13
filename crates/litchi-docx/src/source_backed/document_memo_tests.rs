@@ -187,8 +187,8 @@ fn body_indexes_follow_effective_revisions_and_keep_old_values() {
 }
 
 /// One source revision's unmanaged transaction snapshot is scanned on first
-/// use, shared by every edit and commit started from it (record 0305), and an
-/// edit from the memo publishes what an edit from a fresh scan publishes.
+/// use, shared by every edit and commit started from it, and an edit from the
+/// memo publishes what an edit from a fresh scan publishes.
 #[test]
 fn unmanaged_edits_share_one_transaction_snapshot() {
     let bytes = docx(word_document(
@@ -253,9 +253,9 @@ fn unmanaged_edits_share_one_transaction_snapshot() {
 }
 
 /// A handle committed from a source-backed owner edits its effective
-/// revision through the same memo (record 0311): the revision is scanned
-/// once for the edit and its commit, never served for other bytes, and the
-/// chain publishes what a chain of fresh scans publishes.
+/// revision through the same memo: the revision is scanned once for the edit
+/// and its commit, never served for other bytes, and the chain publishes what a
+/// chain of fresh scans publishes.
 #[test]
 fn committed_handles_share_one_effective_transaction_snapshot() {
     let bytes = docx(word_document(
@@ -309,11 +309,11 @@ fn committed_handles_share_one_effective_transaction_snapshot() {
     assert_eq!(chain(false), chain(true));
 }
 
-/// Record 0317: the transaction snapshot carries the source XML audit proof
-/// the OPC package retained for its exact bytes, so the preserving commit
-/// proves its candidate from it instead of scanning the base again, and the
-/// candidate's proof keeps boundaries of its own for the next commit. Every
-/// chain publishes what one fresh edit of the same paragraphs publishes.
+/// The transaction snapshot carries the source XML audit proof the OPC package
+/// retained for its exact bytes, so the preserving commit proves its candidate
+/// from it instead of scanning the base again, and the candidate's proof keeps
+/// boundaries of its own for the next commit. Every chain publishes what one
+/// fresh edit of the same paragraphs publishes.
 #[test]
 fn preserving_commits_prove_their_candidates_from_retained_proofs() {
     let mut body = String::new();

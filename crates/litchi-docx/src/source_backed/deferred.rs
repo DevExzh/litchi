@@ -1,4 +1,4 @@
-//! Committed source-backed packages (record 0355a).
+//! Committed source-backed packages.
 //!
 //! A source-backed family commit returns a new [`Package`] without writing
 //! anything. Its output is the family's byte-preserving source splice, run
@@ -195,9 +195,8 @@ impl ArtifactStream for Package {
 }
 
 impl Package {
-    /// The SHA-256 of the complete artifact this package writes (record
-    /// 0355a): the source archive for an opened package, the output for a
-    /// committed or edited one.
+    /// The SHA-256 of the complete artifact this package writes: the source
+    /// archive for an opened package, the output for a committed or edited one.
     pub(crate) fn output_fingerprint(&self) -> Result<[u8; 32]> {
         Ok(self.output_artifact()?.1)
     }
@@ -265,7 +264,7 @@ impl Package {
     }
 
     /// The package that restores `after` over `self`, writing the exact
-    /// artifact admitted from `after` (record 0355a).
+    /// artifact admitted from `after`.
     ///
     /// A matching recipient streams the original artifact through `self`'s
     /// execution context: output is charged to it, and both artifacts are

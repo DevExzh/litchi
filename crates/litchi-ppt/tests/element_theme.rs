@@ -4,7 +4,7 @@
     reason = "theme tests use panic-driven assertions"
 )]
 
-//! The `PowerPoint` 2007 theme of a legacy presentation (record 0323).
+//! The `PowerPoint` 2007 theme of a legacy presentation.
 
 use litchi_ppt::Package;
 use std::path::PathBuf;

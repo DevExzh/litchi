@@ -1,4 +1,4 @@
-//! Package-level slide-library synchronization edits (record 0357).
+//! Package-level slide-library synchronization edits.
 //!
 //! [`Package::edit_slide_sync`] stages the optional
 //! `RoundTripSlideSyncInfo12` container of one slide, [`Edit::commit`]

@@ -1,7 +1,7 @@
-//! Record 0771: the MCE stream's names share their namespace URI, so its
-//! event-name sharing and directive checks avoid per-name URI copies and
-//! hashing. Registered-extension checks and observer work are outside this
-//! property. Checks through namespace identities preserve URI-text equality.
+//! The MCE stream's names share their namespace URI, so its event-name
+//! sharing and directive checks avoid per-name URI copies and hashing.
+//! Registered-extension checks and observer work are outside this property.
+//! Checks through namespace identities preserve URI-text equality.
 //!
 //! Work is bounded by counting, not timing: the namespace-URI bytes the scope
 //! hashes, compares or examines for facts, the bytes the stream copies
@@ -125,10 +125,9 @@ fn uri(count: usize) -> String {
     format!("urn:{}", "u".repeat(count))
 }
 
-/// The 0764 review's stream probe input (harness case
-/// `mce_stream_review_long_uri`): `p` bound to a URI of `u_count + 4` bytes
-/// beside an ignorable `x`, around elements of at most 1,000 attributes in
-/// `p` until `attributes` are written.
+/// A stream probe input: `p` bound to a URI of `u_count + 4` bytes beside
+/// an ignorable `x`, around elements of at most 1,000 attributes in `p`
+/// until `attributes` are written.
 fn review_long_uri(u_count: usize, attributes: usize) -> String {
     let mut xml = format!(
         r#"<r xmlns:mc="{MC}" xmlns:x="urn:x" xmlns:p="{}" mc:Ignorable="x">"#,

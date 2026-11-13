@@ -1,5 +1,4 @@
-//! A streaming cursor over the stored cells of a source-backed worksheet
-//! (record 0267).
+//! A streaming cursor over the stored cells of a source-backed worksheet.
 //!
 //! [`SourceBackedWorksheet::visit_cells`] scans the whole worksheet substream
 //! and reports its records in stream order; a reader that wants the sorted
@@ -9,18 +8,18 @@
 //!
 //! [`SourceBackedWorksheet::cell_cursor`] first runs one validating scan that
 //! decodes no value: every record takes the checks the visitor's scan takes
-//! (the measure path of change 0636, which runs every check the parse runs),
-//! and the scan notes whether the stored positions strictly ascend in
-//! row-major order. A refused sheet is refused there, before any cell. A
-//! sheet whose records do not ascend (a position stored out of order or
-//! twice) gets no cursor: its sorted grid is not its stream order. Otherwise
-//! the cursor runs the visitor's scan in batches: each batch scans from where
-//! the last one stopped until it holds [`BATCH`] cells and stops at the next
-//! record boundary that leaves no string-valued `FORMULA` waiting for its
-//! `STRING`. A resumed scan keeps counting the worksheet's scanned bytes and
-//! records from the sheet start, so the limits apply as to one scan, and
-//! each cell is the one the visitor reports, so the cursor returns exactly
-//! the sorted grid's cells in order.
+//! (the measure path, which runs every check the parse runs), and the scan
+//! notes whether the stored positions strictly ascend in row-major order. A
+//! refused sheet is refused there, before any cell. A sheet whose records do
+//! not ascend (a position stored out of order or twice) gets no cursor: its
+//! sorted grid is not its stream order. Otherwise the cursor runs the
+//! visitor's scan in batches: each batch scans from where the last one
+//! stopped until it holds [`BATCH`] cells and stops at the next record
+//! boundary that leaves no string-valued `FORMULA` waiting for its `STRING`.
+//! A resumed scan keeps counting the worksheet's scanned bytes and records
+//! from the sheet start, so the limits apply as to one scan, and each cell is
+//! the one the visitor reports, so the cursor returns exactly the sorted
+//! grid's cells in order.
 //!
 //! What the validating scan does not decode is a cell's value: a shared
 //! string index the string table cannot resolve, or a `STRING` result
@@ -431,8 +430,8 @@ mod tests {
             }
         }
         // The corpus exercises resumed scans. Its out-of-order sheets were
-        // embedded chart caches read as cells, which record 0316 skips; the
-        // unordered case is pinned by `a_sheet_whose_positions_descend_has_no_cursor`.
+        // embedded chart caches read as cells, which the scan now skips; the unordered
+        // case is pinned by `a_sheet_whose_positions_descend_has_no_cursor`.
         assert!(
             sheets > 100 && cells > 10_000 && batched > 10,
             "{sheets} {cells} {batched} {unordered}"

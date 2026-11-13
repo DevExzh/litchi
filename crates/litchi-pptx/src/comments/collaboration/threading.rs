@@ -1,4 +1,4 @@
-//! Immutable comment threading edits of a [`Package`] (record 0351 §2.3).
+//! Immutable comment threading edits of a [`Package`].
 //!
 //! [`Package::edit_comment_threading`] starts an [`Edit`] over a staged copy of the
 //! package; [`Edit::set`] creates or replaces one legacy comment's `p15:threadingInfo` extension and [`Edit::remove`]

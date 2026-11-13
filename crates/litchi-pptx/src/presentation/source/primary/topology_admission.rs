@@ -178,7 +178,7 @@ fn validate_inner(
     };
     visit(None, prepared.rels())?;
     for owner in prepared.iter_parts()? {
-        // Parts the slide owns leave with it (record 0303).
+        // Parts the slide owns leave with it.
         if owned.contains(owner.partname()) {
             continue;
         }
@@ -216,8 +216,8 @@ pub(super) fn stage_layout(
     stage_edges(package, plan, owner, xml, true)
 }
 
-/// Add the typed edges of a restored dependent Part (record 0303) before
-/// installing its exact relationship image.
+/// Add the typed edges of a restored dependent Part before installing its exact
+/// relationship image.
 pub(super) fn stage_dependent_edges(
     package: &Package,
     plan: &mut litchi_opc::SourceTopologyPlan,

@@ -5,9 +5,9 @@
     reason = "bounded, deterministic generated ZIP fixtures and explicit index arithmetic"
 )]
 
-//! Change 0632: one bounded read of the head of the central directory serves
-//! both the locator's first-central-record probe and the index's
-//! central-directory scan.
+//! One bounded read of the head of the central directory serves both the
+//! locator's first-central-record probe and the index's central-directory
+//! scan.
 //!
 //! These tests pin what that read is allowed to change — the number of
 //! positional requests an index build issues and the size of the buffer those

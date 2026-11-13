@@ -8,17 +8,17 @@
 //! Byte-exact goldens for the fresh DOC writer's text paths.
 //!
 //! Every fixture below was first written by the writer at `6d989cad63`, before
-//! the single-pass UTF-16 text encoding of change 0753, and its SHA-256
-//! recorded here. The spec-gap merge re-pinned each digest to the output of
-//! the incoming writer at `a67a38abf2`, which changes the fresh DOC bytes but
-//! does not contain the 0753 encoding: that writer and the merged writer
-//! produce identical bytes for all nine fixtures, so the merged 0753 text
-//! paths still reproduce a writer without them exactly. The same inputs must
-//! keep producing the same bytes: ASCII, Latin-1,
-//! CJK and supplementary-plane text, empty runs, runs longer than 64 KiB,
-//! field characters next to surrogate pairs, and every story that carries
-//! text (main, table, header/footer, footnote, endnote, comment, main and
-//! header text boxes, glossary and attached glossary).
+//! the single-pass UTF-16 text encoding, and its SHA-256 recorded here. The
+//! spec-gap merge re-pinned each digest to the output of the incoming writer at
+//! `a67a38abf2`, which changes the fresh DOC bytes but does not contain the
+//! single-pass encoding: that writer and the merged writer produce identical
+//! bytes for all nine fixtures, so the merged single-pass text paths still
+//! reproduce a writer without them exactly. The same inputs must keep producing
+//! the same bytes: ASCII, Latin-1, CJK and supplementary-plane text, empty
+//! runs, runs longer than 64 KiB, field characters next to surrogate pairs, and
+//! every story that carries text (main, table, header/footer, footnote,
+//! endnote, comment, main and header text boxes, glossary and attached
+//! glossary).
 
 use litchi_core::validation::EvidenceDigest;
 use litchi_doc::writer::{

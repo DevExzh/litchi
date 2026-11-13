@@ -326,10 +326,10 @@ pub struct ZipLocator {
 
 /// One bounded read of the head of the central directory, taken by the locator.
 ///
-/// Change 0632: `finish_locate_in_reader`'s first-central-record probe and the
-/// index's central-directory scan begin at the same offset, so one read serves
-/// both. The buffer is the caller's central-directory scan buffer; `valid` is
-/// how many of its bytes the source actually delivered, starting at `start`.
+/// `finish_locate_in_reader`'s first-central-record probe and the index's
+/// central-directory scan begin at the same offset, so one read serves both.
+/// The buffer is the caller's central-directory scan buffer; `valid` is how
+/// many of its bytes the source actually delivered, starting at `start`.
 #[derive(Debug)]
 pub(crate) struct DirectoryPrefill {
     start: u64,
@@ -798,12 +798,12 @@ impl ZipLocator {
         // Check first entry in central directory, see
         // `ZipLocator::locate_in_byte_slice` for more info
         //
-        // Change 0632: when the caller asked for a directory prefill, this
-        // probe reads the head of the central directory instead of just the
-        // fixed record, because the caller's next act is to read exactly those
-        // bytes. The probe itself is unchanged: the same 46 bytes at the same
-        // offset decide the same way, and a read that cannot deliver 46 bytes
-        // fails the probe exactly as `read_exact_at` of 46 bytes does.
+        // When the caller asked for a directory prefill, this probe reads the
+        // head of the central directory instead of just the fixed record,
+        // because the caller's next act is to read exactly those bytes. The
+        // probe itself is unchanged: the same 46 bytes at the same offset
+        // decide the same way, and a read that cannot deliver 46 bytes fails
+        // the probe exactly as `read_exact_at` of 46 bytes does.
         let central_dir_size = eocd.central_dir_size;
         let (accepted, prefill) =
             self.probe_first_central_record(&reader, eocd.central_dir_offset, central_dir_size);

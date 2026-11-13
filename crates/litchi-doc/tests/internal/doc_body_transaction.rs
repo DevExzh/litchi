@@ -468,8 +468,8 @@ fn genuine_word97_noncanonical_picture_graphs_are_typed_refusals() {
 /// `FloatingPictures.doc` tags each style name as a smart tag
 /// (`PlcfBklFactoid`, FIB table 117) whose end lies inside paragraphs 5
 /// onwards. Replacing such a paragraph would collapse the tag's end, so the
-/// text replacement is a typed refusal (record 0308), not a corrupt file;
-/// paragraphs whose tags end at their own edge stay editable.
+/// text replacement is a typed refusal, not a corrupt file; paragraphs whose
+/// tags end at their own edge stay editable.
 #[test]
 fn a_smart_tag_end_inside_the_paragraph_is_a_typed_refusal() {
     let bytes = std::fs::read(fixture("test-data/ole/doc/FloatingPictures.doc")).expect("fixture");

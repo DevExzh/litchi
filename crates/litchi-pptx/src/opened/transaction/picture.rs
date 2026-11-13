@@ -1,4 +1,4 @@
-//! Picture image replacement and shape descriptions (record 0333).
+//! Picture image replacement and shape descriptions.
 //!
 //! [`Edit::set_picture_image`] points a picture's `a:blip@r:embed` at a new
 //! image part and drops the old relationship and part when nothing else

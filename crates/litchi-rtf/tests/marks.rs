@@ -1,6 +1,5 @@
 //! Field instructions, bookmarks, tab stops and section page setup by
-//! source splicing, and paragraph moves across section breaks (record
-//! 0328).
+//! source splicing, and paragraph moves across section breaks.
 
 use litchi_core::Position;
 use litchi_rtf::edit::{Error, SectionValue};
@@ -207,8 +206,8 @@ fn marks_and_body_work_do_not_mix() {
     ));
 }
 
-/// The section-break follow-up of record 0308: a paragraph moves across a
-/// section break, which keeps its place, and moves back byte-exactly.
+/// A paragraph moves across a section break, which keeps its place, and moves
+/// back byte-exactly.
 #[test]
 fn a_paragraph_moves_across_a_section_break_and_back() {
     let rtf = "{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 Times;}}\\sectd\r\n\

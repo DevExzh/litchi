@@ -1,6 +1,6 @@
-//! Immutable SVG picture edits of a source-backed [`Package`] (record
-//! 0356a): replacing an embedded SVG picture's SVG and raster fallback, and
-//! attaching or detaching the native SVG of a raster picture.
+//! Immutable SVG picture edits of a source-backed [`Package`]: replacing an
+//! embedded SVG picture's SVG and raster fallback, and attaching or detaching
+//! the native SVG of a raster picture.
 //!
 //! [`Package::edit_svg_images`] starts an [`Edit`]; [`Edit::replace`],
 //! [`Edit::attach`] and [`Edit::detach`] stage one picture change each.
@@ -183,7 +183,7 @@ impl std::fmt::Debug for Edit<'_> {
 }
 
 /// `package` as a source-backed package with no staged state: itself when
-/// it is pristine, else its published artifact reopened (record 0356a).
+/// it is pristine, else its published artifact reopened.
 pub(super) fn physical(package: &Package) -> Result<Package> {
     let effective = package.effective()?;
     if effective.is_pristine() {

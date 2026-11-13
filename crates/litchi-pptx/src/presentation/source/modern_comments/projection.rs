@@ -217,8 +217,7 @@ impl Comment {
         self.data.author_display.as_deref()
     }
 
-    /// The resolved author's initials, when the author part supplied them
-    /// (record 0346).
+    /// The resolved author's initials, when the author part supplied them.
     #[must_use]
     pub fn author_initials(&self) -> Option<&str> {
         self.data.author_initials.as_deref()
@@ -297,7 +296,7 @@ impl Reply {
         self.data.author_display.as_deref()
     }
 
-    /// The resolved author's initials, when available (record 0346).
+    /// The resolved author's initials, when available.
     #[must_use]
     pub fn author_initials(&self) -> Option<&str> {
         self.data.author_initials.as_deref()

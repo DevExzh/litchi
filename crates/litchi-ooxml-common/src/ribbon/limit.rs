@@ -1,4 +1,4 @@
-//! The typed budgets of the Ribbon (customUI) family (record 0360).
+//! The typed budgets of the Ribbon (customUI) family.
 
 /// A Ribbon (customUI) family budget that was exceeded.
 ///

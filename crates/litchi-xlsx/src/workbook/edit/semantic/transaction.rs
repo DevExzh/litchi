@@ -104,8 +104,8 @@ impl VerifiedStore {
 
 /// Whether a value-only rewrite may verify through the reduced readback.
 ///
-/// Change 0525 admitted this readback for the source-backed route. The
-/// eager route admits it only where the argument is local to cell records:
+/// The source-backed route admits this readback. The eager route admits it
+/// only where the argument is local to cell records:
 ///
 /// * the rewrite recorded which cell spans it copied verbatim from the
 ///   source, whose complete parse already validated them (with their styles)
@@ -146,9 +146,10 @@ fn reduced_readback_admitted(
 /// the complete parse must verify it.
 ///
 /// Besides [`reduced_readback_admitted`], the reduced store is refused when
-/// one of its cells falls inside an omitted range, as change 0525's merge
-/// refuses it: such a record would sit beside the omitted verbatim record of
-/// the same address, a duplicate only the complete parse would see.
+/// one of its cells falls inside an omitted range, as the source-backed
+/// route's merge refuses it: such a record would sit beside the omitted
+/// verbatim record of the same address, a duplicate only the complete parse
+/// would see.
 fn reduced_readback_store<'s>(
     after: &[u8],
     compacted: &raw::compact::WorksheetOutput,
@@ -720,7 +721,7 @@ impl CaptureBudget {
     /// [`Self::from_staged`] for a ledger rebuilt over the same `base` as
     /// `previous`: the two immutable endpoint charges are a function of
     /// `base` alone, so they are taken from `previous` instead of walking
-    /// the workbook again (record 0377).
+    /// the workbook again.
     fn rebuilt(
         previous: &Self,
         base: &Workbook,
@@ -1106,7 +1107,7 @@ impl CaptureBudget {
         } else {
             worksheet_previous.unwrap_or(0)
         };
-        // One ledger traversal for the read and the write (record 0377a).
+        // One ledger traversal for the read and the write.
         let (maximum, reserved) = (self.maximum, self.reserved);
         let slot = self.cells.entry(key);
         let previous = match &slot {
@@ -1675,7 +1676,7 @@ impl Edit {
         // The reservation exists to admit the worksheet before-image before
         // a projected read can decode it. Once that worksheet is charged, a
         // read decodes nothing unadmitted, and the setter that follows
-        // charges the cell's final payload itself (record 0377).
+        // charges the cell's final payload itself.
         if self
             .capture_budget
             .as_ref()
@@ -3495,7 +3496,7 @@ impl Edit {
         // joined edit keeps staging against it. Commit (`retain_undo` false)
         // reads only the ledger's maximum afterwards (`check_patch` measures
         // the published patch itself), so it keeps the incremental ledger
-        // instead of rebuilding an exact one it never consults (record 0377).
+        // instead of rebuilding an exact one it never consults.
         let previous_capture_budget = if retain_undo {
             self.capture_budget.take()
         } else {
@@ -4037,7 +4038,7 @@ impl Edit {
 
         // Commit reads only the ledger's maximum from here on (`check_patch`
         // measures the published patch), so the style lowering above needs no
-        // ledger rebuild (record 0377).
+        // ledger rebuild.
         let effective_renames = take_effective_renames(&base, &mut sheets)?;
         if let Some((position, _)) = effective_renames.first() {
             let data = base
@@ -4788,12 +4789,11 @@ impl Edit {
                 after.ok_or_else(|| invalid("effective worksheet edit produced no bytes"))?;
             let compacted =
                 raw::compact::changed_worksheet(&after, "compact changed worksheet output")?;
-            // Verification order: the reduced readback (change 0744) when it
-            // is admitted; otherwise the sparse streaming verifier for a large
-            // plain worksheet with a payload-only cell edit (spec-gap branch);
-            // otherwise the complete parse, whose result and error remain
-            // authoritative. The two narrowed readbacks each fall back rather
-            // than refuse.
+            // Verification order: the reduced readback when it is admitted;
+            // otherwise the sparse streaming verifier for a large plain
+            // worksheet with a payload-only cell edit; otherwise the complete
+            // parse, whose result and error remain authoritative. The two
+            // narrowed readbacks each fall back rather than refuse.
             let mut sparse_verified = false;
             let parsed = if requires_store_verification {
                 let strings = || base.inner.shared_strings();

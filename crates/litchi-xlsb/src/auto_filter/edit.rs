@@ -1,5 +1,4 @@
-//! Immutable auto-filter edits of an XLSB [`Package`] (unified-ops record
-//! 0322).
+//! Immutable auto-filter edits of an XLSB [`Package`].
 //!
 //! [`Package::edit_auto_filter`] starts
 //! an [`Edit`]. [`Edit::set_auto_filter`] replaces the filter range in place

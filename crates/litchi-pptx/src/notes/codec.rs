@@ -1422,9 +1422,9 @@ mod tests {
         );
     }
 
-    /// The scanner as it stood before change 0743, verbatim: buffered reads
-    /// into a scratch vector and owned names and values. The borrowed scanner
-    /// must return exactly its values and exactly its refusals.
+    /// The scanner as it stood before the borrowed scanner, verbatim: buffered
+    /// reads into a scratch vector and owned names and values. The borrowed
+    /// scanner must return exactly its values and exactly its refusals.
     fn buffered_scan_oracle(
         processed: &[u8],
         raw_len: usize,

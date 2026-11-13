@@ -30,14 +30,13 @@ const FIXED_OBJECT_CHARGE: u64 = 5;
 const FIXED_WORK_CHARGE: u64 = 2;
 const TEXT_SCAN_CHECK_INTERVAL: u64 = 64;
 
-// Lease chunks (change 0763, owner decision 6 of change 0758). The writer
-// charges one Object and about four Work units per paragraph, one of each per
-// run, one Work unit per text character and each run's input bytes. Leasing
-// in these chunks turns the seven budget updates per paragraph into one claim
-// per chunk, and caps what a sibling holder of the same budget can see
-// pre-claimed at one chunk per resource: 64 Ki Work units and 64 KiB of input
-// (well under 0.01% of the finite profiles' Work and input ceilings), and
-// 4 Ki objects (0.04% of the server profile's).
+// Lease chunks. The writer charges one Object and about four Work units per
+// paragraph, one of each per run, one Work unit per text character and each
+// run's input bytes. Leasing in these chunks turns the seven budget updates per
+// paragraph into one claim per chunk, and caps what a sibling holder of the
+// same budget can see pre-claimed at one chunk per resource: 64 Ki Work units
+// and 64 KiB of input (well under 0.01% of the finite profiles' Work and input
+// ceilings), and 4 Ki objects (0.04% of the server profile's).
 const WORK_LEASE_CHUNK: u64 = 64 * 1024;
 const OBJECT_LEASE_CHUNK: u64 = 4 * 1024;
 const INPUT_LEASE_CHUNK: u64 = 64 * 1024;

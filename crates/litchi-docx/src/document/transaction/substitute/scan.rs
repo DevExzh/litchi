@@ -4,15 +4,15 @@
 //! Field state is tracked across paragraphs: a complex field whose
 //! instruction or result spans paragraphs (a table of contents) keeps its
 //! state from the paragraph holding its `begin` marker to the one holding its
-//! `end` marker (record 0285). Text inside a field instruction (the result of
-//! a field nested in the instruction) is fixed content, never text; text of a
-//! field result is ordinary text.
+//! `end` marker. Text inside a field instruction (the result of a field nested
+//! in the instruction) is fixed content, never text; text of a field result is
+//! ordinary text.
 //!
-//! An `mc:AlternateContent` wrapper (a drawing or text box with a fallback,
-//! record 0307) is one opaque object: a run holding it reads it as one
-//! [`OBJECT`], and nothing inside it, neither branch's text nor the
-//! paragraphs of its text boxes, is listed. The branches differ, and the
-//! visible projection shows only one, so neither is text to an edit.
+//! An `mc:AlternateContent` wrapper (a drawing or text box with a fallback) is
+//! one opaque object: a run holding it reads it as one [`OBJECT`], and nothing
+//! inside it, neither branch's text nor the paragraphs of its text boxes, is
+//! listed. The branches differ, and the visible projection shows only one, so
+//! neither is text to an edit.
 
 use std::ops::Range;
 

@@ -474,8 +474,8 @@ impl Slot {
 
     /// The slot of a package whose core part this crate has just written
     /// from `metadata` (`None`: the part is absent), without decoding it
-    /// again (record 0377a). The writer's output conforms, so the tolerance
-    /// report is empty; debug builds check the round trip against `package`.
+    /// again. The writer's output conforms, so the tolerance report is
+    /// empty; debug builds check the round trip against `package`.
     #[must_use]
     pub fn published(package: &OpcPackage, metadata: Option<Metadata>) -> Self {
         #[cfg(debug_assertions)]

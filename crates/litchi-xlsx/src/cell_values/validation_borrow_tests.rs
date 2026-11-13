@@ -770,8 +770,8 @@ fn workbook_invalid_inputs_are_checked_against_the_same_owned_loop() {
         false,
     );
 
-    // Change 0657: `<fileVersion>` is not a span the rewrite composes, so it
-    // and every attribute on it are copied through unread.
+    // `<fileVersion>` is not a span the rewrite composes, so it and every
+    // attribute on it are copied through unread.
     let unfamiliar_attribute =
         format!(r#"<workbook xmlns="{sml}"><fileVersion unknown="1"/></workbook>"#);
     assert_differential(

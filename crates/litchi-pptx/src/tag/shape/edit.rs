@@ -1,4 +1,4 @@
-//! Immutable shape-tag edits of a [`Package`] (record 0351 §2.3).
+//! Immutable shape-tag edits of a [`Package`].
 //!
 //! [`Package::edit_shape_tags`] starts an [`Edit`] over the package; [`Edit::set`] creates or replaces one shape's programmable-tag list
 //! and [`Edit::remove`] removes it.

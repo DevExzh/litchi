@@ -1693,7 +1693,7 @@ fn foreign_nested_picture_does_not_change_direct_picture_selection() {
 }
 
 /// The `source::svg` family attaches and detaches a native SVG as the
-/// stream route does (record 0356a).
+/// stream route does.
 #[test]
 fn svg_family_attaches_and_detaches_through_the_package() {
     use crate::source::{Package, svg};

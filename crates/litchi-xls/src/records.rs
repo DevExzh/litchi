@@ -2224,9 +2224,8 @@ mod sst_measure_tests {
         Err(last)
     }
 
-    /// Change 0574's falsification criterion for this change: the measure-only
-    /// walk has to reproduce byte-identical `entries` over every fixture that
-    /// carries an SST.
+    /// The measure-only walk has to reproduce byte-identical `entries` over
+    /// every fixture that carries an SST.
     #[test]
     fn every_sst_fixture_indexes_identically_both_ways() {
         let root = test_data_root();
@@ -2333,7 +2332,7 @@ mod sst_measure_tests {
     }
 
     /// The SST index over the whole corpus, pinned to the value it had before
-    /// change 0595 rewrote the walk.
+    /// the walk was rewritten.
     ///
     /// `every_sst_fixture_indexes_identically_both_ways` proves the two
     /// instantiations of the walk agree with *each other*; it cannot see a
@@ -2889,9 +2888,9 @@ impl CellRecord {
     /// keeps one. For the others it needs only a position and an XF index to
     /// validate, yet the `String` a `Label` transcodes and the `Vec<u8>` a
     /// `Formula` copies are allocated, moved through an 88-byte enum and freed.
-    /// This is change 0576's measure-only instantiation applied to those
-    /// records: the same refusals, in the same order, with the same messages,
-    /// and no allocation.
+    /// This is the shared-string table's measure-only instantiation applied to
+    /// those records: the same refusals, in the same order, with the same
+    /// messages, and no allocation.
     ///
     /// It is not a second parser. Each kind's checks are the *same* code the
     /// materializing parse runs — [`Self::cell_head`] for the five fixed-width
@@ -3363,12 +3362,11 @@ mod packed_cell_tests {
 
 /// The measure-only cell walk against the materializing parse.
 ///
-/// Change 0641 (item XLS-5 of change 0587). Every test here prices one property
-/// of [`CellRecord::measure`]: it refuses exactly what [`CellRecord::parse`]
-/// refuses, with the same message, in the same order, and it agrees on the
-/// position, the XF index and the pending-`String` flag of everything it
-/// accepts. The corpus differential is the oracle change 0576 established for
-/// the same pattern on the shared-string table.
+/// Every test here prices one property of [`CellRecord::measure`]: it refuses
+/// exactly what [`CellRecord::parse`] refuses, with the same message, in the
+/// same order, and it agrees on the position, the XF index and the
+/// pending-`String` flag of everything it accepts. The corpus differential is
+/// the oracle used for the same pattern on the shared-string table.
 #[cfg(test)]
 mod cell_measure_tests {
     use super::sst_measure_tests::{collect_xls_fixtures, test_data_root, workbook_stream};
@@ -3506,10 +3504,10 @@ mod cell_measure_tests {
         for line in &skipped {
             println!("cell-differential: skipped {line}");
         }
-        // 67,422 at the time of writing. The corpus census in change 0641's
-        // packet counts the same records from outside this crate and agrees
-        // exactly on the four kinds that live only in worksheet substreams:
-        // 14,854 `Formula`, 6 `Label`, 500 `BoolErr` and 4,359 `RK`.
+        // 67,422 at the time of writing. A corpus census taken outside this
+        // crate counted the same records and agreed exactly on the four
+        // kinds that live only in worksheet substreams: 14,854 `Formula`, 6
+        // `Label`, 500 `BoolErr` and 4,359 `RK`.
         assert!(
             compared > 60_000,
             "expected the corpus to carry more than 60,000 cell records, compared {compared}"
@@ -3524,8 +3522,8 @@ mod cell_measure_tests {
         }
     }
 
-    /// Mutating one byte at a time inside real payloads is what change 0576's
-    /// harness used to reach refusals the corpus does not contain on its own.
+    /// Mutating one byte at a time inside real payloads reaches refusals the
+    /// corpus does not contain on its own.
     #[test]
     fn mutated_cell_payloads_are_refused_identically() {
         let root = test_data_root();
@@ -3706,7 +3704,7 @@ mod cell_measure_tests {
             &formula(&[0x1E, 0x2A, 0x00], 0xFFFF, &[], number),
             "reserved flags",
         );
-        // A stale `fShrFmla` on a complete token stream is ignored (record 0316).
+        // A stale `fShrFmla` on a complete token stream is ignored.
         agree(
             0x0006,
             &formula(&[0x1E, 0x2A, 0x00], 0x0008, &[], number),

@@ -670,7 +670,7 @@ fn debug_assert_reused_body_index(
 }
 
 /// The element a main document's opaque alternate content lies in: a
-/// WordprocessingML run, Transitional or Strict (record 0307).
+/// WordprocessingML run, Transitional or Strict.
 const RUN_HOLDER: litchi_ooxml_common::mce::admission::Holder<'static> =
     litchi_ooxml_common::mce::admission::Holder {
         namespaces: &[
@@ -683,7 +683,7 @@ const RUN_HOLDER: litchi_ooxml_common::mce::admission::Holder<'static> =
 /// Whether every `mc:AlternateContent` of a main-document payload lies
 /// inside a run, and everything outside those wrappers agrees with the
 /// visible projection as the shared admission proof states, with at least
-/// one wrapper (record 0307).
+/// one wrapper.
 ///
 /// The projection replaces each wrapper, inside its run, with the content
 /// of the branch it selects, so every block and every run keeps its parent
@@ -741,13 +741,12 @@ impl SourceAdmission {
 /// returned as is (for example an unsatisfiable `MustUnderstand`). A
 /// projection equal to the source is admitted. One that differs is admitted
 /// when its only selections are `mc:AlternateContent` wrappers inside runs
-/// (record 0307: drawings and text boxes with a fallback), which the
-/// transaction treats as opaque inline objects: their branches' text is
-/// never document text to an edit, and an edit that would have to replace
-/// it is refused. Everything else is refused as an unsafe edit with
-/// `reason`. Decisions are made on decoded names, so a namespace declaration
-/// that spells the namespace with character references is a binding like
-/// any other.
+/// (drawings and text boxes with a fallback), which the transaction treats as
+/// opaque inline objects: their branches' text is never document text to an
+/// edit, and an edit that would have to replace it is refused. Everything else
+/// is refused as an unsafe edit with `reason`. Decisions are made on decoded
+/// names, so a namespace declaration that spells the namespace with character
+/// references is a binding like any other.
 ///
 /// # Errors
 ///

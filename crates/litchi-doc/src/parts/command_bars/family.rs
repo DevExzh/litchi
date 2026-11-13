@@ -1,4 +1,4 @@
-//! The command bars edit family (record 0351 §2.3, record 0359).
+//! The command bars edit family.
 //!
 //! [`crate::Package::edit_command_bars`] stages command bars edits on an [`Edit`];
 //! [`Edit::commit`] publishes a new [`crate::Package`] with an exact

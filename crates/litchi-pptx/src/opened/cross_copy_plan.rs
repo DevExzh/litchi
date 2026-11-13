@@ -27,13 +27,12 @@ use super::patch::Patch as OpenedPatch;
 use crate::{Error, Result, SlideCopyRefusal};
 
 /// Payload-digest memos the caller already holds for the two live packages an
-/// application checks, offered as parents of their complete-package revisions
-/// (change 0751).
+/// application checks, offered as parents of their complete-package revisions.
 ///
-/// The facade passes the memo it retains for each package (change 0655). Each
-/// entry retains the payload allocation it names, so a hit proves byte
-/// identity and a miss is an ordinary hash: the revisions, and every verdict
-/// taken over them, are the ones computed without a memo.
+/// The facade passes the memo it retains for each package. Each entry retains
+/// the payload allocation it names, so a hit proves byte identity and a miss is
+/// an ordinary hash: the revisions, and every verdict taken over them, are the
+/// ones computed without a memo.
 #[derive(Clone, Copy, Default)]
 pub(crate) struct LiveDigests<'a> {
     /// The source package's memo, if the caller holds one.
@@ -44,13 +43,13 @@ pub(crate) struct LiveDigests<'a> {
 
 /// Current durable cross-slide-copy header magic.
 ///
-/// Bumped from `LPCP0003` by change 0742: a candidate may carry eligible copied
-/// image members' verified source-compressed bytes instead of deflating them
-/// again, which changes the serialized-archive revisions this header embeds,
-/// and the header now records which of the two encodings the candidate used.
-/// `LPCP0003` was itself bumped from `LPCP0002` by change 0655, when three of
-/// the six embedded revisions became `litchi-pptx-opened-v2` complete-package
-/// revisions; the physical revisions remain `litchi-pptx-cross-physical-v2`.
+/// Bumped from `LPCP0003`: a candidate may carry eligible copied image members'
+/// verified source-compressed bytes instead of deflating them again, which
+/// changes the serialized-archive revisions this header embeds, and the header
+/// now records which of the two encodings the candidate used. `LPCP0003` was
+/// itself bumped from `LPCP0002` when three of the six embedded revisions
+/// became `litchi-pptx-opened-v2` complete-package revisions; the physical
+/// revisions remain `litchi-pptx-cross-physical-v2`.
 const PATCH_FORMAT: crate::DurablePatchFormat = crate::DurablePatchFormat::CrossSlideCopyV4;
 const PATCH_MAGIC: &[u8; 8] = PATCH_FORMAT.magic();
 /// Recognized but superseded durable cross-slide-copy formats, refused by
@@ -92,8 +91,8 @@ const STRICT_REL_NS: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/relatio
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CopiedMedia {
     /// Every copied member is deflated again from its decoded bytes: the only
-    /// encoding before change 0742, and the encoding of every copy whose
-    /// source lends no eligible image.
+    /// encoding there used to be, and the encoding of every copy whose source
+    /// lends no eligible image.
     Recompressed,
     /// At least one copied member is an eligible image whose verified
     /// source-compressed bytes were framed verbatim; every other copied member
@@ -221,10 +220,10 @@ pub struct Plan {
 /// under a different bound is not a reuse.
 ///
 /// `transferred` lists, as ascending indexes into the plan's parts, the copied
-/// members whose verified source-compressed bytes the archive frames (change
-/// 0742). A later build whose own classification differs is not a reuse
-/// either: it serializes its own candidate, which then fails the comparison
-/// with the plan exactly as it would without retention.
+/// members whose verified source-compressed bytes the archive frames. A later
+/// build whose own classification differs is not a reuse either: it serializes
+/// its own candidate, which then fails the comparison with the plan exactly as
+/// it would without retention.
 ///
 /// This type deliberately does **not** derive `Debug`: a derived one would
 /// print the whole archive, and the slot below formats the retained length
@@ -304,8 +303,8 @@ impl Plan {
     /// dropping the plan.  Applying a plan does not release them, because a
     /// plan may be applied to more than one destination that proves the same
     /// six revisions.  An application shares the retained allocation with the
-    /// package it publishes instead of copying it (change 0751), so that
-    /// package keeps the bytes alive after the plan lets them go.
+    /// package it publishes instead of copying it, so that package keeps the
+    /// bytes alive after the plan lets them go.
     #[must_use]
     pub fn retained_candidate_bytes(&self) -> Option<usize> {
         self.candidate.0.as_ref().map(|held| held.archive.len())
@@ -641,9 +640,9 @@ impl Patch {
     /// before any header field is read. `LPCP0002` embeds three revisions from
     /// the `litchi-pptx-opened-v1` algebra; `LPCP0003` predates the recorded
     /// copied-media encoding that the embedded physical revisions now depend
-    /// on, and is refused by name, as change 0655 refused `LPCP0002`, rather
-    /// than read implicitly as the recompressed encoding. Re-plan the copy
-    /// against the source and destination packages.
+    /// on, and is refused by name, as `LPCP0002` is, rather than read
+    /// implicitly as the recompressed encoding. Re-plan the copy against the
+    /// source and destination packages.
     ///
     /// # Errors
     ///
@@ -754,9 +753,9 @@ impl Snapshot {
     /// Each copied relationship-free, non-XML `image/*` member whose source
     /// member's bytes prove a bounded Store or Deflate encoding of it is
     /// published from those verified compressed bytes, in fresh known-size
-    /// framing, instead of being deflated again (change 0742). See
-    /// [`Patch::transfers_source_compressed_media`] for the rule
-    /// and for what it means for application.
+    /// framing, instead of being deflated again. See
+    /// [`Patch::transfers_source_compressed_media`] for the rule and for what
+    /// it means for application.
     pub fn plan_cross_slide_copy<'s, 'd>(
         &self,
         source: &Snapshot,
@@ -804,7 +803,7 @@ pub(crate) fn apply_plan(
     let limits = plan.patch.patch.limits();
     // Both revisions are recomputed from the live packages; the caller's memos
     // only answer for payload allocations they provably name, and the memos
-    // these passes fill are kept for the captures below (change 0751).
+    // these passes fill are kept for the captures below.
     let (source_revision, source_digests) =
         super::model::package_fingerprint_with_memo(source, live.source)?;
     if source_revision != plan.source_revision {
@@ -1018,7 +1017,7 @@ pub(crate) fn apply_patch(
         } else {
             // The restored clone shares every payload allocation the inverse
             // did not replace with the live destination, whose memo this
-            // capture consults (change 0751).
+            // capture consults.
             let restored_snapshot = super::model::capture_with_parent_digests_and_semantic_limits(
                 &restored,
                 limits,
@@ -1089,11 +1088,11 @@ const CALLER_DEFINED_PART: &str = "a cross-slide copy that frames source-compres
 /// deflates the patch's decoded resources again.
 ///
 /// `candidate_digests` is the payload-digest memo of the capture that proved
-/// `candidate` in this same call (change 0751). The candidate is still
-/// captured here, after `validate_before` and under the patch's limits, with
-/// every validation a capture runs; the memo only spares hashing payload
-/// allocations the candidate provably holds. A candidate rebuilt from the
-/// destination is a different package and is captured as before.
+/// `candidate` in this same call. The candidate is still captured here, after
+/// `validate_before` and under the patch's limits, with every validation a
+/// capture runs; the memo only spares hashing payload allocations the candidate
+/// provably holds. A candidate rebuilt from the destination is a different
+/// package and is captured as before.
 fn validate_application_candidate(
     destination: &OpcPackage,
     candidate: OpcPackage,
@@ -1944,10 +1943,10 @@ fn build_candidate(
                     .is_ok_and(|(fresh, _)| fresh == *held.archive),
                 "cross-slide reused a retained candidate archive a fresh serialization does not reproduce"
             );
-            // The reopen shares the retained allocation instead of copying it
-            // (change 0751): the bytes are immutable behind the `Arc`, so the
-            // package reads and republishes exactly what the plan holds. Its
-            // digest is still recomputed over those bytes, below.
+            // The reopen shares the retained allocation instead of copying it:
+            // the bytes are immutable behind the `Arc`, so the package reads
+            // and republishes exactly what the plan holds. Its digest is still
+            // recomputed over those bytes, below.
             (CandidateBytes::Shared(Arc::clone(&held.archive)), None)
         },
         _ => {
@@ -2023,7 +2022,7 @@ fn build_candidate(
     // destination's for its untouched parts and the source's for the copied
     // ones. The capture therefore consults both snapshots' memos, which name
     // only allocations their own packages hold; every other payload, such as
-    // the rewritten presentation part, is hashed (change 0751).
+    // the rewritten presentation part, is hashed.
     let parents = PartDigests::union(&[&source.part_digests, &destination.part_digests]);
     let captured = match parents.as_ref() {
         Some(parents) => super::model::capture_with_parent_digests_and_semantic_limits(
@@ -2887,12 +2886,11 @@ fn is_xml_part(partname: &PackURI, content_type: &str) -> bool {
 ///
 /// An unmodified owned source streams exactly its retained archive, and
 /// `litchi-opc` keeps that archive's SHA-256 in a memo created with the
-/// archive and filled only from it (change 0751). Its revision is therefore
-/// sealed from that digest — computed on the first request of any clone of the
-/// package's ingress and read by every later one — instead of streaming the
-/// archive into a fresh hash. The archive bound is checked first, so an
-/// archive over it is refused with the error the stream would raise and
-/// without being hashed.
+/// archive and filled only from it. Its revision is therefore sealed from that
+/// digest — computed on the first request of any clone of the package's ingress
+/// and read by every later one — instead of streaming the archive into a fresh
+/// hash. The archive bound is checked first, so an archive over it is refused
+/// with the error the stream would raise and without being hashed.
 fn physical_package_fingerprint(package: &OpcPackage, limits: Limits) -> Result<[u8; 32]> {
     reject_unknown_non_part_members(package, "cross-slide physical authorization")?;
     if let Some(length) = package.exact_source_len() {

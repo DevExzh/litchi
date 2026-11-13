@@ -101,8 +101,8 @@ impl OpaqueBlock {
     /// Borrow the retained active XML element exactly as selected by MCE.
     ///
     /// The bytes are an XML fragment whose namespace declarations are those in
-    /// scope where it appears in the document, which since change 0653 are not
-    /// repeated on the fragment's own root element. Use
+    /// scope where it appears in the document, which are not repeated on the
+    /// fragment's own root element. Use
     /// [`self_contained_xml`](Self::self_contained_xml) to parse it on its own.
     #[must_use]
     pub fn xml_bytes(&self) -> &[u8] {

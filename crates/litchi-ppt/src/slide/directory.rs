@@ -88,7 +88,7 @@ pub struct SlideDirectory {
     by_slide_id: HashMap<u32, usize>,
     by_persist_id: HashMap<u32, usize>,
     /// The notes pages by `NotesId`, read from the same `DocumentContainer`
-    /// at open so no slide selection parses the document again (L-PPT-R2).
+    /// at open so no slide selection parses the document again.
     notes: NotesIndex,
 }
 
@@ -286,9 +286,9 @@ impl SlideDirectory {
                 // failure leaves this slide's outline interactions and
                 // references empty, as LibreOffice ignores slide-list text it
                 // cannot map; limits stay fatal (finding F5.10). The text
-                // bodies the slide's shapes reference (L-PPT-R1) are isolated
-                // the same way, after the interactions and references, so a
-                // body that cannot be framed never drops them.
+                // bodies the slide's shapes reference are isolated the same
+                // way, after the interactions and references, so a body that
+                // cannot be framed never drops them.
                 let read = set
                     .text_interactions(crate::text_interaction::limits_for_source(limits))
                     .and_then(|interactions| Ok((interactions, set.outline_text_refs()?)))
@@ -317,7 +317,7 @@ impl SlideDirectory {
 
         // The notes index reads the DocumentContainer parsed above; a notes
         // list it cannot read is kept as the error of the slides that name a
-        // notes page, as before, and never fails the open (L-PPT-R2).
+        // notes page, as before, and never fails the open.
         let notes = NotesIndex::from_document(&document);
 
         Ok(Self {

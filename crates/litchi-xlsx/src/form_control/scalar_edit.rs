@@ -1,5 +1,5 @@
 //! Selector-first, source-checked scalar edits for existing worksheet
-//! controls of a [`SourceBackedWorkbook`] (record 0360, the 0355a §1 shape).
+//! controls of a [`SourceBackedWorkbook`].
 //!
 //! [`SourceBackedWorkbook::edit_form_controls`] stages scalar changes of one
 //! worksheet's admitted form controls; [`Edit::commit`] validates the paired
@@ -116,7 +116,7 @@ impl FormControlSnapshot {
         self.collection.has_execution_budget() || self.generated_vml.is_some()
     }
     /// The same owner state, whatever source it was read from (a replay
-    /// compares content, record 0360).
+    /// compares content).
     fn same_content(&self, other: &Self) -> bool {
         self.sheet_name == other.sheet_name
             && self.sheet_position == other.sheet_position

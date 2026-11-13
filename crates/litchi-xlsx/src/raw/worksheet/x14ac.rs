@@ -186,7 +186,7 @@ where
 /// stopping event is validated exactly as it is for a stream that runs to EOF.
 /// The captured extension values are deliberately **not** returned: after an
 /// early stop they would describe only the processed prefix, and the one
-/// caller that can stop discards them. Change 0658.
+/// caller that can stop discards them.
 #[expect(
     clippy::result_large_err,
     reason = "The stream error intentionally retains typed primary plus raw/active callback diagnostics; boxing it would change the established API."
@@ -711,7 +711,7 @@ fn start(
 
 fn has_markup_compatibility(content: &[u8]) -> bool {
     // As preprocessing decides it: a declaration that spells the namespace
-    // with references binds it too (record 0011).
+    // with references binds it too.
     litchi_ooxml_common::mce::mentions_namespace(content)
 }
 

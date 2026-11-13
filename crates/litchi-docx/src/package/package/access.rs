@@ -17,7 +17,7 @@ impl Package {
         self.ensure_story_opc_current(operation)
     }
 
-    /// The semantic read budgets this package keeps (record 0355).
+    /// The semantic read budgets this package keeps.
     #[must_use]
     pub fn semantic_limits(&self) -> &crate::SemanticLimits {
         &self.semantic_limits
@@ -292,7 +292,7 @@ impl Package {
     /// [`Self::edit_semantic_opc`] for an edit that knows the core-properties
     /// slot of its candidate and leaves the custom-properties part untouched
     /// (`Some(slot)`), so publication adopts the slot and keeps the custom
-    /// properties instead of decoding both parts again (record 0377a).
+    /// properties instead of decoding both parts again.
     pub(crate) fn edit_semantic_opc_known<T>(
         &mut self,
         operation: &'static str,

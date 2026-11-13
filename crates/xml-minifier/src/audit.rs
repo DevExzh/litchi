@@ -1505,7 +1505,7 @@ impl VerifiedSource {
     ///
     /// When this proof keeps boundaries, so does the returned one, at the
     /// same depth and within the same bounds, so a chain of edits is proved
-    /// edit by edit (record 0317):
+    /// edit by edit:
     ///
     /// * an identical replacement shares these boundaries;
     /// * a splice derives the replacement's boundaries from these and from
@@ -1684,7 +1684,7 @@ impl fmt::Debug for VerifiedSource {
 ///
 /// Debug builds run this for every splice proof, so each debug test that
 /// reaches one re-checks the invariant stated at [`scan`] and the derivation
-/// of record 0317. Release builds do not compile it.
+/// of its derived index. Release builds do not compile it.
 #[cfg(debug_assertions)]
 fn debug_check_successor_proof(
     replacement: &[u8],
@@ -2867,7 +2867,7 @@ impl Observer for WindowSearch<'_> {
 
     // Always inlined: the pair audit's token loop is instantiated for this
     // observer alone and paired with the boundary recorder, and an outlined
-    // call per token costs the pair audit about 1 % (record 0313).
+    // call per token costs the pair audit about 1 %.
     #[inline(always)]
     fn accepted(
         &mut self,

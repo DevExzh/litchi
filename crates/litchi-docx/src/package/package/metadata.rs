@@ -132,8 +132,7 @@ impl Package {
     }
 
     /// The exact part patch that stages `app` and `custom` (each `None`:
-    /// untouched) over this package's application and custom properties
-    /// (record 0342).
+    /// untouched) over this package's application and custom properties.
     pub(crate) fn property_parts_patch(
         &self,
         app: Option<Option<app::Props>>,
@@ -226,7 +225,7 @@ impl Package {
         }
 
         // A core-only change reads and diffs only the core family, and the
-        // published slot is the value just written (record 0377a).
+        // published slot is the value just written.
         if !has_parts {
             let mut package = self.clone();
             let mut core_patch = families::Patch::default();

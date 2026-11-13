@@ -1,6 +1,7 @@
-//! Typed budgets of the ink family (record 0355a).
+//! Typed budgets of the ink family.
 
-/// The bounded resources of the ink family, carried by [`crate::Error::InkLimit`] (record 0355a).
+/// The bounded resources of the ink family, carried by
+/// [`crate::Error::InkLimit`].
 ///
 /// Each variant names one bounded resource; [`std::fmt::Display`] gives its
 /// human-readable name, the one the error messages print.

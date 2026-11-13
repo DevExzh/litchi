@@ -159,14 +159,14 @@ pub fn read(xml: &[u8], limits: Limits) -> Result<Option<Transition>> {
             maximum: limits.input_bytes,
         });
     }
-    // Until change 0653 the preprocessor re-declared every in-scope binding on
-    // every start tag of a document it rewrote, so each retained child of such
-    // a document was self-contained, while a document it passed through
-    // unchanged kept its children's exact source bytes. The preprocessor now
-    // declares each namespace once, so that property is restored here, at the
-    // slice boundary, for exactly the documents it used to hold for: a child
-    // of an untouched document that relies on an ancestor-only prefix stays
-    // inspectable but non-portable, as `Raw` documents.
+    // The preprocessor used to re-declare every in-scope binding on every start
+    // tag of a document it rewrote, so each retained child of such a document
+    // was self-contained, while a document it passed through unchanged kept its
+    // children's exact source bytes. The preprocessor now declares each
+    // namespace once, so that property is restored here, at the slice boundary,
+    // for exactly the documents it used to hold for: a child of an untouched
+    // document that relies on an ancestor-only prefix stays inspectable but
+    // non-portable, as `Raw` documents.
     let redeclare = matches!(processed, Cow::Owned(_));
 
     let bytes = processed.as_ref();
@@ -453,8 +453,8 @@ fn inherited_bindings(
 ///
 /// The markup-compatibility preprocessor declares each namespace once, where
 /// XML requires it, so a child span sliced from its output carries only the
-/// declarations its own subtree makes (change 0653). With no bindings to add
-/// the child is returned borrowed, byte for byte.
+/// declarations its own subtree makes. With no bindings to add the child is
+/// returned borrowed, byte for byte.
 fn self_contained_child<'a>(
     raw: &'a [u8],
     inherited: Vec<(Box<[u8]>, Box<[u8]>)>,

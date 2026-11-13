@@ -998,8 +998,8 @@ pub struct SourceBackedPresentation {
     pub(super) inner: Arc<SourceInner>,
 }
 
-// Risk R3 of unified-ops record 0003: the unified `Pptx` handle shares these
-// owners across threads, so they must stay `Send + Sync`.
+// The unified `Pptx` handle shares these owners across threads, so they must
+// stay `Send + Sync`.
 const _: () = {
     const fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<SourceBackedPresentation>();
@@ -1308,7 +1308,7 @@ pub(crate) struct SourceBackedSlideSnapshot {
     /// Lazily cached laser usage for this exact XML under `laser_limits`.
     laser_usage: Arc<OnceLock<crate::laser::Usage>>,
     /// Markup compatibility enclosed in shape-tree children admits only
-    /// whole top-level shape removal (record 0303).
+    /// whole top-level shape removal.
     mce: crate::presentation::transition::SlideMce,
 }
 
@@ -3019,7 +3019,7 @@ impl SourceBackedSlideEdit {
         )?;
         self.check_execution()?;
         // A slide that encloses markup compatibility in shape children is
-        // spliced on its source bytes (record 0303).
+        // spliced on its source bytes.
         let (xml, changed) = if self.source.mce == crate::presentation::transition::SlideMce::Plain
         {
             crate::opened::stage_shape_removal_with_limits(
@@ -3303,10 +3303,9 @@ impl SourceBackedSlideEdit {
     }
 
     /// Insert or remove one paragraph or run of a text body of this exact
-    /// source slide (record 0333); see
-    /// [`crate::opened::Edit::insert_paragraph`]. Only the selected slide
-    /// payload changes. Notes-page bodies live in another part and are
-    /// refused.
+    /// source slide; see [`crate::opened::Edit::insert_paragraph`]. Only the
+    /// selected slide payload changes. Notes-page bodies live in another part
+    /// and are refused.
     pub(crate) fn change_text_body(
         &mut self,
         body: crate::opened::TextBody,
@@ -3343,7 +3342,7 @@ impl SourceBackedSlideEdit {
     }
 
     /// Apply several bounded batches of rich text edits to this exact source
-    /// slide in one pass (record 0333); see
+    /// slide in one pass; see
     /// [`crate::opened::Edit::set_text_property_chunks`].
     pub(crate) fn set_text_property_chunks(
         &mut self,
@@ -3440,7 +3439,7 @@ impl SourceBackedSlideEdit {
 
     /// Shape edits retain the compatibility guard. The separate transition
     /// path preserves the entire shape tree, while enclosed whole-child
-    /// removal keeps its dedicated source proof (record 0303).
+    /// removal keeps its dedicated source proof.
     fn refuse_enclosed(&self, operation: &'static str) -> Result<()> {
         if self.source.mce == crate::presentation::transition::SlideMce::Plain {
             Ok(())

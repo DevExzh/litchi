@@ -95,8 +95,8 @@ pub struct Package {
     overlays: Arc<[SourceBackedSlideSnapshot]>,
     topology: Option<Arc<topology::Revision>>,
     tolerance: Arc<crate::leniency::ToleranceReport>,
-    /// The deferred output of a committed non-overlay family edit (record
-    /// 0356a); reads and edits go through its materialized artifact.
+    /// The deferred output of a committed non-overlay family edit; reads and
+    /// edits go through its materialized artifact.
     deferred: Option<Arc<deferred::Deferred>>,
 }
 
@@ -221,7 +221,7 @@ impl Package {
     }
 
     /// The number of the first slide, `p:presentation/@firstSlideNum`
-    /// (1 when absent), from the current presentation part (record 0279).
+    /// (1 when absent), from the current presentation part.
     ///
     /// # Errors
     ///
@@ -805,7 +805,7 @@ impl Package {
     /// Stage a new logical order. `moved` names the position of a slide
     /// that one move placed; it leaves its p14 section and joins its new
     /// neighbour's, as `PowerPoint` moves a slide. Without it every slide
-    /// keeps its section and each section is re-sorted (record 0303).
+    /// keeps its section and each section is re-sorted.
     fn stage_order(
         &self,
         ordered: Vec<StableSlideKey>,
@@ -1230,10 +1230,9 @@ impl Slide {
         self.with_part(|part| crate::parts::SlidePart::from_part(part)?.is_hidden())
     }
 
-    /// The effective slide's direct transition, when it has one (record
-    /// 0356a; the read the source-backed slide snapshot offered). A
-    /// transition inside a supported markup-compatibility owner is read
-    /// through its typed choice and fallback.
+    /// The effective slide's direct transition, when it has one. A transition
+    /// inside a supported markup-compatibility owner is read through its typed
+    /// choice and fallback.
     ///
     /// # Errors
     ///
@@ -1302,9 +1301,9 @@ impl Slide {
         result
     }
 
-    /// The Office Math equations of this slide's text (record 0321); see
-    /// [`crate::slide::Slide::equations`]. Like charts, only a physical
-    /// source slide can answer them; a restored slide answers none.
+    /// The Office Math equations of this slide's text; see
+    /// [`crate::slide::Slide::equations`]. Like charts, only a physical source
+    /// slide can answer them; a restored slide answers none.
     pub fn equations(&self) -> Result<Vec<crate::shape::math::Equation>> {
         self.package.check()?;
         let result = match self.physical_source_slide() {
@@ -1315,10 +1314,10 @@ impl Slide {
         result
     }
 
-    /// Resolve a click action of this slide's shapes or text (record
-    /// 0321); see [`crate::slide::Slide::hyperlink`]. A slide target is
-    /// reported at its position in this revision. Like charts, only a
-    /// physical source slide can answer `Some`.
+    /// Resolve a click action of this slide's shapes or text; see
+    /// [`crate::slide::Slide::hyperlink`]. A slide target is reported at its
+    /// position in this revision. Like charts, only a physical source slide can
+    /// answer `Some`.
     pub fn hyperlink(
         &self,
         click: &crate::hyperlinks::Click,
@@ -1343,8 +1342,8 @@ impl Slide {
     }
 
     /// The data-model XML of the SmartArt this slide relates through
-    /// `relationship_id`, or `None` when it has no such diagram (record
-    /// 0284). Like charts, only a physical source slide can answer `Some`.
+    /// `relationship_id`, or `None` when it has no such diagram. Like charts,
+    /// only a physical source slide can answer `Some`.
     pub fn diagram_xml(&self, relationship_id: &str) -> Result<Option<Vec<u8>>> {
         self.package.check()?;
         let result = match self.physical_source_slide() {
@@ -1725,15 +1724,15 @@ impl Edit {
 
     /// Remove one slide from the currently staged logical order, with the
     /// Parts it owns exclusively: its notes slide, pictures, diagrams, VML
-    /// drawings, comments and embedded objects (record 0303). A Part that
-    /// another owner still targets stays. Admission is delegated to the
-    /// shared source-native planner; the resulting candidate retains a
-    /// prepared effective topology and can therefore be read before it is
-    /// published. The final slide, referenced slides, and unmodeled surfaces
-    /// are refused. Durable inversion requires canonical owner-relative
-    /// relationship targets for the presentation binding and every internal
-    /// edge of the slide and its owned Parts, and refuses an edge to a
-    /// missing Part, which an inverse could not restore after reopening.
+    /// drawings, comments and embedded objects. A Part that another owner still
+    /// targets stays. Admission is delegated to the shared source-native
+    /// planner; the resulting candidate retains a prepared effective topology
+    /// and can therefore be read before it is published. The final slide,
+    /// referenced slides, and unmodeled surfaces are refused. Durable inversion
+    /// requires canonical owner-relative relationship targets for the
+    /// presentation binding and every internal edge of the slide and its owned
+    /// Parts, and refuses an edge to a missing Part, which an inverse could not
+    /// restore after reopening.
     ///
     /// ```
     /// # fn main() -> litchi_pptx::Result<()> {
@@ -2076,7 +2075,7 @@ impl Edit {
     /// Insert a paragraph into a text body of one effective slide, with the
     /// semantics of [`crate::opened::Edit::insert_paragraph`]; it composes
     /// with earlier staged changes and participates in source-local replay.
-    /// Notes-page bodies are refused (record 0333).
+    /// Notes-page bodies are refused.
     ///
     /// # Errors
     ///
@@ -2183,7 +2182,7 @@ impl Edit {
 
     /// Apply several bounded batches of rich text edits to one effective
     /// slide in one pass, with the semantics of
-    /// [`crate::opened::Edit::set_text_property_chunks`] (record 0333).
+    /// [`crate::opened::Edit::set_text_property_chunks`].
     pub fn set_text_property_chunks(
         &mut self,
         slide: impl Into<Position>,
@@ -2197,8 +2196,7 @@ impl Edit {
     }
 
     /// [`Self::set_text_property_chunks`], returning each edit's change in
-    /// order (record 0348); see
-    /// [`crate::opened::Edit::set_text_property_chunks_per_edit`].
+    /// order; see [`crate::opened::Edit::set_text_property_chunks_per_edit`].
     pub fn set_text_property_chunks_per_edit(
         &mut self,
         slide: impl Into<Position>,

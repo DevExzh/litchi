@@ -27,13 +27,12 @@ const MAX_COLUMNS: u32 = 16_384;
 const MAX_CELL_CHARACTERS: u64 = 32_767;
 const MIN_OUTPUT_BYTES: u64 = 22;
 
-// Lease chunks (change 0763, owner decision 6 of change 0758). The writer
-// charges one Work unit per row and per cell, and one Object per row and per
-// cell. Leasing in these chunks turns the six budget updates of a four-cell
-// row into one claim per chunk, and caps what a sibling holder of the same
-// budget can see pre-claimed at 64 Ki Work units (well under 0.01% of the
-// finite profiles' Work ceilings) and 4 Ki objects (0.04% of the server
-// profile's).
+// Lease chunks. The writer charges one Work unit per row and per cell, and
+// one Object per row and per cell. Leasing in these chunks turns the six
+// budget updates of a four-cell row into one claim per chunk, and caps what
+// a sibling holder of the same budget can see pre-claimed at 64 Ki Work
+// units (well under 0.01% of the finite profiles' Work ceilings) and 4 Ki
+// objects (0.04% of the server profile's).
 const WORK_LEASE_CHUNK: u64 = 64 * 1024;
 const OBJECT_LEASE_CHUNK: u64 = 4 * 1024;
 
@@ -1782,9 +1781,9 @@ mod tests {
     }
 
     // -------------------------------------------------------------------
-    // Change 0763: row Work and Objects are charged through rough budget
-    // leases. A sole holder sees exactly the refusals of exact accounting,
-    // and the leases are returned when the writer is poisoned or finishes.
+    // Row Work and Objects are charged through rough budget leases. A sole
+    // holder sees exactly the refusals of exact accounting, and the leases
+    // are returned when the writer is poisoned or finishes.
     // -------------------------------------------------------------------
 
     fn resource_limit(error: &Error) -> Option<litchi_core::ResourceLimit> {

@@ -137,7 +137,7 @@ pub struct Diagram {
     /// Colors part header metadata, when referenced.
     pub colors: Option<DiagramDefinition>,
     /// The drawing's extent in EMUs (`wp:extent` `cx`, `cy`), when the
-    /// drawing holding the graphic gives one (record 0335).
+    /// drawing holding the graphic gives one.
     pub extent: Option<(i64, i64)>,
 }
 

@@ -1,4 +1,4 @@
-//! Package-level embedded-object edits (record 0357).
+//! Package-level embedded-object edits.
 //!
 //! [`Package::edit_objects`] stages edits of the live document's
 //! `ExObjListContainer` OLE definitions and their persisted `ExOleObjStg`

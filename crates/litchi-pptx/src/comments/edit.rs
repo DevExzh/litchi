@@ -1,4 +1,4 @@
-//! Immutable legacy comment edits of a [`Package`](crate::Package) (record 0356a).
+//! Immutable legacy comment edits of a [`Package`](crate::Package).
 //!
 //! [`Package::edit_comments`](crate::Package::edit_comments) starts an [`Edit`]
 //! over a staged copy of the package; its verbs run on the staged graph.

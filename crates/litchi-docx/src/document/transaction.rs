@@ -58,9 +58,9 @@ pub(crate) const MAX_DOCUMENT_DEPTH: usize = 256;
 pub(crate) const MAX_DOCUMENT_NODES: usize = 1_000_000;
 pub(crate) const MAX_DOCUMENT_ATTRIBUTES: usize = 256;
 pub(crate) const MAX_DOCUMENT_ATTRIBUTE_BYTES: usize = 8 * 1024 * 1024;
-/// Semantic operations one edit may stage (record 0251f raised it from
-/// 4,096 so a 10,000-paragraph fanout is one transaction; it matches the
-/// unified layer's expanded-target bound).
+/// Semantic operations one edit may stage (raised from 4,096 so a
+/// 10,000-paragraph fanout is one transaction; it matches the unified layer's
+/// expanded-target bound).
 pub(crate) const MAX_OPERATIONS: usize = 65_536;
 /// Runs a field-result scan visits in one paragraph.
 const MAX_FIELD_RUNS: usize = 4_096;
@@ -187,7 +187,7 @@ pub enum Refusal {
     /// fallback) with text of its own. The wrapper is one opaque object to
     /// an edit, and readers show one branch's text as part of the content's,
     /// so replacing the content's text would either keep that text or drop
-    /// the object (record 0307).
+    /// the object.
     AlternateContentText,
     /// The change names a property the operation does not write (record
     /// 0342: a table edit writes its style and borders, a row edit its
@@ -196,8 +196,8 @@ pub enum Refusal {
 }
 
 impl Refusal {
-    /// The shared refusal kind litchi-ops classifies this reason by (record
-    /// 0351 §2.4, one taxonomy across formats; record 0355a).
+    /// The shared refusal kind litchi-ops classifies this reason by (one
+    /// taxonomy across formats).
     #[must_use]
     pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
         use litchi_core::edit::RefusalKind;
@@ -521,11 +521,11 @@ pub(crate) struct TransferRelationship {
     pub(crate) external: bool,
 }
 
-/// A package-graph change staged with a main-document edit (record 0251b):
-/// relationships added to the main part, new parts related from it, and
-/// exact replacements of existing parts. Applied forward, it requires every
-/// relationship and new part to be absent and every replaced part to hold its
-/// `before` bytes; applied backward, the reverse.
+/// A package-graph change staged with a main-document edit: relationships added
+/// to the main part, new parts related from it, and exact replacements of
+/// existing parts. Applied forward, it requires every relationship and new part
+/// to be absent and every replaced part to hold its `before` bytes; applied
+/// backward, the reverse.
 #[derive(Clone, PartialEq, Eq)]
 pub struct GraphChange {
     pub(crate) relationships: Arc<[TransferRelationship]>,
@@ -589,9 +589,8 @@ pub enum TransferRefusal {
 }
 
 impl TransferRefusal {
-    /// The shared refusal kind litchi-ops classifies this reason by (record
-    /// 0351): every transfer refusal is source content the closure cannot
-    /// carry.
+    /// The shared refusal kind litchi-ops classifies this reason by: every
+    /// transfer refusal is source content the closure cannot carry.
     #[must_use]
     pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
         litchi_core::edit::RefusalKind::UnsupportedContent
@@ -1123,9 +1122,9 @@ pub struct Snapshot {
     conformance: Conformance,
     admission: Option<Arc<ManagedAdmission>>,
     /// Proof that these exact bytes passed the package writer's source
-    /// publication audit, set only by [`Edit::commit`] on the preserving route
-    /// (change 0754). Every other constructor leaves it empty, and a derived
-    /// snapshot never inherits it, because a proof covers one allocation.
+    /// publication audit, set only by [`Edit::commit`] on the preserving route.
+    /// Every other constructor leaves it empty, and a derived snapshot never
+    /// inherits it, because a proof covers one allocation.
     publication: Option<xml_minifier::audit::VerifiedSource>,
 }
 
@@ -1865,8 +1864,8 @@ impl Snapshot {
     /// bytes.
     ///
     /// Besides [`Edit::commit`], the source-backed owner attaches the proof
-    /// its OPC package retained for a transaction's base bytes (record 0317),
-    /// which [`commit_preserving_unmodified`] then proves the candidate from.
+    /// its OPC package retained for a transaction's base bytes, which
+    /// [`commit_preserving_unmodified`] then proves the candidate from.
     pub(crate) fn with_publication_proof(
         mut self,
         proof: xml_minifier::audit::VerifiedSource,
@@ -6926,9 +6925,9 @@ pub struct Patch {
     inverse_operations: OperationList,
     inverse_admission: Option<Arc<OperationAdmission>>,
     inverse_string_admission: Option<Arc<StringAdmission>>,
-    /// The exact package pair of a source-backed commit (record 0355a):
-    /// applied to a package writing the first artifact, the patch returns
-    /// the second, so an inverse restores the original archive bytes.
+    /// The exact package pair of a source-backed commit: applied to a package
+    /// writing the first artifact, the patch returns the second, so an inverse
+    /// restores the original archive bytes.
     restore: Option<Arc<(crate::source_backed::Package, crate::source_backed::Package)>>,
 }
 
@@ -7437,19 +7436,15 @@ fn shifted_offset(offset: u32, delta: i64) -> Option<u32> {
 /// well-formedness, exactly one document element, character data only inside
 /// it, the absence of a DTD or DOCTYPE and its finite budgets
 /// (`PackageWriter::audit_published_xml`). It no longer asserts the
-/// repository's compact output contract against any member: change 0665 made
-/// that movement on the eager route as an implementation interpretation of
-/// change 0652's decision 2 (*"Original byte contract: loose the audit, accept
-/// non-compact XMLs"*), after changes 0654 and 0657 established the same
-/// source profile on the source-backed route. Change 0660 named this function
-/// as the one place that had to change when it landed, and this is that change.
+/// repository's compact output contract against any member: non-compact XML is
+/// accepted on the eager route, as on the source-backed route.
 ///
 /// So a producer that indents its markup, or writes a line break after the XML
-/// declaration — the witness change 0602 named, and the shape 53 of this
-/// repository's 55 openable DOCX fixtures have — now publishes preserved. What
-/// still sends a document down the whole-document route is a *structural*
-/// refusal the writer would raise on the preserved bytes: the byte-order-marked
-/// main document change 0650 froze is the one this repository's corpus carries.
+/// declaration — the shape 53 of this repository's 55 openable DOCX fixtures
+/// have — now publishes preserved. What still sends a document down the
+/// whole-document route is a *structural* refusal the writer would raise on the
+/// preserved bytes: the byte-order-marked main document is the one this
+/// repository's corpus carries.
 ///
 /// The gate runs the auditor the writer runs, under the writer's limits, so it
 /// cannot reach a different verdict than the writer. It is asked of the
@@ -7469,15 +7464,15 @@ fn publication_accepts_preserved_xml(xml: &[u8]) -> bool {
 /// compacted in place ([`compact_changed_paragraphs`]); otherwise the whole
 /// document is compacted ([`compact_whole_document`]).
 ///
-/// Change 0754 answers the gate with the pair audit
+/// The gate is answered with the pair audit
 /// [`xml_minifier::audit::VerifiedSource::verify_replacement`], whose verdict
-/// on the source is `verify_source`'s own, so the route cannot differ. When
-/// the candidate passes too, the same pass has audited the candidate's exact
+/// on the source is `verify_source`'s own, so the route cannot differ. When the
+/// candidate passes too, the same pass has audited the candidate's exact
 /// allocation, mostly inside the one element the edit replaced, and the
-/// resulting proof travels with the snapshot to the package writer, which
-/// then does not audit those bytes again. The package writer's audit stays the
-/// last line of defence for everything else: bytes without a proof, and any
-/// bytes other than the proof's own allocation, are audited there.
+/// resulting proof travels with the snapshot to the package writer, which then
+/// does not audit those bytes again. The package writer's audit stays the last
+/// line of defence for everything else: bytes without a proof, and any bytes
+/// other than the proof's own allocation, are audited there.
 ///
 /// The candidate is compacted before the gate's verdict is known, because the
 /// pair audit needs it. Compaction only reads the two snapshots, so when the
@@ -7486,10 +7481,10 @@ fn publication_accepts_preserved_xml(xml: &[u8]) -> bool {
 /// returned exactly where it was. A candidate whose bytes cannot be shared
 /// (a managed projection) takes the historical gate and carries no proof.
 ///
-/// When the source snapshot itself carries a proof (record 0317: the
-/// source-backed owner attaches the one its OPC package retained for these
-/// bytes, with the content boundaries that audit recorded), the gate's
-/// verdict on the source is that proof's, and the candidate is audited with
+/// When the source snapshot itself carries a proof (the source-backed owner
+/// attaches the one its OPC package retained for these bytes, with the content
+/// boundaries that audit recorded), the gate's verdict on the source is that
+/// proof's, and the candidate is audited with
 /// [`xml_minifier::audit::VerifiedSource::verify_successor`]: its verdict and
 /// error are the candidate's complete source audit, but it scans only the
 /// paragraphs that changed, and the original is not scanned at all. The
@@ -7501,7 +7496,7 @@ fn publication_accepts_preserved_xml(xml: &[u8]) -> bool {
 /// (`Package::document_snapshot`'s), and the source-backed writer
 /// ([`crate::source_backed::Package::apply`]), for the snapshots bound to a
 /// source identity, which hands it to the OPC overlay in place of that
-/// overlay's own audit of the replacement (record 0311).
+/// overlay's own audit of the replacement.
 fn commit_preserving_unmodified(
     base: &Snapshot,
     projected: &Snapshot,
@@ -7546,11 +7541,11 @@ fn commit_preserving_unmodified(
 /// proof: [`xml_minifier::audit::VerifiedSource::verify_indexed_replacement`]
 /// for a source snapshot bound to a source identity (the source-backed
 /// owner's) whose bytes can be shared, so the candidate's proof keeps the
-/// content boundaries derived from the source's single scan (record 0317) and
-/// a commit on the revision the owner publishes is proved from them; the plain
-/// [`xml_minifier::audit::VerifiedSource::verify_replacement`] otherwise,
-/// which records nothing, since no other writer keeps the proof for a next
-/// commit. Both have the verdict and error of `verify_source_replacement`.
+/// content boundaries derived from the source's single scan and a commit on the
+/// revision the owner publishes is proved from them; the plain
+/// [`xml_minifier::audit::VerifiedSource::verify_replacement`] otherwise, which
+/// records nothing, since no other writer keeps the proof for a next commit.
+/// Both have the verdict and error of `verify_source_replacement`.
 fn base_pair_audit(
     base: &Snapshot,
     replacement: Arc<Vec<u8>>,
@@ -8559,15 +8554,15 @@ fn is_classified_body_child(local: &[u8]) -> bool {
 
 fn scan_document_with_context(xml: &[u8], context: Option<&ExecutionContext>) -> Result<Layout> {
     // A plain `Reader` and the shared binding tracker replace `NsReader`
-    // (change 0229's pattern for the paragraph text scanner, applied here by
-    // change 0754). `NsReader::from_reader` is `Reader::from_reader` with the
-    // default configuration, so the tokenizer and every tokenizer error are
-    // unchanged, and `BindingTracker` reproduces the resolver's push, deferred
-    // pop and namespace errors byte for byte. Events borrow the input instead
-    // of being copied, and a name is resolved only where a verdict reads its
-    // namespace: the document root, every `body`, and the four classified
-    // direct-body children. `scan_document_with_context_nsreader_oracle`
-    // keeps the previous implementation for the differential tests.
+    // (the pattern of the paragraph text scanner). `NsReader::from_reader` is
+    // `Reader::from_reader` with the default configuration, so the tokenizer
+    // and every tokenizer error are unchanged, and `BindingTracker` reproduces
+    // the resolver's push, deferred pop and namespace errors byte for byte.
+    // Events borrow the input instead of being copied, and a name is resolved
+    // only where a verdict reads its namespace: the document root, every
+    // `body`, and the four classified direct-body children.
+    // `scan_document_with_context_nsreader_oracle` keeps the previous
+    // implementation for the differential tests.
     let mut reader = Reader::from_reader(xml);
     let mut tracker = BindingTracker::new();
     let mut pending_pop = false;
@@ -8740,8 +8735,8 @@ fn scan_document_with_context(xml: &[u8], context: Option<&ExecutionContext>) ->
                     let is_section = is_word && local == b"sectPr";
                     // A child after the body-final section properties is
                     // refused only when it is body content; producers write
-                    // `w:altChunk` imports there (record 0293), which stay an
-                    // untouched tail outside the editable content region.
+                    // `w:altChunk` imports there, which stay an untouched tail
+                    // outside the editable content region.
                     if final_section_start.is_some()
                         && (is_paragraph || is_table || is_control || is_section)
                     {
@@ -8906,10 +8901,10 @@ fn oracle_event_namespace_binding_count(event: &Event<'_>) -> usize {
     }
 }
 
-/// Change-0754 differential oracle: the `NsReader` layout scanner that
+/// Differential oracle: the `NsReader` layout scanner that
 /// [`scan_document_with_context`] replaced, retained test-only so the
-/// tracker-driven scan is pinned to its layouts and errors (the change-0229
-/// pattern of `extract_word_text_nsreader_oracle`).
+/// tracker-driven scan is pinned to its layouts and errors (the pattern of
+/// `extract_word_text_nsreader_oracle`).
 #[cfg(test)]
 fn scan_document_with_context_nsreader_oracle(
     xml: &[u8],
@@ -10618,7 +10613,7 @@ fn scan_text_owner_with_policy(
     let mut depth = 0usize;
     let mut saw_root = false;
     // The depth of the open `mc:AlternateContent`: an opaque object whose
-    // own text refuses the edit (record 0307).
+    // own text refuses the edit.
     let mut opaque = None::<usize>;
 
     loop {
@@ -13816,11 +13811,11 @@ mod tests {
 
     #[test]
     fn a_source_the_publication_audit_refuses_takes_the_whole_document_route() {
-        // Change 0665 leaves every structural and finite-budget refusal in
-        // place, so the preserving policy still has a fallback. One token
-        // larger than the auditor's `TokenBytes` budget is such a refusal and
-        // the snapshot admits it, because the snapshot's own budgets are
-        // counted differently.
+        // Every structural and finite-budget refusal stays in place, so the
+        // preserving policy still has a fallback. One token larger than the
+        // auditor's `TokenBytes` budget is such a refusal and the snapshot
+        // admits it, because the snapshot's own budgets are counted
+        // differently.
         let oversized = "a".repeat(4 * 1024 * 1024 + 1);
         let xml = document(&format!(
             "<w:p><w:pPr><w:pStyle w:val=\"{oversized}\"/></w:pPr><w:r><w:t>first</w:t></w:r></w:p>\
@@ -13897,9 +13892,9 @@ mod tests {
         let compact = apostrophe_corpus();
         assert!(publication_accepts_preserved_xml(&compact));
 
-        // Change 0665: every one of these is a compactness verdict the writer
-        // no longer raises, so the preserving policy must publish them. Each
-        // declares its prefix, as change 0750's namespace check requires.
+        // Every one of these is a compactness verdict the writer no longer
+        // raises, so the preserving policy must publish them. Each declares its
+        // prefix, as the namespace check requires.
         let accepted: [&[u8]; 4] = [
             b"<?xml version=\"1.0\"?>\n<w:p xmlns:w=\"urn:w\"/>",
             b" <w:p xmlns:w=\"urn:w\"/>",
@@ -14069,9 +14064,9 @@ mod tests {
             fixtures >= 50 && edited >= 80,
             "the corpus should reach this test: {fixtures} fixtures, {edited} edits"
         );
-        // Change 0665 removed the compactness refusal from the eager
-        // publication audit, so the gate no longer sends this corpus down the
-        // whole-document fallback: every fixture preserves.
+        // The eager publication audit has no compactness refusal, so the gate
+        // no longer sends this corpus down the whole-document fallback: every
+        // fixture preserves.
         assert_eq!(
             identical, 0,
             "no fixture should still need the audit fallback: {identical}/{edited}"
@@ -15812,9 +15807,9 @@ mod tests {
             .unwrap();
         let commit = edit.commit().unwrap();
         let xml = std::str::from_utf8(commit.snapshot().xml_bytes()).unwrap();
-        // Change 0665: publication no longer refuses a non-compact member, so
-        // the default policy preserves this source's indentation instead of
-        // re-serializing the whole document to remove it.
+        // Publication no longer refuses a non-compact member, so the default
+        // policy preserves this source's indentation instead of re-serializing
+        // the whole document to remove it.
         assert!(xml.contains("\n  "));
         for retained in [
             "<w:rPr><w:b/></w:rPr>",
@@ -16218,8 +16213,8 @@ mod tests {
         ] {
             assert!(xml.contains(retained), "missing retained XML: {retained}");
         }
-        // Change 0665: the default policy preserves the source's line breaks
-        // rather than re-serializing the whole document to remove them.
+        // The default policy preserves the source's line breaks rather than
+        // re-serializing the whole document to remove them.
         assert!(xml.contains("\n"));
 
         let durable = commit.patch().to_durable(durable_limits()).unwrap();
@@ -16552,9 +16547,8 @@ mod tests {
 
     #[test]
     fn text_sets_treat_run_alternate_content_as_one_opaque_object() {
-        // Record 0307: a wrapper without text survives a paragraph text set;
-        // one whose branches hold text refuses it, typed, with the edit
-        // untouched.
+        // A wrapper without text survives a paragraph text set; one whose
+        // branches hold text refuses it, typed, with the edit untouched.
         let document = |run: &str| {
             format!(
                 "<w:document xmlns:w=\"{WORD}\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" xmlns:x=\"urn:x\"><w:body>\

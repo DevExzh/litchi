@@ -2,9 +2,9 @@
     clippy::shadow_reuse,
     reason = "parser bindings are intentionally refined after validation"
 )]
-//! The Word settings-extension family (record 0355): the `w14`/`w15`
-//! extensions of the settings part, read as a [`Snapshot`] and changed
-//! through an [`Edit`] that publishes a new package.
+//! The Word settings-extension family: the `w14`/`w15` extensions of the
+//! settings part, read as a [`Snapshot`] and changed through an [`Edit`] that
+//! publishes a new package.
 //!
 //! ```
 //! use litchi_docx::Package;

@@ -1,5 +1,5 @@
 //! Worksheet drawing objects: the format-neutral half of the XLSX and XLSB
-//! drawing editors (unified-ops records 0320, 0322 and 0325).
+//! drawing editors.
 //!
 //! An XLSB worksheet's Drawings part is the same `SpreadsheetDrawing` XML as
 //! an XLSX one, so both crates' `drawing::edit` families read and write it

@@ -4,7 +4,7 @@
     reason = "integration tests use panic-on-failure extraction"
 )]
 
-//! Document-property edits of a source-backed XLSB owner (record 0261).
+//! Document-property edits of a source-backed XLSB owner.
 
 use std::io::Cursor;
 use std::path::PathBuf;

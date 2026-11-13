@@ -1,5 +1,4 @@
-//! Immutable conditional-formatting edits of an XLSB [`Package`]
-//! (unified-ops record 0322).
+//! Immutable conditional-formatting edits of an XLSB [`Package`].
 //!
 //! A worksheet stores each classic conditional format as one
 //! `BrtBeginConditionalFormatting` collection (its ranges and rules).

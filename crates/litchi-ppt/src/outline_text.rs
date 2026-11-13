@@ -1,5 +1,5 @@
 //! Slide-list text bodies and the outline references that place them in
-//! shapes (MS-PPT 2.4.14.3, 2.9.41, 2.9.78; L-PPT-R1, finding F-10).
+//! shapes (MS-PPT 2.4.14.3, 2.9.41, 2.9.78).
 //!
 //! `PowerPoint` stores the text of a slide's title and body placeholders in
 //! the presentation's `SlideListWithTextContainer`, not in the placeholder

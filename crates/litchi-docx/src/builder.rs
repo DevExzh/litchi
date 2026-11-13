@@ -5,9 +5,9 @@
 //! verbs are staged here and materialized into the package graph by
 //! [`Builder::build`]. The drafts reached from it live in this module without
 //! a prefix ([`Document`], [`Paragraph`], [`Run`], [`Table`], [`Row`],
-//! [`Cell`], [`Style`], …; record 0351 §2.1 rule 7). An opened package never
-//! hydrates into this writer: it changes through [`Package::edit`] and its
-//! scoped `edit_*` families (ADR 0034 §9).
+//! [`Cell`], [`Style`], …). An opened package never hydrates into this writer:
+//! it changes through [`Package::edit`] and its scoped `edit_*` families (ADR
+//! 0034 §9).
 
 pub use crate::writer::bookmark::Bookmark;
 pub use crate::writer::comment::Comment;

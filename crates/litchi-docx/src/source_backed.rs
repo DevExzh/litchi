@@ -110,14 +110,13 @@ pub struct Package {
     /// not prove the same bytes again.
     main_admission: Arc<Mutex<Option<SourceVersion>>>,
     /// The unmanaged main-document transaction snapshot last built from the
-    /// physical source (record 0305). A snapshot is cheap to clone and
-    /// carries its source identity (lineage, revision, part name); it is
-    /// reused only when that identity matches and its bytes equal the
-    /// current payload, so one revision is scanned once, not once per edit
-    /// and again per commit.
+    /// physical source. A snapshot is cheap to clone and carries its source
+    /// identity (lineage, revision, part name); it is reused only when that
+    /// identity matches and its bytes equal the current payload, so one
+    /// revision is scanned once, not once per edit and again per commit.
     main_snapshot: Arc<Mutex<Option<Snapshot>>>,
-    /// The pending output of a committed package (record 0355a); its
-    /// physical source is the materialized output.
+    /// The pending output of a committed package; its physical source is the
+    /// materialized output.
     deferred: Option<Arc<deferred::Deferred>>,
     /// A complete-artifact fingerprint memo for a generic source or an
     /// immutable effective topology. Owned physical sources use the memo
@@ -280,7 +279,7 @@ impl Package {
     }
 
     /// The physical source: the opened archive, or the materialized output
-    /// of a committed package (record 0355a).
+    /// of a committed package.
     fn physical_source(&self) -> Result<&SourceBackedPackage> {
         match &self.deferred {
             Some(deferred) => deferred.materialized(),
@@ -391,7 +390,7 @@ impl Package {
         Self::from_reader_with_options(bytes, options)
     }
 
-    /// The semantic read budgets this package keeps (record 0355).
+    /// The semantic read budgets this package keeps.
     #[must_use]
     pub fn semantic_limits(&self) -> &crate::SemanticLimits {
         &self.semantic_limits
@@ -999,7 +998,7 @@ impl Package {
     }
 
     /// The entries of the `commentsExtended` part, as the eager
-    /// `Document::comments_extended` reads them (record 0345).
+    /// `Document::comments_extended` reads them.
     ///
     /// # Errors
     ///
@@ -1015,7 +1014,7 @@ impl Package {
     }
 
     /// Whether the main document relates a comments part; retained edits
-    /// are included (record 0319).
+    /// are included.
     ///
     /// # Errors
     ///
@@ -1028,8 +1027,7 @@ impl Package {
     }
 
     /// The styles part, located, or `None` when the document has none; only
-    /// the main part's relationships and the styles part are read (record
-    /// 0319).
+    /// the main part's relationships and the styles part are read.
     ///
     /// # Errors
     ///
@@ -1042,8 +1040,7 @@ impl Package {
     }
 
     /// The numbering part, located, or `None` when the document has none;
-    /// only the main part's relationships and the numbering part are read
-    /// (record 0319).
+    /// only the main part's relationships and the numbering part are read.
     ///
     /// # Errors
     ///
@@ -1056,8 +1053,7 @@ impl Package {
     }
 
     /// The header and footer parts the main document relates, in
-    /// relationship order; only the main part's relationships are read
-    /// (record 0319).
+    /// relationship order; only the main part's relationships are read.
     ///
     /// # Errors
     ///
@@ -1068,7 +1064,7 @@ impl Package {
     }
 
     /// The header and footer references of every section, in document
-    /// order, each with its role; only the main part is read (record 0319).
+    /// order, each with its role; only the main part is read.
     ///
     /// # Errors
     ///
@@ -1089,7 +1085,7 @@ impl Package {
     }
 
     /// The payload of part `name`, or `None` when the package has no such
-    /// part (record 0319).
+    /// part.
     ///
     /// # Errors
     ///
@@ -1101,7 +1097,7 @@ impl Package {
 
     /// The footnotes of the main document, in part order, without
     /// separators; only the main part's relationships and the footnotes part
-    /// are read (record 0319).
+    /// are read.
     ///
     /// # Errors
     ///
@@ -1114,7 +1110,7 @@ impl Package {
     }
 
     /// The endnotes of the main document, in part order, without
-    /// separators (record 0319).
+    /// separators.
     ///
     /// # Errors
     ///
@@ -1146,7 +1142,7 @@ impl Package {
     }
 
     /// Run `read` over the main part's relationships as this owner's
-    /// effective graph has them: retained edits included (record 0319).
+    /// effective graph has them: retained edits included.
     fn with_main_relationships<T>(
         &self,
         read: impl FnOnce(&litchi_opc::Relationships) -> Result<T>,
@@ -1161,7 +1157,7 @@ impl Package {
     }
 
     /// The payload of part `uri` in this owner's effective graph, or `None`
-    /// when it has no such part (record 0319).
+    /// when it has no such part.
     fn effective_part_xml(&self, uri: &PackURI) -> Result<Option<Arc<Vec<u8>>>> {
         match &self.effective {
             Some(topology) => match topology.part(uri) {
@@ -1177,7 +1173,7 @@ impl Package {
 
     /// The header, footer, footnotes, endnotes and comments parts the main
     /// document relates, in relationship order, each once; only the main
-    /// part's relationships are read (record 0285).
+    /// part's relationships are read.
     ///
     /// # Errors
     ///
@@ -1290,17 +1286,16 @@ impl Package {
     /// decided on their decoded values. A document whose only selections are
     /// `mc:AlternateContent` wrappers inside runs (a drawing or text box with
     /// a fallback) is admitted once its projection succeeds; each wrapper is
-    /// one opaque inline object to the snapshot's edits (record 0307). A
-    /// document whose projection otherwise selects, unwraps or hides content
-    /// (`AlternateContent` outside a run, `ProcessContent`,
-    /// `MustUnderstand`, ignorable markup holding content, or an `Ignorable`
-    /// below `w:document` listing a namespace that is not understood) is
-    /// refused, and a projection error is returned as is. Under an
-    /// execution context the projection is never built, so only documents
-    /// whose projection differs from the source in spelling alone are
-    /// admitted. Keeping the raw bytes prevents semantic selectors from being
-    /// applied to a different XML representation than the one eventually
-    /// published.
+    /// one opaque inline object to the snapshot's edits. A document whose
+    /// projection otherwise selects, unwraps or hides content
+    /// (`AlternateContent` outside a run, `ProcessContent`, `MustUnderstand`,
+    /// ignorable markup holding content, or an `Ignorable` below `w:document`
+    /// listing a namespace that is not understood) is refused, and a projection
+    /// error is returned as is. Under an execution context the projection is
+    /// never built, so only documents whose projection differs from the source
+    /// in spelling alone are admitted. Keeping the raw bytes prevents semantic
+    /// selectors from being applied to a different XML representation than the
+    /// one eventually published.
     ///
     /// # Errors
     ///
@@ -1385,8 +1380,8 @@ impl Package {
     }
 
     /// Check a document-variable patch against the current settings part
-    /// and return the part and its rewritten XML (record 0355a). Exact
-    /// no-ops skip the rewrite checks.
+    /// and return the part and its rewritten XML. Exact no-ops skip the rewrite
+    /// checks.
     pub(crate) fn document_variables_target(
         &self,
         patch: &variables::Patch,
@@ -1419,8 +1414,8 @@ impl Package {
         Ok((current.partname, target.shared_xml()))
     }
 
-    /// Write this package with one part's payload replaced (record 0355a):
-    /// the output of a committed single-part family change.
+    /// Write this package with one part's payload replaced: the output of a
+    /// committed single-part family change.
     pub(crate) fn write_part_overlay(
         &self,
         writer: &mut dyn Write,
@@ -1505,9 +1500,9 @@ impl Package {
     }
 
     /// Check a section-layout patch against the current main document and
-    /// return the part and its rewritten XML (record 0355a). `commit`, the
-    /// commit that made the patch, lets its retained base inventory spare a
-    /// second scan of an unchanged source.
+    /// return the part and its rewritten XML. `commit`, the commit that made
+    /// the patch, lets its retained base inventory spare a second scan of an
+    /// unchanged source.
     pub(crate) fn section_layout_target(
         &self,
         patch: &layout::Patch,
@@ -1666,7 +1661,7 @@ impl Package {
     }
 
     /// The payload part behind one active main-story altChunk anchor, for
-    /// a replacement of `media_type` and `extension` (record 0355a).
+    /// a replacement of `media_type` and `extension`.
     pub(crate) fn alt_chunk_payload_target(
         &self,
         selector: AltChunkSelector,
@@ -1692,7 +1687,7 @@ impl Package {
     }
 
     /// Check an external-hyperlink detachment patch against the current main
-    /// document and return the part and its rewritten XML (record 0355a).
+    /// document and return the part and its rewritten XML.
     pub(crate) fn external_hyperlink_detachment_target(
         &self,
         patch: &sanitize::Patch,
@@ -1711,7 +1706,7 @@ impl Package {
     }
 
     /// Check an external-hyperlink redaction commit against the current main
-    /// document and return the main part (record 0355a).
+    /// document and return the main part.
     pub(crate) fn external_hyperlink_redaction_target(
         &self,
         patch: &redact::IrreversibleRedactionPatch,
@@ -1730,7 +1725,7 @@ impl Package {
     }
 
     /// Write this package with a redaction's main-document replacement and
-    /// relationship removals (record 0355a).
+    /// relationship removals.
     pub(crate) fn write_external_hyperlink_redaction(
         &self,
         writer: &mut dyn Write,
@@ -1806,8 +1801,7 @@ impl Package {
             .plan_target_urls_with_mode(target_urls, mode)
     }
 
-    /// Check a story-hyperlink redaction against this exact source (record
-    /// 0355a).
+    /// Check a story-hyperlink redaction against this exact source.
     pub(crate) fn story_hyperlink_redaction_admit(
         &self,
         patch: &crate::story_hyperlinks::ForwardOnlyPatch,
@@ -1818,7 +1812,7 @@ impl Package {
     }
 
     /// Write this package with a story-hyperlink redaction's story
-    /// replacements and relationship removals (record 0355a).
+    /// replacements and relationship removals.
     pub(crate) fn write_story_hyperlink_redaction(
         &self,
         writer: &mut dyn Write,
@@ -2153,8 +2147,8 @@ impl Package {
     }
 
     /// `snapshot` with the source XML audit proof the OPC package retained
-    /// for its exact bytes, when it has none yet and `retained` finds one
-    /// (record 0317); the memo then keeps the proven snapshot.
+    /// for its exact bytes, when it has none yet and `retained` finds one; the
+    /// memo then keeps the proven snapshot.
     ///
     /// The proof is the package's own audit of these bytes (its indexed
     /// proof of the original, or the proof an earlier commit's candidate
@@ -3641,7 +3635,7 @@ impl Document {
     }
 
     /// Return the bookmarks of the main story in document order, as
-    /// [`crate::Document::bookmarks`] does (record 0319).
+    /// [`crate::Document::bookmarks`] does.
     ///
     /// # Errors
     ///
@@ -3655,7 +3649,7 @@ impl Document {
     }
 
     /// Return the text boxes of the main story in document order, as
-    /// [`crate::Document::text_boxes`] does (record 0319).
+    /// [`crate::Document::text_boxes`] does.
     ///
     /// # Errors
     ///

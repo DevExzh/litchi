@@ -554,10 +554,10 @@ fn shared_shape_anchor_forks_then_collects_each_orphan() {
     assert!(package.get_part(&original_part).is_err());
 }
 
-/// Change 0743: an unmarked owner reuses the scene's read as the proof the
-/// separate raw offset pass would give, and must still return exactly the
-/// span, and exactly the refusal, of the full route. Debug builds also
-/// compare both routes inside `selected_raw_span_for_shape` itself.
+/// An unmarked owner reuses the scene's read as the proof the separate raw
+/// offset pass would give, and must still return exactly the span, and exactly
+/// the refusal, of the full route. Debug builds also compare both routes inside
+/// `selected_raw_span_for_shape` itself.
 #[test]
 fn the_unmarked_raw_span_route_keeps_spans_and_refusals() {
     let tree = |body: &str| {

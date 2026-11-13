@@ -1,5 +1,4 @@
-//! Immutable edits of XLSB threaded comments and workbook persons (record
-//! 0360b).
+//! Immutable edits of XLSB threaded comments and workbook persons.
 //!
 //! [`crate::Package::threaded_comments`] reads the typed graph;
 //! [`crate::Package::edit_threaded_comments`] starts an [`Edit`] that stages

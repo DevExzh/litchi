@@ -7,22 +7,22 @@
 //! Byte-exact goldens for the fresh XLS writer's shared-string path.
 //!
 //! The fixtures of `fresh_xls_writer_shared_strings_match_the_pre_0753_goldens`
-//! were written by the writer at `6d989cad63`, before change 0753 staged the
-//! shared-string table by borrowing and hashing each string once, and their
-//! SHA-256 recorded here. Each of their worksheets holds at most one distinct
-//! string: until change 0757 the SST listed strings in the order a worksheet's
-//! cell map iterated them, which for several distinct strings depended on that
-//! map's per-process hash seed, so only these shapes were reproducible across
-//! processes. Change 0757 replaced the two strings of `one_string_per_sheet`
-//! that were longer than an SST entry, which the writer now refuses, with
-//! strings exactly at the limit, and pinned that fixture's digest from the
-//! writer at `9ff78bbf1c` (0753's head), which writes it identically.
+//! were written by the writer at `6d989cad63`, before the shared-string table
+//! was staged by borrowing and hashing each string once, and their SHA-256
+//! recorded here. Each of their worksheets holds at most one distinct string:
+//! the SST then listed strings in the order a worksheet's cell map iterated
+//! them, which for several distinct strings depended on that map's per-process
+//! hash seed, so only these shapes were reproducible across processes. The two
+//! strings of `one_string_per_sheet` that were longer than an SST entry, which
+//! the writer now refuses, were replaced with strings exactly at the limit, and
+//! that fixture's digest was pinned from the writer at `9ff78bbf1c`, which
+//! writes it identically.
 //!
-//! Since change 0757 the SST lists each string at its first occurrence in
-//! worksheet, row and column order, whatever the cell maps' seeds, so
+//! The SST now lists each string at its first occurrence in worksheet, row
+//! and column order, whatever the cell maps' seeds, so
 //! `multi_string_worksheets_are_pinned_across_processes` pins worksheets with
-//! many distinct strings too. Those digests were recorded from 0757's writer;
-//! no earlier writer produced them reproducibly.
+//! many distinct strings too. Those digests were recorded from the first
+//! writer with that order; no earlier writer produced them reproducibly.
 
 use litchi_core::validation::EvidenceDigest;
 use litchi_xls::writer::Builder;
@@ -270,10 +270,10 @@ fn scrambled_strings_workbook() -> Vec<u8> {
     written(scrambled_strings())
 }
 
-/// Worksheets with many distinct strings, pinned since change 0757 made the
-/// SST order independent of the cell maps' hash seeds. Each test process seeds
-/// its maps afresh, and each fixture is also built four times in-process, each
-/// time with new maps, so a seed-dependent order would fail here.
+/// Worksheets with many distinct strings, pinned since the SST order became
+/// independent of the cell maps' hash seeds. Each test process seeds its maps
+/// afresh, and each fixture is also built four times in-process, each time
+/// with new maps, so a seed-dependent order would fail here.
 #[test]
 fn multi_string_worksheets_are_pinned_across_processes() {
     let fixtures: [(&str, fn() -> Vec<u8>, &str); 2] = [

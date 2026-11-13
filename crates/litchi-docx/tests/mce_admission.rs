@@ -1,13 +1,13 @@
 #![cfg(any(unix, windows))]
-//! Record 0011: the markup-compatibility admission of DOCX document
-//! transactions, on both owners and under an execution context.
+//! The markup-compatibility admission of DOCX document transactions, on both
+//! owners and under an execution context.
 //!
 //! A transaction edits and publishes the main part's own bytes while readers
-//! see the markup-compatibility projection. Record 0008 found every Word
-//! fixture refused because the part merely mentions the namespace; 0011
-//! admits the parts whose projection hides nothing (stages 1 and 2), applies
-//! the same rule to the owning package and the managed route (stage 3), and
-//! keeps every real hazard refused.
+//! see the markup-compatibility projection. Every Word fixture used to be
+//! refused because the part merely mentions the namespace; the parts whose
+//! projection hides nothing are admitted (stages 1 and 2), the same rule
+//! applies to the owning package and the managed route (stage 3), and every
+//! real hazard stays refused.
 
 use std::io::Cursor;
 use std::num::{NonZeroU64, NonZeroUsize};
@@ -32,8 +32,7 @@ const W14: &str = "http://schemas.microsoft.com/office/word/2010/wordml";
 const W16DU: &str = "http://schemas.microsoft.com/office/word/2023/wordml/word16du";
 const WP14: &str = "http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing";
 
-/// Record 0008 §1: the fixtures that declare the namespace and use nothing
-/// in it (stage 1).
+/// The fixtures that declare the namespace and use nothing in it (stage 1).
 const DECLARED_ONLY: [&str; 13] = [
     "FancyFoot",
     "Headers",
@@ -151,8 +150,8 @@ fn managed(bytes: &[u8]) -> (Budget, CancellationSource, source_backed::Package)
     (budget, cancellation_source, package)
 }
 
-/// The edit record 0008's probe made: replace the text of the first
-/// paragraph the grammar accepts, or append one paragraph when none is.
+/// The probe edit: replace the text of the first paragraph the grammar accepts,
+/// or append one paragraph when none is.
 fn first_edit<P: Clone>(edit: &mut Edit<P>) {
     let count = edit.source().unwrap().paragraph_count();
     for position in 0..count {
@@ -528,8 +527,8 @@ fn witness_matrix_on_both_owners_and_the_managed_route() {
             Expect::UnmanagedOnly,
         ),
         (
-            // Record 0307: run-level alternate content is an opaque inline
-            // object; the projection keeps every block where it is.
+            // Run-level alternate content is an opaque inline object; the
+            // projection keeps every block where it is.
             "W1: AlternateContent in a run",
             document(
                 &mc,
@@ -819,8 +818,8 @@ fn document_variables_follow_the_same_rule() {
 
 /// Scanners that recognize the markup-compatibility namespace on namespace
 /// values as written cannot see a binding spelled with references, which
-/// preprocessing now applies (record 0011). Each refuses such a part, or
-/// reports it, instead of acting on bytes readers see differently.
+/// preprocessing now applies. Each refuses such a part, or reports it, instead
+/// of acting on bytes readers see differently.
 #[test]
 fn raw_namespace_scanners_refuse_a_binding_spelled_with_references() {
     let escaped = document(
@@ -899,9 +898,9 @@ fn paragraph_transfer_requires_a_donor_whose_projection_drops_nothing() {
         "{error:?}"
     );
 
-    // Record 0307: a donor admitted for run-level alternate content selects
-    // a branch, which a receiver need not understand alike; even a paragraph
-    // without a wrapper is refused, as for the opaque donor above.
+    // A donor admitted for run-level alternate content selects a branch, which
+    // a receiver need not understand alike; even a paragraph without a wrapper
+    // is refused, as for the opaque donor above.
     let alternate = eager(&package(
         &document(
             &format!(r#"xmlns:mc="{MCE}""#),

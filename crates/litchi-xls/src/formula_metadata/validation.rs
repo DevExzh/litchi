@@ -22,7 +22,7 @@ pub(crate) enum FlagDefect {
 /// stream is not part of one: Excel writes such records (Apache POI's
 /// `FormulaRecordAggregate` documents and clears the stale flag; LibreOffice
 /// reads the tokens). The flag is ignored here, the bytes are kept, and the
-/// caller receives the [`FlagDefect`] to record (record 0316).
+/// caller receives the [`FlagDefect`] to record.
 pub(crate) fn decode_flags(flags: u16, tokens: &[u8]) -> Result<(Metadata, Option<FlagDefect>)> {
     let (metadata, defect) = decode_flags_preserving(flags, tokens)?;
     if defect.is_some() {
@@ -36,8 +36,8 @@ pub(crate) fn decode_flags_preserving(
     tokens: &[u8],
 ) -> Result<(Metadata, Option<FlagDefect>)> {
     // `[MS-XLS]` 2.4.127: reserved1, reserved2 and reserved3 "MUST be
-    // zero, and MUST be ignored". Producers set them (record 0308); a reader
-    // ignores them, and the record bytes stay as the producer wrote them.
+    // zero, and MUST be ignored". Producers set them; a reader ignores them,
+    // and the record bytes stay as the producer wrote them.
     let metadata = Metadata::from_wire(flags & VALID_FLAGS, 0);
     let defect = (metadata.shared_formula() && !is_ptg_exp(tokens))
         .then_some(FlagDefect::SharedWithoutPtgExp);

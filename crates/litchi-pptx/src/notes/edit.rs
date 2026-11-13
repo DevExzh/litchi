@@ -1,4 +1,4 @@
-//! Immutable speaker-notes edits of a [`Package`] (record 0351 §2.3).
+//! Immutable speaker-notes edits of a [`Package`].
 //!
 //! [`Package::edit_notes`] starts an [`Edit`] over the package's notes graph:
 //! [`Edit::set`] replaces the complete detached graph, the `set_*` verbs

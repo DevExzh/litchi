@@ -56,7 +56,7 @@ pub struct Slide<'doc> {
     /// non-structural defects repaired while they were parsed.
     shapes: OnceCell<(Arc<[ShapeEnum<'static>]>, crate::leniency::ToleranceReport)>,
     /// The owning presentation's one-slide memo, when the slide was selected
-    /// through a presentation (record 0260).
+    /// through a presentation.
     shape_memo: Option<&'doc ShapeMemo>,
     /// Cached text content.
     text_cache: OnceCell<String>,
@@ -78,8 +78,7 @@ pub struct Slide<'doc> {
 /// Parsed shapes of one slide.
 type ParsedShapes = (Arc<[ShapeEnum<'static>]>, crate::leniency::ToleranceReport);
 
-/// A presentation-scoped memo of the most recently parsed slide's shapes
-/// (record 0260).
+/// A presentation-scoped memo of the most recently parsed slide's shapes.
 ///
 /// Every [`crate::Presentation::slide_at`] or [`crate::Presentation::slides`]
 /// call returns new [`Slide`] handles, each with its own lazily parsed shape
@@ -94,9 +93,9 @@ type ParsedShapes = (Arc<[ShapeEnum<'static>]>, crate::leniency::ToleranceReport
 /// one slide's shapes. A poisoned lock is treated as a miss.
 ///
 /// A committed text edit may instead seed the memo with [`PatchedShapes`]
-/// that it proved equal to a parse of the published slide (record 0264).
-/// They are materialized on the first hit, so a publication that nobody
-/// reads again pays nothing for the seed.
+/// that it proved equal to a parse of the published slide. They are
+/// materialized on the first hit, so a publication that nobody reads again pays
+/// nothing for the seed.
 #[derive(Default)]
 pub(crate) struct ShapeMemo(std::sync::Mutex<Option<(u32, MemoEntry)>>);
 
@@ -106,8 +105,8 @@ enum MemoEntry {
 }
 
 /// A slide's shapes as a source array with some positions replaced: the
-/// value a parse of the slide returns, as proven by an incremental readback
-/// (record 0264). Parsing such a slide reports no repairs.
+/// value a parse of the slide returns, as proven by an incremental readback.
+/// Parsing such a slide reports no repairs.
 pub(crate) struct PatchedShapes {
     base: Arc<[ShapeEnum<'static>]>,
     /// Replaced positions, strictly increasing.
@@ -162,10 +161,10 @@ impl ShapeMemo {
     }
 
     /// Seed the memo with a slide's shapes that were proven equal to what
-    /// parsing this presentation's slide `persist_id` returns (record 0264:
-    /// a committed text edit hands its incrementally verified shapes to the
-    /// published package, so a following edit does not parse them again).
-    /// Callers must hold that proof; the memo cannot check it.
+    /// parsing this presentation's slide `persist_id` returns (a committed text
+    /// edit hands its incrementally verified shapes to the published package,
+    /// so a following edit does not parse them again). Callers must hold that
+    /// proof; the memo cannot check it.
     pub(crate) fn seed(&self, persist_id: u32, shapes: Arc<PatchedShapes>) {
         if let Ok(mut entry) = self.0.lock() {
             *entry = Some((persist_id, MemoEntry::Patched(shapes)));

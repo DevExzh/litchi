@@ -1,6 +1,7 @@
-//! Typed budgets of the numbering family (record 0355a).
+//! Typed budgets of the numbering family.
 
-/// The bounded resources of the numbering family, carried by [`crate::Error::NumberingLimit`] (record 0355a).
+/// The bounded resources of the numbering family, carried by
+/// [`crate::Error::NumberingLimit`].
 ///
 /// Each variant names one bounded resource; [`std::fmt::Display`] gives its
 /// human-readable name, the one the error messages print.

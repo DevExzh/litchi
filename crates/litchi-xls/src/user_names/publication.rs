@@ -1,4 +1,4 @@
-//! The XLS `User Names` edit family (record 0351 §2.3).
+//! The XLS `User Names` edit family.
 //!
 //! [`crate::Package::user_names`] reads the shared-workbook user list as a
 //! [`Snapshot`] of the complete validated CFB artifact;

@@ -3027,7 +3027,7 @@ fn generated_entry(entry: &RegeneratedEntry) -> Result<PreparedEntry, Error> {
                 // was measured and rejected: the plan retains one buffer per
                 // regenerated member, so a compressor held across them cannot
                 // be recycled by the allocator and costs 271 minor page faults
-                // per publish (change 0618).
+                // per publish.
                 let mut state = ReusableDeflateState::new();
                 let (mut file, config) = writer
                     .new_file(&entry.name)
@@ -5346,9 +5346,8 @@ mod tests {
         bytes
     }
 
-    /// Carried over from the spec-gap branch's plan-wide Deflate workspace
-    /// (merge record 0759). The workspace itself was not merged: each member
-    /// keeps its own compressor (change 0618) so that parallel waves stay a
+    /// Written for a plan-wide Deflate workspace, which was not adopted:
+    /// each member keeps its own compressor so that parallel waves stay a
     /// pure function of the member. The byte-identity oracle still applies,
     /// here across 32 KiB output-buffer boundaries and empty members.
     #[test]
@@ -5393,8 +5392,6 @@ mod tests {
         }
     }
 
-    /// Carried over from the spec-gap branch (merge record 0759), adapted to
-    /// the reusable encoder this branch uses.
     #[test]
     fn reused_deflate_empty_flush_before_finish_matches_fresh_stream() {
         let mut reused = Vec::new();

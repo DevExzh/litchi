@@ -124,10 +124,10 @@ pub(crate) fn parse_record_reporting(
 
 /// Run every check [`parse_record`] runs, without retaining anything.
 ///
-/// Change 0576's measure-only pattern, applied to the `Formula` record: a
-/// worksheet scan that is looking for one cell frames a `Formula` in order to
-/// learn its position and its XF index, and drops the `Vec<u8>` token copy and
-/// the `Metadata` it also built. The checks are the shared [`frame_record`] and
+/// The measure-only pattern, applied to the `Formula` record: a worksheet scan
+/// that is looking for one cell frames a `Formula` in order to learn its
+/// position and its XF index, and drops the `Vec<u8>` token copy and the
+/// `Metadata` it also built. The checks are the shared [`frame_record`] and
 /// [`check_token_stream`], plus `validate_formula_extra` where the parse calls
 /// `retain_formula_extra` — the same scan of the same `RgbExtra` structures,
 /// stopping before the copy that retains them — and the same `decode_flags`,

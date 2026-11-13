@@ -6,7 +6,7 @@
 )]
 
 //! The package-level families refuse a change to a signed document instead of
-//! removing its signature (ADR 0006; unified-ops record 0014b).
+//! removing its signature (ADR 0006).
 //!
 //! Each family is checked three ways: a change to a signed document is
 //! refused with `OpcError::SignedSourceRequiresExplicitPolicy` and leaves the
@@ -633,10 +633,10 @@ mod ribbon_family {
 }
 
 /// The shared core- and custom-properties owners of `litchi-ooxml-common`
-/// refuse a change to a signed document instead of removing the signature
-/// (unified-ops record 0014a, F1b): the metadata edit refuses a changed
-/// core- or custom-properties commit with `metadata::Error::Signed`, and the
-/// same change publishes once the signature is removed explicitly.
+/// refuse a change to a signed document instead of removing the signature: the
+/// metadata edit refuses a changed core- or custom-properties commit with
+/// `metadata::Error::Signed`, and the same change publishes once the signature
+/// is removed explicitly.
 mod shared_properties {
     use super::*;
     use litchi_ooxml_common::custom::Props as CustomProps;

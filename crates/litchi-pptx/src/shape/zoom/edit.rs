@@ -1,4 +1,4 @@
-//! Immutable zoom edits of a [`Package`] (record 0351 §2.3).
+//! Immutable zoom edits of a [`Package`].
 //!
 //! [`Package::edit_zooms`] starts an [`Edit`] over the package; [`Edit::set`] replaces one slide's zoom owner and [`Edit::remove`]
 //! removes it.

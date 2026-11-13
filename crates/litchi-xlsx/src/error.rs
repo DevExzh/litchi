@@ -94,8 +94,7 @@ pub enum Error {
         /// The largest accepted value.
         maximum: u64,
     },
-    /// A staging or apply operation refused a well-formed request
-    /// (record 0351 §2.4).
+    /// A staging or apply operation refused a well-formed request.
     #[error("XLSX {} refused ({}): {}", .0.operation(), .0.kind(), .0.reason())]
     Refused(litchi_core::edit::Refusal),
     /// The bounded form-control properties codec refused a payload or edit.

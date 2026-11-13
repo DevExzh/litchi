@@ -1,6 +1,6 @@
 //! Styles, numbering, header/footer and note edits staged with
-//! main-document edits (record 0319): each publishes its part and its
-//! main-story markup in one commit, reopens, replays and inverts exactly.
+//! main-document edits: each publishes its part and its main-story markup in
+//! one commit, reopens, replays and inverts exactly.
 
 use litchi_core::Position;
 use litchi_docx::document::{ElementPath, ElementStep, NewNote, NewStory, NoteKind};

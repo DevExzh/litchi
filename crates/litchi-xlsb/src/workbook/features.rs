@@ -1,6 +1,5 @@
-//! Worksheet feature reads of an eager [`Workbook`] (unified-ops record
-//! 0322): the values the worksheet edit families list, read without decoding
-//! worksheet cells.
+//! Worksheet feature reads of an eager [`Workbook`]: the values the
+//! worksheet edit families list, read without decoding worksheet cells.
 
 use super::Workbook;
 use crate::comments::Record;

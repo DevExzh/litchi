@@ -113,8 +113,7 @@ pub enum Refusal {
 }
 
 impl Refusal {
-    /// The shared refusal kind (record 0351 §2.4), by which litchi-ops
-    /// classifies the refusal (record 0362).
+    /// The shared refusal kind, by which litchi-ops classifies the refusal.
     #[must_use]
     pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
         use litchi_core::edit::RefusalKind;
@@ -680,11 +679,11 @@ impl Package {
                 observed: first_shared.source_version()?,
             }));
         }
-        // Variant B2 of change 0644: the opening identity takes one complete
-        // scan, not two.  Its comparison partner is `finish_open`'s own
-        // `final_fingerprint`, which this open already reads and compares, so
-        // the read-twice-compare is still closed — by the caller's outer
-        // bracket instead of by a confirming scan inside the call.
+        // The opening identity takes one complete scan, not two.  Its
+        // comparison partner is `finish_open`'s own `final_fingerprint`, which
+        // this open already reads and compares, so the read-twice-compare is
+        // still closed — by the caller's outer bracket instead of by a
+        // confirming scan inside the call.
         let opening_fingerprint = first_shared.caller_bracketed_identity_fingerprint()?;
         ensure_source_identity(&source, version, length)?;
         // Reopen after the first complete fingerprint.  This binds the
@@ -694,9 +693,8 @@ impl Package {
         // The confirming scan removed above was also what made a mutation of
         // this artifact's own CFB index report `SourceFingerprintChanged`
         // rather than letting this parse blame the file for damage the
-        // caller's writer did (change 0644, cost B-iii).  Change 0621's rule
-        // is to relocate such an observation onto the error branch, which is
-        // what `relocate_structural_cfb_error` does here.
+        // caller's writer did.  Such an observation is relocated onto the error
+        // branch, which is what `relocate_structural_cfb_error` does here.
         let shared = match SharedOleFile::open(Arc::clone(&source), shared_limits) {
             Ok(index) => Arc::new(index),
             Err(error) => {
@@ -780,16 +778,15 @@ impl Package {
                 observed: final_fingerprint,
             }));
         }
-        // Option C of change 0644: the third identity call is gone.  Its two
-        // complete scans bracketed one `ensure_source_identity` and nothing
-        // else — no byte of the artifact was consumed between the second
-        // call's confirming scan and the third call's planning scan — so
-        // every mutation it refused is refused instead by `ensure_current`,
-        // with the same `SourceFingerprintChanged`, at the first access that
-        // consumes a byte.  The cheap identity check it bracketed is retained
-        // even though no byte is read between it and the one above: change
-        // 0644's admission gate requires the open's five
-        // `ensure_source_identity` points to be untouched, and a defence is
+        // The third identity call is gone.  Its two complete scans bracketed
+        // one `ensure_source_identity` and nothing else — no byte of the
+        // artifact was consumed between the second call's confirming scan and
+        // the third call's planning scan — so every mutation it refused is
+        // refused instead by `ensure_current`, with the same
+        // `SourceFingerprintChanged`, at the first access that consumes a byte.
+        // The cheap identity check it bracketed is retained even though no byte
+        // is read between it and the one above: the open's five
+        // `ensure_source_identity` points must stay untouched, and a defence is
         // never dropped on performance grounds.
         ensure_source_identity(&source, version, length)?;
         Ok(Self {
@@ -909,17 +906,16 @@ impl Package {
     ///
     /// This and the four accessors below return values captured when the open
     /// returned; none of them reads the source, and so none of them can refuse
-    /// a source that changed since.  Since change 0659 the open's identity
-    /// fence ends one identity call earlier (change 0644, Option C), so a
-    /// mutation that first becomes visible between that last comparison and
-    /// the open's return is no longer refused *by the open*: it is refused by
-    /// the first call that consumes a byte.  Every such path — [`Self::paragraph`],
-    /// [`Self::edit_paragraph`], [`Self::apply_paragraph`] and
-    /// [`Self::write_to`] — goes through the same complete-artifact comparison and returns
+    /// a source that changed since.  The open's identity fence ends one
+    /// identity call before its return, so a mutation that first becomes
+    /// visible between that last comparison and the open's return is no longer
+    /// refused *by the open*: it is refused by the first call that consumes a
+    /// byte.  Every such path — [`Self::paragraph`], [`Self::edit_paragraph`],
+    /// [`Self::apply_paragraph`] and [`Self::write_to`] — goes through the same
+    /// complete-artifact comparison and returns
     /// `Overlay(SourceFingerprintChanged)`, so no byte is ever served past a
     /// fence.  A caller that opens and then reads only these accessors is
-    /// reading what the open saw, which may no longer be what the source
-    /// holds.
+    /// reading what the open saw, which may no longer be what the source holds.
     #[must_use]
     pub fn source_version(&self) -> SourceVersion {
         self.inner.version
@@ -927,8 +923,7 @@ impl Package {
 
     /// Complete source-artifact fingerprint captured at open.
     ///
-    /// Retained state; see [`Self::source_version`] for what that means after
-    /// change 0659.
+    /// Retained state; see [`Self::source_version`] for what that means.
     #[must_use]
     pub fn fingerprint(&self) -> ArtifactFingerprint {
         self.inner.fingerprint
@@ -1095,10 +1090,9 @@ impl Package {
 
     fn ensure_current(&self) -> Result<()> {
         ensure_source_identity(&self.inner.source, self.inner.version, self.inner.length)?;
-        // Variant B of change 0644 again: one complete scan, compared against
-        // the digest this snapshot retained at open and again against
-        // `confirmed` below.  Two outer comparisons, neither of them inside
-        // the call.
+        // One complete scan, compared against the digest this snapshot retained
+        // at open and again against `confirmed` below.  Two outer comparisons,
+        // neither of them inside the call.
         let observed = self.inner.shared.caller_bracketed_identity_fingerprint()?;
         ensure_source_identity(&self.inner.source, self.inner.version, self.inner.length)?;
         if observed != self.inner.fingerprint {
@@ -2444,12 +2438,12 @@ fn identity_fingerprint(shared: &SharedOleFile, limits: Limits) -> Result<Artifa
 /// Reports a structural CFB failure of the retained index parse as a source
 /// identity change when the artifact moved after the opening scan.
 ///
-/// Change 0644's cost B-iii, relocated by change 0621's rule.  The opening
-/// identity call's confirming scan used to be the first observation to re-read
-/// a mutated CFB allocation table, so a caller whose own writer changed the
-/// artifact under this open was told `SourceFingerprintChanged`.  With that
-/// scan gone the next reader of those bytes is this index parse, which would
-/// report `CorruptedFile` and blame the file for damage the caller did.
+/// The opening identity call's confirming scan used to be the first observation
+/// to re-read a mutated CFB allocation table, so a caller whose own writer
+/// changed the artifact under this open was told `SourceFingerprintChanged`.
+/// With that scan gone the next reader of those bytes is this index parse,
+/// which would report `CorruptedFile` and blame the file for damage the caller
+/// did.
 ///
 /// The relocation is deliberately narrow.
 ///
@@ -2458,8 +2452,8 @@ fn identity_fingerprint(shared: &SharedOleFile, limits: Limits) -> Result<Artifa
 ///   keeps its own `Overlay(Ole(..))` at every ordinal, including the ordinals
 ///   where a mutation landed after that call's planning scan and the digest
 ///   therefore *has* moved: reporting the movement there would invert rows
-///   change 0644's admission gate pins, because the reopen's own failure is
-///   the earlier and more specific observation.
+///   the admission gate pins, because the reopen's own failure is the earlier
+///   and more specific observation.
 /// * It runs only for the CFB errors that describe the artifact's
 ///   *structure*.  A limit refusal, an I/O failure, an allocation failure and
 ///   an already-typed `SourceChanged` keep their own error exactly.
@@ -2834,8 +2828,8 @@ mod tests {
     }
 
     const fn assert_send_sync<T: Send + Sync>() {}
-    // Risk R3 of unified-ops record 0003: the unified `Doc` handle retains
-    // these owners behind an `Arc`, so they must stay thread-safe.
+    // The unified `Doc` handle retains these owners behind an `Arc`, so they
+    // must stay thread-safe.
     const _: () = {
         assert_send_sync::<Package>();
         assert_send_sync::<crate::body_text::Snapshot>();
@@ -3102,7 +3096,7 @@ mod tests {
 
     #[test]
     fn a_libreoffice_fib_and_dop_as_checked_in_are_editable() {
-        // nFib 0x0101 with a zero cswNew and a 610-byte DOP (change 0768).
+        // nFib 0x0101 with a zero cswNew and a 610-byte DOP.
         let bytes = fixture("documentProperties.doc");
         let source = Package::from_bytes(bytes.clone()).expect("LibreOffice DOC");
         assert_eq!(source.inner.protection, EditProtection::None);
@@ -3221,10 +3215,10 @@ mod tests {
         }
     }
 
-    /// Change 0768 review: the positional source classifies protection with
-    /// the shared classifier, so the two entry points agree on every DOC in
-    /// `test-data`. The source refuses encrypted and pre-Word 97 sources before
-    /// it reads protection; the shared verdict for those is `Unknown`.
+    /// The positional source classifies protection with the shared classifier,
+    /// so the two entry points agree on every DOC in `test-data`. The source
+    /// refuses encrypted and pre-Word 97 sources before it reads protection;
+    /// the shared verdict for those is `Unknown`.
     #[test]
     fn source_protection_agrees_with_the_shared_classifier_on_every_doc_fixture() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data");
@@ -3255,9 +3249,9 @@ mod tests {
         assert_eq!(compared, 66);
     }
 
-    /// The change 0768 review's DOP mutations: every `DopBase` lock, the
-    /// password hash, their MS-DOC combinations, `Dop2003` modes 0 to 7 with
-    /// and without enforcement, and bits beside them that are not protection.
+    /// Crafted DOP mutations: every `DopBase` lock, the password hash, their
+    /// MS-DOC combinations, `Dop2003` modes 0 to 7 with and without
+    /// enforcement, and bits beside them that are not protection.
     fn crafted_dop_mutations() -> Vec<(String, fn(&mut [u8], u8) -> bool, u8)> {
         fn dop_base(dop: &mut [u8], which: u8) -> bool {
             match which {
@@ -3345,8 +3339,8 @@ mod tests {
         mutations
     }
 
-    /// The change 0768 review's FIB variants, applied to `WordDocument`;
-    /// `false` when a variant does not apply to this FIB.
+    /// Crafted FIB variants, applied to `WordDocument`; `false` when a variant
+    /// does not apply to this FIB.
     fn crafted_fib_variant(word: &mut [u8], variant: &str) -> bool {
         let count = usize::from(u16::from_le_bytes([word[152], word[153]]));
         let pointer_end = FIB_POINTERS + count * 8;
@@ -3502,8 +3496,7 @@ mod tests {
         (cases, compared)
     }
 
-    /// Change 0768 review: the reviewer's 1,730 crafted protection records,
-    /// one test per fixture.
+    /// 1,730 crafted protection records, one test per fixture.
     macro_rules! crafted_protection_agreement_tests {
         ($($test:ident: $name:literal => $cases:literal, $compared:literal;)*) => {$(
             #[test]
@@ -3617,7 +3610,7 @@ mod tests {
     /// while keeping a stable version token.
     ///
     /// The ordinal lets a test place the mutation in every gap between the
-    /// fence points of one open, which is what change 0589 must not move.
+    /// fence points of one open.
     struct ScheduledMutationSource {
         bytes: Mutex<Vec<u8>>,
         reads: AtomicUsize,
@@ -3716,8 +3709,8 @@ mod tests {
         fixture("documentProperties.doc")
     }
 
-    /// Change 0589: the source-identity fence still refuses a stable-token
-    /// mutation placed in *every* gap between the fence points of one open.
+    /// The source-identity fence still refuses a stable-token mutation placed
+    /// in *every* gap between the fence points of one open.
     ///
     /// Before this change each identity pass hashed the artifact twice; the
     /// second hasher consumed the same bytes as the first because the splice
@@ -3778,8 +3771,8 @@ mod tests {
         assert_eq!(refused, reads - (first_identity - 1));
     }
 
-    /// Change 0589: the same sweep across the mandatory readback, which
-    /// brackets a paragraph read with complete identity passes.
+    /// The same sweep across the mandatory readback, which brackets a paragraph
+    /// read with complete identity passes.
     ///
     /// Only a mutation after the readback's very last read is invisible to it,
     /// which is true of any finite number of passes and is unchanged here.
@@ -3822,9 +3815,9 @@ mod tests {
         }
     }
 
-    /// Change 0589: the identity a snapshot retains is the complete source
-    /// artifact digest whichever adapter supplies the bytes, and a no-op
-    /// commit still publishes exactly those bytes.
+    /// The identity a snapshot retains is the complete source artifact digest
+    /// whichever adapter supplies the bytes, and a no-op commit still publishes
+    /// exactly those bytes.
     ///
     /// `litchi-cfb`'s `noop_plan_reports_the_source_digest_as_both_identities`
     /// pins that this digest is SHA-256 over the whole artifact; here it is
@@ -3905,9 +3898,8 @@ mod tests {
         }
     }
 
-    /// Change 0659 (variant B2 of change 0644): the generic DOC open takes
-    /// **three** complete artifact scans, not six, and `open` plus one
-    /// paragraph read takes **nine**, not fourteen.
+    /// The generic DOC open takes **three** complete artifact scans, not six,
+    /// and `open` plus one paragraph read takes **nine**, not fourteen.
     ///
     /// The count is what the design claims, so it is asserted exactly: a lost
     /// fence point would shrink it silently otherwise.
@@ -3932,16 +3924,16 @@ mod tests {
         assert_eq!(counted.complete_reads.load(Ordering::SeqCst), 15);
     }
 
-    /// Change 0659: a CFB allocation table mutated under the open, after the
-    /// opening identity scan, is still reported as a source identity change
-    /// and not as a corrupt file.
+    /// A CFB allocation table mutated under the open, after the opening
+    /// identity scan, is still reported as a source identity change and not as
+    /// a corrupt file.
     ///
     /// The confirming scan of the opening identity call used to be the first
     /// observation to re-read those bytes. With it gone the retained index
     /// parse reaches them first and would report `CorruptedFile`, blaming the
-    /// file for damage the caller's own writer did. Change 0621's rule
-    /// relocates the observation onto that parse's error branch; this is the
-    /// test of the relocation.
+    /// file for damage the caller's own writer did. The observation is
+    /// relocated onto that parse's error branch; this is the test of the
+    /// relocation.
     #[test]
     fn a_table_mutated_after_the_opening_scan_is_still_an_identity_change() {
         let bytes = documentproperties_bytes();
@@ -3971,8 +3963,8 @@ mod tests {
         }
     }
 
-    /// Change 0659: the relocation is scoped, and these are the two boundaries
-    /// it must not cross.
+    /// The relocation is scoped, and these are the two boundaries it must not
+    /// cross.
     #[test]
     fn the_relocation_leaves_the_composed_reopen_and_a_clean_artifact_alone() {
         let bytes = documentproperties_bytes();
@@ -3990,8 +3982,8 @@ mod tests {
         // identity call, which re-reads the table itself. The digest has moved
         // at these ordinals too — the mutation follows the planning scan — so
         // what keeps `Overlay(Ole)` here is the relocation's scoping and
-        // nothing else. Change 0644's admission gate fails an implementation
-        // that reports an identity change at either of them.
+        // nothing else. An implementation is wrong if it reports an identity
+        // change at either of them.
         for ordinal in 5..=6 {
             let hostile = Arc::new(ScheduledMutationSource::with_offset(
                 bytes.clone(),
@@ -4006,9 +3998,9 @@ mod tests {
         }
     }
 
-    /// Change 0659 (Option C of change 0644): the open's third identity call
-    /// is gone, so a mutation that first becomes visible after the open's last
-    /// comparison is accepted by `open` and refused by the first access.
+    /// The open's third identity call is gone, so a mutation that first becomes
+    /// visible after the open's last comparison is accepted by `open` and
+    /// refused by the first access.
     #[test]
     fn option_c_relocates_the_trailing_refusal_to_the_first_access() {
         let bytes = documentproperties_bytes();

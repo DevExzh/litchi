@@ -1,5 +1,5 @@
 //! Verified compressed transfer of an untouched binary part out of a package
-//! opened from an owned source archive (change 0742).
+//! opened from an owned source archive.
 //!
 //! A part copied from one package into another is normally published as a
 //! new member whose bytes are deflated again from the decoded payload. When

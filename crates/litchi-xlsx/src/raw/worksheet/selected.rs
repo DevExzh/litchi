@@ -7,7 +7,7 @@
 //! callers must discard it and fall back to the existing materialized
 //! worksheet parser, which performs the complete mandatory validation.
 //!
-//! # The ineligibility gate (change 0658)
+//! # The ineligibility gate
 //!
 //! Once the scanner records an ineligibility reason the verdict is settled:
 //! nothing the rest of the worksheet contains can make the scan eligible
@@ -18,9 +18,9 @@
 //! validated exactly as before, so every typed refusal located there keeps its
 //! identity and still outranks the verdict; the bytes after it are read and
 //! validated once, by the materialized parser that owns this worksheet's
-//! mandatory validation and its first typed error (ADR 0005; change 0362).
-//! The verified OPC reader still drains and CRC/size-verifies the whole part,
-//! because that fence belongs to the reader and not to this scan.
+//! mandatory validation and its first typed error (ADR 0005). The verified OPC
+//! reader still drains and CRC/size-verifies the whole part, because that
+//! fence belongs to the reader and not to this scan.
 //!
 //! # Inert worksheet children (M1 L-XLSX-R1)
 //!
@@ -205,8 +205,7 @@ pub enum ScanOutcome {
     /// Full worksheet semantics were deferred; the caller must use the
     /// materialized parser, which owns the mandatory validation and the first
     /// typed error for this worksheet. The scan stops at the event that
-    /// settled the verdict and does not read the rest of the worksheet
-    /// (change 0658).
+    /// settled the verdict and does not read the rest of the worksheet.
     NotEligible(NotEligibleReason),
 }
 
@@ -219,8 +218,7 @@ pub enum RangeScanOutcome {
     /// Full worksheet semantics were deferred; the caller must use the
     /// materialized parser, which owns the mandatory validation and the first
     /// typed error for this worksheet. The scan stops at the event that
-    /// settled the verdict and does not read the rest of the worksheet
-    /// (change 0658).
+    /// settled the verdict and does not read the rest of the worksheet.
     NotEligible(NotEligibleReason),
 }
 
@@ -301,11 +299,11 @@ fn scan_stream_with_targets(
     targets: Option<&[Address]>,
 ) -> StreamResult<(RangeScanOutcome, Option<Rect>)> {
     let mut scanner = Scanner::new(requested, targets);
-    // Change 0658: `Scanner::event` answers `ActiveFlow::Stop` for the event
-    // that settles an ineligible verdict, so the stream ends there instead of
-    // running to EOF. `Scanner::finish` reports that verdict unchanged. An
-    // eligible scan still runs to EOF, so a target scan keeps validating the
-    // complete stream.
+    // `Scanner::event` answers `ActiveFlow::Stop` for the event that settles
+    // an ineligible verdict, so the stream ends there instead of running to
+    // EOF. `Scanner::finish` reports that verdict unchanged. An eligible scan
+    // still runs to EOF, so a target scan keeps validating the complete
+    // stream.
     let result = x14ac::capture_stream_with_stoppable_active(
         input,
         capabilities,
@@ -845,7 +843,7 @@ struct PlainAttributes<'a> {
 
 // quick-xml's duplicate check is on only for tags that may declare namespaces,
 // and every path through the loop below returns at or before the second
-// attribute, so the check compares at most one pair of names (record 0770).
+// attribute, so the check compares at most one pair of names.
 #[allow(clippy::disallowed_methods)]
 fn plain_attributes<'a>(
     element: &'a BytesStart<'_>,
@@ -1356,9 +1354,9 @@ impl<'a> Scanner<'a> {
     /// Consume one selected semantic event and say whether the stream is
     /// still needed.
     ///
-    /// Change 0658: the answer is [`ActiveFlow::Stop`] from the moment an
-    /// ineligibility reason is recorded. The verdict cannot change after that
-    /// — [`Self::mark`] keeps the first reason and [`Self::finish`] returns it
+    /// The answer is [`ActiveFlow::Stop`] from the moment an ineligibility
+    /// reason is recorded. The verdict cannot change after that —
+    /// [`Self::mark`] keeps the first reason and [`Self::finish`] returns it
     /// without looking at any other state — and the caller is required to
     /// re-read the worksheet through the materialized parser, so the remaining
     /// events would only duplicate work that parser is about to do. Failures

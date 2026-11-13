@@ -834,19 +834,19 @@ pub struct OpcPackage {
     source_xml_parts: HashMap<PackURI, PartPayload>,
 
     /// Owned source archive retained for exact and targeted publication,
-    /// with the digest memo bound to exactly those bytes (change 0751).
+    /// with the digest memo bound to exactly those bytes.
     source_archive: Option<retained_archive::RetainedArchive>,
 
     /// Read limits the owned source archive was admitted under. Meaningful
     /// only while `source_archive` is `Some`; a compressed transfer out of the
-    /// archive re-checks the member against the same policy (change 0742).
+    /// archive re-checks the member against the same policy.
     source_limits: SourceLimits,
 
     /// Index of the owned source archive for compressed transfers out of
     /// parts this package materialized eagerly, built on first use and shared
     /// by clones, which share the archive. Deferred parts use the index their
-    /// own decode builds (change 0742). `None` without an owned source, so a
-    /// package that never transfers pays one small cell at most.
+    /// own decode builds. `None` without an owned source, so a package that
+    /// never transfers pays one small cell at most.
     transfer_index: Option<Arc<TransferIndexCell>>,
 
     /// Small relationship members survive borrowed ingress without owning the ZIP.
@@ -891,10 +891,10 @@ pub struct OpcPackage {
     save_options: SaveOptions,
 
     /// The main-document partname, with the relationship it was resolved
-    /// from (record 0286). [`OpcPackage::main_document_part`] reuses it only
-    /// while the package's main-document relationship still has the same
-    /// identifier, target, base and source, so no mutation needs to clear
-    /// it; clones share it.
+    /// from. [`OpcPackage::main_document_part`] reuses it only while the
+    /// package's main-document relationship still has the same identifier,
+    /// target, base and source, so no mutation needs to clear it; clones
+    /// share it.
     main_partname: OnceLock<Arc<MainPartname>>,
 }
 
@@ -1817,8 +1817,8 @@ impl OpcPackage {
             ));
         }
         // The token becomes the retained manifest, which the writer publishes
-        // without its audit (change 0665). Its bytes came from the caller, so
-        // audit them before any mutation (ADR 0006).
+        // without its audit. Its bytes came from the caller, so audit them
+        // before any mutation (ADR 0006).
         verified_metadata_token(
             &replacement.xml.name,
             Arc::clone(&replacement.xml.bytes),
@@ -2114,7 +2114,7 @@ impl OpcPackage {
     /// content-type change, observe writes or count relationship references
     /// its own way, and reopening its bytes yields a built-in part in its
     /// place. A package holding one answers `false`; an unmodified owned
-    /// source holds only built-in parts (change 0742).
+    /// source holds only built-in parts.
     #[must_use]
     pub fn holds_only_built_in_parts(&self) -> bool {
         self.parts
@@ -2131,8 +2131,8 @@ impl OpcPackage {
     /// owned ingress, and shared by every clone of that ingress, because the
     /// clones share the archive: the memo is created together with the
     /// archive by one private constructor, is filled only from those bytes,
-    /// and the archive is never mutated (change 0751). A second caller
-    /// therefore reads the digest instead of hashing the archive again.
+    /// and the archive is never mutated. A second caller therefore reads the
+    /// digest instead of hashing the archive again.
     ///
     /// Returns `None` exactly when [`Self::exact_source_shared`] does: for a
     /// package that was not opened from owned bytes, and for one whose
@@ -2181,7 +2181,7 @@ impl OpcPackage {
     ///
     /// A caller that re-admits the bytes this package publishes, for example
     /// to decide something from those bytes alone, can hold them to the
-    /// policy the package itself was opened under (change 0742).
+    /// policy the package itself was opened under.
     #[must_use]
     pub fn source_read_limits(&self) -> Option<SourceLimits> {
         self.source_archive
@@ -2277,7 +2277,7 @@ impl OpcPackage {
     /// while that authorization is intact. Sharing cannot change what the
     /// package reads or publishes: a `Vec<u8>` behind an `Arc` held by more
     /// than one owner can be mutated in place by none of them, and no path of
-    /// this crate mutates a retained source archive (change 0751).
+    /// this crate mutates a retained source archive.
     ///
     /// # Errors
     ///
@@ -2569,22 +2569,22 @@ impl OpcPackage {
     /// replace the part's `Arc` rather than mutating through it, and
     /// [`Self::add_part`] and [`Self::remove_part`] drop the retained entry
     /// outright. So the entry survives exactly while the part is untouched:
-    /// change 0647's "the map changed iff the capture was dropped" invariant,
-    /// applied to payloads instead of relationship captures, and the same
-    /// proof shape change 0593 gave part relationships.
+    /// the "the map changed iff the capture was dropped" invariant, applied
+    /// to payloads instead of relationship captures, and the same proof shape
+    /// part relationships have.
     ///
     /// A caller that writes the source's own bytes back through `set_blob`
     /// stops being an original here, deliberately. The writer must audit the
     /// bytes a caller supplied, and bytes that merely *equal* the source's are
     /// indistinguishable from authored ones by inspection, so an equality test
-    /// would let a mutation escape the audit. Change 0665 replaced that
-    /// equality test with this proof; the shared `source_blob_retained`
-    /// publication predicate keeps its byte comparison, because an equal
-    /// payload publishes equal bytes either way.
+    /// would let a mutation escape the audit. This proof replaced that
+    /// equality test; the shared `source_blob_retained` publication predicate
+    /// keeps its byte comparison, because an equal payload publishes equal
+    /// bytes either way.
     ///
     /// Publication does not decide compactness from this signal — no member is
-    /// refused for spelling any more (change 0665) — only whether the member
-    /// is parsed again before it is republished.
+    /// refused for spelling any more — only whether the member is parsed again
+    /// before it is republished.
     pub(crate) fn holds_original_source_xml(&self, part: &dyn Part) -> bool {
         self.source_xml_parts
             .get(part.partname())
@@ -2594,8 +2594,8 @@ impl OpcPackage {
                     // payload for replacement; ADR 0030 permits raw passthrough.
                     return true;
                 }
-                // Keep 0665's allocation provenance. Equal replacement bytes
-                // must still pass publication audit, even after lazy ingress.
+                // Keep the allocation provenance. Equal replacement bytes must
+                // still pass publication audit, even after lazy ingress.
                 source
                     .decoded()
                     .is_some_and(|source| Arc::ptr_eq(source, &part.blob_arc()))
@@ -2653,9 +2653,9 @@ impl OpcPackage {
         // provenance; content equality alone must never widen the recipient.
         replacement.preflight_under(self.read_limits)?;
         // These bytes are recorded as the part's source provenance below, and
-        // provenance exempts a payload from the writer's publication audit
-        // (change 0665). They came from the caller, so audit them now, before
-        // any mutation, and hand the part the proof (change 0754).
+        // provenance exempts a payload from the writer's publication audit.
+        // They came from the caller, so audit them now, before any mutation,
+        // and hand the part the proof.
         let verified = verified_source_payload(&canonical_name, Arc::clone(&replacement.bytes))?;
         self.source_xml_parts
             .try_reserve(1)
@@ -2706,9 +2706,9 @@ impl OpcPackage {
         source.preflight_under(self.read_limits)?;
         let mut part = crate::BlobPart::new_shared(source.name, source.content_type, source.bytes);
         // The part is recorded as source provenance below, and provenance
-        // exempts a payload from the writer's publication audit (change
-        // 0665). Its bytes came from the caller, so audit them now, before
-        // any mutation, and hand the part the proof (change 0754).
+        // exempts a payload from the writer's publication audit. Its bytes
+        // came from the caller, so audit them now, before any mutation,
+        // and hand the part the proof.
         if xml_minifier::audit::package::is_xml_part(part.partname().as_str(), part.content_type())
         {
             let verified = verified_source_payload(part.partname(), part.blob_arc())?;
@@ -3274,9 +3274,8 @@ impl OpcPackage {
                 source,
             })?;
         // New XML parts are recorded as source provenance below, which exempts
-        // them from the writer's publication audit (change 0665). They came
-        // from the caller, so audit each one now, before any mutation, and hand
-        // it the proof (change 0754).
+        // them from the writer's publication audit. They came from the caller,
+        // so audit each one now, before any mutation, and hand it the proof.
         let mut xml_count = 0usize;
         for part in &mut parts {
             if !xml_minifier::audit::package::is_xml_part(

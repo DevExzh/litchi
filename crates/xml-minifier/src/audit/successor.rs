@@ -1,6 +1,6 @@
 //! Successor proofs: the source verdict on a replacement, proved from a
 //! verified original's recorded content boundaries without scanning the
-//! original again (records 0313 and 0317).
+//! original again.
 //!
 //! [`super::VerifiedSource::verify_indexed`] audits a payload like
 //! [`super::verify_source`] and, through an [`Observer`] that only reads the
@@ -21,7 +21,7 @@
 //! a boundary carries every piece of state the invariant lets a source-policy
 //! check read. The run may be empty, which is a pure insertion.
 //!
-//! # Derived indexes (record 0317)
+//! # Derived indexes
 //!
 //! A successor proved this way carries a *derived* index, so that the next
 //! edit of its bytes is proved from its own boundaries too. The derived index

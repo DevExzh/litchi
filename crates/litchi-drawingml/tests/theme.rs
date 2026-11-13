@@ -67,13 +67,13 @@ fn strict_theme_namespace_is_accepted() {
     );
 }
 
-/// Change 0765: quick-xml skips a leading byte-order mark without counting
-/// it, and the scheme scanner used to splice at its uncounted positions. In an
-/// indented theme the splice then dropped three indentation bytes and kept the
-/// replaced scheme's last three bytes (`me>`) as text inside
-/// `a:themeElements`: well-formed output that the read-back accepted. The
-/// replacement of a marked theme must equal the unmarked replacement behind
-/// the same mark, compact or indented.
+/// Quick-xml skips a leading byte-order mark without counting it, and the
+/// scheme scanner used to splice at its uncounted positions. In an indented
+/// theme the splice then dropped three indentation bytes and kept the replaced
+/// scheme's last three bytes (`me>`) as text inside `a:themeElements`:
+/// well-formed output that the read-back accepted. The replacement of a marked
+/// theme must equal the unmarked replacement behind the same mark, compact or
+/// indented.
 #[test]
 fn scheme_replacement_of_a_byte_order_marked_theme_matches_the_unmarked_one() {
     let colors = palette();

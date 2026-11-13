@@ -49,18 +49,18 @@ impl From<usize> for Selector<'_> {
 }
 
 /// A slide master by its typed `p:sldMasterId/@id`, unique in the
-/// presentation (record 0356a).
+/// presentation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct MasterId(pub u32);
 
 /// A slide layout by its typed `p:sldLayoutId/@id`, unique in the
-/// presentation across every master (record 0356a).
+/// presentation across every master.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct LayoutId(pub u32);
 
 /// The owner of slide-scoped markup: a slide, a slide layout or a slide
-/// master (record 0356a). Families that edit markup found in all three
-/// (color maps, placeholders) take it.
+/// master. Families that edit markup found in all three (color maps,
+/// placeholders) take it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Owner<'a> {
     /// A slide, by name or position.
@@ -469,9 +469,9 @@ impl<'a> Slide<'a> {
         Ok(Some(part.part().blob()))
     }
 
-    /// The Office Math equations of this slide's text, in document order
-    /// (record 0321), read from the slide's own XML (the shape scene reads
-    /// their picture fallbacks).
+    /// The Office Math equations of this slide's text, in document order, read
+    /// from the slide's own XML (the shape scene reads their picture
+    /// fallbacks).
     ///
     /// # Errors
     ///
@@ -481,9 +481,9 @@ impl<'a> Slide<'a> {
     }
 
     /// Resolve a click action of this slide's shapes or text through the
-    /// slide's relationships (record 0321): an external URL, a slide of the
-    /// presentation, or a relationship-free action. `None` when the click
-    /// names a relationship the slide lacks, or a part that is not a slide.
+    /// slide's relationships: an external URL, a slide of the presentation, or
+    /// a relationship-free action. `None` when the click names a relationship
+    /// the slide lacks, or a part that is not a slide.
     ///
     /// # Errors
     ///
@@ -525,7 +525,7 @@ impl<'a> Slide<'a> {
 
     /// The data-model XML of the SmartArt this slide relates through
     /// `relationship_id` (a SmartArt frame's `dgm:relIds/@r:dm`), or `None`
-    /// when the slide has no such diagram-data relationship (record 0284).
+    /// when the slide has no such diagram-data relationship.
     ///
     /// # Errors
     ///
@@ -714,7 +714,7 @@ impl<'a> SlideLayout<'a> {
     }
 
     /// The layout's typed `p:sldLayoutId/@id`, the selector the edit
-    /// families take (record 0356a).
+    /// families take.
     ///
     /// # Errors
     ///
@@ -823,7 +823,7 @@ impl<'a> SlideMaster<'a> {
     }
 
     /// The master's typed `p:sldMasterId/@id`, the selector the edit
-    /// families take (record 0356a).
+    /// families take.
     ///
     /// # Errors
     ///

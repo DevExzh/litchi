@@ -1,4 +1,4 @@
-//! Package-level picture-bullet edits (record 0357).
+//! Package-level picture-bullet edits.
 //!
 //! [`Package::edit_picture_bullets`] stages lifecycle edits of the live
 //! document's picture-bullet collection, [`Edit::commit`] publishes a new

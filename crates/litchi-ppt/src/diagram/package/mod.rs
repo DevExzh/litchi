@@ -13,7 +13,7 @@ mod model;
     not(test),
     expect(
         dead_code,
-        reason = "the slide-level owner behind the package-level Edit; its full surface stays exercised by the unit tests (record 0357)"
+        reason = "the slide-level owner behind the package-level Edit; its full surface stays exercised by the unit tests"
     )
 )]
 mod transaction;

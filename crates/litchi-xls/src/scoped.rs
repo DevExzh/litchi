@@ -1,14 +1,15 @@
-//! Shared plumbing of the scoped XLS edit families (record 0359).
+//! Shared plumbing of the scoped XLS edit families.
 //!
-//! Every package-level family `x` follows the record 0351 §2.3 shape:
+//! Every package-level family `x` follows one shape:
 //! `Package::edit_x(&self) -> x::Edit`, `x::Edit::commit(self) -> x::Commit`
-//! publishing a new [`Package`], and `Package::apply_x(&self, &x::Patch) ->
-//! x::Commit`. Dropping an `Edit` discards it. The families keep their
-//! record-level staging (the exact bytes they render) and this module turns
-//! the rendered artifact into a published package: an exact no-op returns
-//! the source package unchanged (signatures included), a changed artifact is
-//! republished under the source package's open policy, and a changed write
-//! of a signed source is refused with [`crate::Error::Signed`].
+//! publishing a new [`Package`], and
+//! `Package::apply_x(&self, &x::Patch) -> x::Commit`. Dropping an `Edit`
+//! discards it. The families keep their record-level staging (the exact
+//! bytes they render) and this module turns the rendered artifact into a
+//! published package: an exact no-op returns the source package unchanged
+//! (signatures included), a changed artifact is republished under the source
+//! package's open policy, and a changed write of a signed source is refused
+//! with [`crate::Error::Signed`].
 
 use std::io::Cursor;
 

@@ -1,6 +1,5 @@
-//! The SVG attachment family of a source-backed package (record 0355a):
-//! attach an SVG to, or detach it from, direct main-story pictures, keeping
-//! their raster fallback.
+//! The SVG attachment family of a source-backed package: attach an SVG to, or
+//! detach it from, direct main-story pictures, keeping their raster fallback.
 //!
 //! [`Package::edit_svg`](crate::source_backed::Package::edit_svg) stages an
 //! [`Edit`] over selected pictures whose commit returns a new source-backed

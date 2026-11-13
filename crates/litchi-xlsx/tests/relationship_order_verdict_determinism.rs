@@ -16,7 +16,7 @@
 //! same bytes as `Error::PatchConflict`. Every other captured relationship array
 //! in that file is sorted (`capture_relationships` ends in
 //! `sort_unstable_by(|left, right| left.id.cmp(&right.id))`); this one was the
-//! outlier. Change 0628 found it and left it for this change.
+//! outlier.
 //!
 //! The exact no-op used below is the sharpest form of the defect: nothing about
 //! the document changed, the patch stages no edit, and the refusal is a coin

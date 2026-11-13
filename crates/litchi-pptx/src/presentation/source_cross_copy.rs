@@ -3595,11 +3595,10 @@ enum Dialect {
 }
 
 /// The layouts the presentation's slide masters register. With `lenient`
-/// (slide removal, record 0303), a master's own content is not held to the
-/// copy surface: unknown extension namespaces, relationships besides its
-/// layouts and theme (background pictures, for instance) and a theme with
-/// its own relationships are admitted, because removal reads only the
-/// layout registration.
+/// (slide removal), a master's own content is not held to the copy surface:
+/// unknown extension namespaces, relationships besides its layouts and theme
+/// (background pictures, for instance) and a theme with its own relationships
+/// are admitted, because removal reads only the layout registration.
 fn registered_layouts(
     package: &SourceBackedPackage,
     presentation: &PartView<'_>,
@@ -3797,8 +3796,8 @@ fn registered_layouts(
 ///
 /// Slide insertion reads only the layout registration, so the presentation
 /// root's extensions (a section list, slide guides) and the masters' own
-/// content are read leniently, as for removal (record 0303); the root's
-/// slide bindings are proven separately by the insertion planner.
+/// content are read leniently, as for removal; the root's slide bindings are
+/// proven separately by the insertion planner.
 pub(super) fn registered_source_layout_by_name(
     package: &SourceBackedPackage,
     presentation: &PartView<'_>,
@@ -3875,8 +3874,8 @@ pub(super) fn validate_registered_source_layout(
 /// Prove that `selected` is a layout a slide master registers, for a slide
 /// removal. Removal leaves the presentation root's extensions and other
 /// surfaces untouched; the removal planner proves separately that none of
-/// them names the removed slide (record 0303). Only the root's dialect and
-/// the master/layout graph are checked here.
+/// them names the removed slide. Only the root's dialect and the master/layout
+/// graph are checked here.
 pub(super) fn validate_registered_removal_layout(
     package: &SourceBackedPackage,
     presentation: &PartView<'_>,
@@ -5517,7 +5516,7 @@ fn validate_xml_with_policy(
 }
 
 /// The PresentationML dialect of a document element named `root`, without
-/// checking the rest of the XML (lenient slide-removal reads, record 0303).
+/// checking the rest of the XML (lenient slide-removal reads).
 fn root_dialect(xml: &[u8], root: &[u8], context: &'static str) -> Result<Dialect> {
     let mut reader = NsReader::from_reader(xml);
     loop {

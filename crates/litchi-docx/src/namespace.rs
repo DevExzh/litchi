@@ -111,8 +111,8 @@ impl NamespaceCapture {
 
 impl NamespaceCapture {
     /// Capture the bindings in scope in the shared binding tracker that the
-    /// production layout scanner drives (change 0754), under the same reuse,
-    /// count, byte and aggregate bounds as [`Self::capture`].
+    /// production layout scanner drives, under the same reuse, count, byte and
+    /// aggregate bounds as [`Self::capture`].
     ///
     /// The tracker visits each prefix once, innermost first, and omits the
     /// reserved prefixes and undeclared bindings, so the snapshot is exactly
@@ -315,11 +315,11 @@ pub(crate) fn is_wordprocessing_namespace(namespace: &ResolveResult<'_>) -> bool
 /// One retained element span of `source`, with every namespace declaration it
 /// inherits from `source` re-declared on its own root element.
 ///
-/// Until change 0653 the shared markup-compatibility writer repeated every
-/// in-scope declaration on every element it emitted, so any span cut out of a
-/// processed part happened to resolve on its own. The writer now declares each
-/// namespace once, where XML requires it, so a consumer that hands a span out
-/// or parses it standalone asks for the inherited declarations here instead.
+/// The shared markup-compatibility writer used to repeat every in-scope
+/// declaration on every element it emitted, so any span cut out of a processed
+/// part happened to resolve on its own. The writer now declares each namespace
+/// once, where XML requires it, so a consumer that hands a span out or parses
+/// it standalone asks for the inherited declarations here instead.
 pub(crate) fn self_contained_element_xml(
     source: &[u8],
     start: u32,
@@ -930,12 +930,11 @@ mod tests {
         }
     }
 
-    /// Change 0653: a `w:p` span cut out of a real, marker-bearing
-    /// `word/document.xml` no longer carries `xmlns:w`, because the shared
-    /// markup-compatibility writer stopped repeating every in-scope
-    /// declaration on every element. `Paragraph::self_contained_xml` restores
-    /// it at the slice boundary, which is what `Paragraph::extensions` and
-    /// `Row::extension_ids` now parse.
+    /// A `w:p` span cut out of a real, marker-bearing `word/document.xml` no
+    /// longer carries `xmlns:w`, because the shared markup-compatibility writer
+    /// stopped repeating every in-scope declaration on every element.
+    /// `Paragraph::self_contained_xml` restores it at the slice boundary, which
+    /// is what `Paragraph::extensions` and `Row::extension_ids` now parse.
     #[test]
     fn a_retained_span_resolves_only_after_the_inherited_declarations_return() {
         let package = crate::Package::open("../../test-data/ooxml/docx/table-alignment.docx")

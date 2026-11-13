@@ -448,7 +448,7 @@ impl PreparedPartView {
     }
 
     /// The source XML audit's retained proof of this Part's effective bytes,
-    /// when one is kept; nothing is audited (record 0317).
+    /// when one is kept; nothing is audited.
     ///
     /// A replaced Part answers with the proof its replacement's audit
     /// returned, which an unmanaged revision keeps for at most four Parts. An

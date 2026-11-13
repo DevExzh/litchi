@@ -1236,8 +1236,8 @@ fn same_length_editor_edit_uses_source_backed_copy_through() {
 }
 
 /// Publishes `overlays` over `source` through a generic positional CFB plan:
-/// the exact route `render_copy_through` took before change 0748 sealed the
-/// editor's original allocation.
+/// the exact route `render_copy_through` took before the editor's original
+/// allocation was sealed.
 fn generic_overlay_publication(source: &[u8], overlays: Vec<SameLengthStreamOverlay>) -> Vec<u8> {
     let shared = SharedOleFile::open(
         Arc::new(OwnedSource::new(source.to_vec())),

@@ -1,5 +1,4 @@
-//! The staged part-level engine behind the package-scoped edit families
-//! (unified-ops records 0320 and 0360).
+//! The staged part-level engine behind the package-scoped edit families.
 //!
 //! [`Staged`] owns one immutable [`Package`] (a reference-count clone) and,
 //! from the first change on, a staged copy of its OPC graph: starting an edit
@@ -1612,8 +1611,8 @@ impl WorksheetLayout {
     /// Rewrite a direct child `name` written unprefixed, in a default
     /// namespace declared on itself, into the root's prefix (declared on the
     /// child itself instead), so a prefixed worksheet keeps every direct
-    /// child in its own prefix (record 0320 gap 7, fixed in record 0322).
-    /// Prefixed descendants and every other child keep their bytes.
+    /// child in its own prefix. Prefixed descendants and every other child
+    /// keep their bytes.
     pub(crate) fn unprefixed_in_root_prefix(&self, xml: &[u8], name: &str) -> Vec<u8> {
         let Some(child) = self.child(name) else {
             return xml.to_vec();

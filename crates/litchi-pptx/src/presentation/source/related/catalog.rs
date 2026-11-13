@@ -582,9 +582,8 @@ impl SourceBackedPresentation {
     }
 
     /// The presentation theme: the presentation part's own theme, else the
-    /// first slide master's (record 0321). `None` when there is neither.
-    /// Only the presentation part, at most one master part and the theme
-    /// part are read.
+    /// first slide master's. `None` when there is neither. Only the
+    /// presentation part, at most one master part and the theme part are read.
     ///
     /// # Errors
     /// Returns typed source, execution, limit, relationship or XML errors.

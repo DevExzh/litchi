@@ -272,9 +272,9 @@ fn render_split(paragraphs: &[String], piece: &dyn Fn(usize) -> usize) -> Vec<u8
     writer.finish().expect("package finish")
 }
 
-/// Change 0762: the document member is compressed in fixed chunks cut at
-/// absolute member offsets, so the package bytes are a function of the
-/// document alone, not of how the caller split each run's text.
+/// The document member is compressed in fixed chunks cut at absolute member
+/// offsets, so the package bytes are a function of the document alone, not of
+/// how the caller split each run's text.
 #[test]
 fn package_bytes_do_not_depend_on_how_run_text_is_split() {
     let paragraphs: Vec<String> = (0..600)
@@ -322,10 +322,10 @@ fn package_bytes_do_not_depend_on_how_run_text_is_split() {
 }
 
 // ---------------------------------------------------------------------------
-// Change 0763: the writer charges Objects, Work and input bytes through rough
-// budget leases. A sole holder of the budget must see exactly the refusals of
-// exact accounting; the leases must be returned when the writer is poisoned
-// and when it finishes.
+// The writer charges Objects, Work and input bytes through rough budget leases.
+// A sole holder of the budget must see exactly the refusals of exact
+// accounting; the leases must be returned when the writer is poisoned and when
+// it finishes.
 // ---------------------------------------------------------------------------
 
 /// One API call of the lease script.

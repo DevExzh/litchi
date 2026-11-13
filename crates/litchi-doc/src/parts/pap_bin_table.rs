@@ -26,7 +26,7 @@ const MAX_DATA_INDIRECTION_DEPTH: usize = 64;
 /// reached; it keeps the cache finite for a hostile stylesheet that names
 /// thousands. Eviction is least-recently-used, so the baseline a run of
 /// same-style paragraphs needs always stays resident and no input resolves a
-/// baseline more often than the one-entry cache of change 0051 did.
+/// baseline more often than a one-entry cache would.
 const MAX_CACHED_STYLE_BASELINES: usize = 64;
 // Some older producer tables use operation 0x62, so accept it on input while
 // emitting and exposing the current [MS-DOC] operation 0x6B.
@@ -63,7 +63,7 @@ pub struct PapBinTable {
 /// `ParagraphProperties::resolve_style_baseline` is a pure function of the style
 /// index and the immutable stylesheet, so a baseline resolved for one run is the
 /// baseline every later run with that index would resolve. Only successful
-/// resolutions are retained, exactly as in change 0051.
+/// resolutions are retained.
 #[derive(Debug, Default)]
 struct StyleBaselineCache {
     /// `(istd, resolved baseline, last-use stamp)`, at most
@@ -688,7 +688,7 @@ mod tests {
         assert_eq!(format!("{:?}", cached.0), format!("{:?}", scalar.0));
         assert_eq!(cached.0.style_index, Some(15));
         // A direct `sprmPIstd` never re-keys the cache: only the PAPX header's
-        // initial style does, exactly as in change 0051.
+        // initial style does.
         assert_eq!(keys(&cache), vec![16]);
 
         PapBinTable::parse_properties_with_direct_cached(

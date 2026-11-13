@@ -8,9 +8,9 @@
 //! macros and ambiguous package graphs are refused rather than partially
 //! interpreted.
 //!
-//! Change 0657 replaced that closure's allow-lists with a dependency rule, and
-//! this module's admission follows it on the same terms, asking of each
-//! construct whether its meaning depends on *which rows are hidden*:
+//! That closure's allow-lists were replaced with a dependency rule, and this
+//! module's admission follows it on the same terms, asking of each construct
+//! whether its meaning depends on *which rows are hidden*:
 //!
 //! * a **worksheet relationship** is admitted. The rewrite copies every byte
 //!   but the `<row>` tags it owns, and a hyperlink, drawing, comment or

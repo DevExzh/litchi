@@ -1,5 +1,5 @@
-//! The mail-merge family (record 0355): the settings part's `w:mailMerge`,
-//! its data-source relationships and the recipient-data part.
+//! The mail-merge family: the settings part's `w:mailMerge`, its data-source
+//! relationships and the recipient-data part.
 //!
 //! [`Package::mail_merge_settings`](crate::Package::mail_merge_settings)
 //! reads the settings; [`Package::edit_mail_merge`](crate::Package::edit_mail_merge)

@@ -1,5 +1,4 @@
-//! Focused tests for the proved slide-root classification memo (ADR 0032;
-//! change 0760, re-applying change 0743's withdrawn `99ce9c5e34`).
+//! Focused tests for the proved slide-root classification memo (ADR 0032).
 //!
 //! An opened capture classifies every slide root with the complete notes-graph
 //! scan. The snapshot keeps those classifications keyed by the payload
@@ -1376,11 +1375,11 @@ fn a_planted_wrong_classification_is_caught_by_the_re_derivation() {
     let _ = edit.commit();
 }
 
-/// The facade's only slide-root memo is the one its package memo carries
-/// (record 0377), whose entries name allocations the facade's package holds:
-/// once every snapshot is dropped, each slide payload is held only by the
-/// facade's package, its digest memo and that memo's slide-root entries, so
-/// the memo pins no payload the package does not own.
+/// The facade's only slide-root memo is the one its package memo carries, whose
+/// entries name allocations the facade's package holds: once every snapshot is
+/// dropped, each slide payload is held only by the facade's package, its digest
+/// memo and that memo's slide-root entries, so the memo pins no payload the
+/// package does not own.
 #[test]
 fn the_facade_slide_root_memo_pins_only_package_payloads() -> Result<()> {
     let mut package = text_box_package(3, 1)?;

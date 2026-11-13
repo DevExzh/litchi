@@ -62,8 +62,7 @@ pub enum Refusal {
 }
 
 impl Refusal {
-    /// The shared refusal kind litchi-ops classifies this reason by (record
-    /// 0351).
+    /// The shared refusal kind litchi-ops classifies this reason by.
     #[must_use]
     pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
         use litchi_core::edit::RefusalKind;
@@ -117,7 +116,7 @@ pub enum Error {
     /// A configured finite resource ceiling was exceeded.
     #[error("plain paragraph edit {kind} limit exceeded: {actual} > {max}")]
     Limit {
-        /// The exceeded budget (record 0355a).
+        /// The exceeded budget.
         kind: LimitKind,
         /// Maximum accepted value.
         max: usize,
@@ -498,8 +497,8 @@ impl Patch {
     }
 
     /// This patch bound to the complete artifact whose SHA-256 is
-    /// `fingerprint`, at any source version (record 0355a: the durable form
-    /// of a committed package's patch).
+    /// `fingerprint`, at any source version (the durable form of a committed
+    /// package's patch).
     pub(crate) fn rebound(mut self, fingerprint: [u8; 32]) -> Self {
         self.expected_fingerprint = fingerprint;
         self.source_version = None;
@@ -825,8 +824,8 @@ impl RemovalPatch {
     }
 
     /// This patch bound to the complete artifact whose SHA-256 is
-    /// `fingerprint`, at any source version (record 0355a: the durable form
-    /// of a committed package's patch).
+    /// `fingerprint`, at any source version (the durable form of a committed
+    /// package's patch).
     pub(crate) fn rebound(mut self, fingerprint: [u8; 32]) -> Self {
         self.expected_fingerprint = fingerprint;
         self.source_version = None;
@@ -1091,7 +1090,7 @@ impl Package {
     }
 
     /// Check a plain-paragraph copy patch against this package and return
-    /// the main part and its rewritten XML (record 0355a).
+    /// the main part and its rewritten XML.
     pub(crate) fn plain_paragraph_copy_target(
         &self,
         patch: &Patch,
@@ -1103,7 +1102,7 @@ impl Package {
     }
 
     /// Check a plain-paragraph removal patch against this package and return
-    /// the main part and its rewritten XML (record 0355a).
+    /// the main part and its rewritten XML.
     pub(crate) fn plain_paragraph_removal_target(
         &self,
         patch: &RemovalPatch,
@@ -1919,7 +1918,8 @@ fn take_usize(bytes: &[u8], cursor: &mut usize) -> Result<usize> {
     usize::try_from(u64::from_le_bytes(raw)).map_err(|_error| Error::InvalidDurable)
 }
 
-/// The bounded resources of plain-paragraph copy and removal, carried by [`Error::Limit`] (record 0355a).
+/// The bounded resources of plain-paragraph copy and removal, carried by
+/// [`Error::Limit`].
 ///
 /// Each variant names one bounded resource; [`std::fmt::Display`] gives its
 /// human-readable name, the one the error messages print.

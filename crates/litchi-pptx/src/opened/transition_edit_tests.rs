@@ -1,5 +1,5 @@
 //! Slide transitions staged through the eager edit and the source-backed
-//! primary edit (record 0269), read back through the transition codec.
+//! primary edit, read back through the transition codec.
 
 use std::sync::Arc;
 

@@ -1,5 +1,4 @@
-//! The staged part-level engine behind the package-scoped edit families
-//! (record 0351 §2.3).
+//! The staged part-level engine behind the package-scoped edit families.
 //!
 //! [`Staged`] holds one immutable [`Package`] and a staged copy of its OPC
 //! graph. A family runs its typed graph operations on the staged copy and

@@ -1,5 +1,5 @@
 //! Guarded source-backed merged-range edits for one existing worksheet of a
-//! [`SourceBackedWorkbook`] (record 0360, the 0355a §1 shape).
+//! [`SourceBackedWorkbook`].
 //!
 //! [`SourceBackedWorkbook::edit_merges`] captures the workbook catalog and
 //! one selected worksheet, validates merge semantics with the ordinary

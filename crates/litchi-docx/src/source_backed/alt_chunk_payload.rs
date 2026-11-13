@@ -1,7 +1,6 @@
-//! The alternative-format payload family of a source-backed package
-//! (record 0355a): replace the opaque payload behind one existing
-//! main-story `w:altChunk`, keeping its relationship, part name and media
-//! type.
+//! The alternative-format payload family of a source-backed package: replace
+//! the opaque payload behind one existing main-story `w:altChunk`, keeping its
+//! relationship, part name and media type.
 //!
 //! [`Package::edit_alt_chunk_payload`](crate::source_backed::Package::edit_alt_chunk_payload)
 //! stages an [`Edit`] whose commit returns a new source-backed package;

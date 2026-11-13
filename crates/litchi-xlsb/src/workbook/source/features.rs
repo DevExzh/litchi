@@ -1,6 +1,6 @@
-//! Worksheet feature reads of a source-backed workbook (unified-ops record
-//! 0322): only the selected worksheet stream and the parts its features
-//! live in are read, and the worksheet's cells are not decoded.
+//! Worksheet feature reads of a source-backed workbook: only the selected
+//! worksheet stream and the parts its features live in are read, and the
+//! worksheet's cells are not decoded.
 
 use super::{
     SourceBackedWorkbook, SourceBackedWorksheet, XLSB_COMMENTS_CONTENT_TYPE, postflight_package,

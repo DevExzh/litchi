@@ -122,20 +122,19 @@ where
     F: FnMut(&str) -> std::result::Result<(), E>,
     E: From<Error>,
 {
-    // Plain reader + hand-rolled binding maintenance (change 0229, the
-    // litchi-odt 0227 analog): the tracker replicates the push/pop
-    // `NsReader` performs inside `read_resolved_event` (the
-    // `BindingTracker` byte-exactness contract). Both the old slice-backed
-    // `NsReader` and this plain `Reader` borrow their events; the removed work
-    // is namespace maintenance, not an event-buffer copy.
-    // `NsReader::from_reader` is `Reader::from_reader` with default
+    // Plain reader + hand-rolled binding maintenance (as in litchi-odt): the
+    // tracker replicates the push/pop `NsReader` performs inside
+    // `read_resolved_event` (the `BindingTracker` byte-exactness contract).
+    // Both the old slice-backed `NsReader` and this plain `Reader` borrow their
+    // events; the removed work is namespace maintenance, not an event-buffer
+    // copy. `NsReader::from_reader` is `Reader::from_reader` with default
     // configuration, so the tokenization and error stream are unchanged.
     //
-    // Change 0754 splits each element name once, at the same first colon
-    // `QName::prefix` and `QName::local_name` split at, and resolves it only
-    // where a verdict below reads its namespace; resolution has no effect but
-    // its result. `extract_word_text_base_oracle`, the production loop before
-    // the change with quick-xml's own resolver, pins the output.
+    // Each element name is split once, at the same first colon `QName::prefix`
+    // and `QName::local_name` split at, and resolved only where a verdict below
+    // reads its namespace; resolution has no effect but its result.
+    // `extract_word_text_base_oracle`, the production loop before the change
+    // with quick-xml's own resolver, pins the output.
     let mut reader = Reader::from_reader(xml_bytes);
     let mut tracker = BindingTracker::with_bindings(bindings.iter().map(|(prefix, uri)| {
         (
@@ -602,17 +601,15 @@ where
     operation_check().map_err(|error| writer.document_error(error))?;
 
     // The source is a byte slice, so the reader borrows its events from
-    // `xml_bytes` (change 0229's reading of the sibling `for_each_word_text_chunk`).
-    // `NsReader::<&[u8]>::read_event` and `read_event_into` are the same
-    // `read_event_impl` over the same `ReaderState`, differing only in whether the
-    // token is handed back borrowed from the input or copied into a caller buffer,
-    // so the event stream, the namespace push/pop and the error stream are
-    // unchanged; the copy into `buffer` and the `into_owned()` copy out of it are
-    // the only work removed. `preflight_semantic_xml` above has always read this
-    // same slice with the borrowed form under the same configuration, so every
-    // document reaching this loop was already tokenized that way once. Events
-    // borrow `xml_bytes`, not the reader, so the `&reader` uses below are
-    // unaffected.
+    // `xml_bytes` (as the sibling `for_each_word_text_chunk` reads them).
+    // `NsReader::<&[u8]>::read_event` and `read_event_into` are the same `read_event_impl` over the
+    // same `ReaderState`, differing only in whether the token is handed back borrowed from the
+    // input or copied into a caller buffer, so the event stream, the namespace push/pop and the
+    // error stream are unchanged; the copy into `buffer` and the `into_owned()` copy out of it are
+    // the only work removed. `preflight_semantic_xml` above has always read this same slice with
+    // the borrowed form under the same configuration, so every document reaching this loop was
+    // already tokenized that way once. Events borrow `xml_bytes`, not the reader, so the `&reader`
+    // uses below are unaffected.
     let mut reader = NsReader::from_reader(xml_bytes);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
@@ -1557,13 +1554,13 @@ impl Paragraph {
     }
 }
 
-/// Change-0754 differential oracle: base production `for_each_word_text_chunk`
-/// before change 0754 (eager resolution of every element name, per-candidate
-/// `QName` splitting), with the namespace machinery swapped for quick-xml's own
-/// `NsReader` resolver so the oracle does not share the binding tracker it is
-/// checking. [`extract_word_text_nsreader_oracle`] predates the production
-/// path's decoding of every general reference, so it is the wrong oracle for
-/// a reference outside `w:t`; this one is not.
+/// Differential oracle: the earlier production `for_each_word_text_chunk`
+/// (eager resolution of every element name, per-candidate `QName` splitting),
+/// with the namespace machinery swapped for quick-xml's own `NsReader` resolver
+/// so the oracle does not share the binding tracker it is checking.
+/// [`extract_word_text_nsreader_oracle`] predates the production path's
+/// decoding of every general reference, so it is the wrong oracle for a
+/// reference outside `w:t`; this one is not.
 #[cfg(test)]
 fn extract_word_text_base_oracle(xml_bytes: &[u8]) -> Result<String> {
     let mut result = String::new();
@@ -1685,11 +1682,11 @@ fn extract_word_text_base_oracle(xml_bytes: &[u8]) -> Result<String> {
     Ok(result)
 }
 
-/// Change-0229 differential oracle: the pre-0229 `NsReader` implementation
-/// of [`extract_word_text`], retained test-only so the tracker-driven path
-/// is pinned byte-for-byte against it (the litchi-odt 0227 pattern, where
-/// the oracle stayed in production because other APIs used it; here nothing
-/// else needs it).
+/// Differential oracle: the earlier `NsReader` implementation of
+/// [`extract_word_text`], retained test-only so the tracker-driven path is
+/// pinned byte-for-byte against it (the litchi-odt pattern, where the oracle
+/// stayed in production because other APIs used it; here nothing else needs
+/// it).
 #[cfg(test)]
 fn extract_word_text_nsreader_oracle(xml_bytes: &[u8]) -> Result<String> {
     let mut reader = NsReader::from_reader(xml_bytes);
@@ -2108,7 +2105,7 @@ mod tests {
         assert!(compared > 50, "{compared}");
     }
 
-    /// Change 0754: the complete outcome, error variant included.
+    /// The complete outcome, error variant included.
     fn strict_outcome(result: Result<String>) -> String {
         match result {
             Ok(text) => format!("ok {text:?}"),

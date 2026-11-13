@@ -1,5 +1,4 @@
-//! Immutable read-only-recommendation edits of a [`Package`] (record 0351
-//! §2.3).
+//! Immutable read-only-recommendation edits of a [`Package`].
 //!
 //! [`Package::edit_read_only_recommended`] starts an [`Edit`]: [`Edit::set`]
 //! writes the inert `p1710:readonlyRecommended` hint and [`Edit::remove`]

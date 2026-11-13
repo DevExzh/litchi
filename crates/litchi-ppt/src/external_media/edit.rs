@@ -1,4 +1,4 @@
-//! Package-level external-media edits (record 0357).
+//! Package-level external-media edits.
 //!
 //! [`Package::edit_external_media`] stages edits of the live document's
 //! `ExObjListContainer` media definitions, [`Edit::commit`] publishes a new

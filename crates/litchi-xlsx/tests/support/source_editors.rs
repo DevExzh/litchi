@@ -1,5 +1,5 @@
-//! The source-backed cell-value and row-visibility families of record 0360
-//! in the open/edit/publish shape these integration tests drive.
+//! The source-backed cell-value and row-visibility families in the
+//! open/edit/publish shape these integration tests drive.
 //!
 //! The editors here are thin test drivers: they open a
 //! [`SourceBackedWorkbook`], start family edits on it, and "publish" a commit

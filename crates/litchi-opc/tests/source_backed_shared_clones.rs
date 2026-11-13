@@ -5,7 +5,7 @@
     reason = "focused sharing assertions intentionally fail on fixture errors"
 )]
 
-//! A cloned [`SourceBackedPackage`] is the same opened package (record 0012).
+//! A cloned [`SourceBackedPackage`] is the same opened package.
 //!
 //! These tests drive the public API on real-producer fixtures and on one
 //! package built here. They check that a clone reads what the original reads,
@@ -298,9 +298,9 @@ fn an_exact_no_op_from_any_clone_is_the_source() {
     }
 }
 
-/// Record 0009 T1–T3 at the OPC level: a publication from a clone leaves the
-/// original readable and byte-identical, a second publication is not stale,
-/// and the outcome does not depend on how many clones or views are alive.
+/// At the OPC level, a publication from a clone leaves the original readable
+/// and byte-identical, a second publication is not stale, and the outcome
+/// does not depend on how many clones or views are alive.
 ///
 /// A fixture the overlay publisher refuses for a sole owner must be refused
 /// identically through every clone.
@@ -493,8 +493,8 @@ fn clones_read_and_publish_concurrently() {
     }
 }
 
-/// Record 0009 T6 at the OPC level: replacing the path atomically leaves every
-/// clone on the file it opened.
+/// At the OPC level, replacing the path atomically leaves every clone on the
+/// file it opened.
 #[cfg(unix)]
 #[test]
 fn an_atomic_replacement_leaves_every_clone_on_the_opened_file() {

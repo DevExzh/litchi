@@ -59,8 +59,8 @@ fn parses_real_sparse_and_rowless_dbcell_blocks() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/ole/xls/ConditionalFormattingSamples.xls"
     );
-    // The strict profile ignores the stale flag and records the repair
-    // (record 0316); the explicit profile keeps it.
+    // The strict profile ignores the stale flag and records the repair; the
+    // explicit profile keeps it.
     let strict = Reader::new(File::open(sparse_path).unwrap()).unwrap();
     assert!(
         strict

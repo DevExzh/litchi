@@ -4,9 +4,9 @@
     reason = "focused publication assertions intentionally panic on fixture errors"
 )]
 
-//! Change 0747: source-backed publication audits a replaced Part's original
-//! bytes and its replacement with one `verify_source_replacement` call. The
-//! verdict, the refusal identity and the emitted archive are those of the two
+//! Source-backed publication audits a replaced Part's original bytes and its
+//! replacement with one `verify_source_replacement` call. The verdict, the
+//! refusal identity and the emitted archive are those of the two
 //! `verify_source` audits it replaces, through every public door.
 
 use litchi_opc::{OpcError, PackURI, SourceBackedPackage, SourceTopologyPlan};

@@ -1,4 +1,4 @@
-//! Package-level document-comparison edits (record 0357).
+//! Package-level document-comparison edits.
 //!
 //! [`Package::edit_document_comparison`] stages edits of the inert
 //! `PowerPoint` 10 review metadata of the live document, [`Edit::commit`]

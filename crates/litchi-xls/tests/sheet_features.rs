@@ -1,6 +1,6 @@
-//! Worksheet features of opened workbooks (record 0327): reads on producer
-//! fixtures, and every edit family on a fresh and an opened workbook, read
-//! back through this reader and the eager worksheet reader.
+//! Worksheet features of opened workbooks: reads on producer fixtures, and
+//! every edit family on a fresh and an opened workbook, read back through
+//! this reader and the eager worksheet reader.
 
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_xls::Package;
@@ -713,7 +713,7 @@ fn patches_apply_and_invert() {
 }
 
 /// Writes one workbook with every feature to `LITCHI_XLS_FEATURES_OUT`, for
-/// an external reader to check (record 0327 used LibreOffice).
+/// an external reader such as LibreOffice to check.
 #[test]
 #[ignore = "writes an evidence workbook"]
 fn write_every_feature() {

@@ -926,9 +926,8 @@ fn main_conflicts_ignore_a_malformed_unrelated_header_and_aggregate_quota() {
     );
 }
 
-/// Record 0355a: the edit's output budget is exact through `EditOptions`;
-/// one byte below refuses, and the refused edit can be retried with a
-/// smaller change.
+/// The edit's output budget is exact through `EditOptions`; one byte below
+/// refuses, and the refused edit can be retried with a smaller change.
 #[test]
 fn edit_output_limit_is_exact_one_below_retryable_and_reversible() {
     use litchi_docx::revision::conflict::EditOptions;

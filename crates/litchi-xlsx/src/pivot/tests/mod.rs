@@ -1,4 +1,4 @@
-//! Engine-level coverage of the pivot extension owners (record 0360).
+//! Engine-level coverage of the pivot extension owners.
 //!
 //! These suites build schema-shaped synthetic OPC graphs and drive both the
 //! package routes (`Package::edit_pivot_table`, `edit_pivot_table_data`,

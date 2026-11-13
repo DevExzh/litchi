@@ -229,12 +229,12 @@ fn empty_fragment_deletes_only_the_authorized_source_range() {
 
 #[test]
 fn the_authored_classifier_still_separates_compact_from_formatted_xml() {
-    // Change 0657 stopped making compactness a publication refusal on the
-    // source-backed replacement route: a replacement there is a splice of the
-    // Part's own source, so it carries the producer's formatting and the
-    // contract is now a property of this library's serializers, asserted by
-    // their own tests. The classifier that tells the two apart is unchanged,
-    // and so is its refusal of malformed input.
+    // Compactness is no longer a publication refusal on the source-backed
+    // replacement route: a replacement there is a splice of the Part's own
+    // source, so it carries the producer's formatting and the contract is now
+    // a property of this library's serializers, asserted by their own tests.
+    // The classifier that tells the two apart is unchanged, and so is its
+    // refusal of malformed input.
     let uri = document_uri();
     assert!(
         !authored_xml_requires_source_proof(
@@ -259,7 +259,7 @@ fn the_authored_classifier_still_separates_compact_from_formatted_xml() {
     let mut output = Vec::new();
     package
         .write_topology_to_stream(&mut output, plan)
-        .expect("a formatted replacement publishes since change 0657");
+        .expect("a formatted replacement publishes");
     assert!(!output.is_empty());
 
     // Malformed input is still refused, and still emits no archive.
@@ -634,8 +634,6 @@ fn archive_bytes_with_sibling(document: &[u8], styles: &[u8]) -> Vec<u8> {
         .expect("fixture archive must finish")
 }
 
-/// Change 0654, under change 0652 decision 2.
-///
 /// The original bytes of a replaced Part are audited for structure and finite
 /// budgets, never for this repository's compact output contract. The
 /// replacement keeps the authored contract, which

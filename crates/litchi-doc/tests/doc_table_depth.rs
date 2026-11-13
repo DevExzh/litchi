@@ -5,7 +5,7 @@
     reason = "integration-test fixtures favor concise panic-driven assertions over production-style ergonomics"
 )]
 
-//! L-DOC-R7: table paragraphs that store no table depth form top-level tables.
+//! Table paragraphs that store no table depth form top-level tables.
 //!
 //! Word 97 predates nested tables and marks every table paragraph with
 //! `sprmPFInTable` alone, without `sprmPItap`. [MS-DOC] §2.4.3 derives such a
@@ -90,7 +90,7 @@ fn word97_body_table_of_header_footer_problematic_is_read() {
         paragraph.properties().table_nesting_level == 0 && paragraph.properties().table_depth() == 1
     }));
 
-    // Before L-DOC-R7: no table, and `elements()` kept 3 of 354 paragraphs.
+    // Previously: no table, and `elements()` kept 3 of 354 paragraphs.
     assert_eq!(document.table_count().unwrap(), 1);
     let tables = document.tables().unwrap();
     assert_eq!(tables.len(), 1);

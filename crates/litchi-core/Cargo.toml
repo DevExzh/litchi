@@ -35,7 +35,7 @@ windows-sys = { version = "0.61.2", features = [
 [dev-dependencies]
 # Tests run with insertion-ordered maps, the order a workspace build gets once
 # any linked crate enables the feature; the durable-JSON tests then pin that
-# canonical bytes ignore it (record 0349).
+# canonical bytes ignore it.
 serde_json = { workspace = true, features = ["preserve_order"] }
 tempfile   = { workspace = true }
 

@@ -65,7 +65,7 @@ pub enum ElementStep {
     /// `w:sdtContent`.
     ContentControl(Position),
     /// The body-final `w:sectPr`: only position 0, and only as the first
-    /// step (record 0319).
+    /// step.
     SectionProperties(Position),
 }
 
@@ -470,7 +470,7 @@ fn not_found() -> Error {
 }
 
 /// Whether `xml` is a paragraph whose removal loses only text: its
-/// properties and runs of text, tabs and breaks (record 0304).
+/// properties and runs of text, tabs and breaks.
 fn is_plain_text_block(xml: &[u8]) -> bool {
     let mut reader = quick_xml::Reader::from_reader(xml);
     // Depth inside a `w:pPr` or `w:rPr` subtree, whose content is formatting.
@@ -528,8 +528,7 @@ fn refusal(reason: Refusal) -> Error {
 }
 
 /// The `(start, end)` byte ranges of the body's direct element children and
-/// the offset of the body's end tag, as the element operations count them
-/// (record 0279).
+/// the offset of the body's end tag, as the element operations count them.
 pub(in crate::document::transaction) fn body_children(
     snapshot: &Snapshot,
 ) -> Result<(Vec<(usize, usize)>, usize)> {
@@ -545,7 +544,7 @@ pub(in crate::document::transaction) fn body_children(
 }
 
 /// The byte range of the element `path` names in `snapshot`, for the
-/// story substitution of record 0274.
+/// story substitution.
 pub(in crate::document::transaction) fn locate_element(
     snapshot: &Snapshot,
     path: &ElementPath,
@@ -1133,10 +1132,10 @@ impl Edit {
         self.replace_element(path, &before, &Arc::new(after))
     }
 
-    /// Change the direct properties (`w:tblPr`) of the table at `path`
-    /// (record 0342). The style and the borders are written: only the
-    /// properties whose typed value changes are rewritten, and every other
-    /// byte of the table is kept. An unchanged value is an exact no-op.
+    /// Change the direct properties (`w:tblPr`) of the table at `path`. The
+    /// style and the borders are written: only the properties whose typed value
+    /// changes are rewritten, and every other byte of the table is kept. An
+    /// unchanged value is an exact no-op.
     ///
     /// ```
     /// use litchi_core::Position;
@@ -1184,9 +1183,9 @@ impl Edit {
         self.replace_element(path, &before, &Arc::new(after))
     }
 
-    /// Change the direct properties (`w:trPr`) of the table row at `path`
-    /// (record 0342): its height and its `cantSplit`, `tblHeader` and
-    /// `hidden` flags, with the rules of [`Self::format_table_at`].
+    /// Change the direct properties (`w:trPr`) of the table row at `path`: its
+    /// height and its `cantSplit`, `tblHeader` and `hidden` flags, with the
+    /// rules of [`Self::format_table_at`].
     ///
     /// ```
     /// use litchi_core::Position;
@@ -1326,11 +1325,11 @@ impl Edit {
     /// The cell's properties (`w:tcPr`) and its first paragraph's
     /// properties are kept. Every other block of the cell is removed, so the
     /// edit is refused when one of them holds an open range, a story
-    /// reference or a section break, and (record 0304) when one of them is
-    /// not a paragraph of plain runs: a table, a content control, a
-    /// drawing, a field, a bookmark or anything else that is not text would
-    /// be lost. The first paragraph is rewritten with the rules of
-    /// [`Self::replace_paragraph_text`], so its refusals apply too.
+    /// reference or a section break, and when one of them is not a paragraph of
+    /// plain runs: a table, a content control, a drawing, a field, a bookmark
+    /// or anything else that is not text would be lost. The first paragraph is
+    /// rewritten with the rules of [`Self::replace_paragraph_text`], so its
+    /// refusals apply too.
     ///
     /// # Errors
     ///
@@ -1377,8 +1376,7 @@ impl Edit {
                     Ok(owner) => rewrite_text_owner(paragraph, &owner, &text)?,
                     // A paragraph with no text slot (an empty one) loses
                     // nothing to a plain replacement; any other paragraph the
-                    // text rewrite refuses holds content it would drop
-                    // (record 0304).
+                    // text rewrite refuses holds content it would drop.
                     Err(_) if is_plain_text_block(paragraph) => {
                         self.plain_paragraph(&layout, &text)?
                     },
@@ -1506,8 +1504,8 @@ impl Edit {
 
     /// Insert a run holding an inline SmartArt graphic into the paragraph at
     /// `paragraph`, before its direct run `at` (after its last child for
-    /// `None`) (record 0295). `relationships` are the data, layout, quick
-    /// style and colors relationships the caller stages.
+    /// `None`). `relationships` are the data, layout, quick style and colors
+    /// relationships the caller stages.
     pub(crate) fn insert_smartart_markup_at(
         &mut self,
         paragraph: &ElementPath,
@@ -1580,9 +1578,8 @@ impl Edit {
 
     /// Rewrite (`Some`) or remove (`None`) the picture at `ordinal` among
     /// the paragraph's inline pictures (the order of
-    /// [`crate::Paragraph::images`], record 0335). A removed picture takes
-    /// its run with it when the run holds nothing else. Returns whether
-    /// anything changed.
+    /// [`crate::Paragraph::images`]). A removed picture takes its run with it
+    /// when the run holds nothing else. Returns whether anything changed.
     pub(crate) fn rewrite_picture_at(
         &mut self,
         paragraph: &ElementPath,
@@ -1666,9 +1663,8 @@ impl Edit {
     }
 
     /// Remove every SmartArt drawing of the main story whose `dgm:relIds`
-    /// names the data relationship `data_relationship_id` (record 0335),
-    /// with its run when the run holds nothing else. Returns how many were
-    /// removed.
+    /// names the data relationship `data_relationship_id`, with its run when
+    /// the run holds nothing else. Returns how many were removed.
     pub(crate) fn remove_smartart_drawings(&mut self, data_relationship_id: &str) -> Result<usize> {
         self.ensure_unmanaged("remove_smartart")?;
         let mut removed = 0;
@@ -1787,8 +1783,8 @@ impl Edit {
     }
 
     /// Set the screen tip (`w:tooltip`) of the hyperlink at `hyperlink` to
-    /// `tooltip`, or remove it for `None` (record 0345). The start tag keeps
-    /// every other attribute as written; an unchanged tip is an exact no-op.
+    /// `tooltip`, or remove it for `None`. The start tag keeps every other
+    /// attribute as written; an unchanged tip is an exact no-op.
     ///
     /// ```
     /// use litchi_core::Position;
@@ -1855,11 +1851,11 @@ impl Edit {
     /// its direct runs `range` (inclusive), or around all its content for
     /// `None`, followed by the comment's reference run.
     ///
-    /// Record 0345, after OfficeCLI's `AddComment`: for a whole-paragraph
-    /// anchor, `start_after` starts the range after that direct run (a run
-    /// the paragraph lacks keeps the paragraph start); `reference_only`
-    /// writes the reference run alone, with no range markers, at the end
-    /// of the range (after `start_after` for a whole paragraph).
+    /// After OfficeCLI's `AddComment`: for a whole-paragraph anchor,
+    /// `start_after` starts the range after that direct run (a run the
+    /// paragraph lacks keeps the paragraph start); `reference_only` writes the
+    /// reference run alone, with no range markers, at the end of the range
+    /// (after `start_after` for a whole paragraph).
     pub(crate) fn anchor_comment_at(
         &mut self,
         paragraph: &ElementPath,
@@ -1979,8 +1975,7 @@ impl Edit {
     }
 
     /// The exact bytes of the body-final section properties, with the
-    /// namespace bindings in scope there, or `None` when the body has none
-    /// (record 0319).
+    /// namespace bindings in scope there, or `None` when the body has none.
     pub(crate) fn body_section(
         &self,
     ) -> Result<Option<(Arc<Vec<u8>>, crate::part_scan::Bindings)>> {
@@ -1994,7 +1989,7 @@ impl Edit {
     }
 
     /// Replace the body-final section properties' exact bytes `before` with
-    /// `after` (record 0319).
+    /// `after`.
     pub(crate) fn replace_body_section(
         &mut self,
         before: &Arc<Vec<u8>>,
@@ -2007,8 +2002,7 @@ impl Edit {
         )
     }
 
-    /// Append body-final section properties to a body that has none (record
-    /// 0319).
+    /// Append body-final section properties to a body that has none.
     pub(crate) fn append_body_section(&mut self, xml: &Arc<Vec<u8>>) -> Result<&mut Self> {
         let (children, _) = container_children(&self.projected, &ElementPath::body())?;
         if children.section.is_some() {
@@ -2025,8 +2019,7 @@ impl Edit {
 
     /// Insert one inline run's exact markup into the paragraph at
     /// `paragraph` before its direct run `at` (after its last child for
-    /// `None`), and return its position among the paragraph's direct runs
-    /// (record 0319).
+    /// `None`), and return its position among the paragraph's direct runs.
     pub(crate) fn insert_run_markup_at(
         &mut self,
         paragraph: &ElementPath,
@@ -2038,8 +2031,7 @@ impl Edit {
 
     /// Remove every direct run of every paragraph of the main story that
     /// holds a note reference (`footnoteReference` or `endnoteReference`,
-    /// by `local`) to note `id`. Returns whether anything changed (record
-    /// 0319).
+    /// by `local`) to note `id`. Returns whether anything changed.
     pub(crate) fn strip_note_references(&mut self, local: &[u8], id: i64) -> Result<bool> {
         self.ensure_unmanaged("remove_note")?;
         let mut changed = false;
@@ -2068,7 +2060,7 @@ impl Edit {
     /// The largest comment identifier the main document's range markers and
     /// references use.
     /// Every `paraId` value of the projected main document, for choosing
-    /// a fresh paragraph identifier (record 0345).
+    /// a fresh paragraph identifier.
     pub(crate) fn paragraph_ids(&self) -> Vec<u32> {
         crate::part_scan::paragraph_ids(self.projected.xml_bytes())
     }
@@ -2761,9 +2753,9 @@ const RELATIONSHIPS_NAMESPACE: &str =
 const STRICT_RELATIONSHIPS_NAMESPACE: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships";
 
-/// The rewrite of an existing picture (record 0335): each field, when
-/// present, replaces the drawing's extent (in EMUs, also the shape's own
-/// extent), its name, its description or the relationship of its image.
+/// The rewrite of an existing picture: each field, when present, replaces the
+/// drawing's extent (in EMUs, also the shape's own extent), its name, its
+/// description or the relationship of its image.
 #[derive(Default)]
 pub(crate) struct PictureRewrite<'a> {
     pub(crate) extent: Option<(i64, i64)>,
@@ -2915,8 +2907,8 @@ fn chart_markup(
     Ok(xml)
 }
 
-/// The drawing of a new inline SmartArt graphic (record 0295): its extent
-/// in EMUs, its drawing object identifier, name and description.
+/// The drawing of a new inline SmartArt graphic: its extent in EMUs, its
+/// drawing object identifier, name and description.
 pub(crate) struct SmartArtMarkup<'a> {
     pub(crate) width: i64,
     pub(crate) height: i64,
@@ -3168,7 +3160,7 @@ fn scan_comment_markers(
 /// The fragment without comment `id`'s range markers and reference runs,
 /// or `None` when it holds none.
 /// `xml` without the runs that hold an element named `local` whose `id`
-/// attribute is `id`, or `None` when it has none (record 0319).
+/// attribute is `id`, or `None` when it has none.
 fn without_note_references(xml: &[u8], local: &[u8], id: i64) -> Result<Option<Vec<u8>>> {
     let mut reader = quick_xml::Reader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);

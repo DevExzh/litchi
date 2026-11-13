@@ -302,8 +302,7 @@ pub enum TextTarget {
         end: u32,
     },
     /// The instruction or the cached result of the main-story field whose
-    /// begin mark is at CP `start` (record 0324). The part must hold no
-    /// nested field.
+    /// begin mark is at CP `start`. The part must hold no nested field.
     Field { start: u32, part: FieldPart },
 }
 
@@ -361,7 +360,7 @@ pub enum CharacterValue<'a> {
     /// font-table entry is a resource change.
     Font(&'a str),
     /// The character style (`sprmCIstd`), by stylesheet index. The default
-    /// character style (index 10) clears the direct style (record 0324).
+    /// character style (index 10) clears the direct style.
     Style(u16),
 }
 
@@ -636,11 +635,10 @@ fn cp_table_content(index: usize) -> &'static str {
 }
 
 impl Refusal {
-    /// The shared refusal kind (record 0351 §2.4), by which litchi-ops
-    /// classifies the refusal (record 0362). The budget variants
-    /// (`OperationLimit`, `ReplacementLimit`) are limits, not refusals:
-    /// litchi-ops reports them as `limit_exceeded` before consulting the
-    /// kind, which is `InvalidValue` for them.
+    /// The shared refusal kind, by which litchi-ops classifies the refusal. The
+    /// budget variants (`OperationLimit`, `ReplacementLimit`) are limits, not
+    /// refusals: litchi-ops reports them as `limit_exceeded` before consulting
+    /// the kind, which is `InvalidValue` for them.
     #[must_use]
     pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
         use litchi_core::edit::RefusalKind;
@@ -1081,7 +1079,7 @@ impl Snapshot {
     /// With `reader_validated`, the package's document is the strict public
     /// reader's parse of these bytes under `options`' source limits, so the
     /// reader gate below does not parse them again; the strict owner still
-    /// opens them (record 0377a).
+    /// opens them.
     pub(crate) fn from_package_bytes(
         input: Vec<u8>,
         options: OpenOptions,
@@ -2057,10 +2055,10 @@ impl Edit {
     /// Commit-time form of [`Self::finish_candidate`].
     ///
     /// A validated render that the editor retained under this transaction's
-    /// ceiling is moved out instead of rendering the candidate a second time
-    /// (performance change 0730); otherwise the candidate is rendered as
-    /// [`Self::finish_candidate`] renders it. Both routes return the same
-    /// bytes and apply the same authorization and signed-source checks.
+    /// ceiling is moved out instead of rendering the candidate a second time;
+    /// otherwise the candidate is rendered as [`Self::finish_candidate`]
+    /// renders it. Both routes return the same bytes and apply the same
+    /// authorization and signed-source checks.
     fn take_candidate(&mut self) -> Result<Vec<u8>> {
         let bytes = match self.editor.take_retained_render() {
             Some(rendered) => rendered,
@@ -3579,7 +3577,7 @@ pub enum ChangeRef<'a> {
     },
     /// One ordinary main-story paragraph moved from `from` to `to`.
     ParagraphMove { from: Position, to: Position },
-    /// One paragraph style change, as stylesheet indexes (record 0324).
+    /// One paragraph style change, as stylesheet indexes.
     ParagraphStyle {
         position: Position,
         before: u16,
@@ -3849,7 +3847,7 @@ enum Change {
         from: Position,
         to: Position,
     },
-    /// A record-0324 style, tab, field, bookmark or section change.
+    /// A style, tab, field, bookmark or section change.
     Mark(MarkChange),
 }
 

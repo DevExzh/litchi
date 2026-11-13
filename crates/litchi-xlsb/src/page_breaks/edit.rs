@@ -1,5 +1,4 @@
-//! Immutable page-break edits of an XLSB [`Package`] (unified-ops record
-//! 0322).
+//! Immutable page-break edits of an XLSB [`Package`].
 //!
 //! [`Package::edit_page_breaks`] starts
 //! an [`Edit`]; [`Edit::set_page_breaks`] replaces, inserts or removes a

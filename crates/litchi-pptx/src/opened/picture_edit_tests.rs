@@ -1,4 +1,4 @@
-//! Picture geometry, image replacement and descriptions (record 0333).
+//! Picture geometry, image replacement and descriptions.
 
 use litchi_core::Position;
 

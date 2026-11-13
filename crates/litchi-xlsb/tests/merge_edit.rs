@@ -4,7 +4,7 @@
     reason = "integration tests use panic-on-failure extraction"
 )]
 
-//! Merged ranges through the primary workbook transaction (record 0261).
+//! Merged ranges through the primary workbook transaction.
 
 use litchi_xlsb::Package;
 use litchi_xlsb::builder::{self, Builder};

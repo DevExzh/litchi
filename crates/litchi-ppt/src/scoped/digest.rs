@@ -1,4 +1,4 @@
-//! Incremental exact-package digests of the scoped families (record 0357b).
+//! Incremental exact-package digests of the scoped families.
 //!
 //! A scoped patch binds its source and target package by length and a
 //! *block root*: the SHA-256 over the image length and a 128-bit digest of
@@ -13,7 +13,7 @@
 //! a collision, the same bytes. Scoped patches are process-local, so a
 //! per-process key never has to match across processes. SipHash replaced the
 //! earlier per-block SHA-256; the keyed BLAKE2b replacement was measured and
-//! rejected for its first-commit regression (record 0362).
+//! rejected for its first-commit regression.
 //!
 //! The block list lets a commit derive the target's digests from the
 //! source's: only the blocks a patch changes or appends are hashed again,

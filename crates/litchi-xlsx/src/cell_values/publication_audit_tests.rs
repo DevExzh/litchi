@@ -3,15 +3,15 @@
     clippy::unwrap_used,
     reason = "each test is one constructed witness with a fixed expected verdict"
 )]
-//! Witnesses for change 0747: neither publication audit of a replaced XML
-//! Part is a duplicate of a check that runs earlier in the same operation.
+//! Witnesses that neither publication audit of a replaced XML Part is a
+//! duplicate of a check that runs earlier in the same operation.
 //!
 //! A source-backed value edit is admitted by planning (the value-only
 //! validator with the raw worksheet parser, and the same validator with the
 //! workbook catalog parser), rewritten by the commit, and then audited by
 //! `litchi-opc` at publication with `xml_minifier::audit::verify_source`
 //! under `Limits::default()`, once over each replaced Part's original bytes
-//! and once over its replacement. Change 0747 asked whether planning had
+//! and once over its replacement. The question was whether planning had
 //! already proved the original audit's verdict over the identical bytes, so
 //! that publication could carry the proof instead of repeating the audit. It
 //! had not. Every test below is an input planning and the commit admit and

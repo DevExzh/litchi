@@ -1,4 +1,4 @@
-//! Immutable worksheet query-table edits of a [`crate::Package`] (record 0360).
+//! Immutable worksheet query-table edits of a [`crate::Package`].
 //!
 //! [`crate::Package::edit_query_tables`] starts an [`Edit`] of one worksheet; every operation
 //! runs on a private candidate graph, so an error stages nothing.

@@ -1,4 +1,4 @@
-//! Immutable Scenario Manager edits of an XLSB [`Package`] (record 0360b).
+//! Immutable Scenario Manager edits of an XLSB [`Package`].
 //!
 //! [`Package::edit_scenarios`] starts an [`Edit`]; [`Edit::set_scenarios`]
 //! adds or replaces a worksheet's Scenario Manager and

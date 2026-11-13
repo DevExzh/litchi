@@ -84,9 +84,8 @@ impl<'a> Path<'a> {
     /// of the failure.
     #[inline]
     pub fn parse(input: &'a str) -> std::result::Result<Self, ParseError> {
-        // Inlined so the fast path's result is built where the caller keeps
-        // it rather than copied there (record 0326); the general parser
-        // stays out of line.
+        // Inlined so the fast path's result is built where the caller keeps it
+        // rather than copied there; the general parser stays out of line.
         let mut path = Path::root();
         if parse_plain(input, &mut path) {
             return Ok(path);
@@ -328,12 +327,12 @@ impl fmt::Display for Step<'_> {
     }
 }
 
-/// Parses the common absolute forms in one pass over the bytes (records
-/// 0302 and 0326): `/` followed by plain segment names, each with zero or
-/// more predicates of the forms `[N]`, `[last()]`, `[key]`, `[@key]`,
-/// `[key=value]` and `[@key=value]` written without whitespace, quotes or
-/// escapes (`/body/p[3]`, `/sheet[1]/table[1]/B3`,
-/// `/body/p[@paraId=1A2B3C4D]`, `/slide[1]/shape[@id=4]/paragraph[2]`).
+/// Parses the common absolute forms in one pass over the bytes: `/` followed
+/// by plain segment names, each with zero or more predicates of the forms
+/// `[N]`, `[last()]`, `[key]`, `[@key]`, `[key=value]` and `[@key=value]`
+/// written without whitespace, quotes or escapes (`/body/p[3]`,
+/// `/sheet[1]/table[1]/B3`, `/body/p[@paraId=1A2B3C4D]`,
+/// `/slide[1]/shape[@id=4]/paragraph[2]`).
 ///
 /// Fills `path` (the root path on entry) and returns `true`; returns
 /// `false`, leaving `path` unspecified, for anything else, valid or not: a
@@ -351,8 +350,8 @@ fn parse_plain<'a>(input: &'a str, path: &mut Path<'a>) -> bool {
     parse_plain_steps(input, path).is_some()
 }
 
-/// Byte classes of the fast path (record 0326): one table lookup per byte
-/// instead of a chain of comparisons.
+/// Byte classes of the fast path: one table lookup per byte instead of a chain
+/// of comparisons.
 const DELIMITER: u8 = 1;
 const CONTROL: u8 = 2;
 const KEY: u8 = 4;
@@ -698,12 +697,12 @@ mod plain_tests {
         }
     }
 
-    /// Record 0326: the fast path against the general parser over every
-    /// quoted `/…` string of the workspace's sources, tests and goldens (the
-    /// OfficeCLI corpus, the query corpus, the capability, registry and
-    /// node-view goldens, the CRUD checklist), each also cut at every
-    /// character boundary: equal paths, and byte-identical errors (kind,
-    /// offset and message) from `Path::parse` and the general parser.
+    /// The fast path against the general parser over every quoted `/…` string
+    /// of the workspace's sources, tests and goldens (the OfficeCLI corpus,
+    /// the query corpus, the capability, registry and node-view goldens, the
+    /// CRUD checklist), each also cut at every character boundary: equal
+    /// paths, and byte-identical errors (kind, offset and message) from
+    /// `Path::parse` and the general parser.
     #[test]
     fn path_parser_differential() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -778,7 +777,7 @@ mod plain_tests {
             "/slide[2]/notes",
             "/Größe/ü[007]",
             "/a[18446744073709551615]",
-            // Record 0326: attribute, bare-key and `last()` predicates.
+            // Attribute, bare-key and `last()` predicates.
             "/a[last()]",
             "/a[LaSt()]",
             "/a[@id=1]",

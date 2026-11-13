@@ -737,8 +737,8 @@ fn source_merge_rejects_stale_and_foreign_lineage_before_output() {
         Err(Error::Package(OpcError::SourceChanged { .. }))
     ));
 
-    // A replay compares content (record 0360): a second open of the same
-    // bytes holds the before state.
+    // A replay compares content: a second open of the same bytes holds the
+    // before state.
     let second = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
     assert!(second.apply_merges(commit.patch()).is_ok());
 }
@@ -932,9 +932,9 @@ fn source_merge_publication_reports_bounded_sink_and_source_failures() {
     ));
 }
 
-/// Change 0597: a worksheet the selected stream marks ineligible before
-/// `<sheetData>` must still expose its merges and values through the mandatory
-/// materialized fallback.
+/// A worksheet the selected stream marks ineligible before `<sheetData>` must
+/// still expose its merges and values through the mandatory materialized
+/// fallback.
 ///
 /// `<cols>` marks the scan `NotEligible(Styles)` at worksheet level. The scan
 /// then stops recording document structure, so the later, correctly ordered
@@ -977,7 +977,7 @@ fn source_backed_cell_reads_a_column_formatted_worksheet_with_merges() {
 }
 
 /// Replay a source-backed patch onto `package` through a source-backed
-/// workbook over its bytes (record 0360: source-backed patches replay onto
+/// workbook over its bytes (source-backed patches replay onto
 /// source-backed workbooks).
 fn replay_patch(
     package: &mut OpcPackage,

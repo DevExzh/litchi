@@ -448,8 +448,8 @@ pub(crate) struct SourceInner {
 #[derive(Clone)]
 pub struct SourceBackedWorkbook {
     inner: Arc<SourceInner>,
-    /// The pending output of a committed workbook (record 0360): `inner` is
-    /// then the base the commit was made on.
+    /// The pending output of a committed workbook: `inner` is then the base
+    /// the commit was made on.
     pending: Option<Arc<deferred::Deferred>>,
 }
 
@@ -479,7 +479,7 @@ impl std::fmt::Debug for SourceBackedWorkbook {
 }
 
 // Shared handles: the unified operations layer keeps these in `Arc`-backed,
-// `Send + Sync` file handles (record 0003 risk R3).
+// `Send + Sync` file handles.
 const _: () = {
     const fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<SourceBackedWorkbook>();
@@ -934,8 +934,8 @@ impl SourceBackedWorkbook {
     /// [`SourceBackedPackage::to_opc_package`], read through the same
     /// positional source and observe the same source-version fence.
     ///
-    /// A committed workbook (record 0360) has no indexed package of its own
-    /// until a read writes its output into memory; this does so once.
+    /// A committed workbook has no indexed package of its own until a read
+    /// writes its output into memory; this does so once.
     ///
     /// # Errors
     ///
@@ -1040,8 +1040,8 @@ impl SourceBackedWorkbook {
     ///
     /// Returns `self` unchanged while another clone of this workbook, or a
     /// [`SourceWorksheet`] handle selected from it, still shares the catalog.
-    /// A committed workbook (record 0360), which has no indexed package of
-    /// its own, is returned unchanged too.
+    /// A committed workbook, which has no indexed package of its own, is
+    /// returned unchanged too.
     pub fn try_into_source_backed_package(self) -> std::result::Result<SourceBackedPackage, Self> {
         if self.pending.is_some() {
             return Err(self);
@@ -1072,7 +1072,7 @@ impl SourceBackedWorkbook {
     /// # Errors
     ///
     /// Returns the publication error of a committed workbook's output, which
-    /// the first read writes into memory once (record 0360).
+    /// the first read writes into memory once.
     pub fn sheets(
         &self,
     ) -> Result<impl ExactSizeIterator<Item = SourceWorksheet> + DoubleEndedIterator + '_> {
@@ -1148,7 +1148,7 @@ impl SourceBackedWorkbook {
     /// # Errors
     ///
     /// Returns the publication error of a committed workbook's output, which
-    /// the first read writes into memory once (record 0360).
+    /// the first read writes into memory once.
     pub fn active_sheet(&self) -> Result<Option<SourceWorksheet>> {
         let inner = &self.view()?.inner;
         let Some(data) = inner
@@ -1345,10 +1345,10 @@ impl SourceWorksheet {
     }
 
     /// The rich-text runs of the cell at `at`, as
-    /// [`Worksheet::rich_text`](crate::Worksheet::rich_text) reads them
-    /// (record 0338): an inline rich string, or a shared-string item with
-    /// runs; `None` for any other cell. The worksheet's grid is parsed, and
-    /// the worksheet or shared-string part is scanned once.
+    /// [`Worksheet::rich_text`](crate::Worksheet::rich_text) reads them: an
+    /// inline rich string, or a shared-string item with runs; `None` for
+    /// any other cell. The worksheet's grid is parsed, and the worksheet or
+    /// shared-string part is scanned once.
     ///
     /// # Errors
     ///
@@ -1862,7 +1862,7 @@ fn collect_stored_cells(store: &Store, range: Rect) -> Result<Vec<SourceCell>> {
 ///
 /// Always inlined: the record and the produced cell are both larger than a
 /// register pair, so an out-of-line call copies each of them through the stack
-/// once per cell. Change 0642 measured the out-of-line form at 688,015 more
+/// once per cell. The out-of-line form was measured at 688,015 more
 /// instructions over a 65,536-cell range — about 10.5 per cell — on the pinned
 /// toolchain.
 #[inline(always)]
@@ -5238,11 +5238,11 @@ mod tests {
 
     /// `visit_cells` streams its cells instead of materializing the range.
     ///
-    /// Change 0642 stopped building a whole-range `Vec<SourceCell>` before the
-    /// first callback. These tests pin what that must not change: the visited
-    /// sequence on both routes, and the rule that a refusal the whole-range
-    /// read raises still arrives before any cell is visited, including a
-    /// refusal that the worksheet raises after the requested rectangle.
+    /// No whole-range `Vec<SourceCell>` is built before the first callback.
+    /// These tests pin what that must not change: the visited sequence on both
+    /// routes, and the rule that a refusal the whole-range read raises still
+    /// arrives before any cell is visited, including a refusal that the
+    /// worksheet raises after the requested rectangle.
     mod streaming_0642_tests {
         use std::sync::Arc;
 

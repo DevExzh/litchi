@@ -20,8 +20,8 @@ use crate::settings::{WORD_2010_NAMESPACE, WORD_2012_NAMESPACE};
 
 const INITIAL_NAMESPACE_BYTES: usize = 73;
 const ARC_HEADER_WORDS: usize = 2;
-// Record 0764 added a declaration flag and a hoisted-declaration list (a fat
-// `Rc` pointer) to each frame.
+// Each frame holds a declaration flag and a hoisted-declaration list (a fat
+// `Rc` pointer).
 const FRAME_LAYOUT_WORDS: usize = 15;
 // A B-tree node holds up to eleven entries with its keys, values, lengths and
 // child links; four entry slots per entry bound its node storage generously.
@@ -156,8 +156,8 @@ pub(super) fn memory_requirement(profile: Profile) -> Option<u64> {
 
     let arc_header = usize_bytes.checked_mul(ARC_HEADER_WORDS as u64)?;
     let namespace_layer_object = option_arc_bytes.checked_add(vector_pair_bytes)?;
-    // The ignorable set and, since record 0764, two sets (exact names and
-    // namespace wildcards) for each of the three pattern directives.
+    // The ignorable set and two sets (exact names and namespace wildcards) for
+    // each of the three pattern directives.
     let directive_layer_object =
         option_arc_bytes.checked_add(hash_string_wrapper.max(hash_name_wrapper).checked_mul(7)?)?;
     let namespace_layer_owner = arc_header.checked_add(namespace_layer_object)?;
@@ -217,12 +217,12 @@ pub(super) fn memory_requirement(profile: Profile) -> Option<u64> {
             )?)?
             .checked_add(namespace_layer_owner.checked_mul(namespace_layers)?)?;
 
-    // Record 0764: the prefix index copies every live declaration's prefix
-    // (as a key and in its log) and keeps one binding vector per prefix and a
-    // log entry (depth, prefix, packed key, identity) per binding; each
-    // distinct live URI is copied once into the identity table, with its
-    // entry and keyed-hash index slot; and one element's declarations are
-    // sorted once as borrowed prefixes.
+    // The prefix index copies every live declaration's prefix (as a key and in
+    // its log) and keeps one binding vector per prefix and a log entry (depth,
+    // prefix, packed key, identity) per binding; each distinct live URI is
+    // copied once into the identity table, with its entry and keyed-hash index
+    // slot; and one element's declarations are sorted once as borrowed
+    // prefixes.
     let index_binding_bytes = u64::try_from(size_of::<(usize, usize)>()).ok()?;
     let log_entry_bytes = u64::try_from(size_of::<(usize, String, u64, usize)>()).ok()?;
     let identity_entry_bytes =
@@ -280,8 +280,8 @@ pub(super) fn memory_requirement(profile: Profile) -> Option<u64> {
         .checked_add(
             hash_sum_capacity(directive_tokens, directive_layers, pattern_slot)?.checked_mul(6)?,
         )?
-        // Record 0764: an exact pattern's local names are kept in one set per
-        // namespace, so every target may open a set of its own.
+        // An exact pattern's local names are kept in one set per namespace, so
+        // every target may open a set of its own.
         .checked_add(hash_sum_capacity(
             directive_tokens,
             directive_tokens,

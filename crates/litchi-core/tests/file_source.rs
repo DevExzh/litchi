@@ -222,9 +222,9 @@ fn writing_through_an_independent_handle_changes_the_version() {
     assert_eq!(source.version().expect("stable changed version"), after);
 }
 
-/// The lock-free fast path (record 0280): readers on many threads observe
-/// every change on their next call, each thread's revisions never go back,
-/// and an unchanged file keeps its revision.
+/// The lock-free fast path: readers on many threads observe every change on
+/// their next call, each thread's revisions never go back, and an unchanged
+/// file keeps its revision.
 #[test]
 fn concurrent_version_checks_observe_each_change_and_stay_monotonic() {
     const READERS: usize = 4;

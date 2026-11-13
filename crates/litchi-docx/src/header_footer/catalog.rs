@@ -1,5 +1,5 @@
 //! The header and footer parts a document relates, listed without decoding
-//! them (record 0319, L-DOCX-R5).
+//! them.
 
 use crate::error::Result;
 

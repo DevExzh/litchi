@@ -66,7 +66,7 @@ pub(crate) fn stage_slide_properties(
 
 /// Stage a `p:cSld/@name` update of a slide master (`root` `sldMaster`) or
 /// slide layout (`sldLayout`) part, with the same lexical guarantees as a
-/// slide's (record 0321). An equal name returns `Ok(None)`.
+/// slide's. An equal name returns `Ok(None)`.
 pub(crate) fn stage_common_slide_name(
     xml: &[u8],
     root: &[u8],

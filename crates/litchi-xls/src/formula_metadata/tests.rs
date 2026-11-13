@@ -40,7 +40,7 @@ fn parses_all_formula_flags_and_application_cache() {
 
 #[test]
 fn ignores_reserved_flags_and_rejects_empty_tokens_and_trailing_payload() {
-    // Reserved bits "MUST be ignored" ([MS-XLS] 2.4.127; record 0308).
+    // Reserved bits "MUST be ignored" ([MS-XLS] 2.4.127).
     let ignored = decode_flags(0xFFD2, &[0x16]).unwrap();
     assert_eq!(ignored, decode_flags(0, &[0x16]).unwrap());
     assert!(ignored.1.is_none());
@@ -69,8 +69,8 @@ fn string_cached_values_allow_an_empty_formula_token_stream() {
 fn stale_shared_flag_is_ignored_and_writer_refuses_orphaned_shared_state() {
     assert!(!is_ptg_exp(&[0x16, 0, 0, 0, 0]));
     // A complete token stream is not part of a shared formula: the stale
-    // flag is ignored and reported (record 0316); the preserving decode
-    // keeps it for the explicit compatibility profile.
+    // flag is ignored and reported; the preserving decode keeps it for
+    // the explicit compatibility profile.
     let (metadata, defect) = decode_flags(0x0008, &[0x16]).unwrap();
     assert!(!metadata.shared_formula());
     assert_eq!(defect, Some(FlagDefect::SharedWithoutPtgExp));

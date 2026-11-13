@@ -237,7 +237,7 @@ fn body_index_matches_ordered_block_view_and_handles_markup_compatibility() {
     );
 
     // Body-level AlternateContent selects a branch: the visible view counts
-    // a paragraph the raw part does not hold directly (record 0008 W2).
+    // a paragraph the raw part does not hold directly.
     let alternate = format!(
         r#"<w:document xmlns:w="{W}" xmlns:mc="{MC}" xmlns:w14="{W14}"><w:body><w:p><w:r><w:t>P0</w:t></w:r></w:p><mc:AlternateContent><mc:Choice Requires="w14"><w:p><w:r><w:t>CHOICE</w:t></w:r></w:p></mc:Choice><mc:Fallback><w:p><w:r><w:t>FALLBACK</w:t></w:r></w:p></mc:Fallback></mc:AlternateContent><w:p><w:r><w:t>P2</w:t></w:r></w:p></w:body></w:document>"#
     )

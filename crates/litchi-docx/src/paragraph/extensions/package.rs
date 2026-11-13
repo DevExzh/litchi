@@ -23,8 +23,8 @@ impl Paragraph {
         let _parser_admission = self.parser_admission()?;
         // The `w:p` span is parsed standalone and its root has to resolve into
         // the wordprocessing namespace, so the declarations it inherits from
-        // `word/document.xml` are re-declared on it first. Change 0653 stopped
-        // the markup-compatibility writer from repeating them on every element.
+        // `word/document.xml` are re-declared on it first. The
+        // markup-compatibility writer does not repeat them on every element.
         let xml = self.self_contained_xml()?;
         parse_paragraph(&xml)
     }

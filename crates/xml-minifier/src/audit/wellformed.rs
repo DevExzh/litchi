@@ -732,10 +732,10 @@ mod tests {
         assert_eq!(out, b"a b c d e&\tA");
     }
 
-    /// Change 0750's differential campaign found a `]]>` split as `]]` at the
-    /// end of one block and `>` at the start of the next, missed by the pass.
-    /// Every placement of `]]>` near a block boundary and near the end of the
-    /// input is found, at its own offset.
+    /// A differential campaign found a `]]>` split as `]]` at the end of one
+    /// block and `>` at the start of the next, missed by the pass. Every
+    /// placement of `]]>` near a block boundary and near the end of the input
+    /// is found, at its own offset.
     #[test]
     fn a_cdata_close_is_found_wherever_it_straddles_a_block() {
         for length in [64_usize, 65, 66, 127, 128, 129, 130, 200] {

@@ -1,5 +1,4 @@
-//! Comment replies and resolution staged with a main-document edit (record
-//! 0345).
+//! Comment replies and resolution staged with a main-document edit.
 //!
 //! Word threads a reply under its parent and records a comment's resolved
 //! state in `word/commentsExtended.xml`: one `w15:commentEx` per comment,

@@ -1,6 +1,6 @@
-//! Package-graph changes staged with main-document edits (record 0251b):
-//! hyperlink insertion and retargeting publish their relationship and their
-//! markup in one commit, replay exactly, and invert exactly.
+//! Package-graph changes staged with main-document edits: hyperlink insertion
+//! and retargeting publish their relationship and their markup in one commit,
+//! replay exactly, and invert exactly.
 
 use litchi_core::Position;
 use litchi_docx::document::{ElementPath, ElementStep, HyperlinkTarget, NewRun};

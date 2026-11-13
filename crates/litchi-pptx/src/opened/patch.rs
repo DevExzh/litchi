@@ -563,7 +563,7 @@ impl Patch {
     /// The direction and slide of an exact slide removal or its inverse:
     /// the presentation Part changes, one slide Part leaves or returns, and
     /// every other changed resource is a non-slide Part that leaves or
-    /// returns with it (the Parts the slide owns, record 0303).
+    /// returns with it (the Parts the slide owns).
     pub(crate) fn exact_slide_removal_change(&self) -> Option<(SinglePartChange, &PackURI)> {
         if self.root.is_some() || self.deltas.len() < 2 {
             return None;
@@ -1442,10 +1442,10 @@ fn capture_candidate(
 /// The candidate is captured here, after `validate_before`, under the patch's
 /// limits, with every validation a capture runs. `parent` is a payload-digest
 /// memo whose entries name allocations the candidate may hold — the memo of
-/// the capture that built it moments earlier in the same operation (change
-/// 0751). It is consulted only to skip re-hashing a payload allocation the
-/// candidate provably holds; a miss is an ordinary hash, so the snapshot and
-/// its revision are the ones a capture without it returns.
+/// the capture that built it moments earlier in the same operation. It is
+/// consulted only to skip re-hashing a payload allocation the candidate
+/// provably holds; a miss is an ordinary hash, so the snapshot and its revision
+/// are the ones a capture without it returns.
 pub(crate) fn validate_candidate(
     source: &OpcPackage,
     candidate: &OpcPackage,

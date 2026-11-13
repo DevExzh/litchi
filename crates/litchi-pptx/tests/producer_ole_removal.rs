@@ -5,8 +5,7 @@
 )]
 
 //! Removing a whole `p:graphicFrame` whose `a:graphicData` encloses an
-//! `mc:AlternateContent` (an embedded OLE object), on the source bytes
-//! (record 0303, record 0290 F3).
+//! `mc:AlternateContent` (an embedded OLE object), on the source bytes.
 //!
 //! The slide guard admits markup compatibility strictly inside top-level
 //! shape-tree children for whole-shape removal only; every other edit on

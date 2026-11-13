@@ -1,4 +1,4 @@
-//! The tracked-revision edit family (record 0351 §2.3, record 0359).
+//! The tracked-revision edit family.
 //!
 //! [`crate::Package::edit_tracked_revisions`] stages revision-mark edits on
 //! an [`Edit`]; [`Edit::commit`] publishes a new [`crate::Package`] with an

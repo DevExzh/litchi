@@ -41,13 +41,12 @@ fn selected_record_shared_string_index(record: &SelectedRecord) -> Option<u32> {
 
 /// What the materialized parser answers for the same worksheet bytes.
 ///
-/// Change 0658 stops the selected-cell scan at the event that settles an
-/// ineligible verdict, so from that event on the reader that owns this
-/// worksheet's mandatory validation and its first typed error (ADR 0005;
-/// change 0362) is the materialized parser the caller is required to fall back
-/// to. Tests that used to pin a post-mark refusal raised by the scan pin the
-/// materialized parser's answer instead, which is what the public read now
-/// returns.
+/// The selected-cell scan stops at the event that settles an ineligible
+/// verdict, so from that event on the reader that owns this worksheet's
+/// mandatory validation and its first typed error (ADR 0005) is the
+/// materialized parser the caller is required to fall back to. Tests that used
+/// to pin a post-mark refusal raised by the scan pin the materialized parser's
+/// answer instead, which is what the public read now returns.
 fn materialized_answer(xml: &str) -> Result<(), String> {
     parse(xml.as_bytes(), || Ok(None))
         .map(|_store| ())
@@ -1783,7 +1782,7 @@ mod streaming_0361_tests {
     impl BufRead for FailAfter {
         fn fill_buf(&mut self) -> io::Result<&[u8]> {
             if self.position == self.bytes.len() {
-                return Err(io::Error::other("streaming 0361 input failure"));
+                return Err(io::Error::other("streaming input failure"));
             }
             Ok(&self.bytes[self.position..])
         }
@@ -2460,14 +2459,14 @@ mod streaming_0364_dependency_metadata_tests {
 
     #[test]
     fn change_0658_late_malformed_xml_after_the_mark_moves_to_the_materialized_parser() {
-        // Change 0364 pinned this as "late malformed XML stays primary": the
+        // This was once pinned as "late malformed XML stays primary": the
         // `s="not-a-style"` cell marks the worksheet ineligible and the second
-        // root after it used to be reported by the scan as an MCE failure.
-        // Change 0652 decision 8 accepts the movement of the timing of error
-        // returns for an ineligible read, and change 0658 stops the scan at
-        // the marking event, so the verdict is published and the materialized
-        // parser the caller must fall back to raises the refusal instead. The
-        // read still refuses, with a typed error, before any value.
+        // root after it used to be reported by the scan as an MCE failure. The
+        // timing of error returns for an ineligible read may move, and the
+        // scan stops at the marking event, so the verdict is published and the
+        // materialized parser the caller must fall back to raises the refusal
+        // instead. The read still refuses, with a typed error, before any
+        // value.
         let xml = format!(
             r#"<worksheet xmlns="{SPREADSHEETML}"><sheetData><row r="1"><c r="A1" s="not-a-style"><v>1</v></c></row></sheetData></worksheet><tail>"#
         );
@@ -3642,7 +3641,8 @@ mod streaming_0367_merge_tests {
     #[test]
     fn streaming_0367_rejects_invalid_merge_references_and_placement() {
         // Every case here reaches the scan unmarked, so the scan still raises
-        // the refusal itself; change 0658 moves nothing for them.
+        // the refusal itself; stopping the scan at the mark moves nothing for
+        // them.
         let cases = [
             worksheet(
                 r#"<sheetData/><mergeCells><mergeCell ref="A1:B1"/></mergeCells><mergeCells><mergeCell ref="C1:D1"/></mergeCells>"#,
@@ -3666,7 +3666,7 @@ mod streaming_0367_merge_tests {
         }
 
         // `<hyperlinks/>` marks the worksheet ineligible before the misplaced
-        // `<mergeCells>`, so change 0658 publishes the verdict there and the
+        // `<mergeCells>`, so the scan publishes the verdict there and the
         // materialized parser raises the refusal — with the same message the
         // scan used to raise.
         let after_successor = worksheet(
@@ -3705,14 +3705,14 @@ mod streaming_0367_merge_tests {
 
     #[test]
     fn change_0658_marked_worksheet_hands_merge_placement_to_the_materialized_parser() {
-        // Change 0597 kept two post-mark placement clauses in the scanner.
-        // Change 0658 stops the scan at the mark, so those clauses can no
-        // longer fire and were removed; the materialized parser the caller
-        // must fall back to answers the same questions. For the first case it
-        // answers with the identical message, so the public read is unchanged;
-        // for the second it names the misplaced `<cols>` that marked the
-        // worksheet instead, which is the earlier structural error. Both
-        // remain typed refusals raised before any value is returned.
+        // The scanner once kept two post-mark placement clauses. The scan
+        // stops at the mark, so those clauses can no longer fire and were
+        // removed; the materialized parser the caller must fall back to
+        // answers the same questions. For the first case it answers with the
+        // identical message, so the public read is unchanged; for the second
+        // it names the misplaced `<cols>` that marked the worksheet instead,
+        // which is the earlier structural error. Both remain typed refusals
+        // raised before any value is returned.
         let after_successor = worksheet(
             r#"<sheetData/><hyperlinks/><mergeCells count="1"><mergeCell ref="A1:B1"/></mergeCells>"#,
         );
@@ -4046,15 +4046,14 @@ mod streaming_0366_general_reference_tests {
             "A1",
         ));
 
-        // Change 0658: `<future>` is an unmodelled worksheet child, so it
-        // marks the worksheet ineligible and the scan stops there; the invalid
-        // character reference after it is no longer seen by this stream. The
+        // `<future>` is an unmodelled worksheet child, so it marks the
+        // worksheet ineligible and the scan stops there; the invalid character
+        // reference after it is no longer seen by this stream. The
         // materialized parser — the reader that owns this payload's mandatory
         // validation — accepts the same bytes, and accepted them before this
         // change too, so `litchi_xlsx::Package::open` already returned a value
         // for this worksheet. The change converges the source-backed read onto
-        // that answer instead of keeping a refusal only this path raised; the
-        // witness is recorded in change 0658.
+        // that answer instead of keeping a refusal only this path raised.
         let late_tail = worksheet(
             r#"<sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData><future>&#xZZ;</future>"#,
         );
@@ -4544,8 +4543,8 @@ mod change_0658_ineligibility_gate_tests {
 
     /// Every way a worksheet can become ineligible, and what each costs.
     ///
-    /// Change 0658: the scan stops at the event that settles the verdict, so
-    /// the inert tail is never read. The verdict itself, and the answer the
+    /// The scan stops at the event that settles the verdict, so the inert
+    /// tail is never read. The verdict itself, and the answer the
     /// materialized parser gives for the same bytes, are unchanged.
     #[test]
     fn every_ineligibility_reason_stops_the_stream_at_its_mark() {
@@ -4700,8 +4699,8 @@ mod change_0658_ineligibility_gate_tests {
     }
 }
 
-/// Record 0011: the shared traversal follows the preprocessor's own decision.
-/// A declaration that spells the namespace with references is rewritten by
+/// The shared traversal follows the preprocessor's own decision. A
+/// declaration that spells the namespace with references is rewritten by
 /// preprocessing, so the source is never parsed as if it were borrowed.
 #[test]
 fn escaped_markup_compatibility_takes_the_rewritten_admission() {

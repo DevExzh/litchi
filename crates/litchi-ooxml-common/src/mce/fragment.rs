@@ -1,12 +1,12 @@
 //! Making one element span of a processed part parse standalone.
 //!
-//! Until change 0653 the markup-compatibility writer re-declared every in-scope
-//! namespace binding on every start tag it emitted, so any element span of the
-//! processed buffer happened to be namespace self-contained and a consumer
-//! could slice an inner element out of it and parse that range on its own. The
-//! writer now declares each namespace once, where XML requires it, which makes
-//! the processed part 16x smaller on real producer output and leaves an inner
-//! span carrying only the declarations its own subtree makes.
+//! The markup-compatibility writer used to re-declare every in-scope namespace
+//! binding on every start tag it emitted, so any element span of the processed
+//! buffer happened to be namespace self-contained and a consumer could slice an
+//! inner element out of it and parse that range on its own. The writer now
+//! declares each namespace once, where XML requires it, which makes the
+//! processed part 16x smaller on real producer output and leaves an inner span
+//! carrying only the declarations its own subtree makes.
 //!
 //! This module restores the property **at the slice boundary** instead: one
 //! bounded walk of the bytes before the span collects the declarations the span

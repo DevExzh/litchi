@@ -1,5 +1,5 @@
-//! Change 0754: the preserving commit route answers its source gate with the
-//! pair audit and proves its candidate to the package writer.
+//! The preserving commit route answers its source gate with the pair audit and
+//! proves its candidate to the package writer.
 //!
 //! The route must be the historical one — gate, then paragraph compaction or
 //! whole-document compaction — with the same bytes and the same errors, and a
@@ -9,8 +9,7 @@
 
 use super::*;
 
-/// The commit route before change 0754: the source gate first, then the
-/// route it chose.
+/// The earlier commit route: the source gate first, then the route it chose.
 fn historical_route(base: &Snapshot, projected: &Snapshot) -> Result<Snapshot> {
     if publication_accepts_preserved_xml(base.xml_bytes()) {
         compact_changed_paragraphs(base, projected, None)
@@ -155,7 +154,7 @@ fn the_route_and_proof_follow_the_historical_gate_on_mutated_sources() {
     ];
     let mut fallbacks = 0usize;
     // The first 40 fixtures in path order: enough mutated paragraphs that
-    // adding fixtures (record 0279 added three) keeps the bound meaningful.
+    // adding fixtures keeps the bound meaningful.
     for xml in fixture_documents().into_iter().take(40) {
         let Some(body) = xml.windows(8).position(|window| window == b"<w:body>") else {
             continue;
@@ -266,9 +265,9 @@ fn publishing_with_the_proof_emits_what_publishing_without_it_emits() {
 
 #[test]
 fn a_source_with_identity_is_proven_for_the_source_backed_writer() {
-    // Record 0311: the source-backed writer hands the proof to the OPC
-    // overlay, so a snapshot bound to a source identity is proven too, with
-    // the historical route's bytes.
+    // The source-backed writer hands the proof to the OPC overlay, so a
+    // snapshot bound to a source identity is proven too, with the historical
+    // route's bytes.
     let package = generated_package(16);
     let plain = package.document_snapshot().unwrap();
     let mut archive = std::io::Cursor::new(Vec::new());

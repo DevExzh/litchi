@@ -1,4 +1,4 @@
-//! Immutable worksheet ActiveX control edits of a [`crate::Package`] (record 0360).
+//! Immutable worksheet ActiveX control edits of a [`crate::Package`].
 //!
 //! [`crate::Package::edit_active_x`] starts an [`Edit`] of one worksheet; every operation
 //! runs on a private candidate graph, so an error stages nothing.

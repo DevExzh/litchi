@@ -1,4 +1,4 @@
-//! Slide media pictures (record 0321).
+//! Slide media pictures.
 //!
 //! [`Edit::add_media`] embeds one audio or video file with its poster
 //! image as a `p:pic`: the media part (`/ppt/media/mediaN.ext`), its

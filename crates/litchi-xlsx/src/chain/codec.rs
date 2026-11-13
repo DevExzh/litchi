@@ -768,12 +768,12 @@ fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
 /// The `extLst` span of the processed part, with every namespace declaration it
 /// inherits from the chain root re-declared on its own root element.
 ///
-/// Until change 0653 the shared markup-compatibility writer repeated every
-/// in-scope declaration on every element it emitted, so a retained span
-/// resolved on its own by accident. The writer now declares each namespace
-/// once, where XML requires it, so the inherited declarations are added here,
-/// at the slice boundary. The size bound still applies to the span as it
-/// appears in the part, so the refusal it produces is unchanged.
+/// The shared markup-compatibility writer used to repeat every in-scope
+/// declaration on every element it emitted, so a retained span resolved on
+/// its own by accident. The writer now declares each namespace once, where
+/// XML requires it, so the inherited declarations are added here, at the
+/// slice boundary. The size bound still applies to the span as it appears in
+/// the part, so the refusal it produces is unchanged.
 fn raw_range(bytes: &[u8], start: usize, end: usize) -> Result<String> {
     if end < start || end - start > MAX_EXTENSION_BYTES {
         return Err(invalid("calculation-chain extension list is too large"));

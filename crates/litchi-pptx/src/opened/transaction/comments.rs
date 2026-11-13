@@ -1,5 +1,4 @@
-//! Positional legacy- and modern-comment verbs for the unified API (records
-//! 0252 and 0333).
+//! Positional legacy- and modern-comment verbs for the unified API.
 
 use litchi_core::Position;
 
@@ -180,7 +179,7 @@ impl Edit {
     }
 
     /// Replace the `xsd:dateTime` stamp of the comment at `position` in the
-    /// slide's comment list (record 0346). Returns whether anything changed.
+    /// slide's comment list. Returns whether anything changed.
     ///
     /// # Errors
     ///
@@ -218,12 +217,12 @@ impl Edit {
     }
 
     /// Re-attribute the comment at `position` in the slide's comment list to
-    /// the author `name` with `initials` (record 0346); `None` keeps the
-    /// current author's value. The author is renamed in place when no other
-    /// comment of the presentation is theirs; otherwise the comment moves to
-    /// the author of that name and initials (created when absent) and takes
-    /// that author's next index, so the other comments keep their
-    /// attribution. Returns whether anything changed.
+    /// the author `name` with `initials`; `None` keeps the current author's
+    /// value. The author is renamed in place when no other comment of the
+    /// presentation is theirs; otherwise the comment moves to the author of
+    /// that name and initials (created when absent) and takes that author's
+    /// next index, so the other comments keep their attribution. Returns
+    /// whether anything changed.
     ///
     /// # Errors
     ///
@@ -284,12 +283,11 @@ impl Edit {
             })
     }
 
-    /// Remove the comment at `position` in the slide's legacy comment list
-    /// (record 0333). The slide's comments part and its relationship go
-    /// when the last comment does; the comment authors are kept, since
-    /// other slides may name them, and so is each author's last index, so
-    /// a later comment takes a fresh index. Returns whether anything
-    /// changed.
+    /// Remove the comment at `position` in the slide's legacy comment list. The
+    /// slide's comments part and its relationship go when the last comment
+    /// does; the comment authors are kept, since other slides may name them,
+    /// and so is each author's last index, so a later comment takes a fresh
+    /// index. Returns whether anything changed.
     ///
     /// # Errors
     ///
@@ -341,8 +339,8 @@ impl Edit {
     }
 
     /// Remove the modern (threaded) comment at `position` in the slide's
-    /// modern comment list, with its replies (record 0333). The slide's
-    /// comment part goes with its last comment; authors are kept.
+    /// modern comment list, with its replies. The slide's comment part goes
+    /// with its last comment; authors are kept.
     ///
     /// # Errors
     ///
@@ -367,7 +365,7 @@ impl Edit {
     }
 
     /// Remove the reply at `reply` of the modern comment at `comment` in the
-    /// slide's modern comment list (record 0333).
+    /// slide's modern comment list.
     ///
     /// # Errors
     ///

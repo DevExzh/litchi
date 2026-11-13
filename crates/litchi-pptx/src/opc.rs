@@ -1,4 +1,4 @@
-//! Raw clear-OPC edits of a [`Package`] (record 0351 §2.1 rule 4).
+//! Raw clear-OPC edits of a [`Package`].
 //!
 //! [`Package::edit_opc`] starts an [`Edit`] over a staged copy of the
 //! package's clear OPC graph; [`Edit::update`] runs one low-level graph

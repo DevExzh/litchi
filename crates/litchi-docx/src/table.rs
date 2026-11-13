@@ -65,9 +65,9 @@ impl XmlData {
     /// This span with every namespace declaration it inherits from its part
     /// re-declared on its own root element, so that it parses standalone.
     ///
-    /// Change 0653 stopped the markup-compatibility writer from repeating
-    /// every in-scope declaration on every element, so a span that is parsed
-    /// on its own asks for the inherited ones here.
+    /// The markup-compatibility writer does not repeat every in-scope
+    /// declaration on every element, so a span that is parsed on its own asks
+    /// for the inherited ones here.
     fn self_contained_xml(&self) -> Result<Vec<u8>> {
         match self {
             XmlData::Owned(bytes) => Ok(bytes.to_vec()),
@@ -97,11 +97,10 @@ fn absolute_start(base_offset: u32, relative_start: u32) -> Result<u32> {
 ///
 /// Only the cell's own properties are read: the `w:tcPr` of a cell in a
 /// table nested inside this cell, and properties below a direct child of
-/// `w:tcPr` (such as a `w:tcPrChange` snapshot), are skipped by depth
-/// (finding F-7 of record 0010). Names are resolved as the shared element
-/// scanner resolves them, and the scan keeps that scanner's depth and
-/// element limits and reads to the end of the fragment, so malformed XML is
-/// refused as before.
+/// `w:tcPr` (such as a `w:tcPrChange` snapshot), are skipped by depth. Names
+/// are resolved as the shared element scanner resolves them, and the scan keeps
+/// that scanner's depth and element limits and reads to the end of the
+/// fragment, so malformed XML is refused as before.
 fn word_cell_property_value(
     xml_bytes: &[u8],
     property_name: &[u8],

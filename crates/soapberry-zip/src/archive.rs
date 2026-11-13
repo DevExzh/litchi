@@ -1829,10 +1829,10 @@ impl<R> ZipArchive<R> {
     /// Scan the central directory from a buffer whose first `prefilled` bytes
     /// already hold the directory, starting at [`Self::directory_offset`].
     ///
-    /// Change 0632: the locator's first-central-record probe and this scan's
-    /// first refill begin at the same offset, so the locator reads that span
-    /// once and hands the buffer over. `prefilled` is zero when it did not,
-    /// and the iterator then reads exactly as it does today.
+    /// The locator's first-central-record probe and this scan's first refill
+    /// begin at the same offset, so the locator reads that span once and
+    /// hands the buffer over. `prefilled` is zero when it did not, and the
+    /// iterator then reads exactly as it does today.
     ///
     /// The spill threshold follows the caller-provided buffer when it is at
     /// least the historical recommendation, while retaining that 64 KiB
@@ -2865,11 +2865,11 @@ pub struct ZipEntries<'archive, 'buf, R> {
     /// spill buffer instead of the caller's buffer.
     ///
     /// This is `buffer.len()` for every caller-facing constructor, which is
-    /// the boundary this iterator has always used. Change 0632 sizes the
-    /// index's scan buffer to the declared central directory instead of the
-    /// recommended 64 KiB, and pins the boundary here so that a record whose
-    /// variable part exceeds the directory keeps refusing with the same typed
-    /// error rather than moving from the refill path to the spill path.
+    /// the boundary this iterator has always used. The index's scan buffer is
+    /// sized to the declared central directory instead of the recommended 64
+    /// KiB, and the boundary is pinned here so that a record whose variable
+    /// part exceeds the directory keeps refusing with the same typed error
+    /// rather than moving from the refill path to the spill path.
     spill_threshold: usize,
 }
 

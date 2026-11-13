@@ -1,5 +1,5 @@
 //! Source-native planning for a bounded slide removal. The slide leaves with
-//! the Parts it owns exclusively (record 0303).
+//! the Parts it owns exclusively.
 //!
 //! The plan in this module retains a source-authorized symbolic removal
 //! description. It is therefore reusable by the primary source editor, but it
@@ -33,10 +33,9 @@ const MCE_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatib
 /// A checked source-native whole-slide removal prerequisite.
 ///
 /// The topology removes one presentation relationship, one slide Part and
-/// the Parts that slide owns exclusively (record 0303). Each
-/// raw candidate keeps untouched members as lazy source transfers. The plan is
-/// process-local and one-way: it carries no durable revision patch and no
-/// inverse operation.
+/// the Parts that slide owns exclusively. Each raw candidate keeps untouched
+/// members as lazy source transfers. The plan is process-local and one-way: it
+/// carries no durable revision patch and no inverse operation.
 pub(crate) struct SourceBackedSlideRemovalPlan {
     #[cfg_attr(
         not(test),
@@ -87,7 +86,7 @@ struct RemovalDescription {
         expect(dead_code, reason = "read by the source-level engine tests")
     )]
     removed_slide: PackURI,
-    /// Parts the removed slide owned exclusively (record 0303).
+    /// Parts the removed slide owned exclusively.
     #[cfg_attr(
         not(test),
         expect(dead_code, reason = "read by the source-level engine tests")
@@ -159,9 +158,9 @@ impl SourceBackedPresentationEditor {
     /// relationship besides its presentation binding and the Parts it owns.
     /// The Parts it owns exclusively (notes slide, pictures, diagrams, VML
     /// drawings, comments, embedded objects) are removed with it; Parts that
-    /// another owner still targets stay (record 0303). Signature, macro, protected,
-    /// MCE, unknown-physical-member, positional, and unknown semantic surfaces
-    /// are refused through the typed [`SlideRemovalRefusal`] boundary.
+    /// another owner still targets stay. Signature, macro, protected, MCE,
+    /// unknown-physical-member, positional, and unknown semantic surfaces are
+    /// refused through the typed [`SlideRemovalRefusal`] boundary.
     pub(crate) fn plan_slide_removal(
         &self,
         position: impl Into<Position>,
@@ -476,7 +475,7 @@ fn reserve_candidate_xml(
 
 /// The candidate must be the source with exactly these sorted, disjoint,
 /// nonempty spans deleted: the removed slide's catalog entry and its section
-/// entry (record 0303).
+/// entry.
 fn validate_deletions(
     source: &[u8],
     candidate: &[u8],

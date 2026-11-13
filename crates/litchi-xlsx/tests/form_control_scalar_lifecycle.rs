@@ -1005,7 +1005,7 @@ fn source_patch_rejects_changed_incoming_readset_and_signed_mutation() {
         checked_scalar(Checked::Unchecked),
     )
     .expect("stage signed mutation");
-    // A changed edit of a signed source is refused at commit (record 0360).
+    // A changed edit of a signed source is refused at commit.
     assert!(matches!(
         edit.commit(),
         Err(Error::Signed) | Err(Error::Package(OpcError::SignedSourceRequiresExplicitPolicy))
@@ -2048,9 +2048,9 @@ fn ordinary_form_control_durable_patch_replays_forward_and_inverse() {
     );
 }
 
-/// The source-backed form-control route of record 0360 under the shape these
-/// tests drive: a workbook, an owner policy, and publication by writing the
-/// committed workbook.
+/// The source-backed form-control route under the shape these tests drive: a
+/// workbook, an owner policy, and publication by writing the committed
+/// workbook.
 struct Editor {
     workbook: SourceBackedWorkbook,
     limits: Option<OwnerLimits>,

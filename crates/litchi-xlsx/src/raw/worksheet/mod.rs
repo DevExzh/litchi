@@ -97,8 +97,8 @@ pub(crate) fn source_stream_admission(content: &[u8]) -> Option<SourceAdmission>
     {
         return None;
     }
-    // Exactly the preprocessor's own fast-path test (record 0011): a
-    // declaration that spells the namespace with references is rewritten.
+    // Exactly the preprocessor's own fast-path test: a declaration that spells
+    // the namespace with references is rewritten.
     Some(if mce::mentions_namespace(content) {
         SourceAdmission::Rewritten
     } else {

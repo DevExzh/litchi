@@ -294,7 +294,7 @@ pub(super) fn apply(package: &Package, data: &Data, shape_removals: bool) -> Res
     let root_changed = data.before_root.as_slice() != data.after_root.as_slice();
     let order_changed = data.before_order.as_ref() != data.after_order.as_ref();
     // A root may change without an order change only in section membership
-    // (a slide moved out and back across a section boundary, record 0303).
+    // (a slide moved out and back across a section boundary).
     if (order_changed && !root_changed)
         || (root_changed
             && !order_changed
@@ -485,8 +485,7 @@ pub(super) fn validate_pair_with_limits(
         })
         .transpose()?;
     // A slide that encloses markup compatibility in shape-tree children
-    // admits only whole top-level shape removal, proven on the source bytes
-    // (record 0303).
+    // admits only whole top-level shape removal, proven on the source bytes.
     if shape_removals {
         if let Some(limits) = limits {
             for xml in [before, after] {
@@ -989,7 +988,7 @@ fn validate_root_delta(
 
 /// Whether `after_root` is `before_root` with its slide catalog permuted to
 /// `after_order`. A sectioned root may also move section entries; their
-/// membership must be one the order change keeps (record 0303).
+/// membership must be one the order change keeps.
 fn order_delta_matches(
     before_root: &[u8],
     before_order: &[StableSlideKey],

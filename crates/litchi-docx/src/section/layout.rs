@@ -680,7 +680,7 @@ impl Patch {
     }
 
     /// Apply to a snapshot with the patch's before bytes and complete source
-    /// artifact identity, from any package source (record 0355a).
+    /// artifact identity, from any package source.
     pub(crate) fn apply_content(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.xml.as_slice() != self.before.as_slice() {
             return Err(Error::conflict(

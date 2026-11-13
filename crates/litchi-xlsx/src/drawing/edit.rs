@@ -1,5 +1,4 @@
-//! Worksheet pictures and shapes: read, add, move and remove (unified-ops
-//! record 0320).
+//! Worksheet pictures and shapes: read, add, move and remove.
 //!
 //! [`Package::drawing_elements`] and
 //! [`crate::workbook::SourceWorksheet::drawing_elements`] list the top-level
@@ -346,12 +345,12 @@ impl Edit {
     }
 
     /// Replace the image of the picture at `index` among the worksheet's
-    /// pictures (record 0338): the bytes become a new media part with
-    /// `content_type` and `extension`, the picture's image relationship is
-    /// retargeted to it, and the old media part is removed once nothing
-    /// refers to it. The picture's anchor, names and geometry keep their
-    /// bytes. Returns whether anything changed: the same bytes and content
-    /// type are an exact no-op.
+    /// pictures: the bytes become a new media part with `content_type` and
+    /// `extension`, the picture's image relationship is retargeted to it,
+    /// and the old media part is removed once nothing refers to it. The
+    /// picture's anchor, names and geometry keep their bytes. Returns
+    /// whether anything changed: the same bytes and content type are an
+    /// exact no-op.
     ///
     /// # Errors
     ///
@@ -412,8 +411,7 @@ impl Edit {
     /// [`Self::replace_image`] for a picture its caller has already read:
     /// `picture` is the element at `index` among the worksheet's pictures,
     /// as [`Package::drawing_elements`] or [`Self::elements`] returns it, so
-    /// the drawing is not read a second time to find its image (unified-ops
-    /// record 0347).
+    /// the drawing is not read a second time to find its image.
     ///
     /// The picture's image relationship is still resolved in the staged
     /// drawing: a `picture` whose image part the element at `index` does not

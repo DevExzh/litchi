@@ -1,5 +1,4 @@
-//! Committed source-backed packages whose output is a deferred stream
-//! (record 0356a; the shape of DOCX record 0355a).
+//! Committed source-backed packages whose output is a deferred stream.
 //!
 //! A family whose change is not a slide overlay (the SVG picture families)
 //! commits a new [`Package`] without writing anything. Its output is the

@@ -2639,10 +2639,10 @@ fn chart_fragment_roots_of_many_repeated_names_are_refused_as_before() {
     );
 }
 
-/// Record 0290 F2: PowerPoint and Excel write axis IDs at or above 2^31 as
-/// negative signed integers (`ooxml/pptx/radar-chart.pptx`). The reader takes
-/// them as the same 32 bits, so the bindings still match, and the writer
-/// spells them as the schema's unsigned decimals.
+/// PowerPoint and Excel write axis IDs at or above 2^31 as negative signed
+/// integers (`ooxml/pptx/radar-chart.pptx`). The reader takes them as the same
+/// 32 bits, so the bindings still match, and the writer spells them as the
+/// schema's unsigned decimals.
 #[test]
 fn reads_negative_producer_axis_ids_as_the_same_bits() {
     let xml = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">

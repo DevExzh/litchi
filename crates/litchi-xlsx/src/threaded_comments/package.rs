@@ -1,7 +1,6 @@
-//! Threaded-comment reads of a worksheet and the workbook's people
-//! (unified-ops record 0322): a worksheet names its threaded-comments part,
-//! the workbook names its persons part. Only those relationships and parts
-//! are read.
+//! Threaded-comment reads of a worksheet and the workbook's people: a
+//! worksheet names its threaded-comments part, the workbook names its
+//! persons part. Only those relationships and parts are read.
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, PackURI, Relationships};

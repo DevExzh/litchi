@@ -28,10 +28,10 @@ pub(crate) enum Payload {
         formula: Option<Formula>,
     },
     /// Replace the cached result of an existing formula cell, keeping its
-    /// `f` element byte for byte (record 0279).
+    /// `f` element byte for byte.
     Cache(crate::cell::Value),
     /// Write rich text as the cell's own inline string, each run keeping
-    /// its run properties (record 0295).
+    /// its run properties.
     Rich(Box<crate::cell::RichText>),
     /// Ensure an explicit empty cell record exists.
     Clear,

@@ -213,7 +213,7 @@ pub enum AuthoredReplayError {
     /// A bounded authored resource was exceeded.
     #[error("authored paragraph stream {kind} limit exceeded: {actual} > {maximum}")]
     Limit {
-        /// The exceeded budget (record 0355a).
+        /// The exceeded budget.
         kind: LimitKind,
         /// Observed value.
         actual: u64,
@@ -477,7 +477,7 @@ pub enum Error {
     /// An independent stream limit was exceeded.
     #[error("paragraph stream {kind} limit exceeded: {actual} > {maximum}")]
     Limit {
-        /// The exceeded budget (record 0355a).
+        /// The exceeded budget.
         kind: LimitKind,
         /// Observed value.
         actual: u64,
@@ -1548,7 +1548,7 @@ pub struct ParagraphStreamPlan<'package> {
     main_part: String,
     expected_candidate_archive: Option<patch::ArtifactProof>,
     /// The authored input and expectations, kept for replaying the commit's
-    /// patch onto another package (record 0355a).
+    /// patch onto another package.
     input: Arc<dyn AuthoredInput>,
     expected: Option<PatchExpectations>,
 }
@@ -1626,7 +1626,7 @@ impl<'package> ParagraphStreamPlan<'package> {
     }
 
     /// Commit the prepared append as a new source-backed package; writing
-    /// that package streams this plan's splice (record 0355a).
+    /// that package streams this plan's splice.
     ///
     /// # Errors
     ///
@@ -1667,7 +1667,7 @@ impl<'package> ParagraphStreamPlan<'package> {
 }
 
 /// What a durable forward patch of a prepared append records, apart from
-/// the candidate archive (record 0355a).
+/// the candidate archive.
 struct DurableParts {
     limits: patch::PatchLimits,
     main_part: String,
@@ -2705,7 +2705,7 @@ impl From<crate::Error> for Error {
 }
 
 impl Package {
-    /// A stream edit over a retained authored input (record 0355a replay).
+    /// A stream edit over a retained authored input (replay).
     pub(super) fn stream_edit(
         &self,
         input: Arc<dyn AuthoredInput>,
@@ -2722,7 +2722,8 @@ impl Package {
         })
     }
 }
-/// The bounded resources of a paragraph-stream append, carried by [`Error::Limit`] and [`AuthoredReplayError::Limit`] (record 0355a).
+/// The bounded resources of a paragraph-stream append, carried by
+/// [`Error::Limit`] and [`AuthoredReplayError::Limit`].
 ///
 /// Each variant names one bounded resource; [`std::fmt::Display`] gives its
 /// human-readable name, the one the error messages print.

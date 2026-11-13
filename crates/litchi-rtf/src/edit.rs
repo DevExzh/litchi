@@ -1611,7 +1611,7 @@ pub struct Edit {
     /// destination batch checks uniqueness in constant time per operation.
     destination_effects: std::collections::HashSet<String>,
     /// Field instructions, bookmarks, tab stops and section page setup,
-    /// committed by source splicing (record 0328).
+    /// committed by source splicing.
     marks: Vec<marks::Mark>,
 }
 
@@ -5153,8 +5153,8 @@ impl Edit {
         }
         // The plain-body paths keep their behaviour and cost; a paragraph
         // insertion, removal, move or swap they refuse falls back to exact
-        // source splicing of producer paragraphs (records 0293, 0308), whose
-        // typed refusal names the producer construct.
+        // source splicing of producer paragraphs, whose typed refusal names the
+        // producer construct.
         match self.operations.as_slice() {
             [
                 operation @ (Operation::RemoveParagraph { .. }

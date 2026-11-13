@@ -1,4 +1,4 @@
-//! Immutable Changes Information edits of a [`Package`] (record 0351 §2.3).
+//! Immutable Changes Information edits of a [`Package`].
 //!
 //! [`Package::edit_changes_info`] starts an [`Edit`] over a staged copy of the
 //! package; its verbs run on the staged graph and [`Edit::update`] stages

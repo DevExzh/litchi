@@ -1,5 +1,5 @@
-//! Element edits of the root transaction (record 0323): slide comments,
-//! shape and text hyperlinks, and table-cell text.
+//! Element edits of the root transaction: slide comments, shape and text
+//! hyperlinks, and table-cell text.
 //!
 //! Each verb computes complete record replacements from the working
 //! artifact's exact records and publishes them through
@@ -182,7 +182,7 @@ impl Transaction {
             }))
     }
 
-    /// Replace the text of one table cell (record 0323).
+    /// Replace the text of one table cell.
     ///
     /// A legacy table is a group of cell shapes; the cell's shape text is
     /// rewritten under the ordinary shape-text closure rules, so a changed
@@ -261,7 +261,7 @@ impl Transaction {
     }
 
     /// Set (`Some`) or remove (`None`) the click hyperlink of the top-level
-    /// shape at `target` (record 0323).
+    /// shape at `target`.
     ///
     /// A URL or slide link appends an `ExHyperlinkContainer` to the live
     /// document's external-object list (raising its identifier seed) and,
@@ -421,7 +421,7 @@ impl Transaction {
     }
 
     /// Apply character formatting to the UTF-16 units `start..start +
-    /// length` of the text of the top-level shape at `target` (record 0323).
+    /// length` of the text of the top-level shape at `target`.
     ///
     /// The body's `StyleTextPropAtom` runs are split at the range ends and
     /// the format applied to the runs inside; a body without a style atom
@@ -485,9 +485,9 @@ impl Transaction {
 
     /// Set (`Some`) or remove (`None`) the click hyperlink over exactly the
     /// UTF-16 units `start..start + length` of the text of the top-level
-    /// shape at `target` (record 0323), as an `InteractiveInfo` and
-    /// `TextInteractiveInfoAtom` pair; definitions follow
-    /// [`Self::set_shape_hyperlink`]. An equal link is an exact no-op.
+    /// shape at `target`, as an `InteractiveInfo` and `TextInteractiveInfoAtom`
+    /// pair; definitions follow [`Self::set_shape_hyperlink`]. An equal link is
+    /// an exact no-op.
     ///
     /// # Errors
     ///

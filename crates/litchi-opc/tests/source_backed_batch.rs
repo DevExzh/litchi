@@ -230,20 +230,20 @@ struct MemberRange {
 }
 
 /// The furthest before a member's payload that a read *of that member* can
-/// begin: the fixed local header plus the widest local variable region change
-/// 0573 measured in this repository's corpus.
+/// begin: the fixed local header plus the widest local variable region
+/// measured in this repository's corpus.
 const MEMBER_RECORD_PREFIX_BYTES: u64 = 640;
 
 /// Whether one positional read fetches the payload of the member whose first
 /// payload byte is at `payload`.
 ///
-/// Since change 0611 a member's first read is one bounded read of its whole
-/// local record, which begins at the member's local header rather than at its
-/// payload, so a probe keyed on the payload offset alone would never see a
-/// member start. The read must deliver the payload's first byte and must have
-/// begun inside the member's own local record; the non-empty requirement
-/// excludes the zero-length terminating read a range reader issues at the end
-/// of the preceding member.
+/// A member's first read is one bounded read of its whole local record, which
+/// begins at the member's local header rather than at its payload, so a probe
+/// keyed on the payload offset alone would never see a member start. The read
+/// must deliver the payload's first byte and must have begun inside the
+/// member's own local record; the non-empty requirement excludes the
+/// zero-length terminating read a range reader issues at the end of the
+/// preceding member.
 fn read_fetches_member(offset: u64, requested: usize, payload: u64) -> bool {
     let Ok(requested) = u64::try_from(requested) else {
         return false;
@@ -327,9 +327,9 @@ impl MemberWaveProbe {
     /// The member whose payload's first byte one positional read delivers.
     ///
     /// A member's payload used to arrive in a read that began exactly at its
-    /// offset. Since change 0611 a member's first read is one bounded read of
-    /// its whole local record, which begins at the member's local header, so a
-    /// probe keyed on the payload range alone would never see a member start.
+    /// offset. Now a member's first read is one bounded read of its whole
+    /// local record, which begins at the member's local header, so a probe
+    /// keyed on the payload range alone would never see a member start.
     /// Delivering the payload's first byte holds exactly once per member fetch
     /// under either grammar: a 30-byte local-header read stops inside the
     /// variable region, and a zero-length terminating read delivers nothing.
@@ -456,9 +456,9 @@ impl OrderedFailureProbe {
     /// The member whose payload's first byte one positional read delivers.
     ///
     /// A member's payload used to arrive in a read that began exactly at its
-    /// offset. Since change 0611 a member's first read is one bounded read of
-    /// its whole local record, which begins at the member's local header, so a
-    /// probe keyed on the payload range alone would never see a member start.
+    /// offset. Now a member's first read is one bounded read of its whole
+    /// local record, which begins at the member's local header, so a probe
+    /// keyed on the payload range alone would never see a member start.
     /// Delivering the payload's first byte holds exactly once per member fetch
     /// under either grammar: a 30-byte local-header read stops inside the
     /// variable region, and a zero-length terminating read delivers nothing.

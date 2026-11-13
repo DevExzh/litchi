@@ -6,8 +6,7 @@
 //! performs. It is never read from the environment, a global, or a package's
 //! stored preferences: the ordinary `save` methods always use
 //! [`Durability::Full`], and a weaker level is available only through the
-//! `*_with_durability` methods that take it as an argument (change 0761,
-//! authorized by change 0758 decision 5).
+//! `*_with_durability` methods that take it as an argument.
 
 /// How much an atomic filesystem save synchronizes before it returns.
 ///

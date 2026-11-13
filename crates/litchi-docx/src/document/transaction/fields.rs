@@ -1,5 +1,4 @@
-//! Field results of the main story, read and rewritten for field refresh
-//! (record 0279).
+//! Field results of the main story, read and rewritten for field refresh.
 //!
 //! [`Fields`] indexes the main document: every paragraph (its style, direct
 //! outline level, text and bookmarks), every simple (`w:fldSimple`) and
@@ -405,7 +404,7 @@ impl Fields {
 
     /// The direct body child holding paragraph `paragraph` (the paragraph
     /// itself, a table or a block content control), for a paragraph that
-    /// is not nested (record 0325).
+    /// is not nested.
     #[must_use]
     pub fn body_block(&self, paragraph: usize) -> Option<ElementStep> {
         let block = self.paragraphs.get(paragraph)?.block?;
@@ -696,8 +695,7 @@ pub enum Update {
         name: String,
     },
     /// Replace a field's instruction and mark it for update (`w:dirty`), as
-    /// OfficeCLI's field `set` does; the cached result is kept (record
-    /// 0325).
+    /// OfficeCLI's field `set` does; the cached result is kept.
     Instruction {
         /// The field index.
         field: usize,
@@ -705,7 +703,7 @@ pub enum Update {
         /// field's `w:instr`).
         instruction: String,
     },
-    /// Rename a bookmark (record 0325).
+    /// Rename a bookmark.
     RenameBookmark {
         /// The bookmark index.
         bookmark: usize,
@@ -713,7 +711,7 @@ pub enum Update {
         name: String,
     },
     /// Remove a bookmark's start and end markers, keeping what lies between
-    /// them (record 0325).
+    /// them.
     RemoveBookmark {
         /// The bookmark index.
         bookmark: usize,
@@ -1539,7 +1537,7 @@ fn entry_paragraph(prefix: &str, entry: &TocEntry) -> std::result::Result<String
 }
 
 /// The markup of a new bookmark around optional `text`: its start marker,
-/// a plain run, and its end marker (record 0325).
+/// a plain run, and its end marker.
 fn bookmark_markup(prefix: &str, id: i64, name: &str, text: Option<&str>) -> Result<Vec<u8>> {
     check_text(name).map_err(|reason| refused(0, reason))?;
     if name.is_empty() || name.chars().count() > 40 {
@@ -1557,7 +1555,7 @@ fn bookmark_markup(prefix: &str, id: i64, name: &str, text: Option<&str>) -> Res
 }
 
 /// The markup of a new complex field: its begin, instruction, separate,
-/// result and end runs, each carrying `properties` (record 0325).
+/// result and end runs, each carrying `properties`.
 fn field_markup(
     prefix: &str,
     properties: &[u8],
@@ -1680,9 +1678,8 @@ impl Edit {
 
     /// Insert a bookmark into the paragraph at `paragraph`, before its
     /// direct run `at` (after its last child for `None`): its start marker,
-    /// a plain run of `text` when given, and its end marker (record 0325).
-    /// The bookmark takes the identifier after the largest this document
-    /// uses, which it returns.
+    /// a plain run of `text` when given, and its end marker. The bookmark takes
+    /// the identifier after the largest this document uses, which it returns.
     ///
     /// # Errors
     ///
@@ -1713,8 +1710,8 @@ impl Edit {
     /// Insert a complex field (`begin`, `instrText`, `separate`, the result
     /// and `end` runs) into the paragraph at `paragraph`, before its direct
     /// run `at` (after its last child for `None`), and return the position
-    /// of its begin run among the paragraph's direct runs (record 0325).
-    /// `result` is the cached result; the instruction is written as given.
+    /// of its begin run among the paragraph's direct runs. `result` is the
+    /// cached result; the instruction is written as given.
     ///
     /// # Errors
     ///

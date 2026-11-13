@@ -853,7 +853,7 @@ fn write_new_action(
 /// Write one created cell. `name` is the cell element's qualified name (the
 /// row's prefix and `c`); the tag is written directly, byte-identical to
 /// `write_tag` with the same attributes, without a per-cell tag, attribute
-/// list or address string (record 0377a).
+/// list or address string.
 fn write_new_cell(
     output: &mut Vec<u8>,
     name: &str,
@@ -941,7 +941,7 @@ fn write_payload(output: &mut Vec<u8>, cell_name: &str, payload: &Payload) -> Re
 }
 
 /// Write an existing formula cell's `f` element unchanged, then its new
-/// cached result (record 0279).
+/// cached result.
 fn write_cache(
     output: &mut Vec<u8>,
     source: &[u8],
@@ -1056,7 +1056,7 @@ fn write_content(output: &mut Vec<u8>, cell_name: &str, content: &Content) -> Re
 
 /// Write `rich` as an inline string: one `r` per run, its `rPr` children
 /// re-emitted with the cell's namespace prefix and their attributes as
-/// stored (record 0295).
+/// stored.
 fn write_rich(output: &mut Vec<u8>, cell_name: &str, rich: &crate::cell::RichText) -> Result<()> {
     let inline = sibling_name(cell_name, "is");
     let run = sibling_name(cell_name, "r");

@@ -1,5 +1,4 @@
-//! Source-backed page-break edits of a [`SourceBackedWorkbook`] (record
-//! 0360, the 0355a §1 shape).
+//! Source-backed page-break edits of a [`SourceBackedWorkbook`].
 //!
 //! [`SourceBackedWorkbook::edit_page_breaks`] stages one worksheet's row and
 //! column breaks without materializing any unselected part body;

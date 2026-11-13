@@ -1,4 +1,4 @@
-//! Typed budgets of the web-settings family (record 0355a).
+//! Typed budgets of the web-settings family.
 
 use super::{MAX_FRAMESET_NESTING, MAX_TEXT_BYTES, MAX_XML_BYTES, MAX_XML_EVENTS};
 
@@ -93,7 +93,8 @@ impl Default for Limits {
     }
 }
 
-/// The bounded resources of the web-settings family, carried by [`crate::Error::WebLimit`] (record 0355a).
+/// The bounded resources of the web-settings family, carried by
+/// [`crate::Error::WebLimit`].
 ///
 /// Each variant names one bounded resource; [`std::fmt::Display`] gives its
 /// human-readable name, the one the error messages print.

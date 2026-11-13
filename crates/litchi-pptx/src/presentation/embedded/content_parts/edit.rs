@@ -1,4 +1,4 @@
-//! Immutable slide content-part edits of a [`Package`] (record 0351 §2.3).
+//! Immutable slide content-part edits of a [`Package`].
 //!
 //! [`Package::edit_content_parts`] starts an [`Edit`] over a staged copy of the
 //! package; its verbs run on the staged graph and [`Edit::update`] stages

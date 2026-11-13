@@ -1,5 +1,4 @@
-//! Click actions on shapes and text runs, read and written in place
-//! (record 0321).
+//! Click actions on shapes and text runs, read and written in place.
 //!
 //! [`Click`] is a click action as authored (`a:hlinkClick`): an optional
 //! relationship, an action URI and a tooltip. A slide resolves it to a

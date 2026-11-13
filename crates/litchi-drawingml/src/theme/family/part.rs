@@ -755,8 +755,7 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
     // Element names are resolved on namespace values as written, so an MCE
     // branch bound through a declaration spelled with references stays
     // invisible to the classification below while preprocessing applies it.
-    // Treat such a part as hiding an owner: its mutations are ambiguous
-    // (record 0011).
+    // Treat such a part as hiding an owner: its mutations are ambiguous.
     let mut hidden_owner = litchi_ooxml_common::mce::binds_namespace_by_reference(xml);
     let mut nodes = 0usize;
 

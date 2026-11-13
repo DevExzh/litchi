@@ -5,7 +5,7 @@
 )]
 
 //! `Workbook::unsigned` is the explicit signature removal that authorizes
-//! editing a signed workbook (ADR 0006; unified-ops record 0013).
+//! editing a signed workbook (ADR 0006).
 
 use std::path::PathBuf;
 

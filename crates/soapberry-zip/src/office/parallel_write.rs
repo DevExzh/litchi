@@ -25,11 +25,11 @@ use crate::{Error, ErrorKind};
 /// remainder is below this floor cannot repay the cost of taking the parallel
 /// path, whatever the largest member's size.
 ///
-/// Measured by change 0662 over sixteen changed-set shapes published through
-/// this writer: a wave costs about 9 µs of fixed scheduling, so a remainder of
-/// 768 bytes loses (0.75× at width 2) while 871 bytes already wins (1.48×).
-/// This value is an order of magnitude above that crossover; every shape
-/// measured at or above it returned at least 1.77× at width 2.
+/// Measured over sixteen changed-set shapes published through this writer: a
+/// wave costs about 9 µs of fixed scheduling, so a remainder of 768 bytes
+/// loses (0.75× at width 2) while 871 bytes already wins (1.48×). This value
+/// is an order of magnitude above that crossover; every shape measured at or
+/// above it returned at least 1.77× at width 2.
 pub const DEFAULT_MIN_PARALLELIZABLE_BYTES: u64 = 8 * 1024;
 
 /// Default smallest remainder eligible for a wave the session must build a
@@ -37,9 +37,9 @@ pub const DEFAULT_MIN_PARALLELIZABLE_BYTES: u64 = 8 * 1024;
 ///
 /// Building a pool costs about 120 µs on this host, and a publication owns its
 /// session, so a caller that does not attach its own facility pays that once
-/// per publication. Change 0662 measured a 28 KiB remainder at 0.93× and 0.85×
-/// at widths 4 and 8 on a cold pool against 1.28× and 1.22× on a caller's, and
-/// a 60 KiB remainder at 1.19× cold. This threshold keeps the cold path out of
+/// per publication. Measurement put a 28 KiB remainder at 0.93× and 0.85× at
+/// widths 4 and 8 on a cold pool against 1.28× and 1.22× on a caller's, and a
+/// 60 KiB remainder at 1.19× cold. This threshold keeps the cold path out of
 /// the range where the pool costs more than the wave saves.
 pub const DEFAULT_MIN_POOL_PARALLELIZABLE_BYTES: u64 = 64 * 1024;
 
@@ -47,7 +47,7 @@ pub const DEFAULT_MIN_POOL_PARALLELIZABLE_BYTES: u64 = 64 * 1024;
 ///
 /// The granted width never exceeds `1 + remainder / min_task_bytes`, so a
 /// positive floor narrows a set of one dominant member and a few crumbs to a
-/// serial wave. Change 0662 measured no floor worth imposing on *deflate*: a
+/// serial wave. Measurement found no floor worth imposing on *deflate*: a
 /// changed set of 128 members of 871 bytes each — every task three orders of
 /// magnitude below any plausible floor — scales 6.06× at width 8, because the
 /// cost a wave must repay belongs to the wave, not to the task. A caller whose
@@ -58,11 +58,10 @@ pub const DEFAULT_MIN_TASK_BYTES: u64 = 0;
 ///
 /// zlib's documented deflate footprint at window bits 15 and memory level 8 is
 /// `(1 << 17) + (1 << 17)` bytes, and a worker also touches its own stack and
-/// the wave's bookkeeping. Change 0662 measured peak RSS over a real
-/// publication rising 2.1 MiB at width 4 and 5.0 MiB at width 8 — 525 KiB and
-/// 625 KiB per worker — so this value is set above the larger of the two. A
-/// caller that charges a wave against a memory budget multiplies it by the
-/// granted width.
+/// the wave's bookkeeping. Peak RSS over a real publication was measured
+/// rising 2.1 MiB at width 4 and 5.0 MiB at width 8 — 525 KiB and 625 KiB per
+/// worker — so this value is set above the larger of the two. A caller that
+/// charges a wave against a memory budget multiplies it by the granted width.
 pub const WORKER_STATE_BYTES: u64 = 640 * 1024;
 
 /// A caller-provided facility that runs a bounded set of borrowed tasks.

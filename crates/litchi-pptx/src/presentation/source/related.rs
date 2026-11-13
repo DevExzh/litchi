@@ -880,7 +880,7 @@ impl SourceSlide {
         })
     }
 
-    /// The Office Math equations of this slide's text (record 0321); see
+    /// The Office Math equations of this slide's text; see
     /// [`crate::slide::Slide::equations`].
     ///
     /// # Errors
@@ -910,8 +910,7 @@ impl SourceSlide {
     }
 
     /// Resolve a click action of this slide's shapes or text through the
-    /// slide's relationships (record 0321); see
-    /// [`crate::slide::Slide::hyperlink`].
+    /// slide's relationships; see [`crate::slide::Slide::hyperlink`].
     ///
     /// # Errors
     /// Returns typed source, execution or relationship errors.
@@ -950,7 +949,7 @@ impl SourceSlide {
 
     /// The data-model XML of the SmartArt this slide relates through
     /// `relationship_id` (a SmartArt frame's `dgm:relIds/@r:dm`), or `None`
-    /// when the slide has no such diagram-data relationship (record 0284).
+    /// when the slide has no such diagram-data relationship.
     ///
     /// # Errors
     /// Returns typed source, execution, limit, relationship or XML errors.

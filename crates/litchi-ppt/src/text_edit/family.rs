@@ -1,6 +1,6 @@
-//! The source-backed text family (record 0357a): a same-length splice of one
-//! shape's text atom, published as a new [`Package`] over the composed
-//! overlay source without materializing the package.
+//! The source-backed text family: a same-length splice of one shape's text
+//! atom, published as a new [`Package`] over the composed overlay source
+//! without materializing the package.
 //!
 //! [`Package::edit_text`] opens the family. Its commit plans one
 //! [`litchi_cfb::ValidatedOverlayPlan`] splice in the `PowerPoint Document`
@@ -331,8 +331,7 @@ impl Edit {
 }
 
 impl Package {
-    /// Start a same-length text splice of one shape's text atom
-    /// (record 0357a).
+    /// Start a same-length text splice of one shape's text atom.
     ///
     /// The edit resolves the atom through bounded positional reads of the
     /// retained compound file; it never copies the package. A signed

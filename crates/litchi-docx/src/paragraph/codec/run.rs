@@ -685,9 +685,8 @@ enum Placement {
 /// Until this was added the readers took the first matching element below
 /// any `w:rPr`, so a run without a direct property reported the previous
 /// formatting kept in its `w:rPrChange`, or the formatting of a run nested
-/// in a text box it contains (finding F-8 of record 0010). Names keep the
-/// readers' established local-name matching; [`Run::direct_properties`]
-/// also checks namespaces.
+/// in a text box it contains. Names keep the readers' established local-name
+/// matching; [`Run::direct_properties`] also checks namespaces.
 #[derive(Default)]
 struct OwnProperties {
     depth: usize,

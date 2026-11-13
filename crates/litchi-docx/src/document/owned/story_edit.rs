@@ -1,5 +1,5 @@
 //! Paragraph and run edits of a header, footer or note story with the
-//! main-document transaction verbs (record 0325).
+//! main-document transaction verbs.
 //!
 //! [`Edit::edit_story`] wraps the story's content in a synthetic
 //! `w:document`/`w:body` (keeping the story part root's namespace

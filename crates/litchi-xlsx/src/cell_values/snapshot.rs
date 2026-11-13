@@ -305,7 +305,7 @@ impl MultiSnapshot {
     }
 
     /// The same selected worksheet closures, whatever source they were read
-    /// from (a replay compares content, record 0360).
+    /// from (a replay compares content).
     pub(crate) fn same_content(&self, other: &Self) -> bool {
         self.sheets.len() == other.sheets.len()
             && self
@@ -878,9 +878,9 @@ impl Snapshot {
     /// Refuse an edit at an address a merged range covers but does not
     /// anchor.
     ///
-    /// `<mergeCells>` is one of the worksheet children change 0657 admitted:
-    /// the rewrite copies it verbatim, and a merged range addresses its cells
-    /// by coordinate, so a value change never moves it. What the range does
+    /// `<mergeCells>` is one of the admitted worksheet children: the rewrite
+    /// copies it verbatim, and a merged range addresses its cells by
+    /// coordinate, so a value change never moves it. What the range does
     /// decide is which cell's value the merged rectangle displays — its
     /// top-left anchor. A value written to any other covered address would be
     /// stored and never shown, so this module refuses it, exactly as
@@ -1513,7 +1513,7 @@ fn append_worksheet_replacement(
         // `</sheetData>`, byte for byte from the source, and authors compact
         // bytes only for the `<dimension>` tag and the edited `<c>` records.
         // The replacement therefore carries the producer's own formatting,
-        // which publication audits with source rules since change 0657.
+        // which publication audits with source rules.
         let replacement_spans = after
             .worksheet_replacement_hint
             .as_ref()
@@ -3095,9 +3095,9 @@ mod row_reuse_tests {
     fn malformed_or_mce_candidate_bytes_are_rejected_before_merge() {
         let source = Snapshot::load(&fixture_package(&scalar_fixture()), "Sheet1").unwrap();
 
-        // Change 0657: an unfamiliar attribute on the root is copied through
-        // by the rewrite, so a candidate that carries one is admitted and
-        // still reads back to the same store.
+        // An unfamiliar attribute on the root is copied through by the
+        // rewrite, so a candidate that carries one is admitted and still
+        // reads back to the same store.
         let mut unfamiliar = proof_for_set(&source, "A1", 42);
         assert!(!unfamiliar.omitted.is_empty());
         let root_end = unfamiliar

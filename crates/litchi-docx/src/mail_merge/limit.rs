@@ -1,9 +1,10 @@
-//! Typed budgets of the mail-merge family (record 0355a).
+//! Typed budgets of the mail-merge family.
 
 use litchi_ooxml_common::mce::Limits as MceLimits;
 use litchi_opc::SourceLimits;
 
-/// The bounded resources of the mail-merge family, carried by [`crate::Error::MailMergeLimit`] (record 0355a).
+/// The bounded resources of the mail-merge family, carried by
+/// [`crate::Error::MailMergeLimit`].
 ///
 /// Each variant names one bounded resource; [`std::fmt::Display`] gives its
 /// human-readable name, the one the error messages print.

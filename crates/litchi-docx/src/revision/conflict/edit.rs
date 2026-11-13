@@ -1,5 +1,5 @@
-//! The conflict-markup family (record 0355): Word conflict annotations and
-//! paired conflict ranges of one story.
+//! The conflict-markup family: Word conflict annotations and paired conflict
+//! ranges of one story.
 //!
 //! [`Package::conflicts`](crate::Package::conflicts) reads the main story and
 //! [`Package::conflict_stories`](crate::Package::conflict_stories) every
@@ -18,7 +18,7 @@ graph_family!("conflict-markup", own_limits);
 
 pub use super::limit::LimitKind;
 
-/// Options of a conflict-markup edit (record 0355a).
+/// Options of a conflict-markup edit.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct EditOptions {
     limits: Option<super::Limits>,

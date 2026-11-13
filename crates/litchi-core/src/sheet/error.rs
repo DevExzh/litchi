@@ -13,9 +13,8 @@ use crate::edit::{Refusal, RefusalKind};
 /// it, and a format error converts into it by classification
 /// (`impl From<FormatError> for sheet::Error`).
 ///
-/// It follows the record 0351 §2.4 taxonomy and is content-free by
-/// construction: every message is static text, never a sheet name, a cell
-/// value or formula text.
+/// It is content-free by construction: every message is static text, never a
+/// sheet name, a cell value or formula text.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Error {

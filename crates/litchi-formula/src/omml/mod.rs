@@ -58,8 +58,8 @@ mod tests {
     use super::*;
     use crate::ast::{AccentType, Fence, Formula, LargeOperator};
 
-    /// Change 0765: an error in a byte-order-marked input is reported at its
-    /// byte offset in the input, three bytes after the reader's position.
+    /// An error in a byte-order-marked input is reported at its byte offset in
+    /// the input, three bytes after the reader's position.
     #[test]
     fn a_marked_input_reports_errors_at_byte_offsets() {
         let formula = Formula::new();

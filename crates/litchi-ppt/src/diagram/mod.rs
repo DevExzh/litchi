@@ -20,7 +20,7 @@ mod package;
     not(test),
     expect(
         dead_code,
-        reason = "the record-level owner behind the package-level Edit; its full surface stays exercised by the unit tests (record 0357)"
+        reason = "the record-level owner behind the package-level Edit; its full surface stays exercised by the unit tests"
     )
 )]
 mod transaction;

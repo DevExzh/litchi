@@ -1,4 +1,4 @@
-//! Immutable cell-watch edits of an XLSB [`Package`] (record 0360b).
+//! Immutable cell-watch edits of an XLSB [`Package`].
 //!
 //! [`Package::edit_cell_watches`] starts an [`Edit`] whose verbs add, remove,
 //! replace or clear a worksheet's watched cells and its worksheet-wide

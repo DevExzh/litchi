@@ -1,4 +1,4 @@
-//! Orphan proof for the Parts a removed slide owns exclusively (record 0303).
+//! Orphan proof for the Parts a removed slide owns exclusively.
 //!
 //! A slide reaches its notes slide, pictures, diagrams, VML drawings,
 //! comments and embedded objects through its own relationships. Removing the

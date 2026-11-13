@@ -1,4 +1,4 @@
-//! The semantic budgets an XLSB package keeps (record 0351 §2.5).
+//! The semantic budgets an XLSB package keeps.
 //!
 //! A [`crate::Package`], its [`crate::Workbook`] projection and a
 //! [`crate::SourceBackedWorkbook`] keep the [`SemanticLimits`] they were

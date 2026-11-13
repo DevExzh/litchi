@@ -27,9 +27,8 @@ fn custom_properties_xml(bytes: &[u8]) -> Vec<u8> {
 }
 
 /// Opens and drops a document edit. The alt-chunk-header fixture (an
-/// `w:altChunk` after the body-final section properties) was refused until
-/// record 0293 admitted that tail; either way the package keeps its custom
-/// properties.
+/// `w:altChunk` after the body-final section properties) used to be refused and
+/// is admitted now; either way the package keeps its custom properties.
 fn abandoned_document_edit(package: &mut Package) {
     assert!(
         package.edit().is_ok(),
@@ -316,9 +315,9 @@ fn raw_opc_empty_custom_properties_part_is_preserved_until_explicit_clear() {
     cleared
         .write_to(&mut cleared_output)
         .expect("save explicitly cleared custom properties");
-    // Clearing properties that are already empty is an exact no-op (record
-    // 0355): the empty part is kept byte for byte. Removing the part itself
-    // is a raw graph change.
+    // Clearing properties that are already empty is an exact no-op: the empty
+    // part is kept byte for byte. Removing the part itself is a raw graph
+    // change.
     assert_eq!(custom_properties_xml(&cleared_output), replacement);
 
     let removed = remove_custom_props(&cleared).expect("explicitly remove custom graph");

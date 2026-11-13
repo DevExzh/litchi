@@ -1,4 +1,4 @@
-//! Immutable VBA project edits of an XLSB [`Package`] (record 0360b).
+//! Immutable VBA project edits of an XLSB [`Package`].
 //!
 //! [`Package::edit_vba`] starts an [`Edit`] of the workbook's attached
 //! MS-OVBA project; [`Edit::set`] attaches a cache-free authored project,

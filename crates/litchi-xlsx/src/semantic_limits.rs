@@ -1,4 +1,4 @@
-//! The semantic budgets an XLSX package keeps (record 0360).
+//! The semantic budgets an XLSX package keeps.
 //!
 //! [`OpenOptions::semantic_limits`](crate::OpenOptions::semantic_limits)
 //! configures them when a package is opened; a package keeps the limits it

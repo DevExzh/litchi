@@ -1,6 +1,5 @@
-//! The stylesWithEffects family (record 0355): the optional Word
-//! `stylesWithEffects` part of one owner (the main or the glossary
-//! document).
+//! The stylesWithEffects family: the optional Word `stylesWithEffects` part of
+//! one owner (the main or the glossary document).
 //!
 //! [`Package::styles_with_effects`](crate::Package::styles_with_effects)
 //! reads an owner's [`Snapshot`];

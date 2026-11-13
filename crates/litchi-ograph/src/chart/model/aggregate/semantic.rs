@@ -10,7 +10,7 @@ use super::validation::{cache_dimensions, check_add, dimensions_cover, reserve_o
 use crate::{Error, Limits, Result};
 
 /// Host-neutral semantic chart model: the mutable codec model of one chart
-/// substream (record 0359 renamed it from `Chart`, an owner noun).
+/// substream (renamed from `Chart`, an owner noun).
 ///
 /// Parsed values retain their exact [`Stream`]. An untouched parsed value can
 /// therefore be encoded byte-for-byte without copying. Mutation is allowed for

@@ -1,23 +1,22 @@
 //! Byte identity of the owned cross-copy's durable patches, revisions,
-//! published archives and refusals across change 0751.
+//! published archives and refusals under digest reuse.
 //!
-//! Change 0751 stops re-hashing bytes whose identity is already proven: the
-//! application's live revisions consult the facade's payload-digest memos,
-//! the candidate captures consult the snapshots' memos, an unmodified owned
-//! source's physical revision is sealed from the digest `litchi-opc` binds to
-//! its archive, and an application shares a plan's retained archive instead of
-//! copying it. None of that may move a value. This module records, for a set
-//! of deterministic scenarios, the SHA-256 of every durable patch encoding, the
-//! six recorded revisions, every published archive and returned snapshot
-//! revision, and the text of every refusal, and compares the transcript with
-//! the one base `6d989cad63` produces. The module compiles unchanged on the
-//! base tree, which is how `GOLDEN` was generated.
+//! The owned cross-copy does not re-hash bytes whose identity is already
+//! proven: the application's live revisions consult the facade's payload-digest
+//! memos, the candidate captures consult the snapshots' memos, an unmodified
+//! owned source's physical revision is sealed from the digest `litchi-opc`
+//! binds to its archive, and an application shares a plan's retained archive
+//! instead of copying it. None of that may move a value. This module records,
+//! for a set of deterministic scenarios, the SHA-256 of every durable patch
+//! encoding, the six recorded revisions, every published archive and returned
+//! snapshot revision, and the text of every refusal, and compares the
+//! transcript with the one base `6d989cad63` produces. The module compiles
+//! unchanged on the base tree, which is how `GOLDEN` was generated.
 //!
-//! After 0751's review the transcript also covers a destination holding a
-//! caller-defined part, by plan and by durable patch in both directions, and
-//! size-limit refusals end to end: durable patches read under limits that
-//! admit the patch but not the source or destination archive, and planning
-//! under the same limits.
+//! The transcript also covers a destination holding a caller-defined part, by
+//! plan and by durable patch in both directions, and size-limit refusals end to
+//! end: durable patches read under limits that admit the patch but not the
+//! source or destination archive, and planning under the same limits.
 #![allow(
     clippy::expect_used,
     clippy::unwrap_used,

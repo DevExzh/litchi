@@ -1,5 +1,5 @@
-//! Table grid edits (record 0345): a single cell added to a row, a column
-//! added to or removed from a table, and a column's width.
+//! Table grid edits: a single cell added to a row, a column added to or removed
+//! from a table, and a column's width.
 //!
 //! Each edit rewrites the table as one element replacement, so the grid
 //! (`w:tblGrid`), the rows' cells and their widths change together, replay
@@ -28,8 +28,8 @@ use crate::properties::{Twips, Width};
 /// average: 2400 twips.
 const DEFAULT_COLUMN_WIDTH: u32 = 2400;
 
-/// A cell to add to a row (record 0345): its text, one paragraph, and its
-/// preferred width (`w:tcW`).
+/// A cell to add to a row: its text, one paragraph, and its preferred width
+/// (`w:tcW`).
 ///
 /// ```
 /// use litchi_docx::document::NewCell;
@@ -502,7 +502,7 @@ impl Edit {
     }
 
     /// Add `cell` to the row at `row`, before its cell `at` (or after its
-    /// last cell), and return the new cell's position (record 0345).
+    /// last cell), and return the new cell's position.
     ///
     /// As OfficeCLI's `AddCell`: when the row then spans more grid columns
     /// than the table's grid has, the grid gains columns of the grid's
@@ -599,8 +599,7 @@ impl Edit {
     }
 
     /// Add a column to the table at `table`, before its grid column `at`
-    /// (or after the last one), and return the new column's position
-    /// (record 0345).
+    /// (or after the last one), and return the new column's position.
     ///
     /// As OfficeCLI's `AddTableColumn`: the grid gains a `w:gridCol` of
     /// `width` twips (the grid's average width when `None`, 2400 for an
@@ -693,7 +692,7 @@ impl Edit {
     }
 
     /// Remove grid column `column` of the table at `table`: its
-    /// `w:gridCol` and each row's cell in that column (record 0345).
+    /// `w:gridCol` and each row's cell in that column.
     ///
     /// As OfficeCLI's `RemoveTableColumn`, a column holding a merged or
     /// spanning cell is refused; so are the table's last column and a cell
@@ -740,10 +739,9 @@ impl Edit {
     }
 
     /// Set the width of grid column `column` of the table at `table` to
-    /// `width` twips (record 0345): its `w:gridCol`, and the `w:tcW` of
-    /// each row's cell that occupies that column alone and states a width
-    /// in twips, so Word's fixed layout follows. An unchanged width is an
-    /// exact no-op.
+    /// `width` twips: its `w:gridCol`, and the `w:tcW` of each row's cell that
+    /// occupies that column alone and states a width in twips, so Word's fixed
+    /// layout follows. An unchanged width is an exact no-op.
     ///
     /// # Errors
     ///

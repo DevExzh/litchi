@@ -13,7 +13,7 @@ fn xls_package(snapshot: &Snapshot) -> litchi_xls::Package {
 }
 
 /// The source-backed workbook over `bytes`, for the source-backed comment
-/// family (record 0359a).
+/// family.
 fn source_workbook(bytes: &[u8]) -> litchi_xls::SourceBackedWorkbook {
     litchi_xls::SourceBackedWorkbook::from_read_at(std::sync::Arc::new(
         litchi_core::OwnedSource::new(bytes.to_vec()),

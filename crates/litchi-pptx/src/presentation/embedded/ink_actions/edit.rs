@@ -1,4 +1,4 @@
-//! Immutable InkAction edits of a [`Package`] (record 0351 §2.3).
+//! Immutable InkAction edits of a [`Package`].
 //!
 //! [`Package::edit_ink_actions`] starts an [`Edit`] whose verbs replace the
 //! action profile of one existing InkAction target on one slide.

@@ -26,33 +26,31 @@ const BITSET_WORD_BITS: usize = u64::BITS as usize;
 
 /// A reusable chain map is restored sector by sector only when the chain is
 /// shorter than an eighth (one over this ratio) of the table's words, and by
-/// clearing the table's words otherwise. Restoring every shorter chain
-/// sector by sector ran more instructions on small tables than the bulk clear
-/// it replaced (record 0767). The ratio keeps small tables, which most files
-/// have, on the bulk clear, and still bounds every restoration by eight word
-/// writes per sector of its chain.
+/// clearing the table's words otherwise. Restoring every shorter chain sector
+/// by sector ran more instructions on small tables than the bulk clear it
+/// replaced. The ratio keeps small tables, which most files have, on the bulk
+/// clear, and still bounds every restoration by eight word writes per sector
+/// of its chain.
 const CLEAR_BY_SECTOR_RATIO: usize = 8;
 
 /// Capacity, in bytes, above which a reader frees its retained chain buffer
-/// after a read instead of keeping it for the next read (record 0769,
-/// following the review of record 0767).
+/// after a read instead of keeping it for the next read.
 ///
 /// An [`OleFile`] keeps the buffers its reads collect chains into, so that
-/// reading many streams costs time proportional to their chains (record
-/// 0767). Kept for the reader's lifetime, the chain buffer would pin one
-/// `u32` per sector of the longest chain ever read, about 8 MiB after one
-/// 1 GiB stream of 512-byte sectors. The chain buffer grows by doubling, so a
-/// capacity above 1 MiB follows a chain of more than 131,072 sectors: a
-/// stream of more than 64 MiB even at 512-byte sectors, whose own buffer
-/// that read allocated anyway. The next such read allocates the chain buffer
-/// again; reads of shorter chains keep theirs, so the common small-file path
-/// is unchanged.
+/// reading many streams costs time proportional to their chains. Kept for the
+/// reader's lifetime, the chain buffer would pin one `u32` per sector of the
+/// longest chain ever read, about 8 MiB after one 1 GiB stream of 512-byte
+/// sectors. The chain buffer grows by doubling, so a capacity above 1 MiB
+/// follows a chain of more than 131,072 sectors: a stream of more than 64 MiB
+/// even at 512-byte sectors, whose own buffer that read allocated anyway. The
+/// next such read allocates the chain buffer again; reads of shorter chains
+/// keep theirs, so the common small-file path is unchanged.
 ///
 /// The visited map is kept whatever its size. It holds one bit per entry of
 /// the larger table read, a thirty-second of the memory that table's `u32`
 /// entries already take in the reader for its lifetime, and freeing it would
 /// make every later read allocate and zero a table-sized map again, the cost
-/// record 0767 removed.
+/// keeping it avoids.
 const RETAINED_CHAIN_SCRATCH_BYTES: usize = 1 << 20;
 
 /// Upper bound, in bytes, on the scratch buffer the FAT and MiniFAT loaders
@@ -364,8 +362,8 @@ fn claim_sector_conflict_error(
     ))
 }
 
-/// Where the root mini stream ends, in mini sectors: the bound every byte of
-/// a mini stream must lie within (record 0769).
+/// Where the root mini stream ends, in mini sectors: the bound every byte of a
+/// mini stream must lie within.
 ///
 /// The root entry's stream size is the size of the mini stream in bytes
 /// (MS-CFB 2.6.1), and MS-CFB does not require it to be a whole number of

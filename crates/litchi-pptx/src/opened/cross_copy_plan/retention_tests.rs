@@ -268,7 +268,7 @@ fn releasing_and_dropping_return_the_retained_bytes() -> Result<()> {
     reused.apply_cross_slide_copy_plan(&source, &plan)?;
     assert_eq!(rebuilt.to_bytes()?, reused.to_bytes()?);
     // The application shares the retained allocation with the package it
-    // publishes instead of copying it (change 0751).
+    // publishes instead of copying it.
     let published = reused
         .opc()?
         .exact_source_shared()
@@ -488,8 +488,8 @@ fn the_durable_patch_is_untouched_by_retention() -> Result<()> {
         unretained.patch().to_bytes()?,
         "the encoded durable patch does not depend on retention"
     );
-    // The family prefix, not the version: change 0655 bumps the version in the
-    // same wave and retention has nothing to do with it.
+    // The family prefix, not the version: retention has nothing to do with the
+    // version.
     assert!(retained.patch().to_bytes()?.starts_with(b"LPCP"));
 
     let destination_bytes = destination.to_bytes()?;

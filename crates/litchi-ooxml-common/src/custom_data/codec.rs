@@ -1640,7 +1640,7 @@ fn element_attributes(
     limits: &Limits,
 ) -> Result<Vec<Attribute>> {
     // Counted without quick-xml's duplicate check, which reads on after a
-    // duplicate at a cost that grows with the names before it (record 0770);
+    // duplicate at a cost that grows with the names before it;
     // `NamespaceState::enter` has refused the same count over the limit.
     let attribute_count = count_up_to(element, limits.attributes);
     check_limit(

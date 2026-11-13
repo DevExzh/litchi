@@ -2438,29 +2438,29 @@ const DEFAULT_DEFLATE_LEVEL: u32 = 6;
 
 /// Uncompressed bytes an owned Deflate entry hands the codec per call.
 ///
-/// This is a frozen format constant of the authored (owned-entry) path, fixed
-/// by change 0762. An owned Deflate member is cut into chunks at the absolute
-/// member offsets `k * OWNED_DEFLATE_STAGE_BYTES`; the codec receives each
-/// chunk only once it is complete (or when the caller flushes or finishes the
-/// entry), always with an empty output buffer, and the entry finishes with a
-/// single `Finish` and no sync flush. The raw Deflate stream zlib-rs emits
-/// depends on how its input is split into calls, so this is what makes an
-/// owned member's bytes a pure function of the member's bytes (and of the
-/// offsets of explicit [`Write::flush`] calls), independent of how the caller
-/// split its writes. Changing the value changes every authored package's
-/// bytes; it must not change without a new change record.
+/// This is a frozen format constant of the authored (owned-entry) path. An
+/// owned Deflate member is cut into chunks at the absolute member offsets
+/// `k * OWNED_DEFLATE_STAGE_BYTES`; the codec receives each chunk only once
+/// it is complete (or when the caller flushes or finishes the entry), always
+/// with an empty output buffer, and the entry finishes with a single `Finish`
+/// and no sync flush. The raw Deflate stream zlib-rs emits depends on how its
+/// input is split into calls, so this is what makes an owned member's bytes a
+/// pure function of the member's bytes (and of the offsets of explicit
+/// [`Write::flush`] calls), independent of how the caller split its writes.
+/// Changing the value changes every authored package's bytes, so it must stay
+/// fixed.
 pub(crate) const OWNED_DEFLATE_STAGE_BYTES: usize = 16 * 1024;
 
 /// The zlib level of owned (authored) Deflate members.
 ///
 /// Level 5 runs zlib-rs's `deflate_medium` like level 6 but ends its match
 /// search at a chain of 32 and a match of 32 bytes instead of 128 and 128.
-/// Change 0762 measured it against level 6 under the staged protocol: on the
-/// streaming DOCX, XLSX and PPTX corpora the archives are the same size to
-/// within 0.01% and the XLSX sheet compresses in about half the time; on
-/// every member of the workspace's real DOCX, XLSX and PPTX fixtures it is
-/// 0.21% to 0.23% larger and 7% to 22% faster. Borrowed members, including
-/// every member the preservation writer regenerates, keep level 6.
+/// Measured against level 6 under the staged protocol: on the streaming
+/// DOCX, XLSX and PPTX corpora the archives are the same size to within
+/// 0.01% and the XLSX sheet compresses in about half the time; on every
+/// member of the workspace's real DOCX, XLSX and PPTX fixtures it is 0.21%
+/// to 0.23% larger and 7% to 22% faster. Borrowed members, including every
+/// member the preservation writer regenerates, keep level 6.
 const OWNED_DEFLATE_LEVEL: u32 = 5;
 
 /// Reusable state for one raw Deflate stream at a time.

@@ -554,7 +554,7 @@ fn validate_master_layouts(package: &OpcPackage, master_part: &dyn Part) -> Resu
     Ok(())
 }
 
-/// The part of the slide master `id` (record 0356a).
+/// The part of the slide master `id`.
 pub(crate) fn resolve_master(package: &OpcPackage, id: crate::slide::MasterId) -> Result<PackURI> {
     let presentation = package.main_document_part()?;
     let (_, relationship_id) = parse_master_id_list(presentation.blob())?
@@ -571,7 +571,7 @@ pub(crate) fn resolve_master(package: &OpcPackage, id: crate::slide::MasterId) -
 }
 
 /// The part of the slide layout `id`, searched in every master in master
-/// order (record 0356a).
+/// order.
 pub(crate) fn resolve_layout(package: &OpcPackage, id: crate::slide::LayoutId) -> Result<PackURI> {
     let presentation = package.main_document_part()?;
     for (_, master_relationship) in parse_master_id_list(presentation.blob())? {
@@ -591,7 +591,7 @@ pub(crate) fn resolve_layout(package: &OpcPackage, id: crate::slide::LayoutId) -
     ))
 }
 
-/// The part of a slide, slide layout or slide master (record 0356a).
+/// The part of a slide, slide layout or slide master.
 pub(crate) fn resolve_owner(
     package: &OpcPackage,
     owner: crate::slide::Owner<'_>,

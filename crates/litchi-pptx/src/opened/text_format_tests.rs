@@ -401,8 +401,8 @@ fn run_spans_split_runs_and_format_only_the_span() -> Result<()> {
     Ok(())
 }
 
-/// Record 0279: a field's cached result takes run text; one without an
-/// `a:t` gains one after its properties.
+/// A field's cached result takes run text; one without an `a:t` gains one after
+/// its properties.
 #[test]
 fn field_results_take_run_text() -> Result<()> {
     let text = TextProperties::default().with_text("7");
@@ -423,8 +423,8 @@ fn field_results_take_run_text() -> Result<()> {
     Ok(())
 }
 
-/// Record 0285: table-cell runs take run text and spans as shape runs do,
-/// and the cell's text body reads with the positions they address.
+/// Table-cell runs take run text and spans as shape runs do, and the cell's
+/// text body reads with the positions they address.
 #[test]
 fn cell_runs_and_spans_edit_one_run() -> Result<()> {
     let package = deck()?;
@@ -486,7 +486,7 @@ fn cell_runs_and_spans_edit_one_run() -> Result<()> {
     Ok(())
 }
 
-/// Record 0285: a notes page's shapes take the same run edits as a slide's.
+/// A notes page's shapes take the same run edits as a slide's.
 #[test]
 fn notes_pages_take_run_edits() -> Result<()> {
     let package = deck()?;
@@ -712,8 +712,8 @@ fn chunked_text_edits_equal_one_call_per_chunk() -> Result<()> {
 
 #[test]
 fn batched_paragraph_and_cell_edits_equal_one_edit_at_a_time() -> Result<()> {
-    // Record 0346: paragraph, run and cell edits of one shape are staged on
-    // their own spans and spliced once; the result is the sequential one.
+    // Paragraph, run and cell edits of one shape are staged on their own spans
+    // and spliced once; the result is the sequential one.
     let package = deck()?;
     let paragraph = |index: usize| TextTarget::Paragraph {
         shape: at(0),
@@ -756,8 +756,8 @@ fn batched_paragraph_and_cell_edits_equal_one_edit_at_a_time() -> Result<()> {
 
 #[test]
 fn per_edit_changes_equal_one_edit_at_a_time() -> Result<()> {
-    // Record 0348: the per-edit changes of a chunked batch are the changes
-    // its edits report applied one after the other, on both owners.
+    // The per-edit changes of a chunked batch are the changes its edits report
+    // applied one after the other, on both owners.
     let package = deck()?;
     let cell = |row: usize, column: usize| TextTarget::Cell {
         shape: at(1),
@@ -827,7 +827,7 @@ fn per_edit_changes_equal_one_edit_at_a_time() -> Result<()> {
 
 #[test]
 fn notes_chunks_equal_one_call_per_chunk() -> Result<()> {
-    // Record 0348: one notes-part pass for every chunk.
+    // One notes-part pass for every chunk.
     let package = deck()?;
     let mut edit = package.edit()?;
     assert!(edit.set_notes_text(0usize, "one")?);
@@ -907,7 +907,7 @@ fn notes_chunks_equal_one_call_per_chunk() -> Result<()> {
 
 #[test]
 fn text_indexes_of_the_corpus_equal_the_readers() -> Result<()> {
-    // Record 0348: every table of the tracked PPTX corpus.
+    // Every table of the tracked PPTX corpus.
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data");
     let mut pending = vec![root];
     let (mut tables, mut scanned, mut bodies) = (0usize, 0usize, 0usize);
@@ -986,8 +986,8 @@ fn text_indexes_of_the_corpus_equal_the_readers() -> Result<()> {
 
 #[test]
 fn a_litchi_table_frame_is_indexed_in_one_pass() -> Result<()> {
-    // Record 0348: a frame declaring its namespaces on its root (as
-    // `add_table` writes it) takes the one-pass frame index.
+    // A frame declaring its namespaces on its root (as `add_table` writes it)
+    // takes the one-pass frame index.
     let xml = slide_xml(&deck()?)?;
     let start = memchr::memmem::find(&xml, b"<p:graphicFrame").expect("a frame");
     let end = start

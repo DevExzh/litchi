@@ -4,12 +4,12 @@
 //! presentation root, its stable catalog order, the topology proof supplied by
 //! the owner, and the exact root metadata images.  Resource changes carry the
 //! exact before/after images for one stable slide identity.  Version 5
-//! (record 0303) appends the Parts that removed slides owned exclusively:
-//! notes slides, pictures, diagrams, VML drawings, comments and embedded
-//! objects, each with its exact payload and relationship images.  A patch
-//! without such Parts is still encoded as version 3.  This module only
-//! checks transport integrity and bounds; semantic XML, relationship and
-//! ownership validation belongs to the application layer.
+//! appends the Parts that removed slides owned exclusively: notes slides,
+//! pictures, diagrams, VML drawings, comments and embedded objects, each with
+//! its exact payload and relationship images.  A patch without such Parts is
+//! still encoded as version 3.  This module only checks transport integrity and
+//! bounds; semantic XML, relationship and ownership validation belongs to the
+//! application layer.
 
 use super::super::MAX_SOURCE_BACKED_SLIDE_BATCH;
 use crate::presentation::order::{StableSlideKey, stable_slide_key};
@@ -49,8 +49,8 @@ pub(super) struct Data {
 }
 
 /// The exact before/after image of one Part that a removed slide owned
-/// exclusively (record 0303). `before` is present when the Part exists in
-/// the state before the patch, `after` when it exists after it.
+/// exclusively. `before` is present when the Part exists in the state before
+/// the patch, `after` when it exists after it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct Dependent {
     pub(super) part_uri: PackURI,

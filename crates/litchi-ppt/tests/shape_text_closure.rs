@@ -4,7 +4,7 @@
     reason = "shape-text closure tests use panic-driven assertions"
 )]
 
-//! Length-changing shape text on `PowerPoint`-authored decks (record 0260).
+//! Length-changing shape text on `PowerPoint`-authored decks.
 //!
 //! `PowerPoint` writes a `TextSpecialInfoAtom` and a `TextRulerAtom` beside
 //! almost every text atom, and keeps title/body placeholder text in the
@@ -277,11 +277,11 @@ fn signed_outline_text_admits_exact_noops_and_refuses_changes() {
     );
 }
 
-/// Corpus coverage of a length-changing replacement (record 0260): every
-/// top-level shape of every readable, unencrypted PPT fixture under
-/// `test-data`, one edit per shape. Before record 0260 no target accepted a
-/// changed length; the remaining refusals are shapes without a text body
-/// and the position-dependent records the closure keeps.
+/// Corpus coverage of a length-changing replacement: every top-level shape of
+/// every readable, unencrypted PPT fixture under `test-data`, one edit per
+/// shape. No target used to accept a changed length; the remaining refusals are
+/// shapes without a text body and the position-dependent records the closure
+/// keeps.
 #[test]
 fn corpus_length_change_coverage_is_pinned() {
     const DECKS: &[&str] = &[

@@ -1,5 +1,4 @@
-//! Placeholder authoring and slide-layout retargeting for the unified API
-//! (record 0346).
+//! Placeholder authoring and slide-layout retargeting for the unified API.
 //!
 //! A new placeholder follows OfficeCLI's `AddPlaceholder` binding rules: a
 //! title adopts the layout's title-family type (a `title` on a "Title
@@ -77,8 +76,8 @@ impl Edit {
     /// Give the slide's placeholder of `kind` (any title-family placeholder
     /// for a title; the one at `index` when given) the text `text`, adding
     /// one as [`Self::add_placeholder`] does, with `index`, when the slide
-    /// has none: OfficeCLI's slide `title` and `text` shorthand (record
-    /// 0346). Returns the placeholder's positional scene index.
+    /// has none: OfficeCLI's slide `title` and `text` shorthand. Returns the
+    /// placeholder's positional scene index.
     ///
     /// # Errors
     ///
@@ -121,9 +120,8 @@ impl Edit {
     }
 
     /// Point a slide at the layout named `layout_name` exactly (OfficeCLI's
-    /// slide `layout` set, record 0346): the slide's layout relationship is
-    /// retargeted and its shapes are kept as they are. Returns whether
-    /// anything changed.
+    /// slide `layout` set): the slide's layout relationship is retargeted and
+    /// its shapes are kept as they are. Returns whether anything changed.
     ///
     /// # Errors
     ///

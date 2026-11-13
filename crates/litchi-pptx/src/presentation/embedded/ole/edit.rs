@@ -1,4 +1,4 @@
-//! Immutable embedded OLE object edits of a [`Package`](crate::Package) (record 0356a).
+//! Immutable embedded OLE object edits of a [`Package`](crate::Package).
 //!
 //! [`Package::edit_ole_objects`](crate::Package::edit_ole_objects) starts an [`Edit`]
 //! over a staged copy of the package; its verbs run on the staged graph.

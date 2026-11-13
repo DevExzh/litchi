@@ -1,5 +1,4 @@
-//! Header and footer parts staged with a main-document edit (record 0319,
-//! L-DOCX-R5).
+//! Header and footer parts staged with a main-document edit.
 //!
 //! A new header or footer is a new part related from the main document and
 //! a `w:headerReference`/`w:footerReference` in the body-final section
@@ -521,7 +520,7 @@ impl Edit<Package> {
     /// properties, as OfficeCLI writes a header's text.
     ///
     /// A story holding a field, or text outside its first paragraph's direct
-    /// runs, is refused rather than left beside the new text (record 0304).
+    /// runs, is refused rather than left beside the new text.
     ///
     /// # Errors
     ///
@@ -899,9 +898,8 @@ pub(crate) fn text_run(prefix: &[u8], properties: Option<&[u8]>, text: &str) -> 
 /// [`Edit::set_story_text`]).
 fn story_with_text(xml: &[u8], text: &str, strict: bool) -> Result<Vec<u8>> {
     // A text set replaces the story's text and keeps or refuses everything
-    // else (record 0304): a field is refused, and so is text the first
-    // paragraph's direct runs do not hold, which the set would leave
-    // beside the new text.
+    // else: a field is refused, and so is text the first paragraph's direct
+    // runs do not hold, which the set would leave beside the new text.
     if part_scan::holds_any(xml, part_scan::FIELD_MARKUP).map_err(Error::Document)? {
         return Err(complex_content());
     }

@@ -2854,7 +2854,7 @@ fn slide_removal_plan_removes_owned_parts_and_refuses_shared_owners() -> Result<
                 TargetMode::Internal,
             )?;
         let before = part_states(&package);
-        // A Part only the removed slide targets leaves with it (record 0303).
+        // A Part only the removed slide targets leaves with it.
         let plan = package.opened_presentation()?.plan_slide_removal(0_usize)?;
         assert_eq!(plan.patch().resource_count(), 3, "{target_name}");
         assert!(plan.patch().resources().any(|name| name == &target));
@@ -2890,7 +2890,7 @@ fn slide_removal_plan_removes_owned_parts_and_refuses_shared_owners() -> Result<
             "rIdExternalRemoval".into(),
             TargetMode::External,
         )?;
-    // An external edge leaves with the removed slide (record 0293).
+    // An external edge leaves with the removed slide.
     let plan = external
         .opened_presentation()?
         .plan_slide_removal(0_usize)?;
@@ -3088,7 +3088,7 @@ fn slide_removal_plan_refuses_policy_surfaces_bounds_and_stale_graphs() -> Resul
     }
 
     // The default text style holds paragraph formatting only, so producer
-    // vocabulary inside it is admitted (record 0293).
+    // vocabulary inside it is admitted.
     for default_text_style in [
         r#"<p:defaultTextStyle><a:defPPr futureOwner="opaque"/></p:defaultTextStyle>"#,
         r#"<p:defaultTextStyle><a:futureOwner/></p:defaultTextStyle>"#,
@@ -3155,7 +3155,7 @@ fn slide_removal_plan_refuses_policy_surfaces_bounds_and_stale_graphs() -> Resul
         std::sync::Arc::make_mut(&mut mce.opc)
             .get_part_mut(&target)?
             .set_blob(xml.into_bytes());
-        // A bare declaration carries no alternate content (record 0293).
+        // A bare declaration carries no alternate content.
         mce.opened_presentation()?.plan_slide_removal(0_usize)?;
     }
     let mut mce = opened_plain_slides_package(2)?;
@@ -4872,8 +4872,8 @@ fn package_identity_ignores_opaque_member_insertion_order() -> Result<()> {
     Ok(())
 }
 
-// Change 0655: the admission gates of change 0645's memoized per-part revision
-// proof. Each one is written so that a later change can fail it.
+// The admission gates of the memoized per-part revision proof. Each one is
+// written so that a later change can fail it.
 
 /// One package plus nine single-input mutations of it, the corpus the pairwise
 /// verdict oracle runs over.
@@ -5027,7 +5027,7 @@ fn assert_pairwise_verdicts_agree(
 }
 
 /// Every pairwise verdict of the v2 revision equals the v1 verdict and the
-/// content oracle's verdict, over change 0645's synthetic mutation corpus.
+/// content oracle's verdict, over the synthetic mutation corpus.
 #[test]
 fn revision_v2_preserves_every_pairwise_verdict_of_v1() -> Result<()> {
     let package = opened_two_slide_package()?;
@@ -5038,7 +5038,7 @@ fn revision_v2_preserves_every_pairwise_verdict_of_v1() -> Result<()> {
 }
 
 /// The same oracle over every `.pptx` fixture in the repository, which is the
-/// corpus-wide form change 0645's admission gate 2 requires.
+/// corpus-wide form of the same check.
 #[test]
 fn revision_v2_preserves_every_pairwise_verdict_over_the_pptx_corpus() -> Result<()> {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data");
@@ -5503,7 +5503,7 @@ fn the_facade_memo_never_outlives_the_graph_it_describes() -> Result<()> {
     assert_eq!(facade_memo_len(&package), 0, "a fresh package has no memo");
 
     // A capture of the current graph offers its memo to a package holding
-    // none (change 0751); it names only the package's own allocations.
+    // none; it names only the package's own allocations.
     let source = package.opened_presentation()?;
     assert_eq!(
         facade_memo_len(&package),
@@ -5549,8 +5549,8 @@ fn the_facade_memo_never_outlives_the_graph_it_describes() -> Result<()> {
     assert_facade_memo_names_only_its_own_package("after a removal plan", &package);
 
     // A facade holding a caller-defined part that copies its payload when
-    // cloned (change 0751's review). Its captures and publications name that
-    // copy; the facade keeps neither the copy nor an entry naming it.
+    // cloned. Its captures and publications name that copy; the facade keeps
+    // neither the copy nor an entry naming it.
     let mut removal = opened_plain_slides_package(3)?;
     let custom = with_copying_part(&mut removal)?;
     let plan = removal.opened_presentation()?.plan_slide_removal(0_usize)?;
@@ -5612,8 +5612,7 @@ fn assert_facade_memo_names_only_its_own_package(stage: &str, package: &Package)
 }
 
 /// Every entry of `memo` names an allocation `opc` holds and retains `opc`'s
-/// own `Arc` for it, not an `Arc` of a copy with the same bytes (change 0751's
-/// review).
+/// own `Arc` for it, not an `Arc` of a copy with the same bytes.
 pub(crate) fn assert_memo_retains_only_allocations_of(
     stage: &str,
     memo: &super::PartDigests,
@@ -5639,10 +5638,9 @@ pub(crate) fn assert_memo_retains_only_allocations_of(
     }
 }
 
-/// A caller-defined part that copies its payload whenever it is cloned
-/// (change 0751's review): a snapshot of a package holding one holds a copy
-/// of the payload, so the snapshot's memo names an allocation the package
-/// itself does not hold.
+/// A caller-defined part that copies its payload whenever it is cloned: a
+/// snapshot of a package holding one holds a copy of the payload, so the
+/// snapshot's memo names an allocation the package itself does not hold.
 pub(crate) struct CopyingPart {
     inner: BlobPart,
 }

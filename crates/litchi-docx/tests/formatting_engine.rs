@@ -1,8 +1,8 @@
-//! The DOCX formatting engine of `document::Edit` (unified-ops L-DOCX-W5)
-//! through the public API: the property/value pairs of OfficeCLI's
-//! `examples/word/run-formatting.sh` and `paragraph-formatting.sh` on a blank
-//! document, publication through both package owners, tracked-change
-//! preservation on a real producer's output, and the signature policy.
+//! The DOCX formatting engine of `document::Edit` through the public API: the
+//! property/value pairs of OfficeCLI's `examples/word/run-formatting.sh` and
+//! `paragraph-formatting.sh` on a blank document, publication through both
+//! package owners, tracked-change preservation on a real producer's output, and
+//! the signature policy.
 
 use std::io::Cursor;
 
@@ -312,7 +312,7 @@ fn run_formatting() -> Vec<Line> {
 
 /// `examples/word/paragraph-formatting.sh`. Not ported: `framePr.*` and
 /// `divId` (not in the typed model) and `listStyle`/`start`, which create
-/// numbering definitions (L-DOCX-W10).
+/// numbering definitions.
 fn paragraph_formatting() -> Vec<Line> {
     vec![
         line(

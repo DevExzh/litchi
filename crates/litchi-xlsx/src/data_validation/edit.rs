@@ -1,5 +1,4 @@
-//! Immutable data-validation edits of a [`Package`] (unified-ops record
-//! 0320).
+//! Immutable data-validation edits of a [`Package`].
 //!
 //! [`Package::edit_data_validations`] starts an [`Edit`] over an immutable
 //! snapshot. [`Edit::validations`] reads a worksheet's complete core and
@@ -190,9 +189,9 @@ mod tests {
         assert!(noop.patch().is_noop());
     }
 
-    /// Record 0320 gap 7: on a worksheet whose root carries a prefix, the
-    /// validation owner is written in that prefix, so the hyperlink writer
-    /// still recognizes every direct child.
+    /// On a worksheet whose root carries a prefix, the validation owner is
+    /// written in that prefix, so the hyperlink writer still recognizes
+    /// every direct child.
     #[test]
     fn a_prefixed_root_keeps_the_worksheet_writable() {
         let package = Package::new().unwrap();

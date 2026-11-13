@@ -1,5 +1,4 @@
-//! Record-level edits of one programmable binary tag's data blob (record
-//! 0323).
+//! Record-level edits of one programmable binary tag's data blob.
 //!
 //! `PowerPoint` 2000 and later keep version-specific records in the
 //! `BinaryTagDataBlob` of a `___PPT9`/`___PPT10` programmable tag

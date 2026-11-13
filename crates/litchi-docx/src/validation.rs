@@ -706,7 +706,7 @@ fn relationship_target_content_type_matches(reltype: &str, content_type: &str) -
     if is_office_relationship(reltype, rt::PACKAGE, "package") {
         // An embedded package names its own format: Word types a chart's
         // embedded workbook `spreadsheetml.sheet`, not the generic package
-        // type (record 0336).
+        // type.
         return content_type == ct::OFC_PACKAGE || is_embedded_package_content_type(content_type);
     }
     if reltype == rt::VBA_PROJECT {

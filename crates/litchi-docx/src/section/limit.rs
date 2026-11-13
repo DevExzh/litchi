@@ -1,6 +1,7 @@
-//! Typed section budgets (record 0355a).
+//! Typed section budgets.
 
-/// The bounded resources of section inventories and layouts, carried by [`crate::Error::SectionInventoryLimit`] (record 0355a).
+/// The bounded resources of section inventories and layouts, carried by
+/// [`crate::Error::SectionInventoryLimit`].
 ///
 /// Each variant names one bounded resource; [`std::fmt::Display`] gives its
 /// human-readable name, the one the error messages print.

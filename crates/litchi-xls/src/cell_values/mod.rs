@@ -766,12 +766,12 @@ impl Snapshot {
     /// already open, such as the one a source-backed workbook or a format
     /// detector holds.
     ///
-    /// This is the re-index fallback of unified-ops record 0003 (risk R2):
-    /// the package editor captures its streams through the cursor-based CFB
-    /// reader, so this constructor copies the source once, under the CFB
-    /// owner's version fence, and the editor indexes that copy again. Both
-    /// costs fall when an edit begins, never when the workbook is opened. The
-    /// copy is bounded by `cfb_limits`, which also govern the editor's index.
+    /// This is a re-index fallback: the package editor captures its streams
+    /// through the cursor-based CFB reader, so this constructor copies the
+    /// source once, under the CFB owner's version fence, and the editor
+    /// indexes that copy again. Both costs fall when an edit begins, never
+    /// when the workbook is opened. The copy is bounded by `cfb_limits`,
+    /// which also govern the editor's index.
     ///
     /// # Errors
     ///
@@ -8936,8 +8936,7 @@ fn parse_worksheet(data: &[u8], base_offset: usize) -> Result<Vec<Entry>> {
         if record.kind().get() == BOF {
             // An embedded chart substream (`[MS-XLS]` 2.1.7.20.6 OBJECTS):
             // its data-cache Number and Label records are the chart's, not
-            // cells of this worksheet, as the worksheet parser reads them
-            // (records 0293, 0316).
+            // cells of this worksheet, as the worksheet parser reads them.
             let mut depth = 1_usize;
             while depth > 0 {
                 let nested = records

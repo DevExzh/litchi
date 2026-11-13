@@ -5,7 +5,7 @@
     reason = "integration-test fixtures favor concise panic-driven assertions over production-style ergonomics"
 )]
 
-//! M1 L-DOC-R4: the font table (`SttbfFfn`) and `font_name(ftc)`.
+//! The font table (`SttbfFfn`) and `font_name(ftc)`.
 
 use litchi_core::Position;
 use litchi_doc::raw::Reader;

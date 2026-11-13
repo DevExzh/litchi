@@ -1,6 +1,5 @@
-//! Formatting-preserving text substitution in WordprocessingML stories
-//! (records 0274 and 0285): the one leaf primitive behind template merge and
-//! find/replace.
+//! Formatting-preserving text substitution in WordprocessingML stories: the one
+//! leaf primitive behind template merge and find/replace.
 //!
 //! A [`Story`] is the text of the paragraphs of one story part, as a caller
 //! plans substitutions over it: the main document (its body blocks, or the
@@ -267,7 +266,7 @@ impl Paragraph {
 
     /// The byte offsets in [`Self::text`] of the [`OBJECT`]s that stand for
     /// `mc:AlternateContent` wrappers held by the paragraph's runs (a
-    /// drawing or text box with a fallback; record 0307), in order.
+    /// drawing or text box with a fallback), in order.
     ///
     /// Each wrapper is one opaque object: readers show the text of the
     /// branch the projection selects, which the story never lists, so a
@@ -313,7 +312,7 @@ struct Block {
 /// content) are not listed. A part story lists every paragraph of the part.
 /// Neither lists anything inside an `mc:AlternateContent` wrapper, whose
 /// branches differ: a run holding one reads it as one [`OBJECT`]
-/// ([`Paragraph::alternate_content`]; record 0307).
+/// ([`Paragraph::alternate_content`]).
 #[derive(Clone)]
 pub struct Story {
     part: Option<String>,

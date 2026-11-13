@@ -508,7 +508,7 @@ fn mce_limits_and_partial_sink_are_checked() {
     );
     let mce = fixture(mce_sheet, "", false);
     let editor = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(mce))).unwrap();
-    // Until change 0653 this refused, and the refusal was an artifact of the
+    // This once refused, and the refusal was an artifact of the
     // markup-compatibility writer rather than a property of the worksheet: the
     // writer re-declared every in-scope namespace on every element it emitted,
     // so the `printOptions` it selected out of the `mc:Fallback` carried a
@@ -518,8 +518,8 @@ fn mce_limits_and_partial_sink_are_checked() {
     // that reason. The writer now declares each namespace once, so the
     // selected element carries no declaration and the Fallback's value is
     // read. The old shape is still refused, which
-    // `the_old_writers_redundant_declaration_was_refused_by_this_parser`
-    // below pins.
+    // `the_old_writers_redundant_declaration_was_refused_by_this_parser` below
+    // pins.
     let edit = editor
         .edit_print_options("Sheet1")
         .expect("the selected fallback is readable");
@@ -591,8 +591,8 @@ fn chartsheet_selection_is_refused() {
     ));
 }
 
-/// Change 0653: the markup-compatibility writer's redundant re-declaration was
-/// not only wasteful, it made this parser refuse its own preprocessor's output.
+/// The markup-compatibility writer's redundant re-declaration was not only
+/// wasteful, it made this parser refuse its own preprocessor's output.
 ///
 /// The two byte strings below are the codec's output for the `mc:Fallback`
 /// worksheet in `mce_limits_and_partial_sink_are_checked`, before and after the
@@ -634,7 +634,7 @@ fn the_old_writers_redundant_declaration_was_refused_by_this_parser() {
 }
 
 /// Replay a source-backed patch onto `package` through a source-backed
-/// workbook over its bytes (record 0360: source-backed patches replay onto
+/// workbook over its bytes (source-backed patches replay onto
 /// source-backed workbooks).
 fn replay_patch(
     package: &mut OpcPackage,

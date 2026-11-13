@@ -933,7 +933,7 @@ fn malformed_dops_and_incomplete_fibs_fail_closed_for_both_policies() {
 
 /// The 35 readable DOC fixtures. None carries a DopBase lock, a password
 /// hash, an enforced Dop2003 mode or range-protection tables, although 24 of
-/// them were refused as `Unknown` or `Unrecognized` before change 0768.
+/// them were once refused as `Unknown` or `Unrecognized`.
 const UNPROTECTED_FIXTURES: [&str; 35] = [
     "3endnotes.doc",
     "DiffFirstPageHeadFoot.doc",

@@ -71,7 +71,7 @@ pub enum Error {
     Cfb(OleError),
     /// A required MS-OVBA structure is malformed.
     InvalidData(String),
-    /// An explicit resource ceiling was exceeded (record 0360).
+    /// An explicit resource ceiling was exceeded.
     Limit {
         /// The exceeded ceiling.
         kind: LimitKind,

@@ -1,5 +1,4 @@
-//! Placeholders of a slide inserted from a layout (record 0252; ported from
-//! the M2 L-PPTX-W4 reference work and adapted to the immutable editors).
+//! Placeholders of a slide inserted from a layout.
 //!
 //! A new slide gets the layout's placeholders as empty placeholder shapes, as
 //! `PowerPoint` creates them: one `p:sp` per placeholder holding a `p:ph`
@@ -200,7 +199,7 @@ fn name(planned: &Planned, shape_id: u32) -> String {
 }
 
 /// `PowerPoint`'s name for a new placeholder of `kind` with non-visual
-/// identifier `shape_id` (record 0346 shares it with placeholder addition).
+/// identifier `shape_id` (placeholder addition shares it).
 pub(crate) fn placeholder_name(kind: PlaceholderKind, vertical: bool, shape_id: u32) -> String {
     let label = match kind {
         PlaceholderKind::Title | PlaceholderKind::CenteredTitle => "Title",

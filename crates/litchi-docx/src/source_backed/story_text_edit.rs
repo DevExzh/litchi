@@ -1,6 +1,6 @@
-//! The selected-story text family of a source-backed package (record
-//! 0355a): replace the text of direct paragraphs in the main story or one
-//! header, footer, footnote, endnote, comment or glossary entry.
+//! The selected-story text family of a source-backed package: replace the text
+//! of direct paragraphs in the main story or one header, footer, footnote,
+//! endnote, comment or glossary entry.
 //!
 //! [`Package::edit_story_text`](crate::source_backed::Package::edit_story_text)
 //! stages an [`Edit`] whose commit returns a new source-backed package;

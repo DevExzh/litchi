@@ -1,4 +1,4 @@
-//! Persisted-record rewrites staged by element edits (record 0323).
+//! Persisted-record rewrites staged by element edits.
 //!
 //! Comments, hyperlinks and table-cell text live in records the slide-order
 //! root does not otherwise model: the slide's `___PPT10` programmable tag, a

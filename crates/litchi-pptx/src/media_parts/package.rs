@@ -283,8 +283,8 @@ pub(crate) fn store(
 }
 
 /// [`store`], or, with `append`, add the pictures after the slide's
-/// existing media (record 0321). The caller chooses shape IDs, relationship
-/// IDs and part names that are free on the slide; collisions are refused.
+/// existing media. The caller chooses shape IDs, relationship IDs and part
+/// names that are free on the slide; collisions are refused.
 #[cfg(test)]
 pub(crate) fn store_with(
     package: &mut OpcPackage,

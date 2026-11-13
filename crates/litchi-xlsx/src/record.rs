@@ -1,4 +1,4 @@
-//! The publication side of the record families (record 0360).
+//! The publication side of the record families.
 //!
 //! A record family (Custom Data, Surveys, calculation metadata, page breaks,
 //! the Data Model) stages a typed draft against a [`Source`], an owned

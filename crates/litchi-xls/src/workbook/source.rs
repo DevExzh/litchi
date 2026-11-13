@@ -505,7 +505,7 @@ struct SourceInner {
     /// cell-XF repairs lazy worksheet scans record as queries run.
     tolerance: Mutex<ToleranceReport>,
     /// Per sheet, what the cell cursor's validating scan found, kept so a
-    /// later cursor over the same immutable snapshot skips it (record 0267).
+    /// later cursor over the same immutable snapshot skips it.
     cursor_checks: Box<[std::sync::OnceLock<cursor::Check>]>,
     /// The checked overlay plan a committed source-backed family edit
     /// (`crate::source_backed`) writes. A committed owner keeps its original
@@ -1299,8 +1299,8 @@ impl SourceBackedWorkbook {
         // same object (`source_arc`). An `ensure_current_parts` call here would
         // observe it a second time with nothing in between -- no source byte is
         // consumed, and the captured-version equality it also checks is this
-        // very value -- so it would re-prove what this line proved. Change 0560
-        // collapsed the same pair inside `ensure_current_parts` itself.
+        // very value -- so it would re-prove what this line proved. The same
+        // pair is collapsed inside `ensure_current_parts` itself.
         let expected_version = cfb.source_version().map_err(SourceBackedError::from)?;
         let file_size = cfb.file_size();
         if file_size > limits.max_input_bytes {
@@ -1762,10 +1762,10 @@ impl SourceBackedWorkbook {
         row: u32,
         column: u32,
     ) -> Result<Option<SourceBackedCell>> {
-        // The cell query owns the target's trailing fence (record 0287); a
-        // deferred owner adds the original-source fence below so an
-        // in-flight mutation is not reported as composed-source I/O. A
-        // missing worksheet still checks before it reports.
+        // The cell query owns the target's trailing fence; a deferred
+        // owner adds the original-source fence below so an in-flight
+        // mutation is not reported as composed-source I/O. A missing
+        // worksheet still checks before it reports.
         let owner = self.effective_inner()?;
         let Some(sheet_index) = owner
             .sheets
@@ -2467,8 +2467,8 @@ fn select_workbook_stream(
     // of the four exits proves, and those exits are where it matters: every
     // one of them observes before it reports, so a changed source still
     // outranks `WorkbookStreamMissing` and the mapped CFB error. This is the
-    // shape change 0560 gave the retained-metadata helpers -- fence once,
-    // after the value is produced.
+    // shape of the retained-metadata helpers -- fence once, after the value
+    // is produced.
     for name in ["Workbook", "Book"] {
         let path = vec![name.to_string()];
         let refs = [name];
@@ -3122,19 +3122,19 @@ impl<'a> WorksheetScan<'a> {
     /// Opens a scan at `start`, resuming the allocation-chain walk from `chain`.
     ///
     /// `stream_cursor_at` reaches `start` by walking the workbook stream's
-    /// allocation chain from its **first** sector, every time: change 0584
-    /// priced that at 28,143 links over a 16-sheet workbook's text extraction,
+    /// allocation chain from its **first** sector, every time: that was
+    /// measured at 28,143 links over a 16-sheet workbook's text extraction,
     /// about 91% of them re-walks of a prefix an earlier sheet had already
-    /// walked. `chain` is the position change 0585 left open. A document-wide
-    /// operation passes one for all of its sheets; a single-sheet operation
-    /// passes a fresh one, which is exactly `stream_cursor_at`.
+    /// walked. `chain` keeps that position open. A document-wide operation
+    /// passes one for all of its sheets; a single-sheet operation passes a
+    /// fresh one, which is exactly `stream_cursor_at`.
     ///
     /// It is deliberately **not** the shared-string resolver's hint. A hint
     /// retains one position and is discarded when it sits past the offset
     /// asked for, so a single hint alternating between the string table and a
     /// worksheet region would be discarded on every resolve and again on every
     /// sheet, saving nothing on either. The two lifetimes are disjoint for that
-    /// reason, and change 0585's record says so.
+    /// reason.
     fn new(
         cfb: &'a SharedOleFile,
         path: &'a [&'a str],
@@ -3598,8 +3598,7 @@ fn scan_text_sheet(
         if frame.kind == BOF {
             // An embedded chart substream (`[MS-XLS]` 2.1.7.20.6 OBJECTS):
             // its data-cache Number and Label records are the chart's, not
-            // cells of this worksheet, as the eager parser reads them
-            // (records 0293, 0316).
+            // cells of this worksheet, as the eager parser reads them.
             scan.skip_payload(&frame)?;
             scan.skip_embedded_substream()?;
             continue;
@@ -3860,7 +3859,7 @@ trait CellSink {
 
     /// [`CellSink::wants`] for a `FORMULA` record. The cell cursor's
     /// validating scan parses formulas only, to learn whether one needs the
-    /// workbook's name tables to render (record 0267).
+    /// workbook's name tables to render.
     fn wants_formula(&self, row: u16, col: u16) -> bool {
         self.wants(row, col)
     }
@@ -3885,7 +3884,7 @@ trait CellSink {
 
     /// Whether the scan may stop at the next record boundary that leaves no
     /// string-valued `FORMULA` waiting for its `STRING` (the cell cursor's
-    /// batch is full, record 0267). Every other sink scans to the EOF.
+    /// batch is full). Every other sink scans to the EOF.
     fn stop(&self) -> bool {
         false
     }
@@ -3893,7 +3892,7 @@ trait CellSink {
 
 /// Where a scan a sink stopped resumes: the next record boundary, with the
 /// scan's limit counters, so a resumed scan charges the worksheet's byte and
-/// record limits exactly as one uninterrupted scan does (record 0267).
+/// record limits exactly as one uninterrupted scan does.
 #[derive(Debug, Clone, Copy)]
 struct ScanResume {
     position: u64,
@@ -4257,8 +4256,7 @@ fn scan_worksheet_from<S: CellSink>(
         if frame.kind == BOF {
             // An embedded chart substream (`[MS-XLS]` 2.1.7.20.6 OBJECTS):
             // its data-cache Number and Label records are the chart's, not
-            // cells of this worksheet, as the eager parser reads them
-            // (records 0293, 0316).
+            // cells of this worksheet, as the eager parser reads them.
             scan.skip_payload(&frame)?;
             scan.skip_embedded_substream()?;
             continue;
@@ -4447,7 +4445,7 @@ fn query_cell(
     {
         // The replay publishes nothing, and each of its reads and its
         // trailing check observe the source, so a leading check would only
-        // repeat them (record 0287).
+        // repeat them.
         return replay_indexed_cell(
             owner,
             sheet_index,
@@ -4691,8 +4689,8 @@ fn read_indexed_frame(
         ));
     }
     let mut header = [0_u8; 4];
-    // The payload read below fences the header as well (record 0287); every
-    // error between the two reads is fenced, so a changed source still wins.
+    // The payload read below fences the header as well; every error between
+    // the two reads is fenced, so a changed source still wins.
     cursor
         .read_exact_deferred(&mut header)
         .map_err(SourceBackedError::from)?;
@@ -4847,8 +4845,8 @@ fn finish_scan(owner: &SourceInner, execution: Option<&ExecutionContext>) -> Res
 /// 128 MiB by default and can only be larger than the table it contains. What
 /// this window adds is a transient copy of a strict subset of that, for the
 /// life of one scan, taken only by a scan that has shown it is walking the
-/// table. Change 0576's rule that the owner retains locators and not text is
-/// untouched: nothing here outlives the resolver.
+/// table. The rule that the owner retains locators and not text is untouched:
+/// nothing here outlives the resolver.
 const SHARED_STRING_MAX_WINDOW_BYTES: u64 = 256 * 1024;
 
 /// The `resource` a refused window reservation names.
@@ -4882,8 +4880,8 @@ const SHARED_STRING_WINDOW_RESOLVES: usize = 8;
 ///
 /// # The window
 ///
-/// The hint removed the chain walk but not the read. Change 0636 measured what
-/// remained: `54016.xls`'s whole-sheet walk resolves 16,055 shared strings and
+/// The hint removed the chain walk but not the read. What remained was
+/// measured: `54016.xls`'s whole-sheet walk resolves 16,055 shared strings and
 /// takes 16,105 positional reads past its open, one fresh cursor and one read
 /// per string -- 6,214 of them three bytes long, jumping backwards 4,444 times
 /// -- which no read-ahead inside the cursor can serve, because no second read
@@ -4985,11 +4983,11 @@ impl<'a> SharedStringResolver<'a> {
 
     /// Reads the whole string table with one `read_exact`.
     ///
-    /// The read is a `SharedOleStreamCursor::read_exact`, so change 0558's
-    /// trailing fence runs on it and change 0621's rule -- one source
-    /// observation per read -- holds with this fill as that read. A fill that
-    /// fails leaves the window empty, so the next resolve reads and observes
-    /// again rather than serving bytes that were never completely read.
+    /// The read is a `SharedOleStreamCursor::read_exact`, so its trailing
+    /// fence runs on it and the rule -- one source observation per read --
+    /// holds with this fill as that read. A fill that fails leaves the window
+    /// empty, so the next resolve reads and observes again rather than
+    /// serving bytes that were never completely read.
     fn fill(&mut self, owner: &SourceInner, start: u64, len: usize) -> Result<()> {
         self.window
             .try_reserve_exact(len)
@@ -5191,22 +5189,22 @@ fn finish_shared_string(
 /// Resolves one shared string, refusing a mutation over any other failure.
 ///
 /// Every byte this returns is read through `SharedOleStreamCursor::read_exact`,
-/// which observes the source after each read (change 0558), so the value is
-/// already bracketed by the observation the scan took before it and by that
-/// trailing observation. The resolver therefore takes no observation of its own
-/// on the path that succeeds. It keeps one on the path that fails, where the
-/// observation is not redundant but decisive: change 0317's precedence makes a
-/// stale source outrank the locator, allocation, chain and decode errors a
-/// mutation can provoke. As in `SharedOleFile::finish_stream_range`, only a
-/// `SourceChanged` refusal displaces the original error; an observation that
-/// cannot be taken at all leaves the original error in place.
+/// which observes the source after each read, so the value is already bracketed
+/// by the observation the scan took before it and by that trailing observation.
+/// The resolver therefore takes no observation of its own on the path that
+/// succeeds. It keeps one on the path that fails, where the observation is not
+/// redundant but decisive: precedence makes a stale source outrank the locator,
+/// allocation, chain and decode errors a mutation can provoke. As in
+/// `SharedOleFile::finish_stream_range`, only a `SourceChanged` refusal
+/// displaces the original error; an observation that cannot be taken at all
+/// leaves the original error in place.
 ///
 /// A resolve served from the retained table takes no read, so it takes no
 /// observation either. That moves the point at which a mutation is reported
-/// from the resolve after it to the **fill** after it, exactly as change 0636
-/// moved it for the validation walk, and it is bounded the same way: every
-/// operation built on `scan_worksheet` ends with `SourceInner::ensure_current`,
-/// and `SourceBackedWorkbook::text` ends with one too, so a mutation anywhere
+/// from the resolve after it to the **fill** after it, exactly as it moved for
+/// the validation walk, and it is bounded the same way: every operation built
+/// on `scan_worksheet` ends with `SourceInner::ensure_current`, and
+/// `SourceBackedWorkbook::text` ends with one too, so a mutation anywhere
 /// inside a walk is still refused with the same typed error before any result
 /// reaches a caller. One resolve is never assembled from two reads, because the
 /// table is read whole or not at all.

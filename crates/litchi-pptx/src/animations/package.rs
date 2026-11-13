@@ -352,8 +352,7 @@ fn scan_hosts_with_limits(xml: &[u8], limits: Limits) -> Result<HashMap<u32, Hos
     }
     // Branches are chosen below on namespace values as written; a declaration
     // that spells the markup-compatibility namespace with references would
-    // hide them from that choice while preprocessing applies them
-    // (record 0011).
+    // hide them from that choice while preprocessing applies them.
     if litchi_ooxml_common::mce::binds_namespace_by_reference(xml) {
         return invalid_relationship(
             "slide XML spells the markup-compatibility namespace with references",
@@ -903,8 +902,8 @@ mod tests {
         assert_eq!(parsed.animations.len(), 1);
     }
 
-    /// Record 0011: host branches bound through a declaration that spells
-    /// the namespace with references are never chosen by this scan.
+    /// Host branches bound through a declaration that spells the namespace with
+    /// references are never chosen by this scan.
     #[test]
     fn host_scan_refuses_escaped_markup_compatibility() {
         let xml = format!(

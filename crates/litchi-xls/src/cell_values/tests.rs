@@ -1913,9 +1913,9 @@ fn canonical_formula_resource_matching_refuses_rgb_extra_atomically() {
     assert_eq!(source.bytes(), before.as_slice());
 }
 
-/// The editor shares the writer's formula encoder, which cut a string
-/// constant to 255 UTF-16 code units until change 0757; one unit more is now
-/// refused before anything is staged.
+/// The editor shares the writer's formula encoder, which once cut a string
+/// constant to 255 UTF-16 code units; one unit more is now refused before
+/// anything is staged.
 #[test]
 fn authored_formula_string_constants_are_refused_past_255_units_not_truncated() {
     let source = Snapshot::from_bytes(formula_free_package(), Limits::default()).unwrap();
@@ -2889,8 +2889,8 @@ fn reference_formula_shifts_are_durable_mergeable_and_history_safe() {
 }
 
 // ---------------------------------------------------------------------------
-// Change 0633: the two framing passes of `Snapshot::from_bytes`, and the one
-// complete target parse a source-backed numeric commit now verifies on.
+// The two framing passes of `Snapshot::from_bytes`, and the one complete
+// target parse a source-backed numeric commit now verifies on.
 // ---------------------------------------------------------------------------
 
 type MatrixRecord = (u16, Vec<u8>);
@@ -2990,8 +2990,8 @@ fn matrix_outcome(bytes: Vec<u8>) -> String {
 /// one of those three owners refuses, and the refusal text says which owner
 /// won. Fusing the two framing passes — deriving the inventory from the eager
 /// parse's walk, or feeding the inventory's frames to it — moves these rows,
-/// which is why change 0633 froze that design instead of implementing it. This
-/// test is the oracle any future attempt has to reproduce.
+/// which is why that design was frozen instead of implemented. This test is
+/// the oracle any future attempt has to reproduce.
 #[test]
 fn snapshot_open_first_error_matrix_is_frozen() {
     let base = package();
@@ -3388,8 +3388,8 @@ fn generic_commit_publishes_the_artifact_a_second_render_would_produce() {
 }
 
 /// The editor renames with the rule the reader enforces ([MS-XLS] 2.4.28):
-/// until change 0766 it let U+0003 through, and the reader then refused the
-/// committed workbook.
+/// it once let U+0003 through, and the reader then refused the committed
+/// workbook.
 #[test]
 fn rename_refuses_every_worksheet_name_the_reader_refuses() {
     let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
@@ -3449,8 +3449,8 @@ fn eager_workbook_exposes_its_exact_source_bytes() {
 }
 
 const fn assert_send_sync<T: Send + Sync>() {}
-// Risk R3 of unified-ops record 0003: the unified `Xls` handle retains these
-// owners behind an `Arc`, so they must stay thread-safe.
+// The unified `Xls` handle retains these owners behind an `Arc`, so they must
+// stay thread-safe.
 const _: () = {
     assert_send_sync::<Snapshot>();
     assert_send_sync::<crate::SourceBackedWorkbook>();

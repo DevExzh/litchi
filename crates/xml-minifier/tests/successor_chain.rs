@@ -1,4 +1,4 @@
-//! Chains of successor proofs and depth-3 indexes (record 0317).
+//! Chains of successor proofs and depth-3 indexes.
 //!
 //! A successor proved from recorded boundaries carries boundaries derived for
 //! its own bytes, so a chain of edits is proved edit by edit. Every test
@@ -114,8 +114,8 @@ fn at(text: &str, needle: &str) -> usize {
 
 #[test]
 fn chained_edits_each_scan_only_their_own_paragraph() {
-    // Record 0313 §4.1: two edits far apart used to fall back to the full
-    // audit, because the second was proved from the first's base.
+    // Two edits far apart used to fall back to the full audit, because the
+    // second was proved from the first's base.
     let original = document(40);
     let base = indexed(&original, IndexDepth::default());
     let first = original.replacen("Paragraph 2 holds", "Paragraph 2 held", 1);

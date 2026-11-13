@@ -104,13 +104,13 @@ struct PlannedPart<'package> {
     /// proof check, the copy-or-regenerate decision, the sizes and every
     /// writer read it, and nothing asks the part for its bytes again. The
     /// bytes audited are therefore the bytes published even for a custom part
-    /// whose `blob` and `blob_arc` disagree. Before change 0754's review the
-    /// owned-source route regenerated a changed member from `blob_arc` after
-    /// the plan had audited `blob`.
+    /// whose `blob` and `blob_arc` disagree. The owned-source route used to
+    /// regenerate a changed member from `blob_arc` after the plan had audited
+    /// `blob`.
     blob: Option<Arc<Vec<u8>>>,
     /// Audit every authored/replaced XML allocation, including replacements
     /// equal to source bytes. Unchanged source allocations and deferred source
-    /// members retain their publication provenance (0665 and ADR 0030).
+    /// members retain their publication provenance (ADR 0030).
     audit_payload: bool,
     rels: &'package Relationships,
     relationships_member_present: bool,
@@ -352,10 +352,10 @@ impl<'package> PublicationPlan<'package> {
             if part.audit_payload {
                 let blob = part.materialized_blob()?;
                 // A payload whose exact allocation already passed this audit
-                // under these limits carries the proof (change 0754); any
-                // other bytes, including a copy or a substitute of proven
-                // ones, are audited here. Either way it is the allocation the
-                // plan keeps and every writer publishes.
+                // under these limits carries the proof; any other bytes,
+                // including a copy or a substitute of proven ones, are
+                // audited here. Either way it is the allocation the plan
+                // keeps and every writer publishes.
                 if !part
                     .part
                     .payload_handle()
@@ -1122,9 +1122,9 @@ fn regenerated_part_entry(
 
 /// The generated entry for the payload the plan holds for `part`.
 ///
-/// A part built from a verified compressed transfer (change 0742) carries the
-/// exact compressed bytes its payload decodes from, with their method, actual
-/// CRC and sizes; the writer frames them with fresh known-size headers. Every
+/// A part built from a verified compressed transfer carries the exact
+/// compressed bytes its payload decodes from, with their method, actual CRC
+/// and sizes; the writer frames them with fresh known-size headers. Every
 /// other payload is deflated from its decoded bytes, as before. The payload
 /// and its compressed representation are one value, so a part whose payload
 /// was replaced no longer carries one; the capture is still used only when
@@ -1347,13 +1347,10 @@ impl PackageWriter {
     /// decoding, well-formed XML, exactly one document element, no character
     /// data or CDATA outside it, no DTD or DOCTYPE, the attribute grammar, a
     /// valid `xml:space`, and each finite budget — and asserts no compactness
-    /// contract on any member, whatever its provenance. Change 0652's decision
-    /// 2 names original bytes; change 0665 records this eager-route extension
-    /// as an implementation interpretation informed by the source profile
-    /// established in 0654 and 0657, not as a new owner decision. Compactness
-    /// of this repository's own serializers remains a quality property,
-    /// verified by test and by the debug assertions at the three sites that
-    /// author XML here, not a publication refusal.
+    /// contract on any member, whatever its provenance. Compactness of this
+    /// repository's own serializers remains a quality property, verified by
+    /// test and by the debug assertions at the three sites that author XML
+    /// here, not a publication refusal.
     ///
     /// Refusals keep their identity: the same
     /// [`OpcError::XmlPublication`](crate::OpcError::XmlPublication) is
@@ -1375,10 +1372,10 @@ impl PackageWriter {
     /// The manifest and the relationship members are serialized here, so their
     /// spelling is this repository's own and `docs/CRUD_Scenario_Checklist.md`'s
     /// "every generated XML part is byte-minimal" applies to them. Publication
-    /// no longer refuses a member for breaking it (change 0665); the debug
-    /// assertion keeps every test run and every debug build checking it, so a
-    /// serializer that regresses is caught where it is written rather than
-    /// where a caller's package is refused.
+    /// no longer refuses a member for breaking it; the debug assertion keeps
+    /// every test run and every debug build checking it, so a serializer that
+    /// regresses is caught where it is written rather than where a caller's
+    /// package is refused.
     fn audit_authored_xml(name: &str, bytes: &[u8]) -> Result<()> {
         debug_assert!(
             xml_minifier::audit::verify_authored(bytes, xml_minifier::audit::Limits::default())
@@ -4280,9 +4277,9 @@ mod tests {
         }
     }
 
-    /// Change 0665: no member is refused for its spelling on this route any
-    /// more. Each of these four payloads is one of the compactness verdicts
-    /// change 0654 enumerated, and each one publishes here byte for byte.
+    /// No member is refused for its spelling on this route any more. Each
+    /// of these four payloads is one of the compactness verdicts, and each
+    /// one publishes here byte for byte.
     #[test]
     fn publishes_every_noncompact_spelling_the_authored_contract_refuses() {
         for payload in [
@@ -4312,8 +4309,8 @@ mod tests {
     }
 
     /// The members this writer serializes itself stay byte-minimal. The
-    /// contract is no longer a publication refusal (change 0665), so it is
-    /// asserted here and by the debug assertion in
+    /// contract is no longer a publication refusal, so it is asserted here
+    /// and by the debug assertion in
     /// [`PackageWriter::audit_authored_xml`].
     #[test]
     fn every_member_this_writer_authors_is_compact() {
@@ -4379,8 +4376,8 @@ mod tests {
         assert_eq!(audited, 3, "manifest, package .rels and the part .rels");
     }
 
-    /// Every refusal family change 0654 kept for original bytes is kept here
-    /// too, and each one still precedes every emitted byte.
+    /// Every refusal family kept for original bytes is kept here too, and each
+    /// one still precedes every emitted byte.
     #[test]
     fn every_structural_encoding_doctype_and_budget_refusal_survives_with_no_output() {
         let oversized_token = format!("<root a=\"{}\"/>", "a".repeat(4 * 1024 * 1024 + 1));

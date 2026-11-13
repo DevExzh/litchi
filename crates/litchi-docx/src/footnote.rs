@@ -186,8 +186,7 @@ impl Note {
     }
 
     /// The note's text as OfficeCLI reads it: the text of its runs' `w:t`
-    /// elements, concatenated, without the run holding the reference mark
-    /// (record 0319).
+    /// elements, concatenated, without the run holding the reference mark.
     ///
     /// # Errors
     ///
@@ -199,8 +198,8 @@ impl Note {
     /// Get the XML bytes of this note.
     ///
     /// The bytes are an XML fragment whose namespace declarations are those in
-    /// scope in `word/footnotes.xml` or `word/endnotes.xml`, which since change
-    /// 0653 are not repeated on the fragment's own root element. Use
+    /// scope in `word/footnotes.xml` or `word/endnotes.xml`, which are not
+    /// repeated on the fragment's own root element. Use
     /// [`self_contained_xml`](Self::self_contained_xml) to parse it on its own.
     #[inline]
     #[must_use]

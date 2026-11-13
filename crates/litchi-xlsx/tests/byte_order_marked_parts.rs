@@ -4,8 +4,8 @@
     reason = "differential assertions intentionally panic on fixture failures"
 )]
 
-//! Change 0765: a workbook part that begins with a UTF-8 byte-order mark
-//! reads, edits and saves exactly like the same part without one.
+//! A workbook part that begins with a UTF-8 byte-order mark reads, edits and
+//! saves exactly like the same part without one.
 //!
 //! quick-xml drops a leading mark before its first event without counting it
 //! in its positions, so every span taken from a reader was three bytes early

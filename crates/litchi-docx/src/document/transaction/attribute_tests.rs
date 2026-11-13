@@ -1,5 +1,5 @@
-//! Change 0764: a complex-field marker is read from its first `fldCharType`
-//! at a cost bounded in the attributes of its start tag.
+//! A complex-field marker is read from its first `fldCharType` at a cost
+//! bounded in the attributes of its start tag.
 
 use super::*;
 

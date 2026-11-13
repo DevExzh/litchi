@@ -1,10 +1,10 @@
 //! Format-neutral edit vocabulary: commit triad, diagnostics and refusals.
 //!
-//! Every format publishes a mutation the same way (ADR 0034 §3, record 0351):
-//! an owner snapshot `Package` stages an `Edit`, `Edit::commit()` returns a
-//! `Commit` that carries the **new** `Package`, the reversible `Patch` and
-//! content-free `Diagnostics`, and the source `Package` is never mutated.
-//! Dropping an `Edit` discards it; there is no `rollback`.
+//! Every format publishes a mutation the same way (ADR 0034 §3): an owner
+//! snapshot `Package` stages an `Edit`, `Edit::commit()` returns a `Commit`
+//! that carries the **new** `Package`, the reversible `Patch` and content-free
+//! `Diagnostics`, and the source `Package` is never mutated. Dropping an
+//! `Edit` discards it; there is no `rollback`.
 //!
 //! This module holds the parts of that contract that do not depend on any
 //! format:

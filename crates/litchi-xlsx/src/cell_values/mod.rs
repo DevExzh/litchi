@@ -15,8 +15,8 @@
 //!
 //! # What this module admits
 //!
-//! Change 0657 replaced the element, attribute and relationship allow-lists
-//! with the property they were a proxy for: a value-only rewrite composes the
+//! The element, attribute and relationship allow-lists were replaced with the
+//! property they were a proxy for: a value-only rewrite composes the
 //! worksheet's `<dimension ref>` attribute and its `<sheetData>` span, and
 //! copies every other byte of the worksheet and the workbook from the source.
 //! An element, attribute or relationship the editor does not model is

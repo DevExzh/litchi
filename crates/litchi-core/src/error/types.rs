@@ -81,8 +81,7 @@ pub enum Error {
     Unsupported(String),
 
     /// A well-formed request the route refuses, with a static content-free
-    /// reason classified by its [`RefusalKind`](crate::edit::RefusalKind)
-    /// (record 0351 §2.4).
+    /// reason classified by its [`RefusalKind`](crate::edit::RefusalKind).
     #[error("{0}")]
     Refused(crate::edit::Refusal),
 

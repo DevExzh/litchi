@@ -70,8 +70,7 @@ where
     }
 
     /// The `OfficeArt` shape identifier (`spid`), unique within its drawing
-    /// (MS-ODRAW 2.2.40); the stable identity a shape keeps across reads
-    /// (L-PPT-R4).
+    /// (MS-ODRAW 2.2.40); the stable identity a shape keeps across reads.
     #[must_use]
     pub fn id(&self) -> u32 {
         match self {
@@ -86,7 +85,7 @@ where
     }
 
     /// The shape's name (`wzName`, MS-ODRAW 2.3.4.1), such as
-    /// `"Title 1"` or `"Rectangle 3"`, when it carries one (L-PPT-R3).
+    /// `"Title 1"` or `"Rectangle 3"`, when it carries one.
     #[must_use]
     pub fn name(&self) -> Option<&str> {
         match self {
@@ -101,7 +100,7 @@ where
     }
 
     /// The shape's alternative text (`wzDescription`, MS-ODRAW 2.3.4.3),
-    /// when it carries one (L-PPT-R3).
+    /// when it carries one.
     #[must_use]
     pub fn description(&self) -> Option<&str> {
         match self {
@@ -115,9 +114,9 @@ where
         }
     }
 
-    /// The shape's stable position in its source drawing (L-PPT-R4): its
-    /// zero-based index among its siblings — the drawing's top-level shapes,
-    /// or its group's children — in drawing order.
+    /// The shape's stable position in its source drawing: its zero-based index
+    /// among its siblings — the drawing's top-level shapes, or its group's
+    /// children — in drawing order.
     ///
     /// The index counts every shape of the drawing's shape tree, including
     /// shapes the reader does not return (an unreadable shape, a line
@@ -410,7 +409,7 @@ pub struct TableShape {
     /// Table cells (row-major order)
     cells: Vec<Vec<String>>,
     /// The `OfficeArt` shape ID of each cell's shape, when read from a
-    /// drawing (record 0323).
+    /// drawing.
     cell_ids: Vec<Vec<Option<u32>>>,
     /// The top of each row and the left of each column, in master units,
     /// when read from a drawing.
@@ -476,16 +475,16 @@ impl TableShape {
         self.column_lefts = column_lefts;
     }
 
-    /// The `OfficeArt` shape ID of the cell shape at `row`, `col` (record
-    /// 0323); `None` for a covered cell or a table not read from a drawing.
+    /// The `OfficeArt` shape ID of the cell shape at `row`, `col`; `None` for a
+    /// covered cell or a table not read from a drawing.
     #[must_use]
     pub fn cell_shape_id(&self, row: usize, col: usize) -> Option<u32> {
         self.cell_ids.get(row)?.get(col).copied().flatten()
     }
 
     /// The height of each row in master units (1/576 inch): the distance to
-    /// the next row's top, the last to the table's bottom (record 0323).
-    /// Empty for a table not read from a drawing.
+    /// the next row's top, the last to the table's bottom. Empty for a table
+    /// not read from a drawing.
     #[must_use]
     pub fn row_heights(&self) -> Vec<i32> {
         extents(&self.row_tops, self.top.saturating_add(self.height))
@@ -559,22 +558,21 @@ impl TableShape {
         self.powerpoint12_shape_metadata = metadata;
     }
 
-    /// The shape's name (`wzName`, MS-ODRAW 2.3.4.1), when it carries one
-    /// (L-PPT-R3).
+    /// The shape's name (`wzName`, MS-ODRAW 2.3.4.1), when it carries one.
     #[must_use]
     pub fn name(&self) -> Option<&str> {
         self.identity.name.as_deref()
     }
 
     /// The shape's alternative text (`wzDescription`, MS-ODRAW 2.3.4.3),
-    /// when it carries one (L-PPT-R3).
+    /// when it carries one.
     #[must_use]
     pub fn description(&self) -> Option<&str> {
         self.identity.description.as_deref()
     }
 
     /// The shape's stable zero-based position among its siblings in its
-    /// source drawing (L-PPT-R4); `None` when it was not read from one.
+    /// source drawing; `None` when it was not read from one.
     #[must_use]
     pub fn source_index(&self) -> Option<usize> {
         self.identity.source_index
@@ -735,22 +733,21 @@ impl<'a> GroupShape<'a> {
         self.powerpoint12_shape_metadata = metadata;
     }
 
-    /// The shape's name (`wzName`, MS-ODRAW 2.3.4.1), when it carries one
-    /// (L-PPT-R3).
+    /// The shape's name (`wzName`, MS-ODRAW 2.3.4.1), when it carries one.
     #[must_use]
     pub fn name(&self) -> Option<&str> {
         self.identity.name.as_deref()
     }
 
     /// The shape's alternative text (`wzDescription`, MS-ODRAW 2.3.4.3),
-    /// when it carries one (L-PPT-R3).
+    /// when it carries one.
     #[must_use]
     pub fn description(&self) -> Option<&str> {
         self.identity.description.as_deref()
     }
 
     /// The shape's stable zero-based position among its siblings in its
-    /// source drawing (L-PPT-R4); `None` when it was not read from one.
+    /// source drawing; `None` when it was not read from one.
     #[must_use]
     pub fn source_index(&self) -> Option<usize> {
         self.identity.source_index
@@ -895,22 +892,21 @@ impl LineShape {
         self.powerpoint12_shape_metadata = metadata;
     }
 
-    /// The shape's name (`wzName`, MS-ODRAW 2.3.4.1), when it carries one
-    /// (L-PPT-R3).
+    /// The shape's name (`wzName`, MS-ODRAW 2.3.4.1), when it carries one.
     #[must_use]
     pub fn name(&self) -> Option<&str> {
         self.identity.name.as_deref()
     }
 
     /// The shape's alternative text (`wzDescription`, MS-ODRAW 2.3.4.3),
-    /// when it carries one (L-PPT-R3).
+    /// when it carries one.
     #[must_use]
     pub fn description(&self) -> Option<&str> {
         self.identity.description.as_deref()
     }
 
     /// The shape's stable zero-based position among its siblings in its
-    /// source drawing (L-PPT-R4); `None` when it was not read from one.
+    /// source drawing; `None` when it was not read from one.
     #[must_use]
     pub fn source_index(&self) -> Option<usize> {
         self.identity.source_index

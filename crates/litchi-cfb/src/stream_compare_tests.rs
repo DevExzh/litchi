@@ -1,5 +1,4 @@
-//! `StreamComparer::stream_equals` held to `OleFile::open_stream` (change
-//! 0749).
+//! `StreamComparer::stream_equals` held to `OleFile::open_stream`.
 //!
 //! The in-place comparison must reach the verdict `open_stream` followed by a
 //! byte comparison reaches — equal, different, or the same error — for every
@@ -163,7 +162,7 @@ fn every_fixture_stream_reaches_the_readback_verdict() {
         compared > 1_000,
         "the corpus exercises the comparison ({compared})"
     );
-    eprintln!("0749 corpus: {files} OLE2 files, {compared} expectations agree");
+    eprintln!("corpus: {files} OLE2 files, {compared} expectations agree");
 }
 
 fn written(sector_size: usize) -> Vec<u8> {
@@ -235,7 +234,7 @@ fn corrupted_files_reach_the_readback_verdict() {
         }
     }
     assert!(opened > 100, "enough corrupted files still open ({opened})");
-    eprintln!("0749 corruption: {opened} corrupted files opened and agree");
+    eprintln!("corruption: {opened} corrupted files opened and agree");
 }
 
 /// A candidate that counts what it is asked, optionally failing its first

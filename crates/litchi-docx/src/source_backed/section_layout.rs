@@ -1,5 +1,5 @@
-//! The section-layout family of a source-backed package (record 0355a):
-//! page size, margins, start and columns of one existing section.
+//! The section-layout family of a source-backed package: page size, margins, start and columns of
+//! one existing section.
 //!
 //! [`Package::edit_section_layout`](crate::source_backed::Package::edit_section_layout)
 //! stages an [`Edit`] whose commit returns a new source-backed package;

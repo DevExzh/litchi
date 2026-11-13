@@ -170,7 +170,7 @@ pub(crate) struct PresentationData {
     /// Validated password-to-open profile, when the document was encrypted.
     #[cfg(feature = "encryption")]
     pub(crate) encryption: Option<EncryptionProfile>,
-    /// The most recently parsed slide's shapes (record 0260).
+    /// The most recently parsed slide's shapes.
     pub(crate) shape_memo: crate::slide::ShapeMemo,
 }
 
@@ -368,8 +368,7 @@ impl Presentation {
     }
 
     /// The theme of the first main master that carries a `PowerPoint` 2007
-    /// `RoundTripThemeAtom` (record 0323); `None` for a presentation saved
-    /// without one.
+    /// `RoundTripThemeAtom`; `None` for a presentation saved without one.
     ///
     /// # Errors
     ///
@@ -754,9 +753,9 @@ impl Presentation {
         Hyperlinks::parse(&self.live_document_record()?, &source_limits)
     }
 
-    /// Resolve a click interaction (record 0323): a URL, a slide of this
-    /// presentation or a slide-show jump, with its screen tip. `None` when
-    /// the action is not a hyperlink.
+    /// Resolve a click interaction: a URL, a slide of this presentation or a
+    /// slide-show jump, with its screen tip. `None` when the action is not a
+    /// hyperlink.
     ///
     /// # Errors
     ///
@@ -926,7 +925,7 @@ impl Presentation {
     /// records; only the one referenced by the current `UserEditAtom` is live.
     /// The parsed live `DocumentContainer`: the one the current persist
     /// directory maps. An incrementally saved presentation keeps superseded
-    /// `DocumentContainer` records in the stream (record 0357).
+    /// `DocumentContainer` records in the stream.
     pub(crate) fn live_document_ref(&self) -> Result<&Record> {
         let live = self.live_document_record()?;
         self.inner
@@ -1167,7 +1166,7 @@ impl Presentation {
     /// Returns an error if the operation fails.
     pub fn broadcasts(&self) -> Result<crate::Broadcasts> {
         // The live document: an incrementally saved presentation keeps its
-        // superseded `DocumentContainer` records in the stream (record 0357).
+        // superseded `DocumentContainer` records in the stream.
         crate::Broadcasts::parse_document(&self.live_document_record()?, &self.inner.source_limits)
     }
 
@@ -1424,7 +1423,7 @@ impl Presentation {
             }
 
             // Extract text from Escher/PPDrawing using the optimized path,
-            // resolving outline references as `Slide::text` does (L-PPT-R1)
+            // resolving outline references as `Slide::text` does
             if let Some(ppdrawing) = slide_data.record.find_child(RecordType::PPDrawing) {
                 let escher_text = crate::odraw::text_from_slide_drawing(
                     &ppdrawing.data,

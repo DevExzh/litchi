@@ -1,5 +1,5 @@
-//! The story family (record 0355): hyperlink text across the main, header
-//! and footer stories of an owning package.
+//! The story family: hyperlink text across the main, header and footer stories
+//! of an owning package.
 //!
 //! [`Package::story_inventory`](crate::Package::story_inventory) reads the
 //! stories; [`Package::edit_stories`](crate::Package::edit_stories) stages an

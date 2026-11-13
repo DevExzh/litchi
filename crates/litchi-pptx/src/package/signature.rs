@@ -1,5 +1,5 @@
 //! The explicit signature policy of the package-level edit families (ADR
-//! 0006; unified-ops record 0014a).
+//! 0006).
 //!
 //! A changed edit invalidates every package signature, and removing one is an
 //! explicit operation: [`Package::unsign`](crate::Package::unsign), or
@@ -45,11 +45,10 @@ pub(crate) fn refuse_signed_change(package: &OpcPackage) -> Result<()> {
 ///
 /// On such a package [`OpcPackage::unsign`] removes nothing. It marks the
 /// absent signature graph as explicitly handled and drops the relationship
-/// source captures, which is what every family did unconditionally before
-/// record 0014a, so an unsigned package publishes exactly as it did then. A
-/// package that still needs a disposition is refused instead: this never
-/// removes a signature, even on a path that missed its up-front
-/// [`refuse_signed_change`].
+/// source captures, which is what every family used to do unconditionally, so
+/// an unsigned package publishes exactly as it did then. A package that still
+/// needs a disposition is refused instead: this never removes a signature, even
+/// on a path that missed its up-front [`refuse_signed_change`].
 ///
 /// # Errors
 ///

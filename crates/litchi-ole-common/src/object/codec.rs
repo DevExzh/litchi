@@ -716,7 +716,7 @@ impl Package {
     /// `Ok(None)` so the caller can use the sector-layout writer instead.
     ///
     /// The composed positional view is reopened and every stream is read back
-    /// before the returned bytes are materialized.  This keeps the 0617
+    /// before the returned bytes are materialized.  This keeps the
     /// pre-emission invariant: a sink never observes an unvalidated candidate,
     /// and untouched streams are checked against their captured source bytes.
     ///

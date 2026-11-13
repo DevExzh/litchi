@@ -1017,12 +1017,12 @@ fn streaming_validation_stops_before_large_ciphertext_tail() {
     );
 }
 
-/// The record walk frames a header and then a payload, so before change 0636
-/// it cost two positional reads per record whatever the record's size. Once a
-/// FILEPASS can no longer appear the walk opens a bounded window, and a stream
-/// of small records costs a handful of reads instead of two per record. The
-/// bytes the walk reads do not grow: the window is clamped by the stream, and
-/// this stream is framed to its end.
+/// The record walk frames a header and then a payload, so it once cost two
+/// positional reads per record whatever the record's size. Once a FILEPASS can
+/// no longer appear the walk opens a bounded window, and a stream of small
+/// records costs a handful of reads instead of two per record. The bytes the
+/// walk reads do not grow: the window is clamped by the stream, and this
+/// stream is framed to its end.
 #[test]
 fn streaming_validation_frames_many_records_without_a_read_each() {
     let filler: Vec<Vec<u8>> = (0_u16..2_000)

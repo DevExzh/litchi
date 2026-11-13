@@ -4,8 +4,7 @@
     reason = "property checks panic with the failing case"
 )]
 
-//! A writer-to-reader round-trip property over random workbooks (change
-//! 0766).
+//! A writer-to-reader round-trip property over random workbooks.
 //!
 //! Each case drives one [`Builder`] through a random sequence of registration
 //! calls — worksheet and defined names, strings, numbers, formulas,

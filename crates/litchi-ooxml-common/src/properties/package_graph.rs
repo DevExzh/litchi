@@ -184,9 +184,9 @@ pub(crate) fn free_part_name<P: PackageMetadata>(
     stem: &str,
     resource: crate::LimitKind,
 ) -> Result<PackURI> {
-    // One pass over the part names (record 0377a). The candidates are
-    // `{stem}.xml` (index 1) and `{stem}{index}.xml` (index 2..); a part
-    // conflicts with a candidate when it equals it or lies beneath it (ASCII
+    // One pass over the part names. The candidates are `{stem}.xml` (index
+    // 1) and `{stem}{index}.xml` (index 2..); a part conflicts with a
+    // candidate when it equals it or lies beneath it (ASCII
     // case-insensitive, as `names_conflict`), and with every candidate when
     // it is a segment prefix of the stem. The first index no part blocks is
     // the one the per-candidate scan (`free_part_name_scan`) selects.

@@ -1,5 +1,4 @@
-//! A source-located catalog of the numbering part (record 0319,
-//! L-DOCX-R6).
+//! A source-located catalog of the numbering part.
 //!
 //! [`Catalog`] reads a `numbering.xml` payload once and keeps every
 //! abstract definition (`w:abstractNum`) with its levels (`w:lvl`) and every

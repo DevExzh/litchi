@@ -1564,8 +1564,8 @@ const MAX_MEMBER_SPAN_READ_BYTES: u64 = 64 * 1024;
 ///
 /// Neither half of the variable region is carried by the central directory, so
 /// a bound computed before the local header is read must allow for it. This is
-/// change 0573's measured window — 30 fixed bytes plus 610 — which covers every
-/// OOXML member's variable region in this repository's corpus.
+/// the measured window — 30 fixed bytes plus 610 — which covers every OOXML
+/// member's variable region in this repository's corpus.
 const MEMBER_SPAN_METADATA_ALLOWANCE: u64 = crate::STRICT_LOCAL_HEADER_WINDOW as u64;
 
 /// One member's local record, read once and served to every reader of that
@@ -5690,9 +5690,9 @@ where
 /// call. A caller that must admit the declared central-directory entry count
 /// first (directories included, which [`ArchiveLimits::max_files`] does not
 /// count) locates here, checks [`Self::declared_entries`], and only then
-/// indexes. The locator's bounded central-directory prefill (change 0632) is
-/// carried into the index, so splitting the two steps costs no extra read; at
-/// most [`RECOMMENDED_BUFFER_SIZE`] bytes of the directory are held before the
+/// indexes. The locator's bounded central-directory prefill is carried into
+/// the index, so splitting the two steps costs no extra read; at most
+/// [`RECOMMENDED_BUFFER_SIZE`] bytes of the directory are held before the
 /// index is built.
 pub struct LocatedArchive<R> {
     archive: ZipArchive<R>,
@@ -5721,9 +5721,9 @@ where
     /// misses.
     pub fn locate(reader: R, end_offset: u64) -> Result<Self, Error> {
         let mut buffer = [0_u8; crate::ZipFileHeaderFixed::SIZE];
-        // Change 0632: the locator's first-central-record probe and the
-        // index's central-directory scan begin at the same offset, so the
-        // locator reads that span once, into a buffer sized to the declared
+        // The locator's first-central-record probe and the index's
+        // central-directory scan begin at the same offset, so the locator
+        // reads that span once, into a buffer sized to the declared
         // directory, and hands it over as the scan buffer.
         let (archive, prefill) = ZipLocator::new()
             .directory_prefill(RECOMMENDED_BUFFER_SIZE)
@@ -14827,7 +14827,7 @@ mod tests {
     }
 
     // ---------------------------------------------------------------------
-    // Change 0580: target-scoped strict layout proof.
+    // Target-scoped strict layout proof.
     //
     // The fixtures below are the ones no existing test builds: a record whose
     // *local* variable region is inflated so its declared span swallows other
@@ -14847,9 +14847,9 @@ mod tests {
         /// The `extra_field_length` the *local* header declares.
         local_extra_len: u16,
         /// The `compressed_size` the *local* header declares, when it is to
-        /// differ from the central record's. This is change 0583's input: the
-        /// two records describe one physical payload region, and only the
-        /// local one is what a streaming reader follows.
+        /// differ from the central record's. The two records describe one
+        /// physical payload region, and only the local one is what a
+        /// streaming reader follows.
         local_compressed_size: Option<u32>,
         /// The `uncompressed_size` the *local* header declares, when it is to
         /// differ from the central record's.
@@ -15044,7 +15044,7 @@ mod tests {
         archive
     }
 
-    /// Change 0575's adversarial witness, byte for byte.
+    /// An adversarial witness, byte for byte.
     ///
     /// The archive is 4,405 bytes. `A.bin`'s local extra field is 4,096 bytes, so
     /// A's declared local span `[0, 4163)` physically contains `B.bin`'s entire
@@ -15063,7 +15063,7 @@ mod tests {
         let mut bytes = bytes;
         bytes[35..37].copy_from_slice(&0xFACE_u16.to_le_bytes());
         bytes[37..39].copy_from_slice(&4092_u16.to_le_bytes());
-        assert_eq!(bytes.len(), 4405, "witness archive size is pinned to 0575");
+        assert_eq!(bytes.len(), 4405, "witness archive size is pinned");
         bytes
     }
 
@@ -15176,9 +15176,9 @@ mod tests {
             }
         }
 
-        // C overlaps nothing.  This is the whole semantic delta of change
-        // 0580: the archive-wide proof refused this read because two members
-        // C does not touch overlap each other.
+        // C overlaps nothing.  This is the whole semantic delta of the
+        // target-scoped proof: the archive-wide proof refused this read
+        // because two members C does not touch overlap each other.
         assert_eq!(
             scoped_indexed_read(&bytes, "C.bin").unwrap(),
             vec![b'C'; 32]
@@ -15251,20 +15251,19 @@ mod tests {
     }
 
     // ---------------------------------------------------------------------
-    // Change 0583: a neighbour's payload length is the larger of its local
-    // and central declarations.
+    // A neighbour's payload length is the larger of its local and central
+    // declarations.
     //
-    // Change 0580 bounds a neighbour's span with the local variable-region
-    // length — which it reads — and the *central* payload length, which it
-    // does not cross-check against the local header's own `compressed_size`.
-    // Change 0582's finding 2 showed that a local header declaring a longer
-    // payload than its central record hides bytes a streaming reader assigns
-    // to it, and lets another member be read out of them.
+    // The target-scoped proof bounded a neighbour's span with the local
+    // variable-region length — which it read — and the *central* payload
+    // length, which it did not cross-check against the local header's own
+    // `compressed_size`. A local header declaring a longer payload than its
+    // central record hides bytes a streaming reader assigns to it, and lets
+    // another member be read out of them.
     // ---------------------------------------------------------------------
 
     #[test]
     fn a_predecessor_whose_local_compressed_size_reaches_the_target_is_refused() {
-        // Change 0582's `crafted/neighbour-local-csize-smuggles.zip`, rebuilt.
         // `pred.bin` carries a 16-byte payload in its central record and
         // declares a 100,000-byte payload in its local header.  A reader that
         // trusts local headers places its payload at [38, 100038), which
@@ -15440,8 +15439,7 @@ mod tests {
         // variable region, which the neighbour probe deliberately does not
         // read.  A maximum that took the sentinel literally would reserve
         // 4 GiB for every ZIP64 member and refuse valid archives, so the
-        // sentinel falls back to the central length — exactly the bound
-        // change 0580 computed.
+        // sentinel falls back to the central length.
         let bytes = scoped_fixture(&[
             ScopedMember::new(b"pred.bin", &[b'p'; 32]).local_compressed_size(u32::MAX),
             ScopedMember::new(b"target.bin", &[b't'; 16]).at(200),
@@ -15465,10 +15463,10 @@ mod tests {
         // `uncompressed_size` never describes an on-disk region — the payload
         // that separates one local record from the next is `compressed_size`
         // bytes long whatever the member inflates to — so an inflated local
-        // value cannot move where any reader places a payload.  Change 0582's
-        // `neighbour-local-usize-smuggles` is an ordinary change-0580
-        // local-versus-central relaxation, and is deliberately not given the
-        // compressed-size treatment.
+        // value cannot move where any reader places a payload.  An inflated
+        // local `uncompressed_size` is an ordinary local-versus-central
+        // relaxation, and is deliberately not given the compressed-size
+        // treatment.
         let bytes = scoped_fixture(&[
             ScopedMember::new(b"pred.bin", &[b'p'; 16]).local_uncompressed_size(100_000),
             ScopedMember::new(b"target.bin", &[b't'; 16]).at(200),
@@ -17469,7 +17467,7 @@ mod tests {
 mod lookup_member_name_tests {
     use super::*;
 
-    /// The pre-0600 lookup: always normalize into a fresh `String`.
+    /// The earlier lookup: always normalize into a fresh `String`.
     fn normalizing_lookup(name: &str) -> (String, bool) {
         let explicit_directory = name
             .as_bytes()

@@ -53,7 +53,7 @@
 
 #![forbid(unsafe_code)]
 // quick-xml's checked attribute iteration is quadratic on hostile tags; read
-// attributes through `BytesStartExt` (record 0770, workspace `clippy.toml`).
+// attributes through `BytesStartExt` (workspace `clippy.toml`).
 #![cfg_attr(not(test), deny(clippy::disallowed_methods))]
 #![allow(
     clippy::arbitrary_source_item_ordering,
@@ -172,7 +172,7 @@ pub mod text_ruler;
 pub mod text_run;
 pub mod text_si_exception;
 pub mod text_special_info;
-/// The `PowerPoint` 2007 theme a presentation carries (record 0323).
+/// The `PowerPoint` 2007 theme a presentation carries.
 pub mod theme;
 #[cfg(feature = "vba-inspection")]
 pub mod vba_info;

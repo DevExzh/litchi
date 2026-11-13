@@ -4,12 +4,12 @@
     reason = "integration tests use panic-on-failure extraction"
 )]
 
-//! The package-level edit families refuse a signed package (ADR 0006;
-//! unified-ops record 0014a). A changed edit is refused with
-//! `SignedSourceRequiresExplicitPolicy` (or the format-owned `Error::Signed`
-//! for the shared VBA owner) and leaves the package untouched; after an
-//! explicit `Package::unsign` the same edit publishes a package without
-//! signature parts; an exact no-op keeps the signed source byte for byte.
+//! The package-level edit families refuse a signed package (ADR 0006). A
+//! changed edit is refused with `SignedSourceRequiresExplicitPolicy` (or the
+//! format-owned `Error::Signed` for the shared VBA owner) and leaves the
+//! package untouched; after an explicit `Package::unsign` the same edit
+//! publishes a package without signature parts; an exact no-op keeps the signed
+//! source byte for byte.
 
 mod in_place;
 use in_place::InPlace as _;
@@ -1063,8 +1063,8 @@ fn model3d_refuses_a_signed_package_until_it_is_unsigned() {
     ));
 }
 
-/// Legacy-comment updates and reorders that change nothing publish nothing
-/// (record 0014a class c): they used to rewrite the part and strip.
+/// Legacy-comment updates and reorders that change nothing publish nothing:
+/// they used to rewrite the part and strip.
 #[test]
 fn legacy_comment_no_ops_keep_a_signed_package_exact() {
     let conformance = LegacyConformance::Transitional;
@@ -1120,7 +1120,7 @@ fn legacy_comment_no_ops_keep_a_signed_package_exact() {
 }
 
 /// Modern-comment and modern-author updates and reorders that change
-/// nothing publish nothing (record 0014a class c).
+/// nothing publish nothing.
 #[test]
 fn modern_comment_no_ops_keep_a_signed_package_exact() {
     let source = signed_with(SIGNED[1], |package| {
@@ -1174,7 +1174,7 @@ fn modern_comment_no_ops_keep_a_signed_package_exact() {
 }
 
 /// Modern-comment change commands that a callback leaves unchanged publish
-/// nothing (record 0014a class c).
+/// nothing.
 #[test]
 fn modern_comment_command_no_op_keeps_a_signed_package_exact() {
     let source = signed_with(SIGNED[0], |package| {
@@ -1216,7 +1216,7 @@ fn modern_comment_command_no_op_keeps_a_signed_package_exact() {
 }
 
 /// Theme scheme and override replacements that encode to the stored bytes
-/// publish nothing (record 0014a class c).
+/// publish nothing.
 #[test]
 fn theme_no_ops_keep_a_signed_package_exact() {
     const AUTHORED: &str = "/ppt/theme/theme2.xml";
@@ -1279,9 +1279,9 @@ fn theme_no_ops_keep_a_signed_package_exact() {
 }
 
 /// Shape-span puts of the stored value return before the package is
-/// borrowed mutably, so a signed package stays exact; before record 0014a
-/// that borrow revoked the exact source and the unchanged signed package
-/// could no longer be published.
+/// borrowed mutably, so a signed package stays exact; previously that borrow
+/// revoked the exact source and the unchanged signed package could no longer be
+/// published.
 #[test]
 fn shape_put_no_ops_keep_a_signed_package_exact() {
     let source = signed_with(SIGNED[0], |package| {

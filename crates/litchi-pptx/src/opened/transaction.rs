@@ -511,7 +511,7 @@ impl Edit {
     /// Stage `ordered_ids`. With `moved`, the slide at that position left its
     /// section and joins its new neighbour's, as `PowerPoint` moves a slide;
     /// otherwise every slide keeps its section and each section is re-sorted
-    /// into the new order (p14 sections, record 0252).
+    /// into the new order (p14 sections).
     fn reorder_slide_ids_moving(
         &mut self,
         ordered_ids: &[u32],
@@ -560,9 +560,9 @@ impl Edit {
     /// Remove one slide through the same bounded ownership proof used by
     /// [`Snapshot::plan_slide_removal`].
     ///
-    /// The Parts the slide owns exclusively leave with it (record 0303).
-    /// Signatures, macros, MCE, protection, and incoming secondary owners
-    /// are refused before this transaction changes.
+    /// The Parts the slide owns exclusively leave with it. Signatures, macros,
+    /// MCE, protection, and incoming secondary owners are refused before this
+    /// transaction changes.
     ///
     /// # Errors
     ///
@@ -1120,10 +1120,10 @@ impl Edit {
     }
 
     /// Apply several already bounded batches of rich text edits to one
-    /// slide, in order, in one scene read, rewrite and read-back (record
-    /// 0333). Each chunk keeps the limits of [`Self::set_text_properties`]
-    /// (256 edits and its text bytes); the total is bounded by 100,000
-    /// edits. The return value is the number of edits that changed bytes.
+    /// slide, in order, in one scene read, rewrite and read-back. Each chunk
+    /// keeps the limits of [`Self::set_text_properties`] (256 edits and its
+    /// text bytes); the total is bounded by 100,000 edits. The return value is
+    /// the number of edits that changed bytes.
     ///
     /// # Errors
     ///
@@ -1138,7 +1138,7 @@ impl Edit {
     }
 
     /// [`Self::set_text_property_chunks`], returning for each edit, in
-    /// order, whether it changed bytes (record 0348): the change one
+    /// order, whether it changed bytes: the change one
     /// [`Self::set_text_properties`] call per edit, applied one after the
     /// other, would report. A batch planner learns each edit's change here
     /// instead of reading the targets before staging.
@@ -1385,7 +1385,7 @@ impl Edit {
         let mut removed_relationships =
             shape_relationship_ids(super::xml::span_bytes(blob, span.clone())?, owner.rels())?;
         // A SmartArt's cached drawing is related by the slide but named only
-        // by its data model, so it leaves with the frame (record 0284).
+        // by its data model, so it leaves with the frame.
         let drawings: Vec<String> = removed_relationships
             .iter()
             .filter_map(|id| smartart::drawing_relationship(&self.working, &selected.part_name, id))
@@ -1616,9 +1616,8 @@ impl Edit {
 
     /// Apply a bounded batch of rich text edits to the shapes of one slide's
     /// notes page, in order, as [`Self::set_text_properties`] applies them to
-    /// a slide (record 0285): targets address the notes page's own shapes by
-    /// their positional scene index. Returns the number of edits whose bytes
-    /// changed.
+    /// a slide: targets address the notes page's own shapes by their positional
+    /// scene index. Returns the number of edits whose bytes changed.
     ///
     /// # Errors
     ///
@@ -1666,10 +1665,10 @@ impl Edit {
 
     /// Apply several already bounded batches of rich text edits to the
     /// notes page of one slide, in order, in one notes-part read, rewrite
-    /// and read-back (record 0348), as [`Self::set_text_property_chunks`]
-    /// does for a slide. The result equals one
-    /// [`Self::set_notes_text_properties`] call per chunk, in order. The
-    /// return value is the number of edits that changed bytes.
+    /// and read-back, as [`Self::set_text_property_chunks`] does for a slide.
+    /// The result equals one [`Self::set_notes_text_properties`] call per
+    /// chunk, in order. The return value is the number of edits that changed
+    /// bytes.
     ///
     /// # Errors
     ///
@@ -1685,8 +1684,8 @@ impl Edit {
     }
 
     /// [`Self::set_notes_text_property_chunks`], returning each edit's
-    /// change in order (record 0348), as
-    /// [`Self::set_text_property_chunks_per_edit`] does for a slide.
+    /// change in order, as [`Self::set_text_property_chunks_per_edit`] does for
+    /// a slide.
     ///
     /// # Errors
     ///

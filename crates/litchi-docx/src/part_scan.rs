@@ -1,5 +1,4 @@
-//! A shallow, located element scan of one WordprocessingML part (record
-//! 0319).
+//! A shallow, located element scan of one WordprocessingML part.
 //!
 //! The style, numbering, note and story catalogs read their parts through
 //! this scan: every element down to a chosen depth, in document order, with
@@ -125,8 +124,8 @@ impl Tree {
 }
 
 /// Every `paraId` attribute value (any prefix) of `xml` that parses as
-/// hexadecimal: the paragraph identifiers a fresh one must avoid (record
-/// 0345). A plain byte search; values that do not parse are skipped.
+/// hexadecimal: the paragraph identifiers a fresh one must avoid. A plain byte
+/// search; values that do not parse are skipped.
 pub(crate) fn paragraph_ids(xml: &[u8]) -> Vec<u32> {
     const KEY: &[u8] = b"paraId=";
     let mut ids = Vec::new();
@@ -540,14 +539,13 @@ pub(crate) fn holds_any(xml: &[u8], locals: &[&[u8]]) -> Result<bool> {
     }
 }
 
-/// The field markup a text set refuses rather than keep or drop (record
-/// 0304): keeping a field adds its result to the new text, and replacing it
-/// loses it.
+/// The field markup a text set refuses rather than keep or drop: keeping a
+/// field adds its result to the new text, and replacing it loses it.
 pub(crate) const FIELD_MARKUP: &[&[u8]] = &[b"fldChar", b"instrText", b"fldSimple"];
 
 /// The concatenated `w:t` text of the runs of `xml`, skipping runs that
 /// hold an element named in `skip` and alternate-content fallbacks: the text
-/// OfficeCLI reads from a header, footer or note (record 0319).
+/// OfficeCLI reads from a header, footer or note.
 pub(crate) fn run_text(xml: &[u8], skip: &[&[u8]]) -> Result<String> {
     let mut reader = Reader::from_reader(xml);
     let mut text = String::new();

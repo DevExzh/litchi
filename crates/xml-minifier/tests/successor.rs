@@ -1,6 +1,6 @@
 //! `VerifiedSource::verify_successor` returns exactly what `verify_source`
 //! returns for the replacement, and proves an edit between two recorded
-//! content boundaries by scanning only the edited run (record 0313).
+//! content boundaries by scanning only the edited run.
 //!
 //! Every test compares the verdict with the complete audit, including the
 //! error and its offset; debug builds also re-derive every splice proof from
@@ -495,8 +495,8 @@ fn proofs_without_boundaries_or_under_other_limits_audit_completely() {
         checked(&base, replacement.as_bytes(), other),
         Some(ReplacementProof::Complete)
     );
-    // A successor of an indexed proof keeps boundaries of its own (record
-    // 0317); one of a plain proof keeps none.
+    // A successor of an indexed proof keeps boundaries of its own; one of a
+    // plain proof keeps none.
     let (successor, _how) = base
         .verify_successor(shared(replacement.as_bytes()), Limits::default())
         .unwrap();

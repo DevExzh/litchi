@@ -57,8 +57,8 @@ struct ElementBounds {
 ///
 /// Every tag range an edit method takes is a byte range of
 /// [`bytes`](Self::bytes), counting a leading UTF-8 byte-order mark: slice
-/// the bytes to find the tag (change 0765; before it, the scanner compared
-/// ranges with reader positions that skip the mark).
+/// the bytes to find the tag (the scanner once compared ranges with reader
+/// positions that skip the mark).
 #[derive(Clone)]
 pub struct OwnedXmlPart {
     pub(crate) name: PackURI,

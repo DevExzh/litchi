@@ -1,5 +1,5 @@
 //! Proof obligations of the owned cross-copy's source-compressed media
-//! transfer (change 0742).
+//! transfer.
 //!
 //! A copy publishes each eligible copied image from the source member's
 //! verified compressed bytes in fresh known-size framing, decided from the
@@ -890,9 +890,9 @@ fn splice_member_payload(archive: &[u8], name: &str, at_start: bool, inserted: &
     output
 }
 
-/// The reviewer's counterexample: 16 bytes after the final Deflate block of a
-/// sized member. The ordinary reader decodes it; the capture's consumed-input
-/// check refuses it.
+/// A counterexample: 16 bytes after the final Deflate block of a sized member.
+/// The ordinary reader decodes it; the capture's consumed-input check refuses
+/// it.
 #[test]
 fn a_member_with_bytes_after_its_final_block_keeps_the_recompressing_route() -> Result<()> {
     let (source_bytes, destination_bytes) = media_fixture()?;
@@ -932,7 +932,7 @@ fn a_member_with_bytes_after_its_final_block_keeps_the_recompressing_route() -> 
     Ok(())
 }
 
-/// The reviewer's other counterexample: undo then redo of a transferring copy.
+/// Another counterexample: undo then redo of a transferring copy.
 #[test]
 fn redo_after_undo_publishes_the_first_copy_again() -> Result<()> {
     let (source_bytes, destination_bytes) = media_fixture()?;
@@ -1430,10 +1430,10 @@ fn a_stored_compressible_image_is_transferred_stored() -> Result<()> {
     Ok(())
 }
 
-/// The reviewer's padding case: 200,000 empty stored blocks in front of the
-/// flat image's Deflate stream. The member decodes to the same image, but its
-/// declared compressed size fails the header-only guard, so it is recompressed
-/// instead of being published padded; the photo still transfers.
+/// The padding case: 200,000 empty stored blocks in front of the flat image's
+/// Deflate stream. The member decodes to the same image, but its declared
+/// compressed size fails the header-only guard, so it is recompressed instead
+/// of being published padded; the photo still transfers.
 #[test]
 fn a_member_padded_with_empty_stored_blocks_is_recompressed() -> Result<()> {
     let (source_bytes, destination_bytes) = media_fixture()?;

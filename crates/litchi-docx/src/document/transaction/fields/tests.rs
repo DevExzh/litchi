@@ -309,7 +309,7 @@ fn stale_indexes_and_bad_text_are_refused() {
 
 #[test]
 fn instructions_bookmark_names_and_removals_are_spliced() {
-    // Record 0325: field instruction sets, bookmark renames and removals.
+    // Field instruction sets, bookmark renames and removals.
     let xml = document(&format!(
         r#"{TOC_PLACEHOLDER}<w:p><w:bookmarkStart w:id="4" w:name="Intro"/><w:r><w:t>Body</w:t></w:r><w:bookmarkEnd w:id="4"/></w:p><w:p><w:fldSimple w:instr=" PAGE "><w:r><w:t>3</w:t></w:r></w:fldSimple></w:p>"#
     ));

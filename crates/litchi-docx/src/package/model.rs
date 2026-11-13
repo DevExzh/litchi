@@ -997,9 +997,9 @@ mod font_settings_tests {
         OpcPackage::from_vec(bytes, litchi_opc::SourceLimits::default()).expect("deferred open")
     }
 
-    // Found after the 0759 review: every settings lookup error read as
-    // absence, so a present settings part that failed to decode was reported
-    // as missing, or was taken for no settings part at all.
+    // Every settings lookup error used to read as absence, so a present
+    // settings part that failed to decode was reported as missing, or was taken
+    // for no settings part at all.
     #[test]
     fn font_settings_tell_absent_settings_from_undecodable_ones() {
         let settings = PackURI::new("/word/settings.xml").expect("settings name");
@@ -1099,9 +1099,9 @@ mod font_settings_tests {
         litchi_opc::PackageWriter::to_bytes(&package).expect("signed source")
     }
 
-    // Record 0014b: the managed font settings used to remove a signature
-    // before patching the settings part. A change to a signed package is
-    // refused instead; an unchanged one keeps the signature byte for byte.
+    // The managed font settings used to remove a signature before patching the
+    // settings part. A change to a signed package is refused instead; an
+    // unchanged one keeps the signature byte for byte.
     #[test]
     fn font_settings_refuse_a_signed_package_until_it_is_unsigned() {
         let transitional = font::Conformance::Transitional;

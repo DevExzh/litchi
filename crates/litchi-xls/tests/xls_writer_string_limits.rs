@@ -7,8 +7,8 @@
 //! Every bounded string field of the fresh XLS writer at its limit: one code
 //! unit below and exactly at the limit are written whole and read back, and
 //! one unit past it is refused with a typed error, before any output and
-//! without changing the writer. Until change 0757 the shared-string, formula
-//! string, number-format and worksheet-name encoders truncated such a string
+//! without changing the writer. The shared-string, formula string,
+//! number-format and worksheet-name encoders once truncated such a string
 //! instead, and the defined-name encoder miscounted or misencoded non-ASCII
 //! names.
 
@@ -106,10 +106,10 @@ fn shared_strings_up_to_65535_units_are_written_whole_and_one_more_is_refused() 
     }
 }
 
-/// The 0753 review's reproduction. Cutting this string at 0xFFFF code units
-/// left the emoji's high surrogate alone at the end of the SST entry, and the
-/// crate's own reader then refused the whole workbook ("lone surrogate
-/// found"). The writer refuses the string instead; one `a` fewer fits.
+/// Cutting this string at 0xFFFF code units left the emoji's high surrogate
+/// alone at the end of the SST entry, and the crate's own reader then refused
+/// the whole workbook ("lone surrogate found"). The writer refuses the string
+/// instead; one `a` fewer fits.
 #[test]
 fn a_string_whose_surrogate_pair_straddles_the_limit_is_refused_not_split() {
     let straddling = format!("{}😀", "a".repeat(65_534));
@@ -286,8 +286,8 @@ fn formula_string_literals_up_to_255_units_are_written_whole_and_one_more_is_ref
     for literal in strings_of(256) {
         let mut writer = Builder::new();
         let sheet = writer.add_worksheet("Formulas").unwrap();
-        // Since change 0766 formula text is tokenized when it is set, so the
-        // refusal comes from `write_formula` and leaves the cell unset.
+        // Formula text is tokenized when it is set, so the refusal comes from
+        // `write_formula` and leaves the cell unset.
         assert_eq!(
             too_long(writer.write_formula(sheet, 0, 0, &format!("\"{literal}\""))),
             ("formula string literal", 256, 255)

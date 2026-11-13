@@ -55,12 +55,12 @@ pub(crate) struct Captured {
 
 /// Whether a captured fragment re-declares the namespaces it inherits.
 ///
-/// Until change 0653 the shared markup-compatibility writer repeated every
-/// in-scope declaration on every element it emitted, so a fragment cut out of a
+/// The shared markup-compatibility writer used to repeat every in-scope
+/// declaration on every element it emitted, so a fragment cut out of a
 /// processed part resolved on its own by accident. The writer now declares each
 /// namespace once, where XML requires it, so a fragment cut out of processed
-/// bytes asks for the inherited declarations at its own root element.
-/// A fragment cut out of the source bytes, or out of a synthetic wrapper built
+/// bytes asks for the inherited declarations at its own root element. A
+/// fragment cut out of the source bytes, or out of a synthetic wrapper built
 /// from them, is copied unchanged as before.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Inherited {

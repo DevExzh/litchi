@@ -38,7 +38,7 @@ impl Slide<'_> {
     ///
     /// A shape whose text box references slide-list text (an
     /// `OutlineTextRefAtom`, MS-PPT 2.9.78) carries the text of the body the
-    /// reference selects (L-PPT-R1); see [`Self::outline_text_bodies`].
+    /// reference selects; see [`Self::outline_text_bodies`].
     ///
     /// Non-structural text-style defects repaired while the shapes are parsed
     /// (see [`crate::TextPropDefect`]) are recorded alongside the cached
@@ -119,7 +119,7 @@ impl Slide<'_> {
     }
 
     /// The payload of this slide's first `PPDrawing` child, exactly the
-    /// bytes [`Self::shapes`] parses (record 0264 incremental readback).
+    /// bytes [`Self::shapes`] parses (incremental readback).
     pub(crate) fn drawing_payload(&self) -> Option<&[u8]> {
         self.record
             .find_child(RecordType::PPDrawing)
@@ -144,7 +144,7 @@ impl Slide<'_> {
 
     /// Find a shape by its `OfficeArt` shape identifier (`spid`, see
     /// [`ShapeEnum::id`]), searching group children depth-first in drawing
-    /// order (L-PPT-R4).
+    /// order.
     ///
     /// MS-ODRAW requires identifiers to be unique within a drawing; when a
     /// file repeats one, the first shape in drawing order is returned. `None`
@@ -276,7 +276,7 @@ impl Slide<'_> {
     }
 
     /// This slide's slide-list text bodies, in slide-list order (MS-PPT
-    /// 2.4.14.3; L-PPT-R1).
+    /// 2.4.14.3).
     ///
     /// `PowerPoint` keeps the text of title and body placeholders here: the
     /// placeholder's text box holds an `OutlineTextRefAtom` whose index
@@ -509,8 +509,8 @@ impl Slide<'_> {
     /// The text is the slide's direct text records, then the text of every
     /// text box in drawing order. A text box that references slide-list
     /// text (an `OutlineTextRefAtom`, as title and body placeholders do)
-    /// contributes the body it selects (L-PPT-R1). When none of that yields
-    /// text, the slide's slide-list text is returned instead.
+    /// contributes the body it selects. When none of that yields text, the
+    /// slide's slide-list text is returned instead.
     ///
     /// # Performance
     ///
@@ -560,9 +560,8 @@ impl Slide<'_> {
     ///
     /// Returns an error when the `PowerPoint` 10 programmable tag or a comment record is malformed.
     /// The text, character runs and text hyperlinks of the shape with
-    /// `OfficeArt` ID `shape_id` (record 0323); an outline-backed placeholder
-    /// reads the slide-list body it selects. `None` for a shape without a
-    /// text body.
+    /// `OfficeArt` ID `shape_id`; an outline-backed placeholder reads the
+    /// slide-list body it selects. `None` for a shape without a text body.
     ///
     /// # Errors
     ///

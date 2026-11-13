@@ -271,13 +271,13 @@ impl XmlRef {
     /// from its owning part re-declared on its own root element, so that it
     /// parses standalone.
     ///
-    /// Until change 0653 the shared markup-compatibility writer repeated every
-    /// in-scope declaration on every element it emitted, so a retained range
-    /// carried them by accident. The writer now declares each namespace once,
-    /// where XML requires it, so a consumer that parses a range on its own asks
-    /// for them here. The fragment is returned borrowed when its own root
-    /// already declares everything it inherits, which is the case for a
-    /// standalone paragraph.
+    /// The shared markup-compatibility writer used to repeat every in-scope
+    /// declaration on every element it emitted, so a retained range carried
+    /// them by accident. The writer now declares each namespace once, where XML
+    /// requires it, so a consumer that parses a range on its own asks for them
+    /// here. The fragment is returned borrowed when its own root already
+    /// declares everything it inherits, which is the case for a standalone
+    /// paragraph.
     pub(crate) fn self_contained_bytes(&self) -> Result<Cow<'_, [u8]>> {
         let lease = self.namespace_resolver()?;
         let scope = litchi_ooxml_common::mce::InScopeNamespaces::from_declarations(
@@ -575,8 +575,8 @@ impl OpaqueInline {
     /// active paragraph XML.
     ///
     /// The bytes are an XML fragment whose namespace declarations are those in
-    /// scope where it appears in the document, which since change 0653 are not
-    /// repeated on the fragment's own root element. Use
+    /// scope where it appears in the document, which are not repeated on the
+    /// fragment's own root element. Use
     /// [`self_contained_xml`](Self::self_contained_xml) to parse it on its own.
     #[must_use]
     pub fn xml_bytes(&self) -> &[u8] {
@@ -610,8 +610,8 @@ impl OpaqueRunContent {
     /// Borrow the retained run child exactly as it appeared in source XML.
     ///
     /// The bytes are an XML fragment whose namespace declarations are those in
-    /// scope where it appears in the document, which since change 0653 are not
-    /// repeated on the fragment's own root element. Use
+    /// scope where it appears in the document, which are not repeated on the
+    /// fragment's own root element. Use
     /// [`self_contained_xml`](Self::self_contained_xml) to parse it on its own.
     #[must_use]
     pub fn xml_bytes(&self) -> &[u8] {
@@ -723,9 +723,9 @@ impl Paragraph {
     /// This paragraph's XML with every namespace declaration it inherits from
     /// its part re-declared on its own `w:p`, so that it parses standalone.
     ///
-    /// Change 0653 stopped the markup-compatibility writer from repeating
-    /// every in-scope declaration on every element it emitted, so a `w:p` span
-    /// that is parsed on its own asks for the inherited ones here.
+    /// The markup-compatibility writer does not repeat every in-scope
+    /// declaration on every element it emits, so a `w:p` span that is parsed on
+    /// its own asks for the inherited ones here.
     pub(crate) fn self_contained_xml(&self) -> Result<Vec<u8>> {
         let reference = self.xml_data.xml_ref()?;
         Ok(reference.self_contained_bytes()?.into_owned())

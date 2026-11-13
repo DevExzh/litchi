@@ -1,6 +1,6 @@
 //! Typed table capabilities.
 
-/// Lexical table-column edits (record 0321).
+/// Lexical table-column edits.
 pub(crate) mod columns;
 /// Borrowed tables embedded in slide graphic frames.
 pub mod shape;

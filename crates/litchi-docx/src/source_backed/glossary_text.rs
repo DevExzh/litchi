@@ -1,6 +1,6 @@
-//! The glossary batch text family of a source-backed package (record
-//! 0355a): replace the text of direct paragraphs of several entries of the
-//! glossary document in one atomic change.
+//! The glossary batch text family of a source-backed package: replace the text
+//! of direct paragraphs of several entries of the glossary document in one
+//! atomic change.
 //!
 //! [`Package::edit_glossary_text_batch`](crate::source_backed::Package::edit_glossary_text_batch)
 //! stages an [`Edit`] whose commit returns a new source-backed package;

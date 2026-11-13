@@ -1,5 +1,5 @@
 //! Paragraph insertion, removal, moves and swaps on producer RTF by source
-//! splicing (records 0293, 0308).
+//! splicing.
 //!
 //! The lifecycle projection and the ordinary paragraph map accept only plain
 //! ASCII bodies with default formatting, so producer RTF (Word, LibreOffice,
@@ -36,7 +36,7 @@
 //! A root-level section break (`\sect` and the section controls after it)
 //! is a block of its own that keeps its place among the paragraphs, like a
 //! table row; every section must read back with its properties and headers
-//! unchanged (record 0328).
+//! unchanged.
 
 use std::ops::Range;
 
@@ -270,7 +270,7 @@ fn check_text(source: &Package, position: usize, text: &str) -> Result<(), Error
     }
 }
 
-/// The source segment of each body paragraph (record 0328).
+/// The source segment of each body paragraph.
 pub(super) fn paragraph_ranges(source: &Package, input: &str) -> Result<Vec<Range<usize>>, Error> {
     Ok(segments(source, input)?.ranges)
 }
@@ -310,7 +310,7 @@ fn segments(source: &Package, input: &str) -> Result<Segments, Error> {
     let mut unknown = Vec::new();
     // A root-level `\sect` and the section controls after it, through the
     // next paragraph reset, text or group, are a block of their own that is
-    // not a body paragraph (record 0328, the follow-up of record 0308).
+    // not a body paragraph.
     let mut in_section = false;
     for (token, span) in tokens.iter().zip(&spans) {
         if in_section {

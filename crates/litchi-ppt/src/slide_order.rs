@@ -8,20 +8,20 @@
 //! and complete PowerPoint client-anchor geometry formatting. Slide payload
 //! records and unrelated CFB streams remain exact unless selected explicitly.
 //!
-//! The editing owner (its transaction, commit and patch) is crate-private
-//! since record 0357: [`crate::Package::edit`] is the one public edit route.
-//! This module keeps public the vocabulary those verbs take, the typed
+//! The editing owner (its transaction, commit and patch) is crate-private:
+//! [`crate::Package::edit`] is the one public edit route. This module keeps
+//! public the vocabulary those verbs take, the typed
 //! [`Error`](crate::slide_order::Error)/[`Refusal`](crate::slide_order::Refusal)
 //! they return, and [`Snapshot`](crate::slide_order::Snapshot), an immutable
-//! whole-artifact read view of the slide list and its slide-level state.
-//! Its durable patches, patch joins and three-way planning are reached
-//! through `package::edit::Patch::{to_durable, join}` and
-//! `Package::{apply_durable, plan_three_way}` (record 0357a).
+//! whole-artifact read view of the slide list and its slide-level state. Its
+//! durable patches, patch joins and three-way planning are reached through
+//! `package::edit::Patch::{to_durable, join}` and `Package::{apply_durable,
+//! plan_three_way}`.
 #![cfg_attr(
     not(test),
     expect(
         dead_code,
-        reason = "crate-private native owner of the primary edit (record 0357); its durable, join and three-way surfaces are public through package::edit (record 0357a), the rest stays exercised by the unit tests"
+        reason = "crate-private native owner of the primary edit; its durable, join and three-way surfaces are public through package::edit, the rest stays exercised by the unit tests"
     )
 )]
 
@@ -54,9 +54,9 @@ pub const MAX_SHAPE_TEXT_CHUNKS: usize = 4096;
 /// Maximum number of globally selected shapes accepted by one aggregate
 /// shape-text operation.
 ///
-/// Raised from 4096 with the primary edit bound (record 0264, owner approved
-/// 2026-10-14): verification no longer re-parses the slide, so one larger
-/// publication is linear where several smaller ones each rewrote the slide.
+/// Raised from 4096 with the primary edit bound: verification no longer
+/// re-parses the slide, so one larger publication is linear where several
+/// smaller ones each rewrote the slide.
 pub const MAX_SHAPE_TEXT_CHUNK_SELECTIONS: usize = 16384;
 
 /// Fixed-width manual and automatic advance state from one
@@ -283,8 +283,8 @@ pub enum Refusal {
     UncommittedSlideDependency,
     /// One semantic shape target appeared more than once in one batch.
     DuplicateShapeTextTarget { target: crate::text_edit::Target },
-    /// An element edit (record 0323) would need records whose layout it does
-    /// not model losslessly.
+    /// An element edit would need records whose layout it does not model
+    /// losslessly.
     UnsupportedElement {
         element: &'static str,
         reason: &'static str,
@@ -297,11 +297,11 @@ pub enum Refusal {
         reason: &'static str,
     },
     /// A patch operation (a join, or a durable conversion) is not supported
-    /// for the content of this patch (record 0357a).
+    /// for the content of this patch.
     UnsupportedPatch { reason: &'static str },
-    /// Two joined patches write the same semantic target (record 0357b),
-    /// named as a three-way plan names it (for example
-    /// `document/master-list`), so their order would decide the result.
+    /// Two joined patches write the same semantic target, named as a three-way
+    /// plan names it (for example `document/master-list`), so their order would
+    /// decide the result.
     JoinConflict { target: String },
 }
 
@@ -383,8 +383,8 @@ impl fmt::Display for Refusal {
 }
 
 impl Refusal {
-    /// The shared refusal class of this reason (record 0351 §2.4 rule 2);
-    /// unified callers classify by this kind alone.
+    /// The shared refusal class of this reason; unified callers classify by
+    /// this kind alone.
     #[must_use]
     pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
         use litchi_core::edit::RefusalKind;
@@ -1531,7 +1531,7 @@ enum FormattingChange {
     SlideTransitionVisual(SlideTransitionVisualChange),
     MediaPath(ExternalMediaPathChange),
     MediaPlayback(ExternalMediaPlaybackChange),
-    /// Persisted records an element edit replaced (record 0323).
+    /// Persisted records an element edit replaced.
     Element(records::ElementChange),
 }
 
@@ -1678,16 +1678,15 @@ enum StructuralChange {
     Move(Change),
     Remove(ListChange),
     Insert(ListChange),
-    /// A `DocumentContainer` edit outside the slide list (record 0357a),
-    /// with the slide-order fingerprint it was staged at (record 0357b:
-    /// the edit leaves the slide order alone, so the fingerprint holds on
-    /// both sides and binds its durable operation in either direction).
+    /// A `DocumentContainer` edit outside the slide list, with the slide-order
+    /// fingerprint it was staged at (the edit leaves the slide order alone, so
+    /// the fingerprint holds on both sides and binds its durable operation in
+    /// either direction).
     Document(DocumentChange, [u8; 32]),
 }
 
 /// A staged `DocumentContainer` edit that leaves the slide list order alone:
-/// master order, the custom table-style atom and `fNonOutlineData`
-/// (record 0357a).
+/// master order, the custom table-style atom and `fNonOutlineData`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum DocumentChange {
     /// The master list became `order` (each entry a previous position).
@@ -1815,11 +1814,10 @@ pub(crate) struct Transaction {
     /// text), so staged structure must be rebased over it at commit.
     live_document_changed: bool,
     /// The opened projection of exactly the source bytes, when the root
-    /// edit was started from an immutable package (record 0260).
+    /// edit was started from an immutable package.
     opened: Option<OpenedProjection>,
     /// Shapes of one slide of the working artifact, proven equal to a parse
-    /// by the last batch text publication's incremental readback (record
-    /// 0264).
+    /// by the last batch text publication's incremental readback.
     verified_shapes: Option<VerifiedShapes>,
 }
 
@@ -1881,7 +1879,7 @@ impl Transaction {
 
     /// The working artifact and the proven shapes of one of its slides, when
     /// the last batch text publication verified exactly this working
-    /// artifact (record 0264).
+    /// artifact.
     pub(crate) fn verified_shapes(&self) -> Option<VerifiedSlideShapes> {
         self.verified_shapes
             .as_ref()
@@ -1955,8 +1953,8 @@ impl Transaction {
         Ok(())
     }
 
-    /// Reorders the main and title masters (record 0357a): the master list
-    /// becomes `order`, each entry a current zero-based master position.
+    /// Reorders the main and title masters: the master list becomes `order`,
+    /// each entry a current zero-based master position.
     ///
     /// Slides, notes and title masters reference masters by `masterId`, which
     /// is unchanged, so every reference keeps its master. The identity order
@@ -1995,7 +1993,7 @@ impl Transaction {
         Ok(())
     }
 
-    /// Moves one master to a final zero-based position (record 0357a).
+    /// Moves one master to a final zero-based position.
     ///
     /// # Errors
     ///
@@ -2013,8 +2011,7 @@ impl Transaction {
         self.reorder_masters(&order)
     }
 
-    /// Moves the master with `masterId` `master_id` to a final position
-    /// (record 0357a).
+    /// Moves the master with `masterId` `master_id` to a final position.
     ///
     /// # Errors
     ///
@@ -2047,7 +2044,7 @@ impl Transaction {
     }
 
     /// Inserts a `RoundTripCustomTableStyles12Atom` before or after the
-    /// `EndDocumentAtom` (record 0357a).
+    /// `EndDocumentAtom`.
     ///
     /// # Errors
     ///
@@ -2073,7 +2070,7 @@ impl Transaction {
         Ok(())
     }
 
-    /// Removes the custom table-style atom and returns it (record 0357a).
+    /// Removes the custom table-style atom and returns it.
     ///
     /// # Errors
     ///
@@ -2090,7 +2087,7 @@ impl Transaction {
     }
 
     /// Replaces the custom table-style atom in place and returns the
-    /// previous one (record 0357a). An equal record is an exact no-op.
+    /// previous one. An equal record is an exact no-op.
     ///
     /// # Errors
     ///
@@ -2118,8 +2115,7 @@ impl Transaction {
     }
 
     /// Moves the custom table-style atom before or after the
-    /// `EndDocumentAtom` (record 0357a). Its current placement is an exact
-    /// no-op.
+    /// `EndDocumentAtom`. Its current placement is an exact no-op.
     ///
     /// # Errors
     ///
@@ -2142,8 +2138,8 @@ impl Transaction {
     }
 
     /// Sets one slide's `SlidePersistAtom.fNonOutlineData` flag
-    /// ([MS-PPT] 2.4.14.5; record 0357a). It does not hide the slide. The
-    /// current value is an exact no-op.
+    /// ([MS-PPT] 2.4.14.5). It does not hide the slide. The current value is an
+    /// exact no-op.
     ///
     /// # Errors
     ///
@@ -3276,7 +3272,7 @@ impl Transaction {
         Ok(())
     }
 
-    /// Stage one element edit over persisted records (record 0323).
+    /// Stage one element edit over persisted records.
     ///
     /// `slide` selects a slide by its projected position; `document` offers
     /// the live document. The closure computes the complete replacement of
@@ -3364,7 +3360,7 @@ impl Transaction {
     }
 
     /// Record a staged document-structure edit with the slide-order
-    /// fingerprint its durable operation binds (record 0357b).
+    /// fingerprint its durable operation binds.
     fn push_document(&mut self, change: DocumentChange) -> Result<()> {
         let order = order_digest(&self.document)?;
         self.structural
@@ -3543,7 +3539,7 @@ impl Patch {
     }
 
     /// An exact byte patch from `before` to `after` that retains no semantic
-    /// operations (the result of a durable replay, record 0357a).
+    /// operations (the result of a durable replay).
     pub(crate) fn exact(before: Snapshot, after: Snapshot) -> Self {
         Self {
             before,
@@ -3564,12 +3560,11 @@ impl Patch {
         }
     }
 
-    /// Refuses a patch whose operations a join cannot replay by value
-    /// (record 0357b): slide insertions and removals shift every later
-    /// position, element record edits replace persisted records the other
-    /// patch may also rewrite, and an inverse patch that edits both
-    /// formatting and structure resolves its formatting targets after its
-    /// structure.
+    /// Refuses a patch whose operations a join cannot replay by value: slide
+    /// insertions and removals shift every later position, element record edits
+    /// replace persisted records the other patch may also rewrite, and an
+    /// inverse patch that edits both formatting and structure resolves its
+    /// formatting targets after its structure.
     fn require_joinable(&self) -> Result<()> {
         let refuse = |reason| Err(Error::Refused(Refusal::UnsupportedPatch { reason }));
         if self.structural.iter().any(|change| {
@@ -3714,7 +3709,7 @@ impl Patch {
     }
 
     /// Joins two independently prepared patches over this patch's exact
-    /// source into one patch (records 0357a, 0357b).
+    /// source into one patch.
     ///
     /// Both patches must start from the same exact artifact. They may hold
     /// slide moves, master reorders, custom table-style edits,
@@ -4169,9 +4164,9 @@ impl Patch {
                         )?,
                     )
                 },
-                // Master order, custom table styles and fNonOutlineData
-                // (record 0357b): bound like the slide-list operations, to
-                // the structural artifact and the slide order they run at.
+                // Master order, custom table styles and fNonOutlineData: bound
+                // like the slide-list operations, to the structural artifact
+                // and the slide order they run at.
                 StructuralChange::Document(change, order) => (
                     durable_document_operation(
                         limits,
@@ -4575,13 +4570,13 @@ fn parse_placement(
     }
 }
 
-/// One durable document-structure operation (record 0357b). Every one is
-/// bound to the structural artifact and the slide order it runs at, like
-/// the slide-list operations, and to the state it replaces where the change
-/// carries it: the SHA-256 of the custom table-style atom it removes or
-/// replaces, the placement it moves from, and the `fNonOutlineData` value it
-/// overwrites. Atoms travel as blobs. Master order is a permutation of
-/// zero-based master positions; no native identifier is serialized.
+/// One durable document-structure operation. Every one is bound to the
+/// structural artifact and the slide order it runs at, like the slide-list
+/// operations, and to the state it replaces where the change carries it: the
+/// SHA-256 of the custom table-style atom it removes or replaces, the placement
+/// it moves from, and the `fNonOutlineData` value it overwrites. Atoms travel
+/// as blobs. Master order is a permutation of zero-based master positions; no
+/// native identifier is serialized.
 fn durable_document_operation(
     limits: litchi_core::patch::PatchLimits,
     change: &DocumentChange,
@@ -4676,9 +4671,8 @@ fn durable_document_operation(
     litchi_core::patch::PatchOperation::new(limits, op, target, preconditions, value)
 }
 
-/// Replay one durable document-structure operation (record 0357b) in the
-/// structural transaction, after its artifact and slide-order
-/// preconditions were checked.
+/// Replay one durable document-structure operation in the structural
+/// transaction, after its artifact and slide-order preconditions were checked.
 fn apply_durable_document(
     transaction: &mut Transaction,
     operation: &litchi_core::patch::PatchOperation,
@@ -9754,10 +9748,10 @@ mod tests {
             .collect()
     }
 
-    /// Record 0290 F4: a slide without slide-show information (here, from
-    /// the PPT writer) gains a `SlideShowSlideInfoAtom` after its `SlideAtom`
-    /// when it is hidden; showing it is then a flag change, and the exact
-    /// patch and its inverse restore both states.
+    /// A slide without slide-show information (here, from the PPT writer) gains
+    /// a `SlideShowSlideInfoAtom` after its `SlideAtom` when it is hidden;
+    /// showing it is then a flag change, and the exact patch and its inverse
+    /// restore both states.
     #[test]
     fn slide_visibility_inserts_a_missing_slide_show_information_atom() {
         let source = Snapshot::from_bytes(authored_fixture()).unwrap();
@@ -10146,8 +10140,8 @@ mod tests {
 
     /// The expected values were produced by the implementation that computed
     /// both structural artifact digests eagerly at commit (base `009d515bef`),
-    /// using change 0745's probe over the same fixtures, edits and limits.
-    /// Deferring the digests must leave every durable byte unchanged.
+    /// over the same fixtures, edits and limits. Deferring the digests must
+    /// leave every durable byte unchanged.
     #[test]
     fn durable_wire_bytes_match_the_eager_digest_implementation() {
         let deck = || Snapshot::from_bytes(fixture("45543.ppt")).unwrap();

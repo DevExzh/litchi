@@ -1,5 +1,5 @@
 //! Value-only edits of one worksheet of a [`SourceBackedWorkbook`]: the
-//! single-worksheet form of the [`crate::cell_values`] family (record 0360).
+//! single-worksheet form of the [`crate::cell_values`] family.
 //!
 //! [`SourceBackedWorkbook::edit_sheet_values`] stages value-only changes of
 //! one worksheet; [`Edit::commit`] returns a [`Commit`] whose output is the

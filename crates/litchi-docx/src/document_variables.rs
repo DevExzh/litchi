@@ -1,5 +1,4 @@
-//! The document-variable family (record 0355): the settings part's
-//! `w:docVars`.
+//! The document-variable family: the settings part's `w:docVars`.
 //!
 //! [`Package::document_variables`](crate::Package::document_variables) reads
 //! them; [`Package::edit_document_variables`](crate::Package::edit_document_variables)

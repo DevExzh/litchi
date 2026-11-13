@@ -1407,7 +1407,7 @@ mod streaming_0360_tests {
     impl BufRead for Streaming0360FailAfter {
         fn fill_buf(&mut self) -> io::Result<&[u8]> {
             if self.position == self.bytes.len() {
-                Err(io::Error::other("streaming 0360 input failure"))
+                Err(io::Error::other("streaming input failure"))
             } else {
                 Ok(&self.bytes[self.position..])
             }
@@ -2096,7 +2096,7 @@ mod streaming_0361_raw_recovery_tests {
                 self.interrupted += 1;
                 return Err(io::Error::new(io::ErrorKind::Interrupted, "retry"));
             }
-            Err(io::Error::other("streaming 0361 injected input"))
+            Err(io::Error::other("streaming injected input"))
         }
 
         fn consume(&mut self, amount: usize) {
@@ -2284,7 +2284,7 @@ mod streaming_0361_raw_recovery_tests {
                 ..
             } => {
                 assert_eq!(message, "unbound Requires prefix");
-                assert_eq!(error.to_string(), "streaming 0361 injected input");
+                assert_eq!(error.to_string(), "streaming injected input");
             },
             _ => panic!("expected injected input failure with retained raw error"),
         }
@@ -2484,16 +2484,16 @@ mod streaming_0361_raw_recovery_tests {
 
 #[cfg(test)]
 mod namespace_emission_contract_tests {
-    //! Change 0653 pins what the MCE writer's namespace emission guarantees.
+    //! These tests pin what the MCE writer's namespace emission guarantees.
     //!
-    //! Until change 0653 `write_start` re-declared every in-scope binding on
-    //! every emitted start tag, which made any element span of the processed
-    //! buffer accidentally namespace self-contained and expanded real producer
-    //! parts 16x. It now emits an element's own declarations, plus the
-    //! declarations of ancestors the output drops, hoisted onto the first
-    //! emitted descendant. These tests fix the new contract — the in-scope
-    //! binding set at every emitted element is unchanged while each declaration
-    //! appears once — together with the refusal identities of the borrowed name
+    //! `write_start` used to re-declare every in-scope binding on every emitted
+    //! start tag, which made any element span of the processed buffer
+    //! accidentally namespace self-contained and expanded real producer parts
+    //! 16x. It now emits an element's own declarations, plus the declarations
+    //! of ancestors the output drops, hoisted onto the first emitted
+    //! descendant. These tests fix the new contract — the in-scope binding set
+    //! at every emitted element is unchanged while each declaration appears
+    //! once — together with the refusal identities of the borrowed name
     //! resolver and the exact output bound.
     //!
     //! The property consumers relied on is restored at the slice boundary by
@@ -2659,8 +2659,8 @@ mod namespace_emission_contract_tests {
     #[test]
     fn each_namespace_is_declared_once_and_every_name_still_resolves() {
         // The shape litchi-docx slices: prefixes bound once on the root and
-        // used by descendants several levels down. Before change 0653 the
-        // writer repeated all four declarations on all eight elements.
+        // used by descendants several levels down. The writer used to
+        // repeat all four declarations on all eight elements.
         let xml = format!(
             r#"<w:document xmlns:mc="{MC}" xmlns:w="urn:w" xmlns:w14="urn:w14" mc:Ignorable="q" xmlns:q="urn:q"><w:body><w:p w14:paraId="1"><w:r><w:t>text</w:t></w:r></w:p><w:tbl><w:tr w14:textId="2"><w:tc/></w:tr></w:tbl></w:body></w:document>"#
         );
@@ -2688,10 +2688,10 @@ mod namespace_emission_contract_tests {
 
     #[test]
     fn an_inner_span_is_no_longer_self_contained_but_becomes_so_at_the_boundary() {
-        // The property change 0653 removes from the writer, and where it is
-        // restored: `mce::self_contained_fragment` re-declares the inherited
-        // bindings on the span's own root, which is what every slicing
-        // consumer now calls.
+        // The property the writer no longer has, and where it is restored:
+        // `mce::self_contained_fragment` re-declares the inherited bindings
+        // on the span's own root, which is what every slicing consumer now
+        // calls.
         let xml = format!(
             r#"<w:document xmlns:mc="{MC}" xmlns:w="urn:w" xmlns:w14="urn:w14"><w:body><w:p w14:paraId="1"><w:r><w:t>text</w:t></w:r></w:p></w:body></w:document>"#
         );
@@ -3146,8 +3146,8 @@ mod streaming_0658_active_stop_tests {
     fn a_primary_failure_on_a_later_event_is_unreachable_once_the_stream_has_stopped() {
         // The document is malformed after the stopping event. Without the stop
         // the stream refuses it; with the stop those bytes are never read, so
-        // the caller owns their validation. This is the movement change 0652
-        // decision 8 authorises, pinned here so it cannot widen silently.
+        // the caller owns their validation. This movement is pinned here so it
+        // cannot widen silently.
         let malformed = "<r><stop/></wrong></r>";
         let (_, _, unstopped) = run_stopping_at(malformed, None);
         assert!(
@@ -3191,8 +3191,8 @@ mod streaming_0658_active_stop_tests {
 
 #[cfg(test)]
 mod self_contained_fragment_tests {
-    //! Change 0653 restores, at the slice boundary, the property the writer's
-    //! namespace redundancy used to provide for free.
+    //! `self_contained_fragment` restores, at the slice boundary, the property
+    //! the writer's namespace redundancy used to provide for free.
 
     use super::super::model::{Error, LimitKind, Limits};
     use super::super::{InScopeNamespaces, self_contained_fragment};

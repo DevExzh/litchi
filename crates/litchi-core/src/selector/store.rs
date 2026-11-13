@@ -12,8 +12,8 @@ use std::hash::{Hash, Hasher};
 /// Zero or one element inline; two or more on the heap.
 ///
 /// An enum rather than an `Option` beside a `Vec`: the single-element form
-/// carries no empty `Vec`, which keeps a path step 24 bytes smaller (record
-/// 0302), and a parsed path is moved by value several times per call.
+/// carries no empty `Vec`, which keeps a path step 24 bytes smaller, and a
+/// parsed path is moved by value several times per call.
 #[derive(Clone)]
 pub(super) enum OneOrMany<T> {
     Zero,
@@ -46,7 +46,7 @@ impl<T> OneOrMany<T> {
     pub(super) fn push(&mut self, value: T) {
         match self {
             Self::Zero => {
-                // `Zero` owns nothing: skip its drop glue (record 0326).
+                // `Zero` owns nothing: skip its drop glue.
                 std::mem::forget(std::mem::replace(self, Self::One(value)));
             },
             Self::Many(many) => many.push(value),
@@ -156,7 +156,7 @@ impl<T: Placeholder, const N: usize> Inline<T, N> {
     pub(super) fn push(&mut self, value: T) {
         if self.len < N {
             // The slot holds a placeholder, which owns nothing (`Placeholder`
-            // is allocation-free): skip its drop glue (record 0326).
+            // is allocation-free): skip its drop glue.
             std::mem::forget(std::mem::replace(&mut self.inline[self.len], value));
         } else {
             if self.len == N {

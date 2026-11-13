@@ -26,8 +26,8 @@ const STRICT_REL: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/relationsh
 const XML: &[u8] = b"http://www.w3.org/XML/1998/namespace";
 /// Current durable slide-removal header magic.
 ///
-/// Bumped from `LPRM0001` by change 0655 because the complete-package revision
-/// this header embeds is now `litchi-pptx-opened-v2`.
+/// Bumped from `LPRM0001` because the complete-package revision this header
+/// embeds is now `litchi-pptx-opened-v2`.
 const PATCH_MAGIC: &[u8; 8] = crate::DurablePatchFormat::SlideRemovalV2.magic();
 /// Recognized but superseded durable slide-removal header magic.
 const SUPERSEDED_PATCH_MAGIC: &[u8; 8] = crate::DurablePatchFormat::SlideRemovalV1.magic();
@@ -205,9 +205,8 @@ impl Patch {
 /// The selected slide has exactly one internal relationship to a registered
 /// shared layout. No package resource other than its presentation binding
 /// and the Parts it owns may target the slide. The durable patch removes the
-/// slide Part and the Parts it owns exclusively (record 0303) and edits
-/// exactly the presentation owner; every other resource remains outside the
-/// write set.
+/// slide Part and the Parts it owns exclusively and edits exactly the
+/// presentation owner; every other resource remains outside the write set.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Plan {
     source: Slide,
@@ -267,7 +266,7 @@ impl Snapshot {
     /// relationship and no incoming owner except its one presentation
     /// relationship and the Parts it owns. Its notes slide, charts, media and
     /// other Parts that nothing else targets are removed with it; Parts that
-    /// another owner still targets stay (record 0303).
+    /// another owner still targets stay.
     ///
     /// # Errors
     ///
@@ -342,7 +341,7 @@ impl Snapshot {
             .max_parts()
             .checked_mul(16)
             .ok_or_else(|| invalid("slide-removal relationship limit overflow"))?;
-        // The Parts the slide owns exclusively leave with it (record 0303).
+        // The Parts the slide owns exclusively leave with it.
         let owned = if crate::presentation::owned_parts::may_own(owner.rels()) {
             crate::presentation::owned_parts::Graph::from_opc(
                 self.package.as_ref(),
@@ -572,8 +571,7 @@ fn build_candidate(
 /// (`slide` relationships, which other slides keep owning). Any other
 /// internal edge names a Part the slide may own (a notes slide, a picture,
 /// a diagram, comments): [`crate::presentation::owned_parts`] removes it with
-/// the slide when nothing else targets it, and keeps it otherwise
-/// (record 0303).
+/// the slide when nothing else targets it, and keeps it otherwise.
 pub(crate) fn removal_layout_edge(
     relationships: &litchi_opc::Relationships,
 ) -> Result<&litchi_opc::Relationship> {
@@ -662,7 +660,7 @@ fn validate_unique_incoming_owner(
         }
     }
     for owner in package.iter_parts() {
-        // The Parts the slide owns leave with it (record 0303).
+        // The Parts the slide owns leave with it.
         let leaves = owned.contains(owner.partname());
         for relationship in owner.rels().iter() {
             scanned = checked_relationship_count(scanned, max_relationships)?;
@@ -720,8 +718,8 @@ fn validate_presentation_owner(xml: &[u8], selected: &Slide) -> Result<()> {
     validate_removal_presentation_owner(xml, &selected.relationship_id)
 }
 
-/// The removed slide's section entry leaves with it (record 0303), so the
-/// p14 section list is admitted as it is for insertion.
+/// The removed slide's section entry leaves with it, so the p14 section list is
+/// admitted as it is for insertion.
 pub(crate) fn validate_removal_presentation_owner(xml: &[u8], relationship_id: &str) -> Result<()> {
     validate_presentation_bindings(xml, relationship_id, 1, true)
 }
@@ -823,7 +821,7 @@ pub(crate) fn validate_removal_slide_surface(xml: &[u8]) -> Result<()> {
 // Insertion must not activate an existing XML binding or shift a positional
 // slideshow range. Share the conservative source schema used for deletion.
 /// Insertion additionally admits the PowerPoint 2010 section list, whose
-/// membership the insertion maintains (record 0252).
+/// membership the insertion maintains.
 pub(crate) fn validate_insertion_owner(xml: &[u8], relationship_id: &str) -> Result<()> {
     validate_presentation_bindings(xml, relationship_id, 0, true)
 }

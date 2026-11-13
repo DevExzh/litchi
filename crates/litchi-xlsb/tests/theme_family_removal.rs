@@ -16,7 +16,7 @@ use litchi_xlsb::Workbook;
 mod projection;
 use projection::{InPlace as _, OwnedWorkbook as _};
 
-/// Package-route steps on an owned workbook projection (record 0360b).
+/// Package-route steps on an owned workbook projection.
 trait ThemeSteps {
     fn theme_edit(&self) -> litchi_xlsb::package::PackageResult<litchi_xlsb::theme::Edit>;
     fn publish_theme(

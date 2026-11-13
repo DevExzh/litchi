@@ -1,6 +1,6 @@
-//! Positional modern (threaded) comment authoring for the unified API
-//! (record 0346): add a thread or a reply, and change a thread's or a
-//! reply's text, author, creation stamp or resolution.
+//! Positional modern (threaded) comment authoring for the unified API: add a
+//! thread or a reply, and change a thread's or a reply's text, author, creation
+//! stamp or resolution.
 //!
 //! Identities stay native: a new comment, reply or author takes a fresh
 //! GUID derived from the edit's inputs and the package's existing

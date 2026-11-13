@@ -1,5 +1,5 @@
 //! Immutable, source-bound calculation-metadata edits of a
-//! [`crate::Package`] (record 0360).
+//! [`crate::Package`].
 //!
 //! [`crate::Package::edit_calculation_metadata`] starts an [`Edit`] of the
 //! workbook part's `calcPr` and calculation features;

@@ -24,7 +24,7 @@ pub(crate) struct NoteDescriptor {
 }
 
 /// The presentation's notes pages by `NotesId`, read once per presentation
-/// from the `NotesListWithTextContainer` (L-PPT-R2).
+/// from the `NotesListWithTextContainer`.
 ///
 /// The slide directory builds it at open from the `DocumentContainer` it has
 /// already parsed, so selecting a slide never parses the document again. A

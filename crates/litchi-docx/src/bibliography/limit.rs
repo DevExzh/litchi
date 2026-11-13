@@ -1,6 +1,7 @@
-//! Typed budgets of the bibliography-source family (record 0355a).
+//! Typed budgets of the bibliography-source family.
 
-/// The bounded resources of the bibliography-source family, carried by [`crate::Error::BibliographyLimit`] (record 0355a).
+/// The bounded resources of the bibliography-source family, carried by
+/// [`crate::Error::BibliographyLimit`].
 ///
 /// Each variant names one bounded resource; [`std::fmt::Display`] gives its
 /// human-readable name, the one the error messages print.

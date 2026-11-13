@@ -1,6 +1,6 @@
-//! Worksheet features of an opened workbook (record 0327): legacy notes,
-//! hyperlinks, drawing pictures and shapes, conditional formats, data
-//! validations, the auto-filter and manual page breaks.
+//! Worksheet features of an opened workbook: legacy notes, hyperlinks,
+//! drawing pictures and shapes, conditional formats, data validations,
+//! the auto-filter and manual page breaks.
 //!
 //! [`Package::sheet_features`] reads them from one worksheet substream
 //! without decoding its cells: the records after the cell table, the

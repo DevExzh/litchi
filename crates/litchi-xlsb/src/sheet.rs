@@ -339,7 +339,7 @@ impl Worksheet {
     /// Add a cell to the worksheet
     /// The coordinate of the first stored cell after `after` in row-major
     /// order (the first stored cell for `None`), in O(log n): the cell
-    /// cursor's walk of a complete grid (record 0267).
+    /// cursor's walk of a complete grid.
     pub(crate) fn cell_after(&self, after: Option<(u32, u32)>) -> Option<(u32, u32)> {
         use std::ops::Bound;
         let start = after.map_or(Bound::Unbounded, Bound::Excluded);

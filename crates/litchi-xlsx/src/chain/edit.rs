@@ -1,4 +1,4 @@
-//! Immutable calculation-chain edits of a [`crate::Package`] (record 0360).
+//! Immutable calculation-chain edits of a [`crate::Package`].
 //!
 //! [`crate::Package::edit_calculation_chain`] starts an [`Edit`]; every operation
 //! runs on a private candidate graph, so an error stages nothing.

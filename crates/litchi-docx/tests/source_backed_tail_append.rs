@@ -34,9 +34,9 @@ use soapberry_zip::office::StreamingArchiveWriter;
 use litchi_docx::source_backed::tail_append::EditOptions;
 use litchi_docx::source_backed::tail_append::{self, Error as TailAppendError, Refusal};
 
-/// Record 0355a: a tail-append plan commits to a new source-backed package;
-/// writing that package publishes the splice. This keeps the plan-level
-/// call shape of the tests.
+/// A tail-append plan commits to a new source-backed package; writing that
+/// package publishes the splice. This keeps the plan-level call shape of the
+/// tests.
 struct Published {
     commit: tail_append::Commit,
 }
@@ -2371,10 +2371,9 @@ fn encrypted_metadata_refusal_precedes_main_payload_reads_and_output() {
         MAIN,
     );
     // Encrypted members are now refused when the source is admitted (the
-    // spec-gap branch's admission check, merge record 0759): no package, so no
-    // append plan and no output can follow. Admission reads only framing: the
-    // locator, the central directory and one fixed local-header prefix per
-    // member, never a payload.
+    // admission check): no package, so no append plan and no output can follow.
+    // Admission reads only framing: the locator, the central directory and one
+    // fixed local-header prefix per member, never a payload.
     let eocd = encrypted_archive
         .windows(4)
         .rposition(|window| window == b"PK\x05\x06")

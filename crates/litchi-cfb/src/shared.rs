@@ -3360,7 +3360,7 @@ impl SharedOleStreamCursor<'_> {
     }
 
     /// Reads exactly `output.len()` bytes like [`Self::read_exact`], but
-    /// defers the success fence to the caller (record 0287).
+    /// defers the success fence to the caller.
     ///
     /// A failed read still observes the source, and a `SourceChanged` error
     /// wins over the read's own error, as in [`Self::read_exact`]. A
@@ -3738,18 +3738,18 @@ impl std::fmt::Debug for BufferedOleStreamCursor<'_> {
 impl<'a> BufferedOleStreamCursor<'a> {
     /// Largest window one wrapper may be asked to hold.
     ///
-    /// A caller may declare less. This is the 64 KiB the XLS worksheet window
-    /// took in change 0568, and it bounds the memory one wrapper retains as
-    /// well as the bytes one fill may read beyond the current request.
+    /// A caller may declare less. This is the 64 KiB of the XLS worksheet
+    /// window, and it bounds the memory one wrapper retains as well as the
+    /// bytes one fill may read beyond the current request.
     pub const MAX_READ_AHEAD_BYTES: usize = 64 * 1024;
 
     /// Size of the first fill that reads beyond what the current read needs,
     /// which then doubles to the declared ceiling.
     ///
-    /// This is change 0568's worksheet-window schedule, for the same reason:
-    /// it bounds what a caller that stops after a few records reads beyond
-    /// them by what it has already consumed, instead of paying one
-    /// ceiling-sized read for a stream it abandons.
+    /// This is the XLS worksheet window's schedule, for the same reason: it
+    /// bounds what a caller that stops after a few records reads beyond them
+    /// by what it has already consumed, instead of paying one ceiling-sized
+    /// read for a stream it abandons.
     pub const FIRST_FILL_BYTES: usize = 512;
 
     /// Wraps `cursor` with a window of at most `ceiling` bytes.
@@ -7502,8 +7502,7 @@ mod tests {
 
     #[test]
     fn a_hinted_minifat_read_matches_an_unhinted_one() {
-        // Change 0574 named the mini-stream-resident case as the way this
-        // change could be falsified: a MiniFAT range read reaches the root
+        // The mini-stream-resident case: a MiniFAT range read reaches the root
         // chain by different code from a FAT one.
         let (bytes, expected) = large_mini_bytes(512, 4095);
         for piece in [1usize, 63, 64, 65, 512, 1000] {
@@ -9116,7 +9115,7 @@ mod tests {
         assert_eq!(plain.position(), windowed.position());
     }
 
-    /// One fill per contiguous run, on change 0568's doubling schedule, and one
+    /// One fill per contiguous run, on the doubling schedule, and one
     /// observation per fill rather than one per served read. The request list
     /// is asserted exactly: it is the whole claim.
     #[test]
@@ -9180,7 +9179,7 @@ mod tests {
     }
 
     /// A caller that abandons a stream early reads at most one growth step
-    /// beyond what it consumed, which is what change 0568's schedule buys.
+    /// beyond what it consumed, which is what the doubling schedule buys.
     #[test]
     fn read_ahead_over_reads_at_most_one_growth_step() {
         let source = Arc::new(TestSource::new(sample_bytes()));
@@ -9207,9 +9206,9 @@ mod tests {
         );
     }
 
-    /// The change-under-read sweep of change 0621, extended to fill boundaries:
-    /// a read the window covers does not observe the source, so a mutation
-    /// between two served reads is reported by the next fill.
+    /// The change-under-read sweep, extended to fill boundaries: a read the
+    /// window covers does not observe the source, so a mutation between two
+    /// served reads is reported by the next fill.
     #[test]
     fn read_ahead_reports_a_mutation_at_the_next_fill_not_at_a_served_read() {
         let source = Arc::new(TestSource::new(sample_bytes()));
@@ -9631,8 +9630,8 @@ mod tests {
 
     #[test]
     fn deferred_reads_leave_the_success_fence_to_the_next_fenced_read() {
-        // Record 0287: a deferred read takes no observation on success; the
-        // next fenced read or check observes a change made before either.
+        // A deferred read takes no observation on success; the next fenced
+        // read or check observes a change made before either.
         let source = Arc::new(TestSource::new(sample_bytes()));
         let file = shared(source.clone());
         let mut cursor = file.stream_cursor_at(&["Large"], 0).unwrap();

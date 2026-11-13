@@ -24,9 +24,9 @@ use soapberry_zip::office::StreamingArchiveWriter;
 
 type ManagedCommit = Commit<source_backed::Package>;
 
-/// Record 0355a: a detached main-document commit replays onto a
-/// source-backed package (`Package::apply`), and its inverse patch restores
-/// the main document; there is no separate publication product any more.
+/// A detached main-document commit replays onto a source-backed package
+/// (`Package::apply`), and its inverse patch restores the main document; there
+/// is no separate publication product any more.
 #[allow(dead_code, reason = "shared shim with the document-edit tests")]
 struct Published {
     patch: litchi_docx::document::Patch,

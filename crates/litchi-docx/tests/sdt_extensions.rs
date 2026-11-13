@@ -1321,9 +1321,9 @@ fn package_patch_rejects_stale_story_bytes_without_partial_publication() {
     );
 }
 
-/// Record 0355a: the package edit's output budgets (aggregate and per
-/// story) are exact through `EditOptions`, restoring the coverage of the
-/// pre-0355 `content_control_snapshot_with_limits` route.
+/// The package edit's output budgets (aggregate and per story) are exact
+/// through `EditOptions`, restoring the coverage of the earlier
+/// `content_control_snapshot_with_limits` route.
 #[test]
 fn package_edit_output_limits_are_exact() {
     let payload = b"<root>output-limit</root>";

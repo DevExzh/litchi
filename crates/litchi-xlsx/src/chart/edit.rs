@@ -441,7 +441,7 @@ struct Inventory {
 }
 
 /// Owner-scoped, single-entry memo of the chart inventory of the drawing
-/// payload read last (record 0286).
+/// payload read last.
 ///
 /// A path resolution, [`Edit::chart`] and [`Edit::set`] each need the
 /// inventory of the same worksheet drawing; this lets them scan it once. It

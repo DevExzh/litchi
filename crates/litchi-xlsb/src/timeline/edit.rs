@@ -1,4 +1,4 @@
-//! Immutable timeline edits of an XLSB [`Package`] (record 0360b).
+//! Immutable timeline edits of an XLSB [`Package`].
 //!
 //! [`Package::edit_timelines`] starts an [`Edit`] over the workbook timeline
 //! caches and every worksheet's timeline views; its verbs replace, upsert or

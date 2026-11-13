@@ -169,7 +169,7 @@ const FIXTURES: &[Fixture] = &[
 ];
 
 /// The first worksheet's form controls of a package opened under the
-/// form-control read budget `limits` (record 0360).
+/// form-control read budget `limits`.
 fn eager_limited_controls(
     source: &[u8],
     limits: OwnerLimits,

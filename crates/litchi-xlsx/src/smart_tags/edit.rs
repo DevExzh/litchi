@@ -1,5 +1,4 @@
-//! Immutable worksheet smart-tag edits of a [`crate::Package`] (record
-//! 0360).
+//! Immutable worksheet smart-tag edits of a [`crate::Package`].
 //!
 //! [`crate::Package::edit_smart_tags`] starts an [`Edit`] that retains an
 //! owned selector without loading the worksheet's smart tags; every

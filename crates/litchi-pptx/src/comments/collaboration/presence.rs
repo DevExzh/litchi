@@ -1,4 +1,4 @@
-//! Immutable comment-author presence edits of a [`Package`] (record 0351 §2.3).
+//! Immutable comment-author presence edits of a [`Package`].
 //!
 //! [`Package::edit_author_presence`] starts an [`Edit`] over a staged copy of the
 //! package; [`Edit::set`] creates or replaces one comment author's `p15:presenceInfo` extension and [`Edit::remove`]

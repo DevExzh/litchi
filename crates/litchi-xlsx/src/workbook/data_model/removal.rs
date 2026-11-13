@@ -532,8 +532,7 @@ fn check_formulas(xml: &[u8]) -> Result<()> {
 
 fn check_formulas_with_limits(xml: &[u8], limits: Limits) -> Result<()> {
     // Markup compatibility is recognized below on namespace values as
-    // written; a binding spelled with references applies all the same
-    // (record 0011).
+    // written; a binding spelled with references applies all the same.
     if litchi_ooxml_common::mce::binds_namespace_by_reference(xml) {
         return Err(Error::Unsupported {
             feature: "Data Model removal with unresolved consumer markup compatibility",

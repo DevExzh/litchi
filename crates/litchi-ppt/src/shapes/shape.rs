@@ -174,18 +174,17 @@ pub struct ShapeProperties {
     /// Inert `PowerPoint` 12 placeholder compatibility metadata.
     pub powerpoint12_shape_metadata: Option<crate::slide_extension::ShapeMetadata>,
     /// The shape's name (`wzName`, MS-ODRAW 2.3.4.1), as `PowerPoint` shows
-    /// it in the selection pane; `None` when the shape carries none
-    /// (L-PPT-R3).
+    /// it in the selection pane; `None` when the shape carries none.
     pub name: Option<String>,
     /// The shape's alternative text (`wzDescription`, MS-ODRAW 2.3.4.3);
-    /// `None` when the shape carries none (L-PPT-R3).
+    /// `None` when the shape carries none.
     pub description: Option<String>,
     /// The shape's stable position in its source drawing: its zero-based
     /// index among its siblings (the drawing's top-level shapes, or its
     /// group's children) in drawing order, counting every shape of the
-    /// drawing's shape tree, including shapes the reader does not return
-    /// (L-PPT-R4). The background shape and a group's own header are not
-    /// siblings. `None` for a shape that was not read from a drawing.
+    /// drawing's shape tree, including shapes the reader does not return. The
+    /// background shape and a group's own header are not siblings. `None` for a
+    /// shape that was not read from a drawing.
     pub source_index: Option<usize>,
 }
 
@@ -221,7 +220,7 @@ impl ShapeProperties {
 }
 
 /// What a parsed shape keeps from its source drawing: its position among
-/// its siblings (L-PPT-R4) and its name and alternative text (L-PPT-R3).
+/// its siblings and its name and alternative text.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct SourceIdentity {
     /// Zero-based position among the shape's siblings in drawing order.

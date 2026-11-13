@@ -1,4 +1,4 @@
-//! Immutable worksheet slicer edits of a [`crate::Package`] (record 0360).
+//! Immutable worksheet slicer edits of a [`crate::Package`].
 //!
 //! [`crate::Package::edit_slicers`] starts an [`Edit`] that retains the
 //! package and limits without loading the slicer graph; every operation

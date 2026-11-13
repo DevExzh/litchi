@@ -33,7 +33,7 @@ pub enum LimitKind {
 
 /// The default and hard bound for one primary PPT edit.
 ///
-/// 16384 since record 0264 (owner approved 2026-10-14; it was 4096).
+/// 16384 (it was 4096).
 pub const DEFAULT_MAX_OPERATIONS: usize = 16384;
 /// The maximum operation budget accepted by [`EditOptions`].
 pub const MAX_OPERATIONS: usize = DEFAULT_MAX_OPERATIONS;
@@ -127,8 +127,7 @@ pub enum Error {
     PatchConflict,
     /// A changed write would invalidate the package signature.
     Signed,
-    /// A durable patch could not be built within the selected bounds
-    /// (record 0357a).
+    /// A durable patch could not be built within the selected bounds.
     Durable(litchi_core::patch::PatchError),
 }
 
@@ -143,7 +142,7 @@ impl From<slide_order::Error> for Error {
         match error {
             slide_order::Error::Refused(slide_order::Refusal::Signed) => Self::Signed,
             // A transfer plan made against another receiving artifact is a
-            // patch for another base (record 0351 §2.4).
+            // patch for another base.
             slide_order::Error::Refused(slide_order::Refusal::TransferTargetMismatch) => {
                 Self::PatchConflict
             },
@@ -368,8 +367,8 @@ impl Patch {
     /// native slide and persist identifiers are never serialized. Every
     /// primary-edit verb has a durable form; master reorders, custom
     /// table-style edits and `fNonOutlineData` are the
-    /// `document-structure.*` operations (record 0357b), bound like slide
-    /// moves, with the custom table-style atoms as blobs.
+    /// `document-structure.*` operations, bound like slide moves, with the
+    /// custom table-style atoms as blobs.
     ///
     /// # Errors
     ///
@@ -394,15 +393,14 @@ impl Patch {
 
     /// Join an independently prepared patch over the same exact source.
     ///
-    /// The two patches must commute (records 0357a, 0357b). Each may hold
-    /// slide moves, master reorders, custom table-style edits,
-    /// `fNonOutlineData` changes and the formatting edits (shape and notes
-    /// text, anchors, slide visibility, advance and visual transition,
-    /// external media path and playback). Neither patch's slide-list
-    /// positions (moved ranges, `fNonOutlineData` slides) may meet the
-    /// other's moved positions, and no semantic target may be written by
-    /// both. The joined patch stages both patches' formatting on the
-    /// source, then `self`'s structure and `other`'s, in one commit, and
+    /// The two patches must commute. Each may hold slide moves, master
+    /// reorders, custom table-style edits, `fNonOutlineData` changes and the
+    /// formatting edits (shape and notes text, anchors, slide visibility,
+    /// advance and visual transition, external media path and playback).
+    /// Neither patch's slide-list positions (moved ranges, `fNonOutlineData`
+    /// slides) may meet the other's moved positions, and no semantic target may
+    /// be written by both. The joined patch stages both patches' formatting on
+    /// the source, then `self`'s structure and `other`'s, in one commit, and
     /// counts the operations of both.
     ///
     /// # Errors
@@ -573,7 +571,7 @@ impl Edit {
         let inner = snapshot?.edit();
         ensure_source_version(&self.package, self.expected_source)?;
         // The package's own projection was parsed from exactly these bytes;
-        // target resolution reuses its parsed slides (record 0260).
+        // target resolution reuses its parsed slides.
         Ok(inner?.with_opened_projection(self.package.presentation().map_err(Error::Package)?))
     }
 
@@ -727,7 +725,7 @@ impl Edit {
     }
 
     /// Append a comment to the slide at a zero-based position; returns its
-    /// zero-based position among the slide's comments (record 0323).
+    /// zero-based position among the slide's comments.
     pub fn add_comment(
         &mut self,
         position: Position,
@@ -737,7 +735,7 @@ impl Edit {
             .map(Position::new)
     }
 
-    /// Change the text or anchor of one slide comment (record 0323).
+    /// Change the text or anchor of one slide comment.
     pub fn set_comment(
         &mut self,
         position: Position,
@@ -747,12 +745,12 @@ impl Edit {
         self.stage(1, |inner| inner.set_comment(position, comment, change))
     }
 
-    /// Remove one slide comment (record 0323).
+    /// Remove one slide comment.
     pub fn remove_comment(&mut self, position: Position, comment: Position) -> Result<()> {
         self.stage(1, |inner| inner.remove_comment(position, comment))
     }
 
-    /// Replace the text of one table cell (record 0323).
+    /// Replace the text of one table cell.
     pub fn set_table_cell_text(
         &mut self,
         target: Target,
@@ -765,8 +763,7 @@ impl Edit {
         })
     }
 
-    /// Set or remove the click hyperlink of one top-level shape (record
-    /// 0323).
+    /// Set or remove the click hyperlink of one top-level shape.
     pub fn set_shape_hyperlink(
         &mut self,
         target: Target,
@@ -776,7 +773,7 @@ impl Edit {
     }
 
     /// Apply character formatting to a UTF-16 range of one top-level
-    /// shape's text (record 0323).
+    /// shape's text.
     pub fn set_run_format(
         &mut self,
         target: Target,
@@ -790,7 +787,7 @@ impl Edit {
     }
 
     /// Set or remove the click hyperlink over a UTF-16 range of one
-    /// top-level shape's text (record 0323).
+    /// top-level shape's text.
     pub fn set_text_hyperlink(
         &mut self,
         target: Target,
@@ -804,7 +801,7 @@ impl Edit {
     }
 
     /// Move one main or title master to a final zero-based position in the
-    /// document's master list (record 0357a).
+    /// document's master list.
     ///
     /// Slides, notes and title masters reference a master by its `masterId`,
     /// which is unchanged, so every reference keeps its master.
@@ -817,8 +814,7 @@ impl Edit {
         self.stage(1, |inner| inner.move_master(from, destination))
     }
 
-    /// Move the master whose `masterId` is `master_id` to a final position
-    /// (record 0357a).
+    /// Move the master whose `masterId` is `master_id` to a final position.
     ///
     /// # Errors
     ///
@@ -828,7 +824,7 @@ impl Edit {
     }
 
     /// Reorder the master list: it becomes `order`, each entry a current
-    /// master position (record 0357a). The identity order is a no-op.
+    /// master position. The identity order is a no-op.
     ///
     /// # Errors
     ///
@@ -841,7 +837,7 @@ impl Edit {
 
     /// Insert a `RoundTripCustomTableStyles12Atom` (its complete record
     /// bytes: the 8-byte header and the payload) before or after the
-    /// `EndDocumentAtom` (record 0357a).
+    /// `EndDocumentAtom`.
     ///
     /// # Errors
     ///
@@ -859,8 +855,7 @@ impl Edit {
         })
     }
 
-    /// Remove the custom table-style atom; returns its complete record bytes
-    /// (record 0357a).
+    /// Remove the custom table-style atom; returns its complete record bytes.
     ///
     /// # Errors
     ///
@@ -871,8 +866,8 @@ impl Edit {
     }
 
     /// Replace the custom table-style atom in place with `atom` (its complete
-    /// record bytes); returns the previous atom's bytes (record 0357a). An
-    /// equal atom is a no-op.
+    /// record bytes); returns the previous atom's bytes. An equal atom is a
+    /// no-op.
     ///
     /// # Errors
     ///
@@ -886,7 +881,7 @@ impl Edit {
     }
 
     /// Move the custom table-style atom before or after the
-    /// `EndDocumentAtom` (record 0357a). Its current placement is a no-op.
+    /// `EndDocumentAtom`. Its current placement is a no-op.
     ///
     /// # Errors
     ///
@@ -899,7 +894,7 @@ impl Edit {
     }
 
     /// Set one slide's `SlidePersistAtom.fNonOutlineData` flag ([MS-PPT]
-    /// 2.4.14.5; record 0357a). It does not hide the slide; that is
+    /// 2.4.14.5). It does not hide the slide; that is
     /// [`Self::set_slide_hidden`].
     ///
     /// # Errors
@@ -1196,7 +1191,7 @@ fn open_options(source: &Package) -> OpenOptions<'static> {
 
 /// Hand the shapes a batch text publication proved for its output to the
 /// published package's slide memo, so the next chunked edit resolves its
-/// targets without parsing the slide again (record 0264).
+/// targets without parsing the slide again.
 ///
 /// The proof was made against a default-policy reopen of exactly the
 /// published bytes, from a source parse made by the source package. It

@@ -1,10 +1,10 @@
-//! List definitions staged with a main-document edit (record 0251e).
+//! List definitions staged with a main-document edit.
 //!
 //! A new list is one abstract definition and one numbering instance spliced
 //! into the numbering part (`crate::numbering::insert_lists`). The part is
 //! replaced exactly, or created with its relationship when the document has
-//! none, as a graph change (0251b), so the definition and the paragraphs
-//! that join it publish in one commit.
+//! none, as a graph change, so the definition and the paragraphs that join it
+//! publish in one commit.
 
 use super::super::{Error, Refusal, Result};
 use super::Edit;

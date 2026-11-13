@@ -1,4 +1,4 @@
-//! Immutable auto-filter edits of a [`Package`] (unified-ops record 0320).
+//! Immutable auto-filter edits of a [`Package`].
 //!
 //! [`Package::edit_auto_filter`] starts an [`Edit`] over an immutable
 //! snapshot. [`Edit::auto_filter`] reads a worksheet's direct auto-filter

@@ -113,7 +113,7 @@ pub enum Error {
     InvalidData(String),
     /// A well-formed edit request this route refuses, classified by
     /// [`litchi_core::edit::RefusalKind`]. The refusal is content-free: its
-    /// operation and reason are static (record 0351 §2.4).
+    /// operation and reason are static.
     Refused(litchi_core::edit::Refusal),
     /// A patch, plan or staged precondition was made against another source
     /// than the one receiving it.
@@ -123,8 +123,8 @@ pub enum Error {
         /// Static explanation of the mismatch.
         reason: &'static str,
     },
-    /// A changed write of a signed workbook (record 0351 §2.3 rule 5); remove
-    /// the signature explicitly before editing.
+    /// A changed write of a signed workbook; remove the signature explicitly
+    /// before editing.
     Signed,
     /// A broken internal invariant of an edit route (for example a readback
     /// that disagrees with the staged change); never caused by the request.

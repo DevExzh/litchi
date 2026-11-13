@@ -5,7 +5,7 @@
 )]
 
 //! Source-backed slide removal and order changes keep the `PowerPoint` 2010
-//! section list (`p14:sectionLst`) consistent (record 0303).
+//! section list (`p14:sectionLst`) consistent.
 //!
 //! A removed slide leaves its section, and a section that loses its last
 //! slide stays, as `PowerPoint` keeps an empty section. A moved slide joins

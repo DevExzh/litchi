@@ -77,8 +77,7 @@ struct SheetMetadata {
     /// owner-wide cache mutex.
     build: Mutex<()>,
     /// The first batch of the first cell cursor that validated this
-    /// worksheet (record 0267), which later cursors start from. A few dozen
-    /// cells.
+    /// worksheet, which later cursors start from. A few dozen cells.
     first_batch: OnceCell<Arc<cursor::FirstBatch>>,
 }
 
@@ -171,7 +170,7 @@ pub struct SourceBackedWorksheet {
 }
 
 // Shared handles: the unified operations layer keeps these in `Arc`-backed,
-// `Send + Sync` file handles (record 0003 risk R3).
+// `Send + Sync` file handles.
 const _: () = {
     const fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<SourceBackedWorkbook>();
@@ -1832,8 +1831,8 @@ impl SourceBackedWorksheet {
     }
 
     /// What reading the worksheet stream needs, with every refusal the
-    /// materialization raises before it reads the stream (record 0267 shares
-    /// this with the cell cursor).
+    /// materialization raises before it reads the stream (shared with the
+    /// cell cursor).
     fn materialization_inputs(&self, partname: PackURI) -> Result<MaterializationInputs> {
         if self.inner.incomplete_formula_context {
             return Err(Error::UnsupportedFeature(

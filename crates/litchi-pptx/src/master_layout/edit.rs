@@ -1,5 +1,4 @@
-//! Immutable slide-master and slide-layout edits of a [`Package`] (record
-//! 0351 §2.3).
+//! Immutable slide-master and slide-layout edits of a [`Package`].
 //!
 //! [`Package::edit_master_layout`] starts an [`Edit`]: [`Edit::add_slide_master`]
 //! and [`Edit::add_slide_layout`] author new owners, [`Edit::remove_slide_layout`]

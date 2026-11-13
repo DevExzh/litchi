@@ -481,9 +481,9 @@ fn managed_document_refuses_only_actual_mce_and_retains_part_data() {
     drop(package);
     assert_eq!(budget.used(Resource::Memory), 0);
 
-    // Record 0011: the binding is decided on its decoded value. Spelled with
-    // references and never used, the namespace changes nothing a reader
-    // sees, so the managed route reads the part over its source bytes.
+    // The binding is decided on its decoded value. Spelled with references and
+    // never used, the namespace changes nothing a reader sees, so the managed
+    // route reads the part over its source bytes.
     let encoded = "http:&#x2f;&#x2f;schemas.openxmlformats.org&#x2f;markup-compatibility&#x2f;2006";
     let encoded_declaration = format!(
         r#"<w:document xmlns:w="{W}" xmlns:mc="{encoded}"><w:body><w:p><w:r><w:t>kept</w:t></w:r></w:p></w:body></w:document>"#

@@ -1,4 +1,4 @@
-//! Formatting and structure of existing body content (unified-ops L-DOCX-W5).
+//! Formatting and structure of existing body content.
 //!
 //! These [`Edit`] operations change the direct properties of existing runs
 //! and paragraphs, insert paragraphs and runs that carry properties, and

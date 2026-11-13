@@ -1,4 +1,4 @@
-//! Immutable task-pane edits of a [`Package`] (record 0351 §2.3).
+//! Immutable task-pane edits of a [`Package`].
 //!
 //! [`Package::edit_task_panes`] starts an [`Edit`] over the package; [`Edit::set`] replaces the inert Office Add-in task-pane graph and
 //! [`Edit::remove`] removes it.

@@ -243,7 +243,7 @@ impl StyleTextPropAtom {
     }
 
     /// Apply `apply` to the character formatting of the UTF-16 units
-    /// `start..end` of a body of `text_length` units (record 0323).
+    /// `start..end` of a body of `text_length` units.
     ///
     /// `record_bytes` is the body's complete `StyleTextPropAtom`, or `None`
     /// for a body without one, which gains a default paragraph run and

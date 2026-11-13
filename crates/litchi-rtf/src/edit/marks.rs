@@ -1,5 +1,5 @@
 //! Field instructions, bookmarks, paragraph tab stops and section page
-//! setup by source splicing (record 0328).
+//! setup by source splicing.
 //!
 //! Each staged mark names an entry of the source's native collections
 //! (`fields()`, `bookmarks()`, a body paragraph, `sections()`). The commit

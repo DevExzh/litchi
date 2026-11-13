@@ -1,6 +1,6 @@
-//! What one media picture of a shape scene is (record 0321): its kind and
-//! its playback trim, read from the picture's own fragment, so a scene's
-//! `p:pic` can be classified without parsing the whole slide.
+//! What one media picture of a shape scene is: its kind and its playback trim,
+//! read from the picture's own fragment, so a scene's `p:pic` can be classified
+//! without parsing the whole slide.
 
 use super::{Event, Kind, Namespace, NsReader, ResolveResult, Result, Trim, parse_time, xml_error};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;

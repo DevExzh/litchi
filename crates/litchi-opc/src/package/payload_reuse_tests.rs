@@ -65,14 +65,14 @@ fn with_eocd_comment(mut archive: Vec<u8>, comment: &[u8]) -> Vec<u8> {
 
 /// Assert what the reused package holds for one part.
 ///
-/// `expect_donation` says whether the donor's allocation is adoptable. Since
-/// change 0661 a donor opened through an ordinary owned door holds its
-/// payloads in the retained source archive and materializes one through the
-/// positional reader on first access. That reader sizes a **stored** member's
-/// buffer one byte above its length, so the donation guard — which refuses a
-/// donor allocation larger than the freshly decoded one, so that reuse can
-/// never raise retention — correctly declines it. A deflated member is sized
-/// identically on both paths and is still donated.
+/// `expect_donation` says whether the donor's allocation is adoptable. A
+/// donor opened through an ordinary owned door holds its payloads in the
+/// retained source archive and materializes one through the positional reader
+/// on first access. That reader sizes a **stored** member's buffer one byte
+/// above its length, so the donation guard — which refuses a donor allocation
+/// larger than the freshly decoded one, so that reuse can never raise
+/// retention — correctly declines it. A deflated member is sized identically
+/// on both paths and is still donated.
 fn assert_payload_internals(
     donor: &OpcPackage,
     reused: &OpcPackage,

@@ -1,5 +1,4 @@
-//! Immutable data-validation edits of an XLSB [`Package`] (unified-ops
-//! record 0322).
+//! Immutable data-validation edits of an XLSB [`Package`].
 //!
 //! A worksheet stores its classic validations in one `BrtBeginDVals`
 //! collection: each validation is a `BrtDVal` record, optionally preceded by

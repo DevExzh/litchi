@@ -7,10 +7,10 @@
 
 //! ZIP admission on every OPC ingress, and when each framing fault surfaces.
 //!
-//! Merge 0759 carried the spec-gap branch's admission onto every ingress: the
-//! declared entry count is checked before indexing, and encryption flagged in
-//! the central *or* the local header is refused, on members nothing reads.
-//! What else an ingress checks at open depends on how it reads the archive:
+//! Every ingress shares one admission: the declared entry count is checked
+//! before indexing, and encryption flagged in the central *or* the local
+//! header is refused, on members nothing reads. What else an ingress checks
+//! at open depends on how it reads the archive:
 //!
 //! * the in-memory (slice) ingress indexes each member's local framing, so a
 //!   data descriptor that disagrees with its central record is refused at
@@ -25,7 +25,7 @@
 //!   first decode on every ingress (ADR 0030), which for the eager ingress is
 //!   at open.
 //!
-//! These tests pin that behaviour, which record 0759's judgement 3 describes.
+//! These tests pin that behaviour.
 
 use std::io::Cursor;
 use std::sync::Arc;

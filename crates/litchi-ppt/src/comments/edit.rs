@@ -1,4 +1,4 @@
-//! Record-level comment edits of one `SlideContainer` (record 0323).
+//! Record-level comment edits of one `SlideContainer`.
 //!
 //! `PowerPoint` 2002 stores a slide's comments as `Comment10Container`
 //! records in the `BinaryTagDataBlob` of the slide's `___PPT10` programmable

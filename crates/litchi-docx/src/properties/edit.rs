@@ -901,8 +901,7 @@ fn table_borders_plan(
 }
 
 /// The `w:tblPr` changes from `current` to `target`. The style and the
-/// borders are written (record 0342); a change of any other property is
-/// refused.
+/// borders are written; a change of any other property is refused.
 fn table_changes(current: &Table, target: &Table) -> Result<Vec<Change>, Refusal> {
     let mut rest = target.clone();
     rest.style.clone_from(&current.style);
@@ -948,8 +947,8 @@ fn height_plan(height: &Height) -> Result<Plan, Refusal> {
 }
 
 /// The `w:trPr` changes from `current` to `target`. The flags `cantSplit`,
-/// `tblHeader` and `hidden` and the height are written (record 0342); a
-/// change of any other property is refused.
+/// `tblHeader` and `hidden` and the height are written; a change of any other
+/// property is refused.
 fn row_changes(current: &Row, target: &Row) -> Result<Vec<Change>, Refusal> {
     let mut rest = target.clone();
     rest.cant_split = current.cant_split;
@@ -2331,7 +2330,7 @@ pub(crate) fn same_row(left: &Row, right: &Row) -> bool {
 
 /// Rewrite one table fragment so that its direct properties read as
 /// `target`; see [`splice_run`]. Only the style (`w:tblStyle`) and the
-/// borders (`w:tblBorders`) are written (record 0342).
+/// borders (`w:tblBorders`) are written.
 pub(crate) fn splice_table(
     xml: &[u8],
     current: &Table,
@@ -2365,8 +2364,8 @@ pub(crate) fn splice_table(
 
 /// Rewrite one row fragment so that its direct properties read as
 /// `target`; see [`splice_run`]. The height and the `cantSplit`,
-/// `tblHeader` and `hidden` flags are written (record 0342); a new
-/// `w:trPr` follows the row's `w:tblPrEx`.
+/// `tblHeader` and `hidden` flags are written; a new `w:trPr` follows the row's
+/// `w:tblPrEx`.
 pub(crate) fn splice_row(
     xml: &[u8],
     current: &Row,

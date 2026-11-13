@@ -276,7 +276,7 @@ where
         return Ok(None);
     }
     // Branches are recognized on namespace values as written; a binding
-    // spelled with references could hide a reference inside one (record 0011).
+    // spelled with references could hide a reference inside one.
     if crate::mce::binds_namespace_by_reference(content) {
         return Err(Error::Blocked(BlockReason::MarkupCompatibility));
     }

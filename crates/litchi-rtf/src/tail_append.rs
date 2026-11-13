@@ -3873,7 +3873,7 @@ impl DurableTailAppendPatch {
         object.insert("offset".to_string(), number(self.root_close)?);
         object.insert("selector".to_string(), Value::String("body".to_string()));
         object.insert("version".to_string(), Value::from(1_u64));
-        // Sorted members whatever `serde_json` features are unified (0349).
+        // Sorted members whatever `serde_json` features are unified.
         let bytes = litchi_core::canonical_json::to_vec(&Value::Object(object));
         if bytes.len() != encoded_len {
             return Err(Error::DurablePatch(

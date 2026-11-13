@@ -4,9 +4,8 @@
     reason = "differential assertions intentionally panic on fixture failures"
 )]
 
-//! Change 0765: relationship, content-type and owned XML parts that begin
-//! with a UTF-8 byte-order mark are edited exactly like the same parts
-//! without one.
+//! Relationship, content-type and owned XML parts that begin with a UTF-8
+//! byte-order mark are edited exactly like the same parts without one.
 //!
 //! quick-xml drops a leading mark before its first event without counting it
 //! in its positions, so the source splices of this crate addressed bytes three
@@ -275,8 +274,8 @@ fn eager_round_trip_of_marked_manifests_matches_the_unmarked_round_trip() {
 #[test]
 fn a_local_replacement_of_a_marked_part_publishes_like_the_unmarked_one() {
     // The replacement differs from its original inside one element, so the
-    // publication audit takes change 0747's window proof over the original's
-    // audit; with a mark, both sides carry it and every offset is physical.
+    // publication audit takes the window proof over the original's audit;
+    // with a mark, both sides carry it and every offset is physical.
     let entries = topology_entries();
     let item = b"<items><item id=\"1\"/><item id=\"2\">two</item><item id=\"3\"/></items>";
     let edited = b"<items><item id=\"1\"/><item id=\"2\">TWO!</item><item id=\"3\"/></items>";

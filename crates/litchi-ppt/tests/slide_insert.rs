@@ -4,7 +4,7 @@
     reason = "blank-slide insertion tests use panic-driven assertions"
 )]
 
-//! Blank-slide insertion through the canonical primary edit (record 0260).
+//! Blank-slide insertion through the canonical primary edit.
 
 use litchi_ppt::package::edit::Position;
 use litchi_ppt::{Builder, Package};

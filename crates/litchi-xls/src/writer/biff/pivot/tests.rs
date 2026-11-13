@@ -78,8 +78,8 @@ fn test_write_sxex_default() {
 }
 
 /// An empty `XLUnicodeStringNoCch` keeps its option byte, which the reader
-/// consumes when `cch` is zero. Until change 0766 the encoder wrote nothing,
-/// so a PivotTable with an empty name shifted its data field name by a byte.
+/// consumes when `cch` is zero. The encoder once wrote nothing, so a
+/// PivotTable with an empty name shifted its data field name by a byte.
 #[test]
 fn an_empty_no_cch_string_keeps_its_option_byte() {
     assert_eq!(encode_xl_string_no_cch(""), [0x00]);
@@ -117,8 +117,8 @@ fn view_named<'a>(name: &'a str, data_field_name: &'a str) -> SxViewConfig<'a> {
 }
 
 /// PivotTable names count UTF-16 code units, so a supplementary-plane
-/// character counts two; until change 0766 the count was one short and the
-/// reader refused the workbook ("lone surrogate found").
+/// character counts two; the count was once one short and the reader
+/// refused the workbook ("lone surrogate found").
 #[test]
 fn pivot_names_count_utf16_code_units_up_to_their_limits() {
     for (name, data_name) in [

@@ -1,5 +1,5 @@
 //! The in-place Reuse-plan validation held to the readback validation it
-//! replaced (change 0749).
+//! replaced.
 //!
 //! Every test builds a real plan, corrupts it through a test-only fault
 //! injection, and requires [`ReusePlan::validate`] and the retained readback
@@ -720,7 +720,7 @@ fn sweep_agreement(
         "{label}: every round has a verdict"
     );
     eprintln!(
-        "0749 sweep {label}: {rounds} faults, {accepted} accepted by both, {declined} refused by both"
+        "sweep {label}: {rounds} faults, {accepted} accepted by both, {declined} refused by both"
     );
 }
 

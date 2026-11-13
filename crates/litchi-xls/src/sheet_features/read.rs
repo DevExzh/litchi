@@ -1,4 +1,4 @@
-//! Reading worksheet features from one substream (record 0327).
+//! Reading worksheet features from one substream.
 
 use super::drawing::{self, Block, Object};
 use super::stream::{

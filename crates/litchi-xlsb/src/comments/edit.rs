@@ -1,5 +1,4 @@
-//! Immutable note (legacy comment) edits of an XLSB [`Package`]
-//! (unified-ops record 0322).
+//! Immutable note (legacy comment) edits of an XLSB [`Package`].
 //!
 //! A worksheet's notes live in its comments part ([MS-XLSB] section
 //! 2.1.7.8): an author list and one `BrtBeginComment` collection per note.

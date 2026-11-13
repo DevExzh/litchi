@@ -24,8 +24,8 @@
 //! did with quick-xml's iterator.
 //!
 //! A reader that skips attribute errors and reads on uses
-//! `litchi_ooxml_common::xml::attributes::first_wins` instead (record 0764),
-//! and a reader that needs no duplicate check uses
+//! `litchi_ooxml_common::xml::attributes::first_wins` instead, and a reader
+//! that needs no duplicate check uses
 //! [`BytesStartExt::unchecked_attributes`]. The workspace's `clippy.toml`
 //! disallows quick-xml's checked iteration in the crates that read untrusted
 //! OOXML and OLE2 XML, so a new call site has to choose one of the three.

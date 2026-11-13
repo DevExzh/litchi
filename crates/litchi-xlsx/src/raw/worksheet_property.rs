@@ -46,7 +46,7 @@ fn rewrite_direct_empty(
     let layout = scan(xml, local.as_bytes(), successors, context)?;
     // The scan recognizes markup-compatibility names on namespace values as
     // written; a declaration spelled with references binds the namespace for
-    // preprocessing all the same (record 0011).
+    // preprocessing all the same.
     if layout.alternate_content || litchi_ooxml_common::mce::binds_namespace_by_reference(xml) {
         return Err(invalid(format!(
             "{context} projected through markup compatibility cannot be edited"
@@ -221,8 +221,8 @@ mod tests {
 
     const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 
-    /// Record 0011: a branch bound through a declaration that spells the
-    /// namespace with references blocks the edit like a literal one.
+    /// A branch bound through a declaration that spells the namespace with
+    /// references blocks the edit like a literal one.
     #[test]
     fn escaped_markup_compatibility_is_refused() {
         for namespace in [

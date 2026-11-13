@@ -1,6 +1,6 @@
 //! Engine-level tests of the source-backed slide and SVG publication routes
-//! the `source::Package` families run on (record 0356a: moved from the
-//! crate's integration tests when the routes became crate-private).
+//! the `source::Package` families run on (moved from the crate's integration
+//! tests when the routes became crate-private).
 
 #![allow(
     clippy::unwrap_used,

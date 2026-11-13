@@ -1,4 +1,4 @@
-//! Source checked, lossless edits of `p232:phTypeExt` (record 0351 §2.3).
+//! Source checked, lossless edits of `p232:phTypeExt`.
 //!
 //! The PowerPoint 2023 placeholder type extension is a scalar value, but its
 //! owner is an arbitrary shape tree that may contain markup this crate does
@@ -1889,7 +1889,7 @@ fn push_close(output: &mut Vec<u8>, prefix: &[u8], local: &[u8]) {
 }
 
 // ============================================================================
-// Package family (record 0351 §2.3)
+// Package family
 // ============================================================================
 
 crate::part_edit::family!("placeholder type-extension");

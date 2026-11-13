@@ -4,9 +4,9 @@
 //! [`SequentialOleWriter::save`](super::SequentialOleWriter::save) and
 //! [`ValidatedOverlayPlan::save`](crate::ValidatedOverlayPlan::save) each stage
 //! a complete artifact in a sibling temporary file, optionally verify it, and
-//! replace the destination with it. Until change 0761 each route spelled that
-//! flush, file-sync, rename and parent-sync sequence itself; [`publish_staged`]
-//! now owns it once, so the caller's [`Durability`] decides the same
+//! replace the destination with it. Each route used to spell that flush,
+//! file-sync, rename and parent-sync sequence itself; [`publish_staged`] now
+//! owns it once, so the caller's [`Durability`] decides the same
 //! synchronizations on every route and one test double observes all three.
 //!
 //! What stays per route is passed in: the staging closure, the verification
@@ -319,7 +319,7 @@ pub(crate) mod testing {
     use std::path::Path;
 
     /// Real steps whose replacement and parent sync are caller hooks; the
-    /// shape of the pre-0761 private test entry points.
+    /// shape of the earlier private test entry points.
     pub(crate) struct HookSteps<R, S> {
         replace: Option<R>,
         sync_parent: Option<S>,

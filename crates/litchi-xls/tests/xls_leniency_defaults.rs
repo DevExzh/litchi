@@ -1162,7 +1162,7 @@ fn property_set_repairs_join_the_eager_workbook_report() {
 }
 
 // ---------------------------------------------------------------------------
-// Record 0316: worksheet-record repairs
+// Worksheet-record repairs
 // ---------------------------------------------------------------------------
 
 const WINDOW2: u16 = 0x023E;

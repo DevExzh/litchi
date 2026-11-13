@@ -11,7 +11,7 @@ pub mod metadata;
     not(test),
     expect(
         dead_code,
-        reason = "the property-set owner behind package::metadata; its full surface stays exercised by the unit tests (record 0357)"
+        reason = "the property-set owner behind package::metadata; its full surface stays exercised by the unit tests"
     )
 )]
 pub(crate) mod property_set;

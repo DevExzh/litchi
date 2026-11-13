@@ -615,10 +615,9 @@ pub(crate) fn preflight_declared_streams<R: Read + Seek>(
 
 /// A cursor-backed reader of one Word (.doc) compound file.
 ///
-/// This is the low-level, mutable codec reader (record 0351 §2.1 rule 6: a
-/// non-owner noun): its lazy stream and property-set readers take `&mut
-/// self` because they seek the underlying OLE file. The immutable owner is
-/// [`crate::Package`].
+/// This is the low-level, mutable codec reader, not an owner: its lazy stream
+/// and property-set readers take `&mut self` because they seek the underlying
+/// OLE file. The immutable owner is [`crate::Package`].
 ///
 /// # Examples
 ///
@@ -695,12 +694,12 @@ pub struct Package {
     pub(super) leniency: crate::leniency::Leniency,
     pub(super) edit_profile: Option<EditProfile>,
     /// The body-text snapshot of these exact bytes the last edit opened, with
-    /// the options it was opened under (record 0311), shared by clones.
+    /// the options it was opened under, shared by clones.
     pub(super) body_source: BodySourceMemo,
     /// Whether `document` is the strict public reader's parse of these bytes
     /// under `source_limits`: the default leniency, and no credential because
     /// the document is not encrypted. A body snapshot of these bytes then
-    /// needs no second parse to pass the same reader gate (record 0377a).
+    /// needs no second parse to pass the same reader gate.
     pub(super) strict_document: bool,
 }
 

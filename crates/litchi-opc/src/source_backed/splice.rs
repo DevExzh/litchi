@@ -629,15 +629,15 @@ impl<'package> SourcePartSplicePlan<'package> {
     }
 
     /// An independent copy of this plan that publishes the same candidate:
-    /// a plan can be written more than once (record 0355a: the output of a
-    /// committed source-backed package is written on every save).
+    /// a plan can be written more than once (the output of a committed
+    /// source-backed package is written on every save).
     #[must_use]
     pub fn duplicate(&self) -> Self {
         self.clone_for_preview()
     }
 
     /// This plan over its own share of the source package, so it can outlive
-    /// the borrow it was prepared from (record 0355a).
+    /// the borrow it was prepared from.
     #[must_use]
     pub fn into_owned(self) -> SourcePartSplicePlan<'static> {
         SourcePartSplicePlan {

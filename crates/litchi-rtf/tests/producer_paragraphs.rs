@@ -1,4 +1,4 @@
-//! Paragraph removal, moves and swaps on producer RTF (record 0293).
+//! Paragraph removal, moves and swaps on producer RTF.
 //!
 //! Producer bodies (`\pard` paragraph properties, character-formatting
 //! groups, fonts) are spliced as whole source segments; the candidate must
@@ -79,7 +79,7 @@ fn producer_paragraph_removal_keeps_every_other_byte() {
 #[test]
 fn a_paragraph_that_inherits_properties_moves_with_its_state() {
     // The second paragraph has no `\pard`: it inherits `\qc` from the
-    // first, so the move replays that state before it (record 0308).
+    // first, so the move replays that state before it.
     let source =
         Package::parse("{\\rtf1\\ansi\\pard\\qc One\\par Two\\par\\pard Three\\par}").unwrap();
     let mut edit = source.edit();
@@ -108,9 +108,8 @@ fn an_empty_first_paragraph_moves_and_moves_back() {
     assert_eq!(back.to_bytes().unwrap(), input.as_bytes());
 }
 
-/// Record 0308: a formatting group that holds several paragraphs, paragraphs
-/// that inherit root-level state, insertion, removal of anchored content
-/// and table rows.
+/// A formatting group that holds several paragraphs, paragraphs that inherit
+/// root-level state, insertion, removal of anchored content and table rows.
 mod record_0308 {
     use super::*;
 

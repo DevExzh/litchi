@@ -525,10 +525,10 @@ impl Blocks {
     /// `mc:ProcessContent` content: such a projection only drops attributes
     /// and whole ignorable subtrees, so every `WordprocessingML` element keeps
     /// its parent and its order. Every part the document transaction admits
-    /// (record 0011) qualifies. A container read from a value that does not
-    /// carry this proof — a [`crate::Cell`], a note, a comment or a header —
-    /// reports `false`; the body index of the same document proves it for
-    /// every container in the main document.
+    /// qualifies. A container read from a value that does not carry this proof
+    /// — a [`crate::Cell`], a note, a comment or a header — reports `false`;
+    /// the body index of the same document proves it for every container in the
+    /// main document.
     #[must_use]
     pub fn raw_positions_proven(&self) -> bool {
         self.index.positions.is_preserved()

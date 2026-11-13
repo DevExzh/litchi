@@ -82,9 +82,9 @@ impl<'a> TextBox<'a> {
     ///
     /// A text box whose `ClientTextbox` holds an outline reference reads its
     /// text, runs, and metacharacters from the slide-list body of `outline`
-    /// the reference selects (L-PPT-R1); its own text ruler applies when the
-    /// body has none, as LibreOffice applies it, and
-    /// [`Self::outline_text_refs`] still lists the reference.
+    /// the reference selects; its own text ruler applies when the body has
+    /// none, as LibreOffice applies it, and [`Self::outline_text_refs`] still
+    /// lists the reference.
     pub(crate) fn from_odraw(
         properties: ShapeProperties,
         shape: &OdrawShape<'_>,

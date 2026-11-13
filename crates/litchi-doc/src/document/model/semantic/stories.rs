@@ -1,4 +1,4 @@
-//! Per-story reads through a memoized story index (M1 L-DOC-R1, R2, R3).
+//! Per-story reads through a memoized story index.
 //!
 //! A Word binary document keeps its text as seven stories laid out back to
 //! back in one character-position (CP) space ([MS-DOC] §2.3.1): the main

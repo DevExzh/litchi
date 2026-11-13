@@ -1,5 +1,5 @@
-//! The legacy VML note shapes Excel draws cell notes from, shared by the
-//! XLSX and XLSB note editors (unified-ops records 0320, 0322 and 0325).
+//! The legacy VML note shapes Excel draws cell notes from, shared by the XLSX
+//! and XLSB note editors.
 //!
 //! VML parts are not always well-formed XML, so [`shapes`] scans them
 //! bytewise; [`note_shape`] and [`new_drawing`] author the hidden note box

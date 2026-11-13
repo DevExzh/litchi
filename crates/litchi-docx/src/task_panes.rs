@@ -1,6 +1,5 @@
-//! The task-pane family (record 0355): the package's inert Office Add-in
-//! web extensions and task panes, shared with the other OOXML hosts
-//! ([`crate::web_extensions`]).
+//! The task-pane family: the package's inert Office Add-in web extensions and
+//! task panes, shared with the other OOXML hosts ([`crate::web_extensions`]).
 //!
 //! [`Package::task_panes`](crate::Package::task_panes) reads the panes and
 //! [`Package::plan_task_panes`](crate::Package::plan_task_panes) plans a
@@ -34,7 +33,7 @@ graph_family!("task-pane", own_limits);
 
 /// The typed budgets of the task-pane family: its limit errors are
 /// [`litchi_ooxml_common::Error::Limit`] carried by
-/// [`crate::Error::Common`] (record 0360).
+/// [`crate::Error::Common`].
 pub use litchi_ooxml_common::web::LimitKind;
 
 /// The configuration of a task-pane edit.

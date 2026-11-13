@@ -36,7 +36,7 @@ pub(crate) struct Patch {
     not(test),
     expect(
         dead_code,
-        reason = "record-level accessors the unit tests exercise; the public family is the package-level Edit (record 0357)"
+        reason = "record-level accessors the unit tests exercise; the public family is the package-level Edit"
     )
 )]
 impl Patch {

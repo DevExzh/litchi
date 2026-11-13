@@ -218,8 +218,7 @@ impl ListObject {
         // `[MS-XLS]` 2.5.266 ties only fPersistAutoFilter to fAutoFilter.
         // fApplyAutoFilter "MUST be 1 if the AutoFilter is currently
         // applied", and product note 185 says Excel 2007 and 2010 always
-        // write 1, so a table without an AutoFilter may carry it (record
-        // 0316).
+        // write 1, so a table without an AutoFilter may carry it.
         if self.table_flags.persists_auto_filter() && !self.table_flags.auto_filter() {
             return Err(invalid(
                 FEATURE11_RECORD_TYPE,

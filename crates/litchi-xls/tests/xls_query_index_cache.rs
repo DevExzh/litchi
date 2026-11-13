@@ -790,8 +790,8 @@ fn an_indexed_missing_target_still_takes_the_trailing_freshness_fence() {
 
     // Publish the worksheet index with two successful observations, then use
     // a coordinate absent from its occurrence table.  The hit has no source
-    // read of its own and (record 0287) no leading fence, so its trailing
-    // version observation is its first; the mutation is injected there.
+    // read of its own and no leading fence, so its trailing version
+    // observation is its first; the mutation is injected there.
     assert_eq!(
         worksheet.cell_value(3_999, 0).unwrap(),
         Some(CellValue::Float(3_999.0))
@@ -811,9 +811,9 @@ fn an_indexed_missing_target_still_takes_the_trailing_freshness_fence() {
 
 #[test]
 fn an_indexed_hit_fences_every_observation_of_its_frame() {
-    // Record 0287: an indexed hit takes no leading fence and defers its frame
-    // header's fence to the payload read. A source change before the call,
-    // or before either observation the hit makes, still fails the read.
+    // An indexed hit takes no leading fence and defers its frame header's
+    // fence to the payload read. A source change before the call, or before
+    // either observation the hit makes, still fails the read.
     for observation in 0..=2 {
         let source = Arc::new(CountingSource::new(large_numeric_workbook(4_000)));
         let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();

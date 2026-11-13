@@ -193,9 +193,9 @@ pub(crate) fn write_sst<W: Write, S: AsRef<str>>(
 mod tests {
     use super::*;
 
-    /// The SST writer as it was before change 0753, kept verbatim as the
-    /// reference: non-ASCII strings were collected into a `Vec<u16>` and then
-    /// copied into a fresh byte vector per string.
+    /// The SST writer as it once was, kept verbatim as the reference:
+    /// non-ASCII strings were collected into a `Vec<u16>` and then copied
+    /// into a fresh byte vector per string.
     fn legacy_write_sst<W: Write>(
         writer: &mut W,
         strings: &[String],

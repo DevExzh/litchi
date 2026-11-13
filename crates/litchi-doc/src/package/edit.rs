@@ -668,8 +668,7 @@ impl<'a, S: DeferredOpenState> Edit<'a, S> {
             .map_err(Error::from)
     }
 
-    /// Apply paragraph style `istd` to one ordinary main-story paragraph
-    /// (record 0324).
+    /// Apply paragraph style `istd` to one ordinary main-story paragraph.
     pub fn set_paragraph_style(&mut self, position: Position, istd: u16) -> Result<()> {
         self.inner_mut()?
             .set_paragraph_style(position, istd)
@@ -1223,9 +1222,9 @@ mod tests {
         assert_eq!(changed.to_bytes().unwrap(), before);
     }
 
-    /// Record 0311: edits of one package share the body snapshot opened for
-    /// their options, never one opened under other options, and publish what
-    /// an edit from a fresh open publishes.
+    /// Edits of one package share the body snapshot opened for their options,
+    /// never one opened under other options, and publish what an edit from a
+    /// fresh open publishes.
     #[test]
     fn edits_share_the_body_snapshot_opened_under_their_options() {
         let source = package_with_paragraphs(3);
@@ -1266,10 +1265,10 @@ mod tests {
         assert_eq!(commit(&fresh, EditOptions::default()), first);
     }
 
-    /// Record 0377a: a package whose document is the strict reader's parse of
-    /// its bytes opens its body snapshot without parsing them again, and gets
-    /// the snapshot a full open of those bytes returns. A lenient open keeps
-    /// the full reader gate; a commit's document is the commit's strict parse.
+    /// A package whose document is the strict reader's parse of its bytes opens
+    /// its body snapshot without parsing them again, and gets the snapshot a
+    /// full open of those bytes returns. A lenient open keeps the full reader
+    /// gate; a commit's document is the commit's strict parse.
     #[test]
     fn a_strictly_parsed_package_opens_its_body_snapshot_without_a_second_parse() {
         let source = package_with_paragraphs(3);

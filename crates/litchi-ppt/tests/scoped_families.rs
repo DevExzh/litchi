@@ -4,11 +4,11 @@
     reason = "scoped-family contract tests use panic-driven assertions"
 )]
 
-//! The record 0351 §2.3 contract of every scoped PPT family (record 0357):
-//! `Package::edit_x` stages, `Edit::commit` publishes a new package with an
-//! exact patch and diagnostics, an exact no-op publishes the source
-//! unchanged, `Package::apply_x` replays a patch only onto its source, the
-//! inverse restores the source bytes, and dropping an edit discards it.
+//! The contract of every scoped PPT family: `Package::edit_x` stages,
+//! `Edit::commit` publishes a new package with an exact patch and diagnostics,
+//! an exact no-op publishes the source unchanged, `Package::apply_x` replays a
+//! patch only onto its source, the inverse restores the source bytes, and
+//! dropping an edit discards it.
 
 use std::path::PathBuf;
 
@@ -150,7 +150,7 @@ fn a_missing_broadcast_is_not_found() {
 
 /// The path of movie `id` in the live document, read through the
 /// presentation reader (which reads the live `DocumentContainer` of an
-/// append-only republished package, record 0357).
+/// append-only republished package).
 fn movie_path(package: &Package, id: u32) -> Option<String> {
     let media = package
         .presentation()
@@ -218,10 +218,9 @@ fn external_media_edits_publish_replay_and_invert_exactly() {
     );
     assert_eq!(movie_path(&source, id), original);
     assert_eq!(slide_texts(commit.package()), slide_texts(&source));
-    // The patch is record-sized (record 0357a): the append-only publisher
-    // appends the rewritten document container and touches a few header,
-    // FAT and directory sectors; the patch carries only those, never the
-    // whole package.
+    // The patch is record-sized: the append-only publisher appends the
+    // rewritten document container and touches a few header, FAT and directory
+    // sectors; the patch carries only those, never the whole package.
     let changed = commit.patch().changed_bytes();
     let grown = commit.patch().target_len() - source_bytes.len();
     assert!(changed >= grown);

@@ -1,5 +1,5 @@
-//! The font-table family (record 0355): the main document's font table and
-//! its embedded-font resources.
+//! The font-table family: the main document's font table and its embedded-font
+//! resources.
 //!
 //! [`Package::fonts`](crate::Package::fonts) reads the table;
 //! [`Package::edit_fonts`](crate::Package::edit_fonts) stages an [`Edit`] whose

@@ -1,4 +1,4 @@
-//! Immutable edits of shared-workbook revision metadata (record 0360b).
+//! Immutable edits of shared-workbook revision metadata.
 //!
 //! [`crate::Package::edit_shared_workbook`] starts an [`Edit`] that owns
 //! metadata and opaque BIFF12 record envelopes only: it never coordinates

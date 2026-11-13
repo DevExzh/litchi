@@ -39,11 +39,11 @@ pub(super) fn parse_zoom_percent(value: u16, record_type: u16, name: &str) -> Re
 }
 
 /// A WINDOW2 zoom field outside `0` and `10..=400`, read as the default
-/// zoom (record 0316). `[MS-XLS]` 2.4.346 notes \<144\> and \<145\> say
-/// Excel truncates both fields into a byte when saving, and the page-break
-/// zoom is undefined while page-break preview has an SCL, so a reader cannot
-/// rely on the range; LibreOffice and Apache POI read any value. The record
-/// bytes are kept as written.
+/// zoom. `[MS-XLS]` 2.4.346 notes \<144\> and \<145\> say Excel truncates
+/// both fields into a byte when saving, and the page-break zoom is undefined
+/// while page-break preview has an SCL, so a reader cannot rely on the
+/// range; LibreOffice and Apache POI read any value. The record bytes are
+/// kept as written.
 pub(crate) struct ZoomDefect {
     pub(crate) raw: u16,
 }

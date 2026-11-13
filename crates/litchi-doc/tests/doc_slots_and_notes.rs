@@ -5,8 +5,8 @@
     reason = "integration-test fixtures favor concise panic-driven assertions over production-style ergonomics"
 )]
 
-//! M1 L-DOC-R8 (header and footer slots by section and kind) and L-DOC-R9
-//! (notes and comments by index, one malformed comment failing only itself).
+//! Header and footer slots by section and kind, and notes and comments by
+//! index, one malformed comment failing only itself.
 
 use litchi_core::Position;
 use litchi_doc::raw::Reader;

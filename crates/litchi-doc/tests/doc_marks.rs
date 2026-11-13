@@ -5,10 +5,10 @@
     reason = "integration-test fixtures favor concise panic-driven assertions over production-style ergonomics"
 )]
 
-//! Record 0324: paragraph and character styles, tab stops, `HYPERLINK`
-//! fields, standard bookmarks and section page setup through the primary DOC
-//! package transaction. Every edit is read back from the published bytes,
-//! inverted byte-exactly, and setting a value the target has is a no-op.
+//! Paragraph and character styles, tab stops, `HYPERLINK` fields, standard
+//! bookmarks and section page setup through the primary DOC package
+//! transaction. Every edit is read back from the published bytes, inverted
+//! byte-exactly, and setting a value the target has is a no-op.
 
 use litchi_core::Position;
 use litchi_doc::Package;

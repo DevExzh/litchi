@@ -1,4 +1,4 @@
-//! Source-backed RTF editing (record 0359a F2, the 0355a §1 shape).
+//! Source-backed RTF editing.
 //!
 //! ```text
 //! source_backed::Package::open(&rtf::Package, Arc<dyn ReadAt>, ExecutionContext)

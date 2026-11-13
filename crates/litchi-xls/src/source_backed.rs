@@ -1,4 +1,4 @@
-//! Source-backed XLS edit families (record 0359a F2, the 0355a §1 shape).
+//! Source-backed XLS edit families.
 //!
 //! ```text
 //! SourceBackedWorkbook::edit_cells()            -> source_backed::cells::Edit

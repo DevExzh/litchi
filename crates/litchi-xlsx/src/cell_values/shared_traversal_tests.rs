@@ -24,10 +24,10 @@ const VALID_TAIL: &str =
 /// A refusal the value-only validator owns, placed after the padding so it
 /// is reached only once the traversal has fallen back.
 ///
-/// Change 0657 admitted `<mergeCells>`: it is outside `<sheetData>`, so the
-/// rewrite copies it and the raw parser is the module that models it. An
-/// unknown element *inside* a cell record is still the validator's to refuse,
-/// because that span is the one the rewrite composes.
+/// `<mergeCells>` is admitted: it is outside `<sheetData>`, so the rewrite
+/// copies it and the raw parser is the module that models it. An unknown
+/// element *inside* a cell record is still the validator's to refuse, because
+/// that span is the one the rewrite composes.
 const LATE_VALIDATOR_TAIL: &str =
     "<sheetData><row r=\"1\"><c r=\"A1\"><future/><v>1</v></c></row></sheetData></worksheet>";
 const LATE_RAW_TAIL: &str =
@@ -561,7 +561,7 @@ fn shared_fallback_preserves_reader_and_validator_first_error_order() {
 }
 
 // ---------------------------------------------------------------------------
-// Markup-compatibility admission (change 0603)
+// Markup-compatibility admission
 // ---------------------------------------------------------------------------
 
 const MCE: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";

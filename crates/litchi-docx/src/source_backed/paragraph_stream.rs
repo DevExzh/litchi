@@ -1,6 +1,6 @@
-//! The authored paragraph-stream append family of a source-backed package
-//! (record 0355a): append paragraphs from a replayable source or a one-shot
-//! producer to the main story, never materializing the main document.
+//! The authored paragraph-stream append family of a source-backed package:
+//! append paragraphs from a replayable source or a one-shot producer to the
+//! main story, never materializing the main document.
 //!
 //! [`Package::tail_append_plain_paragraphs`](crate::source_backed::Package::tail_append_plain_paragraphs)
 //! stages an [`Edit`]; its commit returns a new source-backed package whose

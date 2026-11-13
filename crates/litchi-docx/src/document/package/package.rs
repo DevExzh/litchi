@@ -436,9 +436,9 @@ impl Document {
         }
     }
 
-    /// The entries of the `commentsExtended` part (record 0345): each
-    /// comment paragraph's reply parent and resolved state, keyed by the
-    /// paragraph's `w14:paraId`; empty when the document has no such part.
+    /// The entries of the `commentsExtended` part: each comment paragraph's
+    /// reply parent and resolved state, keyed by the paragraph's `w14:paraId`;
+    /// empty when the document has no such part.
     ///
     /// ```
     /// let package = litchi_docx::Builder::new()?.build()?;

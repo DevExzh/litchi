@@ -1,8 +1,8 @@
-//! Inline picture insertion staged with a main-document edit (record 0251d).
+//! Inline picture insertion staged with a main-document edit.
 //!
 //! The image becomes a new media part related from the main part (a graph
-//! change, 0251b), and the picture a new run holding an inline drawing that
-//! references it, so one commit publishes both.
+//! change), and the picture a new run holding an inline drawing that references
+//! it, so one commit publishes both.
 
 use litchi_core::Position;
 
@@ -185,9 +185,9 @@ impl Edit<Package> {
     }
 }
 
-/// A change of an existing picture (record 0335): its extent, its name and
-/// description (alternative text), and its image. Each part left unset
-/// keeps the picture's current value.
+/// A change of an existing picture: its extent, its name and description
+/// (alternative text), and its image. Each part left unset keeps the picture's
+/// current value.
 ///
 /// ```
 /// use litchi_docx::document::PictureChange;

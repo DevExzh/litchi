@@ -597,12 +597,12 @@ fn validate_cell_reference(value: &str) -> Result<()> {
 /// The `ext` element that opens a retained extension, carrying every namespace
 /// declaration the element inherits from the part.
 ///
-/// Until change 0653 the shared markup-compatibility writer repeated every
-/// in-scope declaration on every element it emitted, so a retained extension
-/// resolved on its own by accident. The writer now declares each namespace
-/// once, where XML requires it, so the declarations the fragment inherits are
-/// added here, at the one element that becomes its root. Declarations the
-/// element already makes itself are left alone.
+/// The shared markup-compatibility writer used to repeat every in-scope
+/// declaration on every element it emitted, so a retained extension resolved
+/// on its own by accident. The writer now declares each namespace once, where
+/// XML requires it, so the declarations the fragment inherits are added here,
+/// at the one element that becomes its root. Declarations the element already
+/// makes itself are left alone.
 fn retained_root<'element>(
     element: &BytesStart<'element>,
     resolver: &NamespaceResolver,

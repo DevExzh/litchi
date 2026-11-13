@@ -383,11 +383,11 @@ fn editing_a_shared_slide_payload_leaves_the_document_stream_intact() {
     panic!("no fixture produced a slide to edit");
 }
 
-/// L-PPT-R2: the notes index is built once per presentation, at open, from
-/// the `DocumentContainer` the slide directory parsed. Selecting a slide
-/// parses that slide only: a factory over a stream whose `DocumentContainer`
-/// header no longer reads still finds every slide's notes page, which a
-/// factory that re-parsed the document for its own notes index could not.
+/// The notes index is built once per presentation, at open, from the
+/// `DocumentContainer` the slide directory parsed. Selecting a slide parses
+/// that slide only: a factory over a stream whose `DocumentContainer` header no
+/// longer reads still finds every slide's notes page, which a factory that
+/// re-parsed the document for its own notes index could not.
 #[test]
 fn slide_selection_reads_notes_from_the_index_built_at_open() {
     use crate::slide::{Slide, SlideFactory};
@@ -423,8 +423,8 @@ fn slide_selection_reads_notes_from_the_index_built_at_open() {
     }
 }
 
-/// Record 0260: the presentation's one-slide memo shares the most recently
-/// parsed slide's shape array between handles, and is invisible otherwise.
+/// The presentation's one-slide memo shares the most recently parsed slide's
+/// shape array between handles, and is invisible otherwise.
 #[test]
 fn slide_handles_share_the_memoized_shape_array() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))

@@ -4,7 +4,7 @@
     reason = "focused proof assertions intentionally fail on fixture errors"
 )]
 
-//! Record 0317: the source XML audit proofs a source-backed package keeps.
+//! The source XML audit proofs a source-backed package keeps.
 //!
 //! * An effective revision keeps its replacement's proof, with the boundaries
 //!   derived for it, so the next edit of a committed revision is proved from

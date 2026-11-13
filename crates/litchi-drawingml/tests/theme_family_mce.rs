@@ -275,11 +275,11 @@ fn mce_owners_are_opaque_and_all_shared_mutations_refuse_without_source_change()
     }
 }
 
-/// Record 0011: a declaration that spells the namespace with references
-/// binds it for preprocessing exactly as a literal one does. The scan cannot
-/// see such a binding, so it must never treat the wrapper as a foreign
-/// payload beside which a new direct owner may be added: every shared
-/// mutation still refuses, and no hidden family is projected.
+/// A declaration that spells the namespace with references binds it for
+/// preprocessing exactly as a literal one does. The scan cannot see such a
+/// binding, so it must never treat the wrapper as a foreign payload beside
+/// which a new direct owner may be added: every shared mutation still refuses,
+/// and no hidden family is projected.
 #[test]
 fn escaped_mce_owners_refuse_every_shared_mutation() {
     let incoming = family::Family::new("Fresh MCE Family", OFFICE_ID, OFFICE_VID)

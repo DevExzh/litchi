@@ -44,8 +44,8 @@ impl std::fmt::Debug for SourceBackedPackage {
 
 impl SourceBackedPackage {
     /// Adopt a compound-file index that a publisher already opened and
-    /// validated over a composed target (the source-backed text family,
-    /// record 0357a), under the source package's policies.
+    /// validated over a composed target (the source-backed text family), under
+    /// the source package's policies.
     pub(crate) fn from_validated_shared(
         shared: Arc<SharedOleFile>,
         options: OpenOptions<'_>,

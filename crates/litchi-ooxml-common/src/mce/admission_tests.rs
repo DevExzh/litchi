@@ -1,10 +1,10 @@
 //! The admission proof against the processor it stands in for.
 //!
-//! The witness matrix pins each verdict 0008 and 0011 name. The generated
-//! differential checks the property every caller relies on: whenever the
-//! proof admits a part, processing that part succeeds, and the projection
-//! carries exactly the part's elements, attributes and text, less the
-//! document element's `Ignorable` and whatever the verdict says is dropped.
+//! The witness matrix pins each verdict. The generated differential checks
+//! the property every caller relies on: whenever the proof admits a part,
+//! processing that part succeeds, and the projection carries exactly the
+//! part's elements, attributes and text, less the document element's
+//! `Ignorable` and whatever the verdict says is dropped.
 
 use std::borrow::Cow;
 
@@ -27,8 +27,7 @@ const W14: &str = "http://schemas.microsoft.com/office/word/2010/wordml";
 const R: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const X: &str = "urn:x";
 
-/// The namespace with its last character written as a character reference,
-/// the 0008 W7 spelling.
+/// The namespace with its last character written as a character reference.
 const MC_ESCAPED: &str = "http://schemas.openxmlformats.org/markup-compatibility/200&#54;";
 
 /// A profile like the Word main document's: the OOXML baseline and `w14`.
@@ -295,8 +294,8 @@ fn mentions_namespace_decides_on_decoded_declarations() {
 
 #[test]
 fn processing_applies_an_escaped_namespace_and_skips_a_mention() {
-    // 0008 W7: the escaped spelling binds the namespace, so the branch is
-    // selected for every reader instead of both branches being read.
+    // The escaped spelling binds the namespace, so the branch is selected for
+    // every reader instead of both branches being read.
     let escaped = format!(
         r#"<w:document xmlns:w="{W}" xmlns:mc="{MC_ESCAPED}"><w:body><mc:AlternateContent><mc:Choice Requires="w"><w:p><w:r><w:t>CHOICE</w:t></w:r></w:p></mc:Choice><mc:Fallback><w:p><w:r><w:t>FALLBACK</w:t></w:r></w:p></mc:Fallback></mc:AlternateContent></w:body></w:document>"#
     );

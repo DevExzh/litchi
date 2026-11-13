@@ -1,5 +1,5 @@
 //! Immutable, source-bound worksheet page-break edits of a
-//! [`crate::Package`] (record 0360).
+//! [`crate::Package`].
 //!
 //! [`crate::Package::edit_page_breaks`] starts an [`Edit`] of one
 //! worksheet's row and column breaks; [`Edit::commit`] returns a [`Commit`]

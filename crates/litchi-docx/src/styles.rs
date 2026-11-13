@@ -38,7 +38,7 @@ use std::collections::HashSet;
 pub mod effects;
 
 /// The located styles part: every style with its byte range, read and
-/// edited in place (record 0319).
+/// edited in place.
 pub mod catalog;
 
 /// Semantic kind of a Word style.
@@ -777,8 +777,7 @@ impl Style {
 
     /// Whether the style declares a `w:outlineLvl` of its own, including
     /// the body-text level that [`Self::outline`] reports as `None`; such
-    /// a declaration overrides the level its based-on style would give
-    /// (record 0279).
+    /// a declaration overrides the level its based-on style would give.
     #[inline]
     #[must_use]
     pub const fn declares_outline(&self) -> bool {

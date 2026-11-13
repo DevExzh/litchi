@@ -1,5 +1,5 @@
-//! The document-variable family of a source-backed package (record
-//! 0355a): the variables of the existing settings part.
+//! The document-variable family of a source-backed package: the variables of the existing settings
+//! part.
 //!
 //! [`Package::edit_document_variables`](crate::source_backed::Package::edit_document_variables)
 //! stages an [`Edit`] whose commit returns a new source-backed package;

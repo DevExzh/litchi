@@ -18,18 +18,18 @@
 //! checked error instead of inheriting quick-xml's overflow panic/wrap path.
 //!
 //! Resolution answers exactly what quick-xml's newest-first linear search
-//! answers, without that search's cost (change 0754). The innermost
-//! default-namespace declaration is the top of a stack of their positions,
-//! kept as declarations are added and scopes close. A prefixed name first
-//! tries the positions of the few prefixes resolved most recently; a cached
-//! position is used only after the binding there is checked to carry the
-//! requested prefix, and every change to the binding list clears the cache,
-//! so a hit is the binding the search would have found. A miss searches the
-//! list while at most [`LINEAR_BINDINGS`] bindings of any kind are in scope.
-//! Past that, the first miss builds an ordered map from each declared prefix
-//! to its positions, and later misses search only the bindings added since
-//! the map last caught up — at most [`UNINDEXED_TAIL`] of them, beyond which
-//! the miss first adds them to the map — before asking the map. Nothing is
+//! answers, without that search's cost. The innermost default-namespace
+//! declaration is the top of a stack of their positions, kept as
+//! declarations are added and scopes close. A prefixed name first tries the
+//! positions of the few prefixes resolved most recently; a cached position
+//! is used only after the binding there is checked to carry the requested
+//! prefix, and every change to the binding list clears the cache, so a hit
+//! is the binding the search would have found. A miss searches the list
+//! while at most [`LINEAR_BINDINGS`] bindings of any kind are in scope. Past
+//! that, the first miss builds an ordered map from each declared prefix to
+//! its positions, and later misses search only the bindings added since the
+//! map last caught up — at most [`UNINDEXED_TAIL`] of them, beyond which the
+//! miss first adds them to the map — before asking the map. Nothing is
 //! hashed, so no input can steer a lookup into collisions: a lookup costs at
 //! most a few cache comparisons, [`UNINDEXED_TAIL`] list comparisons and one
 //! ordered-map descent, logarithmic in the number of distinct prefixes in
@@ -1105,9 +1105,9 @@ mod tests {
         (tracker.examined.get(), built)
     }
 
-    /// The change-0754 review's worst cases: many bindings in scope, then
-    /// many lookups. `declarations` repeats one declaration shape on each of
-    /// `levels` nested elements, and `names` follow.
+    /// The worst cases: many bindings in scope, then many lookups.
+    /// `declarations` repeats one declaration shape on each of `levels`
+    /// nested elements, and `names` follow.
     fn crowded_document(
         levels: usize,
         declaration: impl Fn(usize, usize) -> String,

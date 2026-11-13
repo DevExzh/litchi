@@ -5,11 +5,11 @@
 )]
 
 //! The eager slide catalog is parsed at most once per borrowed
-//! [`litchi_pptx::presentation::Presentation`] (change 0637). These tests lock
-//! the two properties that make the memo value-identical: repeating any
-//! catalog query returns what the first call returned, and the memo never
-//! moves a refusal — in particular it must not lend `slide_count`'s
-//! package-graph validation to `slide`, which has never performed it.
+//! [`litchi_pptx::presentation::Presentation`]. These tests lock the two
+//! properties that make the memo value-identical: repeating any catalog query
+//! returns what the first call returned, and the memo never moves a refusal —
+//! in particular it must not lend `slide_count`'s package-graph validation to
+//! `slide`, which has never performed it.
 
 mod in_place;
 use in_place::InPlace as _;

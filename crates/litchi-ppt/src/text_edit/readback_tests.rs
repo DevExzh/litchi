@@ -1,4 +1,4 @@
-//! Differential tests of the incremental readback (record 0264).
+//! Differential tests of the incremental readback.
 //!
 //! Every case publishes a batch through the real rewrite and editor, lets a
 //! hook corrupt the staged slide record (simulating a faulty rewrite), and
@@ -16,7 +16,7 @@ fn target(slide: usize, shape: usize) -> Target {
     Target::new(Position::new(slide), Position::new(shape))
 }
 
-/// One slide with `count` text boxes (the 0218–0260 batch corpus shape).
+/// One slide with `count` text boxes (the batch corpus shape).
 fn deck(count: usize) -> Vec<u8> {
     let mut builder = crate::Builder::new();
     let slide = builder.add_slide().unwrap();
@@ -570,8 +570,8 @@ fn sequential_single_edits_seed_exactly_what_a_fresh_parse_returns() {
     }
 }
 
-/// The per-record rebuild that the single-buffer drawing rewrites replaced
-/// (record 0264), kept as the byte and error oracle.
+/// The per-record rebuild that the single-buffer drawing rewrites replaced,
+/// kept as the byte and error oracle.
 fn reference_rewrite(
     record: &[u8],
     shape_id: u32,
@@ -612,7 +612,8 @@ fn reference_rewrite(
     rebuild(record, &data).map_err(Error::from)
 }
 
-/// The grouped per-record rebuild replaced in record 0264 (error oracle).
+/// The grouped per-record rebuild that the in-place rewrite replaced (error
+/// oracle).
 fn reference_grouped(
     record: &[u8],
     replacements: &std::collections::BTreeMap<u32, Vec<ShapeTextRewrite<'_>>>,

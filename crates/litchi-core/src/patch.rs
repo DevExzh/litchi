@@ -2646,10 +2646,10 @@ mod tests {
             .expect("valid operation")
     }
 
-    /// Record 0349: durable bytes must not depend on whether a linked crate
-    /// enables `serde_json/preserve_order`. This crate's tests enable it, so
-    /// the map below iterates in insertion order; the bytes must still list
-    /// members sorted, exactly as a build without the feature produces them.
+    /// Durable bytes must not depend on whether a linked crate enables
+    /// `serde_json/preserve_order`. This crate's tests enable it, so the map
+    /// below iterates in insertion order; the bytes must still list members
+    /// sorted, exactly as a build without the feature produces them.
     #[test]
     fn durable_json_ignores_serde_json_map_order() {
         let mut value = serde_json::Map::new();

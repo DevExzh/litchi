@@ -1,4 +1,4 @@
-//! Blank-slide insertion for the root slide-order transaction (record 0260).
+//! Blank-slide insertion for the root slide-order transaction.
 //!
 //! A blank slide is a `SlideContainer` with a `SlideAtom` (blank layout,
 //! following its master's objects, scheme and background), a drawing that

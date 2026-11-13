@@ -1,4 +1,4 @@
-//! Immutable theme edits of a [`Package`](crate::Package) (record 0356a).
+//! Immutable theme edits of a [`Package`](crate::Package).
 //!
 //! [`Package::edit_themes`](crate::Package::edit_themes) starts an [`Edit`]
 //! over a staged copy of the package; its verbs run on the staged graph.
@@ -94,8 +94,8 @@ impl Edit<'_> {
 
     /// The theme part a presentation's colors and fonts come from: the
     /// presentation part's own theme relationship, else the first slide
-    /// master's (record 0321; OfficeCLI's `GetThemePart` order). `None` for a
-    /// presentation with neither.
+    /// master's (OfficeCLI's `GetThemePart` order). `None` for a presentation
+    /// with neither.
     ///
     /// # Errors
     ///

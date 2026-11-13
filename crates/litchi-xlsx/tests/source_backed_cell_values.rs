@@ -118,8 +118,8 @@ impl VersionedSource {
 }
 
 /// The furthest before a member's payload that a read *of that member* can
-/// begin: the fixed local header plus the widest local variable region change
-/// 0573 measured in this repository's corpus.
+/// begin: the fixed local header plus the widest local variable region
+/// measured in this repository's corpus.
 const MEMBER_RECORD_PREFIX_BYTES: u64 = 640;
 
 /// Whether one positional read fetches the payload of the member whose first
@@ -127,10 +127,10 @@ const MEMBER_RECORD_PREFIX_BYTES: u64 = 640;
 ///
 /// These diagnostics and triggers used to recognise that read by its start
 /// offset, because a member's payload arrived in a read that *began* at it.
-/// Since change 0611 a member's first read is one bounded read of its whole
-/// local record, which begins at the member's local header, so the test is now
-/// that the read delivers the payload's first byte *and* began inside the
-/// member's own local record. Both halves matter:
+/// Today a member's first read is one bounded read of its whole local record,
+/// which begins at the member's local header, so the test is now that the read
+/// delivers the payload's first byte *and* began inside the member's own local
+/// record. Both halves matter:
 ///
 /// * delivering the byte is what distinguishes the member read from the short
 ///   local-record probes the preservation path issues at the same offset;
@@ -982,9 +982,9 @@ fn insert_holes_inside_merge_array_data_table_and_shared_ranges_refuse_atomicall
 
 #[test]
 fn merge_markup_is_refused_at_source_open() {
-    // Change 0657 admits `<mergeCells>` to the value-only vocabulary, because
-    // the rewrite copies it verbatim. The refusal of a malformed one did not
-    // disappear: it belongs to the module that models merged ranges.
+    // The value-only vocabulary admits `<mergeCells>`, because the rewrite
+    // copies it verbatim. The refusal of a malformed one did not disappear:
+    // it belongs to the module that models merged ranges.
     let bytes = fixture(
         format!(
             r#"<worksheet xmlns="{SML}"><dimension ref="A1:B2"/><sheetData/><mergeCells count="1"><mergeCell ref="A1:B2"/><future/></mergeCells></worksheet>"#
@@ -1256,7 +1256,7 @@ fn signed_insert_changed_refuses_but_empty_noop_is_exact() {
     let mut edit = editor.edit("Sheet1").unwrap();
     edit.insert(address("D1"), Number::new("42").unwrap())
         .unwrap();
-    // A changed edit of a signed source is refused at commit (record 0360).
+    // A changed edit of a signed source is refused at commit.
     assert!(matches!(
         edit.commit(),
         Err(Error::Package(OpcError::SignedSourceRequiresExplicitPolicy))
@@ -1636,8 +1636,8 @@ fn multi_sheet_commit_rejects_foreign_source_lineage() {
         .unwrap()
         .commit()
         .unwrap();
-    // A replay compares content (record 0360): a second open of the same
-    // bytes holds the before state and writes the commit's output.
+    // A replay compares content: a second open of the same bytes holds the
+    // before state and writes the commit's output.
     let second = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
     let mut output = Vec::new();
     second
@@ -1852,7 +1852,7 @@ fn signed_multi_sheet_noop_is_exact_and_changed_publication_refuses() {
     assert_eq!(output, bytes);
 
     let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
-    // A changed edit of a signed source is refused at commit (record 0360).
+    // A changed edit of a signed source is refused at commit.
     assert!(matches!(
         editor
             .edit_many([SheetChange::set("Sheet1", address("A1"), 42u32)])
@@ -1868,8 +1868,8 @@ fn mce_relationships_and_signed_changes_are_refused() {
         format!(
             r#"<worksheet xmlns="{SML}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><sheetData/><mc:AlternateContent/></worksheet>"#
         ),
-        // An unfamiliar attribute on the root is copied through since change
-        // 0657; a relationship reference inside `<sheetData>` is not.
+        // An unfamiliar attribute on the root is copied through; a
+        // relationship reference inside `<sheetData>` is not.
         format!(
             r#"<worksheet xmlns="{SML}" xmlns:r="{REL}"><sheetData><row r="1"><c r="A1" r:id="rIdSheet"><v>1</v></c></row></sheetData></worksheet>"#
         ),
@@ -1938,7 +1938,7 @@ fn mce_relationships_and_signed_changes_are_refused() {
     let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(signed))).unwrap();
     let mut edit = editor.edit("Sheet1").unwrap();
     edit.remove(address("A1")).unwrap();
-    // A changed edit of a signed source is refused at commit (record 0360).
+    // A changed edit of a signed source is refused at commit.
     assert!(matches!(
         edit.commit(),
         Err(Error::Package(OpcError::SignedSourceRequiresExplicitPolicy))
@@ -2064,8 +2064,8 @@ fn commit_is_bound_to_the_exact_positional_source_identity() {
     let source =
         SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
     let commit = changed_commit(&source);
-    // A replay compares content (record 0360): a second open of the same
-    // bytes holds the before state and writes the commit's output.
+    // A replay compares content: a second open of the same bytes holds the
+    // before state and writes the commit's output.
     let second = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
     let mut output = Vec::new();
     second

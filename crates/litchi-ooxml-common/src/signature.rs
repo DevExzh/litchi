@@ -1,5 +1,4 @@
-//! The signature policy of the shared package-level owners (ADR 0006;
-//! unified-ops record 0014a, F1b).
+//! The signature policy of the shared package-level owners (ADR 0006).
 //!
 //! A change to a signed package invalidates every package signature, and only
 //! the caller may remove one: [`OpcPackage::unsign`], or the `unsign` of the
@@ -45,11 +44,10 @@ pub(crate) fn refuse_signed_change(package: &OpcPackage) -> Result<()> {
 ///
 /// On such a package [`OpcPackage::unsign`] removes nothing. It marks the
 /// absent signature graph as explicitly handled and drops the relationship
-/// source captures, which every owner did unconditionally before record
-/// 0014a, so an unsigned package publishes exactly as it did then. A package
-/// that still needs a disposition is refused instead: this never removes a
-/// signature, even on a path that missed its up-front
-/// [`refuse_signed_change`].
+/// source captures, which every owner used to do unconditionally, so an
+/// unsigned package publishes exactly as it did then. A package that still
+/// needs a disposition is refused instead: this never removes a signature,
+/// even on a path that missed its up-front [`refuse_signed_change`].
 ///
 /// # Errors
 ///

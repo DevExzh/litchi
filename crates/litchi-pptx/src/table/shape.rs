@@ -184,10 +184,10 @@ impl<'a> Table<'a> {
     }
 
     /// Every cell's local properties and text body, by row and position in
-    /// the row, as [`Cell::properties`] and [`Cell::text_body`] read each
-    /// (record 0346). A table that declares no namespace has one namespace
-    /// scope, resolved once, so reading every cell is proportional to the
-    /// table rather than to the part per row and cell.
+    /// the row, as [`Cell::properties`] and [`Cell::text_body`] read each. A
+    /// table that declares no namespace has one namespace scope, resolved once,
+    /// so reading every cell is proportional to the table rather than to the
+    /// part per row and cell.
     ///
     /// # Errors
     ///
@@ -278,9 +278,9 @@ impl<'a> Table<'a> {
             .collect()
     }
 
-    /// The number of cells of every row, in one pass over the table
-    /// (record 0333): the counts [`Row::cell_count`] gives, without
-    /// resolving each row's namespace scope again.
+    /// The number of cells of every row, in one pass over the table: the counts
+    /// [`Row::cell_count`] gives, without resolving each row's namespace scope
+    /// again.
     ///
     /// # Errors
     ///
@@ -352,14 +352,13 @@ impl<'a> Table<'a> {
         Ok(counts)
     }
 
-    /// The paragraphs and text runs of every cell (record 0348): what a
-    /// batch planner needs to resolve cell, cell-paragraph and cell-run
-    /// addresses, without reading the cells' properties and text. The
-    /// index equals the one [`Self::cell_contents`] gives, from one pass
-    /// over the table; a table holding markup this pass does not vouch for
-    /// (markup compatibility, a nested table, a second text body in a cell,
-    /// a fragment without its owner) is indexed from [`Self::cell_contents`]
-    /// instead, with its errors.
+    /// The paragraphs and text runs of every cell: what a batch planner needs
+    /// to resolve cell, cell-paragraph and cell-run addresses, without reading
+    /// the cells' properties and text. The index equals the one
+    /// [`Self::cell_contents`] gives, from one pass over the table; a table
+    /// holding markup this pass does not vouch for (markup compatibility, a
+    /// nested table, a second text body in a cell, a fragment without its
+    /// owner) is indexed from [`Self::cell_contents`] instead, with its errors.
     ///
     /// The pass reads structure only: an attribute value the text-body
     /// reader would refuse is not refused here.
@@ -397,7 +396,7 @@ impl<'a> Table<'a> {
     }
 
     /// The widths of the table's grid columns (`a:tblGrid/a:gridCol/@w`),
-    /// in EMU, in grid order (record 0321).
+    /// in EMU, in grid order.
     ///
     /// # Errors
     ///
@@ -477,10 +476,9 @@ enum Mark {
     Other,
 }
 
-/// The state of one pass building a [`CellTextIndex`] (record 0348). It
-/// takes the rows, cells, bodies, paragraphs and runs as
-/// [`Table::cell_contents`] reads them, and gives up on markup that reader
-/// treats otherwise.
+/// The state of one pass building a [`CellTextIndex`]. It takes the rows,
+/// cells, bodies, paragraphs and runs as [`Table::cell_contents`] reads them,
+/// and gives up on markup that reader treats otherwise.
 #[derive(Default)]
 struct CellTextScan {
     index: CellTextIndex,
@@ -493,8 +491,8 @@ struct CellTextScan {
     nodes: usize,
     /// Whether the fragment's table has started.
     tabled: bool,
-    /// The byte span of each cell's text body in the fragment, by cell
-    /// (record 0348): bodies are validated after the pass.
+    /// The byte span of each cell's text body in the fragment, by cell: bodies
+    /// are validated after the pass.
     bodies: Vec<(usize, std::ops::Range<usize>)>,
     /// Where the current cell's text body starts.
     body_start: usize,
@@ -643,9 +641,9 @@ impl CellTextScan {
 }
 
 /// [`Table::cell_text_index`] of the one `DrawingML` table of the graphic
-/// frame at `offset` of `owner`, from one pass over the frame (record
-/// 0348); `None` when the frame holds markup the pass does not vouch for
-/// (or no table, or more than one), which the caller then reads through
+/// frame at `offset` of `owner`, from one pass over the frame; `None` when the
+/// frame holds markup the pass does not vouch for (or no table, or more than
+/// one), which the caller then reads through
 /// [`Table::from_graphic_frame_with_context`].
 pub(crate) fn scan_frame_cell_text_index(
     frame: &[u8],
@@ -669,9 +667,9 @@ fn scan_cell_text_fragment(
 
 /// The paragraphs and text runs of the text body element `xml` (a shape's
 /// `p:txBody`), whose root inherits `scope`, as the one cell of one row,
-/// from one pass (record 0348); `None` when the body holds markup the pass
-/// does not vouch for. The body is not validated: the caller has read it
-/// with the text-body reader.
+/// from one pass; `None` when the body holds markup the pass does not vouch
+/// for. The body is not validated: the caller has read it with the text-body
+/// reader.
 pub(crate) fn scan_read_body_text_index(
     xml: &[u8],
     scope: NamespaceResolver,
@@ -731,11 +729,10 @@ fn scan_text_fragment(
             return Ok(None);
         };
         // A body the text-body reader refuses is indexed as no body, as
-        // `Cell::text_body` sees it fail (record 0348): its paragraph and
-        // run addresses then take the item-by-item path and its refusal.
-        // The reader's verdict depends on the body's markup, not on the
-        // plain text of its runs, so bodies alike but for that text are
-        // read once.
+        // `Cell::text_body` sees it fail: its paragraph and run addresses then
+        // take the item-by-item path and its refusal. The reader's verdict
+        // depends on the body's markup, not on the plain text of its runs, so
+        // bodies alike but for that text are read once.
         let mut verdicts: std::collections::HashMap<Vec<u8>, bool> =
             std::collections::HashMap::new();
         let mut key = Vec::new();
@@ -875,7 +872,7 @@ fn scan_tags(
 }
 
 /// Whether the shared text-body reader accepts the body element `body` in
-/// `scope`, as [`Cell::text_body`] reads it (record 0348).
+/// `scope`, as [`Cell::text_body`] reads it.
 fn body_readable(body: &[u8], scope: &NamespaceResolver) -> bool {
     litchi_drawingml::text::body::reader::read(
         body,
@@ -886,12 +883,11 @@ fn body_readable(body: &[u8], scope: &NamespaceResolver) -> bool {
 }
 
 /// The text-body reader's view of `body` with the plain character data
-/// of its elements reduced to its class, into `key` (record 0348): markup
-/// and attribute values are kept byte for byte; a run of character data
-/// without references, control characters or more than 1 KiB, valid
-/// UTF-8, becomes one byte telling whitespace from text. `false` when the
-/// body is not keyed so (comments, character data sections, a large body):
-/// it is then read on its own.
+/// of its elements reduced to its class, into `key`: markup and attribute
+/// values are kept byte for byte; a run of character data without references,
+/// control characters or more than 1 KiB, valid UTF-8, becomes one byte telling
+/// whitespace from text. `false` when the body is not keyed so (comments,
+/// character data sections, a large body): it is then read on its own.
 fn body_key(body: &[u8], key: &mut Vec<u8>) -> bool {
     const LARGEST: usize = 64 * 1024;
     key.clear();
@@ -953,7 +949,7 @@ fn index_allocation(source: std::collections::TryReserveError) -> Error {
 }
 
 /// The paragraphs and text runs of a table's cells, by row and position in
-/// the row (record 0348); see [`Table::cell_text_index`].
+/// the row; see [`Table::cell_text_index`].
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct CellTextIndex {
     /// Each row's cells, as a range of `cells`.
@@ -1016,8 +1012,7 @@ impl CellTextIndex {
         self.cells.get(cells.clone())?.get(column)
     }
 
-    /// The index of one text body as the one cell of one row (record
-    /// 0348).
+    /// The index of one text body as the one cell of one row.
     pub(crate) fn from_body(body: &litchi_drawingml::text::body::Body) -> Result<Self> {
         let mut index = Self::default();
         index.open_row()?;
@@ -1038,8 +1033,7 @@ impl CellTextIndex {
     }
 
     /// The index of the cells read one by one: a cell whose text body
-    /// [`Cell::text_body`] refuses is indexed as one without a body (record
-    /// 0348).
+    /// [`Cell::text_body`] refuses is indexed as one without a body.
     pub(crate) fn from_cells(table: Table<'_>) -> Result<Self> {
         let mut index = Self::default();
         for row in table.rows()? {
@@ -1199,7 +1193,7 @@ impl<'a> Row<'a> {
     }
 
     /// The row's height (`a:tr@h`) in EMU; `None` when the attribute is
-    /// absent (record 0333).
+    /// absent.
     ///
     /// # Errors
     ///
@@ -1298,7 +1292,7 @@ impl<'a> Cell<'a> {
     /// The cell's text body (`a:txBody`) with its local properties, read
     /// as a shape's text body is; `None` for a cell without one. Paragraph
     /// and run positions count as [`crate::opened::TextTarget::CellRun`]
-    /// addresses them (record 0285).
+    /// addresses them.
     ///
     /// # Errors
     ///
@@ -1309,9 +1303,8 @@ impl<'a> Cell<'a> {
     }
 
     /// [`Self::text_body`], reusing `shared`, the namespace scope every
-    /// offset of the owning table has (record 0346): a table without
-    /// namespace declarations has one scope, which
-    /// [`Table::text_bodies`] computes once.
+    /// offset of the owning table has: a table without namespace declarations
+    /// has one scope, which [`Table::text_bodies`] computes once.
     fn text_body_in(
         self,
         shared: Option<&NamespaceResolver>,
@@ -1394,9 +1387,9 @@ impl<'a> Cell<'a> {
         Ok(Some(body))
     }
 
-    /// The cell's local properties (`a:tcPr`, record 0333): its fill (a
-    /// solid RGB or theme colour, or no fill; other fills read as `None`),
-    /// vertical anchor and insets.
+    /// The cell's local properties (`a:tcPr`): its fill (a solid RGB or theme
+    /// colour, or no fill; other fills read as `None`), vertical anchor and
+    /// insets.
     ///
     /// # Errors
     ///
@@ -1532,7 +1525,7 @@ impl<'a> Cell<'a> {
     }
 }
 
-/// A table cell's local properties (`a:tcPr`, record 0333).
+/// A table cell's local properties (`a:tcPr`).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct CellProperties {
@@ -1603,7 +1596,7 @@ fn scan_with_context(
 }
 
 /// [`scan_with_context`] with the scope at the start of `xml` already
-/// resolved (record 0346).
+/// resolved.
 fn scan_with_scope(
     xml: &[u8],
     target: &[u8],
@@ -2163,9 +2156,9 @@ mod tests {
 
     #[test]
     fn cell_text_index_equals_the_cell_reader() {
-        // Record 0348: runs, breaks and fields; empty paragraphs; cells
-        // without a body or with an empty one; foreign and unmodeled
-        // children; a cell after an empty row.
+        // Runs, breaks and fields; empty paragraphs; cells without a body or
+        // with an empty one; foreign and unmodeled children; a cell after an
+        // empty row.
         let field = r#"<a:fld id="{5C2F1A2B-0000-4000-8000-000000000001}" type="slidenum"><a:t>1</a:t></a:fld>"#;
         let rows = [
             format!(
@@ -2210,9 +2203,9 @@ mod tests {
 
     #[test]
     fn cell_text_index_drops_the_bodies_the_reader_refuses() {
-        // Record 0348: a body the text-body reader refuses is no body, as
-        // `Cell::text_body` sees it fail; bodies alike but for their text
-        // share one reading, others are read on their own.
+        // A body the text-body reader refuses is no body, as `Cell::text_body`
+        // sees it fail; bodies alike but for their text share one reading,
+        // others are read on their own.
         let cell =
             |content: &str| format!("<a:tc><a:txBody><a:p>{content}</a:p></a:txBody></a:tc>");
         let cells = [

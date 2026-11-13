@@ -70,8 +70,8 @@ pub(crate) fn unsupported_embedded_mutation<T>() -> Result<T> {
 }
 
 /// A staged edit of the BIFF8 chart substreams of one package (the `chart`
-/// family, record 0351 §2.3): `Package::edit_charts` starts it,
-/// [`Edit::commit`] publishes a new package. Dropping it discards it.
+/// family): `Package::edit_charts` starts it, [`Edit::commit`] publishes a
+/// new package. Dropping it discards it.
 pub struct Edit {
     base: crate::scoped::Base,
     pub(super) package: Option<ObjectEditor>,

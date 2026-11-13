@@ -49,12 +49,11 @@ pub struct Package {
     /// never answer for bytes that no longer exist. Nothing observable depends
     /// on it: a miss is an ordinary hash.
     ///
-    /// The slot is also filled, when empty, by a capture of the current graph
-    /// (change 0751), which is why it is a cell: a capture takes `&self`. It
-    /// is only ever set to a snapshot's memo re-projected onto `opc`'s own
-    /// allocations, so every entry names and retains an allocation `opc`
-    /// holds, and every mutation that publishes no opened-presentation
-    /// snapshot still empties it.
+    /// The slot is also filled, when empty, by a capture of the current graph,
+    /// which is why it is a cell: a capture takes `&self`. It is only ever set
+    /// to a snapshot's memo re-projected onto `opc`'s own allocations, so every
+    /// entry names and retains an allocation `opc` holds, and every mutation
+    /// that publishes no opened-presentation snapshot still empties it.
     pub(crate) part_digests:
         std::sync::Arc<std::sync::OnceLock<std::sync::Arc<crate::opened::PartDigests>>>,
     /// Retained source-backed relationship closures for semantic replay.
@@ -737,7 +736,7 @@ impl Package {
     }
 
     /// The presentation theme: the presentation part's own theme, else the
-    /// first slide master's (record 0321). `None` when there is neither.
+    /// first slide master's. `None` when there is neither.
     ///
     /// ```
     /// let package = litchi_pptx::Package::new()?;
@@ -758,8 +757,7 @@ impl Package {
     }
 
     /// The number of the first slide, `p:presentation/@firstSlideNum`
-    /// (1 when absent), the number slide-number fields count from
-    /// (record 0279).
+    /// (1 when absent), the number slide-number fields count from.
     ///
     /// # Errors
     ///
@@ -1074,9 +1072,9 @@ impl Package {
     /// part may copy its payload when cloned, and adopting the snapshot's memo
     /// as it is would then keep that copy alive after the snapshot is dropped.
     /// The projection keeps an entry only for an allocation `self.opc` holds,
-    /// and retains `self.opc`'s own `Arc` for it (change 0751's review), so the
-    /// facade retains no payload its own graph does not hold. A projection that
-    /// cannot allocate leaves the memo empty, which only costs a later hash.
+    /// and retains `self.opc`'s own `Arc` for it, so the facade retains no
+    /// payload its own graph does not hold. A projection that cannot allocate
+    /// leaves the memo empty, which only costs a later hash.
     fn adopt_part_digests(&mut self, snapshot: &crate::opened::Snapshot) {
         self.part_digests = std::sync::Arc::new(std::sync::OnceLock::new());
         let _ = self.content_revision.set(snapshot.revision);
@@ -1086,18 +1084,16 @@ impl Package {
     }
 
     /// Keep the memo of a capture of the current graph, re-projected onto
-    /// `self.opc`'s own allocations, when this package holds none (change
-    /// 0751).
+    /// `self.opc`'s own allocations, when this package holds none.
     ///
     /// The ADR 0005 memo amendment's adoption clause says when the facade must
     /// refresh its memo (every publication) and when it must release it (every
     /// mutation that publishes nothing); filling an empty slot from a snapshot
-    /// of the current, unmutated graph is permitted under the coordinator's
-    /// ruling in 0751's review, with the amendment's re-projection clause met
-    /// in code: the memo kept is [`Self::memo_for`]'s projection, whatever the
-    /// parts are. A filled slot is kept: it describes this same graph, because
-    /// every mutation that publishes no snapshot empties it and every
-    /// publication replaces it.
+    /// of the current, unmutated graph is permitted with the amendment's
+    /// re-projection clause met in code: the memo kept is [`Self::memo_for`]'s
+    /// projection, whatever the parts are. A filled slot is kept: it describes
+    /// this same graph, because every mutation that publishes no snapshot
+    /// empties it and every publication replaces it.
     fn offer_part_digests(&self, snapshot: &crate::opened::Snapshot) {
         let _ = self.content_revision.set(snapshot.revision);
         if self.part_digests.get().is_none()
@@ -1184,7 +1180,7 @@ pub(crate) fn resolve_slide_identity(
     }
 }
 
-/// The zero-based position and part of the selected slide (record 0356a).
+/// The zero-based position and part of the selected slide.
 pub(crate) fn resolve_slide_position(
     opc: &OpcPackage,
     key: crate::slide::Selector<'_>,

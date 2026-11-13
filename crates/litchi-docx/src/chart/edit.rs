@@ -1,5 +1,5 @@
-//! The classic-chart family (record 0355): the main document's chart
-//! ownership graph (chart parts, embedded workbooks and companions).
+//! The classic-chart family: the main document's chart ownership graph (chart
+//! parts, embedded workbooks and companions).
 //!
 //! [`Package::chart_graph`](crate::Package::chart_graph) reads the graph;
 //! [`Package::edit_chart`](crate::Package::edit_chart) stages an [`Edit`]

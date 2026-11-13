@@ -7,8 +7,7 @@
 //! served from this cache, so later reads cost a lookup instead of another
 //! scan of the part.
 //!
-//! The cache follows the weighted clean-value rule of ADR 0005 and of
-//! performance change 0680:
+//! The cache follows the weighted clean-value rule of ADR 0005:
 //!
 //! - Every entry carries a logical weight, and the cache never references
 //!   more than [`MAX_RETAINED_WEIGHT`] bytes or [`MAX_RETAINED_ENTRIES`]
@@ -90,7 +89,7 @@ pub(super) enum Axis {
     /// The worksheet XML outside `sheetData`.
     Blocks,
     /// The parsed leading rows of one worksheet, which a cell cursor starts
-    /// from (record 0267).
+    /// from.
     Prefix,
 }
 

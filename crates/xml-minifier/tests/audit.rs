@@ -265,15 +265,15 @@ fn malformed_and_invalid_encoding_are_typed() {
     ));
 }
 
-/// Change 0654, under change 0652 decision 2: one witness per compactness
-/// refusal the original-bytes policy removes. Each input is refused by the
-/// authored contract, with the kind named, and accepted by the source policy.
+/// One witness per compactness refusal the original-bytes policy removes.
+/// Each input is refused by the authored contract, with the kind named, and
+/// accepted by the source policy.
 #[test]
 fn source_policy_accepts_every_noncompact_spelling_the_authored_contract_refuses() {
     for (kind, xml) in [
         // A producer's line ending after the XML declaration and its
-        // indentation between elements. This is the spelling 0602 witnessed on
-        // 93 of 95 real packages, at the newline after the declaration.
+        // indentation between elements. This spelling was seen on 93 of 95
+        // real packages, at the newline after the declaration.
         (
             Kind::FormattingWhitespace,
             b"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n<root>\n  <child/>\n</root>".as_slice(),

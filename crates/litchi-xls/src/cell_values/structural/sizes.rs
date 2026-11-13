@@ -1,5 +1,5 @@
 //! Row heights and column widths around a row or column shift, for the
-//! drawing anchors that keep their place (record 0316).
+//! drawing anchors that keep their place.
 //!
 //! A position-locked anchor (`AnchorBehavior::Absolute`) and the far end of
 //! a size-locked one (`MoveWithoutResize`) keep their absolute position

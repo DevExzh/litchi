@@ -151,7 +151,7 @@ pub(super) fn plan(
         &relationship_id,
     )?;
     // The new slide joins the section of its neighbour, as the eager
-    // editor places it (record 0303).
+    // editor places it.
     let root = if crate::opened::sections::present(&root) {
         let mut ids: Vec<u32> = package.order.iter().map(|key| key.slide_id).collect();
         ids.insert(position, slide_id);

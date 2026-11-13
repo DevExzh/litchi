@@ -633,7 +633,7 @@ fn managed_one_under_budget_fails_before_payload_retention_and_cancellation_stop
 }
 
 /// Replay a source-backed patch onto `package` through a source-backed
-/// workbook over its bytes (record 0360: source-backed patches replay onto
+/// workbook over its bytes (source-backed patches replay onto
 /// source-backed workbooks).
 fn replay_patch(
     package: &mut OpcPackage,

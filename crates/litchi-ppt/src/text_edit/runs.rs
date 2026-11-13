@@ -1,4 +1,4 @@
-//! Character runs and text-range hyperlinks of one text body (record 0323).
+//! Character runs and text-range hyperlinks of one text body.
 //!
 //! A shape's text body is its `ClientTextbox` records, or, for a title or
 //! body placeholder whose textbox holds only an `OutlineTextRefAtom`, the

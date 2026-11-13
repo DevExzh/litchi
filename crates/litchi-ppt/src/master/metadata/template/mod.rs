@@ -106,7 +106,7 @@ pub(crate) struct RecordEdit {
     not(test),
     expect(
         dead_code,
-        reason = "the record-level design-name editor; master::metadata::Edit::set_template_name is the public route and this surface stays exercised by the unit tests (record 0357)"
+        reason = "the record-level design-name editor; master::metadata::Edit::set_template_name is the public route and this surface stays exercised by the unit tests"
     )
 )]
 impl RecordEdit {
@@ -159,7 +159,7 @@ pub(crate) struct RecordCommit {
     not(test),
     expect(
         dead_code,
-        reason = "the record-level design-name editor; master::metadata::Edit::set_template_name is the public route and this surface stays exercised by the unit tests (record 0357)"
+        reason = "the record-level design-name editor; master::metadata::Edit::set_template_name is the public route and this surface stays exercised by the unit tests"
     )
 )]
 impl RecordCommit {

@@ -1,5 +1,5 @@
-//! Change 0761: every opt-in save-durability level publishes exactly the bytes
-//! of the default `save`, through the same atomic replacement.
+//! Every opt-in save-durability level publishes exactly the bytes of the
+//! default `save`, through the same atomic replacement.
 
 #![allow(
     clippy::unwrap_used,

@@ -2,7 +2,7 @@
 //!
 //! This is an ADR 0005 weighted clean-value cache, not an ADR 0032 memo: the
 //! table's size grows with the styles payload. It follows the shape of the
-//! DOCX paragraph-index cache (performance records 0680 and 0682):
+//! DOCX paragraph-index cache:
 //!
 //! * one entry per cache, for the payload generation read last; the owner
 //!   holds the cache, there is no process-wide state;

@@ -1386,7 +1386,7 @@ mod tests {
         assert_eq!(legacy.get(Resource::CpuTasks), 9);
     }
     // -----------------------------------------------------------------------
-    // Change 0763: rough budget leases (owner decision 6 of change 0758).
+    // Rough budget leases.
     // -----------------------------------------------------------------------
 
     /// Work limits of a leaf, its parent and the root.

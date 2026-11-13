@@ -1,22 +1,20 @@
-//! Shared plumbing of the scoped PPT edit families (record 0357).
+//! Shared plumbing of the scoped PPT edit families.
 //!
-//! Every scoped family `x` follows the record 0351 §2.3 shape:
-//! `Package::edit_x(&self, ..) -> x::Edit`, `x::Edit::commit(self) ->
-//! x::Commit` publishing a new [`Package`], and `Package::apply_x(&self,
-//! &x::Patch) -> x::Commit`. Dropping an `Edit` discards it. The families
-//! keep their record-level codecs and staging owners crate-private; this
-//! module retains the source package, lazily captures exact bytes when a
-//! family first needs them, publishes candidate bytes as a new package, and
-//! replays byte patches.
+//! Every scoped family `x` follows the same shape: `Package::edit_x(&self, ..)
+//! -> x::Edit`, `x::Edit::commit(self) -> x::Commit` publishing a new
+//! [`Package`], and `Package::apply_x(&self, &x::Patch) -> x::Commit`. Dropping
+//! an `Edit` discards it. The families keep their record-level codecs and
+//! staging owners crate-private; this module retains the source package, lazily
+//! captures exact bytes when a family first needs them, publishes candidate
+//! bytes as a new package, and replays byte patches.
 //!
-//! A family's patch is exact and record-sized (record 0357a): it carries the
-//! length and block root (record 0357b, [`digest`]) of the source and target
-//! package and the coalesced 512-byte blocks that differ, so `apply_x`
-//! refuses a package that is not the patch's exact source
-//! ([`Failure::PatchConflict`]), rebuilds the exact target, and `inverse`
-//! swaps the endpoints. An exact no-op commit
-//! publishes the source package unchanged (signatures included); a changed
-//! commit of a signed package is refused ([`Failure::Signed`]).
+//! A family's patch is exact and record-sized: it carries the length and block
+//! root ([`digest`]) of the source and target package and the coalesced
+//! 512-byte blocks that differ, so `apply_x` refuses a package that is not the
+//! patch's exact source ([`Failure::PatchConflict`]), rebuilds the exact
+//! target, and `inverse` swaps the endpoints. An exact no-op commit publishes
+//! the source package unchanged (signatures included); a changed commit of a
+//! signed package is refused ([`Failure::Signed`]).
 
 #[cfg(test)]
 use std::io::Cursor;
@@ -117,8 +115,7 @@ impl<T> std::fmt::Debug for Lazy<T> {
     }
 }
 
-/// One side of an exact byte patch: the package length and its block root
-/// (record 0357b).
+/// One side of an exact byte patch: the package length and its block root.
 #[derive(Clone, PartialEq, Eq)]
 struct Endpoint {
     len: usize,
@@ -887,7 +884,7 @@ macro_rules! family {
         #[doc = concat!(
                             "An exact, reversible ", $noun, " patch: the changed byte ranges ",
                             "between two packages, bound to the exact source package (length ",
-                            "and block root, record 0362) it was made from."
+                            "and block root) it was made from."
                         )]
         #[derive(Clone, PartialEq, Eq)]
         pub struct Patch($crate::scoped::BytePatch);

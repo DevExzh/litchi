@@ -1,5 +1,5 @@
 //! Drawing-object operations of the worksheet-feature edit: notes,
-//! pictures, shapes and auto-filter drop-downs (record 0327).
+//! pictures, shapes and auto-filter drop-downs.
 //!
 //! An object is added after the last top-level shape of the worksheet
 //! drawing, or as the first shape of a new drawing; it is removed with every

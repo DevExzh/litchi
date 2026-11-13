@@ -530,8 +530,8 @@ fn patch_forward_inverse_restore_exact_worksheet_and_relationships_and_reject_st
     );
     let foreign_editor =
         SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(foreign))).unwrap();
-    // A replay compares content (record 0360): the foreign worksheet does not
-    // hold the patch's before state (it does not even load as one).
+    // A replay compares content: the foreign worksheet does not hold the
+    // patch's before state (it does not even load as one).
     assert!(foreign_editor.apply_hyperlinks(commit.patch()).is_err());
 }
 
@@ -727,7 +727,7 @@ fn managed_limits_cancellation_and_partial_sink_are_typed() {
 }
 
 /// Replay a source-backed patch onto a source-backed workbook over `bytes`
-/// and return its output (record 0360).
+/// and return its output.
 fn replay_bytes(
     bytes: &[u8],
     patch: &litchi_xlsx::hyperlinks::source::Patch,

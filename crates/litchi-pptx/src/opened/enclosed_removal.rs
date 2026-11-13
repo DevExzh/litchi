@@ -1,5 +1,5 @@
 //! Top-level shape removal on slides whose markup compatibility is enclosed
-//! in shape-tree children (record 0303, follow-up of record 0290 F3).
+//! in shape-tree children.
 //!
 //! PowerPoint writes an embedded OLE object as a `p:graphicFrame` whose
 //! `a:graphicData` holds an `mc:AlternateContent` (a VML choice and a

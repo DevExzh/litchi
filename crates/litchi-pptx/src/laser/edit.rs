@@ -1,4 +1,4 @@
-//! Immutable laser-pointer trace edits of a [`Package`](crate::Package) (record 0356a).
+//! Immutable laser-pointer trace edits of a [`Package`](crate::Package).
 //!
 //! [`Package::edit_laser_traces`](crate::Package::edit_laser_traces) starts an [`Edit`]
 //! over a staged copy of the package; its verbs run on the staged graph.

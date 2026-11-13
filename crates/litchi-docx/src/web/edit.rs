@@ -1,4 +1,4 @@
-//! The web-settings family (record 0355): the document's `webSettings` part.
+//! The web-settings family: the document's `webSettings` part.
 //!
 //! [`Package::web`](crate::Package::web) reads the typed settings and
 //! [`load_snapshot`](super::load_snapshot) the source-preserving

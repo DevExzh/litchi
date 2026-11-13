@@ -1,4 +1,4 @@
-//! The envelope edit family (record 0351 §2.3, record 0359).
+//! The envelope edit family.
 //!
 //! [`crate::Package::edit_envelope`] stages envelope edits on an [`Edit`];
 //! [`Edit::commit`] publishes a new [`crate::Package`] with an exact

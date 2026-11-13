@@ -1,4 +1,4 @@
-//! Shape and text-run click actions (record 0321).
+//! Shape and text-run click actions.
 //!
 //! [`Edit::set_shape_hyperlink`] writes a shape's click action on its
 //! `p:cNvPr` and on every text run, as OfficeCLI does so readers that look
@@ -78,8 +78,8 @@ impl Edit {
     /// Set (`Some`) or remove (`None`) the click action of a shape (`p:sp`)
     /// at a depth-first position of a slide: on its `p:cNvPr` and on every
     /// text run of its text body. A picture (`p:pic`) or a group
-    /// (`p:grpSp`) carries it on its `p:cNvPr` only (record 0325). Returns
-    /// whether the slide changed; an equal action is an exact no-op.
+    /// (`p:grpSp`) carries it on its `p:cNvPr` only. Returns whether the slide
+    /// changed; an equal action is an exact no-op.
     ///
     /// ```
     /// use litchi_core::Position;

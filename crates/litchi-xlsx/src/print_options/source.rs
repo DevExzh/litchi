@@ -8,7 +8,7 @@
 //! raw-copied). An exact no-op returns the source workbook unchanged; a
 //! changed edit of a signed source is refused at commit.
 //! [`SourceBackedWorkbook::apply_print_options`] replays a [`Patch`] onto a workbook
-//! holding its before state (record 0360).
+//! holding its before state.
 
 use std::io::Write;
 

@@ -1,5 +1,5 @@
 //! Paragraph style and tab stops, `HYPERLINK` fields, standard bookmarks
-//! and section page setup on the primary body transaction (record 0324).
+//! and section page setup on the primary body transaction.
 //!
 //! Each operation resolves its target against the staged text, refuses
 //! tracked or structurally ambiguous content, stages one revision-editor
@@ -156,8 +156,9 @@ pub struct HyperlinkInsert {
     pub text: String,
 }
 
-/// A reversible record-0324 change, described for history and three-way
-/// plans; patches still invert through their exact byte snapshots.
+/// A reversible style, tab, field, bookmark or section change, described for
+/// history and three-way plans; patches still invert through their exact byte
+/// snapshots.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum MarkChange {
     ParagraphStyle {

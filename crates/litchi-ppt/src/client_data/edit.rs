@@ -1,4 +1,4 @@
-//! Package-level `OfficeArtClientData` edits (record 0357).
+//! Package-level `OfficeArtClientData` edits.
 //!
 //! [`Package::edit_client_data`] stages edits of the client-data children of
 //! one top-level shape, [`Edit::commit`] publishes a new [`Package`] through

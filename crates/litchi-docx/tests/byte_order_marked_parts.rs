@@ -4,8 +4,8 @@
     reason = "differential assertions intentionally panic on fixture failures"
 )]
 
-//! Change 0765: a DOCX part that begins with a UTF-8 byte-order mark reads,
-//! edits and saves exactly like the same part without one.
+//! A DOCX part that begins with a UTF-8 byte-order mark reads, edits and saves
+//! exactly like the same part without one.
 //!
 //! quick-xml drops a leading mark before its first event without counting it
 //! in its positions, so every span taken from a reader was three bytes early
@@ -235,8 +235,8 @@ fn a_semantic_edit_of_a_marked_main_part_matches_the_unmarked_edit() {
 #[test]
 fn the_marked_alt_chunk_fixture_reads_and_edits_like_its_unmarked_twin() {
     // Word marks eleven members of this fixture. Its body keeps it off the
-    // edit route (0650's structural refusal); the refusal must be the
-    // unmarked twin's, and a save must preserve every member.
+    // edit route (a structural refusal); the refusal must be the unmarked
+    // twin's, and a save must preserve every member.
     let original = std::fs::read(ALT_CHUNK_HEADER).unwrap();
     let marked_members: BTreeSet<String> = members(&original)
         .into_iter()

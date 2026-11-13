@@ -142,8 +142,8 @@ fn write_extension14_collection<W: Write>(
 }
 
 /// The records of one classic validation: its optional `BrtDValList`
-/// override and its `BrtDVal` (record 0322 splices these into an existing
-/// collection).
+/// override and its `BrtDVal` (the edit family splices these into an
+/// existing collection).
 pub(crate) fn encode_classic_records(
     dv: &Validation,
     limits: crate::raw::Limits,

@@ -650,7 +650,7 @@ where
     check_execution_context(context)?;
     output.extend_from_slice(span_bytes(xml, target.span.end..xml.len())?);
     check_execution_context(context)?;
-    // The removed slide leaves its p14 section too (record 0303).
+    // The removed slide leaves its p14 section too.
     if super::sections::present(&output) {
         if let Some(sectioned) = super::sections::remove(&output, selected_id)? {
             check_execution_context(context)?;
@@ -687,7 +687,7 @@ pub(crate) fn slide_binding_removal_spans(
 /// A root with a p14 section list may also change section membership: the
 /// proof then runs on both roots with every section entry stripped, and the
 /// membership itself must be one that the catalog change keeps
-/// ([`super::sections::validate_membership`], record 0303).
+/// ([`super::sections::validate_membership`]).
 pub(crate) fn validate_slide_catalog_delta<'a, 'b, I, J>(
     before: &[u8],
     before_order: I,
@@ -1501,7 +1501,7 @@ fn rewrite_shape_texts(
         return Ok(None);
     }
     // A shape text set fills the run slots; writing into a field's cached
-    // result, or blanking it, would lose the field's text (record 0304).
+    // result, or blanking it, would lose the field's text.
     if edits
         .iter()
         .zip(&elements)
@@ -2092,7 +2092,7 @@ fn shape_removal_plan_with_limits(
 }
 
 /// [`shape_removal_plan_with_limits`] on an already read scene whose spans are defined
-/// against `xml` (the processed owner of a rewritten scene, record 0303).
+/// against `xml` (the processed owner of a rewritten scene).
 pub(super) fn shape_removal_plan_in(
     scene: &crate::shape::Scene<'_>,
     xml: &[u8],

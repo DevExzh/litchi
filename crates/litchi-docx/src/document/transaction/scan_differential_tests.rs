@@ -1,5 +1,5 @@
-//! Change 0754: the tracker-driven layout scanner against the `NsReader`
-//! scanner it replaced.
+//! The tracker-driven layout scanner against the `NsReader` scanner it
+//! replaced.
 //!
 //! `scan_document_with_context` is the admission check of every main-document
 //! snapshot, so its verdict is a refusal surface: the layout it returns and
@@ -422,9 +422,9 @@ fn an_exact_no_op_commit_still_shares_its_source_allocation() {
     ));
 }
 
-/// Record 0293: producers import `w:altChunk` content after the body-final
-/// section properties. That tail is admitted as untouched bytes outside the
-/// content region; body content after the section properties stays refused.
+/// Producers import `w:altChunk` content after the body-final section
+/// properties. That tail is admitted as untouched bytes outside the content
+/// region; body content after the section properties stays refused.
 #[test]
 fn an_alt_chunk_after_the_final_section_properties_is_an_untouched_tail() {
     let admitted = document(r#"<w:p/><w:sectPr/><w:altChunk r:id="rId9" xmlns:r="urn:r"/>"#);

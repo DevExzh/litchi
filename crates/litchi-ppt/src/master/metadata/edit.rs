@@ -1,4 +1,4 @@
-//! Package-level master-metadata edits (record 0357).
+//! Package-level master-metadata edits.
 //!
 //! [`Package::edit_master_metadata`] stages the bounded metadata of one
 //! master record (its name, main-master design name and notes-master text

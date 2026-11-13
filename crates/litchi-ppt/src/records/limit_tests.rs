@@ -6,7 +6,7 @@
 
 //! Source limits enforced by the bounded record parser (moved from the
 //! embedded-font vectors when `Record::parse` became
-//! crate-private, record 0357).
+//! crate-private).
 
 use super::Record;
 use crate::{Error, SourceLimitKind, SourceLimits};

@@ -595,7 +595,7 @@ fn a_payload_the_window_cannot_cover_is_read_from_the_source() {
 }
 
 // ---------------------------------------------------------------------------
-// Change 0623: the read-side local-span accessor.
+// The read-side local-span accessor.
 //
 // `local_span_hint` reports the span this archive's own first read covers, so a
 // caller can fetch those bytes by another route. These tests pin the two

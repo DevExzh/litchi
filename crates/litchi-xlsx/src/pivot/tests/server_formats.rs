@@ -236,10 +236,10 @@ impl Fixture {
             pivot_table_outer_exts = options.pivot_table_outer_exts,
         );
 
-        // Change 0750: the eager writer refuses to publish XML that is not
-        // well-formed. A table that carries a character reference XML
-        // forbids, on purpose, is published as a well-formed stand-in and its
-        // bytes are put back after publication, so the reader still sees them.
+        // The eager writer refuses to publish XML that is not well-formed. A
+        // table that carries a character reference XML forbids, on purpose, is
+        // published as a well-formed stand-in and its bytes are put back after
+        // publication, so the reader still sees them.
         let published_table_xml = table_xml.replace("&#x1;", "");
 
         let mut package = OpcPackage::new();

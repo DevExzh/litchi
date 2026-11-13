@@ -1,5 +1,5 @@
-//! The bibliography-source family (record 0355): the sources of the
-//! document's bibliography Custom XML store.
+//! The bibliography-source family: the sources of the document's bibliography
+//! Custom XML store.
 //!
 //! [`Package::bibliography_sources`](crate::Package::bibliography_sources)
 //! reads them; [`Package::edit_bibliography`](crate::Package::edit_bibliography)

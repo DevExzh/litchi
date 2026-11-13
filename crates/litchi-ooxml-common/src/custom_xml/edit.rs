@@ -1,4 +1,4 @@
-//! Source-checked Custom XML package edits (record 0360).
+//! Source-checked Custom XML package edits.
 
 use crate::signature::refuse_signed_change;
 use crate::{Error, Result};

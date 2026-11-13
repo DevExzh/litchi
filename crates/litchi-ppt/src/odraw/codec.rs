@@ -276,7 +276,7 @@ pub fn text_from_drawing(data: &[u8], source: SourceLimits) -> Result<String> {
 
 /// Extract a presentation slide drawing's text, reading each text box that
 /// references slide-list text (an `OutlineTextRefAtom`, MS-PPT 2.9.78) from
-/// the body of `outline` it selects (L-PPT-R1).
+/// the body of `outline` it selects.
 ///
 /// Text boxes appear in drawing order. A reference that selects no readable
 /// body contributes no text, as POI and LibreOffice show none.
@@ -411,11 +411,10 @@ pub(crate) fn textbox_text_records<'a>(
     Ok(TextRecords::Inline(payload))
 }
 
-/// The shape's name and alternative text (L-PPT-R3): the `wzName` (0x0380,
-/// MS-ODRAW 2.3.4.1) and `wzDescription` (0x0381, MS-ODRAW 2.3.4.3)
-/// properties of its primary property table, where POI
-/// (`HSLFShape.getShapeName`) and LibreOffice (`SvxMSDffManager::ImportObj`)
-/// read them.
+/// The shape's name and alternative text: the `wzName` (0x0380, MS-ODRAW
+/// 2.3.4.1) and `wzDescription` (0x0381, MS-ODRAW 2.3.4.3) properties of its
+/// primary property table, where POI (`HSLFShape.getShapeName`) and LibreOffice
+/// (`SvxMSDffManager::ImportObj`) read them.
 ///
 /// Each is `None` when the property is absent, not complex, or empty. The
 /// table is walked once; the property parser already refuses a repeated

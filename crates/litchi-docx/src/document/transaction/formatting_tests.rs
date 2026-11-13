@@ -1,7 +1,7 @@
-//! The formatting and structure operations of `formatting` (L-DOCX-W5):
-//! per-property splices with preservation, exact no-ops and inverses,
-//! structure round trips, refusals, composition, durable replay, the
-//! bounded-growth layout differential, and the DOCX fixture corpus.
+//! The formatting and structure operations of `formatting`: per-property
+//! splices with preservation, exact no-ops and inverses, structure round trips,
+//! refusals, composition, durable replay, the bounded-growth layout
+//! differential, and the DOCX fixture corpus.
 
 use super::*;
 use crate::color::Theme;

@@ -4,10 +4,10 @@
     reason = "integration tests use panic-on-failure extraction"
 )]
 
-//! Changed publications refuse a signed workbook (ADR 0006; unified-ops
-//! record 0013). Removing a signature is explicit (`Package::unsign`, or
-//! `OpcPackage::unsign` inside an `edit_opc` update); an exact no-op keeps
-//! the source bytes, signature included.
+//! Changed publications refuse a signed workbook (ADR 0006). Removing a
+//! signature is explicit (`Package::unsign`, or `OpcPackage::unsign`
+//! inside an `edit_opc` update); an exact no-op keeps the source bytes,
+//! signature included.
 
 use litchi_core::sheet::WorkbookTrait as _;
 use std::io::Cursor;
@@ -329,9 +329,8 @@ fn threaded_comment_edits_refuse_a_signed_package() {
     assert_eq!(save(edit.commit().unwrap().package()), bytes);
 }
 
-/// Follow-up F2 of record 0013: task panes and the Ribbon refuse a change to a
-/// signed workbook with the typed signed error; the Ribbon used to remove the
-/// signature.
+/// Task panes and the Ribbon refuse a change to a signed workbook with the
+/// typed signed error; the Ribbon used to remove the signature.
 mod task_panes_and_ribbon {
     use super::*;
     use litchi_ooxml_common::ribbon::{Family, Version};

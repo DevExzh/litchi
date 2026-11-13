@@ -1,4 +1,4 @@
-//! Immutable 3D-model edits of a [`Package`] (record 0351 §2.3).
+//! Immutable 3D-model edits of a [`Package`].
 //!
 //! [`Package::edit_model3d`] starts an [`Edit`] over the package; [`Edit::set`] stores one shape's 3D model and [`Edit::remove`] removes
 //! it.

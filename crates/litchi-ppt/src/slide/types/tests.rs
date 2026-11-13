@@ -1785,7 +1785,7 @@ fn test_slide_text_extraction_preserves_order() {
 }
 
 // ---------------------------------------------------------------------------
-// L-PPT-R1: outline text references resolved into shapes (finding F-10).
+// Outline text references resolved into shapes.
 // ---------------------------------------------------------------------------
 
 const OUTLINE_TEXT_REF_ATOM: u16 = 0x0f9e;
@@ -2051,7 +2051,7 @@ fn outline_resolution_keeps_the_shapes_of_every_corpus_slide() {
 }
 
 // ---------------------------------------------------------------------------
-// L-PPT-R3 (name and alternative text) and L-PPT-R4 (stable shape index).
+// Name and alternative text, and the stable shape index.
 // ---------------------------------------------------------------------------
 
 fn utf16z(text: &str) -> Vec<u8> {

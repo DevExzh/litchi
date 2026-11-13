@@ -1,4 +1,4 @@
-//! Immutable sparkline edits of an XLSB [`Package`] (record 0360b).
+//! Immutable sparkline edits of an XLSB [`Package`].
 //!
 //! [`Package::edit_sparklines`] starts an [`Edit`]; [`Edit::set`] inserts or
 //! replaces a worksheet's sparkline collection and [`Edit::remove`] removes

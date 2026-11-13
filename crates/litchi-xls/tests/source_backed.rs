@@ -1040,9 +1040,9 @@ fn text_reads_and_observations(extra: u16) -> (u64, u64) {
 #[test]
 fn a_text_extraction_observes_the_source_once_per_shared_string_read_and_no_more() {
     // Resolving a shared string reads its bytes through the CFB cursor, which
-    // observes the source once after the read (change 0558). The resolver adds
-    // none of its own: its former observations sat between in-memory steps and
-    // between a read and that read's own trailing fence.
+    // observes the source once after the read. The resolver adds none of its
+    // own: its former observations sat between in-memory steps and between a
+    // read and that read's own trailing fence.
     //
     // The slope is the invariant, not the intercept: adding cells on one row
     // adds no rows and so no written objects, and every added cell resolves
@@ -1050,11 +1050,11 @@ fn a_text_extraction_observes_the_source_once_per_shared_string_read_and_no_more
     // observation per cell is the discipline; the four the resolver used to
     // take per string would make this four.
     //
-    // Change 0648 bounds where that slope applies. A scan reads entries one at
-    // a time until it has taken more than `SHARED_STRING_WINDOW_RESOLVES` of
-    // them, so a projection of this shape stays on the per-entry path while it
-    // resolves at most eight strings. `Simple.xls` stores one string cell of
-    // its own, so `extra` of one and five are two and six resolves.
+    // Where that slope applies is bounded. A scan reads entries one at a time
+    // until it has taken more than `SHARED_STRING_WINDOW_RESOLVES` of them, so
+    // a projection of this shape stays on the per-entry path while it resolves
+    // at most eight strings. `Simple.xls` stores one string cell of its own,
+    // so `extra` of one and five are two and six resolves.
     let (base_reads, base_observations) = text_reads_and_observations(1);
     let (wide_reads, wide_observations) = text_reads_and_observations(5);
     assert_eq!(
@@ -1071,8 +1071,8 @@ fn a_text_extraction_observes_the_source_once_per_shared_string_read_and_no_more
 fn a_text_extraction_past_the_resolver_threshold_reads_the_string_table_once() {
     // Past the threshold the resolver reads the workbook's whole string table
     // with one `read_exact` and serves every later resolve from it, so further
-    // string cells cost no read and -- change 0621's rule holding, with the
-    // fill as the read -- no observation either.
+    // string cells cost no read and -- the one-observation-per-read rule
+    // holding, with the fill as the read -- no observation either.
     //
     // The residue the bound allows is not the resolver's: more cells means more
     // worksheet substream, which the worksheet scan's own growing window may
@@ -1149,13 +1149,13 @@ fn a_whole_sheet_walk_reads_the_shared_string_table_once() {
 
 #[test]
 fn a_mutation_in_any_observation_window_of_a_walk_past_the_threshold_is_refused() {
-    // Change 0621's sweep, extended to the fill boundary the retained table
-    // introduces. Past the threshold a resolve publishes bytes that an earlier
-    // fill read, so a mutation between two served resolves is reported by the
-    // walk's own trailing fence rather than by the next resolve. Sweeping the
-    // mutation over every observation window of the operation covers both
-    // halves: the windows before the fill, where a resolve still reads, and the
-    // windows after it, where nothing but the fences observes.
+    // The change-under-read sweep, extended to the fill boundary the retained
+    // table introduces. Past the threshold a resolve publishes bytes that an
+    // earlier fill read, so a mutation between two served resolves is reported
+    // by the walk's own trailing fence rather than by the next resolve.
+    // Sweeping the mutation over every observation window of the operation
+    // covers both halves: the windows before the fill, where a resolve still
+    // reads, and the windows after it, where nothing but the fences observes.
     let bytes = workbook_with_extra_shared_string_cells(24);
     let probe = Arc::new(CountingSource::new(bytes.clone()));
     let owner = SourceBackedWorkbook::from_read_at(probe.clone()).unwrap();
@@ -1196,8 +1196,8 @@ fn a_text_extraction_observes_the_source_once_per_read_and_twice_per_written_obj
     // The composition this pins, for `Simple.xls`:
     //
     //   * one observation per source read, taken by the CFB reader after the
-    //     read (change 0558) -- the globals fills, the worksheet frames and
-    //     every shared-string chunk;
+    //     read -- the globals fills, the worksheet frames and every
+    //     shared-string chunk;
     //   * two per `Write` call reaching the source-checked sink, one before
     //     the bytes leave and one after;
     //   * the few the operation's own brackets take.
@@ -2996,7 +2996,7 @@ fn source_backed_open_reads_each_global_byte_once() {
     // 1.3 MB stream, so the one-window bound is well inside the stream and
     // bites. Its first BoundSheet8 is framed long before the fills reach the
     // globals end, so the clamp holds and no byte at or beyond the smallest
-    // sheet position is read. Before change 0565 each header was read twice.
+    // sheet position is read. Each header was once read twice.
     let bytes = ole_fixture("ConditionalFormattingSamples.xls");
     let workbook = workbook_stream(bytes.clone(), "Workbook");
     let global_end = global_end_offset(&workbook);
@@ -3041,7 +3041,7 @@ fn corrupt_bound_sheet_positions_terminate_the_globals_scan() {
     // the rest of the scan. With only the stream and `max_global_bytes` left,
     // the scan still stops within one window of the globals end rather than
     // running to the stream end, and reports the offset error the semantic pass
-    // reported before change 0565.
+    // used to report.
     let original = workbook_stream(fixture("Simple.xls"), "Workbook");
     let mut stream = original.clone();
     let offsets = bound_sheet_record_offsets(&stream);
@@ -3144,10 +3144,9 @@ fn mid_globals_byte_limit_reads_at_most_one_header_past_the_limit() {
 #[test]
 fn selected_worksheet_scan_reads_each_byte_at_most_once() {
     // Worksheet 1 of this fixture is 177 records in a 46,843-byte region, and
-    // change 0564 measured a one-cell query there at one four-byte read per
-    // record header plus one read per consumed payload. The window schedule
-    // covers the scanned span in disjoint, forward fills clamped to that
-    // region.
+    // a one-cell query there was measured at one four-byte read per record
+    // header plus one read per consumed payload. The window schedule covers
+    // the scanned span in disjoint, forward fills clamped to that region.
     let bytes = ole_fixture("ConditionalFormattingSamples.xls");
     let stream = workbook_stream(bytes.clone(), "Workbook");
     let source = Arc::new(CountingSource::new(bytes));
@@ -3729,9 +3728,9 @@ fn the_whole_sheet_walk_agrees_with_selected_cell_queries() {
     assert_walk_matches_queries(ole_fixture("ConditionalFormattingSamples.xls"), 1, 87);
     // Booleans as well.
     assert_walk_matches_queries(ole_fixture("ConditionalFormattingSamples.xls"), 15, 192);
-    // The differential change 0648's retained string table needs, and the only
-    // fixture pairing that supplies it. The walk shares one resolver and crosses
-    // the resolver's threshold, so its 862 shared strings are decoded out of the
+    // The differential the retained string table needs, and the only fixture
+    // pairing that supplies it. The walk shares one resolver and crosses the
+    // resolver's threshold, so its 862 shared strings are decoded out of the
     // retained table; each selected-cell query builds a fresh resolver, resolves
     // once and stays on the per-entry path. Eleven of this workbook's entries
     // straddle a `Continue` boundary across its thirteen `SST` records, which is
@@ -3924,9 +3923,8 @@ fn the_whole_sheet_walk_refuses_what_a_selected_cell_query_refuses() {
     );
 
     // Three worksheets of the flagship fixture set `fShrFmla` on formulas
-    // that carry their own tokens. The stale flag is ignored (record 0316;
-    // 0568 and 0585 refused them), so the walk and a cell query both read
-    // every sheet.
+    // that carry their own tokens. The stale flag is ignored (they were
+    // once refused), so the walk and a cell query both read every sheet.
     let owner = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(ole_fixture(
         "ConditionalFormattingSamples.xls",
     ))))
@@ -4005,10 +4003,10 @@ fn the_whole_sheet_walk_honours_cancellation() {
     );
 }
 
-/// Change 0641: a selected-cell query validates the records it is *not*
-/// looking for through the measure-only path, so the refusal a malformed
-/// non-target record produces has to be the one the materializing parse
-/// produced, at the same position in the scan.
+/// A selected-cell query validates the records it is *not* looking for
+/// through the measure-only path, so the refusal a malformed non-target
+/// record produces has to be the one the materializing parse produced,
+/// at the same position in the scan.
 #[test]
 fn a_query_refuses_a_malformed_record_it_is_not_looking_for() {
     // A `Number` record whose payload is six bytes instead of fourteen, at a

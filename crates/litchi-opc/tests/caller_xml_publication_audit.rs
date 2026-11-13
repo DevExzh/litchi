@@ -7,11 +7,10 @@
 
 //! Caller-supplied XML that a package records as source provenance.
 //!
-//! The writer publishes retained source bytes without its audit (change
-//! 0665), while ADR 0006 requires publication to audit every XML member it
-//! writes. So every route that installs caller bytes as provenance must audit
-//! them before it mutates the package, as `try_replace_owned_xml_part`
-//! already does.
+//! The writer publishes retained source bytes without its audit, while
+//! ADR 0006 requires publication to audit every XML member it writes. So every
+//! route that installs caller bytes as provenance must audit them before it
+//! mutates the package, as `try_replace_owned_xml_part` already does.
 //!
 //! The malformed input is an `xml:space` value other than `default` or
 //! `preserve` on the document element. The bounded source validator and the

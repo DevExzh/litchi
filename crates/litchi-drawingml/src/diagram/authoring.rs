@@ -1,4 +1,4 @@
-//! Authoring `SmartArt` graphics from a text outline (record 0284).
+//! Authoring `SmartArt` graphics from a text outline.
 //!
 //! A [`Spec`] is a built-in [`Layout`] and a tree of [`Node`]s. It writes the
 //! five diagram parts deterministically: the data model

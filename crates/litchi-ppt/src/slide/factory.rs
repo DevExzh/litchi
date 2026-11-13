@@ -26,8 +26,8 @@ pub struct SlideFactory<'doc> {
     source: PayloadStore<'doc>,
     /// Persist ID to byte offset mapping
     persist_mapping: &'doc PersistMapping,
-    /// The slide directory, which also holds the presentation's notes index
-    /// (L-PPT-R2), so a factory parses nothing but the slides it is asked for
+    /// The slide directory, which also holds the presentation's notes index, so
+    /// a factory parses nothing but the slides it is asked for
     slide_directory: &'doc SlideDirectory,
     source_limits: SourceLimits,
 }

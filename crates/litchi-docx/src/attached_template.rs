@@ -1,6 +1,5 @@
-//! The attached-template family (record 0355): the settings part's
-//! `w:attachedTemplate` and its external relationship. The template is never
-//! dereferenced.
+//! The attached-template family: the settings part's `w:attachedTemplate` and
+//! its external relationship. The template is never dereferenced.
 //!
 //! [`Package::attached_template`](crate::Package::attached_template) reads it;
 //! [`Package::edit_attached_template`](crate::Package::edit_attached_template)

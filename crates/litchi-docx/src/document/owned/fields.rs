@@ -1,4 +1,4 @@
-//! Field refresh primitives on the package-bound edit (record 0279).
+//! Field refresh primitives on the package-bound edit.
 
 use litchi_core::Position;
 
@@ -40,7 +40,7 @@ impl<P: Clone> Edit<P> {
     }
 
     /// Insert a bookmark into the paragraph at `paragraph`; see
-    /// [`super::super::raw::Tree::insert_bookmark_at`] (record 0325).
+    /// [`super::super::raw::Tree::insert_bookmark_at`].
     ///
     /// ```
     /// use litchi_core::Position;
@@ -71,7 +71,7 @@ impl<P: Clone> Edit<P> {
     }
 
     /// Insert a complex field into the paragraph at `paragraph`; see
-    /// [`super::super::raw::Tree::insert_field_at`] (record 0325).
+    /// [`super::super::raw::Tree::insert_field_at`].
     ///
     /// # Errors
     ///

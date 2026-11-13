@@ -446,7 +446,7 @@ fn papx_in_table_state(grpprl: &[u8]) -> Result<bool> {
 /// The SPRMs of a PAPX body (after its style index). A PAPX in an FKP is
 /// stored in whole words (`cb'` counts words), so a body whose SPRMs end on
 /// an odd byte carries one zero padding byte, which Word writes and the
-/// reader skips (record 0293). Any other trailing byte stays malformed.
+/// reader skips. Any other trailing byte stays malformed.
 pub(super) fn papx_sprms(body: &[u8]) -> Result<Vec<crate::sprm::Sprm>> {
     match parse_sprms(body) {
         Err(crate::sprm::Error::Opcode { remaining: 1, .. }) if body.last() == Some(&0) => {

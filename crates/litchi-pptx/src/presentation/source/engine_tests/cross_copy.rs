@@ -5667,9 +5667,9 @@ fn source_backed_cross_copy_preserves_noncompact_source_xml_with_checked_splices
     Ok(())
 }
 
-/// The `source::cross_slide_copy` family (record 0356b): a commit publishes
-/// a new source-backed package whose output is the stream route's bytes; the
-/// inverse applies to the commit's own package only.
+/// The `source::cross_slide_copy` family: a commit publishes a new
+/// source-backed package whose output is the stream route's bytes; the inverse
+/// applies to the commit's own package only.
 #[test]
 fn cross_slide_copy_family_publishes_a_source_backed_package() -> TestResult {
     use crate::source::Package;

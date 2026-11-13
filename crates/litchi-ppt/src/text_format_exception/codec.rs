@@ -114,7 +114,7 @@ pub(super) const MAX_PARA_SPACING_PERCENT: i16 = 13200;
 
 impl TextCFException {
     /// This exception with one `CFStyle` flag (`bold`, `italic` or
-    /// `underline` mask bit) set explicitly (record 0323).
+    /// `underline` mask bit) set explicitly.
     pub(crate) fn with_style_flag(&self, mask: u32, on: bool) -> Self {
         let mut changed = self.clone();
         changed.masks |= mask;
@@ -130,7 +130,7 @@ impl TextCFException {
         changed
     }
 
-    /// This exception with an explicit font size in points (record 0323).
+    /// This exception with an explicit font size in points.
     pub(crate) fn with_size(&self, size: i16) -> Self {
         let mut changed = self.clone();
         changed.masks |= CF_MASK_SIZE;
@@ -138,7 +138,7 @@ impl TextCFException {
         changed
     }
 
-    /// This exception with an explicit sRGB text color (record 0323).
+    /// This exception with an explicit sRGB text color.
     pub(crate) fn with_rgb(&self, [red, green, blue]: [u8; 3]) -> Self {
         let mut changed = self.clone();
         changed.masks |= CF_MASK_COLOR;

@@ -205,13 +205,12 @@ fn extracting_text_still_decodes_shared_strings() {
 /// A whole-sheet walk allocates far less than once per shared string it
 /// resolves.
 ///
-/// Change 0585 hoisted the per-resolve stream path out of the loop; survey item
-/// XLS-10 named what was left — a `chunks` `Vec`, one zero-filled `Vec` per
-/// chunk and a `slices` `Vec` per resolve, three allocations for a string that
-/// does not straddle a `Continue` boundary. Change 0648's retained string table
-/// removes all three: an entry inside one segment is decoded from a slice of
-/// the table, so a served resolve allocates for the decoded `String` and
-/// nothing else.
+/// The per-resolve stream path is hoisted out of the loop; what was left was a
+/// `chunks` `Vec`, one zero-filled `Vec` per chunk and a `slices` `Vec` per
+/// resolve, three allocations for a string that does not straddle a `Continue`
+/// boundary. The retained string table removes all three: an entry inside one
+/// segment is decoded from a slice of the table, so a served resolve allocates
+/// for the decoded `String` and nothing else.
 #[test]
 fn a_whole_sheet_walk_allocates_less_than_once_per_shared_string_resolved() {
     let path = fixture("poi/test-data/spreadsheet/54016.xls");
@@ -241,8 +240,8 @@ fn a_whole_sheet_walk_allocates_less_than_once_per_shared_string_resolved() {
     );
     // Measured on this fixture: 84,182 allocations and 10,281,754 allocated
     // bytes before the retained table, 36,042 and 2,144,490 after — 5.24 per
-    // resolve falling to 2.24, which is the three `Vec`s XLS-10 named. The
-    // bound sits between the two so that either regression fails it.
+    // resolve falling to 2.24, which is those three `Vec`s. The bound sits
+    // between the two so that either regression fails it.
     assert!(
         counts.allocations < resolved * 3,
         "one walk allocated {} times for {resolved} resolved shared strings",

@@ -1,4 +1,4 @@
-//! Test fixture helpers: the edit families of record 0351 applied in place.
+//! Test fixture helpers: the edit families applied in place.
 //!
 //! Each helper runs the public family route (`edit_x`, a verb, `commit`) and
 //! replaces the fixture package with the committed one; an error leaves the
@@ -24,7 +24,7 @@ macro_rules! in_place {
     }};
 }
 
-/// The record 0351 families applied in place.
+/// The edit families applied in place.
 pub(crate) trait InPlace {
     fn edit_opc_in_place<T>(
         &mut self,

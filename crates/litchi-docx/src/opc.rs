@@ -1,5 +1,5 @@
-//! The raw OPC family (record 0355): a low-level escape for graph edits the
-//! typed families do not model.
+//! The raw OPC family: a low-level escape for graph edits the typed families do
+//! not model.
 //!
 //! [`Package::edit_opc`](crate::Package::edit_opc) stages an [`Edit`] retaining
 //! the source graph; the structural candidate is copied on the first mutation

@@ -44,9 +44,9 @@ struct FileState {
     source_id: u64,
     version_policy: FileVersionPolicy,
     version: Mutex<FileVersionState>,
-    /// A lock-free copy of `version` for the common case of an unchanged
-    /// file (record 0280): readers compare the fingerprint they observe with
-    /// it and return its revision without taking the mutex.
+    /// A lock-free copy of `version` for the common case of an unchanged file:
+    /// readers compare the fingerprint they observe with it and return its
+    /// revision without taking the mutex.
     published: Published,
 }
 
@@ -211,10 +211,10 @@ impl ReadAt for FileSource {
     }
 
     fn version(&self) -> io::Result<SourceVersion> {
-        // Fast path (record 0280): one metadata read and a lock-free compare
-        // with the last published fingerprint. Any difference, including a
-        // concurrent update, falls through to the locked path, which reads
-        // the metadata again under the mutex exactly as before.
+        // Fast path: one metadata read and a lock-free compare with the last
+        // published fingerprint. Any difference, including a concurrent
+        // update, falls through to the locked path, which reads the metadata
+        // again under the mutex exactly as before.
         if let Some(fingerprint) = probe_fingerprint(&self.state.file)
             && let Some(revision) = self.state.published.revision_if(&fingerprint)
         {
@@ -426,13 +426,12 @@ struct MetadataFingerprint {
     modified_nanoseconds: i64,
 }
 
-/// The fingerprint of a regular file from one `fstat`, or `None` when the
-/// call fails or the file is no longer regular (the locked path then reports
-/// the error). It reads the same fields as [`metadata_fingerprint`] without
-/// the `statx` field set and the `Metadata` conversion of
-/// [`File::metadata`], about a fifth of the check's cost (record 0280). A
-/// value that ever differed from [`metadata_fingerprint`] would only send
-/// every check to the locked path.
+/// The fingerprint of a regular file from one `fstat`, or `None` when the call
+/// fails or the file is no longer regular (the locked path then reports the
+/// error). It reads the same fields as [`metadata_fingerprint`] without the
+/// `statx` field set and the `Metadata` conversion of [`File::metadata`],
+/// about a fifth of the check's cost. A value that ever differed from
+/// [`metadata_fingerprint`] would only send every check to the locked path.
 #[cfg(unix)]
 #[allow(
     unsafe_code,
@@ -548,7 +547,7 @@ mod tests {
     use super::{metadata_fingerprint, probe_fingerprint};
 
     /// The fast probe reads the fingerprint the locked path compares, so an
-    /// unchanged file takes the fast path (record 0280).
+    /// unchanged file takes the fast path.
     #[test]
     fn the_fast_probe_matches_the_metadata_fingerprint() {
         let directory = tempfile::tempdir().expect("temporary directory");

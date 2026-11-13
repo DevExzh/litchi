@@ -1,5 +1,5 @@
-//! The plain-paragraph copy family of a source-backed package (record
-//! 0355a): duplicate one plain main-story paragraph at another position.
+//! The plain-paragraph copy family of a source-backed package: duplicate one
+//! plain main-story paragraph at another position.
 //!
 //! [`Package::edit_plain_paragraph_copy`](crate::source_backed::Package::edit_plain_paragraph_copy)
 //! stages an [`Edit`] whose commit returns a new source-backed package;
@@ -58,7 +58,7 @@ impl Patch {
     /// artifact it applies to: for a commit's patch, the artifact of the
     /// package it was committed on; for its inverse, the committed
     /// package's output. Serialize it with `to_bytes(limits)` and replay it with
-    /// `Patch::from` (record 0355a).
+    /// `Patch::from`.
     ///
     /// # Errors
     ///

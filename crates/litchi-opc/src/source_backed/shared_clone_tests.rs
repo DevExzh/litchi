@@ -1,5 +1,4 @@
-//! Internal checks of what a [`SourceBackedPackage`] clone shares (record
-//! 0012).
+//! Internal checks of what a [`SourceBackedPackage`] clone shares.
 //!
 //! The public integration tests in `tests/source_backed_shared_clones.rs`
 //! cover reads, publication and source fences through the public API. These

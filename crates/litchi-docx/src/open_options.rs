@@ -70,8 +70,8 @@ impl OpenOptions {
         self
     }
 
-    /// Bound the opened package's semantic reads by `limits` (record 0355);
-    /// the package keeps them for every bounded read and edit.
+    /// Bound the opened package's semantic reads by `limits`; the package keeps
+    /// them for every bounded read and edit.
     #[must_use]
     pub fn semantic_limits(mut self, limits: crate::SemanticLimits) -> Self {
         self.semantic_limits = limits;

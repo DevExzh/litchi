@@ -1,6 +1,6 @@
-//! New list definitions in `numbering.xml` (record 0251e, ported from the
-//! L-DOCX-W10 draft): one abstract definition and one numbering instance per
-//! list, spliced into the authored part without rewriting anything else.
+//! New list definitions in `numbering.xml`: one abstract definition and one
+//! numbering instance per list, spliced into the authored part without
+//! rewriting anything else.
 //!
 //! The definition is the one OfficeCLI's `listStyle` creates
 //! (`WordHandler.StyleList.cs`, `ApplyListStyle`): a hybrid multi-level

@@ -1,4 +1,4 @@
-//! The Custom XML data-store family (record 0355).
+//! The Custom XML data-store family.
 //!
 //! [`Package::custom_xml`](crate::Package::custom_xml) reads the stores;
 //! [`Package::edit_custom_xml`](crate::Package::edit_custom_xml) stages an
@@ -32,7 +32,7 @@ graph_family!("Custom XML", own_limits);
 
 /// The typed budgets of the Custom XML family: its limit errors are
 /// [`litchi_ooxml_common::Error::Limit`] carried by
-/// [`crate::Error::Common`] (record 0360).
+/// [`crate::Error::Common`].
 pub use litchi_ooxml_common::custom_xml::LimitKind;
 graph_edit!("Custom XML", edit_custom_xml, apply_custom_xml);
 

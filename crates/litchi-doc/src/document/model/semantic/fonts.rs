@@ -1,4 +1,4 @@
-//! The document's font table (M1 L-DOC-R4).
+//! The document's font table.
 
 use super::prelude::*;
 use crate::parts::fonts::FontTable;

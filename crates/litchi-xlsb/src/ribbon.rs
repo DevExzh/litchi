@@ -1,5 +1,4 @@
-//! Immutable Ribbon customization edits of an XLSB [`Package`] (record
-//! 0360b).
+//! Immutable Ribbon customization edits of an XLSB [`Package`].
 //!
 //! [`Package::edit_ribbon`] starts an [`Edit`] of the bounded, inert
 //! package-level Ribbon customizations; [`Edit::put`] creates or replaces

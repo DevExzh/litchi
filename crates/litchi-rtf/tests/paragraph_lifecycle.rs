@@ -522,7 +522,7 @@ fn lifecycle_selectors_limits_and_structural_composition_fail_before_publication
 #[test]
 fn changed_lifecycle_refuses_opaque_formatted_ambiguous_and_nonplain_transports() {
     // Formatted paragraphs and line breaks are removed by the producer
-    // splice (record 0293): the survivors read back unchanged.
+    // splice: the survivors read back unchanged.
     for (input, expected) in [
         (r"{\rtf1\ansi \b One\par Two}", r"{\rtf1\ansi \b Two}"),
         (
@@ -537,7 +537,7 @@ fn changed_lifecycle_refuses_opaque_formatted_ambiguous_and_nonplain_transports(
         assert_eq!(commit.package().to_bytes().unwrap(), expected.as_bytes());
         assert_eq!(source.to_bytes().unwrap(), input.as_bytes());
     }
-    // A table row after the paragraph stays (record 0308).
+    // A table row after the paragraph stays.
     let table =
         Package::parse(r"{\rtf1\ansi One\par\trowd\cellx1000\intbl Cell\cell\row}").unwrap();
     let mut edit = table.edit();

@@ -1,10 +1,10 @@
-//! Style definitions staged with a main-document edit (record 0319).
+//! Style definitions staged with a main-document edit.
 //!
 //! Each verb reads the staged styles part through
 //! [`crate::styles::catalog::Catalog`], splices one `w:style` and stages the
-//! part's exact replacement as a graph change (0251b); a document without a
-//! styles part gains `styles.xml` and its relationship. Every other byte of
-//! the part is kept as authored.
+//! part's exact replacement as a graph change; a document without a styles part
+//! gains `styles.xml` and its relationship. Every other byte of the part is
+//! kept as authored.
 
 use std::sync::Arc;
 

@@ -1,5 +1,4 @@
-//! Inline SmartArt insertion staged with a main-document edit (record
-//! 0295, record 0284 follow-up 0284a).
+//! Inline SmartArt insertion staged with a main-document edit.
 //!
 //! A new SmartArt graphic is an authored [`Spec`]
 //! (`litchi_drawingml::diagram::authoring`, the PPTX vocabulary): its data
@@ -126,9 +125,8 @@ impl NewSmartArt {
     }
 }
 
-/// The parts of one SmartArt graphic (record 0335), as
-/// [`Edit::smartart_parts`] reads them and [`Edit::set_smartart`] writes
-/// them.
+/// The parts of one SmartArt graphic, as [`Edit::smartart_parts`] reads them
+/// and [`Edit::set_smartart`] writes them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SmartArtParts {
     /// The data model (`dgm:dataModel`).

@@ -1,4 +1,4 @@
-//! Typed budgets of the stylesWithEffects family (record 0355a).
+//! Typed budgets of the stylesWithEffects family.
 
 use super::{MAX_XML_BYTES, MAX_XML_DEPTH, MAX_XML_EVENTS};
 
@@ -93,7 +93,8 @@ impl Default for Limits {
     }
 }
 
-/// The bounded resources of the stylesWithEffects family, carried by [`crate::Error::StylesWithEffectsLimit`] (record 0355a).
+/// The bounded resources of the stylesWithEffects family, carried by
+/// [`crate::Error::StylesWithEffectsLimit`].
 ///
 /// Each variant names one bounded resource; [`std::fmt::Display`] gives its
 /// human-readable name, the one the error messages print.

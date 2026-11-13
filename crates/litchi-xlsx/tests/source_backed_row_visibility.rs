@@ -81,22 +81,21 @@ impl VersionedSource {
 }
 
 /// The furthest before a member's payload that a read *of that member* can
-/// begin: the fixed local header plus the widest local variable region change
-/// 0573 measured in this repository's corpus.
+/// begin: the fixed local header plus the widest local variable region
+/// measured in this repository's corpus.
 const MEMBER_RECORD_PREFIX_BYTES: u64 = 640;
 
 /// Whether one positional read fetches the payload of the member whose first
 /// payload byte is at `payload`.
 ///
 /// This trigger used to recognise that read by its start offset, because a
-/// member's payload arrived in a read that *began* at it. Since change 0611 a
-/// member's first read is one bounded read of its whole local record, which
-/// begins at the member's local header, so the test is now that the read
-/// delivers the payload's first byte and began inside the member's own local
-/// record. The caller's own size guard keeps a bulk publication copy out; this
-/// keeps the short local-record probes out, and the non-empty requirement
-/// excludes the zero-length terminating read a range reader issues at the end
-/// of a member.
+/// member's payload arrived in a read that *began* at it. Today a member's
+/// first read is one bounded read of its whole local record, which begins at
+/// the member's local header, so the test is now that the read delivers the
+/// payload's first byte and began inside the member's own local record. The
+/// caller's own size guard keeps a bulk publication copy out; this keeps the
+/// short local-record probes out, and the non-empty requirement excludes the
+/// zero-length terminating read a range reader issues at the end of a member.
 fn read_fetches_member(offset: u64, requested: usize, payload: u64) -> bool {
     let Ok(requested) = u64::try_from(requested) else {
         return false;
@@ -873,7 +872,7 @@ fn managed_signature_noop_and_changed_protection_contracts_remain_fail_closed() 
     .unwrap();
     let mut edit = editor.edit("Sheet1").unwrap();
     edit.hide(row(0)).unwrap();
-    // A changed edit of a signed source is refused at commit (record 0360).
+    // A changed edit of a signed source is refused at commit.
     assert!(matches!(
         edit.commit(),
         Err(Error::Package(OpcError::SignedSourceRequiresExplicitPolicy))

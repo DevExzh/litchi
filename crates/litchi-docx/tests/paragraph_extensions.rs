@@ -59,9 +59,9 @@ fn package_round_trip_preserves_extension_state_and_hyperlink_relationships() {
     assert_eq!(ids.text_id(), Id::new(0xdef0));
 }
 
-/// Change 0653: the markup-compatibility writer stopped re-declaring every
-/// in-scope namespace on every element it emits, so a `w:p` span sliced out of
-/// the processed `word/document.xml` no longer carries `xmlns:w` by accident.
+/// The markup-compatibility writer stopped re-declaring every in-scope
+/// namespace on every element it emits, so a `w:p` span sliced out of the
+/// processed `word/document.xml` no longer carries `xmlns:w` by accident.
 /// `Paragraph::extensions` re-declares what the span inherits before it parses
 /// it, so a real marker-bearing document still reads its `w14:paraId`.
 #[test]

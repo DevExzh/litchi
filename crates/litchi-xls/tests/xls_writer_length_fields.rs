@@ -4,12 +4,12 @@
     reason = "limit fixtures favor explicit inputs and panic-driven assertions"
 )]
 
-//! Change 0766: the fresh XLS writer's remaining length fields, counts and
-//! indices. Every limit is tested at N - 1, N and N + 1, with a surrogate pair
-//! straddling it where the field counts UTF-16 code units; every accepted
-//! input is read back by litchi's reader, and every refusal happens when the
-//! input is registered, before any output, leaving the writer writing the
-//! bytes of a writer that never saw the refused call.
+//! The fresh XLS writer's remaining length fields, counts and indices. Every
+//! limit is tested at N - 1, N and N + 1, with a surrogate pair straddling it
+//! where the field counts UTF-16 code units; every accepted input is read back
+//! by litchi's reader, and every refusal happens when the input is registered,
+//! before any output, leaving the writer writing the bytes of a writer that
+//! never saw the refused call.
 
 use std::io::Cursor;
 
@@ -110,8 +110,8 @@ fn cell_value(workbook: &Reader, sheet: usize, row: u32, column: u32) -> Option<
 
 #[test]
 fn an_internal_hyperlink_to_an_astral_sheet_name_keeps_the_link_and_the_cells() {
-    // Until change 0766 the location length counted chars, so this link made
-    // the reader drop the link and every cell of its worksheet.
+    // The location length once counted chars, so this link made the reader
+    // drop the link and every cell of its worksheet.
     let (mut writer, sheet) = one_sheet_writer("R😀");
     writer
         .set_hyperlink(sheet, 0, 1, "internal:'R😀'!A1")
@@ -160,7 +160,7 @@ fn internal_hyperlink_targets_up_to_4093_units_fit_one_record() {
         // The refusal kept the cell's previous hyperlink and changed nothing.
         assert_eq!(written(&mut writer), before);
     }
-    // 32,767 units wrapped the record length to 36 bytes before change 0766.
+    // 32,767 units once wrapped the record length to 36 bytes.
     let (mut writer, sheet) = one_sheet_writer("Links");
     assert_eq!(
         too_long(writer.set_hyperlink(sheet, 0, 1, &format!("internal:{}", "a".repeat(32_767)))),
@@ -790,7 +790,7 @@ fn an_xfext_record_holds_8224_payload_bytes() {
         record_too_long(writer.set_xf_extensions(vec![unknown_extension(8201)])),
         ("XFExt", 8225, 8224)
     );
-    // 65,556 bytes wrapped to 20 before change 0766.
+    // 65,556 bytes once wrapped to 20.
     assert_eq!(
         record_too_long(writer.set_xf_extensions(vec![
             XfExt::try_new(
@@ -848,7 +848,7 @@ fn a_style_ext_record_holds_one_record_of_properties() {
         record_too_long(writer.set_style_extensions(vec![style_with_fonts(most + 1)]));
     assert_eq!((record, limit), ("StyleExt", 8224));
     assert!(bytes > 8224);
-    // 1,000 properties wrapped past 65,535 bytes before change 0766.
+    // 1,000 properties once wrapped past 65,535 bytes.
     record_too_long(writer.set_style_extensions(vec![style_with_fonts(1000)]));
     assert_eq!(written(&mut writer), before);
 }
@@ -955,8 +955,8 @@ fn a_crn_record_holds_8224_payload_bytes() {
         );
         assert_eq!(written(&mut writer), before);
     }
-    // 256 values: colLast is 255, which a debug build computed with an
-    // overflowing subtraction before change 0766.
+    // 256 values: colLast is 255, which a debug build once computed with an
+    // overflowing subtraction.
     let values = (0..256)
         .map(|value| CachedValue::Number(f64::from(value)))
         .collect::<Vec<_>>();
@@ -1309,8 +1309,7 @@ fn pivot_xfs_follow_user_cell_formats_that_reach_past_index_63() {
 
 /// The PivotTable view editor re-encodes names with the same encoders, and
 /// its own `SXVDEx`, `SxEx` and `QsiSXTag` strings count UTF-16 code units
-/// too; until change 0766 a supplementary-plane character left each count
-/// one short.
+/// too; a supplementary-plane character once left each count one short.
 #[test]
 fn the_pivot_view_editor_writes_astral_names_that_read_back() {
     let (mut writer, sheet) = pivot_writer();

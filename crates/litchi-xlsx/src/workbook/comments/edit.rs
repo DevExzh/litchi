@@ -1,4 +1,4 @@
-//! Immutable legacy-note edits of a [`Package`] (unified-ops record 0320).
+//! Immutable legacy-note edits of a [`Package`].
 //!
 //! [`Package::edit_comments`] starts an [`Edit`] over an immutable snapshot.
 //! [`Edit::set`] adds or replaces the note of one cell, [`Edit::remove`]

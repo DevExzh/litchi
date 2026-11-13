@@ -1,5 +1,4 @@
-//! Paragraph and run insertion and removal in existing text bodies
-//! (record 0333).
+//! Paragraph and run insertion and removal in existing text bodies.
 //!
 //! A [`TextBody`] names a shape's text body (`p:txBody`), a table cell's
 //! (`a:tc/a:txBody`) or a notes-page shape's. Paragraph positions count the

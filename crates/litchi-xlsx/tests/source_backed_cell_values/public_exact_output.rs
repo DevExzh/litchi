@@ -73,12 +73,12 @@ fn source_with_worksheet_xml(source_xml: &str) -> Vec<u8> {
 
 #[test]
 fn public_multi_edit_publishes_a_producer_formatted_worksheet_verbatim() {
-    // Change 0654 loosened the audit of the *original* bytes and recorded
-    // that this test still refused, because the value editor's replacement
-    // carries the source's own formatting and the replacement audit then
-    // raised the byte-identical refusal. Change 0657 declares that
-    // replacement source-derived, so the producer's indentation is published
-    // rather than refused, and only the edited cell changes.
+    // The audit of the *original* bytes was loosened first, and this test
+    // still refused, because the value editor's replacement carries the
+    // source's own formatting and the replacement audit then raised the
+    // byte-identical refusal. That replacement is now declared
+    // source-derived, so the producer's indentation is published rather than
+    // refused, and only the edited cell changes.
     let xml = format!(
         r#"<worksheet xmlns="{SML}"><sheetData>
   <row r="1"><c r="A1"><v>1</v></c><c r="B1"><v>2</v></c></row>

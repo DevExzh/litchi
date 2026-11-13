@@ -1,12 +1,10 @@
-//! Footnotes and endnotes staged with a main-document edit (record 0319,
-//! L-DOCX-R5).
+//! Footnotes and endnotes staged with a main-document edit.
 //!
 //! A note lives in the footnotes or endnotes part and is referenced from the
 //! main story by a reference run. Adding one stages the part's replacement
 //! (or the new part and its relationship) as a graph change and the
 //! reference run as an inline insertion, so one commit publishes both, as
-//! comments do (0251c). Removal strips the note and every run holding its
-//! reference.
+//! comments do. Removal strips the note and every run holding its reference.
 
 use litchi_core::Position;
 
@@ -238,7 +236,7 @@ impl Edit<Package> {
         // Down to the runs' children, where the reference mark is.
         let tree = part_scan::scan(&xml, 4).map_err(Error::Document)?;
         let note = find_note(&tree, kind, id).ok_or_else(not_found)?;
-        // A field is refused rather than kept or dropped (record 0304).
+        // A field is refused rather than kept or dropped.
         let element = &tree.elements[note];
         if part_scan::holds_any(&xml[element.start..element.end], part_scan::FIELD_MARKUP)
             .map_err(Error::Document)?

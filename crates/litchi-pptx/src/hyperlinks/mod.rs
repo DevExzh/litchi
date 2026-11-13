@@ -3,7 +3,7 @@
 //! `model` owns the contextual target variants and constructors. `codec`
 //! parses the small target grammar with bounded strings; it never follows a
 //! relationship or accesses package storage. `link` reads and locates the
-//! click actions of shapes and text runs (record 0321).
+//! click actions of shapes and text runs.
 
 mod codec;
 pub(crate) mod link;

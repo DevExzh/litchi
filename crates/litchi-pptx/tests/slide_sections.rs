@@ -1,5 +1,5 @@
-//! Record 0252: p14 section membership follows slides that are inserted,
-//! moved, swapped or reordered through the primary edits.
+//! P14 section membership follows slides that are inserted, moved, swapped or
+//! reordered through the primary edits.
 #![allow(clippy::unwrap_used, clippy::expect_used, reason = "test assertions")]
 use std::sync::Arc;
 
@@ -130,8 +130,8 @@ fn eager_moves_and_reorders_keep_sections_coherent() {
 
 #[test]
 fn source_insertion_places_the_new_slide_in_a_section() {
-    // The source-backed editor maintains the section list (record 0303):
-    // a slide inserted at the end joins the section of the slide before it.
+    // The source-backed editor maintains the section list: a slide inserted at
+    // the end joins the section of the slide before it.
     let bytes = deck();
     let layout = blank_layout(&Package::from_bytes(&bytes).unwrap());
     let source =

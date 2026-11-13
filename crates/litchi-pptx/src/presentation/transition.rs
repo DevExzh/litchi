@@ -39,8 +39,8 @@ const MCE_BRANCH_SELECTION: &str = "source-backed slide edits do not support mar
 pub(crate) enum SlideMce {
     /// None outside a direct transition owner: every edit is admitted.
     Plain,
-    /// Some strictly inside top-level shape-tree children (record 0303).
-    /// Only whole-child removal is admitted, proven on the source bytes.
+    /// Some strictly inside top-level shape-tree children. Only whole-child
+    /// removal is admitted, proven on the source bytes.
     Enclosed,
     /// Compatibility wrappers at the shape-tree boundary. Direct transition
     /// edits retain this complete source subtree; positional shape edits do
@@ -156,7 +156,7 @@ fn has_mce_markup(xml: &[u8], transition_limits: crate::transition::Limits) -> R
     }
     // The scan below resolves names on namespace values as written. A
     // declaration that spells the namespace with references binds it for
-    // preprocessing, so its markup counts as present (record 0011).
+    // preprocessing, so its markup counts as present.
     if litchi_ooxml_common::mce::binds_namespace_by_reference(xml) {
         return Ok(true);
     }
@@ -448,9 +448,9 @@ fn validate_active_transition(
             "active transition owner did not reduce to one direct transition",
         ));
     }
-    // The preprocessor declares each namespace once, where XML requires it
-    // (change 0653), so the sliced owner is re-declared with every binding it
-    // inherits before it is validated standalone.
+    // The preprocessor declares each namespace once, where XML requires it, so
+    // the sliced owner is re-declared with every binding it inherits before it
+    // is validated standalone.
     let active = litchi_ooxml_common::mce::self_contained_fragment(
         processed.as_ref(),
         range.start,
@@ -1784,7 +1784,7 @@ fn locate(
 
 /// [`locate`] with an explicit policy for compatibility inside the shape tree.
 /// Transition splices can retain that complete subtree; shape edits need the
-/// stricter direct-child boundary (record 0303).
+/// stricter direct-child boundary.
 fn locate_with(
     xml: &[u8],
     operation: &'static str,
@@ -2456,8 +2456,8 @@ mod tests {
 
     const P: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
 
-    /// Record 0011: preprocessing applies a binding spelled with references,
-    /// so the transition guard counts it as markup compatibility.
+    /// Preprocessing applies a binding spelled with references, so the
+    /// transition guard counts it as markup compatibility.
     #[test]
     fn escaped_markup_compatibility_counts_as_markup() {
         let escaped = format!(

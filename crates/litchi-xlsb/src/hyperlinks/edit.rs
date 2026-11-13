@@ -1,5 +1,4 @@
-//! Immutable hyperlink edits of an XLSB [`Package`] (unified-ops record
-//! 0322).
+//! Immutable hyperlink edits of an XLSB [`Package`].
 //!
 //! A worksheet stores each hyperlink as one `BrtHLink` record; an external
 //! target lives in a worksheet relationship the record names. [`Edit`]

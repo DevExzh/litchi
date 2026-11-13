@@ -1,5 +1,4 @@
-//! Source-preserving reads and edits of a `SmartArt` data-model part
-//! (record 0284).
+//! Source-preserving reads and edits of a `SmartArt` data-model part.
 //!
 //! [`Outline::read`] projects a `dgm:dataModel` onto its content nodes in
 //! document order (the `parOf` connection tree from the document point,

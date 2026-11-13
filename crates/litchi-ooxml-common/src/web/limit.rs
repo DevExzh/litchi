@@ -1,4 +1,4 @@
-//! The typed budgets of the Web Extensions (task-pane) family (record 0360).
+//! The typed budgets of the Web Extensions (task-pane) family.
 
 /// A Web Extensions (task-pane) family budget that was exceeded.
 ///

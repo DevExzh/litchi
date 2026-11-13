@@ -7,7 +7,7 @@
 
 #![forbid(unsafe_code)]
 // quick-xml's checked attribute iteration is quadratic on hostile tags; read
-// attributes through `BytesStartExt` (record 0770, workspace `clippy.toml`).
+// attributes through `BytesStartExt` (workspace `clippy.toml`).
 #![cfg_attr(not(test), deny(clippy::disallowed_methods))]
 // The public model deliberately mirrors the names and shapes in the ECMA-376
 // schemas. Renaming these items or reshaping their signatures solely for style

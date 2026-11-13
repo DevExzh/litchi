@@ -1,4 +1,4 @@
-//! The semantic read budgets a DOCX package keeps (record 0355).
+//! The semantic read budgets a DOCX package keeps.
 //!
 //! [`OpenOptions::semantic_limits`](crate::OpenOptions::semantic_limits)
 //! configures them when a package is opened; a package keeps the limits it

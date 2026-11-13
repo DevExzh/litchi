@@ -1,4 +1,4 @@
-//! The `PowerPoint` 2007 theme a legacy presentation carries (record 0323).
+//! The `PowerPoint` 2007 theme a legacy presentation carries.
 //!
 //! `PowerPoint` 2007 and later write each main master's DrawingML theme as an
 //! embedded OPC package in a `RoundTripThemeAtom` ([MS-PPT] 2.3.?): the same

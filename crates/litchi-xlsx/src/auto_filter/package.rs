@@ -132,7 +132,7 @@ fn scan_layout(xml: &[u8]) -> Result<Layout> {
     let mut open = None;
     let mut span = None;
     // Names are recognized on namespace values as written; a binding spelled
-    // with references applies all the same (record 0011).
+    // with references applies all the same.
     let mut alternate_content = litchi_ooxml_common::mce::binds_namespace_by_reference(xml);
     let mut events = 0usize;
     loop {

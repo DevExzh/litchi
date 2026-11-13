@@ -1,4 +1,4 @@
-//! Defined-name replay for the primary workbook transaction (record 0261).
+//! Defined-name replay for the primary workbook transaction.
 //!
 //! A defined name that refers to a worksheet range is one `BrtName` record
 //! whose formula is a `PtgRef3d` or `PtgArea3d` over an `Xti` entry of the workbook's

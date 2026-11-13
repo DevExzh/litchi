@@ -430,7 +430,7 @@ pub(crate) fn formula_reference_spans(tokens: &[u8]) -> Option<FormulaReferences
 /// The references of a `ShrFmla` template (`SharedParsedFormula`):
 /// `(same_sheet, shared_relative, three_d)`, where `shared_relative` are the
 /// `PtgRefN`/`PtgAreaN` fields, whose relative components are offsets from
-/// each formula cell (record 0308).
+/// each formula cell.
 pub(crate) fn shared_formula_reference_spans(
     tokens: &[u8],
 ) -> Option<(
@@ -513,7 +513,7 @@ struct FormulaDecoder<'a> {
     /// prefixes render as placeholders and 3-D references are recorded.
     locate_only: bool,
     references_3d: Vec<Formula3dSpan>,
-    /// The shared-relative `PtgRefN`/`PtgAreaN` fields (record 0308).
+    /// The shared-relative `PtgRefN`/`PtgAreaN` fields.
     references_relative: Vec<FormulaReferenceSpan>,
 }
 

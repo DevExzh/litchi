@@ -1,4 +1,4 @@
-//! Immutable task-pane edits of a [`crate::Package`] (record 0360).
+//! Immutable task-pane edits of a [`crate::Package`].
 //!
 //! [`crate::Package::edit_task_panes`] starts an [`Edit`] of the
 //! package-level Office Add-in task-pane graph; every operation works on a

@@ -1,6 +1,6 @@
-//! Located style, numbering and story catalogs of the owning package
-//! (record 0319, L-DOCX-R5/R6). Each accessor reads the main part's
-//! relationships and, where it returns one, the one related part.
+//! Located style, numbering and story catalogs of the owning package. Each
+//! accessor reads the main part's relationships and, where it returns one, the
+//! one related part.
 
 use std::sync::Arc;
 

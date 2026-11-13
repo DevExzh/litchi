@@ -1,6 +1,7 @@
-//! Typed budgets of the story family (record 0355a).
+//! Typed budgets of the story family.
 
-/// The bounded resources of the story family, carried by [`crate::Error::StoryLimit`] (record 0355a).
+/// The bounded resources of the story family, carried by
+/// [`crate::Error::StoryLimit`].
 ///
 /// Each variant names one bounded resource; [`std::fmt::Display`] gives its
 /// human-readable name, the one the error messages print.

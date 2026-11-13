@@ -31,7 +31,7 @@ use litchi_xlsb::{SourceBackedWorkbook, Workbook};
 mod projection;
 use projection::{InPlace as _, OwnedWorkbook as _, Reprojected as _};
 
-/// Package-route steps on an owned workbook projection (record 0360b).
+/// Package-route steps on an owned workbook projection.
 trait ThemeSteps {
     fn reprojected_theme(
         &self,

@@ -482,7 +482,7 @@ pub(crate) fn attach_worksheet(xml: &[u8], relationship_id: &str) -> Result<Vec<
         return Err(unsupported("merging into an existing worksheet drawing"));
     }
     // Branches bound through a declaration spelled with references are
-    // invisible to the layout scan but applied by preprocessing (record 0011).
+    // invisible to the layout scan but applied by preprocessing.
     if layout.alternate_content || litchi_ooxml_common::mce::binds_namespace_by_reference(xml) {
         return Err(unsupported(
             "inserting a drawing beside worksheet markup-compatibility branches",

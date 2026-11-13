@@ -353,8 +353,8 @@ mod edits {
     }
 }
 
-/// Record 0285: one primitive for find and merge, field state across
-/// paragraphs, segments, scoped stories and formatted replacements.
+/// One primitive for find and merge, field state across paragraphs, segments,
+/// scoped stories and formatted replacements.
 mod unified {
     use litchi_core::Position;
 
@@ -658,9 +658,9 @@ const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 
 #[test]
 fn alternate_content_is_one_opaque_object() {
-    // Record 0307: a text box with a fallback, each branch holding its own
-    // paragraph. Neither branch's paragraph is listed, and the run reads the
-    // wrapper as one object.
+    // A text box with a fallback, each branch holding its own paragraph.
+    // Neither branch's paragraph is listed, and the run reads the wrapper as
+    // one object.
     let wrapper = r#"<mc:AlternateContent xmlns:wps="urn:wps"><mc:Choice Requires="wps"><w:drawing><w:txbxContent><w:p><w:r><w:t>CHOICE {{a}}</w:t></w:r></w:p></w:txbxContent></w:drawing></mc:Choice><mc:Fallback><w:pict><w:txbxContent><w:p><w:r><w:t>FALLBACK {{a}}</w:t></w:r></w:p></w:txbxContent></w:pict></mc:Fallback></mc:AlternateContent>"#;
     let body = format!(
         r#"<w:p><w:r><w:t>ab</w:t>{wrapper}<w:t>cd</w:t></w:r><w:r><mc:AlternateContent/></w:r></w:p><w:p><w:r><w:t>{{{{a}}}}</w:t></w:r></w:p>"#

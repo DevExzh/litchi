@@ -1,5 +1,4 @@
-//! Immutable Office Add-in task-pane edits of an XLSB [`Package`] (record
-//! 0360b).
+//! Immutable Office Add-in task-pane edits of an XLSB [`Package`].
 //!
 //! [`Package::edit_task_panes`] starts an [`Edit`] of the package-level
 //! task-pane graph; [`Edit::replace`] stores a complete pane collection

@@ -1,9 +1,9 @@
 //! Attribute iteration for readers that stop at a start tag's first attribute
 //! error, with a worst case that stays bounded on hostile tags.
 //!
-//! This is a copy of `xml_minifier::xml_attributes` (record 0770) for this crate,
-//! which may not depend on `xml-minifier` (`tools/crate_boundaries.json`). Keep
-//! the two in step: this module compiles the same tests, from
+//! This is a copy of `xml_minifier::xml_attributes` for this crate, which may not
+//! depend on `xml-minifier` (`tools/crate_boundaries.json`). Keep the two in
+//! step: this module compiles the same tests, from
 //! `xml-minifier/src/xml_attributes/tests.rs`, against its own code.
 //!
 //! quick-xml 0.41 checks a start tag's attribute names for duplicates by

@@ -1,4 +1,4 @@
-//! The presentation theme's color scheme and font scheme (record 0321).
+//! The presentation theme's color scheme and font scheme.
 //!
 //! [`Edit::theme`] reads the theme the presentation's colors and fonts come
 //! from (the presentation part's own theme, else the first slide master's);

@@ -35,9 +35,9 @@ use std::sync::Arc;
 /// it cannot enforce the OPC `ArchiveTotalEntries` policy by itself. Locate
 /// the EOCD first, check its physical entry count, and only then let the
 /// indexed reader reserve its per-entry maps and layout vectors. Locating
-/// holds at most the locator's bounded central-directory prefill (change
-/// 0632), which the index then reuses as its scan buffer, so no per-entry
-/// ownership is allocated before the policy check and no read is repeated.
+/// holds at most the locator's bounded central-directory prefill, which the
+/// index then reuses as its scan buffer, so no per-entry ownership is
+/// allocated before the policy check and no read is repeated.
 pub(crate) fn indexed_archive_with_limits<R: soapberry_zip::ReaderAt>(
     reader: R,
     end_offset: u64,
@@ -244,11 +244,11 @@ impl<R: soapberry_zip::ReaderAt> ArchiveAccess for soapberry_zip::office::Indexe
 /// inflate state plus flate2's 32 KiB `BufReader` — for the length of the pass,
 /// where the old code handed those pages back between members. That is
 /// immaterial when the open allocates megabytes and material when it does not.
-/// Measured on one host for change 0594: a 445-member PPTX opened in a fresh
-/// process is 2.20% faster at p50 and takes one extra minor page fault, while a
-/// 20-member DOCX carrying three relationship members is 1.08% slower and takes
-/// eight. Relationship members are counted rather than archive members because
-/// they are exactly the members the session would serve: the pass reads
+/// Measured on one host: a 445-member PPTX opened in a fresh process is 2.20%
+/// faster at p50 and takes one extra minor page fault, while a 20-member DOCX
+/// carrying three relationship members is 1.08% slower and takes eight.
+/// Relationship members are counted rather than archive members because they
+/// are exactly the members the session would serve: the pass reads
 /// `[Content_Types].xml` once and then one `.rels` per relationship-bearing
 /// part.
 ///

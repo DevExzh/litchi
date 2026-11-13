@@ -5,8 +5,7 @@
     reason = "integration tests use panic-on-failure extraction and exact fixture values"
 )]
 
-//! Partial cell formats and formula text through package cell edits
-//! (record 0261).
+//! Partial cell formats and formula text through package cell edits.
 
 use litchi_core::sheet::{Cell as _, CellValue};
 use litchi_xlsb::builder::{self, Builder};

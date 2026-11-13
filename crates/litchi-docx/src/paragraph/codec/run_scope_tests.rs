@@ -1,5 +1,4 @@
-//! The single-property run readers read only the run's own `w:rPr`
-//! (finding F-8 of record 0010).
+//! The single-property run readers read only the run's own `w:rPr`.
 
 use crate::Run;
 use crate::format::UnderlineStyle;

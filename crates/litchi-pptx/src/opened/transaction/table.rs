@@ -1,5 +1,4 @@
-//! Table grid columns and rows of a slide graphic frame (records 0321 and
-//! 0333).
+//! Table grid columns and rows of a slide graphic frame.
 //!
 //! [`Edit::set_table_column_width`], [`Edit::insert_table_column`] and
 //! [`Edit::remove_table_column`] change one column of a table: its
@@ -175,9 +174,8 @@ impl Edit {
     }
 
     /// Set the height, in EMU, of the row at a zero-based position of a
-    /// table frame (record 0333). Returns whether the slide changed; an
-    /// equal height is an exact no-op. The frame's height follows the sum
-    /// of the row heights.
+    /// table frame. Returns whether the slide changed; an equal height is an
+    /// exact no-op. The frame's height follows the sum of the row heights.
     ///
     /// # Errors
     ///
@@ -225,11 +223,10 @@ impl Edit {
 
     /// Change the style switches (`a:tblPr@firstRow`, `firstCol`,
     /// `lastRow`, `lastCol`, `bandRow`, `bandCol`) of the table frame at a
-    /// depth-first shape position of a slide (record 0342). A switch turned
-    /// on is written `"1"`; one turned off loses its attribute (off is the
-    /// default). A missing `a:tblPr` is created. Only the changed attributes
-    /// change; equal switches are an exact no-op. Returns whether the slide
-    /// changed.
+    /// depth-first shape position of a slide. A switch turned on is written
+    /// `"1"`; one turned off loses its attribute (off is the default). A
+    /// missing `a:tblPr` is created. Only the changed attributes change; equal
+    /// switches are an exact no-op. Returns whether the slide changed.
     ///
     /// ```
     /// let source = litchi_pptx::Package::new()?;

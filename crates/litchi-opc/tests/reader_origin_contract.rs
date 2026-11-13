@@ -4,13 +4,13 @@
     reason = "contract assertions intentionally panic on reader errors"
 )]
 
-//! Change 0765: `litchi_core::xml::ReaderOrigin` models how the `quick-xml`
-//! build this workspace links reports positions for an input that begins with
-//! a UTF-8 byte-order mark. Every OOXML crate converts reader positions to
-//! byte offsets through it, so this test pins the model to the real reader: if
-//! a `quick-xml` upgrade or a feature change (for example enabling
-//! `encoding`, which also consumes UTF-16 marks) moved the positions, the
-//! offsets would silently address the wrong bytes, and this test fails first.
+//! `litchi_core::xml::ReaderOrigin` models how the `quick-xml` build this
+//! workspace links reports positions for an input that begins with a UTF-8
+//! byte-order mark. Every OOXML crate converts reader positions to byte
+//! offsets through it, so this test pins the model to the real reader: if a
+//! `quick-xml` upgrade or a feature change (for example enabling `encoding`,
+//! which also consumes UTF-16 marks) moved the positions, the offsets would
+//! silently address the wrong bytes, and this test fails first.
 
 use std::io::BufReader;
 

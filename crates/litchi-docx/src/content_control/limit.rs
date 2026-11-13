@@ -1,6 +1,7 @@
-//! Typed budgets of the content-control family (record 0355a).
+//! Typed budgets of the content-control family.
 
-/// The bounded resources of the content-control family, carried by [`crate::Error::ContentControlLimit`] (record 0355a).
+/// The bounded resources of the content-control family, carried by
+/// [`crate::Error::ContentControlLimit`].
 ///
 /// Each variant names one bounded resource; [`std::fmt::Display`] gives its
 /// human-readable name, the one the error messages print.

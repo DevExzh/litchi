@@ -2497,9 +2497,9 @@ fn audit_proof(
 
 #[test]
 fn verified_byte_replacements_publish_what_audited_replacements_publish() {
-    // Record 0311: the overlay accepts the audit's proof for the replacement
-    // in place of auditing it again; the result is byte-identical, on a
-    // fresh candidate and on a chained one.
+    // The overlay accepts the audit's proof for the replacement in place of
+    // auditing it again; the result is byte-identical, on a fresh candidate
+    // and on a chained one.
     let limits = xml_minifier::audit::Limits::default();
     let base = open(Arc::new(VersionedSource::new(source_bytes())))
         .prepare_topology(SourceTopologyPlan::new())
@@ -2648,9 +2648,9 @@ fn a_remembered_original_still_audits_every_unproven_replacement() {
 
 #[test]
 fn insertions_after_a_remembered_original_match_a_fresh_package() {
-    // Record 0313: once the original has passed, an unproven insertion is
-    // proved from the original's recorded boundaries. Every verdict, error
-    // and published byte is a fresh package's.
+    // Once the original has passed, an unproven insertion is proved from
+    // the original's recorded boundaries. Every verdict, error and
+    // published byte is a fresh package's.
     let mut document = String::from(r#"<w:document xmlns:w="urn:w"><w:body>"#);
     for index in 0..40 {
         document.push_str(&format!(

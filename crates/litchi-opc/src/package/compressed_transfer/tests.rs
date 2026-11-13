@@ -1,4 +1,4 @@
-//! Proof obligations of the verified compressed transfer (change 0742).
+//! Proof obligations of the verified compressed transfer.
 //!
 //! These tests pin, at the OPC boundary: which parts are eligible and that
 //! eligibility never decodes; that every refusal after eligibility is typed;
@@ -769,13 +769,13 @@ fn disagreeing_descriptor_archive() -> Vec<u8> {
 
 #[test]
 fn a_data_descriptor_that_disagrees_is_refused() {
-    // Every `OpcPackage` ingress is in-memory, and since merge 0759 the
-    // in-memory (slice) admission indexes each member's local framing,
-    // descriptor included, before the package exists. A descriptor that
-    // disagrees with its central record is therefore refused at open, with a
-    // typed error, so no package that could issue a transfer holds it. A
-    // positional (source-backed) open does not check descriptors: it admits
-    // the member and refuses at the first read.
+    // Every `OpcPackage` ingress is in-memory, and the in-memory (slice)
+    // admission indexes each member's local framing, descriptor included,
+    // before the package exists. A descriptor that disagrees with its
+    // central record is therefore refused at open, with a typed error, so no
+    // package that could issue a transfer holds it. A positional
+    // (source-backed) open does not check descriptors: it admits the member
+    // and refuses at the first read.
     let error = OpcPackage::from_vec(disagreeing_descriptor_archive(), SourceLimits::default())
         .expect_err("a disagreeing descriptor is refused");
     assert!(

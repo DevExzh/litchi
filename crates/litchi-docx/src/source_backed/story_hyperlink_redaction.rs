@@ -1,7 +1,7 @@
-//! The story-hyperlink redaction family of a source-backed package
-//! (record 0355a): remove the hyperlinks to selected target URLs from every
-//! relationship-owned story (main, headers, footers, notes, comments,
-//! glossary), with their relationship records.
+//! The story-hyperlink redaction family of a source-backed package: remove the
+//! hyperlinks to selected target URLs from every relationship-owned story
+//! (main, headers, footers, notes, comments, glossary), with their relationship
+//! records.
 //!
 //! The redaction is forward-only and sealed to the exact source it was
 //! planned on; its inverse restores the exact source on that commit's

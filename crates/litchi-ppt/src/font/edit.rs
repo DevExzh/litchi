@@ -1,4 +1,4 @@
-//! Package-level font edits (record 0357).
+//! Package-level font edits.
 //!
 //! [`Package::edit_fonts`] stages edits of the live document's font
 //! collections, [`Edit::commit`] publishes a new [`Package`] through one

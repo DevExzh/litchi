@@ -268,8 +268,8 @@ pub(in crate::document) struct DocumentState {
     /// a malformed table is not reparsed.
     pub(in crate::document) font_table:
         OnceLock<std::result::Result<Option<crate::parts::fonts::FontTable>, String>>,
-    /// Memoized per-story element indexes (M1 L-DOC-R3), a weighted
-    /// clean-value cache; see [`Document::story_blocks`].
+    /// Memoized per-story element indexes, a weighted clean-value cache; see
+    /// [`Document::story_blocks`].
     pub(in crate::document) story_indexes: super::semantic::stories::StoryIndexCache,
 }
 

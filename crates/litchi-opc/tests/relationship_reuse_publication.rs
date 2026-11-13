@@ -1,28 +1,28 @@
 //! Publishing after a relationship call that establishes nothing.
 //!
-//! Change 0593 gives every relationship collection an open-time capture of its
-//! canonical serialization, and publication copies the source `.rels` member
-//! verbatim while that capture still stands. Change 0647 stops
-//! [`litchi_opc::Relationships::add_relationship`] from dropping the capture on
+//! Every relationship collection has an open-time capture of its canonical
+//! serialization, and publication copies the source `.rels` member verbatim
+//! while that capture still stands.
+//! [`litchi_opc::Relationships::add_relationship`] does not drop the capture on
 //! an occupied identifier, which is the path
 //! [`litchi_opc::Relationships::get_or_add`] takes when it reuses a
 //! relationship the collection already carries.
 //!
-//! These tests pin the contract that change makes: a reusing call must publish
-//! exactly what taking the mutable seam alone publishes, and exactly what the
-//! pre-change serialize-and-byte-compare route published, **including on a
-//! package whose `.rels` members are not spelled the way this crate would
-//! serialize them**. That last condition is what makes the test meaningful:
-//! 2,189 of the 2,216 relationships members in this repository's OOXML corpus
-//! are spelled differently from their canonical form, so if keeping the capture
-//! could move a published byte, it would move one here.
+//! These tests pin that contract: a reusing call must publish exactly what
+//! taking the mutable seam alone publishes, and exactly what the pre-change
+//! serialize-and-byte-compare route published, **including on a package whose
+//! `.rels` members are not spelled the way this crate would serialize them**.
+//! That last condition is what makes the test meaningful: 2,189 of the 2,216
+//! relationships members in this repository's OOXML corpus are spelled
+//! differently from their canonical form, so if keeping the capture could move
+//! a published byte, it would move one here.
 use litchi_opc::SourceLimits;
 use litchi_opc::phys_pkg::PhysPkgReader;
 use litchi_opc::{OpcPackage, PackURI, PackageWriter};
 
-/// A 132-member producer-written workbook. Changes 0593 and 0628 both measure
-/// it, and neither its package member nor its drawing member is spelled the
-/// way [`litchi_opc::Relationships::to_xml`] would spell it.
+/// A 132-member producer-written workbook. Neither its package member nor its
+/// drawing member is spelled the way [`litchi_opc::Relationships::to_xml`]
+/// would spell it.
 const FIXTURE: &str = "ooxml/xlsx/ConditionalFormattingSamples.xlsx";
 
 /// A part whose relationships member carries fifteen internal relationships
@@ -79,7 +79,7 @@ fn the_fixture_is_not_spelled_the_way_this_crate_serializes_relationships() {
         member(&bytes, PACKAGE_MEMBER),
         package.rels().to_xml().into_bytes(),
         "the package relationships member is already canonical, so this file \
-         cannot witness the byte question change 0647 asks"
+         cannot witness the byte question"
     );
     assert_ne!(
         member(&bytes, DRAWING_MEMBER),
@@ -117,8 +117,8 @@ fn reusing_a_package_relationship_publishes_what_taking_the_seam_publishes() {
     let reuse_output = PackageWriter::to_bytes(&reuse).expect("publish reuse leg");
 
     // Removing an absent identifier keeps every value identical but drops
-    // every open-time proof, which is the route the reuse leg took before
-    // change 0647. It is the oracle for "the capture is only ever a shortcut".
+    // every open-time proof, which is the route the reuse leg used to take. It
+    // is the oracle for "the capture is only ever a shortcut".
     let mut compared =
         OpcPackage::from_vec(bytes.clone(), SourceLimits::default()).expect("open compared leg");
     compared.rels_mut().remove("rIdAbsent0647");

@@ -156,8 +156,8 @@ fn series_colors_replace_insert_and_clear_fills() {
     }
 }
 
-/// Record 0290 F2: a source-preserving edit finds an axis whose producer ID
-/// is spelled as a negative signed integer.
+/// A source-preserving edit finds an axis whose producer ID is spelled as a
+/// negative signed integer.
 #[test]
 fn edits_find_axes_with_negative_producer_ids() {
     let source = std::str::from_utf8(CHART)

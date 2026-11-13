@@ -1,4 +1,4 @@
-//! Typed budgets of the chart family (record 0355a).
+//! Typed budgets of the chart family.
 
 use super::model::{
     MAX_ATTRIBUTE_BYTES, MAX_ATTRIBUTES, MAX_CHART_XML, MAX_CHARTS, MAX_COMPANION_XML,
@@ -150,7 +150,8 @@ impl Default for Limits {
     }
 }
 
-/// The bounded resources of the chart family, carried by [`crate::Error::ChartLimit`] (record 0355a).
+/// The bounded resources of the chart family, carried by
+/// [`crate::Error::ChartLimit`].
 ///
 /// Each variant names one bounded resource; [`std::fmt::Display`] gives its
 /// human-readable name, the one the error messages print.

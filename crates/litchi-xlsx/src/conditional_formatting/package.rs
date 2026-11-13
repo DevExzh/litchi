@@ -105,8 +105,7 @@ pub fn replace_conditional_formattings(
 
 /// [`replace_conditional_formattings`], writing the owners in the
 /// worksheet root's own prefix without a local namespace declaration, so
-/// every other worksheet writer reads them as direct children (the edit
-/// family of record 0320).
+/// every other worksheet writer reads them as direct children.
 pub(crate) fn replace_in_root_prefix(
     worksheet_xml: &[u8],
     values: &[Formatting],

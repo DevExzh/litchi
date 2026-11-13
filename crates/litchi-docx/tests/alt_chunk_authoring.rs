@@ -72,8 +72,8 @@ fn package_with_document(
     Package::from_opc_package(opc).unwrap()
 }
 
-/// The record 0355a family on an opened package, one commit per verb, in
-/// the shape of the pre-0355 package verbs these tests were written for.
+/// The alternative-format family on an opened package, one commit per verb, in
+/// the shape of the earlier package verbs these tests were written for.
 trait AltVerbs {
     fn add_alt(&mut self, import: Import, match_source: Option<bool>)
     -> litchi_docx::Result<Chunk>;

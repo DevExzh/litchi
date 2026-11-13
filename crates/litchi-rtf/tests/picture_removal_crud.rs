@@ -266,11 +266,11 @@ fn durable_inverse_refuses_a_foreign_artifact_even_with_the_same_visible_text() 
     ));
 }
 
-/// Record 0290 F7: removal moves the whole group's bytes, so a payload that
-/// does not match its declared format (LibreOffice `n192129.rtf` stores GIF
-/// data under `\pngblip`) or a format payload edits do not support (EMF) is
-/// removed exactly, and the durable inverse restores it; payload replacement
-/// still refuses such a picture.
+/// Removal moves the whole group's bytes, so a payload that does not match its
+/// declared format (LibreOffice `n192129.rtf` stores GIF data under `\pngblip`)
+/// or a format payload edits do not support (EMF) is removed exactly, and the
+/// durable inverse restores it; payload replacement still refuses such a
+/// picture.
 #[test]
 fn removes_groups_whose_payload_format_payload_edits_refuse() {
     const MISMATCHED: &str =

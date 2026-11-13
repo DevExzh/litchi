@@ -1,6 +1,7 @@
-//! Typed budgets of the conflict-markup family (record 0355a).
+//! Typed budgets of the conflict-markup family.
 
-/// The bounded resources of the conflict-markup family, carried by [`crate::Error::ConflictLimit`] (record 0355a).
+/// The bounded resources of the conflict-markup family, carried by
+/// [`crate::Error::ConflictLimit`].
 ///
 /// Each variant names one bounded resource; [`std::fmt::Display`] gives its
 /// human-readable name, the one the error messages print.

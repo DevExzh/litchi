@@ -1,6 +1,6 @@
-//! Record 0252: slides inserted from a layout instantiate its placeholders,
-//! and notes text creates a notes page when the slide has none, through both
-//! the eager and the source-backed primary edits.
+//! Slides inserted from a layout instantiate its placeholders, and notes text
+//! creates a notes page when the slide has none, through both the eager and the
+//! source-backed primary edits.
 #![allow(clippy::unwrap_used, clippy::expect_used, reason = "test assertions")]
 use std::sync::Arc;
 

@@ -52,7 +52,7 @@ impl ThemeState {
     }
 }
 
-/// Package-route steps on an owned workbook projection (record 0360b).
+/// Package-route steps on an owned workbook projection.
 trait ThemeSteps {
     fn reprojected_theme(
         &self,

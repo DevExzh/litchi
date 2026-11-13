@@ -1,4 +1,4 @@
-//! Immutable embedded-font edits of a [`Package`] (record 0351 §2.3).
+//! Immutable embedded-font edits of a [`Package`].
 //!
 //! [`Package::edit_fonts`] starts an [`Edit`] over the package; [`Edit::set`] replaces the presentation-owned embedded-font collection
 //! and [`Edit::remove`] removes it.

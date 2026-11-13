@@ -1,6 +1,6 @@
-//! The source-backed RTF tail-append family (record 0359a F2): a commit
-//! validates and writes nothing, the committed package writes the planned
-//! tail splice, edits chain, and the patch is an exact pair.
+//! The source-backed RTF tail-append family: a commit validates and writes
+//! nothing, the committed package writes the planned tail splice, edits chain,
+//! and the patch is an exact pair.
 
 #![allow(
     clippy::expect_used,

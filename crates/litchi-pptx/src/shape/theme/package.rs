@@ -369,8 +369,8 @@ pub fn validate(package: &OpcPackage) -> Result<()> {
 
 /// The theme part a presentation's colors and fonts come from: the
 /// presentation part's own theme relationship, else the first slide
-/// master's (record 0321; OfficeCLI's `GetThemePart` order). `None` for a
-/// presentation with neither.
+/// master's (OfficeCLI's `GetThemePart` order). `None` for a presentation with
+/// neither.
 ///
 /// # Errors
 ///

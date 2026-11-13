@@ -1,5 +1,4 @@
-//! Click hyperlinks of shapes and their document-level definitions
-//! (record 0323).
+//! Click hyperlinks of shapes and their document-level definitions.
 //!
 //! A shape's click action is the `InteractiveInfo` container (instance 0)
 //! in its `OfficeArtClientData`; a URL or slide link names an

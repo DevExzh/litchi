@@ -343,8 +343,8 @@ fn an_empty_or_missing_rpr_states_nothing() {
 
 #[test]
 fn run_properties_ignore_revision_snapshots_and_nested_runs() {
-    // F-8: the previous formatting in w:rPrChange and the runs of a text box
-    // or phonetic guide inside the run are not the run's own properties.
+    // The previous formatting in w:rPrChange and the runs of a text box or
+    // phonetic guide inside the run are not the run's own properties.
     let properties = run(concat!(
         r#"<w:rPr><w:i/><w:rPrChange w:id="1" w:author="A"><w:rPr><w:b/><w:sz w:val="40"/><w:highlight w:val="red"/></w:rPr></w:rPrChange></w:rPr>"#,
         r#"<w:drawing><wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><w:txbxContent><w:p><w:r><w:rPr><w:strike/><w:caps/></w:rPr><w:t>box</w:t></w:r></w:p></w:txbxContent></wp:inline></w:drawing>"#,
@@ -934,7 +934,7 @@ fn cell_properties_are_typed() {
 
 #[test]
 fn cell_properties_read_only_the_cells_own_tcpr() {
-    // F-7: a nested table's cell properties are not the outer cell's.
+    // A nested table's cell properties are not the outer cell's.
     let nested = concat!(
         r#"<w:tbl><w:tr><w:tc><w:tcPr><w:gridSpan w:val="4"/><w:vMerge w:val="restart"/><w:shd w:val="clear" w:fill="FF0000"/></w:tcPr>"#,
         r#"<w:p/></w:tc></w:tr></w:tbl><w:p/>"#

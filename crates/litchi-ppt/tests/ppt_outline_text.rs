@@ -1,12 +1,12 @@
-//! Slide-list text resolved into the shapes that reference it (L-PPT-R1).
+//! Slide-list text resolved into the shapes that reference it.
 //!
 //! `PowerPoint` keeps the text of title and body placeholders in the
 //! `SlideListWithTextContainer`; the placeholder's text box holds only an
-//! `OutlineTextRefAtom` (MS-PPT 2.9.78). Before L-PPT-R1 those placeholders
-//! read as empty. The expected strings below are the slide-list bodies the
-//! references select; where Apache POI's own test suite asserts the same
-//! text (`poi-scratchpad/src/test/java/org/apache/poi/hslf/...`), the test
-//! names the POI assertion it agrees with.
+//! `OutlineTextRefAtom` (MS-PPT 2.9.78). Those placeholders used to read as
+//! empty. The expected strings below are the slide-list bodies the references
+//! select; where Apache POI's own test suite asserts the same text
+//! (`poi-scratchpad/src/test/java/org/apache/poi/hslf/...`), the test names the
+//! POI assertion it agrees with.
 
 #![allow(
     clippy::unwrap_used,
@@ -231,8 +231,8 @@ fn single_reference_fixtures_resolve() {
 
 /// POI `TestTextShape.read` asserts "Title Placeholder" for the title
 /// placeholder of this deck. The slide's text now includes the title beside
-/// the shapes that hold their text inline; before L-PPT-R1 the title was
-/// missing from both the shape and the slide text.
+/// the shapes that hold their text inline; the title used to be missing from
+/// both the shape and the slide text.
 #[test]
 fn slide_text_includes_resolved_placeholders_beside_inline_text() {
     with_presentation("ole/ppt/text_shapes.ppt", None, |presentation| {

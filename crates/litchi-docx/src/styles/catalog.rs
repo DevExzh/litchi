@@ -1,4 +1,4 @@
-//! A source-located catalog of the styles part (record 0319, L-DOCX-R6).
+//! A source-located catalog of the styles part.
 //!
 //! [`Catalog`](crate::styles::catalog::Catalog) reads a `styles.xml` payload once and keeps, for every
 //! `w:style`, its identity, its UI flags and the byte range of its element.

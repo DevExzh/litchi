@@ -1,6 +1,6 @@
-//! Change 0761: every CFB save route publishes through one shared
-//! `publish_staged`, and each caller-chosen [`Durability`] makes exactly its
-//! synchronizations while keeping the bytes, the checks and the typed errors.
+//! Every CFB save route publishes through one shared `publish_staged`, and
+//! each caller-chosen [`Durability`] makes exactly its synchronizations while
+//! keeping the bytes, the checks and the typed errors.
 
 #![allow(
     clippy::expect_used,

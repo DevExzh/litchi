@@ -1,5 +1,4 @@
-//! Locate one master of a package for the package-level master families
-//! (record 0357).
+//! Locate one master of a package for the package-level master families.
 //!
 //! The live `DocumentContainer` names the main and title masters in its
 //! master list and the notes and handout masters in its `DocumentAtom`. The

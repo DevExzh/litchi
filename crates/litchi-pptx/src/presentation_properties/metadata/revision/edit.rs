@@ -1,4 +1,4 @@
-//! Immutable Revision Information edits of a [`Package`](crate::Package) (record 0356a).
+//! Immutable Revision Information edits of a [`Package`](crate::Package).
 //!
 //! [`Package::edit_revision_info`](crate::Package::edit_revision_info) starts an [`Edit`]
 //! over a staged copy of the package; its verbs run on the staged graph.

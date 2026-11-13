@@ -1674,8 +1674,8 @@ impl OpcPackage {
         }
         if member_present {
             // The bytes become the owner's retained `.rels` source, which the
-            // writer publishes without its audit (change 0665). Audit them
-            // before mutating the package (ADR 0006).
+            // writer publishes without its audit. Audit them before mutating
+            // the package (ADR 0006).
             super::verified_metadata_token(
                 &relationship_uri,
                 Arc::clone(&replacement),
@@ -1751,8 +1751,8 @@ impl OpcPackage {
         }
         if replacement.member_present {
             // The token becomes the owner's retained `.rels` source, which the
-            // writer publishes without its audit (change 0665). Its bytes came
-            // from the caller, so audit them before any mutation (ADR 0006).
+            // writer publishes without its audit. Its bytes came from the
+            // caller, so audit them before any mutation (ADR 0006).
             let member = replacement
                 .owner
                 .rels_uri()

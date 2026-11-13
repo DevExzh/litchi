@@ -143,9 +143,9 @@ where
     }
 
     /// Skip the cell table without decoding it, then read the worksheet
-    /// features after it (record 0322): the cheap read the worksheet feature
-    /// edit families and their unified nodes share with full
-    /// materialization, so both number features identically.
+    /// features after it: the cheap read the worksheet feature edit families
+    /// and their unified nodes share with full materialization, so both
+    /// number features identically.
     pub(crate) fn skip_to_features(&mut self) -> Result<()> {
         loop {
             self.buf.clear();

@@ -1,4 +1,4 @@
-//! Package-level diagram metadata edits (record 0357).
+//! Package-level diagram metadata edits.
 //!
 //! [`Package::edit_diagrams`] stages edits of the fixed-width diagram build
 //! metadata of one slide (the `BuildList` in its `___PPT10` programmable tag,

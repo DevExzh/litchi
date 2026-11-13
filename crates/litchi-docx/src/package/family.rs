@@ -1,4 +1,4 @@
-//! Shared staging of the package-level edit families (record 0355).
+//! Shared staging of the package-level edit families.
 //!
 //! Every package-level family stages its changes on a working copy of the
 //! source [`Package`]: cloning a package is O(1) (its graph, properties and

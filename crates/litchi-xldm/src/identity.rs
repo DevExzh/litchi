@@ -5856,11 +5856,11 @@ mod tests {
         );
     }
 
-    /// Change 0765: quick-xml drops a leading UTF-8 byte-order mark before
-    /// its first event without counting it, so both scanners convert reader
-    /// positions with `reader_origin`. A marked part — with or without a
-    /// declaration before its root — is rewritten exactly like the unmarked
-    /// part, behind the same mark.
+    /// quick-xml drops a leading UTF-8 byte-order mark before its first event
+    /// without counting it, so both scanners convert reader positions with
+    /// `reader_origin`. A marked part — with or without a declaration before
+    /// its root — is rewritten exactly like the unmarked part, behind the same
+    /// mark.
     #[test]
     fn byte_order_marked_sources_are_rewritten_like_unmarked_ones() {
         const MARK: &[u8] = b"\xEF\xBB\xBF";

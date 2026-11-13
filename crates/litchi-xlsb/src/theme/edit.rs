@@ -1,4 +1,4 @@
-//! Immutable Theme edits of an XLSB [`Package`] (record 0360b).
+//! Immutable Theme edits of an XLSB [`Package`].
 //!
 //! [`Package::edit_theme`] starts an [`Edit`] of the workbook's optional
 //! DrawingML Theme part: it can create the part, replace its typed color and

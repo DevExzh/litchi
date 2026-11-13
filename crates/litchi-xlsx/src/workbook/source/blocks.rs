@@ -217,8 +217,8 @@ impl SourceInner {
 }
 
 impl crate::workbook::source::SourceBackedWorkbook {
-    /// The workbook's people, the authors and mentions of threaded comments
-    /// (record 0322); `None` without a persons part.
+    /// The workbook's people, the authors and mentions of threaded comments;
+    /// `None` without a persons part.
     ///
     /// # Errors
     ///
@@ -330,9 +330,9 @@ impl SourceWorksheet {
         self.finish_result(value)
     }
 
-    /// Parse this worksheet's threaded comments (record 0322); `None`
-    /// without a threaded-comments part. Only the worksheet's relationships
-    /// and that part are read.
+    /// Parse this worksheet's threaded comments; `None` without a
+    /// threaded-comments part. Only the worksheet's relationships and that
+    /// part are read.
     pub fn threaded_comments(&self) -> Result<Option<crate::threaded_comments::Comments>> {
         if self.data.kind != WorksheetKind::Worksheet {
             return Err(Error::NotWorksheet {

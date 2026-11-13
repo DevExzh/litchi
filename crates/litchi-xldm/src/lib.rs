@@ -8,7 +8,7 @@
 //! responsible for the typed section 2.5 model.
 
 // quick-xml's checked attribute iteration is quadratic on hostile tags; read
-// attributes through `BytesStartExt` (record 0770, workspace `clippy.toml`).
+// attributes through `BytesStartExt` (workspace `clippy.toml`).
 #![cfg_attr(not(test), deny(clippy::disallowed_methods))]
 
 mod error;

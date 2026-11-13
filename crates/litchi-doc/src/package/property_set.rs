@@ -1,6 +1,6 @@
-//! The DOC property-set edit family (record 0351 §2.3, record 0359): typed
-//! edits of the OLE `SummaryInformation`, `DocumentSummaryInformation` and
-//! user-defined property sets of one [`crate::Package`].
+//! The DOC property-set edit family: typed edits of the OLE
+//! `SummaryInformation`, `DocumentSummaryInformation` and user-defined property
+//! sets of one [`crate::Package`].
 //!
 //! [`crate::Package::property_sets`] reads the sections,
 //! [`crate::Package::edit_property_sets`] stages edits on an [`Edit`] and

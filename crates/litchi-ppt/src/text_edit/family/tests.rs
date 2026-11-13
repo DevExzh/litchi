@@ -1,6 +1,6 @@
-//! The source-backed text family through its public route (record 0357a):
-//! the scenarios of the native `SourceSnapshot`/`SourceTransaction` tests,
-//! run through `Package::{edit_text, apply_text}`.
+//! The source-backed text family through its public route: the scenarios of the
+//! native `SourceSnapshot`/`SourceTransaction` tests, run through
+//! `Package::{edit_text, apply_text}`.
 
 use std::io::{self, Cursor, Write};
 use std::sync::Arc;

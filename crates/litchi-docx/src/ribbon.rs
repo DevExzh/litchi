@@ -1,4 +1,4 @@
-//! The package-level Ribbon (`customUI`) family (record 0355).
+//! The package-level Ribbon (`customUI`) family.
 //!
 //! [`Package::ribbon`](crate::Package::ribbon) reads the legacy and modern
 //! Ribbon slots. [`Package::edit_ribbon`](crate::Package::edit_ribbon) stages
@@ -34,7 +34,7 @@ graph_family!("Ribbon", own_limits);
 
 /// The typed budgets of the Ribbon family: its limit errors are
 /// [`litchi_ooxml_common::Error::Limit`] carried by
-/// [`crate::Error::Common`] (record 0360).
+/// [`crate::Error::Common`].
 pub use litchi_ooxml_common::ribbon::LimitKind;
 graph_edit!("Ribbon", edit_ribbon, apply_ribbon);
 

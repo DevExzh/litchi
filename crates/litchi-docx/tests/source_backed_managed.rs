@@ -344,9 +344,9 @@ fn is_memory_limit(error: &Error) -> bool {
     )
 }
 
-// Review of the 0759 merge: the incoming `revisions()` parsed the whole
-// managed document without the parser admission that `extract_text` and the
-// other document queries reserve, so it succeeded where they were refused.
+// `revisions()` used to parse the whole managed document without the parser
+// admission that `extract_text` and the other document queries reserve, so it
+// succeeded where they were refused.
 #[test]
 fn managed_revisions_query_is_admitted_and_charged_like_extract_text() {
     let mut body = String::new();

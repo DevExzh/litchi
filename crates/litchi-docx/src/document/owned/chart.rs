@@ -1,5 +1,5 @@
 //! Inline chart insertion and chart-part edits staged with a main-document
-//! edit (record 0283).
+//! edit.
 //!
 //! A new chart is an authored [`Spec`]: its chart part (a `c:chartSpace`, or
 //! for an extended family a `cx:chartSpace` with its chart-style and

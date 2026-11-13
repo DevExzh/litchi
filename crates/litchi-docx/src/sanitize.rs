@@ -1123,7 +1123,8 @@ fn limit(resource: LimitKind, maximum: usize, actual: usize) -> Error {
     }
 }
 
-/// The bounded resources of external-hyperlink detachment, carried by [`crate::Error::ExternalHyperlinkDetachmentLimit`] (record 0355a).
+/// The bounded resources of external-hyperlink detachment, carried by
+/// [`crate::Error::ExternalHyperlinkDetachmentLimit`].
 ///
 /// Each variant names one bounded resource; [`std::fmt::Display`] gives its
 /// human-readable name, the one the error messages print.

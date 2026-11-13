@@ -31,9 +31,9 @@ use soapberry_zip::office::StreamingArchiveWriter;
 
 type ManagedCommit = Commit<source_backed::Package>;
 
-/// Record 0355a: a detached main-document commit replays onto a
-/// source-backed package (`Package::apply`), and its inverse patch restores
-/// the main document; there is no separate publication product any more.
+/// A detached main-document commit replays onto a source-backed package
+/// (`Package::apply`), and its inverse patch restores the main document; there
+/// is no separate publication product any more.
 struct Published {
     patch: litchi_docx::document::Patch,
 }
@@ -1051,10 +1051,10 @@ fn tracked_revision_fixture(signed: bool) -> Vec<u8> {
     archive_fixture(&tracked_revision_document(), &media, &opaque, None, signed)
 }
 
-// Review of the 0759 merge: the incoming revision dispositions skipped the
-// managed-transaction rule every other non-text operation follows. They were
-// committed and published uncharged, through a snapshot rebuilt without its
-// source identity or admission.
+// The revision dispositions used to skip the managed-transaction rule every
+// other non-text operation follows. They were committed and published
+// uncharged, through a snapshot rebuilt without its source identity or
+// admission.
 #[test]
 fn managed_revision_dispositions_are_refused_like_revision_text_replacement() {
     let insertion =
@@ -1875,11 +1875,11 @@ fn managed_changed_publication_rejects_settings_mce_and_dtd_before_output() {
     }
 }
 
-/// Record 0011: Word's markup compatibility that cannot change content (a
-/// declared namespace, a root `mc:Ignorable` of an understood namespace) is
-/// admitted under an execution context. The managed transaction edits and
-/// publishes the source bytes exactly as the unmanaged one does, and every
-/// reservation is released.
+/// Word's markup compatibility that cannot change content (a declared
+/// namespace, a root `mc:Ignorable` of an understood namespace) is admitted
+/// under an execution context. The managed transaction edits and publishes the
+/// source bytes exactly as the unmanaged one does, and every reservation is
+/// released.
 #[test]
 fn managed_source_document_admits_word_markup_compatibility() {
     let document = format!(
@@ -1984,9 +1984,9 @@ fn managed_reopened_inverse_restores_exact_artifact_and_rejects_foreign_member()
     let foreign = fixture_with_document(changed_document, 37, 29);
     assert_eq!(part_bytes(&foreign, MAIN), part_bytes(&changed, MAIN));
     assert_ne!(foreign, changed);
-    // Record 0355a: a package with the changed main document but foreign
-    // members is not the commit's artifact, and the main-document patch is
-    // bound to its source lineage, so the inverse is refused before output.
+    // A package with the changed main document but foreign members is not the
+    // commit's artifact, and the main-document patch is bound to its source
+    // lineage, so the inverse is refused before output.
     let (foreign_budget, _cancellation_source, foreign_package) = managed(foreign, 1 << 20);
     let mut foreign_output = Vec::new();
     let result = foreign_package.publish_inverse(&mut foreign_output, &publication);

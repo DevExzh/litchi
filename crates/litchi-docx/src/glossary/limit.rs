@@ -1,4 +1,4 @@
-//! Typed budgets of the glossary family (record 0355a).
+//! Typed budgets of the glossary family.
 
 use super::{
     MAX, MAX_DEPTH, MAX_DOM_ATTRIBUTES, MAX_DOM_BYTES, MAX_DOM_CONTENT, MAX_DOM_TOKENS,
@@ -186,7 +186,8 @@ impl Default for Limits {
     }
 }
 
-/// The bounded resources of the glossary family, carried by [`crate::Error::GlossaryLimit`] (record 0355a).
+/// The bounded resources of the glossary family, carried by
+/// [`crate::Error::GlossaryLimit`].
 ///
 /// Each variant names one bounded resource; [`std::fmt::Display`] gives its
 /// human-readable name, the one the error messages print.

@@ -889,9 +889,8 @@ fn signed_and_encrypted_packages_refuse_hints_before_payload_transfer() {
         OpcError::SignedSourceRequiresExplicitPolicy
     ));
 
-    // Encrypted members are now refused when the source is admitted (the
-    // spec-gap branch's admission check, merge record 0759), so a hint can
-    // never reach an encrypted package's payload.
+    // Encrypted members are now refused when the source is admitted, so a
+    // hint can never reach an encrypted package's payload.
     let encrypted_archive =
         mark_entry_encrypted(archive_bytes(FORMATTED_DOCUMENT), DOCUMENT_MEMBER);
     let encrypted_error = match SourceBackedPackage::from_vec(

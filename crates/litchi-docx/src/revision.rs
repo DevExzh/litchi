@@ -80,11 +80,11 @@ mod limits_tests;
 pub use kind::LimitKind;
 pub use limits::Limits;
 
-/// A revision reader under explicit budgets (record 0355a): the
-/// configurable form of `Paragraph::revisions`, `Table::revisions`,
-/// `Row::revisions` and `Cell::revisions`, which read under
-/// [`Limits::default`]. [`Reader::for_package`] takes the budgets a package
-/// was opened with ([`crate::SemanticLimits::revisions`]).
+/// A revision reader under explicit budgets: the configurable form of
+/// `Paragraph::revisions`, `Table::revisions`, `Row::revisions` and
+/// `Cell::revisions`, which read under [`Limits::default`].
+/// [`Reader::for_package`] takes the budgets a package was opened with
+/// ([`crate::SemanticLimits::revisions`]).
 ///
 /// ```
 /// use litchi_docx::revision::{Limits, Reader};

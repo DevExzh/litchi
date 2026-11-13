@@ -1,4 +1,4 @@
-//! Immutable VBA project edits of a [`Package`](crate::Package) (record 0356a).
+//! Immutable VBA project edits of a [`Package`](crate::Package).
 //!
 //! [`Package::edit_vba`](crate::Package::edit_vba) starts an [`Edit`]
 //! over a staged copy of the package; its verbs run on the staged graph.

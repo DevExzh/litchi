@@ -1,5 +1,5 @@
 //! The byte spans of a paragraph's inline pictures that a picture edit
-//! rewrites (record 0335).
+//! rewrites.
 //!
 //! [`picture_spans`] finds the same pictures, in the same order, as
 //! [`crate::image::parse_inline_images`] (the order of
@@ -192,9 +192,9 @@ fn find_attribute(tag: &str, key: &str) -> Option<(Range<usize>, char)> {
     }
 }
 
-/// One SmartArt drawing of an element's XML (record 0335): the data-model
-/// relationship its `dgm:relIds` names (`r:dm`), the `w:drawing` element,
-/// and the run it is the only content of.
+/// One SmartArt drawing of an element's XML: the data-model relationship its
+/// `dgm:relIds` names (`r:dm`), the `w:drawing` element, and the run it is the
+/// only content of.
 #[derive(Debug, Clone)]
 pub(crate) struct DiagramSpan {
     pub(crate) data_relationship_id: String,
@@ -325,7 +325,7 @@ pub(crate) fn with_attribute(tag: &[u8], key: &str, value: &str) -> Option<Vec<u
 
 /// The start tag (or empty element) `tag` without attribute `key` (its
 /// exact qualified name), unchanged when absent; `None` for a tag this
-/// cannot rewrite (record 0345).
+/// cannot rewrite.
 pub(crate) fn without_attribute(tag: &[u8], key: &str) -> Option<Vec<u8>> {
     let text = std::str::from_utf8(tag).ok()?;
     if !text.starts_with('<') {

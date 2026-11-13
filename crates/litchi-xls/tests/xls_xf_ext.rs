@@ -35,7 +35,7 @@ fn xf_extension_index_is_validated_against_the_xf_table() {
     let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Ext").unwrap();
     writer.write_string(sheet, 0, 0, "content").unwrap();
-    // Refused when it is set, since change 0766; the writer still writes.
+    // Refused when it is set; the writer still writes.
     assert!(
         writer
             .set_xf_extensions(vec![XfExt::try_new(4000, Vec::new()).unwrap()])

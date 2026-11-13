@@ -1007,9 +1007,9 @@ fn worksheet_indexes_many_array_ranges_and_rejects_indexed_overlap() {
 
 /// An embedded chart substream (BOF ... EOF after its drawing object) holds
 /// chart-sheet records such as HEADER and its own EOF. The worksheet parser
-/// must skip it: before record 0293 it stopped at the chart's EOF, and the
-/// chart's HEADER collided with the worksheet's, so the complete reader
-/// dropped the worksheet.
+/// must skip it: it once stopped at the chart's EOF, and the chart's HEADER
+/// collided with the worksheet's, so the complete reader dropped the
+/// worksheet.
 #[test]
 fn worksheet_skips_embedded_chart_substreams() {
     let mut number = Vec::new();

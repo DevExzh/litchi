@@ -1,4 +1,4 @@
-//! Immutable merged-cell edits of an XLSB [`Package`] (record 0360b).
+//! Immutable merged-cell edits of an XLSB [`Package`].
 //!
 //! [`Package::edit_merged_cells`] starts an [`Edit`]; its verbs replace,
 //! add, remove or clear a worksheet's `BrtBeginMergeCells` collection, and

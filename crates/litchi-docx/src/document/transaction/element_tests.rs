@@ -245,8 +245,8 @@ fn cell_text_replacement_keeps_cell_and_first_paragraph_properties() {
 
 #[test]
 fn cell_text_replacement_refuses_content_it_would_drop() {
-    // Record 0304: a later block that is not plain text, and a first
-    // paragraph the text rewrite refuses, are refused rather than dropped.
+    // A later block that is not plain text, and a first paragraph the text
+    // rewrite refuses, are refused rather than dropped.
     for content in [
         r#"<w:p><w:r><w:t>one</w:t></w:r></w:p><w:p><w:r><w:pict/></w:r></w:p>"#,
         r#"<w:p><w:r><w:t>one</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p/></w:tc></w:tr></w:tbl><w:p/>"#,
@@ -381,9 +381,8 @@ fn element_paths_round_trip_their_durable_spelling() {
     assert_eq!(ElementPath::parse("x:1"), None);
 }
 
-/// Record 0342: table borders and row properties, spliced in schema order,
-/// exact both ways; other properties are refused, and an unchanged value
-/// is a no-op.
+/// Table borders and row properties, spliced in schema order, exact both ways;
+/// other properties are refused, and an unchanged value is a no-op.
 #[test]
 fn table_borders_and_row_properties_are_exact_and_reversible() {
     use crate::properties::{

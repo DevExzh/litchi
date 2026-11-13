@@ -30,7 +30,7 @@ struct PackageInner {
     leniency: crate::leniency::Leniency,
     /// The digest facts of the exact package bytes (block digests, block
     /// root, signature presence), computed once on demand or seeded by the
-    /// scoped publisher that produced them (records 0357a, 0357b).
+    /// scoped publisher that produced them.
     exact: crate::scoped::ExactCache,
 }
 
@@ -304,7 +304,7 @@ impl Package {
     }
 
     /// The digest facts of the package's exact bytes, for the scoped
-    /// families' patches (record 0357b).
+    /// families' patches.
     pub(crate) fn exact(&self) -> &crate::scoped::ExactCache {
         &self.inner.exact
     }
@@ -367,7 +367,7 @@ impl Package {
     }
 
     /// Seed the presentation's one-slide shape memo with shapes proven equal
-    /// to a parse of slide `persist_id` of this package (record 0264).
+    /// to a parse of slide `persist_id` of this package.
     pub(crate) fn seed_slide_shapes(
         &self,
         persist_id: u32,

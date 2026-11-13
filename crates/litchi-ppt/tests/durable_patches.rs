@@ -5,10 +5,10 @@
 )]
 
 //! Durable patches, undo/redo, joins and three-way planning of the primary
-//! PPT edit (records 0357a, 0357b).
+//! PPT edit.
 //!
-//! Record 0357 kept these surfaces on the crate-private native slide-order
-//! owner; they are `package::edit::Patch::{to_durable, join}` and
+//! These surfaces used to be on the crate-private native slide-order owner;
+//! they are `package::edit::Patch::{to_durable, join}` and
 //! `Package::{apply_durable, plan_three_way}` now.
 
 use std::path::PathBuf;
@@ -321,8 +321,8 @@ fn joins_refuse_overlap_other_operations_and_other_sources() {
         )))
     ));
 
-    // A slide insertion shifts every later position (record 0357b: other
-    // operations join; insertions and removals do not).
+    // A slide insertion shifts every later position (other operations join;
+    // insertions and removals do not).
     let mut edit = source.edit().unwrap();
     edit.insert_slide(Position::new(3)).unwrap();
     let inserted = edit.commit().unwrap().patch().clone();
@@ -386,9 +386,9 @@ fn transition_visual(package: &Package, position: Position) -> SlideTransitionVi
         .unwrap()
 }
 
-/// The native-handoff visual-transition scenario of record 0357: exact
-/// replay and inverse, a durable round trip, undo/redo and a three-way
-/// conflict, all through the public route.
+/// The native-handoff visual-transition scenario: exact replay and inverse, a
+/// durable round trip, undo/redo and a three-way conflict, all through the
+/// public route.
 #[test]
 fn genuine_visual_transition_reverses_merges_and_undoes() {
     let source = fixture("poi/test-data/slideshow/45543.ppt");
@@ -458,8 +458,8 @@ fn genuine_visual_transition_reverses_merges_and_undoes() {
     );
 }
 
-// Record 0357b: the document-structure verbs of record 0357a (master order,
-// custom table styles, `fNonOutlineData`) have durable operations and join.
+// The document-structure verbs (master order, custom table styles,
+// `fNonOutlineData`) have durable operations and join.
 
 fn masters_deck() -> Package {
     fixture("poi/test-data/slideshow/slide_master.ppt")

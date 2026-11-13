@@ -790,11 +790,11 @@ fn declared_size_is_rejected_before_payload_and_media_stays_cold() {
 }
 
 /// The sink parser reads borrowed events straight out of the pinned
-/// main-document slice (change 0643). A borrowed reader and a buffered one
-/// tokenize with the same state machine, so this pins the projection across
-/// every event kind the parser accepts, including the ones that arrive as
-/// several events inside one `w:t`: a comment or a CDATA section splits the
-/// text run, and character references arrive as their own events.
+/// main-document slice. A borrowed reader and a buffered one tokenize with the
+/// same state machine, so this pins the projection across every event kind the
+/// parser accepts, including the ones that arrive as several events inside one
+/// `w:t`: a comment or a CDATA section splits the text run, and character
+/// references arrive as their own events.
 #[test]
 fn every_accepted_event_kind_projects_identically_through_both_sink_facades() {
     let bytes = package_bytes(
@@ -816,8 +816,8 @@ fn every_accepted_event_kind_projects_identically_through_both_sink_facades() {
 /// End of input is where a borrowed reader and a buffered one are most likely
 /// to diverge, so the two truncation refusals are pinned exactly: the message,
 /// the retained progress, and the bytes the sink already accepted. Both are
-/// raised by `preflight_semantic_xml`, which already read borrowed events
-/// before change 0643 and now shares that form with the emission loop.
+/// raised by `preflight_semantic_xml`, which reads borrowed events and shares
+/// that form with the emission loop.
 #[test]
 fn truncated_documents_refuse_at_end_of_input_with_unchanged_message_and_progress() {
     // The tail ends on a token boundary, so the reader reaches `Eof` cleanly

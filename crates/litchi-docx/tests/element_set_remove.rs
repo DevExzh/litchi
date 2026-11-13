@@ -1,6 +1,6 @@
 //! Picture, comment and SmartArt changes and removals staged with
-//! main-document edits (record 0335): each publishes in one commit,
-//! replays exactly, inverts exactly, and an identical change is a no-op.
+//! main-document edits: each publishes in one commit, replays exactly, inverts
+//! exactly, and an identical change is a no-op.
 
 use litchi_core::Position;
 use litchi_docx::document::{

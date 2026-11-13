@@ -264,7 +264,7 @@ impl Edit {
     fn ensure_prepared(&mut self) -> Result<()> {
         // A prepared draft implies a resolved worksheet; return before
         // `resolve_selector` clones its part name, since every staged
-        // operation passes through here (record 0377).
+        // operation passes through here.
         if self.raw.is_some() {
             return Ok(());
         }

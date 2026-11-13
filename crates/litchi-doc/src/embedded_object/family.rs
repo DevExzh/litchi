@@ -1,4 +1,4 @@
-//! The embedded-object edit family (record 0351 §2.3, record 0359).
+//! The embedded-object edit family.
 //!
 //! [`crate::Package::embedded_objects`] reads the managed field and
 //! `ObjectPool` inventory, [`crate::Package::edit_embedded_objects`] stages

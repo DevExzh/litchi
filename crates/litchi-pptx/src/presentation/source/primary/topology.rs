@@ -433,8 +433,8 @@ impl Revision {
             laser_limits,
             laser_usage: Arc::new(OnceLock::new()),
             // A prepared slide that encloses markup compatibility in shape
-            // children admits only whole-shape removal (record 0303); other
-            // slides keep the edit-time guards of each operation.
+            // children admits only whole-shape removal; other slides keep the
+            // edit-time guards of each operation.
             mce,
         })
     }
@@ -541,7 +541,7 @@ pub(super) fn remove(
             after: None,
         },
     );
-    // The Parts the slide owns exclusively leave with it (record 0303).
+    // The Parts the slide owns exclusively leave with it.
     let mut dependents = current_dependents(package);
     for part_uri in owned.parts() {
         let (before, content_type) = match physical_dependent(package, part_uri, &mut retained)? {
@@ -2177,10 +2177,10 @@ fn build_plan(
     Ok(plan)
 }
 
-/// Remove or restore the Parts that removed slides owned (record 0303).
-/// A dependent is never edited: a restored image must equal a physical Part
-/// that still exists, and a Part absent from the source is added with its
-/// exact payload, typed edges and relationship image.
+/// Remove or restore the Parts that removed slides owned. A dependent is never
+/// edited: a restored image must equal a physical Part that still exists, and a
+/// Part absent from the source is added with its exact payload, typed edges and
+/// relationship image.
 fn stage_dependents(
     package: &Package,
     plan: &mut SourceTopologyPlan,
@@ -2655,7 +2655,7 @@ fn validate_changes_against_effective(
                     package.owner.limits,
                 )?;
                 // A restored slide is an exact image; markup compatibility
-                // enclosed in its shapes is admitted (record 0303).
+                // enclosed in its shapes is admitted.
                 let semantic =
                     crate::open_options::selected(package.owner.semantic_limits.as_ref());
                 crate::presentation::transition::admit_source_with_limits(

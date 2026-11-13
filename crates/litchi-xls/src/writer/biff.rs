@@ -42,7 +42,7 @@ pub(crate) use cells::{write_formula, write_formula_with_metadata};
 pub(crate) use comment::CommentConfig;
 
 /// The comment shape container (without its text box atom) and `Obj`
-/// record of a hidden note, for the worksheet-feature editor (record 0327).
+/// record of a hidden note, for the worksheet-feature editor.
 pub(crate) fn note_shape(
     row: u16,
     column: u8,

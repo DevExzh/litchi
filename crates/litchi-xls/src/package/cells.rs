@@ -1,4 +1,4 @@
-//! Package-level cell-value routes (record 0359a F1).
+//! Package-level cell-value routes.
 //!
 //! The cell-value engine (`cell_values::{Edit, Commit, Patch}` and the
 //! snapshot constructors) is crate-private: [`Package::edit`] is its only

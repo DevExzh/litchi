@@ -3,10 +3,9 @@
     clippy::expect_used,
     reason = "test assertions panic on failure by design"
 )]
-//! The presentation-metadata and comment-collaboration edit families of
-//! record 0356: each commit publishes a new package with a reversible patch,
-//! the source package never changes, and an unchanged edit publishes the
-//! source bytes.
+//! The presentation-metadata and comment-collaboration edit families: each
+//! commit publishes a new package with a reversible patch, the source package
+//! never changes, and an unchanged edit publishes the source bytes.
 
 use litchi_pptx::Package;
 use litchi_pptx::presentation_properties::metadata::color_map::{Role, Slot};

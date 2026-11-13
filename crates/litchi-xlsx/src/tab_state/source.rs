@@ -10,7 +10,7 @@
 //! signed source is refused at commit. The workbook's catalog accessors read
 //! the committed catalog without materializing the output.
 //! [`SourceBackedWorkbook::apply_tab_state`] replays a [`Patch`] onto a
-//! workbook holding its before state (record 0360).
+//! workbook holding its before state.
 
 use std::io::Write;
 use std::sync::Arc;
@@ -631,7 +631,7 @@ fn audit_xml(content: &[u8], owner: XmlOwner, limits: Limits) -> Result<XmlAudit
     let mut reader = NsReader::from_reader(content);
     // Names are recognized on namespace values as written; a declaration that
     // spells the markup-compatibility namespace with references binds it for
-    // preprocessing all the same (record 0011).
+    // preprocessing all the same.
     let mut audit = XmlAudit {
         alternate_content: litchi_ooxml_common::mce::binds_namespace_by_reference(content),
         ..XmlAudit::default()

@@ -1,6 +1,5 @@
-//! The alternative-format import family (record 0355a): body
-//! `w:altChunk` anchors of an opened or built package, their main-part
-//! relationships and internal payload parts.
+//! The alternative-format import family: body `w:altChunk` anchors of an opened
+//! or built package, their main-part relationships and internal payload parts.
 //!
 //! [`Package::edit_alt_chunks`](crate::Package::edit_alt_chunks) stages an
 //! [`Edit`] whose commit publishes a new package; the anchor element is

@@ -73,7 +73,7 @@ pub enum Error {
     #[error("{0}")]
     SpreadsheetXmlMaps(String),
 
-    /// A bounded resource exceeds its ceiling (record 0351 §2.4).
+    /// A bounded resource exceeds its ceiling.
     #[error("OOXML {kind} exceeds limit {maximum} (actual {observed})")]
     Limit {
         /// The exceeded bound.

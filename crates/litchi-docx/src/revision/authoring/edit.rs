@@ -1,5 +1,5 @@
-//! The tracked-revision family (record 0355): accepting and rejecting the
-//! main story's tracked insertions, deletions, moves and property changes.
+//! The tracked-revision family: accepting and rejecting the main story's tracked insertions,
+//! deletions, moves and property changes.
 //!
 //! [`Package::tracked_revisions`](crate::Package::tracked_revisions) reads
 //! the changes; [`Package::edit_tracked_revisions`](crate::Package::edit_tracked_revisions)

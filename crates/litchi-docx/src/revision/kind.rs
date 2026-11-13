@@ -1,6 +1,7 @@
-//! Typed revision budgets (record 0355a).
+//! Typed revision budgets.
 
-/// The bounded resources of revision reads and tracked-revision authoring, carried by [`crate::Error::RevisionLimit`] (record 0355a).
+/// The bounded resources of revision reads and tracked-revision authoring,
+/// carried by [`crate::Error::RevisionLimit`].
 ///
 /// Each variant names one bounded resource; [`std::fmt::Display`] gives its
 /// human-readable name, the one the error messages print.

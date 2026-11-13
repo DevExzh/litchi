@@ -5,8 +5,7 @@
     reason = "integration-test fixtures favor concise panic-driven assertions over production-style ergonomics"
 )]
 
-//! M1 L-DOC-R1, R2, R3: per-story reads, character-position ranges, and the
-//! memoized story index.
+//! Per-story reads, character-position ranges, and the memoized story index.
 
 use litchi_core::Position;
 use litchi_doc::body_text::{Projection, Snapshot, Story};

@@ -1,6 +1,7 @@
-//! Typed budgets of the settings family (record 0355a).
+//! Typed budgets of the settings family.
 
-/// The bounded resources of the settings family, carried by [`crate::Error::SettingsLimit`] (record 0355a).
+/// The bounded resources of the settings family, carried by
+/// [`crate::Error::SettingsLimit`].
 ///
 /// Each variant names one bounded resource; [`std::fmt::Display`] gives its
 /// human-readable name, the one the error messages print.

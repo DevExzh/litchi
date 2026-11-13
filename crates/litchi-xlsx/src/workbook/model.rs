@@ -408,7 +408,7 @@ pub(crate) struct Inner {
     /// before the table itself (see `crate::leniency`).
     pub(super) shared_strings_tolerance: OnceLock<ToleranceReport>,
     /// Ascending indexes of the shared-string items that carry rich-text
-    /// runs, scanned on first use (record 0273).
+    /// runs, scanned on first use.
     pub(super) rich_shared_strings: OnceLock<Box<[usize]>>,
     pub(crate) shared_string_lineage: Arc<SharedStringLineage>,
     pub(super) styles_uri: Option<PackURI>,
@@ -437,7 +437,7 @@ pub(crate) struct Inner {
     pub(super) format_cache: Arc<FormatCache>,
     /// Memo of the chart inventory of the worksheet drawing read last,
     /// shared by the lineage like `format_cache` and keyed by the drawing
-    /// payload allocation (record 0286).
+    /// payload allocation.
     pub(super) chart_inventories: Arc<crate::chart::edit::InventoryCache>,
     /// Repairs made while the workbook catalog was parsed at open time.
     pub(super) tolerance: ToleranceReport,
@@ -1173,8 +1173,8 @@ impl Workbook {
         crate::workbook_metadata::protection::parse_workbook_protection(workbook.blob())
     }
 
-    /// The workbook's people, the authors and mentions of threaded comments
-    /// (record 0322); `None` without a persons part.
+    /// The workbook's people, the authors and mentions of threaded comments;
+    /// `None` without a persons part.
     ///
     /// # Errors
     ///
@@ -1355,10 +1355,9 @@ impl Worksheet {
         .map(|part| part.comments))
     }
 
-    /// Read this worksheet's threaded comments (record 0322); `None`
-    /// without a threaded-comments part. Only the worksheet's relationships
-    /// and that part are read; authors resolve through
-    /// [`crate::Workbook::people`].
+    /// Read this worksheet's threaded comments; `None` without a
+    /// threaded-comments part. Only the worksheet's relationships and that
+    /// part are read; authors resolve through [`crate::Workbook::people`].
     pub fn threaded_comments(&self) -> Result<Option<crate::threaded_comments::Comments>> {
         if self.data.kind != WorksheetKind::Worksheet {
             return Err(Error::NotWorksheet {
@@ -1588,7 +1587,7 @@ impl Worksheet {
     /// Whether the stored text at `at` carries rich-text runs: an inline
     /// string with `r` runs, or a shared string whose item has them.
     /// Writing a plain value to such a cell drops the runs' formatting, so
-    /// a text search refuses to rewrite it (record 0273).
+    /// a text search refuses to rewrite it.
     ///
     /// # Errors
     ///
@@ -1613,10 +1612,10 @@ impl Worksheet {
     }
 
     /// The rich-text runs of the shared string at `at`, each with its run
-    /// properties as stored (record 0295). `None` for a cell that is not a
-    /// shared string with runs, or whose item a run rewrite cannot keep
-    /// (phonetic runs, nested run-property markup). An inline rich string
-    /// is read from the worksheet part (one scan of it).
+    /// properties as stored. `None` for a cell that is not a shared string
+    /// with runs, or whose item a run rewrite cannot keep (phonetic runs,
+    /// nested run-property markup). An inline rich string is read from the
+    /// worksheet part (one scan of it).
     ///
     /// # Errors
     ///
@@ -2222,8 +2221,8 @@ pub(crate) fn rich_items_many(
     }
 }
 
-/// The runs of the inline string of cell `a1` in worksheet `xml` (record
-/// 0295), as [`rich_item`] reads an item. One scan of the worksheet part.
+/// The runs of the inline string of cell `a1` in worksheet `xml`, as
+/// [`rich_item`] reads an item. One scan of the worksheet part.
 pub(crate) fn inline_rich(xml: &[u8], a1: &str) -> Result<Option<crate::RichText>> {
     use quick_xml::events::Event;
     let mut reader = quick_xml::Reader::from_reader(xml);
@@ -2599,8 +2598,8 @@ mod rich_text_write_tests {
         Ok(())
     }
 
-    /// Typed run fonts (record 0338): reads of stored markup, changes that
-    /// keep the properties they do not name, and the source-backed read.
+    /// Typed run fonts: reads of stored markup, changes that keep the
+    /// properties they do not name, and the source-backed read.
     #[test]
     fn run_fonts_read_and_change_in_place() -> crate::Result<()> {
         use crate::style::{FontChange, FontColor, Script, Underline};

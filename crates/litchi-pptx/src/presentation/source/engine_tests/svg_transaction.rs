@@ -517,9 +517,9 @@ fn svg_transaction_validates_every_picture_owner_before_edit_creation() {
     );
 }
 
-/// The `source::svg` family (record 0356a): a commit publishes a new
-/// source-backed package whose output is the stream route's bytes, reads of
-/// it see the change, and the inverse patch restores the picture.
+/// The `source::svg` family: a commit publishes a new source-backed package
+/// whose output is the stream route's bytes, reads of it see the change, and
+/// the inverse patch restores the picture.
 #[test]
 fn svg_family_publishes_a_source_backed_package() {
     use crate::source::{Package, svg};

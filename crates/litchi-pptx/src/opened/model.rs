@@ -241,10 +241,10 @@ impl Limits {
     /// [`crate::cross_slide_copy::Plan::release_retained_candidate`] or by dropping the
     /// plan.  The default is 64 MiB.  This ceiling bounds what a plan *holds*.
     /// Applying the plan shares the retained archive with the package it
-    /// opens and publishes rather than copying it (change 0751), so after an
-    /// application the plan and the destination may hold one allocation
-    /// between them, and releasing or dropping the plan frees it only once
-    /// the destination no longer holds it.
+    /// opens and publishes rather than copying it, so after an application the
+    /// plan and the destination may hold one allocation between them, and
+    /// releasing or dropping the plan frees it only once the destination no
+    /// longer holds it.
     ///
     /// Zero is rejected for this field by [`Self::new`]. Pass `1` to turn
     /// candidate retention off, since no ZIP archive is
@@ -482,7 +482,7 @@ pub(crate) struct PartDigests {
     /// second package walk merely to retain the physical owner metric.
     part_bytes: u64,
     /// The slide-root memo of the capture that filled this package memo, with
-    /// the package source profile it was admitted under (record 0377).
+    /// the package source profile it was admitted under.
     ///
     /// A package keeps one memo per graph state (`Package::part_digests`), so
     /// every later capture of the same immutable package — each detached
@@ -518,7 +518,7 @@ impl PartDigests {
 
     /// One parent memo answering for every allocation any of `parents`
     /// names, for a capture of a package assembled from several packages'
-    /// payloads (change 0751).
+    /// payloads.
     ///
     /// Each entry is copied with the payload `Arc` it retains, so every
     /// answer is still the digest of the allocation its own memo hashed. Two
@@ -628,7 +628,7 @@ impl PartDigests {
     /// Each kept entry retains `package`'s own `Arc` for that allocation, never
     /// the one `self` retained, so the result is re-projected onto `package`'s
     /// allocations rather than inherited; the facade relies on this at every
-    /// point it keeps a snapshot's memo (change 0751).
+    /// point it keeps a snapshot's memo.
     pub(crate) fn project(&self, package: &OpcPackage) -> Result<Self> {
         if self.entries.is_empty() {
             return Ok(Self {
@@ -772,8 +772,8 @@ impl Snapshot {
 
     /// This snapshot's payload-digest memo re-projected onto `package`'s own
     /// allocations, carrying the slide-root memo when `package` has the
-    /// snapshot's source profile (record 0377). Every entry kept names, and
-    /// retains, an allocation `package` holds.
+    /// snapshot's source profile. Every entry kept names, and retains, an
+    /// allocation `package` holds.
     pub(crate) fn package_memo(&self, package: &OpcPackage) -> Result<PartDigests> {
         let mut memo = self.part_digests.project(package)?;
         let limits = package.read_limits();
@@ -893,8 +893,8 @@ pub(crate) fn capture_with_parent_digests_and_semantic_limits(
 /// Capture a candidate package assembled from `parent`'s package, reusing
 /// `parent`'s payload digests and, under the same source profile, its proved
 /// slide-root classifications and source admission for every payload
-/// allocation the candidate still shares (record 0377). Every validation of
-/// a changed or reallocated payload still runs.
+/// allocation the candidate still shares. Every validation of a changed or
+/// reallocated payload still runs.
 pub(crate) fn capture_with_parent_snapshot(
     package: &OpcPackage,
     parent: &Snapshot,
@@ -1003,8 +1003,8 @@ fn capture_internal(
     let mut mce_capture = MceCapture::new(parent_mce, limits.max_retained_mce_bytes());
     // A capture of a package whose memo already carries the slide-root
     // proofs of an earlier capture of the same payload allocations under the
-    // same source profile reuses them (record 0377); a commit passes its
-    // source snapshot's memo explicitly.
+    // same source profile reuses them; a commit passes its source snapshot's
+    // memo explicitly.
     let inherited_roots = match &revision {
         Revision::Parent(parent) => parent.slide_roots_for(package.read_limits()),
         Revision::Cold | Revision::Known(..) => None,
@@ -1483,7 +1483,7 @@ pub(crate) fn invalid(message: impl Into<String>) -> Error {
 }
 
 /// Which complete-package fingerprints a test thread computed, and how many
-/// payloads each hashed rather than answering from a memo (change 0751).
+/// payloads each hashed rather than answering from a memo.
 ///
 /// Only fingerprints outside a `debug_assert!` are of interest to the tests
 /// that read this log, and those are the ones taken with a parent memo; the

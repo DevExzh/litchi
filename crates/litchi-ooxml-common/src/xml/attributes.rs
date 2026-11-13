@@ -21,11 +21,11 @@
 //! A reader that stops at a tag's first attribute error uses
 //! [`BytesStartExt::checked_attributes`] instead: quick-xml's items up to and
 //! including that error, with its duplicate check replaced by an ordered map
-//! from the 33rd name on (record 0770; defined in `litchi_opc::xml_attributes`,
-//! which this module re-exports). Above 32 names quick-xml's own check hashes
-//! names with an unkeyed hasher and rescans every earlier name on each hash
-//! hit, so its worst case grows with the square of the tag even for readers
-//! that stop at the first error.
+//! from the 33rd name on (defined in `litchi_opc::xml_attributes`, which this
+//! module re-exports). Above 32 names quick-xml's own check hashes names with
+//! an unkeyed hasher and rescans every earlier name on each hash hit, so its
+//! worst case grows with the square of the tag even for readers that stop at
+//! the first error.
 
 use std::collections::{BTreeMap, BTreeSet};
 

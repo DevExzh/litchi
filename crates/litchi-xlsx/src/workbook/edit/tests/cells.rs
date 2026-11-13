@@ -6649,8 +6649,8 @@ fn protection_alignment_and_quote_facets_join_when_disjoint_and_conflict_when_ov
     );
 }
 
-/// Record 0279: a formula cache write keeps the formula markup (shared
-/// members included), sets the cell type from the value, and inverts exactly.
+/// A formula cache write keeps the formula markup (shared members included),
+/// sets the cell type from the value, and inverts exactly.
 #[test]
 fn formula_cache_writes_keep_formula_markup() {
     let baseline = crate::Package::new().expect("baseline");

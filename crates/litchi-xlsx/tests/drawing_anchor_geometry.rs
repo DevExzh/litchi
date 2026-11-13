@@ -427,13 +427,13 @@ fn applies_drawing_size_and_marker_text_limits_before_projection() {
 
 #[test]
 fn rejects_mce_output_that_exceeds_the_drawing_budget_after_expansion() {
-    // MCE declares each namespace once (change 0653), except that the
-    // declarations a dropped `mc:AlternateContent` wrapper made are hoisted
-    // onto every child it emits. A large but bounded URI declared on the
-    // wrapper therefore makes the processed XML exceed the 32 MiB drawing
-    // limit while the caller input remains small. Each hoisted declaration
-    // stays under the parser's 1 MiB attribute limit, so the MCE output bound
-    // is what refuses the expansion.
+    // MCE declares each namespace once, except that the declarations a
+    // dropped `mc:AlternateContent` wrapper made are hoisted onto every child
+    // it emits. A large but bounded URI declared on the wrapper therefore
+    // makes the processed XML exceed the 32 MiB drawing limit while the
+    // caller input remains small. Each hoisted declaration stays under the
+    // parser's 1 MiB attribute limit, so the MCE output bound is what refuses
+    // the expansion.
     let padding = "x".repeat(768 * 1024);
     let source = |count: usize| {
         let mut children = String::new();

@@ -1,5 +1,5 @@
 //! Worksheet pictures and shapes of an XLSB package: read, add, move and
-//! remove (unified-ops record 0322).
+//! remove.
 //!
 //! An XLSB worksheet's Drawings part is the same SpreadsheetML drawing XML
 //! as XLSX's ([MS-XLSB] section 2.1.7.23); the worksheet names it with a

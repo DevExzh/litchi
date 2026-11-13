@@ -1,4 +1,4 @@
-//! The subdocument edit family (record 0351 §2.3, record 0359).
+//! The subdocument edit family.
 //!
 //! [`crate::Package::edit_subdocuments`] stages subdocument edits on an [`Edit`];
 //! [`Edit::commit`] publishes a new [`crate::Package`] with an exact

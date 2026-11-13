@@ -6,7 +6,7 @@
 )]
 
 //! The package-level families refuse a change to a signed package instead of
-//! removing its signature (ADR 0006; unified-ops record 0014b).
+//! removing its signature (ADR 0006).
 //!
 //! Each family is checked three ways: a change to a signed package is refused
 //! with [`Error::Signed`] and leaves the package as it was (it still publishes
@@ -1087,7 +1087,7 @@ mod slicer_and_timeline_family {
         );
         // The store wrote the cache extension with another serializer than
         // the reorder's, so even the current order changes bytes: a change,
-        // refused (record 0014b, F1c).
+        // refused.
         assert_signed(timelines.reorder_caches(&[String::from("Timeline_A")]));
         assert_signed(timelines.update_view(&worksheet, "Timeline", |view| {
             view.caption = Some("Changed".into());
@@ -1132,8 +1132,7 @@ fn package_unsign_is_explicit_and_leaves_an_unsigned_package_untouched() {
 
 /// The shared custom-properties and VBA owners of `litchi-ooxml-common`
 /// refuse a change to a signed package with this crate's typed
-/// [`Error::Signed`] instead of removing the signature (unified-ops record
-/// 0014a, F1b).
+/// [`Error::Signed`] instead of removing the signature.
 mod shared_owners {
     use super::*;
     use litchi_xlsx::custom::Props;

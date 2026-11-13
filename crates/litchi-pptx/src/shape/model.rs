@@ -22,8 +22,7 @@ use crate::{Error, Result};
 /// the owner against which this span is defined: `&scene.xml()[start..end]`
 /// is the element. Offsets count every byte of that owner, including a
 /// leading UTF-8 byte-order mark, which the owner keeps whenever markup
-/// compatibility processing did not rewrite it (change 0765; before it,
-/// spans of a marked owner were three bytes early).
+/// compatibility processing did not rewrite it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Span {
     pub(super) start: u32,
@@ -646,8 +645,8 @@ impl<'a> Common<'a> {
         Ok(Some(text_reader::read(xml, scope, limits)?))
     }
 
-    /// The paragraphs and text runs of [`Self::text_body`] (record 0348);
-    /// `None` without a body.
+    /// The paragraphs and text runs of [`Self::text_body`]; `None` without a
+    /// body.
     ///
     /// # Errors
     ///
@@ -658,9 +657,9 @@ impl<'a> Common<'a> {
             .transpose()
     }
 
-    /// [`Self::text_index`] of a body [`Self::text_body`] has read (record
-    /// 0348): from one pass over the body when it can, without decoding it
-    /// again, so values the reader would refuse are not checked here.
+    /// [`Self::text_index`] of a body [`Self::text_body`] has read: from one
+    /// pass over the body when it can, without decoding it again, so values the
+    /// reader would refuse are not checked here.
     ///
     /// # Errors
     ///
@@ -1159,7 +1158,7 @@ impl std::fmt::Debug for Common<'_> {
     }
 }
 
-/// The paragraphs and text runs of a shape's text body (record 0348); see
+/// The paragraphs and text runs of a shape's text body; see
 /// [`Common::text_index`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BodyTextIndex(crate::table::CellTextIndex);

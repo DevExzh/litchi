@@ -306,9 +306,9 @@ fn ole_doc_fixture(name: &str) -> Vec<u8> {
 }
 
 /// Every readable checked-in DOC fixture. None carries document or range
-/// protection (change 0768), so each accepts a tracked insertion at CP 0 as
-/// checked in, including the 24 that the strict protection grammar refused and
-/// the 11 whose saved selection is a caret at CP 0.
+/// protection, so each accepts a tracked insertion at CP 0 as checked in,
+/// including the 24 that the strict protection grammar refused and the 11 whose
+/// saved selection is a caret at CP 0.
 const READABLE_FIXTURES: [&str; 35] = [
     "3endnotes.doc",
     "DiffFirstPageHeadFoot.doc",

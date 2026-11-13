@@ -4,7 +4,7 @@
     reason = "integration tests use panic-on-failure extraction"
 )]
 
-//! Defined names through the primary workbook transaction (record 0261).
+//! Defined names through the primary workbook transaction.
 
 use std::path::PathBuf;
 

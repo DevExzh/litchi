@@ -1,8 +1,8 @@
-//! Change 0750: the source policy refuses every well-formedness defect of XML
-//! 1.0 (Fifth Edition) and Namespaces in XML 1.0 (Third Edition) that the
-//! tokenizer-level checks accepted, each as `Error::Malformed` at its offset,
-//! and still accepts every well-formed spelling. The authored and default
-//! policies keep their tokenizer-level verdicts, which fragment audits rely on.
+//! The source policy refuses every well-formedness defect of XML 1.0 (Fifth
+//! Edition) and Namespaces in XML 1.0 (Third Edition) that the tokenizer-level
+//! checks accepted, each as `Error::Malformed` at its offset, and still accepts
+//! every well-formed spelling. The authored and default policies keep their
+//! tokenizer-level verdicts, which fragment audits rely on.
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,

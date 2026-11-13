@@ -1,6 +1,6 @@
 //! `VerifiedSource` exists only for bytes that passed `verify_source`, and
 //! covers exactly the audited allocation: the same address and length, under
-//! the same limits (change 0754).
+//! the same limits.
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,

@@ -273,7 +273,7 @@ pub enum Error {
     /// A bounded story operation exceeded one finite resource ceiling.
     #[error("source-backed story text {kind} limit exceeded: {actual} > {maximum}")]
     Limit {
-        /// The exceeded budget (record 0355a).
+        /// The exceeded budget.
         kind: LimitKind,
         /// Observed value.
         actual: usize,
@@ -1170,8 +1170,8 @@ impl Patch {
     }
 
     /// Apply to a selected-story snapshot with the patch's exact selector,
-    /// part and before bytes, from any source (record 0355a: a package
-    /// replay reads the snapshot it applies to).
+    /// part and before bytes, from any source (a package replay reads the
+    /// snapshot it applies to).
     pub(crate) fn apply_content(&self, source: &Snapshot) -> Result<Snapshot> {
         self.check_content(source)?;
         Ok(if self.is_noop() {
@@ -1399,7 +1399,7 @@ impl Package {
     }
 
     /// Check a selected-story patch against this package and return the part
-    /// and its rewritten bytes (record 0355a).
+    /// and its rewritten bytes.
     pub(crate) fn story_text_target(&self, patch: &Patch) -> Result<(PackURI, Arc<Vec<u8>>)> {
         self.trim_clean_paragraph_index_for_operation();
         self.physical_package()?.check_execution()?;
@@ -5236,7 +5236,7 @@ impl Package {
     }
 
     /// Check a glossary batch patch against this package and return the part
-    /// and its rewritten bytes (record 0355a).
+    /// and its rewritten bytes.
     pub(crate) fn glossary_text_batch_target(
         &self,
         patch: &GlossaryBatchPatch,
@@ -5782,7 +5782,8 @@ fn batch_paragraph_index_error(_entry_index: usize, index: usize, len: usize) ->
     }
 }
 
-/// The bounded resources of source-backed story-text edits, carried by [`Error::Limit`] (record 0355a).
+/// The bounded resources of source-backed story-text edits, carried by
+/// [`Error::Limit`].
 ///
 /// Each variant names one bounded resource; [`std::fmt::Display`] gives its
 /// human-readable name, the one the error messages print.

@@ -103,7 +103,7 @@ fn accepts_spec_absolute_a1_references() {
     );
     let retained = std::str::from_utf8(parsed.entries()[0].retained_xml()).unwrap();
     // The retained sheetView re-declares what it inherits from the worksheet
-    // root, so it parses standalone (change 0653).
+    // root, so it parses standalone.
     assert!(retained.starts_with(&format!(
         r#"<sheetView workbookViewId="0" topLeftCell="$XFD$1048576" zoomScaleNormal="0" xmlns="{T}">"#
     )));

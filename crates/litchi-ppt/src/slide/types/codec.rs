@@ -85,10 +85,9 @@ impl Slide<'_> {
     /// materialization while retaining the ordinary shape ordering rules.
     ///
     /// `outline` holds the slide's slide-list text bodies, which supply the
-    /// text of shapes that reference them (L-PPT-R1). Resolution only fills
-    /// in text: which shapes are returned, and in which order, never depends
-    /// on `outline`, so a caller that passes no bodies addresses the same
-    /// shapes.
+    /// text of shapes that reference them. Resolution only fills in text: which
+    /// shapes are returned, and in which order, never depends on `outline`, so
+    /// a caller that passes no bodies addresses the same shapes.
     pub(crate) fn parse_shape_enums(
         ppdrawing_data: &[u8],
         outline: &[crate::OutlineTextBody],
@@ -191,7 +190,7 @@ impl Slide<'_> {
 
         // The shape keeps its stable position among its siblings — `index`
         // counts every sibling, read or not — and its name and alternative
-        // text (L-PPT-R4, L-PPT-R3).
+        // text.
         if let Some(shape) = &mut converted {
             let (name, description) = crate::odraw::shape_labels(escher_shape);
             shape.apply_source_identity(crate::shapes::shape::SourceIdentity {
@@ -226,7 +225,7 @@ impl Slide<'_> {
 
     /// The text a placeholder, auto shape, or table cell shows: the inline
     /// text of its `ClientTextbox`, or the slide-list body its outline
-    /// reference selects (L-PPT-R1).
+    /// reference selects.
     ///
     /// A reference that selects no readable body leaves the text empty, as
     /// POI and LibreOffice leave it, and is recorded as
@@ -580,8 +579,8 @@ impl Slide<'_> {
         }
 
         // 2. Extract text from Escher/PPDrawing (shapes, text boxes), with
-        // outline references resolved into the slide-list text they select
-        // (L-PPT-R1). This is separate from regular record text extraction.
+        // outline references resolved into the slide-list text they select.
+        // This is separate from regular record text extraction.
         if let Some(ppdrawing) = self.record.find_child(RecordType::PPDrawing) {
             let escher_text = crate::odraw::text_from_slide_drawing(
                 &ppdrawing.data,

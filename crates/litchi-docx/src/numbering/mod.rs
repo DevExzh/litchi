@@ -8,7 +8,7 @@ pub mod catalog;
 mod codec;
 mod edit;
 /// The located numbering part: definitions, levels and instances with their
-/// byte ranges, read and edited in place (record 0319).
+/// byte ranges, read and edited in place.
 mod limit;
 mod lists;
 mod model;

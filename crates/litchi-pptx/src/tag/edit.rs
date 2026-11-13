@@ -1,4 +1,4 @@
-//! Immutable slide-tag edits of a [`Package`] (record 0351 §2.3).
+//! Immutable slide-tag edits of a [`Package`].
 //!
 //! [`Package::edit_tags`] starts an [`Edit`]; [`Edit::set`] creates or
 //! replaces one slide's direct programmable-tag list and [`Edit::remove`]

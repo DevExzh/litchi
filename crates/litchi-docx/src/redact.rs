@@ -791,7 +791,8 @@ fn unsafe_closure<T>(reason: &'static str) -> Result<T> {
     ))
 }
 
-/// The bounded resources of external-hyperlink redaction, carried by [`crate::Error::ExternalHyperlinkRedactionLimit`] (record 0355a).
+/// The bounded resources of external-hyperlink redaction, carried by
+/// [`crate::Error::ExternalHyperlinkRedactionLimit`].
 ///
 /// Each variant names one bounded resource; [`std::fmt::Display`] gives its
 /// human-readable name, the one the error messages print.

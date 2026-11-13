@@ -163,7 +163,7 @@ fn text_outside_objects(xml: &[u8]) -> String {
 struct Totals {
     files: usize,
     admitted: usize,
-    /// Paragraphs whose runs hold `mc:AlternateContent` (record 0307).
+    /// Paragraphs whose runs hold `mc:AlternateContent`.
     alternate: usize,
     blocks: usize,
     wrapped: usize,
@@ -197,9 +197,9 @@ fn check_transaction_positions(
                 .windows(b"AlternateContent".len())
                 .any(|window| window == b"AlternateContent")
             {
-                // Record 0307: the raw paragraph holds every branch of its
-                // run-level alternate content and the visible one only the
-                // selected branch, so they agree outside those objects.
+                // The raw paragraph holds every branch of its run-level
+                // alternate content and the visible one only the selected
+                // branch, so they agree outside those objects.
                 *alternate += 1;
                 assert_eq!(
                     text_outside_objects(raw_xml),

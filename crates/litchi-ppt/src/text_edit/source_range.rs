@@ -259,7 +259,7 @@ pub(super) fn resolve_source_target(
     // resolving the source range without enumerating them; the presentation
     // is being rewritten rather than read. Only the shape's native identity is
     // needed here, so no slide-list text is resolved; resolution never
-    // changes which shapes are returned (L-PPT-R1).
+    // changes which shapes are returned.
     let shapes = crate::slide::types::Slide::parse_shape_enums(
         &ppdrawing.data,
         &[],

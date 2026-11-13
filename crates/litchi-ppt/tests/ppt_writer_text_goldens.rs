@@ -8,12 +8,12 @@
 //! Byte-exact goldens for the fresh PPT writer's text and drawing paths.
 //!
 //! Every fixture below was written by the writer at `6d989cad63`, before
-//! change 0753 wrote `ClientTextbox`, shape, drawing and slide records in
-//! place, and its SHA-256 recorded here. The same inputs must keep producing
-//! the same bytes: ASCII, Latin-1, CJK and supplementary-plane text, empty and
-//! very long text, text interactions, rich text, tables, pictures, comments,
-//! transitions, timings, per-slide header/footer records, notes (through
-//! `save`), and the three benchmark writer shapes.
+//! the writer wrote `ClientTextbox`, shape, drawing and slide records in place,
+//! and its SHA-256 recorded here. The same inputs must keep producing the same
+//! bytes: ASCII, Latin-1, CJK and supplementary-plane text, empty and very long
+//! text, text interactions, rich text, tables, pictures, comments, transitions,
+//! timings, per-slide header/footer records, notes (through `save`), and the
+//! three benchmark writer shapes.
 
 use litchi_core::validation::EvidenceDigest;
 use litchi_ppt::writer::text_format::{Paragraph, TextRun};

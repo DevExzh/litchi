@@ -1,6 +1,6 @@
 //! Positive proof that the owned cross-copy's plan and application take the
-//! memoized routes of change 0751, and that each memo answers only for
-//! allocations it provably names.
+//! memoized routes, and that each memo answers only for allocations it provably
+//! names.
 //!
 //! `digest_reuse_tests` proves the values did not move. These tests prove the
 //! saving is real and bounded: which fingerprints consulted a memo, how many
@@ -180,7 +180,7 @@ fn an_application_hashes_only_payloads_no_memo_names() -> Result<()> {
     destination.apply_cross_slide_copy_plan(&source, &plan)?;
     let consulted = fingerprint_log::take_with_parent();
     // The primary edit that stages the plan captures the destination first;
-    // planning filled its memo, so that capture hashes nothing (record 0356).
+    // planning filled its memo, so that capture hashes nothing.
     assert_eq!(
         hashed(&consulted),
         [0, 0, 0, UNSHARED, 0],
@@ -295,12 +295,11 @@ fn a_capture_fills_the_facade_memo_and_the_next_capture_reuses_it() -> Result<()
     Ok(())
 }
 
-/// A capture's memo is re-projected onto the facade's own allocations (change
-/// 0751's review). A facade holding a caller-defined part that copies its
-/// payload when cloned keeps every entry but that part's: the snapshot's memo
-/// names the snapshot's copy, which the facade does not hold, and every entry
-/// the facade keeps retains the facade's own `Arc`. A later capture still
-/// computes every value.
+/// A capture's memo is re-projected onto the facade's own allocations. A facade
+/// holding a caller-defined part that copies its payload when cloned keeps
+/// every entry but that part's: the snapshot's memo names the snapshot's copy,
+/// which the facade does not hold, and every entry the facade keeps retains the
+/// facade's own `Arc`. A later capture still computes every value.
 #[test]
 fn a_capture_memo_is_projected_onto_the_facade_allocations() -> Result<()> {
     let (source_bytes, _destination) = media_pair()?;

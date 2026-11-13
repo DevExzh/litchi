@@ -486,8 +486,8 @@ pub struct Spec {
     binding: Binding,
     appearance: Appearance,
     series_kinds: Vec<Kind>,
-    /// Per-series worksheet references (record 0338): `(series index,
-    /// values reference, categories reference)`.
+    /// Per-series worksheet references: `(series index, values reference,
+    /// categories reference)`.
     series_references: Vec<(usize, String, Option<String>)>,
 }
 
@@ -752,10 +752,10 @@ impl Spec {
 
     /// Bind the values of series `index` to the worksheet range `values`
     /// (`Sheet1!$B$2:$B$13`), and its categories to `categories` when
-    /// given; the series keeps its cached values (record 0338). Each
-    /// reference overrides the [`Binding`]'s for that series, so a chart can
-    /// refer to ranges anywhere in a workbook, another sheet included. A
-    /// scatter or bubble chart ignores them.
+    /// given; the series keeps its cached values. Each reference overrides the
+    /// [`Binding`]'s for that series, so a chart can refer to ranges anywhere
+    /// in a workbook, another sheet included. A scatter or bubble chart ignores
+    /// them.
     ///
     /// ```
     /// use litchi_drawingml::chart::authoring::{Kind, Series, Spec, Variant};

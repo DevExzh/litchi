@@ -33,7 +33,7 @@ fn parses_writes_typed_sheets_steps_strict_and_extensions() {
     assert!(strict.contains(STRICT_NS));
     assert!(strict.contains("x:cell=\"kept\""));
     // The retained extension list re-declares what it inherits from the chain
-    // root, so it parses standalone (change 0653).
+    // root, so it parses standalone.
     assert!(strict.contains("<extLst"));
     let reparsed = read(strict.as_bytes()).unwrap();
     assert_eq!(reparsed, chain);

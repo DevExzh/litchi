@@ -1,4 +1,4 @@
-//! Source-backed DOC editing (record 0359a F2, the 0355a §1 shape).
+//! Source-backed DOC editing.
 //!
 //! ```text
 //! source_backed::Package::open(Arc<dyn ReadAt>) / from_bytes / from_shared

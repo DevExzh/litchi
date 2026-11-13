@@ -17,11 +17,11 @@
 //! publishes nothing for a value equal to the stored one.
 //!
 //! [`Edit::set_app_props`] and [`Edit::set_custom_props`] stage the
-//! application and custom properties (record 0342). [`Edit::remove_custom_props`]
-//! explicitly removes the custom-properties graph. They are written by the
-//! shared engine's exact part patch ([`litchi_ooxml_common::properties::Patch`]):
-//! the application part is spliced, so every element the typed model does
-//! not carry keeps its bytes, and an unchanged value publishes nothing.
+//! application and custom properties. [`Edit::remove_custom_props`] explicitly
+//! removes the custom-properties graph. They are written by the shared engine's
+//! exact part patch ([`litchi_ooxml_common::properties::Patch`]): the
+//! application part is spliced, so every element the typed model does not carry
+//! keeps its bytes, and an unchanged value publishes nothing.
 //!
 //! ```
 //! use litchi_docx::Package;
@@ -109,7 +109,7 @@ pub enum Error {
     #[error("the metadata patch base does not match the package's core properties")]
     PatchConflict,
     /// The application- or custom-properties part refused the staged value,
-    /// or its graph is invalid (record 0342).
+    /// or its graph is invalid.
     #[error(transparent)]
     Properties(#[from] families::Error),
     /// A staged value exceeds a metadata bound.

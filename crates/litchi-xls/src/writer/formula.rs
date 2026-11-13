@@ -341,7 +341,7 @@ pub struct FormulaTokenizer {
     /// Built-in function names to indices
     functions: &'static [(&'static str, u16)],
     /// Whether every other built-in worksheet function is admitted too
-    /// (record 0327, for conditional-format and validation formulas).
+    /// (for conditional-format and validation formulas).
     extended: bool,
 }
 
@@ -371,7 +371,7 @@ impl FormulaTokenizer {
 
     /// The Excel function-table index of the upper-case function `name`:
     /// the tokenizer's own table first, then, for an extended tokenizer,
-    /// every other admitted built-in function (record 0327).
+    /// every other admitted built-in function.
     fn function_index(&self, name: &str) -> Option<u16> {
         self.functions
             .iter()
@@ -1877,9 +1877,8 @@ mod tests {
         assert!(try_encode_array_tokens(&[Ptg::Num(-0.0)], &[None], 1_800).is_err());
     }
 
-    /// The static function table (change 0766) resolves every name the
-    /// per-tokenizer map did, in any case, to the same Excel index, and
-    /// nothing else.
+    /// The static function table resolves every name the per-tokenizer
+    /// map did, in any case, to the same Excel index, and nothing else.
     #[test]
     fn every_function_resolves_to_its_excel_index_in_any_case() {
         let expected = [

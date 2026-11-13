@@ -1,6 +1,6 @@
-//! Record encoders of the worksheet-feature editor (record 0327). Every
-//! encoder returns complete records (headers included) and refuses values
-//! outside their BIFF8 bounds instead of truncating them.
+//! Record encoders of the worksheet-feature editor. Every encoder returns
+//! complete records (headers included) and refuses values outside their
+//! BIFF8 bounds instead of truncating them.
 
 use super::Area;
 use super::stream::{

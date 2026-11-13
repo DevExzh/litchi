@@ -1,5 +1,4 @@
-//! The staged part-level engine behind the XLSB package edit families
-//! (unified-ops records 0322 and 0360b).
+//! The staged part-level engine behind the XLSB package edit families.
 //!
 //! [`Staged`] owns one immutable [`Package`] (a reference-count clone, with
 //! its cached workbook projection) and, from the first change on, a staged

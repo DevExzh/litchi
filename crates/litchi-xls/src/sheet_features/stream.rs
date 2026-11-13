@@ -1,5 +1,5 @@
 //! Record-level views of a BIFF8 Workbook stream for the worksheet-feature
-//! editor (record 0327).
+//! editor.
 //!
 //! The editor never decodes cells. It splits the workbook globals and one
 //! worksheet substream into raw records (an embedded chart substream is one

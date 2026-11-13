@@ -1,4 +1,4 @@
-//! Package-graph changes staged with a main-document edit (record 0251b).
+//! Package-graph changes staged with a main-document edit.
 //!
 //! An eager package-bound [`Edit`] can stage relationships of the main part,
 //! new parts related from it, and exact replacements of existing parts. They

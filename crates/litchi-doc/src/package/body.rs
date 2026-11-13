@@ -1,4 +1,4 @@
-//! Package-level body-text routes (record 0359a F1).
+//! Package-level body-text routes.
 //!
 //! The body-text engine (`body_text::{Snapshot, Edit, Commit, Patch}`) is
 //! crate-private: [`Package::edit`] is its only staging route. This module

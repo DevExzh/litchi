@@ -1,7 +1,6 @@
 #![allow(missing_docs)]
 // quick-xml's checked attribute iteration is quadratic on hostile tags; read
-// attributes through `omml::xml_attributes` (records 0764 and 0770, workspace
-// `clippy.toml`).
+// attributes through `omml::xml_attributes` (workspace `clippy.toml`).
 #![cfg_attr(not(test), deny(clippy::disallowed_methods))]
 
 // Formula Module - Mathematical Formula Parsing and Conversion

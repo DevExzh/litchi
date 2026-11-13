@@ -1,5 +1,4 @@
-//! The exact, reversible package-graph patch of a package-level edit family
-//! (record 0355).
+//! The exact, reversible package-graph patch of a package-level edit family.
 //!
 //! A family stages its changes on a working copy of the package; the patch
 //! is the difference between the source graph and the working graph: for

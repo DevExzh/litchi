@@ -8,7 +8,7 @@
 //! [`crate::Package::shape_designer_properties`] reads a [`Snapshot`];
 //! [`crate::Package::edit_shape_designer_properties`] starts an [`Edit`]
 //! whose [`Edit::commit`] publishes a new package with the reversible
-//! [`Patch`] (record 0351 §2.3).
+//! [`Patch`].
 
 use std::ops::Range;
 use std::sync::Arc;

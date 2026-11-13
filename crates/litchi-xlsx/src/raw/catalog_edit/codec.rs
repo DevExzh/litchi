@@ -185,7 +185,7 @@ pub(super) fn scan(content: &[u8]) -> Result<Layout> {
     // The scan recognizes markup-compatibility names on namespace values as
     // written. A declaration that spells the namespace with references binds
     // it for preprocessing all the same, so every operation that refuses
-    // alternate content refuses such a workbook too (record 0011).
+    // alternate content refuses such a workbook too.
     if litchi_ooxml_common::mce::binds_namespace_by_reference(content) {
         scanner.alternate_content = true;
         scanner.alternate_dependencies = true;

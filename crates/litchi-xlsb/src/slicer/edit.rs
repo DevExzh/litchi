@@ -1,4 +1,4 @@
-//! Immutable slicer edits of an XLSB [`Package`] (record 0360b).
+//! Immutable slicer edits of an XLSB [`Package`].
 //!
 //! [`Package::edit_slicers`] starts an [`Edit`] over the workbook slicer
 //! caches and every worksheet's slicer views; its verbs replace, upsert or

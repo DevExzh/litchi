@@ -1,4 +1,4 @@
-//! Immutable slide-ID Designer-tag edits of a [`Package`] (record 0351 §2.3).
+//! Immutable slide-ID Designer-tag edits of a [`Package`].
 //!
 //! [`Package::edit_slide_designer_tags`] starts an [`Edit`]: [`Edit::set`]
 //! creates or replaces the Designer tag list of one slide's `p:sldId` and

@@ -1,6 +1,5 @@
-//! The VBA-project family (record 0355): the main document's MS-OVBA
-//! project and its Word supplemental data. Payloads stay inert: nothing is
-//! executed.
+//! The VBA-project family: the main document's MS-OVBA project and its Word
+//! supplemental data. Payloads stay inert: nothing is executed.
 //!
 //! [`Package::vba`](crate::Package::vba) discovers the attached project;
 //! [`Package::edit_vba`](crate::Package::edit_vba) stages an [`Edit`] whose
@@ -14,8 +13,7 @@ use crate::vba_project::{VbaProject, VbaSupplementalData};
 graph_family!("VBA-project", own_limits);
 
 /// The typed budgets of the VBA-project family: its limit errors are
-/// [`litchi_vba::Error::Limit`] carried by [`crate::Error::Vba`] (record
-/// 0360).
+/// [`litchi_vba::Error::Limit`] carried by [`crate::Error::Vba`].
 pub use litchi_vba::LimitKind;
 graph_edit!("VBA-project", edit_vba, apply_vba);
 

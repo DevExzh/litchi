@@ -48,9 +48,9 @@ use sha2::{Digest as _, Sha256};
 use soapberry_zip::office::StreamingArchiveWriter;
 use tempfile::tempdir;
 
-/// Record 0355a: a prepared stream plan commits to a new source-backed
-/// package, and writing that package is the publication. These helpers
-/// keep the publication-shaped assertions of this suite.
+/// A prepared stream plan commits to a new source-backed package, and writing
+/// that package is the publication. These helpers keep the publication-shaped
+/// assertions of this suite.
 struct Published {
     commit: source_backed::paragraph_stream::Commit,
 }

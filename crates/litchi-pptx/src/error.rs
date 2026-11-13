@@ -395,15 +395,14 @@ pub enum SlideCopyRefusal {
 /// serialized header carries.
 ///
 /// A durable patch embeds complete-package revisions computed by one exact
-/// algorithm. Change 0655 redefined that algorithm (`litchi-pptx-opened-v1` →
+/// algorithm. That algorithm was redefined (`litchi-pptx-opened-v1` →
 /// `litchi-pptx-opened-v2`), so the two durable families carry a new magic and
-/// a patch serialized under the superseded magic is refused by name rather
-/// than compared across algebras. Change 0742 made a cross-presentation copy's
-/// serialized-archive (physical) revisions depend on how its candidate
-/// encodes copied image members, which the header now records; `LPCP0003`
-/// carries no such field, so it is superseded by `LPCP0004` and refused by
-/// name rather than read implicitly as either encoding. See
-/// [`Error::PatchConflict`].
+/// a patch serialized under the superseded magic is refused by name rather than
+/// compared across algebras. A cross-presentation copy's serialized-archive
+/// (physical) revisions depend on how its candidate encodes copied image
+/// members, which the header now records; `LPCP0003` carries no such field, so
+/// it is superseded by `LPCP0004` and refused by name rather than read
+/// implicitly as either encoding. See [`Error::PatchConflict`].
 ///
 /// This enum never carries attacker-supplied bytes: an unrecognized magic is
 /// not classified here at all and keeps the existing
@@ -419,7 +418,7 @@ pub enum DurablePatchFormat {
     CrossSlideCopyV2,
     /// `LPCP0003`: cross-presentation slide copy without the recorded
     /// copied-media encoding its physical revisions now depend on
-    /// (superseded by change 0742).
+    /// (superseded).
     CrossSlideCopyV3,
     /// `LPCP0004`: cross-presentation slide copy, current semantic and
     /// physical proofs, with the candidate's copied-media encoding recorded.
@@ -502,7 +501,7 @@ pub enum SlideOrderRefusal {
 }
 
 impl SlideCopyRefusal {
-    /// The refusal kind litchi-ops classifies this reason by (record 0351).
+    /// The refusal kind litchi-ops classifies this reason by.
     #[must_use]
     pub const fn kind(self) -> litchi_core::edit::RefusalKind {
         use litchi_core::edit::RefusalKind;
@@ -540,7 +539,7 @@ impl std::fmt::Display for SlideCopyRefusal {
 }
 
 impl SlideRemovalRefusal {
-    /// The refusal kind litchi-ops classifies this reason by (record 0351).
+    /// The refusal kind litchi-ops classifies this reason by.
     ///
     /// [`Self::FinalSlide`] is an invalid value: the selection would leave
     /// the presentation without slides. litchi-ops reports it as
@@ -580,7 +579,7 @@ impl std::fmt::Display for SlideRemovalRefusal {
 }
 
 impl SlideOrderRefusal {
-    /// The refusal kind litchi-ops classifies this reason by (record 0351).
+    /// The refusal kind litchi-ops classifies this reason by.
     ///
     /// [`Self::AmbiguousBindings`] is unsupported content; litchi-ops
     /// reports it as `corrupt_file`, because ambiguous slide bindings are a
@@ -615,7 +614,7 @@ impl std::fmt::Display for SlideOrderRefusal {
 }
 
 impl ShapeTransferRefusal {
-    /// The refusal kind litchi-ops classifies this reason by (record 0351).
+    /// The refusal kind litchi-ops classifies this reason by.
     #[must_use]
     pub const fn kind(self) -> litchi_core::edit::RefusalKind {
         use litchi_core::edit::RefusalKind;
@@ -858,14 +857,13 @@ pub enum Error {
     #[error("invalid PresentationML URI: {0}")]
     Uri(String),
 
-    /// A well-formed request this route refuses (record 0351): the kind
-    /// classifies it, the operation and reason are static text.
+    /// A well-formed request this route refuses: the kind classifies it, the
+    /// operation and reason are static text.
     #[error("PPTX {0}")]
     Refused(litchi_core::edit::Refusal),
 
     /// A patch or staged plan does not match the package it is applied to:
-    /// it was made against different exact source bytes or another revision
-    /// (record 0351).
+    /// it was made against different exact source bytes or another revision.
     #[error("PPTX patch base does not match the target package")]
     PatchConflict,
 

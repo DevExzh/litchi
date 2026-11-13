@@ -1,4 +1,4 @@
-//! The worksheet-feature transaction (record 0327, ADR 0034 scoped family).
+//! The worksheet-feature transaction (ADR 0034 scoped family).
 //!
 //! [`Edit`] stages record-level changes to a working copy of the Workbook
 //! stream; [`Edit::commit`] publishes them as a new [`Package`] and an exact

@@ -94,8 +94,7 @@ pub enum Refusal {
 }
 
 impl Refusal {
-    /// The shared refusal kind litchi-ops classifies this reason by (record
-    /// 0351).
+    /// The shared refusal kind litchi-ops classifies this reason by.
     #[must_use]
     pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
         use litchi_core::edit::RefusalKind;
@@ -141,7 +140,7 @@ pub enum Error {
     /// A finite operation ceiling was exceeded.
     #[error("plain paragraph tail append {kind} limit exceeded: {actual} > {maximum}")]
     Limit {
-        /// The exceeded budget (record 0355a).
+        /// The exceeded budget.
         kind: LimitKind,
         /// First observed value beyond the ceiling.
         actual: u64,
@@ -402,8 +401,7 @@ impl<'package, 'text> Edit<'package, 'text> {
         self.with_options(options).prepare()
     }
 
-    /// Prepare and commit the append as a new source-backed package
-    /// (record 0355a).
+    /// Prepare and commit the append as a new source-backed package.
     ///
     /// # Errors
     ///
@@ -466,7 +464,7 @@ impl<'package> Plan<'package> {
     }
 
     /// Commit the prepared append as a new source-backed package; writing
-    /// that package publishes this plan's source splice (record 0355a).
+    /// that package publishes this plan's source splice.
     ///
     /// # Errors
     ///
@@ -653,9 +651,9 @@ impl Package {
     }
 
     /// Replay a tail-append patch onto this package: the same paragraph is
-    /// appended to this package's main story (record 0355a). The inverse
-    /// restores the retained owner, or an independently opened package whose
-    /// complete content matches the recorded candidate.
+    /// appended to this package's main story. The inverse restores the retained
+    /// owner, or an independently opened package whose complete content matches
+    /// the recorded candidate.
     ///
     /// # Errors
     ///
@@ -3823,7 +3821,8 @@ fn validate_candidate(
     }
     Ok(())
 }
-/// The bounded resources of a source-backed tail append, carried by [`Error::Limit`] (record 0355a).
+/// The bounded resources of a source-backed tail append, carried by
+/// [`Error::Limit`].
 ///
 /// Each variant names one bounded resource; [`std::fmt::Display`] gives its
 /// human-readable name, the one the error messages print.

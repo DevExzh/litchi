@@ -3177,9 +3177,9 @@ mod tests {
         )
     }
 
-    // Review of the 0759 merge: the closure probes read any `get_part` error
-    // as absence, so a present part whose payload failed to decode was
-    // silently left out of the reverse closure.
+    // The closure probes used to read any `get_part` error as absence, so a
+    // present part whose payload failed to decode was silently left out of the
+    // reverse closure.
     #[test]
     fn closure_probes_refuse_a_present_part_that_fails_to_decode() {
         let before = lazy_package(b"<a/>", true);

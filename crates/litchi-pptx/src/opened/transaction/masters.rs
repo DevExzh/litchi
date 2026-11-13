@@ -1,4 +1,4 @@
-//! Slide master and slide layout names and placeholder text (record 0321).
+//! Slide master and slide layout names and placeholder text.
 //!
 //! Masters are selected by their zero-based position in
 //! `p:sldMasterIdLst`, layouts by their position in their master's

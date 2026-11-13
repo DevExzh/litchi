@@ -4,7 +4,7 @@
     reason = "table edit tests use panic-driven assertions"
 )]
 
-//! Table-cell text through the canonical primary edit (record 0323).
+//! Table-cell text through the canonical primary edit.
 
 use litchi_ppt::Package;
 use litchi_ppt::package::edit::{Position, Target};

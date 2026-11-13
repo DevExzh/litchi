@@ -733,7 +733,7 @@ impl<R: Read + Seek> Reader<R> {
                     if !preserve_formula_defect
                         && matches!(formula_defect, Some(FlagDefect::SharedWithoutPtgExp))
                     {
-                        // The stale flag is ignored (record 0316).
+                        // The stale flag is ignored.
                         tolerance.record(
                             WorksheetDefect::SharedFormulaFlag,
                             u32::from(cell_record.row()),

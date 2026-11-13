@@ -1,4 +1,4 @@
-//! The typed budgets of the MS-OVBA project codec (record 0360).
+//! The typed budgets of the MS-OVBA project codec.
 
 /// A MS-OVBA project codec budget that was exceeded.
 ///

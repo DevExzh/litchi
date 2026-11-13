@@ -547,7 +547,7 @@ impl Snapshot {
     }
 
     /// Capture only the core-properties family of an owning package; the
-    /// application and custom families are not read (record 0377a).
+    /// application and custom families are not read.
     ///
     /// Only [`publish_core_metadata`] uses such a snapshot, and only for a
     /// changed core patch, which reads and writes nothing of the other two
@@ -1279,8 +1279,8 @@ impl Plan {
     /// Setting a value equal to the snapshot's is an exact no-op even when
     /// the source has no core part: these hosts read an absent part as
     /// `Metadata::default()`, so creating one would change bytes without
-    /// changing the value (0351 §2.3 *No-op*). A host whose API tells an
-    /// absent core part from an empty one records explicit creation through
+    /// changing the value. A host whose API tells an absent core part from
+    /// an empty one records explicit creation through
     /// [`Self::set_core_metadata`].
     pub fn set_metadata(&mut self, metadata: Metadata) -> &mut Self {
         self.metadata = Some(metadata);
@@ -2268,7 +2268,7 @@ impl Edit {
         }
         // The patch was planned from this edit's own snapshot of `package`,
         // which nothing has changed since, so `Patch::apply`'s source check
-        // and second package clone are redundant here (record 0377a).
+        // and second package clone are redundant here.
         if !patch.is_noop() {
             refuse_signed_change(&package)?;
             patch.apply_changes(&mut package)?;
@@ -2278,7 +2278,7 @@ impl Edit {
 }
 
 /// Publish a changed core-properties value of an owning package, reading
-/// and diffing only the core family (record 0377a).
+/// and diffing only the core family.
 ///
 /// `target` replaces the core fields (`None` removes the part), as
 /// [`Edit::set_core_metadata`] and [`Edit::clear_metadata`] stage them. The

@@ -164,8 +164,8 @@ pub enum Error {
     },
     /// Workbook is password protected
     PasswordProtected,
-    /// A well-formed request this route refuses (record 0351 §2.4),
-    /// classified by its [`litchi_core::edit::RefusalKind`].
+    /// A well-formed request this route refuses, classified by its
+    /// [`litchi_core::edit::RefusalKind`].
     Refused(litchi_core::edit::Refusal),
     /// A configured budget was exceeded.
     Limit {

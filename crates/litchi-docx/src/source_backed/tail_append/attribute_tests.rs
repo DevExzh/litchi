@@ -1,5 +1,5 @@
-//! Change 0764: the opaque-section attribute check and the settings MCE
-//! directive facts stay bounded on hostile start tags and namespace scopes.
+//! The opaque-section attribute check and the settings MCE directive facts stay
+//! bounded on hostile start tags and namespace scopes.
 
 use std::fmt::Write as _;
 
@@ -83,7 +83,7 @@ fn opaque_attributes_refuse_repeats_as_before_and_accept_many_distinct_names() {
     ));
 }
 
-/// The prefix lookup `settings_mce_directive_facts` made before 0764.
+/// The prefix lookup `settings_mce_directive_facts` used to make.
 fn bindings_lookup<'r>(resolver: &'r NamespaceResolver, prefix: &[u8]) -> Option<Namespace<'r>> {
     resolver
         .bindings()

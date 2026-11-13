@@ -1,4 +1,4 @@
-//! Package-level animation edits (record 0357).
+//! Package-level animation edits.
 //!
 //! [`Package::edit_animations`] stages edits of the persisted animation and
 //! timing records of every slide and main master, [`Edit::commit`] publishes a

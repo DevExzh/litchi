@@ -527,8 +527,8 @@ mod tests {
         .expect("the main document decodes")
     }
 
-    // Review of the 0759 merge: the helper decoded the settings part only to
-    // read its relationships, and read a failed decode as "no targets".
+    // The helper used to decode the settings part only to read its
+    // relationships, and read a failed decode as "no targets".
     #[test]
     fn mail_merge_targets_are_read_from_metadata_without_decoding() {
         let snapshot = SettingsPartSnapshot {

@@ -48,7 +48,7 @@ mod transition_edit_tests;
 /// The family reports the crate's [`crate::Error`]; resource refusals of the
 /// family's own [`Limits`] use [`crate::Error::Limit`] with a
 /// [`LimitKind`]. Splitting a focused error out of the crate error is
-/// deferred (record 0252).
+/// deferred.
 pub use crate::Error;
 pub use limit::{CodecLimitKind, LimitKind};
 pub use model::{
@@ -57,8 +57,8 @@ pub use model::{
 };
 pub use patch::{Conflict, History, Patch, Resolution, ThreeWayPlan};
 
-/// Configuration of a primary edit (record 0351 §2.5): the bounds of its
-/// [`Limits`]. The defaults are the finite [`Limits::default`].
+/// Configuration of a primary edit: the bounds of its [`Limits`]. The defaults
+/// are the finite [`Limits::default`].
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct EditOptions {
     limits: Limits,

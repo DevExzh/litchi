@@ -1,5 +1,5 @@
-//! The XLS property-set edit family (record 0351 §2.3): typed edits of the
-//! OLE `SummaryInformation`, `DocumentSummaryInformation` and user-defined
+//! The XLS property-set edit family: typed edits of the OLE
+//! `SummaryInformation`, `DocumentSummaryInformation` and user-defined
 //! property sets of one [`Package`].
 //!
 //! [`Package::property_sets`] reads the sections, [`Package::edit_property_sets`]

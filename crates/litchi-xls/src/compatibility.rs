@@ -15,10 +15,10 @@ pub enum CompatibilityProfile {
     ///
     /// `[MS-XLS]` 2.4.127 requires the token only for a formula that is part
     /// of a shared formula. The strict profile ignores such a stale flag and
-    /// records [`crate::WorksheetDefect::SharedFormulaFlag`] (record 0316);
-    /// this V1 profile keeps the flag in the typed metadata instead and
-    /// reports [`crate::formula_metadata::Defect::SharedFlagWithoutPtgExp`].
-    /// It exists for the real `ConditionalFormattingSamples.xls` fixture
+    /// records [`crate::WorksheetDefect::SharedFormulaFlag`]; this V1
+    /// profile keeps the flag in the typed metadata instead and reports
+    /// [`crate::formula_metadata::Defect::SharedFlagWithoutPtgExp`]. It
+    /// exists for the real `ConditionalFormattingSamples.xls` fixture
     /// mirrored in the Apache POI spreadsheet test-data corpus. Local
     /// provenance does not identify the original producing application, so
     /// no producer is inferred.

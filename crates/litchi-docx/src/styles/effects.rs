@@ -3115,9 +3115,9 @@ mod tests {
             .expect("corruption is deferred to first decode")
     }
 
-    // Review of the 0759 merge: the graph walk decoded every owner only to
-    // read its relationships, and skipped an owner whose payload failed to
-    // decode, losing the parts reachable through it.
+    // The graph walk used to decode every owner only to read its relationships,
+    // and skipped an owner whose payload failed to decode, losing the parts
+    // reachable through it.
     #[test]
     fn relationship_graph_walk_reads_metadata_without_decoding_payloads() {
         for corrupt_owner in [false, true] {

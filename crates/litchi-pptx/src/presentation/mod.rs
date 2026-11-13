@@ -40,7 +40,7 @@ pub use source::raw;
 pub use source::sections;
 
 /// The `firstSlideNum` of a `p:presentation` root (default 1), the number
-/// slide-number fields count from (record 0279).
+/// slide-number fields count from.
 pub(crate) fn first_slide_number(xml: &[u8]) -> crate::Result<u32> {
     use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
     use quick_xml::events::Event;

@@ -517,7 +517,7 @@ mod testing {
     use super::{PublishSteps, sync_parent};
 
     /// Real steps whose parent synchronization is a caller hook; the shape of
-    /// the pre-0761 private test entry point, whose only test is unix-only.
+    /// the earlier private test entry point, whose only test is unix-only.
     #[cfg(unix)]
     pub(super) struct ParentSyncHook<S> {
         sync: Option<S>,
@@ -915,7 +915,7 @@ mod tests {
 
     #[test]
     fn each_level_makes_exactly_its_synchronizations() {
-        // (file syncs, parent syncs, renames) per level, as change 0761 fixes.
+        // (file syncs, parent syncs, renames) per level.
         let expected = [(1, 1, 1), (1, 0, 1), (0, 0, 1)];
         for (durability, expected) in LEVELS.into_iter().zip(expected) {
             let directory = tempfile::tempdir().expect("temporary directory");

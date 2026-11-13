@@ -1,5 +1,5 @@
 //! Guarded source-backed existing-row visibility edits of a
-//! [`SourceBackedWorkbook`] (record 0360, the 0355a §1 shape).
+//! [`SourceBackedWorkbook`].
 //!
 //! [`SourceBackedWorkbook::edit_row_visibility`] stages hide/unhide changes of
 //! existing row owners of one worksheet; [`Edit::commit`] returns a

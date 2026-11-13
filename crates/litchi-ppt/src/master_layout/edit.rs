@@ -1,4 +1,4 @@
-//! Package-level master-layout edits (record 0357).
+//! Package-level master-layout edits.
 //!
 //! [`Package::edit_master_layout`] stages record-tree edits of one master
 //! record, [`Edit::commit`] validates the candidate and publishes a new

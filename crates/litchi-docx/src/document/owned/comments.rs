@@ -1,5 +1,4 @@
-//! Comment authoring and removal staged with a main-document edit (record
-//! 0251c).
+//! Comment authoring and removal staged with a main-document edit.
 //!
 //! A comment lives in the comments part and is anchored in the main
 //! document by a range and a reference run. Adding one stages the part (or
@@ -50,13 +49,13 @@ pub struct NewComment {
     initials: Option<String>,
     date: Option<String>,
     text: String,
-    /// The comment this one replies to (record 0345).
+    /// The comment this one replies to.
     parent: Option<u32>,
-    /// The resolved state (record 0345).
+    /// The resolved state.
     done: Option<bool>,
-    /// The direct run a whole-paragraph range starts after (record 0345).
+    /// The direct run a whole-paragraph range starts after.
     start_after: Option<Position>,
-    /// Whether the comment has range markers (record 0345).
+    /// Whether the comment has range markers.
     range: bool,
 }
 
@@ -78,15 +77,14 @@ impl NewComment {
 
     /// Make the comment a reply to comment `parent` (its native
     /// identifier), threaded through `commentsExtended`
-    /// (`w15:paraIdParent`) as Word threads replies (record 0345).
+    /// (`w15:paraIdParent`) as Word threads replies.
     #[must_use]
     pub const fn with_parent(mut self, parent: u32) -> Self {
         self.parent = Some(parent);
         self
     }
 
-    /// Set the comment's resolved state (`w15:done` in `commentsExtended`,
-    /// record 0345).
+    /// Set the comment's resolved state (`w15:done` in `commentsExtended`).
     #[must_use]
     pub const fn with_done(mut self, done: bool) -> Self {
         self.done = Some(done);
@@ -95,8 +93,8 @@ impl NewComment {
 
     /// For a whole-paragraph anchor, start the comment's range after the
     /// paragraph's direct run `run` instead of at the paragraph start
-    /// (OfficeCLI's `runStart`, record 0345). A run the paragraph lacks
-    /// keeps the paragraph start.
+    /// (OfficeCLI's `runStart`). A run the paragraph lacks keeps the paragraph
+    /// start.
     #[must_use]
     pub const fn with_start_after(mut self, run: Position) -> Self {
         self.start_after = Some(run);
@@ -105,7 +103,7 @@ impl NewComment {
 
     /// Whether the comment spans a range (`true`, the default: range
     /// markers and a reference run) or is a point comment carrying only
-    /// its reference run (`false`; OfficeCLI's `range=false`, record 0345).
+    /// its reference run (`false`; OfficeCLI's `range=false`).
     #[must_use]
     pub const fn with_range(mut self, range: bool) -> Self {
         self.range = range;
@@ -140,8 +138,8 @@ impl NewComment {
     }
 }
 
-/// A change of an existing comment (record 0335): its author, initials,
-/// date and text. Each part left unset keeps the comment's current value.
+/// A change of an existing comment: its author, initials, date and text. Each
+/// part left unset keeps the comment's current value.
 ///
 /// ```
 /// use litchi_docx::document::CommentChange;
@@ -194,8 +192,7 @@ impl CommentChange {
         self
     }
 
-    /// The new resolved state (`w15:done` in `commentsExtended`, record
-    /// 0345).
+    /// The new resolved state (`w15:done` in `commentsExtended`).
     #[must_use]
     pub const fn with_done(mut self, done: bool) -> Self {
         self.done = Some(done);
@@ -279,8 +276,8 @@ impl Edit<Package> {
             comment.start_after,
             !comment.range,
         )?;
-        // Replies and resolution (record 0345): the comment's paragraph
-        // takes a fresh identifier, which `commentsExtended` keys on.
+        // Replies and resolution: the comment's paragraph takes a fresh
+        // identifier, which `commentsExtended` keys on.
         let threaded = comment.parent.is_some() || comment.done.is_some();
         let mut current = current.map(|xml| xml.as_ref().clone());
         let mut fresh = self.fresh_paragraph_ids(current.as_deref())?;
@@ -548,9 +545,8 @@ impl Edit<Package> {
             cursor = end;
         }
         output.extend_from_slice(&xml[cursor..]);
-        // The resolved state (record 0345): the comment's last paragraph
-        // keys its `commentsExtended` entry, given an identifier if it has
-        // none.
+        // The resolved state: the comment's last paragraph keys its
+        // `commentsExtended` entry, given an identifier if it has none.
         let mut threaded = false;
         if let Some(done) = change.done {
             let mut fresh = self.fresh_paragraph_ids(Some(&output))?;
@@ -697,8 +693,7 @@ fn comment_range(xml: &[u8], id: u32) -> Result<Option<(usize, usize)>> {
 }
 
 /// The comments part with `comment` appended as comment `id`; its
-/// paragraph carries `paragraph_id` (`w14:paraId`) when given (record
-/// 0345).
+/// paragraph carries `paragraph_id` (`w14:paraId`) when given.
 fn append_comment(
     xml: &[u8],
     id: u32,

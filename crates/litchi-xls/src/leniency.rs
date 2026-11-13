@@ -661,7 +661,7 @@ impl SheetDefect {
 }
 
 /// The class of worksheet-record defect the reader repairs the way Excel,
-/// LibreOffice and Apache POI repair it (record 0316).
+/// LibreOffice and Apache POI repair it.
 ///
 /// Repaired and recorded under every [`Leniency`] variant. Each class is a
 /// field `[MS-XLS]` constrains as a producer obligation that Excel itself is

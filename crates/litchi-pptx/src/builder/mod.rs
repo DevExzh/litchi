@@ -2,7 +2,7 @@
 //!
 //! [`Builder`] owns the authoring drafts — the [`Presentation`] with its
 //! [`Slide`]s and their [`Shape`]s — and publishes them once, as an
-//! immutable [`Package`], in [`Builder::build`] (record 0351 §2.1 rule 7).
+//! immutable [`Package`], in [`Builder::build`].
 
 pub(crate) mod presentation;
 pub(crate) mod shape;

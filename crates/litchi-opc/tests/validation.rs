@@ -847,7 +847,7 @@ impl ReadAt for MutatingSource {
 }
 
 /// `validate_parts` reports a dangling internal relationship and a malformed
-/// XML part, and nothing for a well-formed package (record 0336).
+/// XML part, and nothing for a well-formed package.
 #[test]
 fn part_validation_reports_dangling_targets_and_malformed_xml() {
     let clean = package_bytes(CONTENT_TYPES, ROOT_RELS, b"<document/>");

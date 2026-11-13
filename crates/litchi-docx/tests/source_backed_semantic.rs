@@ -1059,9 +1059,9 @@ fn effective_owner_refuses_unmigrated_operations_and_foreign_candidates() {
                 .is_err()
         );
         assert!(effective.story_hyperlinks_only_snapshot().is_err());
-        // Record 0355a: a detached patch replays by content. The no-op
-        // patch of "before" applies to the unchanged effective owner (and
-        // writes its artifact) and is refused as stale by the changed one.
+        // A detached patch replays by content. The no-op patch of "before"
+        // applies to the unchanged effective owner (and writes its artifact)
+        // and is refused as stale by the changed one.
         let applied = effective.apply(commit.patch());
         if changed {
             assert!(applied.is_err());

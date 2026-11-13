@@ -1,11 +1,11 @@
-//! Change 0767: the reader's reusable chain maps keep every verdict and
-//! clear only what a walk set.
+//! The reader's reusable chain maps keep every verdict and clear only what a
+//! walk set.
 //!
 //! - Random call sequences hold both reusable chain collectors to the
 //!   allocating helpers they replace, call for call, and require an all-clear
 //!   map after every call.
-//! - Stream-allocation validation (A5 in record 0749) is held, on fault
-//!   injected states, to a copy of its per-stream fresh-map form.
+//! - Stream-allocation validation is held, on fault injected states, to a copy
+//!   of its per-stream fresh-map form.
 //! - Reading every stream through one reader, whose chain buffers persist,
 //!   is held to a fresh reader per stream.
 //! - The work tests count the words the chain maps write and bound them by
@@ -267,9 +267,9 @@ fn before_allocation_validation(file: &mut OleFile<Cursor<Vec<u8>>>) {
 }
 
 /// `validate_stream_allocations` as it was before this change: a fresh
-/// table-sized map for every stream, through the owned exact helper, which
-/// the base's scratch was tested to match. Record 0769 changed the bound on
-/// mini sectors (`MiniStreamEnd`) in both, identically.
+/// table-sized map for every stream, through the owned exact helper, which the
+/// base's scratch was tested to match. A later change moved the bound on mini
+/// sectors (`MiniStreamEnd`) in both, identically.
 fn fresh_map_allocation_validation(file: &mut OleFile<Cursor<Vec<u8>>>) -> Result<(), OleError> {
     file.repair_empty_stream_start(None);
     let root = file
@@ -851,10 +851,10 @@ fn a_reader_reuses_its_chain_buffers_across_reads_and_errors() {
     assert_eq!(file.stream_chain.sectors.capacity(), capacity);
 }
 
-/// Review follow-up (record 0769): a reader frees a chain buffer whose
-/// capacity exceeds `RETAINED_CHAIN_SCRATCH_BYTES` after the read that used
-/// it, on the FAT and MiniFAT paths and on success and error alike, keeps a
-/// buffer at or below the threshold, and keeps its visited map.
+/// A reader frees a chain buffer whose capacity exceeds
+/// `RETAINED_CHAIN_SCRATCH_BYTES` after the read that used it, on the FAT and
+/// MiniFAT paths and on success and error alike, keeps a buffer at or below
+/// the threshold, and keeps its visited map.
 #[test]
 fn a_reader_frees_an_oversized_chain_buffer_after_each_read() {
     let limit = RETAINED_CHAIN_SCRATCH_BYTES / size_of::<u32>();
@@ -923,9 +923,9 @@ fn a_reader_frees_an_oversized_chain_buffer_after_each_read() {
     assert_eq!(read_every_stream(&mut file, &paths), expected);
 }
 
-/// Review follow-up (record 0769): the MiniFAT read, like the FAT read, holds
-/// its chain buffers outside the reader while it works and puts them back,
-/// so mini stream reads keep reusing one scratch, all-clear after each.
+/// The MiniFAT read, like the FAT read, holds its chain buffers outside the
+/// reader while it works and puts them back, so mini stream reads keep reusing
+/// one scratch, all-clear after each.
 #[test]
 fn a_mini_stream_read_puts_its_chain_buffers_back() {
     let bytes = build_file(SECTOR_SIZE_V4, &[700, 1_500, 64, 3_000, 9_000]);

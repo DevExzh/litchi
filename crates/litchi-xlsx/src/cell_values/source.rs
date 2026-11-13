@@ -1,5 +1,5 @@
 //! Guarded source-backed value-only worksheet edits of a
-//! [`SourceBackedWorkbook`] (record 0360, the 0355a §1 shape).
+//! [`SourceBackedWorkbook`].
 //!
 //! [`SourceBackedWorkbook::edit_cell_values`] stages value-only changes over a
 //! bounded worksheet set ([`super::Edit`]); [`super::sheet`] is the same
@@ -323,7 +323,7 @@ impl crate::workbook::source::deferred::Change for Record {
             // The patch was made over this exact source: nothing to reload.
             SourceProvenance::Matched => Ok(()),
             SourceProvenance::Mismatched if before.same_lineage(package) => Err(conflict()),
-            // A replay compares content (record 0360).
+            // A replay compares content.
             SourceProvenance::Mismatched | SourceProvenance::Unavailable => {
                 let current = MultiSnapshot::load_source_backed(
                     package,

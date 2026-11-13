@@ -3146,11 +3146,11 @@ struct PreparedTopologyRetention {
     policy_appended: Vec<PolicyAppendedEntry>,
     _additions: Vec<TopologyPartAddition>,
     transfer_sources: Option<Arc<Vec<SourceSnapshot>>>,
-    /// One monitored-read scope per transfer source (change 0600's counted
-    /// scopes). They live exactly as long as the prepared state, so every read
-    /// of a transfer source during candidate readback and publication
-    /// re-observes that source, and a source shared with another package stops
-    /// paying the per-read observation once this preparation is dropped.
+    /// One monitored-read scope per transfer source (counted scopes). They
+    /// live exactly as long as the prepared state, so every read of a transfer
+    /// source during candidate readback and publication re-observes that
+    /// source, and a source shared with another package stops paying the
+    /// per-read observation once this preparation is dropped.
     _transfer_monitors: Vec<MonitoredReads>,
     _relationship_memory_reservations: Vec<Arc<Reservation>>,
     _content_type_memory_reservations: Vec<Arc<Reservation>>,
@@ -3178,9 +3178,8 @@ struct PreparedPart {
     source_xml: Option<SourceXmlPart>,
     /// The source XML audit's proof of `replacement`, with the boundaries
     /// its audit recorded or derived, kept on unmanaged packages only so the
-    /// next edit of this effective revision is proved from it (record
-    /// 0317). At most [`RETAINED_EFFECTIVE_XML_PROOFS`] Parts of one
-    /// revision keep one.
+    /// next edit of this effective revision is proved from it. At most
+    /// [`RETAINED_EFFECTIVE_XML_PROOFS`] Parts of one revision keep one.
     xml_proof: Option<xml_minifier::audit::VerifiedSource>,
     _metadata_reservation: Option<Arc<Reservation>>,
 }
@@ -4259,8 +4258,7 @@ type MonitoredReadDepth = AtomicUsize;
 /// the operation that needs per-read freshness: a stream, a verified read, or
 /// a publication that copies source bytes into an output. When the last scope
 /// on a snapshot ends the snapshot returns to the unmonitored state a freshly
-/// opened package is in, where the bracketing observations of change 0317
-/// fence a read instead.
+/// opened package is in, where bracketing observations fence a read instead.
 ///
 /// It counts rather than latches so that concurrent operations on the same
 /// snapshot, a nested scope, and a scope taken on a clone of the snapshot
@@ -8089,8 +8087,8 @@ impl SourceBackedPackage {
             .map_err(map_execution_error)?;
         self.source.ensure_current()?;
         self.cache.check_context().map_err(map_execution_error)?;
-        // A counted scope (change 0600): the read below and the fences after
-        // it re-observe the source for as long as this handle is built.
+        // A counted scope: the read below and the fences after it re-observe
+        // the source for as long as this handle is built.
         let _monitored = self.source.monitor_publication();
 
         let mut zip_accounting = LowLevelZipOperationAccounting::default();
@@ -8196,8 +8194,8 @@ impl SourceBackedPackage {
             .map_err(map_execution_error)?;
         self.source.ensure_current()?;
         self.cache.check_context().map_err(map_execution_error)?;
-        // A counted scope (change 0600): the read below and the fences after
-        // it re-observe the source for as long as this handle is built.
+        // A counted scope: the read below and the fences after it re-observe
+        // the source for as long as this handle is built.
         let _monitored = self.source.monitor_publication();
         let mut zip_accounting = LowLevelZipOperationAccounting::default();
         let read_result = if accounting.is_some() {
@@ -8983,9 +8981,9 @@ impl SourceBackedPackage {
     /// With `defer_payloads` (the source-preserving conversion, which always
     /// holds the source archive in memory), ordinary part payloads stay in
     /// that retained archive and inflate on first use, exactly as an owning
-    /// open of the same bytes defers them (record 0286); the declared sizes
-    /// are admitted here, as that open admits them before any payload work.
-    /// Otherwise every payload is read now.
+    /// open of the same bytes defers them; the declared sizes are admitted
+    /// here, as that open admits them before any payload work. Otherwise
+    /// every payload is read now.
     fn materialize_opc_package_with_accounting(
         &self,
         non_part_members: Vec<NonPartMember>,
@@ -11332,7 +11330,7 @@ impl SourceBackedPackage {
                 source,
             })?;
         // The proofs the audits below return, by pending replacement, kept
-        // for the effective Parts (record 0317).
+        // for the effective Parts.
         let mut replacement_proofs: Vec<Option<xml_minifier::audit::VerifiedSource>> = Vec::new();
         if !self.cache.is_managed() {
             replacement_proofs
@@ -13015,7 +13013,7 @@ impl SourceBackedPackage {
             ) {
                 // The pair audit's verdict and error, from the remembered
                 // original and its indexed proof when this unmanaged package
-                // has audited it before (records 0311, 0313 and 0317).
+                // has audited it before.
                 let _proof = self.audit_physical_replacement_xml(
                     overlay.target,
                     &original,
@@ -14885,9 +14883,9 @@ impl SourceBackedPackage {
     /// length and the operation is long enough to repay it.
     ///
     /// A managed package intentionally gets `None`: retaining decoder
-    /// workspace across a managed load would escape the managed memory budget
-    /// (change 0402). Its cancellation and reservation policy is unchanged. An
-    /// operation shorter than
+    /// workspace across a managed load would escape the managed memory budget.
+    /// Its cancellation and reservation policy is unchanged. An operation
+    /// shorter than
     /// [`SESSION_MEMBER_THRESHOLD`](crate::pkgreader::SESSION_MEMBER_THRESHOLD)
     /// also gets `None`, under that constant's stated rule: the one workspace a
     /// kept session retains is only worth its heap high-water when the
@@ -15135,8 +15133,8 @@ impl SourceBackedPackage {
             // this payload against a current source, nothing between the two
             // reads the source, and the fence that decides publication is the
             // one taken after the provisional publication below -- strictly
-            // later, and the only one that can undo what it observes. Change
-            // 0563 removed the warm-path observation on the same argument.
+            // later, and the only one that can undo what it observes. The
+            // warm-path observation was removed on the same argument.
             Ok(Arc::new(bytes))
         })();
         let reservation = flight
@@ -15178,11 +15176,11 @@ impl SourceBackedPackage {
                         self.cache
                             .complete_failure_with_observer(entry_id, &flight, observer);
                         // The flight is already completed as failed, so this
-                        // early return leaks nothing. Change 0317 fixes the
-                        // observable precedence as source-version failure
-                        // before execution failure, and the removed
-                        // pre-publication observation is what produced it on
-                        // this branch; take it here instead.
+                        // early return leaks nothing. The observable
+                        // precedence is source-version failure before
+                        // execution failure, and the removed pre-publication
+                        // observation is what produced it on this branch;
+                        // take it here instead.
                         self.source.ensure_current()?;
                         return Err(map_execution_error(error));
                     },
@@ -16023,17 +16021,17 @@ fn validate_overlay_xml(part: &str, bytes: &[u8]) -> Result<()> {
 /// replaces, on both sides of the replacement: the original bytes the package
 /// holds, then the replacement published in their place.
 ///
-/// Change 0654 introduced the source policy for the *original* bytes: they
-/// were written by whatever produced the package, this library did not author
-/// them, and the compact output contract does not apply to them (change 0652,
-/// decision 2). Change 0657 extended it to the *replacement* at the seven
-/// paired sites, because a source-backed replacement is a splice: the XLSX
-/// value editor copies every unedited row and cell record and the whole
-/// envelope from the source and authors compact bytes only for the cells it
-/// changed, so holding the assembled part to the compact contract refuses the
-/// producer's own indentation and, with it, every real third-party package.
-/// Compactness is therefore a property of this library's serializers,
-/// asserted by their own tests, and not a publication refusal on this route.
+/// The source policy applies to the *original* bytes: they were written by
+/// whatever produced the package, this library did not author them, and the
+/// compact output contract does not apply to them. It extends to the
+/// *replacement* at the seven paired sites, because a source-backed
+/// replacement is a splice: the XLSX value editor copies every unedited row
+/// and cell record and the whole envelope from the source and authors compact
+/// bytes only for the cells it changed, so holding the assembled part to the
+/// compact contract refuses the producer's own indentation and, with it,
+/// every real third-party package. Compactness is therefore a property of
+/// this library's serializers, asserted by their own tests, and not a
+/// publication refusal on this route.
 ///
 /// Every other check stays, on both sides, and reports the same
 /// [`OpcError::XmlPublication`] [`validate_overlay_xml`] reports: UTF-8,
@@ -16042,10 +16040,9 @@ fn validate_overlay_xml(part: &str, bytes: &[u8]) -> Result<()> {
 /// after the XML declaration, attribute separators of any length and
 /// whitespace before a tag close are accepted as the producer spelled them.
 ///
-/// Change 0747 audits the pair with one source-replacement audit call. The
-/// established paths use
-/// [`xml_minifier::audit::verify_source_replacement`], while the topology
-/// path may use its bounded
+/// The pair is audited with one source-replacement audit call. The
+/// established paths use [`xml_minifier::audit::verify_source_replacement`],
+/// while the topology path may use its bounded
 /// [`xml_minifier::audit::verify_source_replacement_with_spans`] variant when
 /// it receives more than one untrusted window hint. Both verdicts are exactly
 /// those of auditing the original and then the replacement with
@@ -16112,8 +16109,8 @@ impl SourceBackedPackage {
     ///
     /// On an unmanaged package the remembered original also keeps its audit's
     /// proof with the content boundaries that audit recorded
-    /// ([`xml_minifier::audit::VerifiedSource::verify_indexed`]; record
-    /// 0313). An unproven replacement is then audited by
+    /// ([`xml_minifier::audit::VerifiedSource::verify_indexed`]). An unproven
+    /// replacement is then audited by
     /// [`xml_minifier::audit::VerifiedSource::verify_successor`], whose
     /// verdict and error are the replacement's complete source audit but
     /// which scans only the bytes that took the place of a run between two
@@ -16121,7 +16118,7 @@ impl SourceBackedPackage {
     /// the original's allocation alive; at most
     /// [`RETAINED_SOURCE_XML_PROOFS`] are kept per package.
     ///
-    /// Record 0317 adds two things:
+    /// Two refinements apply:
     ///
     /// * `predecessor`, the retained proof of the effective revision the
     ///   replacement edits, is preferred over the original's proof once the
@@ -16229,7 +16226,7 @@ impl SourceBackedPackage {
 
     /// The indexed proof the source bytes of `partname` earned when this
     /// package last audited a replacement of them, when it keeps one;
-    /// nothing is audited (record 0317).
+    /// nothing is audited.
     ///
     /// Only an unmanaged package remembers its originals, at most four of
     /// them with their proofs, and only for its current source revision. The
@@ -16331,7 +16328,7 @@ const RETAINED_SOURCE_XML_PROOFS: usize = 4;
 const RETAINED_EFFECTIVE_XML_PROOFS: usize = 4;
 
 /// The depth to which the source XML audit of a Part with `content_type`
-/// records content boundaries (record 0317).
+/// records content boundaries.
 ///
 /// PresentationML slides, layouts, masters and notes keep their shapes in
 /// `p:cSld/p:spTree`, three elements deep, so they are indexed one level
@@ -16870,11 +16867,10 @@ fn write_exact_snapshot_with_accounting<W: Write>(
 ///
 /// The open reads `[Content_Types].xml`, the package `_rels/.rels`, and every
 /// `*/_rels/*.rels` relationship part the relationship walk or its orphan
-/// fallback reaches (change 0577 establishes that those reads are mandatory and
-/// measures that all 1,237 relationship parts of the 167-package OOXML corpus
-/// are read at open). The test is on the name alone: no member is read, parsed
-/// or classified to apply it, which is what lets it run before the catalog
-/// exists.
+/// fallback reaches (those reads are mandatory, and all 1,237 relationship
+/// parts of the 167-package OOXML corpus are read at open). The test is on the
+/// name alone: no member is read, parsed or classified to apply it, which is
+/// what lets it run before the catalog exists.
 ///
 /// It is deliberately a superset in one direction and exact in the other. A
 /// relationship part the walk never reaches is still named here, and the only
@@ -17391,7 +17387,7 @@ mod tests {
 
     /// The furthest before a member's payload that a read *of that member* can
     /// begin: the fixed local header plus the widest local variable region
-    /// change 0573 measured in this repository's corpus.
+    /// measured in this repository's corpus.
     const MEMBER_RECORD_PREFIX_BYTES: usize = 640;
 
     /// Whether one positional read fetches the payload of the member whose
@@ -17400,11 +17396,11 @@ mod tests {
     /// The test sources below fire — sleep, cancel, bump their version, park on
     /// a barrier — when the member they watch is fetched, and used to recognise
     /// that read by its start offset, because a member's payload arrived in a
-    /// read that *began* at it. Since change 0611 a member's first read is one
-    /// bounded read of its whole local record, which begins at the member's
-    /// local header, so the test is now that the read delivers the payload's
-    /// first byte *and* began inside the member's own local record. Both halves
-    /// matter: delivering the byte distinguishes the member read from the short
+    /// read that *began* at it. Today a member's first read is one bounded read
+    /// of its whole local record, which begins at the member's local header, so
+    /// the test is now that the read delivers the payload's first byte *and*
+    /// began inside the member's own local record. Both halves matter:
+    /// delivering the byte distinguishes the member read from the short
     /// local-record probes issued at the same offset, and beginning inside the
     /// member's own record keeps a bulk copy that spans the member from
     /// counting as a fetch of it, which is how these triggers behaved before.
@@ -18633,9 +18629,9 @@ mod tests {
 
     #[test]
     fn a_remembered_original_proves_insertions_from_its_boundaries() {
-        // Record 0313: the remembered original keeps its indexed proof, and
-        // an unproven replacement gets its complete audit's verdict and error
-        // from a scan of the inserted run alone.
+        // The remembered original keeps its indexed proof, and an unproven
+        // replacement gets its complete audit's verdict and error from a scan
+        // of the inserted run alone.
         let partname = PackURI::new("/word/document.xml").unwrap();
         let mut document = String::from("<w:document xmlns:w=\"urn:w\"><w:body>");
         for index in 0..40 {
@@ -18722,7 +18718,7 @@ mod tests {
 
     #[test]
     fn physical_replacement_audit_remembers_only_passing_originals() {
-        // Record 0311: the remembered original verdict and the plan's proof.
+        // The remembered original verdict and the plan's proof.
         let partname = PackURI::new("/word/document.xml").unwrap();
         let package = SourceBackedPackage::from_vec(
             archive_bytes(root_relationships(), b"<before/>", false),
@@ -24956,7 +24952,7 @@ mod tests {
         )
         .unwrap();
 
-        // Record 0286: no ordinary payload is inflated by the conversion.
+        // No ordinary payload is inflated by the conversion.
         let owned = package.to_opc_package_preserving_source().unwrap();
         assert_eq!(owned.deferred_decode_counters(), Some((0, 0)));
 
@@ -26488,9 +26484,9 @@ mod tests {
         );
         // The catalog lookup in `part()`, the cold load's opening observation,
         // the post-read fence, and the fence taken after the provisional
-        // publication. Change 0600 removed the fourth, which stood between the
-        // post-read fence and the publication fence with no source read
-        // between them and no side effect of its own.
+        // publication. A removed pre-publication observation once stood
+        // between the post-read fence and the publication fence with no source
+        // read between them and no side effect of its own.
         assert_eq!(
             source.versions.load(Ordering::SeqCst) - versions_before,
             4,
@@ -26582,9 +26578,9 @@ mod tests {
         // k-th observation of the read the one that sees the change. The cold
         // read takes four: `part()`, the cold-load closure head, the post-read
         // fence, and the fence after the provisional publication. Each must
-        // report the same typed error, including ordinal 3, which before
-        // change 0600 was the removed pre-publication observation and is now
-        // the publication fence.
+        // report the same typed error, including ordinal 3, which was once the
+        // removed pre-publication observation and is now the publication
+        // fence.
         for skip in 0..4usize {
             let source = Arc::new(ChangeOnHitVersionSource::new(archive_bytes(
                 root_relationships(),
@@ -26613,10 +26609,10 @@ mod tests {
 
         // One ordinal past the read's last observation, the read itself is
         // complete and correct — every fence it took saw the unchanged source —
-        // and the change is reported by the next observation, not lost. Before
-        // change 0600 this ordinal fell inside the read because the read took
-        // one more observation; the mutation is caught either way, only its
-        // reporting point moves.
+        // and the change is reported by the next observation, not lost. This
+        // ordinal once fell inside the read because the read took one more
+        // observation; the mutation is caught either way, only its reporting
+        // point moves.
         let source = Arc::new(ChangeOnHitVersionSource::new(archive_bytes(
             root_relationships(),
             b"change under a cold read",

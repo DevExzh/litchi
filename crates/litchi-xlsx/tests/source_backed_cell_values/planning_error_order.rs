@@ -180,11 +180,11 @@ fn raw_and_validator_cases() -> Vec<ErrorCase> {
             ),
             expected: ExpectedError::Invalid("cell edits refuse unknown cells and cell metadata"),
         },
-        // Change 0657 admitted `cm` and `vm` to the vocabulary, because the
-        // writer preserves every attribute of the cell it re-tags. The
-        // refusal did not disappear: it moved to the gate that owns the
-        // dependency, which is the scalar-cell closure for an in-range index
-        // and the raw parser's own Office limit for an out-of-range one.
+        // The vocabulary admits `cm` and `vm`, because the writer preserves
+        // every attribute of the cell it re-tags. The refusal did not
+        // disappear: it moved to the gate that owns the dependency, which is
+        // the scalar-cell closure for an in-range index and the raw parser's
+        // own Office limit for an out-of-range one.
         ErrorCase {
             name: "metadata attribute is refused by the scalar-cell gate".into(),
             worksheet: worksheet(
@@ -208,10 +208,10 @@ fn raw_and_validator_cases() -> Vec<ErrorCase> {
                 "invalid OOXML structure: unsupported XML entity reference '&missing;'",
             ),
         },
-        // `<mergeCells>` after `<sheetData>` is copied through since change
-        // 0657; the span the rewrite composes is what still holds a name to
-        // the modelled vocabulary, so the late validator refusal now lives
-        // inside a cell record.
+        // `<mergeCells>` after `<sheetData>` is copied through; the span
+        // the rewrite composes is what still holds a name to the modelled
+        // vocabulary, so the late validator refusal now lives inside a cell
+        // record.
         ErrorCase {
             name: "validator rejects late dependency element".into(),
             worksheet: worksheet(
@@ -229,8 +229,8 @@ fn raw_and_validator_cases() -> Vec<ErrorCase> {
             expected: ExpectedError::Invalid("value-only XML mixes SpreadsheetML dialects"),
         },
         // An unfamiliar attribute on a cell is preserved by the writer and
-        // is admitted since change 0657. A relationship reference inside
-        // `<sheetData>` is not: a removed cell record would take it with it.
+        // is admitted. A relationship reference inside `<sheetData>` is not:
+        // a removed cell record would take it with it.
         ErrorCase {
             name: "validator rejects a relationship reference inside sheetData".into(),
             worksheet: format!(

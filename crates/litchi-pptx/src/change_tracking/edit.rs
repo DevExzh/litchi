@@ -1,5 +1,4 @@
-//! Immutable change-tracking identifier edits of a [`Package`] (record 0351
-//! §2.3).
+//! Immutable change-tracking identifier edits of a [`Package`].
 //!
 //! [`Package::edit_change_tracking`] starts an [`Edit`] whose verbs set or
 //! clear a slide's creation identifier and its shapes' modification

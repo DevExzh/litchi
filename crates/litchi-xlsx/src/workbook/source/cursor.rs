@@ -1,5 +1,4 @@
-//! A streaming cursor over the stored cells of a source-backed worksheet
-//! (record 0267).
+//! A streaming cursor over the stored cells of a source-backed worksheet.
 //!
 //! [`SourceWorksheet::grid`] parses the whole worksheet part before the first
 //! cell can be read. A caller that stops after the first few cells (a query's

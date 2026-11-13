@@ -257,9 +257,9 @@ impl<'a> Scene<'a> {
         }
 
         // Markup compatibility that only follows the shape tree's `cSld`
-        // owner (a slide transition's `mc:AlternateContent`, record 0269)
-        // cannot change the scene: keep the source bytes, so spans stay
-        // source offsets and byte-splicing editors remain exact.
+        // owner (a slide transition's `mc:AlternateContent`) cannot change the
+        // scene: keep the source bytes, so spans stay source offsets and
+        // byte-splicing editors remain exact.
         let output = match output {
             Cow::Owned(processed) if scene_prefix_unchanged(xml, &processed) => Cow::Borrowed(xml),
             other => other,
@@ -646,7 +646,7 @@ impl<'a> Scanner<'a> {
                         end,
                     )?;
                     // One local-name test keeps the record's span and
-                    // payload work (L-PPTX-R6, R7) off every other element.
+                    // payload work off every other element.
                     if is_shape_part_name(local_name) {
                         self.note_shape_part(
                             &namespace,
@@ -972,7 +972,7 @@ impl<'a> Scanner<'a> {
             record.name = name;
             record.id = id;
             // The start tag alone: alternative text, title and the hidden
-            // flag are decoded from it on request (L-PPTX-R6).
+            // flag are decoded from it on request.
             record.non_visual = Some(span_between(start, end)?);
         } else if is_pml(namespace, local_name, b"ph") && parent_is_nv_pr {
             let active = self
@@ -1669,8 +1669,7 @@ impl<'a> Scanner<'a> {
 
     /// Track the active shape's own transform (within two levels:
     /// `p:spPr/a:xfrm`, `p:grpSpPr/a:xfrm`, a frame's `p:xfrm`), its direct
-    /// `p:txBody`, and the relationship its payload element names
-    /// (L-PPTX-R6, R7).
+    /// `p:txBody`, and the relationship its payload element names.
     #[inline(never)]
     fn note_shape_part(
         &mut self,
@@ -1783,7 +1782,7 @@ impl<'a> Scanner<'a> {
 
     /// Note the active shape's payload relationship, refusing competition:
     /// a picture's own `a:blip`, or a frame's `c:chart`, `dgm:relIds` or
-    /// `p:oleObj` (L-PPTX-R6).
+    /// `p:oleObj`.
     fn note_payload(
         &mut self,
         namespace: &ResolveResult<'_>,

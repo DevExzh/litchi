@@ -70,7 +70,7 @@ pub enum Error {
     /// A DOCX InkML inventory exhausted a finite resource budget.
     #[error("DOCX ink {kind} limit exceeded: {actual} > {maximum}")]
     InkLimit {
-        /// The exceeded budget (record 0355a).
+        /// The exceeded budget.
         kind: crate::ink::LimitKind,
         actual: usize,
         maximum: usize,
@@ -94,12 +94,12 @@ pub enum Error {
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 
-    /// A well-formed request this route refuses (record 0351): the kind
-    /// classifies it, the operation and reason are static text.
+    /// A well-formed request this route refuses: the kind classifies it, the
+    /// operation and reason are static text.
     #[error("DOCX {0}")]
     Refused(litchi_core::edit::Refusal),
 
-    /// A patch or staged plan was made against another base (record 0351).
+    /// A patch or staged plan was made against another base.
     #[error("DOCX {operation} patch conflict: {reason}")]
     PatchConflict {
         /// Operation whose base did not match.
@@ -135,8 +135,8 @@ pub enum Error {
     #[error("{0}")]
     Other(String),
 
-    /// Writing a committed paragraph-stream package failed (record 0355a):
-    /// the typed stream error, carried through the package writer.
+    /// Writing a committed paragraph-stream package failed: the typed stream
+    /// error, carried through the package writer.
     #[error(transparent)]
     ParagraphStream(Box<crate::source_backed::tail_append_stream::Error>),
 
@@ -188,7 +188,7 @@ pub enum Error {
         source: TryReserveError,
     },
 
-    /// An alternative-format anchor budget is exhausted (record 0355a).
+    /// An alternative-format anchor budget is exhausted.
     #[error("DOCX alternative-format {kind} limit exceeded: {observed} > {maximum}")]
     AltChunkLimit {
         /// Bounded resource.
@@ -199,7 +199,7 @@ pub enum Error {
         maximum: usize,
     },
 
-    /// A glossary budget is exhausted (record 0355a).
+    /// A glossary budget is exhausted.
     #[error("DOCX glossary {kind} limit exceeded: {actual} > {maximum}")]
     GlossaryLimit {
         /// The exceeded budget.
@@ -210,7 +210,7 @@ pub enum Error {
         maximum: usize,
     },
 
-    /// A content-control budget is exhausted (record 0355a).
+    /// A content-control budget is exhausted.
     #[error("DOCX content-control {kind} limit exceeded: {actual} > {maximum}")]
     ContentControlLimit {
         /// The exceeded budget.
@@ -221,7 +221,7 @@ pub enum Error {
         maximum: usize,
     },
 
-    /// A conflict-markup budget is exhausted (record 0355a).
+    /// A conflict-markup budget is exhausted.
     #[error("DOCX conflict-markup {kind} limit exceeded: {actual} > {maximum}")]
     ConflictLimit {
         /// The exceeded budget.
@@ -232,7 +232,7 @@ pub enum Error {
         maximum: usize,
     },
 
-    /// A chart budget is exhausted (record 0355a).
+    /// A chart budget is exhausted.
     #[error("DOCX chart {kind} limit exceeded: {actual} > {maximum}")]
     ChartLimit {
         /// The exceeded budget.
@@ -243,7 +243,7 @@ pub enum Error {
         maximum: usize,
     },
 
-    /// A font-table budget is exhausted (record 0355a).
+    /// A font-table budget is exhausted.
     #[error("DOCX font-table {kind} limit exceeded: {actual} > {maximum}")]
     FontLimit {
         /// The exceeded budget.
@@ -254,7 +254,7 @@ pub enum Error {
         maximum: usize,
     },
 
-    /// A bibliography-source budget is exhausted (record 0355a).
+    /// A bibliography-source budget is exhausted.
     #[error("DOCX bibliography-source {kind} limit exceeded: {actual} > {maximum}")]
     BibliographyLimit {
         /// The exceeded budget.
@@ -265,7 +265,7 @@ pub enum Error {
         maximum: usize,
     },
 
-    /// A web-settings budget is exhausted (record 0355a).
+    /// A web-settings budget is exhausted.
     #[error("DOCX web-settings {kind} limit exceeded: {actual} > {maximum}")]
     WebLimit {
         /// The exceeded budget.
@@ -276,7 +276,7 @@ pub enum Error {
         maximum: usize,
     },
 
-    /// A story budget is exhausted (record 0355a).
+    /// A story budget is exhausted.
     #[error("DOCX story {kind} limit exceeded: {actual} > {maximum}")]
     StoryLimit {
         /// The exceeded budget.
@@ -287,7 +287,7 @@ pub enum Error {
         maximum: usize,
     },
 
-    /// A numbering budget is exhausted (record 0355a).
+    /// A numbering budget is exhausted.
     #[error("DOCX numbering {kind} limit exceeded: {actual} > {maximum}")]
     NumberingLimit {
         /// The exceeded budget.
@@ -298,7 +298,7 @@ pub enum Error {
         maximum: usize,
     },
 
-    /// A mail-merge budget is exhausted (record 0355a).
+    /// A mail-merge budget is exhausted.
     #[error("DOCX mail-merge {kind} limit exceeded: {actual} > {maximum}")]
     MailMergeLimit {
         /// The exceeded budget.
@@ -320,7 +320,7 @@ pub enum Error {
         maximum: usize,
     },
 
-    /// A stylesWithEffects budget is exhausted (record 0355a).
+    /// A stylesWithEffects budget is exhausted.
     #[error("DOCX stylesWithEffects {kind} limit exceeded: {actual} > {maximum}")]
     StylesWithEffectsLimit {
         /// The exceeded budget.
@@ -331,7 +331,7 @@ pub enum Error {
         maximum: usize,
     },
 
-    /// A settings budget is exhausted (record 0355a).
+    /// A settings budget is exhausted.
     #[error("DOCX settings {kind} limit exceeded: {actual} > {maximum}")]
     SettingsLimit {
         /// The exceeded budget.
@@ -356,7 +356,7 @@ pub enum Error {
     /// A tracked-revision read exceeded a finite resource ceiling.
     #[error("DOCX revision {kind} limit exceeded: {actual} > {maximum}")]
     RevisionLimit {
-        /// The exceeded budget (record 0355a).
+        /// The exceeded budget.
         kind: crate::revision::LimitKind,
         /// Observed value.
         actual: usize,
@@ -396,7 +396,7 @@ pub enum Error {
     /// A bounded main-document section inventory ceiling was exceeded.
     #[error("DOCX section inventory {kind} limit exceeded: {actual} > {maximum}")]
     SectionInventoryLimit {
-        /// The exceeded budget (record 0355a).
+        /// The exceeded budget.
         kind: crate::section::LimitKind,
         /// Maximum accepted value.
         maximum: usize,

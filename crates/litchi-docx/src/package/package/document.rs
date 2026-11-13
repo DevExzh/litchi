@@ -143,8 +143,7 @@ impl Package {
     /// it, or carry valid `mc:Ignorable` directives that hide nothing a
     /// reader sees are admitted, and so are payloads whose only selections
     /// are `mc:AlternateContent` wrappers inside runs (a drawing or text box
-    /// with a fallback; record 0307), each an opaque inline object to the
-    /// snapshot's edits.
+    /// with a fallback), each an opaque inline object to the snapshot's edits.
     ///
     /// The snapshot shares the main part's payload allocation instead of
     /// copying it. `Part::set_blob` and `set_blob_shared` replace the part's
@@ -315,10 +314,10 @@ impl Package {
         // exactly as they do on the source-backed publisher.
         crate::source_backed::document_policy::validate_changed_owned_document(&self.opc)?;
         // A commit that proved its candidate's exact allocation to the
-        // writer's source audit publishes that allocation with the proof
-        // (change 0754): the writer then does not audit those bytes again,
-        // and the part shares the snapshot's bytes instead of copying them.
-        // Any other candidate is copied and audited at publication as before.
+        // writer's source audit publishes that allocation with the proof: the
+        // writer then does not audit those bytes again, and the part shares the
+        // snapshot's bytes instead of copying them. Any other candidate is
+        // copied and audited at publication as before.
         let replacement = match candidate.publication_proof() {
             Some(proof) => MainReplacement::Proven(proof.clone()),
             None => MainReplacement::Copied(candidate.xml_bytes().to_vec()),

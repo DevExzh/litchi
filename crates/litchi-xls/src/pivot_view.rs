@@ -1,5 +1,5 @@
-//! The XLS pivot-view edit family (record 0351 §2.3): rewrites of existing
-//! BIFF8 worksheet `PivotTable` views and their caches.
+//! The XLS pivot-view edit family: rewrites of existing BIFF8 worksheet
+//! `PivotTable` views and their caches.
 //!
 //! [`crate::Package::edit_pivot_views`] starts an [`Edit`]; [`Edit::commit`]
 //! publishes a new package with an exact whole-package [`Patch`] and

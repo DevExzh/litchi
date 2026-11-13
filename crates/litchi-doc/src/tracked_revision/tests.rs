@@ -418,10 +418,10 @@ fn fixture_with_object_selection(name: &str, unit: u16, flags: u16) -> Option<(V
     Some((crate::package::object_edit_bytes(&package).unwrap(), cp))
 }
 
-/// Change 0768 review: text inserted at a selected inline picture (its
-/// 0x0001 character) or floating shape (its 0x0008 anchor) is written in
-/// front of the object, so the saved selection moves with the object and
-/// covers none of the new text; rejecting the insertion restores the record.
+/// Text inserted at a selected inline picture (its 0x0001 character) or
+/// floating shape (its 0x0008 anchor) is written in front of the object, so the
+/// saved selection moves with the object and covers none of the new text;
+/// rejecting the insertion restores the record.
 #[test]
 fn tracked_insertion_at_a_selected_object_moves_the_selection_with_the_object() {
     let fixtures = [
@@ -482,10 +482,9 @@ fn tracked_insertion_at_a_selected_object_moves_the_selection_with_the_object() 
     }
 }
 
-/// Change 0768 review: MS-DOC 2.3.1 requires the main document's last
-/// character to be a paragraph mark, so a tracked insertion at `ccpText`
-/// (after that mark) is refused, and one in front of the mark extends the last
-/// paragraph.
+/// MS-DOC 2.3.1 requires the main document's last character to be a paragraph
+/// mark, so a tracked insertion at `ccpText` (after that mark) is refused, and
+/// one in front of the mark extends the last paragraph.
 #[test]
 fn tracked_insertion_after_the_final_paragraph_mark_is_refused() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))

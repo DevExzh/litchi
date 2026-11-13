@@ -1,6 +1,6 @@
-//! Change 0750: every XML member of every OPC package and every loose OOXML
-//! XML part in the repository's `test-data` passes the source publication
-//! audit, except pinned malformed members and encodings outside its UTF-8 profile.
+//! Every XML member of every OPC package and every loose OOXML XML part in the
+//! repository's `test-data` passes the source publication audit, except pinned
+//! malformed members and encodings outside its UTF-8 profile.
 //!
 //! A member is audited when publication would audit it:
 //! `xml_minifier::audit::package::is_xml_part(name, media_type)`, with the
@@ -62,8 +62,8 @@ const REFUSED: &[(&str, &str, &str)] = &[
         "",
         "malformed XML at byte 268: ill-formed document: expected `</a:hlinkClick>`, but `</p:sld>` was found",
     ),
-    // Change 0750: slide fragments whose prefixes the enclosing slide
-    // declares, and a deliberately undeclared entity.
+    // Slide fragments whose prefixes the enclosing slide declares, and a
+    // deliberately undeclared entity.
     (
         "ooxml/pptx/backgrounds/solid.xml",
         "",

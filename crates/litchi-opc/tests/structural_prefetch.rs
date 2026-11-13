@@ -252,12 +252,12 @@ fn local_header_offsets(bytes: &[u8]) -> Vec<u64> {
 
 /// Remove the ZIP admission probes and return the reads that remain.
 ///
-/// Since the spec-gap branch merge (change 0759), package admission refuses
-/// an encryption flag in any central or local header, and reads each physical
-/// entry's fixed eight-byte local-header prefix exactly once to do so. Those
-/// probes happen before any member is read; this helper checks that there is
-/// exactly one per entry, so the tests below can keep asserting the
-/// structural prefetch's own read shape unchanged.
+/// Package admission refuses an encryption flag in any central or local
+/// header, and reads each physical entry's fixed eight-byte local-header
+/// prefix exactly once to do so. Those probes happen before any member is
+/// read; this helper checks that there is exactly one per entry, so the tests
+/// below can keep asserting the structural prefetch's own read shape
+/// unchanged.
 fn without_admission_probes(bytes: &[u8], reads: Vec<(u64, usize)>) -> Vec<(u64, usize)> {
     let offsets = local_header_offsets(bytes);
     let (probes, rest): (Vec<_>, Vec<_>) = reads
@@ -347,8 +347,8 @@ fn one_read_serves_a_contiguous_run_of_structural_members() {
     // Eleven structural members — the content-types member, the package
     // `_rels/.rels`, the document's relationship part and eight child
     // relationship parts — are written consecutively, so one read covers all
-    // of them. The remaining reads are the archive locator's: change 0632
-    // merged its first-central-record probe into the central-directory read,
+    // of them. The remaining reads are the archive locator's: its
+    // first-central-record probe is merged into the central-directory read,
     // so there are two of them rather than three.
     assert_eq!(package.iter_parts().count(), 9);
     assert_eq!(
@@ -502,10 +502,10 @@ fn a_duplicate_relationship_id_keeps_its_repair_anywhere_in_a_run() {
     }
 }
 
-/// Change 0577's `e4`/`e5` pair: the same untyped member is tolerated archive
-/// junk when nothing names it and a fatal `ContentTypeNotFound` when a deep
-/// relationship does. The verdict is a property of the package's bytes, and
-/// coalescing the fetch must not move it.
+/// The same untyped member is tolerated archive junk when nothing names it
+/// and a fatal `ContentTypeNotFound` when a deep relationship does. The
+/// verdict is a property of the package's bytes, and coalescing the fetch
+/// must not move it.
 #[test]
 fn the_untyped_member_admission_verdict_does_not_move() {
     let build = |referenced: bool| {
@@ -626,9 +626,9 @@ fn a_scattered_package_costs_no_more_reads() {
     let source = Recording::new(bytes.clone());
     open(Arc::clone(&source)).expect("open");
     let reads = without_admission_probes(&bytes, source.take());
-    // Two locator reads (change 0632 merged the third into the second) plus
-    // one read for each of the seven structural members: exactly what the same
-    // package costs without this mechanism.
+    // Two locator reads (the third is merged into the second) plus one read
+    // for each of the seven structural members: exactly what the same package
+    // costs without this mechanism.
     assert_eq!(reads.len(), 9, "unexpected read shape {reads:?}");
 }
 

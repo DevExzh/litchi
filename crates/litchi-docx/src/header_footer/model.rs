@@ -127,8 +127,8 @@ impl Story {
     }
 
     /// The story's text as OfficeCLI reads a header or footer: the text of
-    /// its runs' `w:t` elements, concatenated without paragraph separators
-    /// (record 0319); alternate-content fallbacks are skipped.
+    /// its runs' `w:t` elements, concatenated without paragraph separators;
+    /// alternate-content fallbacks are skipped.
     ///
     /// # Errors
     ///

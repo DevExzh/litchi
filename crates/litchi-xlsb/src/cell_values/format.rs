@@ -168,7 +168,7 @@ impl Format {
             return Err(Error::InvalidFormat("text rotation must be 0..=180 or 255"));
         }
         if self.indent.is_some_and(|value| value > 250) {
-            return Err(Error::InvalidFormat("indent must be 0250"));
+            return Err(Error::InvalidFormat("indent must be 0..=250"));
         }
         if self.reading_order.is_some_and(|value| value > 2) {
             return Err(Error::InvalidFormat("reading order must be 0, 1 or 2"));

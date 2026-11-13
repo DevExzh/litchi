@@ -180,7 +180,7 @@ pub fn is_omml_name(namespace: &ResolveResult<'_>, name: QName<'_>, local_name: 
 /// Locate exact `<oMath>` byte ranges in transitional or strict OMML XML.
 ///
 /// Each range is a byte offset and length in `xml_bytes`, counting a leading
-/// UTF-8 byte-order mark (change 0765).
+/// UTF-8 byte-order mark.
 /// # Errors
 ///
 /// Returns an error when input violates OOXML constraints, exceeds a configured

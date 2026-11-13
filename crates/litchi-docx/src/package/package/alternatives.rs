@@ -16,7 +16,7 @@ use crate::alt::LimitKind;
 
 /// The body whose anchors an alternative-format verb edits: a builder's
 /// draft document, or an opened package's main-document XML
-/// ([`crate::alt::XmlBody`], record 0355a).
+/// ([`crate::alt::XmlBody`]).
 pub(crate) trait AltBody {
     /// The active body anchors, in document order.
     fn alts(&self) -> Result<Vec<Chunk>>;
@@ -316,10 +316,10 @@ impl Package {
     }
 }
 
-/// An opened package's main-document XML as an [`AltBody`] (record
-/// 0355a): anchors are the active body-level `w:altChunk` elements, found
-/// with the scan the reader uses, and every change is an exact splice of
-/// the source bytes, so everything else in the part is kept byte for byte.
+/// An opened package's main-document XML as an [`AltBody`]: anchors are the
+/// active body-level `w:altChunk` elements, found with the scan the reader
+/// uses, and every change is an exact splice of the source bytes, so everything
+/// else in the part is kept byte for byte.
 pub(crate) struct XmlBody {
     xml: Vec<u8>,
     changed: bool,
@@ -516,7 +516,7 @@ impl AltBody for XmlBody {
 
 impl Package {
     /// Run an alternative-format verb on this package's main-document XML
-    /// and store the XML back when it changed (record 0355a).
+    /// and store the XML back when it changed.
     pub(crate) fn with_alt_body<T>(
         &mut self,
         verb: impl FnOnce(&mut Self, &mut XmlBody) -> Result<T>,

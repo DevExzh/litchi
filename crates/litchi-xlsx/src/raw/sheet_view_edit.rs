@@ -115,7 +115,7 @@ struct Scanner {
 pub(crate) fn rewrite(content: &[u8], selected: bool, context: Context<'_>) -> Result<Vec<u8>> {
     // The scan recognizes markup-compatibility names on namespace values as
     // written; a binding spelled with references could put the view inside a
-    // branch preprocessing selects (record 0011).
+    // branch preprocessing selects.
     if litchi_ooxml_common::mce::binds_namespace_by_reference(content) {
         return Err(block(context));
     }
@@ -688,8 +688,8 @@ mod tests {
         }
     }
 
-    /// Record 0011: a view inside a branch bound through a declaration that
-    /// spells the namespace with references is never edited.
+    /// A view inside a branch bound through a declaration that spells the
+    /// namespace with references is never edited.
     #[test]
     fn escaped_markup_compatibility_blocks_the_edit() {
         let source = format!(

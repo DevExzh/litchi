@@ -39,7 +39,7 @@ use litchi_opc::constants::relationship_type;
 use litchi_opc::{OpcPackage, PackURI, Relationships, TargetMode};
 use std::collections::BTreeSet;
 
-/// Repetitions per determinism assertion. Change 0617 saw twelve distinct
+/// Repetitions per determinism assertion. A probe saw twelve distinct
 /// outcomes in twelve processes at eight hash keys; with two candidates a
 /// single build agrees by chance about half the time, so the count has to be
 /// large enough that accidental agreement is not worth considering. At 128

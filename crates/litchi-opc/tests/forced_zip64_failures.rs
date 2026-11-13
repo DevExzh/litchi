@@ -8,11 +8,10 @@
 //! Failure-atomicity coverage for Python's small forced-ZIP64 OPC shape.
 //!
 //! The fixture is generated independently with `zipfile.ZipFile.open(...,
-//! force_zip64=true)` and retained with the 0416 evidence corpus.  Its local
-//! records reserve ZIP64 sizes while its central records retain ordinary
-//! sizes; the descriptor carries the final 64-bit values.  The tests below
-//! keep the publication sink caller-owned and exercise only public
-//! `SourceBackedPackage` APIs.
+//! force_zip64=true)`.  Its local records reserve ZIP64 sizes while its central
+//! records retain ordinary sizes; the descriptor carries the final 64-bit
+//! values.  The tests below keep the publication sink caller-owned and exercise
+//! only public `SourceBackedPackage` APIs.
 
 use std::io::{self, Write};
 use std::num::{NonZeroU64, NonZeroUsize};

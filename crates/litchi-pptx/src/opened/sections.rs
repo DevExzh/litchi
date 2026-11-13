@@ -1,6 +1,4 @@
-//! Section membership of slides a transaction adds, moves or removes
-//! (record 0252, ported from the M2 L-PPTX-W4 reference work; removal and
-//! the source-backed editor, record 0303).
+//! Section membership of slides a transaction adds, moves or removes.
 //!
 //! `PowerPoint` 2010 sections live in an extension of the presentation
 //! part: `p:extLst/p:ext[@uri="{521415D9-…}"]/p14:sectionLst/p14:section/
@@ -615,7 +613,7 @@ pub(crate) fn strip(xml: &[u8]) -> Result<Option<(Vec<u8>, Vec<Vec<u32>>)>> {
 }
 
 /// Prove that section membership after a slide catalog change is the one an
-/// order change, insertion or removal keeps (record 0303):
+/// order change, insertion or removal keeps:
 ///
 /// - the section count is unchanged and no slide is in two sections;
 /// - every entry names a slide of the new order, or a stale identifier the

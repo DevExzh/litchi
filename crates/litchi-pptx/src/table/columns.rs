@@ -1,5 +1,4 @@
-//! Lexical table-column and table-row edits of a slide graphic frame
-//! (records 0321 and 0333).
+//! Lexical table-column and table-row edits of a slide graphic frame.
 //!
 //! A column is one `a:gridCol` of the table's `a:tblGrid` and the cell at
 //! its position in every `a:tr`; a row is one `a:tr`. The editor rewrites
@@ -13,7 +12,7 @@
 //! (`gridSpan` on a merge's first cell, `hMerge` on the cells it covers to
 //! the right, `rowSpan` and `vMerge` likewise downwards), so a cell's grid
 //! column is its position in its row. Merges stay consistent where that is
-//! safe (record 0333):
+//! safe:
 //!
 //! - a column is inserted at a boundary no horizontal merge crosses;
 //! - removing a column shrinks the horizontal merges it is part of (the
