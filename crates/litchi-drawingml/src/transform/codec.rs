@@ -614,3 +614,159 @@ fn unqualified_attribute_value(
 fn limit(kind: crate::LimitKind, observed: usize, maximum: usize) -> Error {
     Error::limit(kind, observed, maximum)
 }
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the transform reader accepts before, around and after `xfrm`, and the exact error reported otherwise. Each
+    //! expected line is the row label followed by the result.
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+            ("reference before root", format!("&amp;{d}")),
+            ("reference after root", format!("{d}&amp;")),
+            ("CDATA after root", format!("{d}<![CDATA[x]]>")),
+            ("end tag before root", format!("</foreign>{d}")),
+            (
+                "declaration inside root",
+                format!("{open}{DECLARATION}{body}{close}"),
+            ),
+            (
+                "text, CDATA and reference inside root",
+                format!("{open}{body}text<![CDATA[x]]>&amp;{close}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&str) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(&xml)))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    /// The transform reader.
+    #[test]
+    fn transform_read_envelope() {
+        let root = Root {
+            open: r#"<a:xfrm xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">"#,
+            body: r#"<a:off x="1" y="2"/>"#,
+            close: r"</a:xfrm>",
+            empty: r#"<a:xfrm xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"DrawingML transform has no root element\")",
+                "whitespace only: Invalid(\"DrawingML transform has no root element\")",
+                "declaration only: Invalid(\"DrawingML transform contains unsupported document markup\")",
+                "empty-element root: Ok(None)",
+                "start and end root: Ok(None)",
+                "root then whitespace: Ok(Some(Point { x: Coordinate(1), y: Coordinate(2) }))",
+                "root then comment: Invalid(\"DrawingML transform contains unsupported document markup\")",
+                "root then PI: Invalid(\"DrawingML transform contains unsupported document markup\")",
+                "root then text: Invalid(\"DrawingML transform contains unexpected text\")",
+                "root then second root: Invalid(\"DrawingML transform contains more than one root\")",
+                "root then foreign start: Invalid(\"DrawingML transform contains more than one root\")",
+                "root then foreign empty: Invalid(\"DrawingML transform contains more than one root\")",
+                "declaration after root: Invalid(\"DrawingML transform contains unsupported document markup\")",
+                "two declarations: Invalid(\"DrawingML transform contains unsupported document markup\")",
+                "comment before declaration: Invalid(\"DrawingML transform contains unsupported document markup\")",
+                "text before root: Invalid(\"DrawingML transform contains unexpected text\")",
+                "unterminated root: Invalid(\"DrawingML transform root is not closed\")",
+                "stray end tag: Xml(\"malformed DrawingML transform XML\")",
+                "DOCTYPE: Invalid(\"DrawingML transform contains unsupported document markup\")",
+                "top-level CDATA: Invalid(\"DrawingML transform contains unexpected text\")",
+                "declaration then root: Invalid(\"DrawingML transform contains unsupported document markup\")",
+                "whitespace before declaration: Invalid(\"DrawingML transform contains unsupported document markup\")",
+                "PI before declaration: Invalid(\"DrawingML transform contains unsupported document markup\")",
+                "comment then root: Invalid(\"DrawingML transform contains unsupported document markup\")",
+                "PI then root: Invalid(\"DrawingML transform contains unsupported document markup\")",
+                "root then text then second root: Invalid(\"DrawingML transform contains unexpected text\")",
+                "empty-element root then root: Invalid(\"DrawingML transform contains more than one root\")",
+                "declaration after empty-element root: Invalid(\"DrawingML transform contains unsupported document markup\")",
+                "reference before root: Invalid(\"DrawingML transform contains an unsupported entity\")",
+                "reference after root: Invalid(\"DrawingML transform contains an unsupported entity\")",
+                "CDATA after root: Invalid(\"DrawingML transform contains unexpected text\")",
+                "end tag before root: Xml(\"malformed DrawingML transform XML\")",
+                "declaration inside root: Invalid(\"DrawingML transform contains unsupported document markup\")",
+                "text, CDATA and reference inside root: Invalid(\"DrawingML transform contains unexpected text\")",
+            ],
+            |xml| {
+                outcome(
+                    super::read(xml.as_bytes(), &super::Limits::DEFAULT),
+                    |transform| format!("{:?}", transform.offset()),
+                )
+            },
+        );
+    }
+}

@@ -599,3 +599,167 @@ pub(super) fn is_preserved_drawing_element(local_name: &[u8]) -> bool {
 pub(super) fn is_drawing_color_map_choice(local_name: &[u8]) -> bool {
     matches!(local_name, b"masterClrMapping" | b"overrideClrMapping")
 }
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the chart event reader accepts before, around and after `c:chartSpace`, and the exact error reported otherwise. Each
+    //! expected line is the row label followed by the result.
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+            ("reference before root", format!("&amp;{d}")),
+            ("reference after root", format!("{d}&amp;")),
+            ("CDATA after root", format!("{d}<![CDATA[x]]>")),
+            ("end tag before root", format!("</foreign>{d}")),
+            (
+                "declaration inside root",
+                format!("{open}{DECLARATION}{body}{close}"),
+            ),
+            (
+                "text, CDATA and reference inside root",
+                format!("{open}{body}text<![CDATA[x]]>&amp;{close}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&str) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(&xml)))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    /// The chart event reader, read to the end of input; after an error it is read again, up to three errors, since a caller may keep reading.
+    #[test]
+    fn chart_event_reader_envelope() {
+        let root = Root {
+            open: r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">"#,
+            body: r"<c:chart/>",
+            close: r"</c:chartSpace>",
+            empty: r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"chart XML has no complete chartSpace root\") then Invalid(\"chart XML has no complete chartSpace root\") then Invalid(\"chart XML has no complete chartSpace root\")",
+                "whitespace only: Invalid(\"chart XML has no complete chartSpace root\") then Invalid(\"chart XML has no complete chartSpace root\") then Invalid(\"chart XML has no complete chartSpace root\")",
+                "declaration only: Invalid(\"chart XML has no complete chartSpace root\") then Invalid(\"chart XML has no complete chartSpace root\") then Invalid(\"chart XML has no complete chartSpace root\")",
+                "empty-element root: Invalid(\"chart XML must have one non-empty DrawingML chartSpace root\") then Invalid(\"chart XML has no complete chartSpace root\") then Invalid(\"chart XML has no complete chartSpace root\")",
+                "start and end root: Ok(2)",
+                "root then whitespace: Ok(4)",
+                "root then comment: Ok(4)",
+                "root then PI: Ok(4)",
+                "root then text: Invalid(\"chart XML contains text outside its root\") then Ok(3)",
+                "root then second root: Invalid(\"chart XML must have one DrawingML chartSpace root\") then Invalid(\"chart XML must have one non-empty DrawingML chartSpace root\") then Invalid(\"chart XML has an unmatched closing element\")",
+                "root then foreign start: Invalid(\"chart XML must have one DrawingML chartSpace root\") then Invalid(\"chart XML has an unmatched closing element\") then Ok(3)",
+                "root then foreign empty: Invalid(\"chart XML must have one non-empty DrawingML chartSpace root\") then Ok(3)",
+                "declaration after root: Ok(4)",
+                "two declarations: Ok(5)",
+                "comment before declaration: Ok(5)",
+                "text before root: Invalid(\"chart XML contains text outside its root\") then Ok(3)",
+                "unterminated root: Invalid(\"chart XML has no complete chartSpace root\") then Invalid(\"chart XML has no complete chartSpace root\") then Invalid(\"chart XML has no complete chartSpace root\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\") then Ok(3)",
+                "DOCTYPE: Ok(4)",
+                "top-level CDATA: Invalid(\"chart XML contains data outside its root\") then Ok(3)",
+                "declaration then root: Ok(4)",
+                "whitespace before declaration: Ok(5)",
+                "PI before declaration: Ok(5)",
+                "comment then root: Ok(4)",
+                "PI then root: Ok(4)",
+                "root then text then second root: Invalid(\"chart XML contains text outside its root\") then Invalid(\"chart XML must have one DrawingML chartSpace root\") then Invalid(\"chart XML must have one non-empty DrawingML chartSpace root\")",
+                "empty-element root then root: Invalid(\"chart XML must have one non-empty DrawingML chartSpace root\") then Ok(3)",
+                "declaration after empty-element root: Invalid(\"chart XML must have one non-empty DrawingML chartSpace root\") then Invalid(\"chart XML has no complete chartSpace root\") then Invalid(\"chart XML has no complete chartSpace root\")",
+                "reference before root: Invalid(\"chart XML contains data outside its root\") then Ok(3)",
+                "reference after root: Invalid(\"chart XML contains data outside its root\") then Ok(3)",
+                "CDATA after root: Invalid(\"chart XML contains data outside its root\") then Ok(3)",
+                "end tag before root: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\") then Ok(3)",
+                "declaration inside root: Ok(4)",
+                "text, CDATA and reference inside root: Ok(6)",
+            ],
+            |xml| {
+                let mut reader =
+                    super::ChartXmlReader::from_reader(xml.as_bytes(), super::Limits::DEFAULT);
+                let mut buffer = Vec::new();
+                let mut results = Vec::new();
+                let mut events = 0_usize;
+                for _ in 0..64 {
+                    buffer.clear();
+                    match reader.read_event_into(&mut buffer) {
+                        Ok(super::Event::Eof) => {
+                            results.push(format!("Ok({events})"));
+                            break;
+                        },
+                        Ok(_) => events += 1,
+                        Err(error) => {
+                            results.push(format!("{error:?}"));
+                            if results.len() == 3 {
+                                break;
+                            }
+                        },
+                    }
+                }
+                results.join(" then ")
+            },
+        );
+    }
+}

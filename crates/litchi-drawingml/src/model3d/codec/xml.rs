@@ -1193,3 +1193,159 @@ fn invalid(message: impl Into<String>) -> Error {
 fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
     Error::limit(kind, observed, maximum)
 }
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the 3D model reader accepts before, around and after `m3d:model3d`, and the exact error reported otherwise. Each
+    //! expected line is the row label followed by the result.
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+            ("reference before root", format!("&amp;{d}")),
+            ("reference after root", format!("{d}&amp;")),
+            ("CDATA after root", format!("{d}<![CDATA[x]]>")),
+            ("end tag before root", format!("</foreign>{d}")),
+            (
+                "declaration inside root",
+                format!("{open}{DECLARATION}{body}{close}"),
+            ),
+            (
+                "text, CDATA and reference inside root",
+                format!("{open}{body}text<![CDATA[x]]>&amp;{close}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&str) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(&xml)))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    /// The 3D model reader.
+    #[test]
+    fn model3d_read_envelope() {
+        let root = Root {
+            open: r#"<m3d:model3d xmlns:m3d="http://schemas.microsoft.com/office/drawing/2017/model3d" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1">"#,
+            body: r#"<m3d:spPr/><m3d:camera/><m3d:trans/><m3d:raster rName="x" rVer="y"><m3d:blip r:embed="rId2"/></m3d:raster><m3d:objViewport/>"#,
+            close: r"</m3d:model3d>",
+            empty: r#"<m3d:model3d xmlns:m3d="http://schemas.microsoft.com/office/drawing/2017/model3d" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"model3d XML has no root element\")",
+                "whitespace only: Invalid(\"model3d XML has no root element\")",
+                "declaration only: Invalid(\"model3d XML has no root element\")",
+                "empty-element root: Invalid(\"model3d required child 'spPr' is missing\")",
+                "start and end root: Invalid(\"model3d required child 'spPr' is missing\")",
+                "root then whitespace: Ok(5)",
+                "root then comment: Ok(5)",
+                "root then PI: Ok(5)",
+                "root then text: Invalid(\"model3d XML contains text outside its root\")",
+                "root then second root: Invalid(\"model3d XML has more than one root element\")",
+                "root then foreign start: Invalid(\"model3d XML has more than one root element\")",
+                "root then foreign empty: Invalid(\"model3d XML has more than one root element\")",
+                "declaration after root: Ok(5)",
+                "two declarations: Ok(5)",
+                "comment before declaration: Ok(5)",
+                "text before root: Invalid(\"model3d XML contains text outside its root\")",
+                "unterminated root: Invalid(\"model3d XML root is not closed\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"DTD is forbidden in model3d XML\")",
+                "top-level CDATA: Ok(5)",
+                "declaration then root: Ok(5)",
+                "whitespace before declaration: Ok(5)",
+                "PI before declaration: Ok(5)",
+                "comment then root: Ok(5)",
+                "PI then root: Ok(5)",
+                "root then text then second root: Invalid(\"model3d XML contains text outside its root\")",
+                "empty-element root then root: Invalid(\"model3d XML has more than one root element\")",
+                "declaration after empty-element root: Invalid(\"model3d required child 'spPr' is missing\")",
+                "reference before root: Ok(5)",
+                "reference after root: Ok(5)",
+                "CDATA after root: Ok(5)",
+                "end tag before root: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "declaration inside root: Ok(5)",
+                "text, CDATA and reference inside root: Ok(5)",
+            ],
+            |xml| {
+                outcome(
+                    super::read(xml.as_bytes(), super::Limits::DEFAULT),
+                    |metadata| metadata.children.len().to_string(),
+                )
+            },
+        );
+    }
+}

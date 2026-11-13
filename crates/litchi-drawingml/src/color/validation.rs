@@ -411,3 +411,159 @@ fn is_transform_name(name: &[u8]) -> bool {
             | b"tint"
     )
 }
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the color fragment check accepts before, around and after its one element, and the exact error reported otherwise. Each
+    //! expected line is the row label followed by the result.
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+            ("reference before root", format!("&amp;{d}")),
+            ("reference after root", format!("{d}&amp;")),
+            ("CDATA after root", format!("{d}<![CDATA[x]]>")),
+            ("end tag before root", format!("</foreign>{d}")),
+            (
+                "declaration inside root",
+                format!("{open}{DECLARATION}{body}{close}"),
+            ),
+            (
+                "text, CDATA and reference inside root",
+                format!("{open}{body}text<![CDATA[x]]>&amp;{close}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&str) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(&xml)))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    /// The color fragment check.
+    #[test]
+    fn color_fragment_envelope() {
+        let root = Root {
+            open: r#"<a:srgbClr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" val="FF0000">"#,
+            body: r#"<a:alpha val="50000"/>"#,
+            close: r"</a:srgbClr>",
+            empty: r#"<a:srgbClr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" val="FF0000"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"DrawingML color fragment must contain one complete root\")",
+                "whitespace only: Invalid(\"DrawingML color fragment must contain one complete root\")",
+                "declaration only: Invalid(\"DrawingML color fragment cannot contain an XML declaration or doctype\")",
+                "empty-element root: Ok(89)",
+                "start and end root: Ok(100)",
+                "root then whitespace: Ok(124)",
+                "root then comment: Ok(130)",
+                "root then PI: Ok(130)",
+                "root then text: Invalid(\"DrawingML color fragment contains text outside its root\")",
+                "root then second root: Invalid(\"DrawingML color fragment contains multiple roots\")",
+                "root then foreign start: Invalid(\"DrawingML color fragment contains multiple roots\")",
+                "root then foreign empty: Invalid(\"DrawingML color fragment contains multiple roots\")",
+                "declaration after root: Invalid(\"DrawingML color fragment cannot contain an XML declaration or doctype\")",
+                "two declarations: Invalid(\"DrawingML color fragment cannot contain an XML declaration or doctype\")",
+                "comment before declaration: Invalid(\"DrawingML color fragment cannot contain an XML declaration or doctype\")",
+                "text before root: Invalid(\"DrawingML color fragment contains text outside its root\")",
+                "unterminated root: Invalid(\"DrawingML color fragment must contain one complete root\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"DrawingML color fragment cannot contain an XML declaration or doctype\")",
+                "top-level CDATA: Invalid(\"DrawingML color fragment contains data outside its root\")",
+                "declaration then root: Invalid(\"DrawingML color fragment cannot contain an XML declaration or doctype\")",
+                "whitespace before declaration: Invalid(\"DrawingML color fragment cannot contain an XML declaration or doctype\")",
+                "PI before declaration: Invalid(\"DrawingML color fragment cannot contain an XML declaration or doctype\")",
+                "comment then root: Ok(130)",
+                "PI then root: Ok(130)",
+                "root then text then second root: Invalid(\"DrawingML color fragment contains text outside its root\")",
+                "empty-element root then root: Invalid(\"DrawingML color fragment contains multiple roots\")",
+                "declaration after empty-element root: Invalid(\"DrawingML color fragment cannot contain an XML declaration or doctype\")",
+                "reference before root: Invalid(\"DrawingML color fragment contains data outside its root\")",
+                "reference after root: Invalid(\"DrawingML color fragment contains data outside its root\")",
+                "CDATA after root: Invalid(\"DrawingML color fragment contains data outside its root\")",
+                "end tag before root: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "declaration inside root: Invalid(\"DrawingML color fragment cannot contain an XML declaration or doctype\")",
+                "text, CDATA and reference inside root: Ok(144)",
+            ],
+            |xml| {
+                outcome(
+                    super::validated_fragment(xml.as_bytes(), super::Limits::DEFAULT),
+                    |bytes| bytes.len().to_string(),
+                )
+            },
+        );
+    }
+}

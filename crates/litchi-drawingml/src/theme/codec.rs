@@ -3597,3 +3597,220 @@ mod tests {
         ));
     }
 }
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the replacement check and the source statistics pass accept before, around and after their root, and the exact error reported otherwise. Each
+    //! expected line is the row label followed by the result.
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+            ("reference before root", format!("&amp;{d}")),
+            ("reference after root", format!("{d}&amp;")),
+            ("CDATA after root", format!("{d}<![CDATA[x]]>")),
+            ("end tag before root", format!("</foreign>{d}")),
+            (
+                "declaration inside root",
+                format!("{open}{DECLARATION}{body}{close}"),
+            ),
+            (
+                "text, CDATA and reference inside root",
+                format!("{open}{body}text<![CDATA[x]]>&amp;{close}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&str) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(&xml)))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    /// The replacement fragment check, for a font scheme.
+    #[test]
+    fn replacement_fragment_envelope() {
+        let root = Root {
+            open: r#"<a:fontScheme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="f">"#,
+            body: r#"<a:majorFont><a:latin typeface="A"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont><a:minorFont><a:latin typeface="B"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont>"#,
+            close: r"</a:fontScheme>",
+            empty: r#"<a:fontScheme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="f"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"theme replacement is unterminated\")",
+                "whitespace only: Invalid(\"theme replacement is unterminated\")",
+                "declaration only: Invalid(\"theme replacement contains forbidden markup\")",
+                "empty-element root: Invalid(\"font scheme replacement must contain major and minor latin faces\")",
+                "start and end root: Invalid(\"font scheme replacement must contain major and minor latin faces\")",
+                "root then whitespace: Ok(9 nodes, depth 3)",
+                "root then comment: Ok(9 nodes, depth 3)",
+                "root then PI: Invalid(\"theme replacement contains forbidden markup\")",
+                "root then text: Invalid(\"theme replacement contains unsupported text\")",
+                "root then second root: Invalid(\"theme replacement has more than one root\")",
+                "root then foreign start: Invalid(\"theme replacement has more than one root\")",
+                "root then foreign empty: Invalid(\"theme replacement has more than one root\")",
+                "declaration after root: Invalid(\"theme replacement contains forbidden markup\")",
+                "two declarations: Invalid(\"theme replacement contains forbidden markup\")",
+                "comment before declaration: Invalid(\"theme replacement contains forbidden markup\")",
+                "text before root: Invalid(\"theme replacement contains unsupported text\")",
+                "unterminated root: Invalid(\"theme replacement is unterminated\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"theme replacement contains forbidden markup\")",
+                "top-level CDATA: Invalid(\"theme replacement contains unsupported content\")",
+                "declaration then root: Invalid(\"theme replacement contains forbidden markup\")",
+                "whitespace before declaration: Invalid(\"theme replacement contains forbidden markup\")",
+                "PI before declaration: Invalid(\"theme replacement contains forbidden markup\")",
+                "comment then root: Ok(9 nodes, depth 3)",
+                "PI then root: Invalid(\"theme replacement contains forbidden markup\")",
+                "root then text then second root: Invalid(\"theme replacement contains unsupported text\")",
+                "empty-element root then root: Invalid(\"font scheme replacement must contain major and minor latin faces\")",
+                "declaration after empty-element root: Invalid(\"font scheme replacement must contain major and minor latin faces\")",
+                "reference before root: Invalid(\"theme replacement contains unsupported content\")",
+                "reference after root: Invalid(\"theme replacement contains unsupported content\")",
+                "CDATA after root: Invalid(\"theme replacement contains unsupported content\")",
+                "end tag before root: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "declaration inside root: Invalid(\"theme replacement contains forbidden markup\")",
+                "text, CDATA and reference inside root: Invalid(\"theme replacement contains unsupported text\")",
+            ],
+            |xml| {
+                outcome(
+                    super::validate_replacement_fragment(
+                        xml.as_bytes(),
+                        b"fontScheme",
+                        b"http://schemas.openxmlformats.org/drawingml/2006/main",
+                        super::Limits::DEFAULT,
+                    ),
+                    |stats| format!("{} nodes, depth {}", stats.nodes, stats.max_depth),
+                )
+            },
+        );
+    }
+
+    /// The source statistics pass, with the whole input as the target range.
+    #[test]
+    fn source_stats_envelope() {
+        let root = Root {
+            open: r#"<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="t">"#,
+            body: r"<a:themeElements/>",
+            close: r"</a:theme>",
+            empty: r#"<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="t"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"theme XML is unterminated\")",
+                "whitespace only: Invalid(\"theme XML is unterminated\")",
+                "declaration only: Invalid(\"theme XML is unterminated\")",
+                "empty-element root: Ok(1 nodes, 1 in target)",
+                "start and end root: Ok(1 nodes, 1 in target)",
+                "root then whitespace: Ok(2 nodes, 2 in target)",
+                "root then comment: Ok(2 nodes, 2 in target)",
+                "root then PI: Invalid(\"theme XML contains forbidden markup\")",
+                "root then text: Ok(2 nodes, 2 in target)",
+                "root then second root: Invalid(\"theme XML has multiple root elements\")",
+                "root then foreign start: Invalid(\"theme XML has multiple root elements\")",
+                "root then foreign empty: Invalid(\"theme XML has multiple root elements\")",
+                "declaration after root: Ok(2 nodes, 2 in target)",
+                "two declarations: Ok(2 nodes, 2 in target)",
+                "comment before declaration: Ok(2 nodes, 2 in target)",
+                "text before root: Ok(2 nodes, 2 in target)",
+                "unterminated root: Invalid(\"theme XML is unterminated\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"theme XML contains forbidden markup\")",
+                "top-level CDATA: Ok(2 nodes, 2 in target)",
+                "declaration then root: Ok(2 nodes, 2 in target)",
+                "whitespace before declaration: Ok(2 nodes, 2 in target)",
+                "PI before declaration: Invalid(\"theme XML contains forbidden markup\")",
+                "comment then root: Ok(2 nodes, 2 in target)",
+                "PI then root: Invalid(\"theme XML contains forbidden markup\")",
+                "root then text then second root: Invalid(\"theme XML has multiple root elements\")",
+                "empty-element root then root: Invalid(\"theme XML has multiple root elements\")",
+                "declaration after empty-element root: Ok(1 nodes, 1 in target)",
+                "reference before root: Ok(2 nodes, 2 in target)",
+                "reference after root: Ok(2 nodes, 2 in target)",
+                "CDATA after root: Ok(2 nodes, 2 in target)",
+                "end tag before root: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "declaration inside root: Ok(2 nodes, 2 in target)",
+                "text, CDATA and reference inside root: Ok(2 nodes, 2 in target)",
+            ],
+            |xml| {
+                outcome(
+                    super::source_stats(xml.as_bytes(), &(0..xml.len()), super::Limits::DEFAULT),
+                    |stats| format!("{} nodes, {} in target", stats.nodes, stats.target_nodes),
+                )
+            },
+        );
+    }
+}

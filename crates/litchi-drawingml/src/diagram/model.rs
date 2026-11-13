@@ -2081,3 +2081,159 @@ mod tests {
         ));
     }
 }
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the SmartArt data reader accepts before, around and after `dgm:dataModel`, and the exact error reported otherwise. Each
+    //! expected line is the row label followed by the result.
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+            ("reference before root", format!("&amp;{d}")),
+            ("reference after root", format!("{d}&amp;")),
+            ("CDATA after root", format!("{d}<![CDATA[x]]>")),
+            ("end tag before root", format!("</foreign>{d}")),
+            (
+                "declaration inside root",
+                format!("{open}{DECLARATION}{body}{close}"),
+            ),
+            (
+                "text, CDATA and reference inside root",
+                format!("{open}{body}text<![CDATA[x]]>&amp;{close}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&str) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(&xml)))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    /// The SmartArt data reader.
+    #[test]
+    fn smart_art_data_envelope() {
+        let root = Root {
+            open: r#"<dgm:dataModel xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram">"#,
+            body: r#"<dgm:ptLst><dgm:pt modelId="1" type="doc"/></dgm:ptLst>"#,
+            close: r"</dgm:dataModel>",
+            empty: r#"<dgm:dataModel xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"unterminated SmartArt data XML\")",
+                "whitespace only: Invalid(\"unterminated SmartArt data XML\")",
+                "declaration only: Invalid(\"unterminated SmartArt data XML\")",
+                "empty-element root: Invalid(\"the SmartArt data model root is empty\")",
+                "start and end root: Invalid(\"unterminated SmartArt data XML\")",
+                "root then whitespace: Ok(0)",
+                "root then comment: Ok(0)",
+                "root then PI: Ok(0)",
+                "root then text: Invalid(\"non-whitespace text is outside the SmartArt data model\")",
+                "root then second root: Invalid(\"trailing markup follows the SmartArt data model\")",
+                "root then foreign start: Invalid(\"trailing markup follows the SmartArt data model\")",
+                "root then foreign empty: Invalid(\"trailing markup follows the SmartArt data model\")",
+                "declaration after root: Ok(0)",
+                "two declarations: Ok(0)",
+                "comment before declaration: Ok(0)",
+                "text before root: Invalid(\"non-whitespace text is outside the SmartArt data model\")",
+                "unterminated root: Invalid(\"unterminated SmartArt data XML\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"DTDs are rejected\")",
+                "top-level CDATA: Invalid(\"CDATA is outside SmartArt text\")",
+                "declaration then root: Ok(0)",
+                "whitespace before declaration: Ok(0)",
+                "PI before declaration: Ok(0)",
+                "comment then root: Ok(0)",
+                "PI then root: Ok(0)",
+                "root then text then second root: Invalid(\"non-whitespace text is outside the SmartArt data model\")",
+                "empty-element root then root: Invalid(\"the SmartArt data model root is empty\")",
+                "declaration after empty-element root: Invalid(\"the SmartArt data model root is empty\")",
+                "reference before root: Invalid(\"entity reference is outside the SmartArt data model\")",
+                "reference after root: Invalid(\"entity reference is outside the SmartArt data model\")",
+                "CDATA after root: Invalid(\"CDATA is outside SmartArt text\")",
+                "end tag before root: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "declaration inside root: Ok(0)",
+                "text, CDATA and reference inside root: Invalid(\"non-whitespace text is outside the SmartArt data model\")",
+            ],
+            |xml| {
+                outcome(
+                    super::SmartArt::parse_data_xml(xml, &super::Limits::default()),
+                    |nodes| nodes.len().to_string(),
+                )
+            },
+        );
+    }
+}

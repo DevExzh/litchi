@@ -3582,3 +3582,327 @@ fn check_limit(kind: LimitKind, value: usize, maximum: usize) -> Result<()> {
 fn xml_error(error: impl fmt::Display) -> Error {
     Error::Xml(error.to_string())
 }
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the four ink-action readers accept before, around and after `iact:actions`, and the exact error reported otherwise. Each
+    //! expected line is the row label followed by the result.
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+            ("reference before root", format!("&amp;{d}")),
+            ("reference after root", format!("{d}&amp;")),
+            ("CDATA after root", format!("{d}<![CDATA[x]]>")),
+            ("end tag before root", format!("</foreign>{d}")),
+            (
+                "declaration inside root",
+                format!("{open}{DECLARATION}{body}{close}"),
+            ),
+            (
+                "text, CDATA and reference inside root",
+                format!("{open}{body}text<![CDATA[x]]>&amp;{close}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&str) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(&xml)))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    /// The lenient reader.
+    #[test]
+    fn actions_read_envelope() {
+        let root = Root {
+            open: r#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" lengthUnit="cm" timeUnit="ms">"#,
+            body: r#"<iact:action type="remove" startTime="2"><iact:actionData/></iact:action>"#,
+            close: r"</iact:actions>",
+            empty: r#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" lengthUnit="cm" timeUnit="ms"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"ink actions root is absent or unterminated\")",
+                "whitespace only: Invalid(\"ink actions root is absent or unterminated\")",
+                "declaration only: Invalid(\"ink actions root is absent or unterminated\")",
+                "empty-element root: Ok(0)",
+                "start and end root: Ok(0)",
+                "root then whitespace: Ok(1)",
+                "root then comment: Ok(1)",
+                "root then PI: Invalid(\"ink actions rejects DTDs and processing instructions\")",
+                "root then text: Invalid(\"ink actions has text outside its root\")",
+                "root then second root: Invalid(\"ink actions has content after its root\")",
+                "root then foreign start: Invalid(\"ink actions has content after its root\")",
+                "root then foreign empty: Invalid(\"ink actions has content after its root\")",
+                "declaration after root: Invalid(\"ink actions has a duplicate or late XML declaration\")",
+                "two declarations: Invalid(\"ink actions has a duplicate or late XML declaration\")",
+                "comment before declaration: Invalid(\"ink actions has a duplicate or late XML declaration\")",
+                "text before root: Invalid(\"ink actions has text outside its root\")",
+                "unterminated root: Invalid(\"ink actions root is absent or unterminated\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"ink actions rejects DTDs and processing instructions\")",
+                "top-level CDATA: Invalid(\"ink actions CDATA is not allowed outside its root\")",
+                "declaration then root: Ok(1)",
+                "whitespace before declaration: Invalid(\"ink actions has a duplicate or late XML declaration\")",
+                "PI before declaration: Invalid(\"ink actions rejects DTDs and processing instructions\")",
+                "comment then root: Ok(1)",
+                "PI then root: Invalid(\"ink actions rejects DTDs and processing instructions\")",
+                "root then text then second root: Invalid(\"ink actions has text outside its root\")",
+                "empty-element root then root: Invalid(\"ink actions has content after its root\")",
+                "declaration after empty-element root: Invalid(\"ink actions has a duplicate or late XML declaration\")",
+                "reference before root: Invalid(\"ink actions has a reference outside its root\")",
+                "reference after root: Invalid(\"ink actions has a reference outside its root\")",
+                "CDATA after root: Invalid(\"ink actions CDATA is not allowed outside its root\")",
+                "end tag before root: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "declaration inside root: Invalid(\"ink actions has a duplicate or late XML declaration\")",
+                "text, CDATA and reference inside root: Ok(1)",
+            ],
+            |xml| {
+                outcome(
+                    super::read(xml.as_bytes(), super::Limits::DEFAULT),
+                    |actions| actions.actions().len().to_string(),
+                )
+            },
+        );
+    }
+
+    /// The lenient reader's validation-only twin.
+    #[test]
+    fn actions_validate_source_envelope() {
+        let root = Root {
+            open: r#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" lengthUnit="cm" timeUnit="ms">"#,
+            body: r#"<iact:action type="remove" startTime="2"><iact:actionData/></iact:action>"#,
+            close: r"</iact:actions>",
+            empty: r#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" lengthUnit="cm" timeUnit="ms"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"ink actions root is absent or unterminated\")",
+                "whitespace only: Invalid(\"ink actions root is absent or unterminated\")",
+                "declaration only: Invalid(\"ink actions root is absent or unterminated\")",
+                "empty-element root: Ok()",
+                "start and end root: Ok()",
+                "root then whitespace: Ok()",
+                "root then comment: Ok()",
+                "root then PI: Invalid(\"ink actions rejects DTDs and processing instructions\")",
+                "root then text: Invalid(\"ink actions has text outside its root\")",
+                "root then second root: Invalid(\"ink actions has content after its root\")",
+                "root then foreign start: Invalid(\"ink actions has content after its root\")",
+                "root then foreign empty: Invalid(\"ink actions has content after its root\")",
+                "declaration after root: Invalid(\"ink actions has a duplicate or late XML declaration\")",
+                "two declarations: Invalid(\"ink actions has a duplicate or late XML declaration\")",
+                "comment before declaration: Invalid(\"ink actions has a duplicate or late XML declaration\")",
+                "text before root: Invalid(\"ink actions has text outside its root\")",
+                "unterminated root: Invalid(\"ink actions root is absent or unterminated\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"ink actions rejects DTDs and processing instructions\")",
+                "top-level CDATA: Invalid(\"ink actions CDATA is not allowed outside its root\")",
+                "declaration then root: Ok()",
+                "whitespace before declaration: Invalid(\"ink actions has a duplicate or late XML declaration\")",
+                "PI before declaration: Invalid(\"ink actions rejects DTDs and processing instructions\")",
+                "comment then root: Ok()",
+                "PI then root: Invalid(\"ink actions rejects DTDs and processing instructions\")",
+                "root then text then second root: Invalid(\"ink actions has text outside its root\")",
+                "empty-element root then root: Invalid(\"ink actions has content after its root\")",
+                "declaration after empty-element root: Invalid(\"ink actions has a duplicate or late XML declaration\")",
+                "reference before root: Invalid(\"ink actions has a reference outside its root\")",
+                "reference after root: Invalid(\"ink actions has a reference outside its root\")",
+                "CDATA after root: Invalid(\"ink actions CDATA is not allowed outside its root\")",
+                "end tag before root: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "declaration inside root: Invalid(\"ink actions has a duplicate or late XML declaration\")",
+                "text, CDATA and reference inside root: Ok()",
+            ],
+            |xml| {
+                outcome(
+                    super::validate_source(xml.as_bytes(), super::Limits::DEFAULT),
+                    |()| String::new(),
+                )
+            },
+        );
+    }
+
+    /// The strict profile reader.
+    #[test]
+    fn profile_read_envelope() {
+        let root = Root {
+            open: r#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" lengthUnit="cm" timeUnit="ms">"#,
+            body: r#"<iact:action type="remove" startTime="2"><iact:actionData/></iact:action>"#,
+            close: r"</iact:actions>",
+            empty: r#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" lengthUnit="cm" timeUnit="ms"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"ink actions profile root is absent or unterminated\")",
+                "whitespace only: Invalid(\"ink actions profile root is absent or unterminated\")",
+                "declaration only: Invalid(\"ink actions profile root is absent or unterminated\")",
+                "empty-element root: Ok(0)",
+                "start and end root: Ok(0)",
+                "root then whitespace: Ok(1)",
+                "root then comment: Ok(1)",
+                "root then PI: Invalid(\"ink actions profile rejects DTDs and processing instructions\")",
+                "root then text: Invalid(\"ink actions profile has text outside its root\")",
+                "root then second root: Invalid(\"ink actions profile has content after its root\")",
+                "root then foreign start: Invalid(\"ink actions profile has content after its root\")",
+                "root then foreign empty: Invalid(\"ink actions profile has content after its root\")",
+                "declaration after root: Invalid(\"ink actions profile has a duplicate or late XML declaration\")",
+                "two declarations: Invalid(\"ink actions profile has a duplicate or late XML declaration\")",
+                "comment before declaration: Invalid(\"ink actions profile has a duplicate or late XML declaration\")",
+                "text before root: Invalid(\"ink actions profile has text outside its root\")",
+                "unterminated root: Invalid(\"ink actions profile root is absent or unterminated\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"ink actions profile rejects DTDs and processing instructions\")",
+                "top-level CDATA: Invalid(\"ink actions profile has CDATA outside its root\")",
+                "declaration then root: Ok(1)",
+                "whitespace before declaration: Invalid(\"ink actions profile has a duplicate or late XML declaration\")",
+                "PI before declaration: Invalid(\"ink actions profile rejects DTDs and processing instructions\")",
+                "comment then root: Ok(1)",
+                "PI then root: Invalid(\"ink actions profile rejects DTDs and processing instructions\")",
+                "root then text then second root: Invalid(\"ink actions profile has text outside its root\")",
+                "empty-element root then root: Invalid(\"ink actions profile has content after its root\")",
+                "declaration after empty-element root: Invalid(\"ink actions profile has a duplicate or late XML declaration\")",
+                "reference before root: Invalid(\"ink actions profile has a reference outside its root\")",
+                "reference after root: Invalid(\"ink actions profile has a reference outside its root\")",
+                "CDATA after root: Invalid(\"ink actions profile has CDATA outside its root\")",
+                "end tag before root: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "declaration inside root: Invalid(\"ink actions profile has a duplicate or late XML declaration\")",
+                "text, CDATA and reference inside root: Invalid(\"ink actions profile recognized element-only content contains text\")",
+            ],
+            |xml| {
+                outcome(
+                    super::read_profile(xml.as_bytes(), super::Limits::DEFAULT),
+                    |profile| profile.children().len().to_string(),
+                )
+            },
+        );
+    }
+
+    /// The strict profile reader's validation-only twin.
+    #[test]
+    fn profile_validate_source_envelope() {
+        let root = Root {
+            open: r#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" lengthUnit="cm" timeUnit="ms">"#,
+            body: r#"<iact:action type="remove" startTime="2"><iact:actionData/></iact:action>"#,
+            close: r"</iact:actions>",
+            empty: r#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" lengthUnit="cm" timeUnit="ms"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"ink actions profile root is absent or unterminated\")",
+                "whitespace only: Invalid(\"ink actions profile root is absent or unterminated\")",
+                "declaration only: Invalid(\"ink actions profile root is absent or unterminated\")",
+                "empty-element root: Ok()",
+                "start and end root: Ok()",
+                "root then whitespace: Ok()",
+                "root then comment: Ok()",
+                "root then PI: Invalid(\"ink actions profile rejects DTDs and processing instructions\")",
+                "root then text: Invalid(\"ink actions profile has text outside its root\")",
+                "root then second root: Invalid(\"ink actions profile has content after its root\")",
+                "root then foreign start: Invalid(\"ink actions profile has content after its root\")",
+                "root then foreign empty: Invalid(\"ink actions profile has content after its root\")",
+                "declaration after root: Invalid(\"ink actions profile has a duplicate or late XML declaration\")",
+                "two declarations: Invalid(\"ink actions profile has a duplicate or late XML declaration\")",
+                "comment before declaration: Invalid(\"ink actions profile has a duplicate or late XML declaration\")",
+                "text before root: Invalid(\"ink actions profile has text outside its root\")",
+                "unterminated root: Invalid(\"ink actions profile root is absent or unterminated\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"ink actions profile rejects DTDs and processing instructions\")",
+                "top-level CDATA: Invalid(\"ink actions profile has CDATA outside its root\")",
+                "declaration then root: Ok()",
+                "whitespace before declaration: Invalid(\"ink actions profile has a duplicate or late XML declaration\")",
+                "PI before declaration: Invalid(\"ink actions profile rejects DTDs and processing instructions\")",
+                "comment then root: Ok()",
+                "PI then root: Invalid(\"ink actions profile rejects DTDs and processing instructions\")",
+                "root then text then second root: Invalid(\"ink actions profile has text outside its root\")",
+                "empty-element root then root: Invalid(\"ink actions profile has content after its root\")",
+                "declaration after empty-element root: Invalid(\"ink actions profile has a duplicate or late XML declaration\")",
+                "reference before root: Invalid(\"ink actions profile has a reference outside its root\")",
+                "reference after root: Invalid(\"ink actions profile has a reference outside its root\")",
+                "CDATA after root: Invalid(\"ink actions profile has CDATA outside its root\")",
+                "end tag before root: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "declaration inside root: Invalid(\"ink actions profile has a duplicate or late XML declaration\")",
+                "text, CDATA and reference inside root: Invalid(\"ink actions profile recognized element-only content contains text\")",
+            ],
+            |xml| {
+                outcome(
+                    super::validate_profile_source(xml.as_bytes(), super::Limits::DEFAULT),
+                    |()| String::new(),
+                )
+            },
+        );
+    }
+}

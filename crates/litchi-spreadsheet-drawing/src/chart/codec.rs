@@ -698,3 +698,158 @@ pub(crate) fn fragment_ids(chart: &ChartModel) -> Result<HashSet<String>> {
     }
     Ok(relationship_ids)
 }
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the user-shapes relationship scan accepts before, around and after `c:userShapes`, and the exact error reported otherwise. Each
+    //! expected line is the row label followed by the result.
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+            ("reference before root", format!("&amp;{d}")),
+            ("reference after root", format!("{d}&amp;")),
+            ("CDATA after root", format!("{d}<![CDATA[x]]>")),
+            ("end tag before root", format!("</foreign>{d}")),
+            (
+                "declaration inside root",
+                format!("{open}{DECLARATION}{body}{close}"),
+            ),
+            (
+                "text, CDATA and reference inside root",
+                format!("{open}{body}text<![CDATA[x]]>&amp;{close}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&str) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(&xml)))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    /// The user-shapes relationship scan.
+    #[test]
+    fn user_shapes_envelope() {
+        let root = Root {
+            open: r#"<c:userShapes xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">"#,
+            body: r#"<c:x r:id="rId1"/>"#,
+            close: r"</c:userShapes>",
+            empty: r#"<c:userShapes xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"chart user-shapes XML has no complete root\")",
+                "whitespace only: Invalid(\"chart user-shapes XML has no complete root\")",
+                "declaration only: Invalid(\"chart user-shapes XML has no complete root\")",
+                "empty-element root: Ok(0)",
+                "start and end root: Ok(0)",
+                "root then whitespace: Ok(1)",
+                "root then comment: Ok(1)",
+                "root then PI: Ok(1)",
+                "root then text: Invalid(\"chart user-shapes XML contains text outside its root\")",
+                "root then second root: Invalid(\"chart user-shapes XML must have one chart userShapes root\")",
+                "root then foreign start: Invalid(\"chart user-shapes XML must have one chart userShapes root\")",
+                "root then foreign empty: Invalid(\"chart user-shapes XML must have one chart userShapes root\")",
+                "declaration after root: Ok(1)",
+                "two declarations: Ok(1)",
+                "comment before declaration: Ok(1)",
+                "text before root: Invalid(\"chart user-shapes XML contains text outside its root\")",
+                "unterminated root: Invalid(\"chart user-shapes XML has no complete root\")",
+                "stray end tag: Encoding(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"chart user-shapes XML cannot contain a document type\")",
+                "top-level CDATA: Invalid(\"chart user-shapes XML contains data outside its root\")",
+                "declaration then root: Ok(1)",
+                "whitespace before declaration: Ok(1)",
+                "PI before declaration: Ok(1)",
+                "comment then root: Ok(1)",
+                "PI then root: Ok(1)",
+                "root then text then second root: Invalid(\"chart user-shapes XML contains text outside its root\")",
+                "empty-element root then root: Invalid(\"chart user-shapes XML must have one chart userShapes root\")",
+                "declaration after empty-element root: Ok(0)",
+                "reference before root: Invalid(\"chart user-shapes XML contains data outside its root\")",
+                "reference after root: Invalid(\"chart user-shapes XML contains data outside its root\")",
+                "CDATA after root: Invalid(\"chart user-shapes XML contains data outside its root\")",
+                "end tag before root: Encoding(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "declaration inside root: Ok(1)",
+                "text, CDATA and reference inside root: Ok(1)",
+            ],
+            |xml| {
+                outcome(super::user_shapes_ids(xml.as_bytes()), |ids| {
+                    ids.len().to_string()
+                })
+            },
+        );
+    }
+}

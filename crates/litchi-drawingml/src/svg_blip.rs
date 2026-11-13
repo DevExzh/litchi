@@ -2935,6 +2935,165 @@ pub(crate) mod codec {
         }
         Ok(())
     }
+
+    #[cfg(test)]
+    mod envelope_tests {
+        //! What the contextual child walk accepts before, around and after its one element, and the exact error reported otherwise. Each
+        //! expected line is the row label followed by the result.
+
+        const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+        /// One reader's root element in the forms the rows are built from.
+        struct Root<'a> {
+            /// The start tag.
+            open: &'a str,
+            /// Content that makes the element valid for its reader.
+            body: &'a str,
+            /// The end tag.
+            close: &'a str,
+            /// The element as one empty-element tag.
+            empty: &'a str,
+        }
+
+        fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+            let Root {
+                open,
+                body,
+                close,
+                empty,
+            } = *root;
+            let document = format!("{open}{body}{close}");
+            let d = document.as_str();
+            vec![
+                ("empty input", String::new()),
+                ("whitespace only", " \n".to_owned()),
+                ("declaration only", DECLARATION.to_owned()),
+                ("empty-element root", empty.to_owned()),
+                ("start and end root", format!("{open}{close}")),
+                ("root then whitespace", format!("{d}\n ")),
+                ("root then comment", format!("{d}<!--c-->")),
+                ("root then PI", format!("{d}<?pi x?>")),
+                ("root then text", format!("{d}text")),
+                ("root then second root", format!("{d}{d}")),
+                ("root then foreign start", format!("{d}<foreign></foreign>")),
+                ("root then foreign empty", format!("{d}<foreign/>")),
+                ("declaration after root", format!("{d}{DECLARATION}")),
+                ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+                (
+                    "comment before declaration",
+                    format!("<!--c-->{DECLARATION}{d}"),
+                ),
+                ("text before root", format!("text{d}")),
+                ("unterminated root", format!("{open}{body}")),
+                ("stray end tag", format!("{d}</foreign>")),
+                ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+                ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+                ("declaration then root", format!("{DECLARATION}{d}")),
+                (
+                    "whitespace before declaration",
+                    format!(" {DECLARATION}{d}"),
+                ),
+                ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+                ("comment then root", format!("<!--c-->{d}")),
+                ("PI then root", format!("<?pi x?>{d}")),
+                ("root then text then second root", format!("{d}text{d}")),
+                ("empty-element root then root", format!("{empty}{d}")),
+                (
+                    "declaration after empty-element root",
+                    format!("{empty}{DECLARATION}"),
+                ),
+                ("reference before root", format!("&amp;{d}")),
+                ("reference after root", format!("{d}&amp;")),
+                ("CDATA after root", format!("{d}<![CDATA[x]]>")),
+                ("end tag before root", format!("</foreign>{d}")),
+                (
+                    "declaration inside root",
+                    format!("{open}{DECLARATION}{body}{close}"),
+                ),
+                (
+                    "text, CDATA and reference inside root",
+                    format!("{open}{body}text<![CDATA[x]]>&amp;{close}"),
+                ),
+            ]
+        }
+
+        fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&str) -> String) {
+            let actual = rows(root)
+                .into_iter()
+                .map(|(label, xml)| format!("{label}: {}", read(&xml)))
+                .collect::<Vec<_>>();
+            assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+        }
+
+        fn outcome<T, E: std::fmt::Debug>(
+            result: Result<T, E>,
+            summary: impl Fn(T) -> String,
+        ) -> String {
+            match result {
+                Ok(value) => format!("Ok({})", summary(value)),
+                Err(error) => format!("{error:?}"),
+            }
+        }
+
+        /// The contextual child walk, under an empty host context.
+        #[test]
+        fn contextual_children_envelope() {
+            let root = Root {
+                open: r#"<svg:g xmlns:svg="urn:example:svg">"#,
+                body: r"<svg:a/>text",
+                close: r"</svg:g>",
+                empty: r#"<svg:g xmlns:svg="urn:example:svg"/>"#,
+            };
+            assert_matrix(
+                &root,
+                &[
+                    "empty input: Invalid(\"SVG contextual child is not one complete XML item\")",
+                    "whitespace only: Invalid(\"SVG contextual child is not one complete XML item\")",
+                    "declaration only: Invalid(\"SVG contextual child contains forbidden markup\")",
+                    "empty-element root: Ok(0)",
+                    "start and end root: Ok(0)",
+                    "root then whitespace: Ok(2)",
+                    "root then comment: Invalid(\"SVG contextual child has markup outside its root\")",
+                    "root then PI: Invalid(\"SVG contextual child contains forbidden markup\")",
+                    "root then text: Invalid(\"SVG contextual child has text outside its root\")",
+                    "root then second root: Invalid(\"SVG contextual child has markup outside its root\")",
+                    "root then foreign start: Invalid(\"SVG contextual child has markup outside its root\")",
+                    "root then foreign empty: Invalid(\"SVG contextual child has markup outside its root\")",
+                    "declaration after root: Invalid(\"SVG contextual child contains forbidden markup\")",
+                    "two declarations: Invalid(\"SVG contextual child contains forbidden markup\")",
+                    "comment before declaration: Invalid(\"SVG contextual child has markup outside its root\")",
+                    "text before root: Invalid(\"SVG contextual child has text outside its root\")",
+                    "unterminated root: Invalid(\"SVG contextual child is not one complete XML item\")",
+                    "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                    "DOCTYPE: Invalid(\"SVG contextual child contains forbidden markup\")",
+                    "top-level CDATA: Invalid(\"SVG contextual child has markup outside its root\")",
+                    "declaration then root: Invalid(\"SVG contextual child contains forbidden markup\")",
+                    "whitespace before declaration: Invalid(\"SVG contextual child contains forbidden markup\")",
+                    "PI before declaration: Invalid(\"SVG contextual child contains forbidden markup\")",
+                    "comment then root: Invalid(\"SVG contextual child has markup outside its root\")",
+                    "PI then root: Invalid(\"SVG contextual child contains forbidden markup\")",
+                    "root then text then second root: Invalid(\"SVG contextual child has text outside its root\")",
+                    "empty-element root then root: Invalid(\"SVG contextual child has markup outside its root\")",
+                    "declaration after empty-element root: Invalid(\"SVG contextual child contains forbidden markup\")",
+                    "reference before root: Invalid(\"SVG contextual child has markup outside its root\")",
+                    "reference after root: Invalid(\"SVG contextual child has markup outside its root\")",
+                    "CDATA after root: Invalid(\"SVG contextual child has markup outside its root\")",
+                    "end tag before root: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                    "declaration inside root: Invalid(\"SVG contextual child contains forbidden markup\")",
+                    "text, CDATA and reference inside root: Ok(4)",
+                ],
+                |xml| {
+                    let mut children = Vec::new();
+                    let result = super::collect_contextual_children(
+                        xml.as_bytes(),
+                        &super::NamespaceContext::empty(),
+                        &mut children,
+                    );
+                    outcome(result, |()| children.len().to_string())
+                },
+            );
+        }
+    }
 }
 
 fn validate_reference(reference: &Reference) -> Result<()> {

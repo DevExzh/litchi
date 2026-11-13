@@ -1490,3 +1490,159 @@ fn check_limit(kind: LimitKind, value: usize, maximum: usize) -> Result<()> {
 fn xml_error(error: impl fmt::Display) -> Error {
     Error::Xml(error.to_string())
 }
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the theme family scan accepts before, around and after `thm15:themeFamily`, and the exact error reported otherwise. Each
+    //! expected line is the row label followed by the result.
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+            ("reference before root", format!("&amp;{d}")),
+            ("reference after root", format!("{d}&amp;")),
+            ("CDATA after root", format!("{d}<![CDATA[x]]>")),
+            ("end tag before root", format!("</foreign>{d}")),
+            (
+                "declaration inside root",
+                format!("{open}{DECLARATION}{body}{close}"),
+            ),
+            (
+                "text, CDATA and reference inside root",
+                format!("{open}{body}text<![CDATA[x]]>&amp;{close}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&str) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(&xml)))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    /// The theme family scan.
+    #[test]
+    fn theme_family_scan_envelope() {
+        let root = Root {
+            open: r#"<thm15:themeFamily xmlns:thm15="http://schemas.microsoft.com/office/thememl/2012/main" name="Office Theme" id="{62F939B6-93AF-4DB8-9C6B-D6C7DFDC589F}" vid="{4A3C46E8-61CC-4603-A589-7422A47A8E4A}">"#,
+            body: r"<thm15:extLst/>",
+            close: r"</thm15:themeFamily>",
+            empty: r#"<thm15:themeFamily xmlns:thm15="http://schemas.microsoft.com/office/thememl/2012/main" name="Office Theme" id="{62F939B6-93AF-4DB8-9C6B-D6C7DFDC589F}" vid="{4A3C46E8-61CC-4603-A589-7422A47A8E4A}"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"theme family fragment is unterminated\")",
+                "whitespace only: Invalid(\"theme family fragment is unterminated\")",
+                "declaration only: Invalid(\"theme family fragment is unterminated\")",
+                "empty-element root: Ok(0..197)",
+                "start and end root: Ok(0..216)",
+                "root then whitespace: Ok(0..231)",
+                "root then comment: Ok(0..231)",
+                "root then PI: Invalid(\"theme family contains forbidden document markup\")",
+                "root then text: Invalid(\"theme family has text outside its root\")",
+                "root then second root: Invalid(\"theme family fragment has more than one root\")",
+                "root then foreign start: Invalid(\"theme family fragment has more than one root\")",
+                "root then foreign empty: Invalid(\"theme family fragment has more than one root\")",
+                "declaration after root: Invalid(\"theme family XML declaration is misplaced\")",
+                "two declarations: Invalid(\"theme family XML declaration is misplaced\")",
+                "comment before declaration: Invalid(\"theme family XML declaration is misplaced\")",
+                "text before root: Invalid(\"theme family has text outside its root\")",
+                "unterminated root: Invalid(\"theme family fragment is unterminated\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"theme family contains forbidden document markup\")",
+                "top-level CDATA: Invalid(\"theme family has CDATA outside its root\")",
+                "declaration then root: Ok(38..269)",
+                "whitespace before declaration: Invalid(\"theme family XML declaration is misplaced\")",
+                "PI before declaration: Invalid(\"theme family contains forbidden document markup\")",
+                "comment then root: Ok(8..239)",
+                "PI then root: Invalid(\"theme family contains forbidden document markup\")",
+                "root then text then second root: Invalid(\"theme family has text outside its root\")",
+                "empty-element root then root: Invalid(\"theme family fragment has more than one root\")",
+                "declaration after empty-element root: Invalid(\"theme family XML declaration is misplaced\")",
+                "reference before root: Invalid(\"theme family has a reference outside its root\")",
+                "reference after root: Invalid(\"theme family has a reference outside its root\")",
+                "CDATA after root: Invalid(\"theme family has CDATA outside its root\")",
+                "end tag before root: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "declaration inside root: Invalid(\"theme family XML declaration is misplaced\")",
+                "text, CDATA and reference inside root: Invalid(\"theme family element-only container contains text\")",
+            ],
+            |xml| {
+                outcome(
+                    super::scan(xml.as_bytes(), super::Limits::DEFAULT),
+                    |parsed| format!("{}..{}", parsed.root_start, parsed.root_end),
+                )
+            },
+        );
+    }
+}

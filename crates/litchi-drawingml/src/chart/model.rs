@@ -871,3 +871,163 @@ impl Default for Chart {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the chart fragment check accepts before, around and after its one chart element, and the exact error reported otherwise. Each
+    //! expected line is the row label followed by the result.
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+            ("reference before root", format!("&amp;{d}")),
+            ("reference after root", format!("{d}&amp;")),
+            ("CDATA after root", format!("{d}<![CDATA[x]]>")),
+            ("end tag before root", format!("</foreign>{d}")),
+            (
+                "declaration inside root",
+                format!("{open}{DECLARATION}{body}{close}"),
+            ),
+            (
+                "text, CDATA and reference inside root",
+                format!("{open}{body}text<![CDATA[x]]>&amp;{close}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&str) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(&xml)))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    /// The chart fragment check, on shape properties.
+    #[test]
+    fn chart_fragment_envelope() {
+        let root = Root {
+            open: r#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">"#,
+            body: r"<c:x/>",
+            close: r"</c:spPr>",
+            empty: r#"<c:spPr xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"chart shape properties has no complete root\")",
+                "whitespace only: Invalid(\"chart shape properties has no complete root\")",
+                "declaration only: Invalid(\"chart shape properties cannot contain an XML declaration or document type\")",
+                "empty-element root: Ok()",
+                "start and end root: Ok()",
+                "root then whitespace: Ok()",
+                "root then comment: Ok()",
+                "root then PI: Ok()",
+                "root then text: Invalid(\"chart shape properties contains text outside its root\")",
+                "root then second root: Invalid(\"chart shape properties must have one DrawingML chart root\")",
+                "root then foreign start: Invalid(\"chart shape properties must have one DrawingML chart root\")",
+                "root then foreign empty: Invalid(\"chart shape properties must have one DrawingML chart root\")",
+                "declaration after root: Invalid(\"chart shape properties cannot contain an XML declaration or document type\")",
+                "two declarations: Invalid(\"chart shape properties cannot contain an XML declaration or document type\")",
+                "comment before declaration: Invalid(\"chart shape properties cannot contain an XML declaration or document type\")",
+                "text before root: Invalid(\"chart shape properties contains text outside its root\")",
+                "unterminated root: Invalid(\"chart shape properties has no complete root\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"chart shape properties cannot contain an XML declaration or document type\")",
+                "top-level CDATA: Invalid(\"chart shape properties contains data outside its root\")",
+                "declaration then root: Invalid(\"chart shape properties cannot contain an XML declaration or document type\")",
+                "whitespace before declaration: Invalid(\"chart shape properties cannot contain an XML declaration or document type\")",
+                "PI before declaration: Invalid(\"chart shape properties cannot contain an XML declaration or document type\")",
+                "comment then root: Ok()",
+                "PI then root: Ok()",
+                "root then text then second root: Invalid(\"chart shape properties contains text outside its root\")",
+                "empty-element root then root: Invalid(\"chart shape properties must have one DrawingML chart root\")",
+                "declaration after empty-element root: Invalid(\"chart shape properties cannot contain an XML declaration or document type\")",
+                "reference before root: Invalid(\"chart shape properties contains data outside its root\")",
+                "reference after root: Invalid(\"chart shape properties contains data outside its root\")",
+                "CDATA after root: Invalid(\"chart shape properties contains data outside its root\")",
+                "end tag before root: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "declaration inside root: Invalid(\"chart shape properties cannot contain an XML declaration or document type\")",
+                "text, CDATA and reference inside root: Ok()",
+            ],
+            |xml| {
+                outcome(
+                    super::validate_chart_xml_fragment(
+                        xml.as_bytes(),
+                        b"spPr",
+                        "chart shape properties",
+                    ),
+                    |()| String::new(),
+                )
+            },
+        );
+    }
+}

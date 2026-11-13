@@ -2034,3 +2034,215 @@ mod tests {
         });
     }
 }
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the editable data-model reader and the drawing reader accept before, around and after their root, and the exact error reported otherwise. Each
+    //! expected line is the row label followed by the result.
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+            ("reference before root", format!("&amp;{d}")),
+            ("reference after root", format!("{d}&amp;")),
+            ("CDATA after root", format!("{d}<![CDATA[x]]>")),
+            ("end tag before root", format!("</foreign>{d}")),
+            (
+                "declaration inside root",
+                format!("{open}{DECLARATION}{body}{close}"),
+            ),
+            (
+                "text, CDATA and reference inside root",
+                format!("{open}{body}text<![CDATA[x]]>&amp;{close}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&str) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(&xml)))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    /// The editable data-model reader.
+    #[test]
+    fn editable_data_model_envelope() {
+        let root = Root {
+            open: r#"<dgm:dataModel xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram">"#,
+            body: r#"<dgm:ptLst><dgm:pt modelId="1" type="doc"/></dgm:ptLst>"#,
+            close: r"</dgm:dataModel>",
+            empty: r#"<dgm:dataModel xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"unterminated diagram data model\")",
+                "whitespace only: Invalid(\"unterminated diagram data model\")",
+                "declaration only: Invalid(\"unterminated diagram data model\")",
+                "empty-element root: Invalid(\"the diagram data model is empty\")",
+                "start and end root: Invalid(\"the diagram data model has no document point\")",
+                "root then whitespace: Ok(1)",
+                "root then comment: Ok(1)",
+                "root then PI: Ok(1)",
+                "root then text: Invalid(\"non-whitespace text is outside the diagram data model\")",
+                "root then second root: Invalid(\"trailing markup follows the diagram data model\")",
+                "root then foreign start: Invalid(\"trailing markup follows the diagram data model\")",
+                "root then foreign empty: Invalid(\"trailing markup follows the diagram data model\")",
+                "declaration after root: Ok(1)",
+                "two declarations: Ok(1)",
+                "comment before declaration: Ok(1)",
+                "text before root: Invalid(\"non-whitespace text is outside the diagram data model\")",
+                "unterminated root: Invalid(\"unterminated diagram data model\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"document type in a diagram part\")",
+                "top-level CDATA: Invalid(\"CDATA is outside the diagram data model\")",
+                "declaration then root: Ok(1)",
+                "whitespace before declaration: Ok(1)",
+                "PI before declaration: Ok(1)",
+                "comment then root: Ok(1)",
+                "PI then root: Ok(1)",
+                "root then text then second root: Invalid(\"non-whitespace text is outside the diagram data model\")",
+                "empty-element root then root: Invalid(\"the diagram data model is empty\")",
+                "declaration after empty-element root: Invalid(\"the diagram data model is empty\")",
+                "reference before root: Invalid(\"entity reference is outside the diagram data model\")",
+                "reference after root: Invalid(\"entity reference is outside the diagram data model\")",
+                "CDATA after root: Invalid(\"CDATA is outside the diagram data model\")",
+                "end tag before root: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "declaration inside root: Ok(1)",
+                "text, CDATA and reference inside root: Invalid(\"non-whitespace text is outside the diagram data model\")",
+            ],
+            |xml| {
+                outcome(
+                    super::Parsed::read(xml.as_bytes(), &super::Limits::default()),
+                    |parsed| parsed.points.len().to_string(),
+                )
+            },
+        );
+    }
+
+    /// The diagram drawing reader.
+    #[test]
+    fn diagram_drawing_envelope() {
+        let root = Root {
+            open: r#"<dsp:drawing xmlns:dsp="http://schemas.microsoft.com/office/drawing/2008/diagram">"#,
+            body: r"<dsp:spTree/>",
+            close: r"</dsp:drawing>",
+            empty: r#"<dsp:drawing xmlns:dsp="http://schemas.microsoft.com/office/drawing/2008/diagram"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"unterminated diagram drawing\")",
+                "whitespace only: Invalid(\"unterminated diagram drawing\")",
+                "declaration only: Invalid(\"unterminated diagram drawing\")",
+                "empty-element root: Invalid(\"the diagram drawing root is empty\")",
+                "start and end root: Invalid(\"unterminated diagram drawing\")",
+                "root then whitespace: Ok(0 shapes, strict false)",
+                "root then comment: Ok(0 shapes, strict false)",
+                "root then PI: Ok(0 shapes, strict false)",
+                "root then text: Invalid(\"non-whitespace text is outside the diagram drawing\")",
+                "root then second root: Invalid(\"trailing markup follows the diagram drawing\")",
+                "root then foreign start: Invalid(\"trailing markup follows the diagram drawing\")",
+                "root then foreign empty: Invalid(\"trailing markup follows the diagram drawing\")",
+                "declaration after root: Ok(0 shapes, strict false)",
+                "two declarations: Ok(0 shapes, strict false)",
+                "comment before declaration: Ok(0 shapes, strict false)",
+                "text before root: Invalid(\"non-whitespace text is outside the diagram drawing\")",
+                "unterminated root: Invalid(\"unterminated diagram drawing\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"document type in a diagram part\")",
+                "top-level CDATA: Invalid(\"CDATA is outside the diagram drawing\")",
+                "declaration then root: Ok(0 shapes, strict false)",
+                "whitespace before declaration: Ok(0 shapes, strict false)",
+                "PI before declaration: Ok(0 shapes, strict false)",
+                "comment then root: Ok(0 shapes, strict false)",
+                "PI then root: Ok(0 shapes, strict false)",
+                "root then text then second root: Invalid(\"non-whitespace text is outside the diagram drawing\")",
+                "empty-element root then root: Invalid(\"the diagram drawing root is empty\")",
+                "declaration after empty-element root: Invalid(\"the diagram drawing root is empty\")",
+                "reference before root: Invalid(\"entity reference is outside the diagram drawing\")",
+                "reference after root: Invalid(\"entity reference is outside the diagram drawing\")",
+                "CDATA after root: Invalid(\"CDATA is outside the diagram drawing\")",
+                "end tag before root: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "declaration inside root: Ok(0 shapes, strict false)",
+                "text, CDATA and reference inside root: Invalid(\"non-whitespace text is outside the diagram drawing\")",
+            ],
+            |xml| {
+                outcome(
+                    super::read_drawing(xml.as_bytes(), &super::Limits::default()),
+                    |(shapes, strict)| format!("{} shapes, strict {strict}", shapes.len()),
+                )
+            },
+        );
+    }
+}

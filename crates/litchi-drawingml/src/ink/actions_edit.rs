@@ -6366,3 +6366,224 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the opaque payload checks accept before, around and after the payload element, and the exact error reported otherwise. Each
+    //! expected line is the row label followed by the result.
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+            ("reference before root", format!("&amp;{d}")),
+            ("reference after root", format!("{d}&amp;")),
+            ("CDATA after root", format!("{d}<![CDATA[x]]>")),
+            ("end tag before root", format!("</foreign>{d}")),
+            (
+                "declaration inside root",
+                format!("{open}{DECLARATION}{body}{close}"),
+            ),
+            (
+                "text, CDATA and reference inside root",
+                format!("{open}{body}text<![CDATA[x]]>&amp;{close}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&str) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(&xml)))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    /// The three payload passes together, as an authored payload meets them.
+    #[test]
+    fn payload_fragment_envelope() {
+        let root = Root {
+            open: r#"<inkml:trace xmlns:inkml="http://www.w3.org/2003/InkML">"#,
+            body: r"1 2",
+            close: r"</inkml:trace>",
+            empty: r#"<inkml:trace xmlns:inkml="http://www.w3.org/2003/InkML"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"ink action opaque payload must contain one complete root element\")",
+                "whitespace only: Invalid(\"ink action opaque payload must contain one complete root element\")",
+                "declaration only: Invalid(\"ink action opaque payload cannot contain a declaration, DTD, or PI\")",
+                "empty-element root: Ok(1 nodes, depth 1)",
+                "start and end root: Ok(1 nodes, depth 1)",
+                "root then whitespace: Invalid(\"ink action opaque payload must contain one complete root element\")",
+                "root then comment: Invalid(\"ink action opaque payload must contain one complete root element\")",
+                "root then PI: Invalid(\"ink action opaque payload cannot contain a declaration, DTD, or PI\")",
+                "root then text: Invalid(\"ink action opaque payload must contain one complete root element\")",
+                "root then second root: Invalid(\"ink action opaque payload has content after its root\")",
+                "root then foreign start: Invalid(\"ink action opaque payload has content after its root\")",
+                "root then foreign empty: Invalid(\"ink action opaque payload has content after its root\")",
+                "declaration after root: Invalid(\"ink action opaque payload cannot contain a declaration, DTD, or PI\")",
+                "two declarations: Invalid(\"ink action opaque payload cannot contain a declaration, DTD, or PI\")",
+                "comment before declaration: Invalid(\"ink action opaque payload must contain one complete root element\")",
+                "text before root: Invalid(\"ink action opaque payload must contain one complete root element\")",
+                "unterminated root: Invalid(\"ink action opaque payload must contain one complete root element\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"ink action opaque payload cannot contain a declaration, DTD, or PI\")",
+                "top-level CDATA: Invalid(\"ink action opaque payload must contain one complete root element\")",
+                "declaration then root: Invalid(\"ink action opaque payload cannot contain a declaration, DTD, or PI\")",
+                "whitespace before declaration: Invalid(\"ink action opaque payload must contain one complete root element\")",
+                "PI before declaration: Invalid(\"ink action opaque payload cannot contain a declaration, DTD, or PI\")",
+                "comment then root: Invalid(\"ink action opaque payload must contain one complete root element\")",
+                "PI then root: Invalid(\"ink action opaque payload cannot contain a declaration, DTD, or PI\")",
+                "root then text then second root: Invalid(\"ink action opaque payload has content after its root\")",
+                "empty-element root then root: Invalid(\"ink action opaque payload has content after its root\")",
+                "declaration after empty-element root: Invalid(\"ink action opaque payload cannot contain a declaration, DTD, or PI\")",
+                "reference before root: Invalid(\"ink action opaque payload must contain one complete root element\")",
+                "reference after root: Invalid(\"ink action opaque payload must contain one complete root element\")",
+                "CDATA after root: Invalid(\"ink action opaque payload must contain one complete root element\")",
+                "end tag before root: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "declaration inside root: Invalid(\"ink action opaque payload cannot contain a declaration, DTD, or PI\")",
+                "text, CDATA and reference inside root: Ok(1 nodes, depth 1)",
+            ],
+            |xml| {
+                outcome(
+                    super::validate_payload_fragment(
+                        xml.as_bytes(),
+                        super::EditOptions::default(),
+                        super::PayloadRoot::Trace,
+                        false,
+                    ),
+                    |metrics| format!("{} nodes, depth {}", metrics.nodes, metrics.depth),
+                )
+            },
+        );
+    }
+
+    /// The namespace pass on its own.
+    #[test]
+    fn payload_namespace_grammar_envelope() {
+        let root = Root {
+            open: r#"<inkml:trace xmlns:inkml="http://www.w3.org/2003/InkML">"#,
+            body: r"1 2",
+            close: r"</inkml:trace>",
+            empty: r#"<inkml:trace xmlns:inkml="http://www.w3.org/2003/InkML"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"ink action opaque payload must contain one complete root element\")",
+                "whitespace only: Invalid(\"ink action opaque payload must contain one complete root element\")",
+                "declaration only: Invalid(\"ink action opaque payload cannot contain a declaration, DTD, or PI\")",
+                "empty-element root: Ok()",
+                "start and end root: Ok()",
+                "root then whitespace: Ok()",
+                "root then comment: Ok()",
+                "root then PI: Invalid(\"ink action opaque payload cannot contain a declaration, DTD, or PI\")",
+                "root then text: Ok()",
+                "root then second root: Invalid(\"ink action opaque payload has content after its root\")",
+                "root then foreign start: Invalid(\"ink action opaque payload has content after its root\")",
+                "root then foreign empty: Invalid(\"ink action opaque payload has content after its root\")",
+                "declaration after root: Invalid(\"ink action opaque payload cannot contain a declaration, DTD, or PI\")",
+                "two declarations: Invalid(\"ink action opaque payload cannot contain a declaration, DTD, or PI\")",
+                "comment before declaration: Invalid(\"ink action opaque payload cannot contain a declaration, DTD, or PI\")",
+                "text before root: Ok()",
+                "unterminated root: Invalid(\"ink action opaque payload must contain one complete root element\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"ink action opaque payload cannot contain a declaration, DTD, or PI\")",
+                "top-level CDATA: Ok()",
+                "declaration then root: Invalid(\"ink action opaque payload cannot contain a declaration, DTD, or PI\")",
+                "whitespace before declaration: Invalid(\"ink action opaque payload cannot contain a declaration, DTD, or PI\")",
+                "PI before declaration: Invalid(\"ink action opaque payload cannot contain a declaration, DTD, or PI\")",
+                "comment then root: Ok()",
+                "PI then root: Invalid(\"ink action opaque payload cannot contain a declaration, DTD, or PI\")",
+                "root then text then second root: Invalid(\"ink action opaque payload has content after its root\")",
+                "empty-element root then root: Invalid(\"ink action opaque payload has content after its root\")",
+                "declaration after empty-element root: Invalid(\"ink action opaque payload cannot contain a declaration, DTD, or PI\")",
+                "reference before root: Ok()",
+                "reference after root: Ok()",
+                "CDATA after root: Ok()",
+                "end tag before root: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "declaration inside root: Invalid(\"ink action opaque payload cannot contain a declaration, DTD, or PI\")",
+                "text, CDATA and reference inside root: Ok()",
+            ],
+            |xml| {
+                outcome(
+                    super::validate_payload_namespace_grammar(
+                        xml.as_bytes(),
+                        super::EditOptions::default(),
+                        false,
+                    ),
+                    |()| String::new(),
+                )
+            },
+        );
+    }
+}
