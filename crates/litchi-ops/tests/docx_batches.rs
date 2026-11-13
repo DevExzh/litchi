@@ -1773,3 +1773,328 @@ fn coalesced_paragraph_text_sets_match_single_operations() {
         );
     }
 }
+
+/// Every malformed command and the refusal it gets: the code, the message
+/// and whether the refusal aborts a best-effort batch.
+const MALFORMED: &[(&str, Code, &str)] = &[
+    // Unknown and read-only verbs.
+    (
+        r#"{"command":"frobnicate","path":"/body/p[1]"}"#,
+        Code::UnsupportedCommand,
+        "unknown batch command",
+    ),
+    (
+        r#"{"command":" set ","path":"/body/p[1]","props":{"bold":true}}"#,
+        Code::UnsupportedCommand,
+        "unknown batch command",
+    ),
+    (
+        r#"{"command":"get","path":"/body/p[1]"}"#,
+        Code::UnsupportedCapability,
+        "this command is not integrated into the batch result channel",
+    ),
+    (
+        r#"{"command":"QUERY","selector":"p"}"#,
+        Code::UnsupportedCapability,
+        "this command is not integrated into the batch result channel",
+    ),
+    (
+        r#"{"command":"view","mode":"text"}"#,
+        Code::UnsupportedCapability,
+        "this command is not integrated into the batch result channel",
+    ),
+    (
+        r#"{"command":"raw","part":"/word/document.xml"}"#,
+        Code::UnsupportedCapability,
+        "this command is not integrated into the batch result channel",
+    ),
+    (
+        r#"{"command":"raw-set","part":"/word/document.xml","xpath":"//w:p","action":"remove"}"#,
+        Code::UnsupportedCapability,
+        "this command is not integrated into the batch result channel",
+    ),
+    (
+        r#"{"command":"add-part","parent":"/"}"#,
+        Code::UnsupportedCapability,
+        "this command is not integrated into the batch result channel",
+    ),
+    (
+        r#"{"command":"validate"}"#,
+        Code::UnsupportedCapability,
+        "this command is not integrated into the batch result channel",
+    ),
+    (
+        r#"{"command":"import","from":"x.csv"}"#,
+        Code::UnsupportedCapability,
+        "this command is not integrated into the batch result channel",
+    ),
+    // set
+    (
+        r#"{"command":"set","props":{"bold":true}}"#,
+        Code::MissingArgument,
+        "set requires path",
+    ),
+    (
+        r#"{"command":"SET","path":"  ","props":{"bold":true}}"#,
+        Code::MissingArgument,
+        "set requires path",
+    ),
+    (
+        r#"{"command":"set","path":"/body/p[1]"}"#,
+        Code::MissingArgument,
+        "set requires props",
+    ),
+    (
+        r#"{"command":"set","path":"/body/p[1]","props":{}}"#,
+        Code::InvalidArgument,
+        "set requires at least one property",
+    ),
+    (
+        r#"{"command":"set","path":"/body/p[1]","props":{"bold":true},"parent":"/body"}"#,
+        Code::InvalidArgument,
+        "this batch command does not accept the parent field",
+    ),
+    (
+        r#"{"command":"set","props":{"bold":true},"type":"p","path2":"/body/p[2]"}"#,
+        Code::InvalidArgument,
+        "this batch command does not accept the path2 field",
+    ),
+    (
+        r#"{"command":"set","path":"/body/p[1]","props":{"bold":true},"dumpVersion":2}"#,
+        Code::InvalidArgument,
+        "this batch command does not accept the dumpVersion field",
+    ),
+    // remove
+    (
+        r#"{"command":"remove"}"#,
+        Code::MissingArgument,
+        "remove requires path",
+    ),
+    (
+        r#"{"command":"Remove","path":""}"#,
+        Code::MissingArgument,
+        "remove requires path",
+    ),
+    (
+        r#"{"command":"remove","path":"/body/p[1]","props":{"bold":true}}"#,
+        Code::InvalidArgument,
+        "this batch command does not accept the props field",
+    ),
+    (
+        r#"{"command":"remove","to":"/body"}"#,
+        Code::InvalidArgument,
+        "this batch command does not accept the to field",
+    ),
+    // add
+    (
+        r#"{"command":"add","type":"paragraph"}"#,
+        Code::MissingArgument,
+        "add requires parent or path",
+    ),
+    (
+        r#"{"command":"add","parent":"/body"}"#,
+        Code::MissingArgument,
+        "add requires type",
+    ),
+    (
+        r#"{"command":"add","parent":"/body","index":0,"after":"/body/p[1]"}"#,
+        Code::MissingArgument,
+        "add requires type",
+    ),
+    (
+        r#"{"command":"add","parent":"/body","path":"/body","type":"paragraph"}"#,
+        Code::InvalidArgument,
+        "add accepts either parent or path",
+    ),
+    (
+        r#"{"command":"add","type":"paragraph","from":"/body/p[1]"}"#,
+        Code::InvalidArgument,
+        "add accepts either type or from",
+    ),
+    (
+        r#"{"command":"add","from":"/body/p[1]"}"#,
+        Code::UnsupportedCapability,
+        "add-from copying is not integrated",
+    ),
+    (
+        r#"{"command":"add","parent":"/body","type":"paragraph","index":0,"after":"/body/p[1]"}"#,
+        Code::InvalidArgument,
+        "only one of index, after or before is allowed",
+    ),
+    (
+        r#"{"command":"add","parent":"/body","type":"paragraph","index":-1}"#,
+        Code::InvalidArgument,
+        "index must be nonnegative",
+    ),
+    (
+        r#"{"command":"add","parent":"/body","type":"paragraph","to":"/body","from":"/body/p[1]"}"#,
+        Code::InvalidArgument,
+        "this batch command does not accept the to field",
+    ),
+    (
+        r#"{"command":"add","parent":"/body","type":"table","props":{"text":"a\nb"},"index":-1}"#,
+        Code::UnsupportedCapability,
+        "OfficeCLI text controls are not integrated for this command target",
+    ),
+    // move
+    (
+        r#"{"command":"move","to":"/body"}"#,
+        Code::MissingArgument,
+        "move requires path",
+    ),
+    (
+        r#"{"command":"move","props":{"bold":true}}"#,
+        Code::UnsupportedCapability,
+        "move-time property assignments are not integrated",
+    ),
+    (
+        r#"{"command":"move","path":"/body/p[1]","type":"paragraph"}"#,
+        Code::InvalidArgument,
+        "this batch command does not accept the type field",
+    ),
+    (
+        r#"{"command":"move","path":"/body/p[1]","to":"/body","after":"/body/p[2]"}"#,
+        Code::UnsupportedCapability,
+        "move to a parent combined with a relative anchor is not integrated",
+    ),
+    (
+        r#"{"command":"move","path":"/body/p[1]","before":"/body/p[2]","after":"/body/p[2]"}"#,
+        Code::InvalidArgument,
+        "only one of index, after or before is allowed",
+    ),
+    (
+        r#"{"command":"move","index":-1}"#,
+        Code::MissingArgument,
+        "move requires path",
+    ),
+    // swap
+    (
+        r#"{"command":"swap","path2":"/body/p[2]"}"#,
+        Code::MissingArgument,
+        "swap requires path",
+    ),
+    (
+        r#"{"command":"swap","path":"/body/p[1]"}"#,
+        Code::MissingArgument,
+        "swap requires path2 or to",
+    ),
+    (
+        r#"{"command":"swap","path2":"/body/p[2]","to":"/body/p[2]"}"#,
+        Code::InvalidArgument,
+        "swap accepts either path2 or to",
+    ),
+    (
+        r#"{"command":"swap","path":"/body/p[1]","path2":"/body/p[2]","index":0}"#,
+        Code::InvalidArgument,
+        "this batch command does not accept the index field",
+    ),
+    // meta
+    (
+        r#"{"command":"meta","dumpVersion":2,"path":"/body"}"#,
+        Code::InvalidArgument,
+        "this batch command does not accept the path field",
+    ),
+    (
+        r#"{"command":"meta"}"#,
+        Code::UnsupportedCapability,
+        "batch dump versions other than explicit v2 are not integrated",
+    ),
+    (
+        r#"{"command":"Meta","dumpVersion":1}"#,
+        Code::UnsupportedCapability,
+        "batch dump versions other than explicit v2 are not integrated",
+    ),
+];
+
+#[test]
+fn malformed_commands_keep_their_refusal_on_every_route() {
+    use litchi_ops::batch::{Options, Unsupported};
+
+    const VALID: &str = r#"{"command":"set","path":"/body/p[2]/r[1]","props":{"bold":true}}"#;
+    let file = open(false);
+    let modes = [BatchMode::Atomic, BatchMode::BestEffort];
+    let policies = [Unsupported::Refuse, Unsupported::Warn];
+    for &(json, code, message) in MALFORMED {
+        let check = |error: &litchi_ops::Error, index: usize, route: &str| {
+            assert_eq!(error.code(), code, "{json} ({route})");
+            assert_eq!(error.message(), message, "{json} ({route})");
+            assert_eq!(error.item(), Some(index), "{json} ({route})");
+            assert!(error.warnings().is_empty(), "{json} ({route})");
+        };
+        let single = format!("[{json}]");
+        let item = items(&single).remove(0);
+        let meta = item.command.eq_ignore_ascii_case("meta");
+
+        // A single command.
+        for unsupported in policies {
+            let options = Options::new().unsupported(unsupported);
+            check(&file.apply_with(&item, &options).unwrap_err(), 0, "apply");
+        }
+
+        for mode in modes {
+            for unsupported in policies {
+                let options = Options::new().mode(mode).unsupported(unsupported);
+                let route = format!("{mode:?}, {unsupported:?}");
+                let best_effort = mode == BatchMode::BestEffort && !meta;
+
+                // Alone, and after a valid command that an atomic batch still
+                // holds in a pending native run.
+                for (position, payload) in [single.clone(), format!("[{VALID},{json}]")]
+                    .iter()
+                    .enumerate()
+                {
+                    match file.batch_with(items(payload), &options) {
+                        Err(error) => {
+                            assert!(!best_effort, "{json} ({route}): aborted");
+                            check(&error, position, &route);
+                        },
+                        Ok(commit) => {
+                            assert!(best_effort, "{json} ({route}): continued");
+                            let ItemResult::Failed(error) = &commit.value()[position] else {
+                                panic!("{json} ({route}): expected an item failure");
+                            };
+                            check(error, position, &route);
+                            assert_eq!(commit.diagnostics().changed(), position == 1);
+                        },
+                    }
+                }
+
+                // Before a valid command: best effort continues past it.
+                match file.batch_with(items(&format!("[{json},{VALID}]")), &options) {
+                    Err(error) => {
+                        assert!(!best_effort, "{json} ({route}): aborted");
+                        check(&error, 0, &route);
+                    },
+                    Ok(commit) => {
+                        assert!(best_effort, "{json} ({route}): continued");
+                        let ItemResult::Failed(error) = &commit.value()[0] else {
+                            panic!("{json} ({route}): expected an item failure");
+                        };
+                        check(error, 0, &route);
+                        assert!(applied(&commit.value()[1]).changed, "{json} ({route})");
+                    },
+                }
+            }
+        }
+    }
+    assert_eq!(file.to_bytes().unwrap(), bytes());
+}
+
+#[test]
+fn a_blank_command_is_a_corrupt_batch_on_every_route() {
+    let file = open(false);
+    for command in ["", "  ", "\t"] {
+        let mut item = BatchItem::new(command);
+        item.path = Some("/body/p[1]".into());
+        item.props = Some(litchi_ops::Props::new().with("bold", true));
+        let error = file.apply(&item).unwrap_err();
+        assert_eq!(error.code(), Code::CorruptBatch);
+        assert_eq!(error.message(), "a batch item requires a command");
+        assert_eq!(error.item(), Some(0));
+        let error = file.batch([&item], BatchMode::Atomic).unwrap_err();
+        assert_eq!(error.code(), Code::CorruptBatch);
+        assert_eq!(error.item(), Some(0));
+        let commit = file.batch([&item], BatchMode::BestEffort).unwrap();
+        failed(&commit.value()[0], 0, Code::CorruptBatch);
+    }
+}

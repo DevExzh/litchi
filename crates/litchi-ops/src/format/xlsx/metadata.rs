@@ -113,19 +113,13 @@ impl Xlsx {
     /// metadata.
     fn adopt_metadata(&self, workbook: xlsx::Package, metadata: Metadata) -> Self {
         let options = OpenOptions::new().retain_source(self.0.retain_source);
-        let signature = match self.signature() {
-            super::Signature::RemovalAuthorized => super::Signature::Unsigned,
-            signature => signature,
-        };
-        Self::with_owner(
+        Self(self.0.committed(Self::state(
             XlsxOwner::Eager(workbook),
             metadata,
             self.0.metadata_repairs.clone(),
             &options,
             self.0.ooxml_limits,
-        )
-        .with_origin(self.origin())
-        .with_signature(signature)
+        )))
     }
 }
 

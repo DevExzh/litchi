@@ -380,17 +380,21 @@ impl Ppt {
 
     /// Adopt a newly built canonical package as an eager, editable handle.
     fn from_package(package: Package) -> Result<Self> {
+        Ok(Self(Opened::new(Self::eager_state(package)?)))
+    }
+
+    fn eager_state(package: Package) -> Result<PptState> {
         let presentation = package.presentation()?;
         let metadata = package.metadata().ok().filter(Metadata::has_data);
         let source_limits = package.source_limits();
         let encrypted = package.is_encrypted();
-        Ok(Self(Opened::new(PptState {
+        Ok(PptState {
             presentation,
             metadata,
             source_limits,
             encrypted,
             owner: PptOwner::Eager(package),
-        })))
+        })
     }
 
     /// Whether this handle retains an edit source, without reading any payload.
@@ -569,13 +573,7 @@ impl Ppt {
     /// Adopt a committed native package as an eager immutable handle while
     /// retaining the origin and the explicit signature transition.
     pub(crate) fn with_package(&self, package: Package) -> Result<Self> {
-        let signature = match self.signature() {
-            Signature::RemovalAuthorized => Signature::Unsigned,
-            signature => signature,
-        };
-        Ok(Self::from_package(package)?
-            .with_origin(self.origin())
-            .with_signature(signature))
+        Ok(Self(self.0.committed(Self::eager_state(package)?)))
     }
 
     /// One-shot unified PPT setter.
@@ -829,10 +827,15 @@ impl Ppt {
         }))))
     }
 
-    /// The same presentation under another signature disposition (record
-    /// 0013).
-    pub(crate) fn with_signature(&self, signature: Signature) -> Self {
-        Self(self.0.with_signature(signature))
+    /// The same presentation, marked signed by the opener.
+    pub(crate) fn signed(&self) -> Self {
+        Self(self.0.signed())
+    }
+
+    /// The same presentation after [`crate::Signed::unsign`]: its first committed
+    /// write removes the signature.
+    pub(crate) fn removal_authorized(&self) -> Self {
+        Self(self.0.removal_authorized())
     }
 
     /// This handle's signature disposition (record 0013).

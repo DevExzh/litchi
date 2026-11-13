@@ -543,10 +543,15 @@ impl Pptx {
         }))
     }
 
-    /// The same presentation under another signature disposition (record
-    /// 0013).
-    pub(crate) fn with_signature(&self, signature: Signature) -> Self {
-        Self(self.0.with_signature(signature))
+    /// The same presentation, marked signed by the opener.
+    pub(crate) fn signed(&self) -> Self {
+        Self(self.0.signed())
+    }
+
+    /// The same presentation after [`crate::Signed::unsign`]: its first committed
+    /// write removes the signature.
+    pub(crate) fn removal_authorized(&self) -> Self {
+        Self(self.0.removal_authorized())
     }
 
     /// Adopt a native source commit without serializing or reopening.
@@ -568,7 +573,7 @@ impl Pptx {
         }
         // Check the candidate's own freshness and execution fence before adoption.
         revision.presentation()?;
-        let handle = Self(Opened::new(PptxState {
+        let handle = Self(self.0.revised(PptxState {
             owner: PptxOwner::Source(presentation.clone()),
             source_guard: self.0.source_guard.clone(),
             metadata: self.0.metadata.clone(),
@@ -584,9 +589,7 @@ impl Pptx {
             unsigned_promotion: OnceLock::new(),
             cells: Mutex::new(None),
             notes: Mutex::new(None),
-        }))
-        .with_signature(self.signature())
-        .with_origin(self.origin());
+        }));
         self.check_owner()?;
         Ok(handle)
     }

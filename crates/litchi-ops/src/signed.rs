@@ -7,16 +7,6 @@ use std::sync::Arc;
 
 use litchi_core::FileFormat;
 
-#[cfg(any(
-    feature = "doc",
-    feature = "docx",
-    feature = "ppt",
-    feature = "pptx",
-    feature = "xls",
-    feature = "xlsx",
-    feature = "xlsb"
-))]
-use crate::format::signature::Signature;
 use crate::{Family, File};
 
 /// Where a [`Signed`] input's signature was found. Detection is
@@ -108,7 +98,7 @@ impl Signed {
     ))]
     pub(crate) fn new(file: File, format: FileFormat, origin: SignatureOrigin) -> Self {
         Self(Arc::new(SignedState {
-            file: file.with_signature(Signature::Signed),
+            file: file.signed(),
             format,
             origin,
         }))
@@ -182,7 +172,7 @@ impl Signed {
             feature = "xlsb"
         ))]
         {
-            self.0.file.with_signature(Signature::RemovalAuthorized)
+            self.0.file.removal_authorized()
         }
         #[cfg(not(any(
             feature = "doc",

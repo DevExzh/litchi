@@ -203,15 +203,7 @@ impl Xls {
     /// Carry one native package publication back into the immutable facade
     /// while retaining origin and the explicit signature disposition.
     pub(crate) fn with_package(&self, package: Package) -> Result<Self> {
-        let signature = match self.signature() {
-            Signature::RemovalAuthorized => Signature::Unsigned,
-            signature => signature,
-        };
-        Ok(Self(
-            Opened::new(XlsState::new(package))
-                .with_origin(self.origin())
-                .with_signature(signature),
-        ))
+        Ok(Self(self.0.committed(XlsState::new(package))))
     }
 
     /// The one-shot unified worksheet and scalar-cell setter.
@@ -385,8 +377,15 @@ impl Xls {
         }
     }
 
-    pub(crate) fn with_signature(&self, signature: Signature) -> Self {
-        Self(self.0.with_signature(signature))
+    /// The same workbook, marked signed by the opener.
+    pub(crate) fn signed(&self) -> Self {
+        Self(self.0.signed())
+    }
+
+    /// The same workbook after [`crate::Signed::unsign`]: its first committed
+    /// write removes the signature.
+    pub(crate) fn removal_authorized(&self) -> Self {
+        Self(self.0.removal_authorized())
     }
 
     pub(crate) fn signature(&self) -> Signature {

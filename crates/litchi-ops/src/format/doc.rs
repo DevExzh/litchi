@@ -196,9 +196,15 @@ impl Doc {
         }
     }
 
-    /// The same document under another signature disposition (record 0013).
-    pub(crate) fn with_signature(&self, signature: Signature) -> Self {
-        Self(self.0.with_signature(signature))
+    /// The same document, marked signed by the opener.
+    pub(crate) fn signed(&self) -> Self {
+        Self(self.0.signed())
+    }
+
+    /// The same document after [`crate::Signed::unsign`]: its first committed
+    /// write removes the signature.
+    pub(crate) fn removal_authorized(&self) -> Self {
+        Self(self.0.removal_authorized())
     }
 
     /// This handle's signature disposition (record 0013).

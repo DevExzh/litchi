@@ -244,15 +244,13 @@ impl Xlsb {
             let options = OpenOptions::new()
                 .retain_source(self.0.retain_source)
                 .ooxml_limits(self.0.ooxml_limits);
-            let after = Self::with_owner(
+            let after = Self(self.0.revised(Self::state(
                 XlsbOwner::Source(source.with_workbook(workbook)),
                 metadata,
                 self.0.metadata_repairs.clone(),
                 &options,
                 self.0.ooxml_limits,
-            )
-            .with_origin(self.origin())
-            .with_signature(self.signature());
+            )));
             (after.clone(), Some(after))
         };
         self.check_source_for_replay()?;
@@ -275,19 +273,13 @@ impl Xlsb {
         let options = OpenOptions::new()
             .retain_source(self.0.retain_source)
             .ooxml_limits(self.0.ooxml_limits);
-        let signature = match self.signature() {
-            super::Signature::RemovalAuthorized => super::Signature::Unsigned,
-            signature => signature,
-        };
-        Ok(Self::with_owner(
+        Ok(Self(self.0.committed(Self::state(
             super::eager_package(package)?,
             metadata,
             self.0.metadata_repairs.clone(),
             &options,
             self.0.ooxml_limits,
-        )
-        .with_origin(self.origin())
-        .with_signature(signature))
+        ))))
     }
 }
 

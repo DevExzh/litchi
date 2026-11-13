@@ -486,6 +486,41 @@ fn a_changed_source_is_a_typed_io_error_on_every_read() {
     changed(handle.editor().err().expect("materialization refuses"));
 }
 
+/// A row iterator built before the source changed is fused: it reports the
+/// changed source once and ends, however many rows it still had to yield.
+#[cfg(any(unix, windows))]
+#[test]
+fn a_row_iterator_reports_a_changed_source_once_and_ends() {
+    use xlsb::builder::{self, Builder};
+
+    let mut rows = builder::Worksheet::new("Rows");
+    for row in 0..3 {
+        rows.set_cell(row, 0, "ROW");
+    }
+    let mut writer = Builder::new();
+    writer.add_worksheet(rows);
+    let mut three_rows = Cursor::new(Vec::new());
+    writer
+        .build()
+        .expect("build XLSB fixture")
+        .write_to(&mut three_rows)
+        .unwrap();
+    let file = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(file.path(), three_rows.into_inner()).unwrap();
+    let handle = open_path(file.path(), &OpenOptions::new());
+    let sheet = WorkbookTrait::worksheet_by_index(&handle, 0).unwrap();
+    assert_eq!(sheet.rows().filter(Result::is_ok).count(), 3);
+    let mut rows = sheet.rows();
+    assert!(rows.next().unwrap().is_ok());
+
+    std::fs::write(file.path(), mixed_chart_tabs()).unwrap();
+
+    let error = rows.next().unwrap().map(drop).unwrap_err();
+    assert_eq!(error.code(), Code::IoError, "{error}");
+    assert_eq!(error.format(), Some(litchi_core::FileFormat::Xlsb));
+    assert!(rows.next().is_none());
+}
+
 // --- Single materialization under concurrency ---------------------------
 
 #[derive(Clone)]

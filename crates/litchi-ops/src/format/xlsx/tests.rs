@@ -603,6 +603,41 @@ fn a_changed_source_is_a_typed_io_error_on_every_read() {
     }
 }
 
+/// A row iterator built before the source changed is not fused: it reports
+/// the changed source once for every row it still had to yield. XLSB's row
+/// iterator and the worksheet iterator stop after their first error.
+#[cfg(any(unix, windows))]
+#[test]
+fn a_row_iterator_reports_a_changed_source_for_every_remaining_row() {
+    let file = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(file.path(), selector_workbook("7", VALID_SECOND)).unwrap();
+    let handle = open_path(file.path(), &OpenOptions::new());
+    let sheet = WorkbookTrait::worksheet_by_index(&handle, 0).unwrap();
+    assert_eq!(sheet.rows().filter(Result::is_ok).count(), 3);
+    let mut rows = sheet.rows();
+    assert!(rows.next().unwrap().is_ok());
+
+    std::fs::write(
+        file.path(),
+        selector_workbook("12345678901234567890", VALID_SECOND),
+    )
+    .unwrap();
+
+    for _ in 0..2 {
+        let error = rows.next().unwrap().map(drop).unwrap_err();
+        assert_eq!(error.code(), Code::IoError, "{error}");
+        assert_eq!(error.format(), Some(litchi_core::FileFormat::Xlsx));
+    }
+    assert!(rows.next().is_none());
+    // An iterator built after the change reports it once, at construction.
+    let mut rows = sheet.rows();
+    assert_eq!(
+        rows.next().unwrap().map(drop).unwrap_err().code(),
+        Code::IoError
+    );
+    assert!(rows.next().is_none());
+}
+
 // --- Editor promotion -----------------------------------------------------
 
 #[cfg(any(unix, windows))]

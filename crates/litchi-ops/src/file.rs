@@ -434,8 +434,8 @@ impl File {
         }
     }
 
-    /// This file under another signature disposition (record 0013). Only
-    /// the tier 1 and tier 2 variants carry one; the openers never sign
+    /// This file with its handle marked signed. Only the tier 1 and tier 2
+    /// variants carry a signature disposition; the openers never sign
     /// another variant.
     #[cfg(any(
         feature = "doc",
@@ -446,22 +446,54 @@ impl File {
         feature = "xlsx",
         feature = "xlsb"
     ))]
-    pub(crate) fn with_signature(&self, signature: crate::format::signature::Signature) -> Self {
+    pub(crate) fn signed(&self) -> Self {
         match self {
             #[cfg(feature = "docx")]
-            Self::Docx(handle) => Self::Docx(handle.with_signature(signature)),
+            Self::Docx(handle) => Self::Docx(handle.signed()),
             #[cfg(feature = "xlsx")]
-            Self::Xlsx(handle) => Self::Xlsx(handle.with_signature(signature)),
+            Self::Xlsx(handle) => Self::Xlsx(handle.signed()),
             #[cfg(feature = "pptx")]
-            Self::Pptx(handle) => Self::Pptx(handle.with_signature(signature)),
+            Self::Pptx(handle) => Self::Pptx(handle.signed()),
             #[cfg(feature = "xlsb")]
-            Self::Xlsb(handle) => Self::Xlsb(handle.with_signature(signature)),
+            Self::Xlsb(handle) => Self::Xlsb(handle.signed()),
             #[cfg(feature = "doc")]
-            Self::Doc(handle) => Self::Doc(handle.with_signature(signature)),
+            Self::Doc(handle) => Self::Doc(handle.signed()),
             #[cfg(feature = "xls")]
-            Self::Xls(handle) => Self::Xls(handle.with_signature(signature)),
+            Self::Xls(handle) => Self::Xls(handle.signed()),
             #[cfg(feature = "ppt")]
-            Self::Ppt(handle) => Self::Ppt(handle.with_signature(signature)),
+            Self::Ppt(handle) => Self::Ppt(handle.signed()),
+            // `Locked`, `Signed` and the tier 3 variants carry none.
+            other => other.clone(),
+        }
+    }
+
+    /// This file with the removal of its signature authorized: what
+    /// [`crate::Signed::unsign`] returns.
+    #[cfg(any(
+        feature = "doc",
+        feature = "docx",
+        feature = "ppt",
+        feature = "pptx",
+        feature = "xls",
+        feature = "xlsx",
+        feature = "xlsb"
+    ))]
+    pub(crate) fn removal_authorized(&self) -> Self {
+        match self {
+            #[cfg(feature = "docx")]
+            Self::Docx(handle) => Self::Docx(handle.removal_authorized()),
+            #[cfg(feature = "xlsx")]
+            Self::Xlsx(handle) => Self::Xlsx(handle.removal_authorized()),
+            #[cfg(feature = "pptx")]
+            Self::Pptx(handle) => Self::Pptx(handle.removal_authorized()),
+            #[cfg(feature = "xlsb")]
+            Self::Xlsb(handle) => Self::Xlsb(handle.removal_authorized()),
+            #[cfg(feature = "doc")]
+            Self::Doc(handle) => Self::Doc(handle.removal_authorized()),
+            #[cfg(feature = "xls")]
+            Self::Xls(handle) => Self::Xls(handle.removal_authorized()),
+            #[cfg(feature = "ppt")]
+            Self::Ppt(handle) => Self::Ppt(handle.removal_authorized()),
             // `Locked`, `Signed` and the tier 3 variants carry none.
             other => other.clone(),
         }

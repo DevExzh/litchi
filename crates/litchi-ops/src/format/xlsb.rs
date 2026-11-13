@@ -210,19 +210,13 @@ impl Xlsb {
             .retain_source(self.0.retain_source)
             .ooxml_limits(self.0.ooxml_limits);
         let owner = eager_package(package)?;
-        let signature = match self.signature() {
-            Signature::RemovalAuthorized => Signature::Unsigned,
-            signature => signature,
-        };
-        Ok(Self::with_owner(
+        Ok(Self(self.0.committed(Self::state(
             owner,
             self.0.metadata.clone(),
             self.0.metadata_repairs.clone(),
             &options,
             self.0.ooxml_limits,
-        )
-        .with_origin(self.origin())
-        .with_signature(signature))
+        ))))
     }
 
     /// Check signature disposition and retained-source freshness before a
@@ -515,7 +509,23 @@ impl Xlsb {
         options: &OpenOptions,
         ooxml_limits: SourceLimits,
     ) -> Self {
-        Self(Opened::new(XlsbState {
+        Self(Opened::new(Self::state(
+            owner,
+            metadata,
+            metadata_repairs,
+            options,
+            ooxml_limits,
+        )))
+    }
+
+    fn state(
+        owner: XlsbOwner,
+        metadata: Metadata,
+        metadata_repairs: MetadataRepairs,
+        options: &OpenOptions,
+        ooxml_limits: SourceLimits,
+    ) -> XlsbState {
+        XlsbState {
             owner,
             catalog: OnceLock::new(),
             defined_names: OnceLock::new(),
@@ -523,12 +533,18 @@ impl Xlsb {
             metadata_repairs,
             retain_source: options.retain_source,
             ooxml_limits,
-        }))
+        }
     }
 
-    /// The same workbook under another signature disposition (record 0013).
-    pub(crate) fn with_signature(&self, signature: Signature) -> Self {
-        Self(self.0.with_signature(signature))
+    /// The same workbook, marked signed by the opener.
+    pub(crate) fn signed(&self) -> Self {
+        Self(self.0.signed())
+    }
+
+    /// The same workbook after [`crate::Signed::unsign`]: its first committed
+    /// write removes the signature.
+    pub(crate) fn removal_authorized(&self) -> Self {
+        Self(self.0.removal_authorized())
     }
 
     /// This handle's signature disposition (record 0013).

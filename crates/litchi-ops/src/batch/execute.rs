@@ -208,7 +208,9 @@ impl File {
     ) -> Result<Commit<Applied>> {
         let unsupported = options.unsupported;
         self.edit_with_options(options.edit, |edit| {
-            apply_item(edit, &item.into(), unsupported, 0).map_err(|error| error.with_item(0))
+            let item = item.into();
+            apply_item(edit, Verb::of(&item), &item, unsupported, 0)
+                .map_err(|error| error.with_item(0))
         })
     }
 
@@ -358,77 +360,88 @@ impl File {
                     Error::from(TransactionError::Allocation { source }).with_item(index)
                 })?;
                 let item = item.into();
-                if coalesce && item.command.eq_ignore_ascii_case("set") {
-                    let (path, props) = match set_fields(&item) {
-                        Ok(fields) => fields,
-                        Err(error) => {
-                            // A previous deferred native failure precedes a
-                            // malformed following command in wire order.
-                            edit.flush_pending()?;
-                            return Err(error.with_item(index));
-                        },
-                    };
-                    match edit.coalesce_set(path, props, index) {
-                        Ok(Some(changed)) => {
-                            results.push(ItemResult::Applied(Applied {
-                                path: None,
-                                changed,
-                                warnings: Box::default(),
-                                found: 0,
-                            }));
-                            continue;
-                        },
-                        Ok(None) => {},
-                        // A closing prior run already carries its originating
-                        // wire index. Do not reattribute it to the next item.
-                        Err(error) if error.item().is_some() => return Err(error),
-                        // Runs admit every property before staging, so a
-                        // refusal is this item's own and nothing of it was
-                        // staged: retry it alone, skipping what is refused.
-                        Err(error)
-                            if unsupported == Unsupported::Warn
-                                && error.code() == Code::UnsupportedProperty => {},
-                        Err(error) => return Err(error.with_item(index)),
-                    }
-                }
-                if coalesce && item.command.eq_ignore_ascii_case("remove") {
-                    let path = match remove_fields(&item) {
-                        Ok(path) => path,
-                        Err(error) => {
-                            // A previous deferred native failure precedes a
-                            // malformed following command in wire order.
-                            edit.flush_pending()?;
-                            return Err(error.with_item(index));
-                        },
-                    };
-                    if let Some(changed) = edit.coalesce_remove(path, index).map_err(|error| {
-                        // A closing prior run already carries its
-                        // originating wire index. Do not reattribute it
-                        // to the next item.
-                        if error.item().is_some() {
-                            error
-                        } else {
-                            error.with_item(index)
+                let verb = Verb::of(&item);
+                // An atomic batch first offers a `set` or a `remove` to the
+                // pending native run; an item the run declines falls through
+                // to its own isolated dispatch.
+                let joined = match verb {
+                    Verb::Set if coalesce => {
+                        let (path, props) = match set_fields(&item) {
+                            Ok(fields) => fields,
+                            Err(error) => {
+                                // A previous deferred native failure precedes a
+                                // malformed following command in wire order.
+                                edit.flush_pending()?;
+                                return Err(error.with_item(index));
+                            },
+                        };
+                        match edit.coalesce_set(path, props, index) {
+                            Ok(joined) => joined,
+                            // A closing prior run already carries its originating
+                            // wire index. Do not reattribute it to the next item.
+                            Err(error) if error.item().is_some() => return Err(error),
+                            // Runs admit every property before staging, so a
+                            // refusal is this item's own and nothing of it was
+                            // staged: retry it alone, skipping what is refused.
+                            Err(error)
+                                if unsupported == Unsupported::Warn
+                                    && error.code() == Code::UnsupportedProperty =>
+                            {
+                                None
+                            },
+                            Err(error) => return Err(error.with_item(index)),
                         }
-                    })? {
-                        results.push(ItemResult::Applied(Applied {
-                            path: None,
-                            changed,
-                            warnings: Box::default(),
-                            found: 0,
-                        }));
-                        continue;
-                    }
+                    },
+                    Verb::Remove if coalesce => {
+                        let path = match remove_fields(&item) {
+                            Ok(path) => path,
+                            Err(error) => {
+                                // A previous deferred native failure precedes a
+                                // malformed following command in wire order.
+                                edit.flush_pending()?;
+                                return Err(error.with_item(index));
+                            },
+                        };
+                        edit.coalesce_remove(path, index).map_err(|error| {
+                            // A closing prior run already carries its
+                            // originating wire index. Do not reattribute it
+                            // to the next item.
+                            if error.item().is_some() {
+                                error
+                            } else {
+                                error.with_item(index)
+                            }
+                        })?
+                    },
+                    Verb::Set
+                    | Verb::Remove
+                    | Verb::Meta
+                    | Verb::Add
+                    | Verb::Move
+                    | Verb::Swap
+                    | Verb::ReadOnly
+                    | Verb::Unknown => None,
+                };
+                if let Some(changed) = joined {
+                    results.push(ItemResult::Applied(Applied {
+                        path: None,
+                        changed,
+                        warnings: Box::default(),
+                        found: 0,
+                    }));
+                    continue;
                 }
                 edit.flush_pending()?;
-                // Metadata changes interpretation of the whole payload. It is
-                // never safe to skip a bad declaration and continue replay.
-                let meta = item.command.eq_ignore_ascii_case("meta");
-                match apply_item(edit, &item, unsupported, index)
+                match apply_item(edit, verb, &item, unsupported, index)
                     .map_err(|error| error.with_item(index))
                 {
                     Ok(applied) => results.push(ItemResult::Applied(applied)),
-                    Err(error) if mode == BatchMode::Atomic || meta || fatal(&error) => {
+                    // Metadata changes interpretation of the whole payload. It
+                    // is never safe to skip a bad declaration and continue
+                    // replay.
+                    Err(error)
+                        if mode == BatchMode::Atomic || verb == Verb::Meta || fatal(&error) =>
+                    {
                         return Err(error);
                     },
                     Err(error) => results.push(ItemResult::Failed(error)),
@@ -455,21 +468,90 @@ impl File {
     }
 }
 
+/// The verb of a batch item: its `command` string, classified once per item
+/// (ASCII case-insensitively, without trimming).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Verb {
+    Meta,
+    Set,
+    Add,
+    Remove,
+    Move,
+    Swap,
+    /// A known OfficeCLI command the batch result channel does not carry.
+    ReadOnly,
+    Unknown,
+}
+
+impl Verb {
+    fn of(item: &BatchItem<'_>) -> Self {
+        const VERBS: [(&str, Verb); 14] = [
+            ("set", Verb::Set),
+            ("add", Verb::Add),
+            ("remove", Verb::Remove),
+            ("move", Verb::Move),
+            ("swap", Verb::Swap),
+            ("meta", Verb::Meta),
+            ("get", Verb::ReadOnly),
+            ("query", Verb::ReadOnly),
+            ("view", Verb::ReadOnly),
+            ("raw", Verb::ReadOnly),
+            ("raw-set", Verb::ReadOnly),
+            ("add-part", Verb::ReadOnly),
+            ("validate", Verb::ReadOnly),
+            ("import", Verb::ReadOnly),
+        ];
+        VERBS
+            .iter()
+            .find(|(name, _)| item.command.eq_ignore_ascii_case(name))
+            .map_or(Self::Unknown, |&(_, verb)| verb)
+    }
+}
+
+/// An admitted command: a [`Verb`] with exactly the fields it takes, every
+/// envelope requirement already checked ([`admit`]).
+enum Command<'i> {
+    /// A `dumpVersion: 2` declaration.
+    Meta,
+    Set {
+        path: &'i str,
+        props: &'i Props<'i>,
+    },
+    Add {
+        parent: &'i str,
+        kind: &'i str,
+        props: Option<std::borrow::Cow<'i, Props<'i>>>,
+        at: Placement<'i>,
+    },
+    Remove {
+        path: &'i str,
+    },
+    Move {
+        path: &'i str,
+        to: Placement<'i>,
+    },
+    Swap {
+        first: &'i str,
+        second: &'i str,
+    },
+}
+
 fn apply_item(
     edit: &mut Edit,
+    verb: Verb,
     item: &BatchItem<'_>,
     unsupported: Unsupported,
     index: usize,
 ) -> Result<Applied> {
     let warn = unsupported == Unsupported::Warn
         && item.props.as_ref().is_some_and(|props| !props.is_empty())
-        && (item.command.eq_ignore_ascii_case("set") || item.command.eq_ignore_ascii_case("add"));
+        && matches!(verb, Verb::Set | Verb::Add);
     // A failed earlier find must not lend its count to this command.
     let _ = edit.take_matched();
     if warn {
-        return apply_skipping(edit, item, index);
+        return apply_skipping(edit, verb, item, index);
     }
-    let (path, changed) = edit.isolated(|edit| dispatch(edit, item))?;
+    let (path, changed) = edit.isolated(|edit| dispatch(edit, verb, item))?;
     Ok(Applied {
         path: path.map(Box::new),
         changed,
@@ -486,13 +568,18 @@ fn apply_item(
 /// retry removes at least one assignment. When the reduced command fails
 /// for another reason, its error carries the skipped properties
 /// ([`Error::warnings`]).
-fn apply_skipping(edit: &mut Edit, item: &BatchItem<'_>, index: usize) -> Result<Applied> {
+fn apply_skipping(
+    edit: &mut Edit,
+    verb: Verb,
+    item: &BatchItem<'_>,
+    index: usize,
+) -> Result<Applied> {
     let mut warnings = Vec::new();
     let mut current: Option<BatchItem<'_>> = None;
     loop {
         let attempt = current.as_ref().unwrap_or(item);
         let props = attempt.props.as_ref();
-        if attempt.command.eq_ignore_ascii_case("set") && props.is_none_or(Props::is_empty) {
+        if verb == Verb::Set && props.is_none_or(Props::is_empty) {
             // OfficeCLI applies nothing and reports the skipped properties.
             return Ok(Applied {
                 path: None,
@@ -501,7 +588,7 @@ fn apply_skipping(edit: &mut Edit, item: &BatchItem<'_>, index: usize) -> Result
                 found: 0,
             });
         }
-        let error = match edit.isolated(|edit| dispatch(edit, attempt)) {
+        let error = match edit.isolated(|edit| dispatch(edit, verb, attempt)) {
             Ok((path, changed)) => {
                 return Ok(Applied {
                     path: path.map(Box::new),
@@ -555,86 +642,112 @@ fn without_refused<'a>(props: &Props<'a>, error: &Error) -> Option<Props<'a>> {
     )
 }
 
-fn dispatch(edit: &mut Edit, item: &BatchItem<'_>) -> Result<Option<Path<'static>>> {
-    item.validate()?;
-    let command = item.command.as_ref();
-    if command.eq_ignore_ascii_case("meta") {
-        fields(item, &["dumpVersion"])?;
-        return if item.dump_version == Some(2) {
-            Ok(None)
-        } else {
-            Err(pending(
-                "batch dump versions other than explicit v2 are not integrated",
-            ))
-        };
-    }
-    if command.eq_ignore_ascii_case("set") {
-        let (path, props) = set_fields(item)?;
-        edit.set_command(path, props)?;
-    } else if command.eq_ignore_ascii_case("add") {
-        fields(
-            item,
-            &[
-                "parent", "path", "type", "props", "index", "after", "before", "from",
-            ],
-        )?;
-        if item.from.is_some() && item.kind.is_some() {
-            return Err(invalid("add accepts either type or from"));
-        }
-        if item.from.is_some() {
-            return Err(pending("add-from copying is not integrated"));
-        }
-        let parent = aliases(
-            item.parent.as_deref(),
-            item.path.as_deref(),
-            "add accepts either parent or path",
-        )?;
-        let parent = required(parent, "add requires parent or path")?;
-        let kind = required(item.kind.as_deref(), "add requires type")?;
-        let empty = Props::new();
-        let props = add_text_props(kind, item.props.as_ref().unwrap_or(&empty))?;
-        let node = NewNode::new(kind)
-            .with_props(props.as_ref())?
-            .at(placement(item, false)?);
-        return edit.add_command(parent, node).map(Some);
-    } else if command.eq_ignore_ascii_case("remove") {
-        edit.remove(remove_fields(item)?)?;
-    } else if command.eq_ignore_ascii_case("move") {
-        fields(item, &["path", "to", "index", "after", "before", "props"])?;
-        if item.props.is_some() {
-            return Err(pending("move-time property assignments are not integrated"));
-        }
-        edit.move_to(
-            required(item.path.as_deref(), "move requires path")?,
-            placement(item, true)?,
-        )?;
-    } else if command.eq_ignore_ascii_case("swap") {
-        fields(item, &["path", "path2", "to"])?;
-        let second = aliases(
-            item.path2.as_deref(),
-            item.to.as_deref(),
-            "swap accepts either path2 or to",
-        )?;
-        edit.swap(
-            required(item.path.as_deref(), "swap requires path")?,
-            required(second, "swap requires path2 or to")?,
-        )?;
-    } else if [
-        "get", "query", "view", "raw", "raw-set", "add-part", "validate", "import",
-    ]
-    .iter()
-    .any(|known| command.eq_ignore_ascii_case(known))
-    {
-        return Err(pending(
-            "this command is not integrated into the batch result channel",
-        ));
-    } else {
-        return Err(Error::new(
-            Code::UnsupportedCommand,
-            "unknown batch command",
-        ));
+fn dispatch(edit: &mut Edit, verb: Verb, item: &BatchItem<'_>) -> Result<Option<Path<'static>>> {
+    match admit(verb, item)? {
+        Command::Meta => {},
+        Command::Set { path, props } => edit.set_command(path, props)?,
+        Command::Add {
+            parent,
+            kind,
+            props,
+            at,
+        } => {
+            let node = NewNode::new(kind);
+            let node = match &props {
+                Some(props) => node.with_props(props.as_ref())?,
+                None => node,
+            };
+            return edit.add_command(parent, node.at(at)).map(Some);
+        },
+        Command::Remove { path } => edit.remove(path)?,
+        Command::Move { path, to } => edit.move_to(path, to)?,
+        Command::Swap { first, second } => edit.swap(first, second)?,
     }
     Ok(None)
+}
+
+/// Check the envelope of `item` against its verb, in wire-compatible order:
+/// the first requirement an item breaks is the one reported.
+fn admit<'a>(verb: Verb, item: &'a BatchItem<'_>) -> Result<Command<'a>> {
+    item.validate()?;
+    match verb {
+        Verb::Meta => {
+            fields(item, &["dumpVersion"])?;
+            if item.dump_version != Some(2) {
+                return Err(pending(
+                    "batch dump versions other than explicit v2 are not integrated",
+                ));
+            }
+            Ok(Command::Meta)
+        },
+        Verb::Set => {
+            let (path, props) = set_fields(item)?;
+            Ok(Command::Set { path, props })
+        },
+        Verb::Add => {
+            fields(
+                item,
+                &[
+                    "parent", "path", "type", "props", "index", "after", "before", "from",
+                ],
+            )?;
+            if item.from.is_some() && item.kind.is_some() {
+                return Err(invalid("add accepts either type or from"));
+            }
+            if item.from.is_some() {
+                return Err(pending("add-from copying is not integrated"));
+            }
+            let parent = aliases(
+                item.parent.as_deref(),
+                item.path.as_deref(),
+                "add accepts either parent or path",
+            )?;
+            let parent = required(parent, "add requires parent or path")?;
+            let kind = required(item.kind.as_deref(), "add requires type")?;
+            let props = match item.props.as_ref() {
+                Some(props) => Some(add_text_props(kind, props)?),
+                None => None,
+            };
+            Ok(Command::Add {
+                parent,
+                kind,
+                props,
+                at: placement(item, false)?,
+            })
+        },
+        Verb::Remove => Ok(Command::Remove {
+            path: remove_fields(item)?,
+        }),
+        Verb::Move => {
+            fields(item, &["path", "to", "index", "after", "before", "props"])?;
+            if item.props.is_some() {
+                return Err(pending("move-time property assignments are not integrated"));
+            }
+            Ok(Command::Move {
+                path: required(item.path.as_deref(), "move requires path")?,
+                to: placement(item, true)?,
+            })
+        },
+        Verb::Swap => {
+            fields(item, &["path", "path2", "to"])?;
+            let second = aliases(
+                item.path2.as_deref(),
+                item.to.as_deref(),
+                "swap accepts either path2 or to",
+            )?;
+            Ok(Command::Swap {
+                first: required(item.path.as_deref(), "swap requires path")?,
+                second: required(second, "swap requires path2 or to")?,
+            })
+        },
+        Verb::ReadOnly => Err(pending(
+            "this command is not integrated into the batch result channel",
+        )),
+        Verb::Unknown => Err(Error::new(
+            Code::UnsupportedCommand,
+            "unknown batch command",
+        )),
+    }
 }
 
 fn aliases<'a>(

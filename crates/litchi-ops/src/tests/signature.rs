@@ -1829,3 +1829,119 @@ fn an_unlocked_signed_package_is_not_unsigned_into_the_clear() {
     let error = builder_refusal(&signed.clone().unsign());
     assert_eq!(error.code(), Code::UnsupportedCapability, "{error:?}");
 }
+
+/// The signature disposition of the tier 1 or tier 2 handle of `file`.
+fn disposition(file: &File) -> crate::format::signature::Signature {
+    match file {
+        #[cfg(feature = "docx")]
+        File::Docx(handle) => handle.signature(),
+        #[cfg(feature = "pptx")]
+        File::Pptx(handle) => handle.signature(),
+        #[cfg(feature = "xlsx")]
+        File::Xlsx(handle) => handle.signature(),
+        #[cfg(feature = "xlsb")]
+        File::Xlsb(handle) => handle.signature(),
+        #[cfg(feature = "doc")]
+        File::Doc(handle) => handle.signature(),
+        #[cfg(feature = "xls")]
+        File::Xls(handle) => handle.signature(),
+        #[cfg(feature = "ppt")]
+        File::Ppt(handle) => handle.signature(),
+        other => panic!("{other:?} carries no signature disposition"),
+    }
+}
+
+/// One changed edit every signed input admits once it is unsigned.
+fn change(file: &File, value: &'static str) -> crate::Result<File> {
+    let leaf = match file {
+        File::Signed(signed) => signed.file(),
+        other => other,
+    };
+    match leaf {
+        // The DOC text editor only replaces text of the same width.
+        #[cfg(feature = "doc")]
+        File::Doc(_) => {
+            let node = file.get("/body/p[1]")?;
+            let text = node.view().text()?.unwrap_or_default();
+            let text = same_width(&text).expect("a DOC paragraph with text");
+            file.set("/body/p[1]", crate::props! { "text" => text.as_str() })
+        },
+        #[cfg(feature = "xls")]
+        File::Xls(_) => file.set("/sheet[1]", crate::props! { "name" => value }),
+        _ => file.set("/metadata", crate::props! { "title" => value }),
+    }
+}
+
+/// The disposition transitions themselves, on every route: an open marks the
+/// leaf signed, a read or an exact no-op keeps that mark, `unsign` authorizes
+/// the removal, and the first changed commit through the unified API leaves
+/// an ordinary unsigned file whose later edits and saves stay unsigned.
+#[test]
+fn the_disposition_follows_open_unsign_and_the_first_changed_commit() {
+    use crate::format::signature::Signature;
+
+    for input in &inputs() {
+        let (files, _temporaries) = routes(input);
+        for (route, file) in files {
+            let what = format!("{} ({route})", input.label);
+            let File::Signed(signed) = &file else {
+                panic!("{what}: expected a signed file, got {file:?}");
+            };
+            let original = file.to_bytes().unwrap();
+
+            // Signed: reads and exact no-ops keep the mark and the bytes.
+            assert_eq!(disposition(signed.file()), Signature::Signed, "{what}");
+            let _ = file.text().unwrap();
+            let noop = file.edit(|_| Ok(())).unwrap();
+            assert!(noop.file().is_signed(), "{what}: no-op lost the wrapper");
+            assert_eq!(noop.file().to_bytes().unwrap(), original, "{what}");
+            let leaf_noop = signed.file().edit(|_| Ok(())).unwrap();
+            assert_eq!(disposition(leaf_noop.file()), Signature::Signed, "{what}");
+            assert_eq!(leaf_noop.file().to_bytes().unwrap(), original, "{what}");
+            assert_eq!(disposition(signed.file()), Signature::Signed, "{what}");
+
+            // A changed edit of the signed file is refused on both handles.
+            for candidate in [&file, signed.file()] {
+                let error = change(candidate, "first").unwrap_err();
+                assert_signed_refusal(&error, input.format, &what);
+            }
+
+            // `unsign` authorizes the removal without committing anything.
+            let unsigned = signed.clone().unsign();
+            assert_eq!(
+                disposition(&unsigned),
+                Signature::RemovalAuthorized,
+                "{what}"
+            );
+            let noop = unsigned.edit(|_| Ok(())).unwrap();
+            assert_eq!(
+                disposition(noop.file()),
+                Signature::RemovalAuthorized,
+                "{what}: an exact no-op is not a committed write"
+            );
+
+            // The first changed commit leaves an ordinary unsigned file.
+            let changed = change(&unsigned, "first")
+                .unwrap_or_else(|error| panic!("{what}: first changed commit: {error:?}"));
+            assert_eq!(disposition(&changed), Signature::Unsigned, "{what}");
+            let output = changed.to_bytes().unwrap();
+            assert!(
+                !crate::open_bytes(output).unwrap().is_signed(),
+                "{what}: the first changed commit published a signature"
+            );
+            let again = change(&changed, "second")
+                .unwrap_or_else(|error| panic!("{what}: second changed commit: {error:?}"));
+            assert_eq!(disposition(&again), Signature::Unsigned, "{what}");
+            assert!(
+                !crate::open_bytes(again.to_bytes().unwrap())
+                    .unwrap()
+                    .is_signed(),
+                "{what}: a later commit published a signature"
+            );
+
+            // The handle that was not unsigned is unaffected.
+            assert_eq!(disposition(signed.file()), Signature::Signed, "{what}");
+            assert_eq!(file.to_bytes().unwrap(), original, "{what}");
+        }
+    }
+}

@@ -959,7 +959,8 @@ fn unsigned_managed_source_respects_native_materialization_policy() {
     )
     .unwrap();
     let handle = Pptx::from_source(presentation, &options())
-        .with_signature(super::Signature::RemovalAuthorized);
+        .signed()
+        .removal_authorized();
     let cold = handle.cold_loads();
     let error = handle.unsigned_package().unwrap_err();
     assert!(matches!(

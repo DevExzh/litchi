@@ -495,7 +495,7 @@ pub(crate) fn attach_origin(file: File, origin: Arc<Path>) -> File {
         File::Signed(signed) => {
             let format = signed.format();
             let signature_origin = signed.origin();
-            let file = attach_origin(signed.unsign(), origin);
+            let file = attach_origin(signed.file().clone(), origin);
             File::Signed(crate::Signed::new(file, format, signature_origin))
         },
         #[cfg(any(

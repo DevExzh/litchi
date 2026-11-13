@@ -23,6 +23,23 @@ use crate::error::Error;
 use crate::error::Result;
 
 /// What a handle may do with the signature of the input it was opened from.
+///
+/// The transitions, each a method below and the only way a handle changes
+/// its disposition ([`Opened`] has no general setter):
+///
+/// | from                | `found`  | `authorize_removal` | `after_commit` |
+/// |---------------------|----------|---------------------|----------------|
+/// | `Unsigned`          | `Signed` | `Unsigned`          | `Unsigned`     |
+/// | `Signed`            | `Signed` | `RemovalAuthorized` | `Signed`       |
+/// | `RemovalAuthorized` | `Signed` | `RemovalAuthorized` | `Unsigned`     |
+///
+/// ```text
+/// Unsigned --found--> Signed --authorize_removal--> RemovalAuthorized --after_commit--> Unsigned
+/// ```
+///
+/// No transition leads from `Signed` to `Unsigned`: a signature is only ever
+/// dropped by a committed write of a handle [`crate::Signed::unsign`]
+/// returned.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Signature {
     /// The opener found no signature.
@@ -33,6 +50,42 @@ pub(crate) enum Signature {
     /// [`crate::Signed::unsign`] consumed the signature. Editors work on a
     /// copy whose signature the leaf removed explicitly.
     RemovalAuthorized,
+}
+
+impl Signature {
+    /// The opener found a signature in the container.
+    fn found(self) -> Self {
+        match self {
+            Self::Unsigned | Self::Signed | Self::RemovalAuthorized => Self::Signed,
+        }
+    }
+
+    /// [`crate::Signed::unsign`] consumed the signed file. A handle that
+    /// carries no signature has none to remove and stays as it is.
+    fn authorize_removal(self) -> Self {
+        match self {
+            Self::Signed | Self::RemovalAuthorized => Self::RemovalAuthorized,
+            Self::Unsigned => Self::Unsigned,
+        }
+    }
+
+    /// A write was committed. The editor of a removal-authorized handle works
+    /// on a copy without the signature, so the committed state is ordinary
+    /// unsigned state. A signed handle only commits exact no-ops, which keep
+    /// the signature.
+    #[cfg(any(
+        feature = "docx",
+        feature = "ppt",
+        feature = "xls",
+        feature = "xlsx",
+        feature = "xlsb"
+    ))]
+    fn after_commit(self) -> Self {
+        match self {
+            Self::Unsigned | Self::RemovalAuthorized => Self::Unsigned,
+            Self::Signed => Self::Signed,
+        }
+    }
 }
 
 /// One handle over the state of one open: that state, which every clone and
@@ -59,13 +112,30 @@ impl<S> Opened<S> {
         Self::from_parts_with_origin(Signature::Unsigned, Arc::new(state), None)
     }
 
-    /// The handle of a committed state with its signature disposition and
-    /// path origin, built in one step (record 0286): adopting a commit
-    /// through [`Self::new`], [`Self::with_origin`] and
-    /// [`Self::with_signature`] allocates two handles only to drop them.
-    #[cfg(feature = "docx")]
-    pub(crate) fn adopted(state: S, signature: Signature, origin: Option<Arc<Path>>) -> Arc<Self> {
-        Self::from_parts_with_origin(signature, Arc::new(state), origin)
+    /// The handle of the `state` a write of this handle committed, with this
+    /// handle's path origin and the disposition a commit leaves
+    /// ([`Signature::after_commit`]), built in one step: no intermediate
+    /// handle is allocated only to be dropped.
+    #[cfg(any(
+        feature = "docx",
+        feature = "ppt",
+        feature = "xls",
+        feature = "xlsx",
+        feature = "xlsb"
+    ))]
+    pub(crate) fn committed(&self, state: S) -> Arc<Self> {
+        Self::from_parts_with_origin(
+            self.signature.after_commit(),
+            Arc::new(state),
+            self.origin.clone(),
+        )
+    }
+
+    /// The handle of a `state` that revises this one without publishing a
+    /// write of its own: it keeps this handle's disposition and path origin.
+    #[cfg(any(feature = "pptx", feature = "xlsb"))]
+    pub(crate) fn revised(&self, state: S) -> Arc<Self> {
+        Self::from_parts_with_origin(self.signature, Arc::new(state), self.origin.clone())
     }
 
     fn from_parts_with_origin(
@@ -85,8 +155,49 @@ impl<S> Opened<S> {
         self.signature
     }
 
-    /// A handle over the same state with another disposition.
-    pub(crate) fn with_signature(&self, signature: Signature) -> Arc<Self> {
+    /// A handle over the same state, marked signed: the opener found a
+    /// signature in the container.
+    #[cfg(any(
+        feature = "doc",
+        feature = "docx",
+        feature = "ppt",
+        feature = "pptx",
+        feature = "xls",
+        feature = "xlsx",
+        feature = "xlsb"
+    ))]
+    pub(crate) fn signed(&self) -> Arc<Self> {
+        self.with_signature(self.signature.found())
+    }
+
+    /// A handle over the same state whose signature
+    /// [`crate::Signed::unsign`] authorized the first committed write to
+    /// remove.
+    #[cfg(any(
+        feature = "doc",
+        feature = "docx",
+        feature = "ppt",
+        feature = "pptx",
+        feature = "xls",
+        feature = "xlsx",
+        feature = "xlsb"
+    ))]
+    pub(crate) fn removal_authorized(&self) -> Arc<Self> {
+        self.with_signature(self.signature.authorize_removal())
+    }
+
+    /// A handle over the same state with another disposition. Private: the
+    /// transitions of [`Signature`] are the only dispositions a handle takes.
+    #[cfg(any(
+        feature = "doc",
+        feature = "docx",
+        feature = "ppt",
+        feature = "pptx",
+        feature = "xls",
+        feature = "xlsx",
+        feature = "xlsb"
+    ))]
+    fn with_signature(&self, signature: Signature) -> Arc<Self> {
         Self::from_parts_with_origin(signature, Arc::clone(&self.state), self.origin.clone())
     }
 
