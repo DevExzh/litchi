@@ -99,10 +99,6 @@ impl From<usize> for ReplySelector {
 /// A navigator name is a developer-facing Keynote property distinct from the
 /// slide's visible title content. Selectors never contain native object IDs,
 /// component names, or template identifiers.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "SlideSelector keeps the selected Keynote domain explicit at the public boundary"
-)]
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SlideSelector<'a> {
@@ -193,10 +189,6 @@ impl From<usize> for SlideSelector<'_> {
 }
 
 /// Errors raised while resolving a semantic slide selector.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "SlideSelectorError keeps the failing selector domain clear at the crate boundary"
-)]
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SlideSelectorError {

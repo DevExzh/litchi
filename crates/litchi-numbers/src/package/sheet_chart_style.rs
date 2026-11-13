@@ -10,11 +10,6 @@
 //! radar_start_angle, 3d_series_gap, 3d_rotation, 3d_depth, rounded_corners}`
 //! routes, collapsed into one property verb.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the focused transaction keeps its public types beside the staged rewrite"
-)]
-
 use std::fmt;
 
 use litchi_iwa_common::chart::kind::Kind as ChartKind;

@@ -65,10 +65,6 @@ impl Writer {
 
     fn raw(&mut self, mut value: u64) {
         loop {
-            #[allow(
-                clippy::cast_possible_truncation,
-                reason = "the value is masked to seven bits"
-            )]
             let byte = (value & 0x7f) as u8;
             value >>= 7;
             if value == 0 {
@@ -408,11 +404,6 @@ fn ellipse(actual: &[Element], width: f32, height: f32) -> bool {
     matches(actual, &authored, extent) || matches(actual, &native, extent)
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    reason = "checked integral and in range first"
-)]
 fn integral_u8(value: f32) -> Option<u8> {
     (value.is_finite()
         && value.fract() == 0.0

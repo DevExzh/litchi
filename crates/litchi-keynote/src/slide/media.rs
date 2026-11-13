@@ -466,10 +466,6 @@ pub mod playback {
         }
     }
 
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "Keynote stores media times as f32 seconds"
-    )]
     fn canonical_duration(value: Duration, field: TimeField) -> Result<Duration> {
         let seconds = value.as_secs_f64();
         if !seconds.is_finite() || seconds > f64::from(f32::MAX) {

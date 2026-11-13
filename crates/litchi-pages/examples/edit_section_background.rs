@@ -1,10 +1,5 @@
 //! Set or clear one Pages section background through a semantic selector.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports its committed semantic change"
-)]
-
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
 use std::io;

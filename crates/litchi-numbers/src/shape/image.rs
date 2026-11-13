@@ -19,10 +19,6 @@ pub mod adjustments {
 /// The selector contains only a checked semantic position. Native object
 /// identifiers, component names, and protobuf payloads remain private to the
 /// Numbers package adapter that resolves it.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "ImageSelector keeps the selected Numbers domain explicit at the public boundary"
-)]
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ImageSelector {

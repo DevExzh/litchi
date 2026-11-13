@@ -8,11 +8,6 @@
 //! never replaced.  A Date & Time-format transaction changes display metadata
 //! only; the scalar cell value is left untouched.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports its committed semantic change"
-)]
-
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
 use std::io;

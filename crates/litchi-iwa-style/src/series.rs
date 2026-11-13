@@ -1688,10 +1688,6 @@ fn patch_chart_references(
 /// An empty `expected`; an invalid chart, sparse array, override,
 /// stylesheet, object container or registry; a value the property rejects;
 /// a write that does not read back.
-#[allow(
-    clippy::too_many_lines,
-    reason = "one transaction in the migration host's order, kept in one place for review"
-)]
 pub fn set_values<P: Property>(
     workspace: &mut Workspace<'_>,
     chart: u64,
@@ -2493,10 +2489,6 @@ pub mod property {
                 let raw = field.payload();
                 let (value, consumed) = litchi_iwa_common::varint::decode_varint_from_bytes(raw)
                     .map_err(|_| Error::Invalid("a malformed pie leader-line field"))?;
-                #[allow(
-                    clippy::cast_possible_truncation,
-                    reason = "an int32 varint, sign-extended when negative"
-                )]
                 let native = match value {
                     0..=0x7fff_ffff | 0xffff_ffff_8000_0000..=u64::MAX => value as i32,
                     _ => return Err(Error::Invalid("a pie leader-line value outside int32")),
@@ -2537,10 +2529,6 @@ pub mod property {
         fn patch(&self, payload: &[u8], value: &LeaderLineVisibility) -> Result<Vec<u8>> {
             let properties = codec::decode(payload, Archive::SeriesNonStyle, CodecLimits::DEFAULT)?;
             let existing = properties.extension();
-            #[allow(
-                clippy::cast_sign_loss,
-                reason = "a negative int32 is stored sign-extended"
-            )]
             let native = i64::from(value.native_value()) as u64;
             let visible = *value == LeaderLineVisibility::Visible;
             let patched = match existing {

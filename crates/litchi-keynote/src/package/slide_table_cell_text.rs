@@ -11,11 +11,6 @@
 //! behaviour of the host editor's `set_table_cell_*`/`reset_table_cell_*`
 //! families on Pages slide tables, collapsed into one property verb.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the focused transaction keeps its public types beside the staged rewrite"
-)]
-
 use std::fmt;
 
 use litchi_iwa_common::table::coordinate::At;

@@ -149,10 +149,6 @@ impl Date {
         let date = NaiveDate::from_ymd_opt(year, month, day).ok_or(Error::DateInvalid)?;
         let epoch = NaiveDate::from_ymd_opt(APPLE_EPOCH_YEAR, APPLE_EPOCH_MONTH, APPLE_EPOCH_DAY)
             .ok_or(Error::DateInvalid)?;
-        #[allow(
-            clippy::cast_precision_loss,
-            reason = "The supported NaiveDate range is safely represented by epoch seconds"
-        )]
         let days = date.signed_duration_since(epoch).num_days() as f64;
         Ok(Self(days * SECONDS_PER_DAY))
     }
@@ -756,10 +752,6 @@ mod tests {
         assert_eq!(Style::with_fill(color).fill(), Some(color));
     }
 
-    #[allow(
-        clippy::float_cmp,
-        reason = "The epoch conversion is expected to preserve this exact day value"
-    )]
     #[test]
     fn date_operands_are_midnight_aligned_and_ranges_are_ordered() {
         let date =

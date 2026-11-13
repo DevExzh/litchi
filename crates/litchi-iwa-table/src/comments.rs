@@ -14,11 +14,6 @@
 //! consume the shared implementation; it is not re-exported by a supported
 //! facade.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The comment transaction keeps its algebra beside its bounded validation helpers."
-)]
-
 use std::fmt;
 use std::sync::Arc;
 

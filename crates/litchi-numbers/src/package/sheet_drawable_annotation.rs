@@ -12,11 +12,6 @@
 //! use of that author removes it again. The publication follows the host
 //! text editor step by step.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the focused transaction keeps its public types beside the staged rewrite"
-)]
-
 use std::fmt;
 
 use litchi_iwa_common::WireLimits;
@@ -470,7 +465,6 @@ fn pick(list: &[Annotation], position: usize) -> Result<Annotation, Error> {
         .ok_or(Error::Refused(Refusal::AnnotationNotFound { position }))
 }
 
-#[allow(clippy::too_many_lines, reason = "one arm per host annotation route")]
 fn apply_one(
     source: &Package,
     sheet: usize,

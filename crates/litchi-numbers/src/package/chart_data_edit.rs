@@ -9,14 +9,6 @@
 //! shared lazy chart-data codec and published through the chart-arrangement
 //! archive seam.
 
-#![allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    reason = "The package boundary converts bounded native arithmetic and redacts graph failures."
-)]
-
 use std::fmt;
 use std::mem::size_of;
 use std::sync::Arc;

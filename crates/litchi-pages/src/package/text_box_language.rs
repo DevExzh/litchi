@@ -9,11 +9,6 @@
 //! `remove_text_box_text_language_boundary` and
 //! `reset_text_box_text_languages` routes.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the focused transaction keeps its public types beside the staged rewrite"
-)]
-
 use std::fmt;
 
 use litchi_iwa_common::WireLimits;

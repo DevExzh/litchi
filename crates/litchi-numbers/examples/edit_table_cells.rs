@@ -5,11 +5,6 @@
 //! admitted. Every successful artifact is published through a sibling
 //! temporary file without clobbering an existing target.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports content-free commit diagnostics"
-)]
-
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
 use std::io;

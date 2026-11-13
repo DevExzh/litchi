@@ -1,10 +1,5 @@
 //! Move one Numbers sheet through an exact immutable order transaction.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports its committed semantic change"
-)]
-
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
 use std::io;

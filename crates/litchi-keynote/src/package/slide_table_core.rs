@@ -7,14 +7,6 @@
 //! consumer; keeping this proof here avoids copying the same several-hundred
 //! line graph walk into every table property owner.
 
-#![allow(
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    clippy::too_many_arguments,
-    clippy::wildcard_enum_match_arm,
-    reason = "The private graph boundary redacts native failure detail."
-)]
-
 use std::collections::{HashMap, HashSet};
 use std::mem::size_of;
 use std::sync::Arc;

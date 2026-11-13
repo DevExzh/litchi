@@ -4,11 +4,6 @@
 //! owner.  Native chart references and IWA objects stay here; the wire-level
 //! title engines are supplied by `litchi-iwa-style::chart_text`.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The focused chart-text transaction keeps its bounded phases together."
-)]
-
 use std::fmt;
 use std::sync::Arc;
 

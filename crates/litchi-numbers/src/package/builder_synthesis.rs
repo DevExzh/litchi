@@ -359,10 +359,6 @@ fn geometry(model: &[u8]) -> Result<topology::Geometry, Failure> {
 }
 
 /// The document component with every option written.
-#[allow(
-    clippy::too_many_lines,
-    reason = "one pass over the template's document component"
-)]
 fn document(
     stream: &mut Stream,
     options: &Options<'_>,

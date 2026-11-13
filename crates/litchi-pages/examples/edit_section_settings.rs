@@ -6,11 +6,6 @@
 //! clobbering an existing path. If optional inverse publication fails after
 //! the main output succeeds, the main output remains.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports its committed semantic change"
-)]
-
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
 use std::io;

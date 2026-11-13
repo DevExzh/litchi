@@ -7,14 +7,6 @@
 //! remain private to this module.  The retained package source is the
 //! preservation authority for no-ops, unknown fields, and inverse patches.
 
-#![allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    reason = "The package boundary converts bounded native arithmetic and redacts graph failures."
-)]
-
 use std::fmt;
 use std::mem::size_of;
 use std::sync::Arc;

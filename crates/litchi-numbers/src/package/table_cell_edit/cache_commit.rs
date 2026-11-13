@@ -646,10 +646,6 @@ fn validate_prepared_formula_list_source(
     Ok(())
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "strict source route, host join, and transaction authority remain explicit"
-)]
 fn prepare_formula_list_source<'source>(
     source: &'source Package,
     route: &resolve::ListRoute,
@@ -1253,10 +1249,6 @@ pub(super) fn prepare_final_overlay(
 /// Supplied caches for supported formulas must equal strict evaluation.
 /// Structurally valid evaluator-unsupported formulas may retain a supplied
 /// cache only when no impacted descendant consumes it.
-#[allow(
-    clippy::too_many_arguments,
-    reason = "the final graph and shared transaction ledger remain explicit"
-)]
 pub(super) fn prepare_final_cache_from_sets<'artifact>(
     source: &Package,
     target: &resolve::Target,

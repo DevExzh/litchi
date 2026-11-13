@@ -170,10 +170,6 @@ impl Layout {
     /// Returns a typed error when a scalar is non-finite, outside its allowed
     /// range, when margins consume a page, or when an orientation is not
     /// canonical.
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "The constructor mirrors the complete native page-layout record."
-    )]
     pub fn new(
         page_width: Option<f32>,
         page_height: Option<f32>,

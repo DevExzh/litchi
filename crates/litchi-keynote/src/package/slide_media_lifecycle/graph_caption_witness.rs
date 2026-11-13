@@ -8,11 +8,6 @@
 //! not discover arbitrary descendants or treat unknown archive-header edges as
 //! proof of ownership.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The witness keeps schema admission and its fixed-size result together."
-)]
-
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_core::ArchiveObject;
 use litchi_iwa_protos::{keynote_movie_caption_codec, pages_movie_caption_codec};

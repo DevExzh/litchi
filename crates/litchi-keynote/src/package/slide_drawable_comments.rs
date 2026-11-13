@@ -5,13 +5,6 @@
 //! locations, while this module owns source profiles, candidate reopening,
 //! exact-source patches, and the immutable commit result.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    reason = "The transaction keeps public selection, candidate verification, and publication together."
-)]
-
 use std::fmt;
 use std::mem::size_of;
 use std::sync::Arc;

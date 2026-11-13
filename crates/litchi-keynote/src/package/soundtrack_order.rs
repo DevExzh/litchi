@@ -2839,10 +2839,6 @@ fn physical_source(package: &Package) -> Result<&SourceCatalog, Error> {
     }
 }
 
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "used directly as a Result::map_err conversion"
-)]
 fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
     match error {
         litchi_iwa_common::Error::LimitExceeded {
@@ -2869,10 +2865,6 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
     }
 }
 
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "used directly as a Result::map_err conversion"
-)]
 fn map_codec_error(error: soundtrack_codec::DecodeError, budget: &TransactionBudget) -> Error {
     let Some(limit) = error.resource_limit() else {
         return Error::InvalidSource;
@@ -2901,10 +2893,6 @@ fn map_codec_error(error: soundtrack_codec::DecodeError, budget: &TransactionBud
     }
 }
 
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "used directly as a Result::map_err conversion"
-)]
 fn map_read_error(error: ReadError) -> Error {
     match error {
         ReadError::SemanticLimit {
@@ -2951,10 +2939,6 @@ fn map_read_error(error: ReadError) -> Error {
     }
 }
 
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "used directly as a Result::map_err conversion"
-)]
 fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
         litchi_iwa_archive::Error::Limit {
@@ -2983,10 +2967,6 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     }
 }
 
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "used directly as a Result::map_err conversion"
-)]
 fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {

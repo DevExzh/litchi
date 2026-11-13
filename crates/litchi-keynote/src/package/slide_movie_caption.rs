@@ -5,14 +5,6 @@
 //! canonical stand-in creation, and fresh-stand-in removal all share the chart
 //! owner's bounded physical lifecycle seam.
 
-#![allow(
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    clippy::shadow_reuse,
-    clippy::wildcard_enum_match_arm,
-    reason = "The transaction redacts native graph failures at the semantic boundary."
-)]
-
 use std::fmt;
 use std::sync::Arc;
 

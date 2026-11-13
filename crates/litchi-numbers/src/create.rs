@@ -342,10 +342,6 @@ impl Package {
     pub fn new() -> Self {
         // The template is a compile-time constant the crate's own tests
         // open; its failure would be a build defect, not a runtime input.
-        #[allow(
-            clippy::expect_used,
-            reason = "the embedded template is validated by the crate's tests"
-        )]
         Self::from_shared_profile(Arc::from(BLANK), Profile::default())
             .expect("the embedded blank Numbers workbook opens")
     }

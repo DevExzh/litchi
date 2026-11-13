@@ -133,10 +133,6 @@ impl WireBudget {
             .saturating_sub(self.total_work)
     }
 
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "candidate reservation needs the exact selected archive/message bounds"
-    )]
     pub fn precharge_candidate_reopen(
         &mut self,
         source: &SourceCatalog,

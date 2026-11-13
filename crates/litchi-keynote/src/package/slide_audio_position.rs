@@ -6,13 +6,6 @@
 //! positive-size [`crate::slide::media::geometry::MovieGeometry`] or touches size, flags, angle, playback,
 //! assets, comments, or other native fields.
 
-#![allow(
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    clippy::wildcard_enum_match_arm,
-    reason = "The semantic boundary redacts lower-layer failure details."
-)]
-
 use std::fmt;
 use std::sync::Arc;
 

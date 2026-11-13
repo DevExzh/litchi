@@ -5,11 +5,6 @@
 //! bounded to the ten bytes representable by a `u64`; malformed input fails
 //! without probing an unbounded continuation stream.
 
-#![allow(
-    clippy::module_name_repetitions,
-    reason = "The public names explicitly identify the varint encoding they operate on"
-)]
-
 use std::fmt;
 use std::io::{self, Read};
 
@@ -179,10 +174,6 @@ pub fn decode_svarint<R: Read>(reader: &mut R) -> io::Result<i64> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    reason = "Varint tests intentionally panic on an unexpected fixture failure"
-)]
 mod tests {
     use super::*;
     use std::io::Cursor;

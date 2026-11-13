@@ -14,11 +14,6 @@
 //! reclaim an author, or expose a public comment API; the transaction owner
 //! remains responsible for applying the validated closure atomically.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The private planner keeps source admission, strict decoding, and closure facts together."
-)]
-
 use std::mem::size_of;
 
 use litchi_iwa_common::{WireLimits, wire::WireView};

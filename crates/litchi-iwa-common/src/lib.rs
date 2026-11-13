@@ -111,10 +111,6 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// The hard ceilings prevent a caller from turning a configurable limit into
 /// an unbounded allocation or traversal. Lower limits are useful for document
 /// profiles and adversarial-input tests.
-#[allow(
-    clippy::struct_field_names,
-    reason = "Each budget has a distinct public accessor and must remain independently configurable"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct WireLimits {
     max_input_bytes: usize,

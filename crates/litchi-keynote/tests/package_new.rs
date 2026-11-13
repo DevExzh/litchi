@@ -249,7 +249,6 @@ fn builder_writes_language_and_locale() -> Result<(), Box<dyn std::error::Error>
         .flat_map(|object| &object.messages)
         .find(|message| message.type_ == 1)
         .ok_or("document archive")?;
-    #[allow(deprecated, reason = "native locale fields")]
     {
         let decoded = litchi_iwa_protos::kn::DocumentArchive::decode(root.data.as_slice())?;
         assert_eq!(decoded.super_.document_language.as_deref(), Some("fr"));

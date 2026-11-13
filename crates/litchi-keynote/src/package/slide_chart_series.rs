@@ -10,12 +10,6 @@
 //! `chart::style` and `chart::axis` families
 //! (`super::slide_chart_style`) publish through the same core.
 
-#![allow(
-    clippy::cast_sign_loss,
-    clippy::needless_pass_by_value,
-    reason = "The focused adapter keeps the semantic boundary beside its staged transaction."
-)]
-
 use std::fmt;
 use std::mem::size_of;
 use std::sync::Arc;

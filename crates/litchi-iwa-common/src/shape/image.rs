@@ -6,11 +6,6 @@
 //! exchanged at that boundary. In particular, an omitted control is distinct
 //! from a control explicitly set to its neutral value.
 
-#![allow(
-    clippy::module_name_repetitions,
-    reason = "The public Image* names identify the native inspector controls while staying concise at the shape::image boundary"
-)]
-
 const EXPOSURE_PRESENT: u8 = 1 << 0;
 const SATURATION_PRESENT: u8 = 1 << 1;
 const ENHANCEMENT_PRESENT: u8 = 1 << 2;

@@ -11,11 +11,6 @@
 //! is applied to the package the previous one produced, as the host applies
 //! them one after another; the save token advances once per transaction.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the focused transaction keeps its public types beside the staged rewrite"
-)]
-
 use std::fmt;
 
 use litchi_iwa_table::cell_appearance::{self as engine, Kind, Plan, Property};

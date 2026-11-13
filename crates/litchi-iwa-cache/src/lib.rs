@@ -10,10 +10,6 @@
 //! infer the retained memory cost of an arbitrary `V` safely.
 
 #![forbid(unsafe_code)]
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The public error contracts and their state-machine helpers are kept together for auditability."
-)]
 
 use std::borrow::Borrow;
 use std::collections::HashMap;

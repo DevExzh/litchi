@@ -648,10 +648,6 @@ fn try_snapshot_buffer<T>(requested: usize, kind: AllocationKind) -> Result<Vec<
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    reason = "Tests use fixed non-null identities and bounded spans."
-)]
 mod tests {
     use std::num::NonZeroU32;
 

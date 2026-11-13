@@ -318,7 +318,6 @@ fn currency_cell_type_matches_view(cell: &BncCellView<'_>) -> bool {
 
 /// Marker used by the generic owner to keep native failures content-free.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)]
 pub enum NativeControlKind {
     Checkbox,
     StarRating,
@@ -3068,7 +3067,6 @@ fn validate_refcounts(
 /// Current implementation delegates Pop-Up Menu graph transitions to the
 /// existing strict native owner.  Scalar controls are admitted only after
 /// their corresponding source-preserving list transition is available.
-#[allow(dead_code)]
 pub fn unsupported_scalar_control() -> NativePopUpError {
     NativePopUpError::UnsupportedDependency
 }

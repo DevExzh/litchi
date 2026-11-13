@@ -104,7 +104,6 @@ fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
     )?)
 }
 
-#[allow(clippy::cast_possible_truncation, reason = "protobuf varint byte")]
 fn push_varint(mut value: u64, output: &mut Vec<u8>) {
     while value >= 0x80 {
         output.push(((value as u8) & 0x7f) | 0x80);
@@ -756,10 +755,6 @@ fn aliased_node_slide_package(source: &[u8]) -> TestResult<Vec<u8>> {
                 .iter_mut()
                 .find(|message| message.type_ == 4)
                 .ok_or_else(|| io::Error::other("synthetic node payload is missing"))?;
-            #[allow(
-                deprecated,
-                reason = "the native node reference is deliberately made adversarial"
-            )]
             {
                 let mut decoded = kn::SlideNodeArchive::decode(message.data.as_slice())?;
                 decoded.slide = Some(reference(FIRST_NODE));
@@ -791,10 +786,6 @@ fn shared_slide_package(source: &[u8]) -> TestResult<Vec<u8>> {
             .iter_mut()
             .find(|message| message.type_ == 4)
             .ok_or_else(|| io::Error::other("synthetic second node payload is missing"))?;
-        #[allow(
-            deprecated,
-            reason = "the native node reference is deliberately made adversarial"
-        )]
         {
             let mut decoded = kn::SlideNodeArchive::decode(message.data.as_slice())?;
             decoded.slide = Some(reference(FIRST_SLIDE));
@@ -1010,10 +1001,6 @@ fn raw_node_has_transition(package: &[u8], identifier: u64) -> TestResult<bool> 
         .ok_or_else(|| io::Error::other("missing slide-node message"))?
         .data
         .as_slice();
-    #[allow(
-        deprecated,
-        reason = "the native node cache is deliberately verified at the raw fixture boundary"
-    )]
     Ok(kn::SlideNodeArchive::decode(payload)?.has_transition)
 }
 

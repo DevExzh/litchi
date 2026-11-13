@@ -31,10 +31,6 @@ pub use litchi_iwa_package::{
     Error as PackageEntryStoreError, Patch,
 };
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "PackageState is the explicit cache-coherent state for physical package snapshots."
-)]
 pub use crate::package_state::{
     GetOrInsertError, PackageState, ParseError, is_legacy_operation_storage,
 };

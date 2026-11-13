@@ -47,11 +47,6 @@
 //! categories, pivots, column edits under sort rules, removing a hidden row
 //! or column, and removing a row or column that carries a border layer.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the focused transaction keeps its public types beside the staged rewrite"
-)]
-
 pub(super) use litchi_iwa_table::structure::wire;
 
 pub(super) use litchi_numbers_wire::table_topology::extents as calc;

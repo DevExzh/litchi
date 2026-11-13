@@ -1,10 +1,5 @@
 //! Edit Pages document and footnote formatter settings in one transaction.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports its committed semantic change"
-)]
-
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
 use std::io;

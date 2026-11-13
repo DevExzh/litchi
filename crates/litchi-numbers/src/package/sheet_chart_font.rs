@@ -6,11 +6,6 @@
 //! size are one focused family because the native chart font graph stores
 //! them in the same inherited paragraph-style variations.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The focused transaction keeps its public contract beside the bounded graph phases."
-)]
-
 use std::fmt;
 use std::mem::size_of;
 

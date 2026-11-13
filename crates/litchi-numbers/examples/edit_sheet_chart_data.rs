@@ -6,11 +6,6 @@
 //! writer accepts inline chart data and the empty-source mediator shape;
 //! non-zero table or formula dependencies are refused before publication.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports its committed semantic change"
-)]
-
 use std::error::Error;
 use std::ffi::OsString;
 use std::io;

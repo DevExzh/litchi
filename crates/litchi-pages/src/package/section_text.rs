@@ -1714,7 +1714,6 @@ fn utf16_len(text: &str) -> Result<u32, Error> {
     })
 }
 
-#[allow(clippy::needless_pass_by_value, reason = "Result::map_err conversion")]
 fn map_selector_error(selection_error: crate::SelectorError) -> Error {
     match selection_error {
         crate::SelectorError::EmptySectionName => Error::Refused(Refusal::NameNotFound),
@@ -1727,7 +1726,6 @@ fn map_selector_error(selection_error: crate::SelectorError) -> Error {
     }
 }
 
-#[allow(clippy::needless_pass_by_value, reason = "Result::map_err conversion")]
 fn map_transaction_error(transaction_error: crate::section::settings::Error) -> Error {
     use crate::section::settings::{Error as SettingsError, LimitKind as SettingsLimitKind};
 
@@ -1789,7 +1787,6 @@ fn map_transaction_error(transaction_error: crate::section::settings::Error) -> 
     }
 }
 
-#[allow(clippy::needless_pass_by_value, reason = "Result::map_err conversion")]
 fn map_package_error(package_error: PackageError) -> Error {
     match package_error {
         PackageError::Archive(archive_error) => map_archive_error(archive_error),
@@ -1823,7 +1820,6 @@ fn map_package_error(package_error: PackageError) -> Error {
     }
 }
 
-#[allow(clippy::needless_pass_by_value, reason = "Result::map_err conversion")]
 fn map_storage_wire_limits_error(limit_error: StorageWireLimitsError) -> Error {
     match limit_error {
         StorageWireLimitsError::Physical(physical_error) => map_archive_error(physical_error),
@@ -1831,7 +1827,6 @@ fn map_storage_wire_limits_error(limit_error: StorageWireLimitsError) -> Error {
     }
 }
 
-#[allow(clippy::needless_pass_by_value, reason = "Result::map_err conversion")]
 fn map_archive_error(archive_error: litchi_iwa_archive::Error) -> Error {
     match archive_error {
         litchi_iwa_archive::Error::Limit {
@@ -1860,7 +1855,6 @@ fn map_archive_error(archive_error: litchi_iwa_archive::Error) -> Error {
     }
 }
 
-#[allow(clippy::needless_pass_by_value, reason = "Result::map_err conversion")]
 fn map_core_error(core_error: litchi_iwa_core::Error) -> Error {
     match core_error {
         litchi_iwa_core::Error::Limit {
@@ -1896,7 +1890,6 @@ fn map_core_error(core_error: litchi_iwa_core::Error) -> Error {
     }
 }
 
-#[allow(clippy::needless_pass_by_value, reason = "Result::map_err conversion")]
 fn map_text_rewrite_error(error: litchi_iwa_text_wire::RewriteError) -> Error {
     match error {
         litchi_iwa_text_wire::RewriteError::LimitExceeded {

@@ -14,11 +14,6 @@
 //! before any family accepts it, and the family's patch retains both exact
 //! artifacts, so its inverse restores the source byte for byte.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the working set keeps its helpers beside the phase that uses them"
-)]
-
 // The working set and its phases are the shared table engine
 // (`litchi_iwa_table::structure`); Numbers keeps its sheet and document
 // helpers, the patch artifacts and the family macro here.

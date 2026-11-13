@@ -1,10 +1,5 @@
 //! Edit an existing Keynote soundtrack's playback mode and volume.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports its committed semantic change"
-)]
-
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
 use std::io;

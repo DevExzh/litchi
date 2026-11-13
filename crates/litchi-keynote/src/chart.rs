@@ -5,11 +5,6 @@
 //! [`ChartSelector`] before it enters its native graph, but native object IDs,
 //! archive names, and protobuf values do not cross this boundary.
 
-#![allow(
-    clippy::module_name_repetitions,
-    reason = "chart semantic types keep their domain explicit at the crate boundary"
-)]
-
 use std::collections::TryReserveError;
 
 use litchi_core::Position;

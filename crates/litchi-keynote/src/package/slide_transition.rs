@@ -5,16 +5,6 @@
 //! only used to retain extension fields and the native envelope around a
 //! transition.
 
-#![allow(
-    clippy::cast_sign_loss,
-    clippy::arbitrary_source_item_ordering,
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    clippy::shadow_reuse,
-    clippy::wildcard_enum_match_arm,
-    reason = "The transaction deliberately redacts lower-layer errors and exhaustively maps bounded cross-crate error families."
-)]
-
 use std::fmt;
 use std::sync::Arc;
 
@@ -2056,10 +2046,6 @@ fn check_output(output: &[u8], limits: WireLimits) -> Result<(), Error> {
     }
 }
 
-#[allow(
-    clippy::unnecessary_wraps,
-    reason = "the semantic-only source feature adds a typed unsupported-source branch"
-)]
 fn physical_catalog(package: &Package) -> Result<&litchi_iwa_archive::SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),

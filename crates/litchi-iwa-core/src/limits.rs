@@ -9,10 +9,6 @@ use crate::error::{Error, LimitKind, Result};
 /// points therefore rely on that invariant instead of validating the profile
 /// again on every call.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(
-    clippy::struct_field_names,
-    reason = "The max_* vocabulary makes the resource-budget fields self-documenting."
-)]
 pub struct Limits {
     max_archive_bytes: usize,
     max_objects: usize,

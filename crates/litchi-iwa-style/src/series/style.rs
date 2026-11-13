@@ -746,7 +746,6 @@ fn value_image(value: Option<&Value>) -> Option<u64> {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn write_values(
     workspace: &mut Workspace<'_>,
     chart: u64,

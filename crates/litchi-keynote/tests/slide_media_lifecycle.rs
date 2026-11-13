@@ -455,10 +455,6 @@ fn canonical_native_shape_info(shape: &mut tswp::ShapeInfoArchive) {
     canonical_native_reference(&mut shape.owned_storage);
 }
 
-#[allow(
-    deprecated,
-    reason = "The native fixture intentionally exercises both storage edges."
-)]
 fn canonical_native_caption(caption: &mut tsa::CaptionInfoArchive) {
     canonical_native_shape_info(&mut caption.super_);
     canonical_native_reference(&mut caption.placement);

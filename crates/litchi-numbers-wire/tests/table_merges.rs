@@ -131,7 +131,6 @@ fn range_node_with_uuid_bytes(
     )
 }
 
-#[allow(clippy::too_many_arguments)]
 fn range_node_with_extra_cross_fields(
     region: Region,
     table_words: Option<[u32; 4]>,
@@ -241,7 +240,6 @@ fn formula_with_uuid_bytes(
     output
 }
 
-#[allow(clippy::too_many_arguments)]
 fn formula_with_extra_cross_fields(
     region: Region,
     table_words: Option<[u32; 4]>,

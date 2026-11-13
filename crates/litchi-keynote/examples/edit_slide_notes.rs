@@ -1,10 +1,5 @@
 //! Set, clear, or replace a UTF-16 span in one slide's existing speaker notes.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example intentionally reports its committed semantic change"
-)]
-
 use std::error::Error;
 use std::ffi::OsString;
 use std::fs::OpenOptions;

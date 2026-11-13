@@ -100,10 +100,6 @@ pub type Result<T> = std::result::Result<T, Error>;
 ///
 /// The presets describe the complete nine-level native list style rather than
 /// exposing unvalidated protobuf integers or partial per-level state.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "The explicit ParagraphList name remains unambiguous when this value is re-exported by format facades."
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum ParagraphList {
     /// Ordinary paragraphs without labels.

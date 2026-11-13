@@ -15,10 +15,6 @@ pub enum Hyphenation {
 ///
 /// These controls correspond to Pages' Text → More inspector. The underlying
 /// paragraph style is shared by Pages, Numbers, and Keynote text storage.
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "Flow mirrors five independent native paragraph inspector controls."
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Flow {
     keep_lines_together: bool,

@@ -7,8 +7,6 @@
 //! checked cell positions, and reply ordinals; native identifiers are used
 //! only by the test oracle when checking COW and culling.
 
-#![allow(deprecated)]
-
 use std::io;
 
 #[path = "support/numbers_comment_fixture.rs"]

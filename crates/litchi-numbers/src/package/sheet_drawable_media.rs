@@ -105,10 +105,6 @@ fn seconds(duration: std::time::Duration) -> Result<f32, Invalid> {
     if seconds == 0.0 || seconds > f64::from(f32::MAX) {
         return Err(Invalid::Placement);
     }
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "bounded by f32::MAX above, as the host narrows it"
-    )]
     Ok(seconds as f32)
 }
 

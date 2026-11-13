@@ -230,10 +230,6 @@ pub fn objects(
     let paragraph = request.paragraph_style;
     let paragraph_count = request.profile.paragraph_style_count();
 
-    #[allow(
-        clippy::cast_sign_loss,
-        reason = "chart kinds are positive enum values"
-    )]
     let mut unity = Writer::new()
         .varint(1, request.kind.native_value() as u64)
         .varint(2, SCATTER_FORMAT_SHARED_X)
@@ -585,10 +581,6 @@ impl Writer {
 
     fn raw(&mut self, mut value: u64) {
         loop {
-            #[allow(
-                clippy::cast_possible_truncation,
-                reason = "the value is masked to seven bits"
-            )]
             let byte = (value & 0x7f) as u8;
             value >>= 7;
             if value == 0 {

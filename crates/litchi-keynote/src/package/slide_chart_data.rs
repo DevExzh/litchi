@@ -5,12 +5,6 @@
 //! native identifiers, archive objects, and generated protobuf values remain
 //! private to the package and protocol crates.
 
-#![allow(
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    reason = "The package boundary maps native failures to content-redacted semantic errors."
-)]
-
 use std::{
     fmt,
     mem::size_of,

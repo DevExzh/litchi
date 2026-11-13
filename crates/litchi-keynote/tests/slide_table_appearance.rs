@@ -393,7 +393,6 @@ fn synthetic_package(locked: bool, with_unknown_group: bool) -> TestResult<Vec<u
         },
         ..Default::default()
     };
-    #[allow(deprecated, reason = "native schema retains legacy slide-node flags")]
     let node = kn::SlideNodeArchive {
         slide: Some(reference(SLIDE_ID)),
         ..Default::default()

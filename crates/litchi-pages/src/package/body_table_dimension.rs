@@ -4,11 +4,6 @@
 //! only the archive-free dimension value and the narrow header-bucket rewrite;
 //! object identifiers and wire records remain private proof data.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the focused Pages transaction keeps its proof beside the rewrite"
-)]
-
 use std::fmt;
 use std::num::NonZeroU64;
 use std::sync::Arc;

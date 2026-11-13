@@ -26,10 +26,6 @@ pub(super) fn root_preview_count(package: &Package) -> Result<usize, Error> {
     .map_err(map_rendering_invalidation_error)
 }
 
-#[allow(
-    clippy::unnecessary_wraps,
-    reason = "the semantic-only source feature adds a typed unsupported-source branch"
-)]
 pub(super) fn physical_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),

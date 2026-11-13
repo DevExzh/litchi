@@ -3,11 +3,6 @@
 //! Slide/table selection and the A1 cell coordinate are semantic; native
 //! object identifiers, BNC records, and format-list keys stay private.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports its committed semantic change"
-)]
-
 use std::error::Error;
 use std::ffi::OsString;
 use std::io;

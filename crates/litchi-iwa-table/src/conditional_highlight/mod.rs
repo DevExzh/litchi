@@ -21,11 +21,6 @@
 //! period, an offset from today) need the calculation engine's volatile
 //! owner family; they and tables that already carry it are refused.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the port keeps the host module's order"
-)]
-
 mod formula;
 mod graph;
 mod native;

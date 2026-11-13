@@ -5,15 +5,6 @@
 //! native chart drawable, title stand-in, non-style object, component name,
 //! and generated extension remain private to this adapter.
 
-#![allow(
-    clippy::cast_sign_loss,
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    clippy::shadow_reuse,
-    clippy::wildcard_enum_match_arm,
-    reason = "The transaction redacts lower-layer failures and keeps native graph adapters private."
-)]
-
 use std::collections::HashMap;
 use std::fmt;
 use std::mem::size_of;

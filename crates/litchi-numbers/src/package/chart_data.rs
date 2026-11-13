@@ -5,14 +5,6 @@
 //! labels and values are copied into the common semantic model after the
 //! codec and package budgets have admitted the complete operation.
 
-#![allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    reason = "The package boundary converts bounded native arithmetic and redacts graph failures."
-)]
-
 use std::fmt;
 use std::mem::size_of;
 

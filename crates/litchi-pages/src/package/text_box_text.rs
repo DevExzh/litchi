@@ -22,11 +22,6 @@
 //! `reset_text_box_paragraph_*` families, collapsed into one property
 //! verb.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the focused transaction keeps its public types beside the staged rewrite"
-)]
-
 use std::fmt;
 
 use litchi_iwa_common::WireLimits;
@@ -522,10 +517,6 @@ fn replace_with_references(
     references::replace(object, index, data, removed, appended, &[], limits)
 }
 
-#[allow(
-    clippy::too_many_lines,
-    reason = "one staged change: plan, then the rewrite, derive or collapse publication"
-)]
 fn apply_one(
     source: &Package,
     selector: DrawableSelector,

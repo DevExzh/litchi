@@ -124,10 +124,6 @@ impl Rgba {
 
     /// Return whether this color is fully opaque.
     #[must_use]
-    #[allow(
-        clippy::float_cmp,
-        reason = "Opacity is the exact validated alpha endpoint, not an approximate measurement"
-    )]
     pub const fn is_opaque(self) -> bool {
         self.alpha == 1.0
     }

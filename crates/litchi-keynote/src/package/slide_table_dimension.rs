@@ -6,14 +6,6 @@
 //! changed operation rewrites the selected header bucket and the owning
 //! `TSD.DrawableArchive` geometry in one package transaction.
 
-#![allow(
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    clippy::too_many_arguments,
-    clippy::wildcard_enum_match_arm,
-    reason = "The focused package boundary keeps native proof details private."
-)]
-
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::sync::Arc;

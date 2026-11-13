@@ -181,11 +181,6 @@ fn usize_u64(value: usize) -> u64 {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    clippy::shadow_unrelated,
-    reason = "logical ingress tests use fixed fallible fixtures and compare independent failures"
-)]
 mod tests {
     use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
     use litchi_iwa_package::{Entry, EntryStore};

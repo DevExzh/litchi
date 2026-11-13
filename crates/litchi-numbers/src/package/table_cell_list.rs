@@ -22,11 +22,6 @@
 //! [`Edit::set_list`] with [`ParagraphList::None`] and
 //! [`Edit::set_level`] with [`ParagraphListLevel::ZERO`].
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the focused transaction keeps its public types beside the staged rewrite"
-)]
-
 use std::fmt;
 
 use litchi_iwa_table::cell_rich_text::{self as rich, list as engine};

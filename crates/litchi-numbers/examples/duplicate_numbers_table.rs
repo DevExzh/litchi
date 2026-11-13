@@ -5,11 +5,6 @@
 //! selector, then the output is reopened and the copied semantic content is
 //! checked.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports its committed semantic change"
-)]
-
 use std::env;
 use std::error::Error;
 use std::io;

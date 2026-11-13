@@ -1174,11 +1174,6 @@ pub mod axis {
             return Ok(value);
         }
         if raw >= NEGATIVE_INT32_START {
-            #[allow(
-                clippy::cast_possible_truncation,
-                clippy::cast_possible_wrap,
-                reason = "a sign-extended int32 varint, as protobuf encodes it"
-            )]
             return Ok(raw as i64 as i32);
         }
         Err(SymbolError::Invalid(
@@ -1262,10 +1257,6 @@ pub mod axis {
                     Frequency::AutoFit => None,
                     Frequency::All => Some(1),
                     Frequency::Every(interval) => Some(u64::from(interval.value())),
-                    #[allow(
-                        clippy::cast_sign_loss,
-                        reason = "a negative int32 is stored sign-extended"
-                    )]
                     Frequency::Unsupported(value) => Some(i64::from(value) as u64),
                     _ => {
                         return Err(SymbolError::Invalid(

@@ -5,11 +5,6 @@
 //! dependency proof required before changing row/column partitions.  Native
 //! identifiers stay in the private proof and never cross the public API.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the focused package boundary keeps transaction vocabulary beside its proof"
-)]
-
 use std::fmt;
 use std::num::NonZeroU64;
 use std::sync::Arc;

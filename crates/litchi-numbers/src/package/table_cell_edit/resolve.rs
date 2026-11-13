@@ -1795,7 +1795,6 @@ fn sentinel_range(payload: &[u8]) -> bool {
         == Some([32_767, 2_147_483_647, 32_767, 2_147_483_647])
 }
 
-#[allow(clippy::too_many_arguments, reason = "one dormant hidden-owner proof")]
 fn validate_dormant_hidden_owner(
     source: &Package,
     model_object: &ArchiveObject,
@@ -1831,7 +1830,6 @@ fn validate_dormant_hidden_owner(
     )))
 }
 
-#[allow(clippy::too_many_arguments, reason = "one dormant tracker proof")]
 fn resolve_sort_rule_tracker(
     source: &Package,
     model_object: &ArchiveObject,
@@ -2332,10 +2330,6 @@ impl storage_codec::StorageVisitor for HeaderStage {
     }
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "all storage roles share one proof boundary"
-)]
 fn resolve_lists(
     source: &Package,
     owner: &ArchiveObject,
@@ -2498,7 +2492,6 @@ fn resolve_lists(
     })
 }
 
-#[allow(clippy::too_many_arguments, reason = "one exact list-role proof")]
 fn resolve_list(
     source: &Package,
     owner: &ArchiveObject,
@@ -2765,7 +2758,6 @@ fn validate_segment_key_range(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments, reason = "one segmented-list proof")]
 fn resolve_list_segments(
     source: &Package,
     owner: &ArchiveObject,
@@ -4143,10 +4135,6 @@ impl dependency_codec::DependencyVisitor for CellRecordCount {
     }
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "one dormant dependency-tile proof"
-)]
 fn resolve_empty_cell_dependency_tiles(
     source: &Package,
     owner: &ArchiveObject,
@@ -4192,7 +4180,6 @@ fn resolve_empty_cell_dependency_tiles(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments, reason = "selected dependency-tile proof")]
 fn resolve_selected_cell_dependency_tiles(
     source: &Package,
     owner: &ArchiveObject,
@@ -4300,7 +4287,6 @@ fn validate_selected_cell_tile_wire(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments, reason = "one dependency-tile proof")]
 fn resolve_dependency_tiles(
     source: &Package,
     owner: &ArchiveObject,

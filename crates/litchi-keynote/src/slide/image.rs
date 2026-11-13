@@ -11,10 +11,6 @@ use crate::{Error, Result};
 /// The selector contains only a checked semantic position. Native object
 /// identifiers, component names, and protobuf payloads remain private to the
 /// package adapter that resolves it.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "ImageSelector keeps the selected Keynote domain explicit at the public boundary"
-)]
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ImageSelector {

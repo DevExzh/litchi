@@ -1,10 +1,5 @@
 //! Edit one Keynote slide transition without exposing native identities.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example intentionally reports its committed semantic change"
-)]
-
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
 use std::io;

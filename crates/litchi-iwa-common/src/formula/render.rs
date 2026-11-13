@@ -4,11 +4,6 @@
 //! types. This module owns the format-independent expression arena used after
 //! those adapters have converted native events into renderable pieces.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The arena keeps its public budget contract beside its storage operations."
-)]
-
 use std::ops::Range;
 use std::sync::atomic::{AtomicU32, Ordering};
 

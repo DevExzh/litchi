@@ -7,13 +7,6 @@
 //! candidate and publishing a commit.  Native identifiers therefore remain
 //! entirely inside this private module and its graph/metadata siblings.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    clippy::too_many_arguments,
-    clippy::too_many_lines,
-    reason = "The private transaction keeps admission, graph ownership, and candidate staging together."
-)]
-
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::mem::size_of;
 use std::time::{SystemTime, UNIX_EPOCH};

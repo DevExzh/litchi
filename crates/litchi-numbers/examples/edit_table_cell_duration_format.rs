@@ -10,11 +10,6 @@
 //! Diagnostics report only semantic format settings and bounded transaction
 //! counters; native identifiers and archive payloads are never printed.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports its committed semantic change"
-)]
-
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
 use std::io;

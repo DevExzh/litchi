@@ -1,14 +1,5 @@
 //! Exact-source transactions for rooted Numbers sheet and table names.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    clippy::shadow_reuse,
-    clippy::wildcard_enum_match_arm,
-    reason = "The transaction keeps its public API before private graph/rewrite helpers and maps lower-layer errors into one redacted Numbers boundary."
-)]
-
 use std::collections::HashSet;
 use std::fmt;
 use std::sync::Arc;
@@ -1190,10 +1181,6 @@ fn validate_name_volatile_dependencies(
     Ok(())
 }
 
-#[allow(
-    deprecated,
-    reason = "Numbers still roots its native calculation engine through the deprecated document field."
-)]
 fn rooted_formula_dependency_identifiers(source: &Package) -> Result<HashSet<u64>, Error> {
     let component = source
         .state
@@ -1350,10 +1337,6 @@ struct SheetTarget<'a> {
 }
 
 #[derive(Debug, Clone, Copy)]
-#[allow(
-    clippy::struct_field_names,
-    reason = "The model prefix distinguishes every coordinate from the enclosing table-info owner."
-)]
 struct TableTarget<'a> {
     model_identifier: u64,
     model_component_index: usize,

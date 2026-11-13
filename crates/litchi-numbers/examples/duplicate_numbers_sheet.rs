@@ -4,11 +4,6 @@
 //! generates the same suffixed visible name as the leaf API. The example
 //! verifies the committed and reopened sheet lists and exact inverse bytes.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports its committed semantic change"
-)]
-
 use std::env;
 use std::error::Error;
 use std::io;

@@ -887,10 +887,6 @@ fn as_seconds(value: Duration) -> Result<f32, Error> {
         }
         .into());
     }
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the native field is a float; the range was checked"
-    )]
     Ok(seconds as f32)
 }
 

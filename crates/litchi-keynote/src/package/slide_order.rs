@@ -538,10 +538,6 @@ impl Package {
         Ok(self.editable_source_catalog()?.shared_source())
     }
 
-    #[allow(
-        clippy::unnecessary_wraps,
-        reason = "the internal prepared-source feature adds a semantic-only failure branch"
-    )]
     fn physical_shared_source(&self) -> Result<Arc<[u8]>, Error> {
         match &self.state.source {
             PhysicalSource::Package(source) => Ok(source.shared_source()),
@@ -1021,10 +1017,6 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     }
 }
 
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "used directly as a Result::map_err conversion"
-)]
 fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
@@ -1041,10 +1033,6 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     }
 }
 
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "used directly as a Result::map_err conversion"
-)]
 fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
     match error {
         litchi_iwa_common::Error::LimitExceeded {

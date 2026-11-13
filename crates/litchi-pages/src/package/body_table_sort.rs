@@ -6,11 +6,6 @@
 //! the strict source-preserving field projection is provided by the hidden
 //! `table_sort_order_codec`.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The focused transaction keeps its proof beside the rewrite."
-)]
-
 use std::fmt;
 use std::sync::Arc;
 

@@ -1056,7 +1056,6 @@ impl Trendline {
     ///
     /// [`Error::NonCanonicalBool`], [`Error::TrendlineVisibility`], an
     /// invalid order or period, or the [`Self::validate`] errors.
-    #[allow(clippy::too_many_arguments, reason = "one argument per stored field")]
     pub fn from_native(
         show: Option<u64>,
         native_type: Option<u64>,

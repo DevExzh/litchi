@@ -28,12 +28,6 @@
 //! `table_delete` and `formula_dependency_shift` phases. Refused with a
 //! typed [`Unsupported`] reason so a failed edit never publishes.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    clippy::too_many_lines,
-    reason = "the engine keeps its phases in plan order"
-)]
-
 mod layout;
 mod shift;
 

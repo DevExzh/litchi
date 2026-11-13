@@ -835,10 +835,6 @@ fn checked_charge(
     Ok(observed)
 }
 
-#[allow(
-    clippy::unnecessary_wraps,
-    reason = "the internal-source feature adds a semantic-source error path"
-)]
 fn physical_source(package: &Package) -> Result<Arc<[u8]>, Error> {
     let source = match &package.state.source {
         super::PhysicalSource::Package(source) => source,
@@ -851,10 +847,6 @@ fn physical_source(package: &Package) -> Result<Arc<[u8]>, Error> {
     Ok(source.shared_source())
 }
 
-#[allow(
-    clippy::unnecessary_wraps,
-    reason = "the internal-source feature adds a semantic-source error path"
-)]
 fn physical_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
     match &package.state.source {
         super::PhysicalSource::Package(source) => Ok(source),
@@ -864,10 +856,6 @@ fn physical_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
     }
 }
 
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "used directly as a Result::map_err conversion"
-)]
 fn map_document_codec_error(
     error: keynote_document_codec::DecodeError,
     budget: &TransactionBudget,
@@ -908,10 +896,6 @@ fn map_document_codec_error(
     Error::InvalidSource
 }
 
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "used directly as a Result::map_err conversion"
-)]
 fn map_soundtrack_codec_error(
     error: soundtrack_codec::DecodeError,
     budget: &TransactionBudget,
@@ -1017,10 +1001,6 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     }
 }
 
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "used directly as a Result::map_err conversion"
-)]
 fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
@@ -1056,10 +1036,6 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     }
 }
 
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "used directly as a Result::map_err conversion"
-)]
 fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
     match error {
         litchi_iwa_common::Error::LimitExceeded {

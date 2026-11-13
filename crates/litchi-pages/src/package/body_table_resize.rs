@@ -500,7 +500,6 @@ fn resize_axis(
     rewrite_repeated_varint_fields(&data, axis.uid_field, &uid_for_index).map_err(wire)
 }
 
-#[allow(clippy::too_many_lines)]
 fn resize(source: &Package, table: usize, rows: usize, columns: usize) -> Result<Package, Error> {
     let selector = BodyTableSelector::index(table);
     let mut budget = Budget::new(source)?;

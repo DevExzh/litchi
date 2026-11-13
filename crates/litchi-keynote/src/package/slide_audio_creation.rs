@@ -4,11 +4,6 @@
 //! and archive internals.  This module keeps the identity and resource ledger
 //! needed by the package owner and its metadata/playback adapters in one place.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Creation planning keeps the source admission and ledger helpers together."
-)]
-
 use std::{mem::size_of, sync::Arc};
 
 use litchi_core::Position;

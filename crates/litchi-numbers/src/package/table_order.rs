@@ -9,11 +9,6 @@
 //! its tables, those nodes are reordered the same way. No object is added or
 //! removed, and every untouched record keeps its exact bytes.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the focused transaction keeps its public types beside the staged rewrite"
-)]
-
 use std::fmt;
 
 use litchi_iwa_core::RawMessage;

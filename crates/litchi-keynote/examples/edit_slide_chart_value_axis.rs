@@ -3,11 +3,6 @@
 //! The example deliberately keeps selection and values semantic. It never
 //! accepts or prints a native object identifier, archive name, or wire value.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports its committed semantic change"
-)]
-
 use std::collections::hash_map::DefaultHasher;
 use std::error::Error;
 use std::ffi::OsString;

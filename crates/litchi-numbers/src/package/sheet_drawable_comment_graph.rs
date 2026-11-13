@@ -63,7 +63,6 @@ fn generated_author(public: bool) -> Vec<u8> {
         out.push(number << 3 | 2);
         let mut length = payload.len();
         loop {
-            #[allow(clippy::cast_possible_truncation, reason = "seven-bit groups")]
             let byte = (length & 0x7f) as u8;
             length >>= 7;
             if length == 0 {

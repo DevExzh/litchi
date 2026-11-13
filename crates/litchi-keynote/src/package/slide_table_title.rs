@@ -6,13 +6,6 @@
 //! transaction edits only the member that owns the selected model. Legacy
 //! type-6000 models remain compatibility-host scope.
 
-#![allow(
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    clippy::wildcard_enum_match_arm,
-    reason = "the semantic boundary redacts lower-layer failure details"
-)]
-
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::mem::size_of;

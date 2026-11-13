@@ -101,7 +101,6 @@ pub(crate) fn stroke_from_native(stroke: &native::Stroke) -> NativeResult<Option
             let Some(values) = pattern.pattern.get(..used) else {
                 return invalid("native iWork stroke pattern is truncated");
             };
-            #[allow(clippy::float_cmp, reason = "native dash presets are exact constants")]
             match values {
                 [SHORT_DASH_LENGTH, SHORT_DASH_LENGTH] => Pattern::ShortDash,
                 [MEDIUM_DASH_LENGTH, MEDIUM_DASH_LENGTH] => Pattern::MediumDash,
@@ -260,10 +259,6 @@ pub(crate) fn shadow_from_native(shadow: &native::Shadow) -> NativeResult<ShapeS
     }
 }
 
-#[allow(
-    clippy::cast_possible_wrap,
-    reason = "the host writes the bounded blur radius as a native int32"
-)]
 pub(crate) fn shadow_to_native(shadow: ShapeShadow) -> native::Shadow {
     let appearance_to_native = |appearance: Appearance| native::Shadow {
         color: Some(color_to_native(appearance.color())),
@@ -303,7 +298,6 @@ fn angle_from_native(native_degrees: f32) -> NativeResult<Angle> {
     if !native_degrees.is_finite() || !(0.0..FULL_TURN_DEGREES).contains(&native_degrees) {
         return invalid("iWork shadow has a non-canonical native angle");
     }
-    #[allow(clippy::float_cmp, reason = "native zero is an exact sentinel")]
     let degrees = if native_degrees == 0.0 {
         0.0
     } else {

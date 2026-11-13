@@ -9,11 +9,6 @@
 //! and the hidden rows on the reopened candidate. Root previews are kept,
 //! as the host keeps them, and the persisted sort order is unchanged.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the focused transaction keeps its public types beside the staged rewrite"
-)]
-
 use std::collections::HashSet;
 use std::fmt;
 

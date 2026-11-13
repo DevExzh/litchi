@@ -286,10 +286,6 @@ impl Patch {
         }
     }
 
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "crate-private exact patch handoff"
-    )]
     pub(crate) fn from_parts(
         source: Arc<[u8]>,
         target: Arc<[u8]>,

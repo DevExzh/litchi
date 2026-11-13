@@ -15,11 +15,6 @@
 //! - **Detach**: the entry names no style; an exclusive variation is removed
 //!   with its stylesheet registration, UUID and references.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the focused transaction keeps its public types beside the staged rewrite"
-)]
-
 use std::collections::BTreeMap;
 use std::fmt;
 
@@ -528,10 +523,6 @@ fn release_owner_reference(
     Ok(())
 }
 
-#[allow(
-    clippy::too_many_lines,
-    reason = "one staged change: plan, then the rewrite, derive or detach publication"
-)]
 fn apply_one(
     source: &Package,
     selector: DrawableSelector,

@@ -7,11 +7,6 @@
 //! budget and deliberately leaves the author, text, date, UUID, and unknown
 //! fields untouched.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The adapter keeps admission, accounting, and execution together."
-)]
-
 use std::mem::size_of;
 
 use litchi_iwa_common::WireLimits;
@@ -317,10 +312,6 @@ fn limit_u64(kind: LimitKind, observed: u64, maximum: u64) -> Error {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    reason = "Focused adapter fixtures use explicit test assertions."
-)]
 mod tests {
     use std::path::PathBuf;
 

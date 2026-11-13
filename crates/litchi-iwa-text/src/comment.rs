@@ -5,15 +5,6 @@
 //! bounded values that an adapter can exchange with Pages, Numbers, and
 //! Keynote.
 
-#![allow(
-    clippy::module_name_repetitions,
-    reason = "TextComment names identify the comment semantic value in this focused module"
-)]
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Opaque IDs keep their raw adapter module adjacent to private representations."
-)]
-
 use std::num::NonZeroU64;
 
 use litchi_iwa_common::comment::{AuthorId, Uuid};
@@ -67,10 +58,6 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub struct TextCommentId(NonZeroU64);
 
 /// Explicit native-boundary conversions for the opaque comment handle.
-#[allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Keep the explicit raw adapter boundary adjacent to its opaque handles."
-)]
 pub mod raw {
     use super::{Result, TextCommentId, TextCommentReplyId};
 

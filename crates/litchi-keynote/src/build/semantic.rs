@@ -7,12 +7,7 @@
 //! ordinary build settings use the typed values below instead of raw fields.
 
 #![allow(
-    clippy::arbitrary_source_item_ordering,
-    clippy::float_cmp,
-    clippy::missing_errors_doc,
-    clippy::shadow_reuse,
     clippy::unnecessary_lazy_evaluations,
-    clippy::wildcard_enum_match_arm,
     reason = "This focused migration leaf keeps its validated constructors and lossless unknown branches together; the archive adapter audit will replace these local exceptions as each native family moves."
 )]
 

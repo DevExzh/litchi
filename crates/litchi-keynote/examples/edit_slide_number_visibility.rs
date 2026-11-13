@@ -1,10 +1,5 @@
 //! Show or hide one layout-provided Keynote slide-number placeholder.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports its committed semantic change"
-)]
-
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
 use std::io;

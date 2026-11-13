@@ -8,11 +8,6 @@
 //! component so a component shared by two owners is decompressed, encoded,
 //! and reassembled only once.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The focused transaction keeps its public value types beside the exact-source machinery."
-)]
-
 use std::fmt;
 
 use litchi_iwa_archive::{

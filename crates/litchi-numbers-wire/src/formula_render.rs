@@ -4,11 +4,6 @@
 //! semantic projection of those events into formula text. Format adapters
 //! supply only their error budget and borrowed table/category/function names.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The renderer keeps its generic contract next to its event and formatting helpers."
-)]
-
 use std::fmt::Write as _;
 use std::result::Result;
 

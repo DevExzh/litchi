@@ -8,13 +8,6 @@
 //! never cross a supported facade and the three owners share one mutation
 //! implementation.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    clippy::too_many_arguments,
-    clippy::too_many_lines,
-    reason = "The bounded wire transaction keeps its validation and rewrite phases together."
-)]
-
 use std::sync::Arc;
 
 use litchi_iwa_common::WireLimits;

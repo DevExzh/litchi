@@ -2980,7 +2980,6 @@ impl Stage {
         }
     }
 
-    #[allow(clippy::too_many_arguments, reason = "streaming stage budget state")]
     fn push<T>(
         slot: &mut Vec<T>,
         value: T,
@@ -3838,10 +3837,6 @@ fn append_edges(
     Ok(())
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "complete range graph remains explicit"
-)]
 fn append_range_edges(
     output: &mut Vec<Edge>,
     source_owner: u32,
@@ -4066,10 +4061,6 @@ fn validate_formula_ranges(
     Ok(())
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "logical graph authority is explicit"
-)]
 fn replace_with_logical_graph(
     edges: &mut Vec<Edge>,
     hosts: &mut Vec<FormulaHost>,

@@ -93,10 +93,6 @@ pub const fn assignable_kind(kind: Kind) -> bool {
     kind.native_value() != Kind::Undefined.native_value() && !kind.is_unsupported()
 }
 
-#[allow(
-    clippy::cast_sign_loss,
-    reason = "protobuf enum varints are sign-extended"
-)]
 fn native(value: i32) -> u64 {
     i64::from(value) as u64
 }

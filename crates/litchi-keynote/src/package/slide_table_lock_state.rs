@@ -5,13 +5,6 @@
 //! package bytes stay private to this adapter. The transaction rewrites only
 //! the optional lock field in one canonical TableInfo object.
 
-#![allow(
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    clippy::wildcard_enum_match_arm,
-    reason = "the package boundary redacts lower-layer failure details"
-)]
-
 use std::sync::{Arc, OnceLock};
 use std::{collections::HashSet, fmt};
 

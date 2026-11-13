@@ -6,13 +6,6 @@
 //! merge-owner rewrite.  No generated table model or native object identity
 //! crosses this boundary.
 
-#![allow(
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    clippy::too_many_arguments,
-    reason = "The package boundary deliberately redacts native failure detail."
-)]
-
 use std::fmt;
 use std::sync::Arc;
 

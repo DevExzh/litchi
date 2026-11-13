@@ -940,10 +940,6 @@ fn allocate_bytes(capacity: usize) -> Result<Vec<u8>, Error> {
     Ok(output)
 }
 
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "used directly as a Result::map_err conversion"
-)]
 fn map_selector_error(selection_error: crate::SelectorError) -> Error {
     match selection_error {
         crate::SelectorError::EmptySectionName => Error::Refused(Refusal::NameNotFound),
@@ -956,10 +952,6 @@ fn map_selector_error(selection_error: crate::SelectorError) -> Error {
     }
 }
 
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "used directly as a Result::map_err conversion"
-)]
 fn map_package_error(package_error: PackageError) -> Error {
     match package_error {
         PackageError::Archive(archive_error) => map_archive_error(archive_error),
@@ -994,10 +986,6 @@ fn map_package_error(package_error: PackageError) -> Error {
     }
 }
 
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "used directly as a Result::map_err conversion"
-)]
 fn map_archive_error(archive_error: litchi_iwa_archive::Error) -> Error {
     match archive_error {
         litchi_iwa_archive::Error::Limit {
@@ -1026,10 +1014,6 @@ fn map_archive_error(archive_error: litchi_iwa_archive::Error) -> Error {
     }
 }
 
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "used directly as a Result::map_err conversion"
-)]
 fn map_core_error(core_error: litchi_iwa_core::Error) -> Error {
     match core_error {
         litchi_iwa_core::Error::Limit {
@@ -1065,10 +1049,6 @@ fn map_core_error(core_error: litchi_iwa_core::Error) -> Error {
     }
 }
 
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "used directly as a Result::map_err conversion"
-)]
 fn map_wire_error(wire_error: litchi_iwa_common::Error) -> Error {
     match wire_error {
         litchi_iwa_common::Error::LimitExceeded {

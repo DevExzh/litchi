@@ -97,7 +97,6 @@ fn paragraph<T>(
     move |style| style.paragraph.as_ref().map_or(Ok(None), &read)
 }
 
-#[allow(clippy::too_many_lines, reason = "one arm per property family")]
 pub(super) fn effective(
     styles: &(impl Styles + ?Sized),
     style: u64,

@@ -5,10 +5,6 @@ use thiserror::Error;
 
 /// Selects one section by its exact semantic name or zero-based source
 /// position without retaining a native object identifier.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "The public name identifies the selected Pages object."
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum SectionSelector<'a> {
@@ -99,10 +95,6 @@ impl From<Position> for SectionSelector<'_> {
 }
 
 /// Errors raised while resolving a section selector.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "The public name distinguishes selector failures from document construction errors."
-)]
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum SelectorError {
@@ -122,10 +114,6 @@ pub enum SelectorError {
 }
 
 /// Result type for checked semantic section lookup.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "The alias is re-exported at crate scope beside SelectorError."
-)]
 pub type SelectorResult<T> = Result<T, SelectorError>;
 
 /// Selects one table attached to the main Pages body by its exact visible
@@ -134,10 +122,6 @@ pub type SelectorResult<T> = Result<T, SelectorError>;
 /// Native attachment, drawable, and table-model identities are deliberately
 /// not representable by this selector. The package adapter proves those
 /// private ownership edges only after resolving this semantic value.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "The public selector name identifies the Pages body-table domain."
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BodyTableSelector<'a> {
     /// Select by the exact table name stored in the Pages table model.
@@ -222,10 +206,6 @@ impl From<Position> for BodyTableSelector<'_> {
 /// The order is the order of ordinary `TSD.ImageArchive` attachments in the
 /// rooted body storage. Native object identifiers, archive members, and
 /// generated protobuf values are deliberately not representable here.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "The selector name identifies the Pages body-image domain."
-)]
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ImageSelector {
@@ -239,10 +219,6 @@ pub enum ImageSelector {
 /// Native attachment, drawable, and archive identities are deliberately not
 /// representable here. The package owner proves those private graph edges
 /// after resolving this semantic selector.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "The selector name identifies the Pages body-chart domain."
-)]
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BodyChartSelector {
@@ -328,10 +304,6 @@ impl ImageSelector {
 /// shapes that are not text boxes; text boxes are its shapes flagged as text
 /// boxes that own their storage. Native identifiers are not representable
 /// here.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "The selector name identifies the Pages body-drawable domain."
-)]
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DrawableSelector {

@@ -1,9 +1,3 @@
-#![allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    reason = "The fixtures deliberately use small, checked wire values."
-)]
-
 use litchi_iwa_core::{
     Archive, ArchiveObject, Error, FieldInfo, FieldPath, FieldType, LimitKind,
     Limits as ArchiveLimits, RawMessage,

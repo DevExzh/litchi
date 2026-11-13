@@ -4,10 +4,6 @@ use litchi_core::Position;
 
 /// Selects one sheet by its exact visible name or checked zero-based document
 /// position without allocating for the selector itself.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "The public selector names intentionally identify their selected Numbers object."
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum SheetSelector<'a> {
@@ -86,10 +82,6 @@ impl From<Position> for SheetSelector<'_> {
 /// catalog. Keeping this selector positional prevents native drawable IDs,
 /// archive names, and generated payloads from leaking through the semantic
 /// package boundary.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "The public selector name intentionally identifies the selected Numbers object."
-)]
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ChartSelector {
@@ -133,10 +125,6 @@ impl From<Position> for ChartSelector {
 
 /// Selects one table by its exact visible name or checked zero-based position
 /// within a sheet without allocating for the selector itself.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "The public selector names intentionally identify their selected Numbers object."
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum TableSelector<'a> {

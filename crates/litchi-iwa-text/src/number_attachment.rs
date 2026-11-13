@@ -4,11 +4,6 @@
 //! package mutation stay in the owning IWA adapter. This module owns only the
 //! checked values exchanged at that boundary.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Opaque IDs keep their raw adapter module adjacent to private representations."
-)]
-
 use std::fmt;
 use std::num::NonZeroU64;
 
@@ -63,10 +58,6 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub struct TextNumberAttachmentId(NonZeroU64);
 
 /// Explicit native-boundary conversions for the opaque attachment handle.
-#[allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Keep the explicit raw adapter boundary adjacent to its opaque handle."
-)]
 pub mod raw {
     use super::{Result, TextNumberAttachmentId};
 
@@ -321,10 +312,6 @@ impl TextNumberAttachmentSettings {
 }
 
 /// One native number attachment at a U+FFFC text position.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "TextNumberAttachment is the established semantic name at the adapter boundary."
-)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TextNumberAttachment {
     /// Native attachment object identifier.

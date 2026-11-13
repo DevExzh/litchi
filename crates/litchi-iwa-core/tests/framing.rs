@@ -1,13 +1,3 @@
-#![allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    reason = "Test fixtures intentionally generate byte patterns from bounded counters."
-)]
-#![allow(
-    clippy::shadow_unrelated,
-    reason = "Short-lived error assertions keep each malformed-input case independent."
-)]
-
 use litchi_iwa_core::{
     Archive, ArchiveObject, Error, FieldInfo, FieldPath, FieldType, HeaderKind, HeaderOperation,
     KnownFieldRule, LimitKind, Limits as ArchiveLimits, RawMessage, SnappyLimits, SnappyStream,

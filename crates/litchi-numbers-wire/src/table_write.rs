@@ -608,10 +608,6 @@ pub fn tile_set_cell_in_field_order(
     tile_set_cell_placed(tile, local_row, column, columns, cell, true, limits)
 }
 
-#[allow(
-    clippy::too_many_lines,
-    reason = "one row rewrite: decode, splice, new row and row count"
-)]
 fn tile_set_cell_placed(
     tile: &[u8],
     local_row: u32,

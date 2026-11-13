@@ -9,11 +9,6 @@
 //! package members remain source authoritative. The leaf keeps its public
 //! transaction types and publication policy.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The focused transaction keeps its proof and rewrite helpers together."
-)]
-
 use std::fmt;
 use std::num::NonZeroU64;
 use std::sync::Arc;
@@ -82,10 +77,6 @@ pub struct Target {
 ///
 /// The Pages owner implements it over its table-lock budget, so the
 /// resolution, proof and rewrite share one ledger.
-#[allow(
-    missing_docs,
-    reason = "each method charges or reports the resource it names"
-)]
 pub trait Budget {
     fn wire_limits(&self) -> WireLimits;
     fn remaining_wire_fields(&self) -> usize;
@@ -107,10 +98,6 @@ pub trait Budget {
         references: usize,
     ) -> Result<(), Error>;
     fn parse<'a>(&mut self, source: &'a [u8], depth: usize) -> Result<WireView<'a>, Error>;
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "the leaf budget's precharge shape"
-    )]
     fn precharge_candidate_reopen(
         &mut self,
         source: &litchi_iwa_archive::SourceCatalog,

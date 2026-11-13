@@ -1,8 +1,3 @@
-#![allow(
-    clippy::print_stdout,
-    reason = "This command-line example intentionally renders the semantic package projection."
-)]
-
 use std::error::Error;
 use std::path::PathBuf;
 

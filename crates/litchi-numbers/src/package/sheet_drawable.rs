@@ -13,11 +13,6 @@
 //! `set_sheet_drawable_order`, `move_sheet_drawable` and
 //! `remove_sheet_{text_box,shape}` routes.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the focused transaction keeps its public types beside the staged rewrite"
-)]
-
 use std::collections::{BTreeSet, HashMap};
 use std::fmt;
 
@@ -753,10 +748,6 @@ fn publish_order(
 
 /// Removals, additions and moves in one structural working set; returns
 /// the candidate and the sheet's final list.
-#[allow(
-    clippy::too_many_lines,
-    reason = "one staged publication: removals, creations, the sheet list, the registry"
-)]
 fn publish_structural(
     source: &Package,
     base: &SheetDrawables,

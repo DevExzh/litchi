@@ -4,11 +4,6 @@
 //! garbage collection. It admits only the supported flat native ownership
 //! topology and fails closed on a surviving inbound owner.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports its committed semantic change"
-)]
-
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
 use std::io;

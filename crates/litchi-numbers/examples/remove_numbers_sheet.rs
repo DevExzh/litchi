@@ -4,11 +4,6 @@
 //! non-table drawables. This example validates the final-sheet restriction,
 //! retains leaf errors, and verifies persisted names and exact inverse bytes.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports its committed semantic change"
-)]
-
 use std::env;
 use std::error::Error;
 use std::io;

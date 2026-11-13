@@ -10,13 +10,6 @@
 //! fresh-stand-in removal share the movie-caption owner's bounded physical
 //! lifecycle seam.
 
-#![allow(
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    clippy::wildcard_enum_match_arm,
-    reason = "The semantic boundary deliberately redacts lower-layer failures."
-)]
-
 use std::fmt;
 use std::sync::Arc;
 

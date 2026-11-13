@@ -6,15 +6,6 @@
 //! locality checks stay private to the package adapter. A caller supplies its
 //! own aggregate budget; no public API exposes IDs or wire objects.
 
-#![allow(
-    clippy::cast_sign_loss,
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    clippy::shadow_reuse,
-    clippy::wildcard_enum_match_arm,
-    reason = "The graph adapter redacts lower-layer failures and keeps native graph details private."
-)]
-
 use std::collections::HashSet;
 
 use litchi_core::Position;

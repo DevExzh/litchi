@@ -5,16 +5,6 @@
 //! effective value: a variation with an empty `FillArchive` is an explicit
 //! no-fill override, while a variation without a fill inherits its parent.
 
-#![allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    clippy::shadow_reuse,
-    clippy::wildcard_enum_match_arm,
-    reason = "The package adapter redacts lower-layer failures at its semantic boundary."
-)]
-
 use std::collections::HashSet;
 use std::fmt;
 use std::sync::Arc;

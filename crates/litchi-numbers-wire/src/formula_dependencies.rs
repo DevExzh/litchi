@@ -2287,7 +2287,6 @@ fn final_table_formula_count(
     )
 }
 
-#[allow(clippy::too_many_arguments)]
 fn rewrite_owner(
     graph: CompleteGraph<'_, '_>,
     owner: &SourceOwner<'_, '_>,

@@ -21,11 +21,6 @@
 //! - **redefine** folds the storage's overrides into its named style before
 //!   applying it.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the focused transaction keeps its public types beside the staged rewrite"
-)]
-
 use std::collections::BTreeMap;
 use std::fmt;
 

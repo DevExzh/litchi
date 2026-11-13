@@ -13,11 +13,6 @@
 //! is reopened through the ordinary strict ingress, and every member the
 //! edit did not rewrite is proven unchanged.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the working set keeps its helpers beside the phase that uses them"
-)]
-
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
 

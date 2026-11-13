@@ -8,13 +8,6 @@
 //! one of its bounded child adapters.  Every changed package is built from
 //! the exact source ZIP and reopened before the commit is returned.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    clippy::too_many_lines,
-    clippy::too_many_arguments,
-    reason = "The lifecycle transaction keeps source admission, graph closure, and publication together."
-)]
-
 use std::{fmt, mem::size_of, sync::Arc};
 
 use litchi_core::Position;

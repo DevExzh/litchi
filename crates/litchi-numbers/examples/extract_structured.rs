@@ -4,11 +4,6 @@
 //! cargo run -p litchi-numbers --example extract_structured -- workbook.numbers
 //! ```
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example intentionally renders table content"
-)]
-
 use std::{error::Error, path::PathBuf};
 
 use litchi_numbers::Package;

@@ -4,11 +4,6 @@
 //! and reopened semantic result, and verifies that the inverse patch restores
 //! the exact source artifact.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports its committed semantic change"
-)]
-
 use std::env;
 use std::error::Error;
 use std::io;

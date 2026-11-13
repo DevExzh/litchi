@@ -11,11 +11,6 @@
 //! that holds charts, images, shapes or other non-table drawables is
 //! refused.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the focused transaction keeps its public types beside the staged rewrite"
-)]
-
 use std::fmt;
 
 use litchi_iwa_common::wire::patch_length_delimited_field;
@@ -513,10 +508,6 @@ fn add_sheet(source: &Package, name: &str) -> Result<(structure::Published, Vec<
     Ok((published, sheets))
 }
 
-#[allow(
-    clippy::too_many_lines,
-    reason = "one sheet copy: the record, its lists, its tables and the registry"
-)]
 fn duplicate_sheet(
     source: &Package,
     position: usize,

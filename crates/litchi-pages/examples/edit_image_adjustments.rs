@@ -3,11 +3,6 @@
 //! The image is selected by its checked zero-based body order. Native object
 //! identifiers and archive objects never enter this command-line interface.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports its committed semantic change"
-)]
-
 use std::error::Error;
 use std::ffi::OsString;
 use std::io;

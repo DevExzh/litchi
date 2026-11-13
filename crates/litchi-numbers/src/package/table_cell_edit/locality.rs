@@ -755,10 +755,6 @@ fn canonical_single_message_object(object: &ArchiveObject) -> bool {
         && info.diff_read_version.is_empty()
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "two independent directional cursors are intentionally explicit"
-)]
 fn verify_persistent_object(
     source: &ArchiveObject,
     candidate: &ArchiveObject,

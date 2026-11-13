@@ -5,11 +5,6 @@
 //! remain the responsibility of the focused Pages, Numbers, and Keynote
 //! adapters.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "This command-line example intentionally reports its component count."
-)]
-
 mod support;
 
 use std::env;
@@ -46,10 +41,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut archive_count = 0usize;
     for entry in catalog {
         let (name, mut data) = entry.into_parts();
-        #[allow(
-            clippy::case_sensitive_file_extension_comparisons,
-            reason = "IWA member names are case-sensitive protocol names."
-        )]
         let is_iwa = name.ends_with(".iwa");
         if is_iwa {
             let decompressed = SnappyStream::decompress(&data, Default::default())?;

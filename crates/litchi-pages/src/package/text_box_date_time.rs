@@ -11,11 +11,6 @@
 //! rewrites the entry and the object in place; removing drops both and
 //! forgets the object's registrations, as the host text editor does.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the focused transaction keeps its public types beside the staged rewrite"
-)]
-
 use std::fmt;
 
 use litchi_iwa_common::WireLimits;

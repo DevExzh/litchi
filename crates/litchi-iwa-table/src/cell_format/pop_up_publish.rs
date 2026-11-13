@@ -46,10 +46,6 @@ pub struct Publication<P> {
 /// The engine's typed refusals, limits, allocation and verification
 /// failures; [`Error::PatchConflict`] when the cell no longer holds
 /// `before`.
-#[allow(
-    clippy::too_many_lines,
-    reason = "one staged publication: native graph, metadata, reassembly, reopen, locality, readback"
-)]
 pub fn publish<P: TableSource>(
     source: &P,
     target: Target,

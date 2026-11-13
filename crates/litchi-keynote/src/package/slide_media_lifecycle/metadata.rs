@@ -17,11 +17,6 @@
 //! to [`rewrite_metadata`]; the adapter invokes it before every transient
 //! rewrite allocation.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The lifecycle adapter keeps its borrowed facts and transition helpers together."
-)]
-
 use core::mem::size_of;
 
 use litchi_iwa_protos::{

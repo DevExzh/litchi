@@ -5,11 +5,6 @@
 //! is byte-for-byte identical to the input. Unknown IWA payloads, unsupported
 //! ZIP members, and legacy package envelopes remain untouched.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "This command-line example intentionally reports its verification result."
-)]
-
 mod support;
 
 use std::env;

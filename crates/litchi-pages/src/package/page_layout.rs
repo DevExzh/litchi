@@ -1471,10 +1471,6 @@ fn map_package_error(error: PackageError) -> Error {
     }
 }
 
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "Result::map_err supplies the owned codec error directly."
-)]
 fn map_layout_codec_error(error: pages_page_layout_codec::DecodeError) -> Error {
     if let Some((observed, maximum)) = error.field_limit_values() {
         return Error::Limit {
@@ -1534,10 +1530,6 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     }
 }
 
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "Result::map_err supplies the owned component error directly."
-)]
 fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
@@ -1575,10 +1567,6 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     }
 }
 
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "Result::map_err supplies the owned wire error directly."
-)]
 fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
     match error {
         litchi_iwa_common::Error::LimitExceeded {

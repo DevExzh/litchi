@@ -9,14 +9,6 @@
 //! may legitimately point to the imported document stylesheet; that style is
 //! validated and retained but never rewritten by this owner.
 
-#![allow(
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    clippy::shadow_reuse,
-    clippy::wildcard_enum_match_arm,
-    reason = "The transaction redacts native graph failures at the semantic boundary."
-)]
-
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::mem::size_of;

@@ -114,7 +114,6 @@ pub struct StoredPattern<'a> {
 /// [`Error::Unsupported`] for smart, frame and patterned strokes and
 /// non-standard dashes, [`Error::Missing`]/[`Error::Unknown`] for invalid
 /// fields, or an invalid width or miter limit.
-#[allow(clippy::too_many_arguments, reason = "one argument per stored field")]
 pub fn stroke(
     color: Option<Result<Rgba>>,
     width: Option<f32>,
@@ -246,7 +245,6 @@ pub fn gradient(
 /// [`Error::Unsupported`] for legacy or database-backed images,
 /// [`Error::Missing`]/[`Error::Unknown`] for invalid fields, or an invalid
 /// size.
-#[allow(clippy::too_many_arguments, reason = "one argument per stored field")]
 pub fn image(
     data: Option<u64>,
     technique: Option<i32>,

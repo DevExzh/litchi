@@ -47,10 +47,6 @@ impl Writer {
 
     fn raw_varint(&mut self, mut value: u64) {
         loop {
-            #[allow(
-                clippy::cast_possible_truncation,
-                reason = "the value is masked to seven bits"
-            )]
             let byte = (value & 0x7f) as u8;
             value >>= 7;
             if value == 0 {

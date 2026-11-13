@@ -5,11 +5,6 @@
 //! exact inverse before publishing through a sibling temporary file, so an
 //! existing destination is never replaced.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports its committed semantic change"
-)]
-
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
 use std::io;

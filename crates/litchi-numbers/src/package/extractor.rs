@@ -5464,10 +5464,6 @@ fn render_formula_with_node_charge(
     renderer.render(root, budget)
 }
 
-#[allow(
-    clippy::too_many_lines,
-    reason = "the exhaustive AST match preserves native node semantics"
-)]
 #[cfg(test)]
 fn render_formula_ast_array(
     ast: &tsce::AstNodeArrayArchive,

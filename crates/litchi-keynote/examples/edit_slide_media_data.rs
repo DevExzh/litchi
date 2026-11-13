@@ -10,11 +10,6 @@
 //!                        <content|poster> <replacement-file> [--inverse PATH]
 //! ```
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports semantic edit diagnostics"
-)]
-
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
 use std::fs;

@@ -6,13 +6,6 @@
 //! attachment/drawable/body/z-order ownership, and only then hands the
 //! selected drawable payload to the bounded lazy Buffa codec.
 
-#![allow(
-    clippy::cast_sign_loss,
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    reason = "The Pages package boundary redacts native graph failures."
-)]
-
 use std::fmt;
 use std::mem::size_of;
 use std::num::NonZeroU64;

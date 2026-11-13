@@ -12,11 +12,6 @@
 //! once. The leaf reopens the candidate through its ordinary strict ingress
 //! ([`TableLeaf::reopen_candidate`]) before any family accepts it.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the working set keeps its helpers beside the phase that uses them"
-)]
-
 pub mod budget;
 pub mod collect;
 pub mod create;

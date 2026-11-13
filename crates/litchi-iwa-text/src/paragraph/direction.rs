@@ -4,10 +4,6 @@
 ///
 /// `Natural` lets iWork infer the direction from the paragraph contents. The
 /// explicit variants are useful for neutral or mixed-direction content.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "WritingDirection distinguishes the paragraph direction value from its module."
-)]
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum WritingDirection {

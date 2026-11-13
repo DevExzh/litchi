@@ -351,7 +351,6 @@ impl Variation {
 ///
 /// [`Error::InvalidSource`] unless the payload is exactly the canonical
 /// variation the host writes; resource errors as configured.
-#[allow(clippy::too_many_lines, reason = "one check per native field")]
 pub fn model(style: &[u8], limits: WireLimits) -> Result<Variation> {
     let mut budget = Budget::new(limits);
     let mut base = native::StyleBase::default();

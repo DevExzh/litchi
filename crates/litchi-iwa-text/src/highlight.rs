@@ -4,15 +4,6 @@
 //! in the owning IWA adapter. This leaf owns only the compact checked identity
 //! and UTF-16 range exchanged by the format crates.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Opaque IDs keep their raw adapter module adjacent to private representations."
-)]
-#![allow(
-    clippy::module_name_repetitions,
-    reason = "TextHighlight names identify the semantic value in this focused module."
-)]
-
 use std::num::NonZeroU64;
 
 use crate::position::TextRange;

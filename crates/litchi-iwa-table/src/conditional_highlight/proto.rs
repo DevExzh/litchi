@@ -9,12 +9,6 @@
 //! route checks marks it `other`, so a native graph carrying overrides the
 //! routes do not model is refused rather than misread.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    clippy::struct_field_names,
-    reason = "the mirror keeps the generated schema's names and order"
-)]
-
 use litchi_iwa_common::WireLimits;
 
 /// A malformed payload for the mirrored schema.

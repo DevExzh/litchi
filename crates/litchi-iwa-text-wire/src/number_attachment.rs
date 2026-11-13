@@ -384,10 +384,6 @@ pub fn encode(settings: &TextNumberAttachmentSettings, limits: WireLimits) -> Re
     Ok(writer.into_bytes())
 }
 
-#[allow(
-    clippy::cast_sign_loss,
-    reason = "protobuf int32 encodes the sign-extended 64-bit value"
-)]
 const fn int32_varint(value: i32) -> u64 {
     value as i64 as u64
 }

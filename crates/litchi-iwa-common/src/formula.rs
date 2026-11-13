@@ -6,11 +6,6 @@
 //! and Numbers can share one allocation-conscious model without a concrete
 //! format dependency.
 
-#![allow(
-    clippy::module_name_repetitions,
-    reason = "Formula-prefixed names keep the shared public vocabulary explicit at call sites"
-)]
-
 pub mod render;
 
 /// Failure returned when a floating-point semantic scalar is not finite.

@@ -159,7 +159,6 @@ fn duplicate_sheet_payload_ownership_is_rejected_before_projection() -> TestResu
 }
 
 #[test]
-#[allow(deprecated)]
 fn length_delimited_wire_fields_are_not_accidentally_treated_as_scalars() -> TestResult {
     let mut root = numbers_root([]).encode_to_vec();
     // Field 99 is unknown, but its payload is deliberately framed as a

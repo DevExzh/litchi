@@ -519,7 +519,6 @@ fn cell_input(value: &Value) -> CellInput<'_> {
     }
 }
 
-#[allow(clippy::too_many_lines, reason = "one staged publication")]
 fn publish(edit: &Edit<'_>) -> Result<Package, Error> {
     let target = edit.target.as_ref().ok_or(Error::InvalidSource)?;
     let package = edit.source;

@@ -7,11 +7,6 @@
 //! table-info/model fields; all unrelated wire bytes and all unrelated
 //! package members remain source authoritative.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The focused transaction keeps its proof and rewrite helpers together."
-)]
-
 use std::fmt;
 use std::sync::Arc;
 

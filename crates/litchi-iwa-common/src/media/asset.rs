@@ -308,7 +308,6 @@ impl Stats {
 #[must_use]
 pub fn format_bytes(bytes: u64) -> String {
     const UNITS: &[&str] = &["B", "KB", "MB", "GB", "TB"];
-    #[allow(clippy::cast_precision_loss, reason = "a display approximation")]
     let mut size = bytes as f64;
     let mut unit = 0;
     while size >= 1024.0 && unit < UNITS.len() - 1 {

@@ -13,11 +13,6 @@
 //! required component is reported by its discovered source name rather than
 //! by an assumed `Index/AnnotationAuthorStorage.iwa` path.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The adapter keeps source discovery, identity planning, and strict witnesses together."
-)]
-
 use std::collections::HashSet;
 use std::mem::size_of;
 

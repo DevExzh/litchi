@@ -75,10 +75,6 @@ pub(super) mod testing {
     }
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "the transaction boundary keeps selector and diagnostics facts explicit"
-)]
 pub(super) fn commit_sparse_scalar_tiles(
     source: &Package,
     path: Path,

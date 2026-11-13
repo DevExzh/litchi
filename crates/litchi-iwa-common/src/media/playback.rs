@@ -265,10 +265,6 @@ impl MediaPlaybackSettings {
     }
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "the native movie schema is explicitly f32 seconds"
-)]
 fn canonical_duration(value: Duration, field: TimeField) -> Result<Duration> {
     let seconds = value.as_secs_f64();
     if !seconds.is_finite() || seconds > f64::from(f32::MAX) {

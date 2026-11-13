@@ -5,11 +5,6 @@
 //! the stored cell value or convert a numeric cell to text.  The output is
 //! written through a sibling temporary file and is never replaced in place.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports its committed semantic change"
-)]
-
 use std::error::Error;
 use std::ffi::OsString;
 use std::io;

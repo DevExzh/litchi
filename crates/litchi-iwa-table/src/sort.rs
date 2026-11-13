@@ -22,12 +22,6 @@
 //! ([`Target`]), reads the persisted order, checks the scope and merges, and
 //! supplies the user-hidden rows; [`Hooks`] carries the per-leaf policies.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    clippy::too_many_lines,
-    reason = "the executor keeps its phases in plan order"
-)]
-
 use std::collections::{HashMap, HashSet};
 
 use litchi_iwa_common::table::sort::planning::{RowPermutation, stable_body_row_permutation};

@@ -5,11 +5,6 @@
 //! reopened from the requested output and the inverse patch is checked
 //! against the exact input bytes.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports its committed semantic change"
-)]
-
 use std::env;
 use std::error::Error;
 use std::io;

@@ -6,15 +6,6 @@
 //! stay untouched.  The package adapter owns the physical media closure,
 //! `PackageMetadata` digest/length rewrite, and ZIP reassembly.
 
-#![allow(
-    clippy::cast_possible_truncation,
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    clippy::too_many_lines,
-    clippy::wildcard_enum_match_arm,
-    reason = "The adapter keeps strict physical admission, rewrite, and readback adjacent."
-)]
-
 use std::fmt;
 use std::mem::size_of;
 use std::sync::Arc;

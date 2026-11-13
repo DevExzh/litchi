@@ -138,10 +138,6 @@ fn append(
 }
 
 /// Build the chart at UTF-16 body position `anchor`.
-#[allow(
-    clippy::too_many_lines,
-    reason = "one staged creation: graph, attachment, registrations, registry"
-)]
 pub(super) fn add(
     source: &Package,
     anchor: TextPosition,
@@ -611,10 +607,6 @@ fn zorder_count(source: &Package, zorder: NonZeroU64, drawable: u64) -> Result<u
     )
 }
 
-#[allow(
-    clippy::too_many_lines,
-    reason = "one graph proof in the host's discovery order"
-)]
 fn resolve_chart(
     source: &Package,
     selector: BodyChartSelector,
@@ -951,10 +943,6 @@ fn chart_position(candidate: &Package, drawable: u64) -> Result<Option<usize>, E
 
 /// Copy the selected chart under fresh identifiers anchored at UTF-16 body
 /// position `anchor`, offset 12 pt.
-#[allow(
-    clippy::too_many_lines,
-    reason = "one staged copy in the host's order: graph, styles, anchor, preset, registry"
-)]
 pub(super) fn duplicate(
     source: &Package,
     selector: BodyChartSelector,
@@ -1210,10 +1198,6 @@ pub(super) fn duplicate(
 
 /// Remove the selected chart, its attachment and U+FFFC, its private
 /// styles and preset; a direct comment is cleared first.
-#[allow(
-    clippy::too_many_lines,
-    reason = "one staged removal in the host's order: text, z-order, styles, preset, registry"
-)]
 pub(super) fn remove(
     source: &Package,
     selector: BodyChartSelector,

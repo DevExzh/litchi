@@ -5,11 +5,6 @@
 //! traversal and wire updates; this leaf owns the validated values exchanged
 //! by Pages, Numbers, and Keynote.
 
-#![allow(
-    clippy::module_name_repetitions,
-    reason = "DrawableComment and TableCellComment are canonical semantic record names"
-)]
-
 use std::fmt;
 use std::num::{NonZeroU32, NonZeroU64};
 

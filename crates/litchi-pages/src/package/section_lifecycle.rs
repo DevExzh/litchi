@@ -23,11 +23,6 @@
 //! other member keeps its exact bytes, and the patch's inverse restores the
 //! source byte for byte.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the focused transaction keeps its public types beside the staged rewrite"
-)]
-
 use std::collections::{BTreeSet, HashMap};
 use std::fmt;
 
@@ -376,10 +371,6 @@ impl Edit<'_> {
     /// [`Refusal::SectionNotFound`] when the selector resolves no section,
     /// [`Refusal::InvalidName`] for a name containing NUL,
     /// [`Refusal::OperationAlreadyStaged`] after one operation.
-    #[allow(
-        clippy::should_implement_trait,
-        reason = "`add` is the glossary verb for staging a new element, not arithmetic"
-    )]
     pub fn add<'selector>(
         mut self,
         after: impl Into<SectionSelector<'selector>>,
@@ -625,10 +616,6 @@ fn body_storage(working: &Working<'_>, identifier: u64) -> Result<(String, usize
     Ok((component, index))
 }
 
-#[allow(
-    clippy::too_many_lines,
-    reason = "one staged publication: the graph copy, the break, the table, the registry"
-)]
 fn add_section(
     source: &Package,
     after: usize,

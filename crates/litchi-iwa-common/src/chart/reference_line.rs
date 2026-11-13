@@ -366,10 +366,6 @@ impl Line {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    reason = "Common semantic tests use expect for fixed valid fixtures"
-)]
 mod tests {
     use std::mem::size_of;
 

@@ -1735,10 +1735,6 @@ pub fn read_any_display_format(
     ))
 }
 
-#[allow(
-    clippy::too_many_lines,
-    reason = "one validation pass over the cell, its tile and its format list"
-)]
 fn read_display_format_resolved(
     requested: Option<DisplayFormatFamily>,
     source: &dyn TableSource,

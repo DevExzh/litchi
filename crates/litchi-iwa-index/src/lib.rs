@@ -1,8 +1,4 @@
 #![forbid(unsafe_code)]
-#![allow(
-    clippy::module_name_repetitions,
-    reason = "Focused modules retain explicit public names when re-exported at the crate root."
-)]
 
 //! Archive-free object-location indexing for iWork format adapters.
 //!

@@ -260,10 +260,6 @@ pub(super) fn direct_index(legend_payload: &[u8]) -> SymbolResult<Option<usize>>
     let Some(raw) = varint(extension, LEGEND_PARAGRAPH_INDEX_FIELD)? else {
         return Ok(None);
     };
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "prost decodes an int32 from the low 32 bits of its varint"
-    )]
     let index = raw as u32 as i32;
     usize::try_from(index)
         .map(Some)

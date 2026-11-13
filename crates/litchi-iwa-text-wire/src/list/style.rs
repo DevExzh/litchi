@@ -99,7 +99,6 @@ fn varints(field: Field<'_>, output: &mut Vec<i32>) -> NativeResult<()> {
                 litchi_iwa_common::varint::decode_varint_from_bytes(&packed[offset..])
                     .map_err(|_| NativeError::Invalid("malformed packed protobuf varints"))?;
             native::reserve(output, 1)?;
-            #[allow(clippy::cast_possible_truncation, reason = "protobuf int32 decoding")]
             output.push(value as i32);
             offset += length;
         }
@@ -228,7 +227,6 @@ fn optional_uint32(writer: &mut Writer, number: u32, value: Option<u32>) -> Nati
 }
 
 fn level_indents(step: f32) -> Vec<f32> {
-    #[allow(clippy::cast_precision_loss, reason = "nine small level indexes")]
     (0..LEVELS).map(|level| level as f32 * step).collect()
 }
 

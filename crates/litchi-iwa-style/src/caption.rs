@@ -253,7 +253,6 @@ fn versioned(
 /// # Errors
 ///
 /// The codec's refusals and limits, or an object that cannot be built.
-#[allow(clippy::too_many_arguments)]
 pub fn graph_objects(
     ids: GraphIds,
     drawable: u64,

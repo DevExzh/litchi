@@ -5,14 +5,6 @@
 //! selector, package publication, and semantic transaction boundary; native
 //! chart identifiers and paragraph-style objects never cross that boundary.
 
-#![allow(
-    clippy::cast_sign_loss,
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    clippy::wildcard_enum_match_arm,
-    reason = "The package boundary redacts native graph failures."
-)]
-
 use std::collections::HashSet;
 use std::fmt;
 use std::mem::size_of;

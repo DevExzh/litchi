@@ -5,11 +5,6 @@
 //! returns.  All observations are borrowed from the immutable source and both
 //! metadata codecs publish candidates only after their own strict verification.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The planner keeps its source admission, identity, and media phases adjacent."
-)]
-
 use std::collections::HashSet;
 use std::fmt::Write as _;
 use std::mem::size_of;

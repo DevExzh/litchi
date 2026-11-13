@@ -81,10 +81,6 @@ impl AsRef<str> for TextLanguageTag {
 }
 
 /// The language effective from one text boundary onward.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "TextLanguage names the semantic value represented by this language module."
-)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub enum TextLanguage {
     /// Use iWork's automatic or document-level language selection.

@@ -14,16 +14,6 @@
 //! admission (`slide_table_core`), its strict key scan, and its
 //! post-publication verification of keys, UID maps, headers and locality.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    clippy::cast_possible_truncation,
-    clippy::match_same_arms,
-    clippy::needless_pass_by_value,
-    clippy::too_many_arguments,
-    clippy::type_complexity,
-    reason = "The physical boundary keeps the complete admission and verification pipeline local."
-)]
-
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::mem::size_of;

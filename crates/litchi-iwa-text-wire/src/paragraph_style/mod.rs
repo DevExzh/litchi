@@ -296,10 +296,6 @@ impl Target {
 /// (`TSP.FieldInfo` with an "ignore and preserve" unknown-field rule): the
 /// IWA archive records which nested messages the applications may extend.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "each flag is one independent field path"
-)]
 pub struct ManagedFields {
     text_fill: bool,
     text_stroke: bool,
@@ -948,7 +944,6 @@ fn differs<T: PartialEq + Clone>(value: &T, inherited: &T) -> Option<T> {
     (value != inherited).then(|| value.clone())
 }
 
-#[allow(clippy::too_many_lines, reason = "one arm per property")]
 fn apply(
     overrides: &mut Overrides,
     property: &Property,

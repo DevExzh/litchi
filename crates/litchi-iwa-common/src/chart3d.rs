@@ -363,11 +363,6 @@ impl SeriesGap {
         {
             return Err(Error::OutOfRange);
         }
-        #[allow(
-            clippy::cast_possible_truncation,
-            clippy::cast_sign_loss,
-            reason = "rounded is a whole number in 0.0..=200.0"
-        )]
         Ok(Self(rounded as u16))
     }
 

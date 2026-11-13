@@ -7,13 +7,6 @@
 //! model fields, archive metadata, previews, and package members remain
 //! source-authoritative.
 
-#![allow(
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    clippy::wildcard_enum_match_arm,
-    reason = "the focused package boundary redacts lower-layer failure details"
-)]
-
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::mem::size_of;

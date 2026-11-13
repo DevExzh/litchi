@@ -5,11 +5,6 @@
 //! two native playback objects and rewrites the slide-node scalar cache. All
 //! payload bytes come from the neutral Buffa writer in `litchi-iwa-protos`.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The focused build adapter keeps input mapping and bounded error mapping adjacent."
-)]
-
 use std::mem::size_of;
 
 use litchi_iwa_common::WireLimits;

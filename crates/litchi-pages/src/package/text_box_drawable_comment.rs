@@ -17,11 +17,6 @@
 //! - new comment storages are authored by the generated annotation author,
 //!   which is created on first use and removed with its last comment.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the focused transaction keeps its public types beside the staged rewrite"
-)]
-
 use std::collections::BTreeSet;
 use std::fmt;
 
@@ -731,10 +726,6 @@ impl Graph<'_, '_> {
     }
 }
 
-#[allow(
-    clippy::too_many_lines,
-    reason = "one arm per host drawable comment route"
-)]
 fn apply_one(
     source: &Package,
     selector: DrawableSelector,

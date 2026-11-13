@@ -4,11 +4,6 @@
 //! archive model. It does not pull the Pages, Numbers, Keynote, or legacy
 //! umbrella facades into low-level package comparison.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "This command-line diagnostic intentionally reports package differences."
-)]
-
 mod support;
 
 use std::collections::BTreeSet;

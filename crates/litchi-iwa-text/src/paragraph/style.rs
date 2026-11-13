@@ -4,15 +4,6 @@
 //! mutation remain in the concrete IWA adapter. This module owns only the
 //! checked semantic values that cross that boundary.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Opaque IDs keep their raw adapter module adjacent to private representations."
-)]
-#![allow(
-    clippy::module_name_repetitions,
-    reason = "The explicit names distinguish paragraph-style identities at format boundaries."
-)]
-
 use std::{fmt, num::NonZeroU64};
 
 /// Maximum UTF-8 byte length retained by a paragraph-style name.
@@ -141,10 +132,6 @@ impl TryFrom<String> for ParagraphStyleName {
 pub struct ParagraphStyleId(NonZeroU64);
 
 /// Explicit native-boundary conversions for the opaque paragraph-style handle.
-#[allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Keep the explicit raw adapter boundary adjacent to its opaque handle."
-)]
 pub mod raw {
     use super::{ParagraphStyleId, Result};
 

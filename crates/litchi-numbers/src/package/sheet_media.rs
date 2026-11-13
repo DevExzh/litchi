@@ -11,11 +11,6 @@
 //! rewritten and its `DataInfo` digest and materialized length are patched in
 //! place, as the host's media editor does.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the focused transaction keeps its public types beside the staged rewrite"
-)]
-
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
 use std::sync::Arc;

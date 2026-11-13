@@ -2698,7 +2698,6 @@ struct CreationIds {
     attachment: u64,
 }
 
-#[allow(clippy::too_many_arguments)]
 fn drawable_payload(
     ids: &CreationIds,
     body: u64,
@@ -2815,7 +2814,6 @@ fn check_type(
     Ok(())
 }
 
-#[allow(clippy::too_many_lines)]
 fn add(
     source: &Package,
     anchor: TextPosition,
@@ -3224,10 +3222,6 @@ fn text_storage_payload(text: &str, context: &BodyTextContext) -> (Vec<u8>, Vec<
 /// identifiers after an optional new z-order; the U+FFFC and attachment
 /// entry; the z-order entry; UUIDs, the style's external reference and the
 /// identifier watermark.
-#[allow(
-    clippy::too_many_lines,
-    reason = "one creation: graph, anchor, metadata"
-)]
 fn add_text_shape(
     source: &Package,
     anchor: TextPosition,

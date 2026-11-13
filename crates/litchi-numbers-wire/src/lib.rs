@@ -3262,11 +3262,6 @@ pub fn decimal128_le(value: f64) -> Result<[u8; 16]> {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::expect_used,
-        clippy::unwrap_used,
-        reason = "the codec fixtures use fixed, locally constructed values whose failure should abort the test"
-    )]
 
     use super::*;
 

@@ -21,11 +21,6 @@
 //! (`litchi_iwa_style::data_owner::release`), and data nothing references
 //! any more loses its `DataInfo` and `Data/` member.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the focused transaction keeps its public types beside the staged rewrite"
-)]
-
 use std::fmt;
 use std::mem::{size_of, size_of_val};
 use std::sync::Arc;

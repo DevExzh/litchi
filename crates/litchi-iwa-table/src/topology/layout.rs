@@ -55,10 +55,6 @@ fn replace<P: TableLeaf>(
 ///
 /// [`Refusal::InvalidSize`], [`Refusal::StoredCells`],
 /// [`Refusal::UnsupportedLayout`], source and resource errors.
-#[allow(
-    clippy::too_many_lines,
-    reason = "one resize: tiles, headers, UID map, strokes, owner extents and model"
-)]
 pub fn stage_resize<P: TableLeaf>(
     working: &mut Working<'_, P>,
     target: &Target,

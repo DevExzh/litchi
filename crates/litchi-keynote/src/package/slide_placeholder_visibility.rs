@@ -1,13 +1,5 @@
 //! Exact-source per-slide placeholder-visibility transactions.
 
-#![allow(
-    clippy::cast_sign_loss,
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    clippy::wildcard_enum_match_arm,
-    reason = "the focused transaction maps non-exhaustive lower-layer errors into a content-redacted boundary"
-)]
-
 mod errors;
 mod resolve;
 mod rewrite;

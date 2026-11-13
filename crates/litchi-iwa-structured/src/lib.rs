@@ -31,10 +31,6 @@ pub const DEFAULT_MAX_TEXT_BYTES: usize = litchi_numbers::MAX_TEXT_BYTES;
 ///
 /// Every dimension defaults to its hard ceiling; the builder only tightens
 /// them, rejecting zero and values above the ceiling.
-#[allow(
-    clippy::struct_field_names,
-    reason = "The public budget accessors intentionally share one max_* vocabulary"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SemanticLimits {
     max_tables: usize,

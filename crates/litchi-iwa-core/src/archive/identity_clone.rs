@@ -699,10 +699,6 @@ pub(super) fn preflight_clone_archive_info_header_length(
     Ok(output_length)
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "The dry-run keeps source and target message metadata explicit for bounded sizing."
-)]
 fn preflight_clone_message_info_length(
     source: &[u8],
     before: &MessageInfo,
@@ -1163,10 +1159,6 @@ fn effective_archive_identifier_field(
     Ok(field_index)
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "The physical clone rewrite keeps source and target metadata explicit for atomic verification."
-)]
 fn rewrite_clone_message_info(
     source: &[u8],
     before: &MessageInfo,

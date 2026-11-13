@@ -134,7 +134,6 @@ fn pre_header(version: u8, cell_type: u8, flags: u32) -> Vec<u8> {
     bytes
 }
 
-#[allow(clippy::too_many_arguments)]
 fn pre_cell(
     version: u8,
     cell_type: u8,
@@ -205,7 +204,6 @@ fn nonfinite_decimal128() -> [u8; 16] {
     bytes
 }
 
-#[allow(clippy::too_many_arguments)]
 fn bnc_cell(
     cell_type: u8,
     flags: u32,

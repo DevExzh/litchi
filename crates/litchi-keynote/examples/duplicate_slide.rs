@@ -7,11 +7,6 @@
 //! duplicate_slide <input.key> --layouts
 //! ```
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports its committed semantic change"
-)]
-
 use std::error::Error;
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};

@@ -959,10 +959,6 @@ fn commit_operations(source: &Package, operations: &[Operation]) -> Result<Commi
                 let chunk = workspace.allocate().map_err(lift)?;
                 let uuid = workspace.clone_uuid(None, chunk).map_err(lift)?;
                 let registered = workspace.clone_uuid(None, build).map_err(lift)?;
-                #[allow(
-                    clippy::cast_possible_truncation,
-                    reason = "the seed is the low 32 bits"
-                )]
                 let seed = uuid.lower as u32;
                 let limits = workspace.archive_limits();
                 for (identifier, message_type, data) in [

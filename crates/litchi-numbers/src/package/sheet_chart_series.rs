@@ -10,11 +10,6 @@
 //! changes are republished once. The host editor's `set_sheet_chart_*`
 //! all-series and one-series routes collapse into [`Edit::set`].
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the focused transaction keeps its public types beside the staged rewrite"
-)]
-
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::mem::size_of;

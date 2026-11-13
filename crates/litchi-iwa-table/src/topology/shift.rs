@@ -244,11 +244,6 @@ fn u32_of(value: u64) -> Out<u32> {
 /// Decode a protobuf `int32`/`sint32`-carrying varint as the host does.
 fn int32_of(value: u64) -> Out<i32> {
     // `int32` is sign-extended to 64 bits on the wire.
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_possible_wrap,
-        reason = "protobuf int32 wire semantics: the low 32 bits carry the value"
-    )]
     Ok(value as i64 as i32)
 }
 
@@ -713,10 +708,6 @@ fn whole_axis(tract: &[u8], row_axis: bool) -> Out<bool> {
 }
 
 /// `mutate_tract_interval`; `None` for an interval wholly removed.
-#[allow(
-    clippy::too_many_arguments,
-    reason = "the host editor's interval rule takes the whole edit context"
-)]
 fn mutate_interval(
     begin: u32,
     end: u32,
@@ -844,7 +835,6 @@ fn cfuuid_key(uuid: &[u8]) -> Out<Option<(u64, u64)>> {
         return Ok(None);
     };
     let value = u128::from_be_bytes(bytes);
-    #[allow(clippy::cast_possible_truncation, reason = "splitting a 128-bit value")]
     Ok(Some((value as u64, (value >> 64) as u64)))
 }
 
@@ -1903,10 +1893,6 @@ struct Moved {
 /// place. When they diverge, the entry is split: it keeps the formula
 /// of its unchanged cells (or the first new formula), and every other
 /// new formula takes a new entry its cells move to.
-#[allow(
-    clippy::too_many_arguments,
-    reason = "the formula list of one table, with the plan it feeds"
-)]
 fn rewrite_formulas(
     package: &dyn TableSource,
     store: &[u8],

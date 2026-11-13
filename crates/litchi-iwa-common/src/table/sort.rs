@@ -245,10 +245,6 @@ impl ColumnIndex {
 
     /// Return the native `uint32` column index.
     #[must_use]
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "ColumnIndex::new enforces the native u32 bound"
-    )]
     pub const fn native_value(self) -> u32 {
         self.0 as u32
     }

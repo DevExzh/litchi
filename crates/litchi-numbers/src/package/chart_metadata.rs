@@ -5,14 +5,6 @@
 //! labels and the optional title are copied into the archive-free common
 //! model after every source and allocation limit has been charged.
 
-#![allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    reason = "The package boundary converts bounded native arithmetic and redacts graph failures."
-)]
-
 use std::fmt;
 use std::mem::size_of;
 use std::num::NonZeroU64;

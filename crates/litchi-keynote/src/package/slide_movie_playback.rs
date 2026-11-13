@@ -8,13 +8,6 @@
 //! creation/removal, media replacement, geometry, and metadata allocation are
 //! outside this module.
 
-#![allow(
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    clippy::wildcard_enum_match_arm,
-    reason = "The semantic boundary deliberately redacts lower-layer failures."
-)]
-
 use std::collections::HashMap;
 use std::fmt;
 use std::mem::size_of;

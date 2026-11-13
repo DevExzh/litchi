@@ -7,11 +7,6 @@
 //! codecs plus small raw-wire projections; generated native messages are not
 //! used as an ingress or verification representation.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The witness keeps each bounded graph phase adjacent to its source checks."
-)]
-
 use std::mem::size_of;
 
 use litchi_iwa_common::{WireLimits, wire::WireFieldView, wire::WireView};

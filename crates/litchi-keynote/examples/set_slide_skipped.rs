@@ -1,10 +1,5 @@
 //! Set one Keynote slide's playback skip state without exposing native IDs.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example intentionally reports its committed semantic change"
-)]
-
 use std::error::Error;
 use std::fs::OpenOptions;
 use std::path::PathBuf;

@@ -4,11 +4,6 @@
 //! (`Package::new`). With a title (and optional subtitle and notes), builds an
 //! independent document with a freshly generated identity.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports what it wrote"
-)]
-
 use std::error::Error;
 use std::fs::OpenOptions;
 use std::path::PathBuf;

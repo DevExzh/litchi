@@ -20,11 +20,6 @@
 //!   --inverse <path>
 //! ```
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports semantic item diagnostics"
-)]
-
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
 use std::fs;

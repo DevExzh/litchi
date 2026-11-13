@@ -4,11 +4,6 @@
 //! UTF-16 range covered by a link. Native object lookup, protobuf fields, and
 //! wire mutation remain in the concrete IWA adapter.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Opaque IDs keep their raw adapter module adjacent to private representations."
-)]
-
 use std::num::NonZeroU64;
 
 use crate::position::TextRange;
@@ -55,19 +50,11 @@ impl std::error::Error for Error {}
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// A compact, validated semantic hyperlink identity.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "TextHyperlinkId is the established public name of this semantic value."
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct TextHyperlinkId(NonZeroU64);
 
 /// Explicit native-boundary conversions for the opaque hyperlink handle.
-#[allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Keep the explicit raw adapter boundary adjacent to its opaque handle."
-)]
 pub mod raw {
     use super::{Result, TextHyperlinkId};
 
@@ -105,10 +92,6 @@ impl TextHyperlinkId {
 /// Targets are deliberately not parsed into URL schemes. Ordinary URLs,
 /// `mailto:` values, Keynote targets such as `?slide=next`, and future native
 /// forms are stored and returned byte-for-byte as supplied.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "TextHyperlinkTarget is the established public name of this semantic value."
-)]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TextHyperlinkTarget(Box<str>);
 
@@ -184,10 +167,6 @@ impl TryFrom<&str> for TextHyperlinkTarget {
 }
 
 /// One native hyperlink attached to a nonempty UTF-16 text range.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "TextHyperlink is the established public name of this semantic value."
-)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TextHyperlink {
     /// Stable semantic identity used by the owning adapter for updates.

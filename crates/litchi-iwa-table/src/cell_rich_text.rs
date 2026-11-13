@@ -16,11 +16,6 @@
 //! ([`litchi_iwa_text_wire::paragraph_style`], [`litchi_iwa_text_wire::list`]);
 //! nothing here re-plans a style.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the engine keeps each graph helper beside the phase that uses it"
-)]
-
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::table::coordinate::At;
 use litchi_iwa_core::RawMessage;

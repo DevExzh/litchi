@@ -7,11 +7,6 @@
 //! positions; payload bytes are read from the immutable [`Package`] only by
 //! the transaction engine.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The graph keeps route admission, source-order selection, and closure validation together."
-)]
-
 use std::collections::HashSet;
 use std::mem::size_of;
 use std::sync::Arc;

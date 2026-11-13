@@ -5,15 +5,6 @@
 //! encoding a changed header, or the temporary work required by an identity
 //! remap. Format owners must admit those operations separately.
 
-#![allow(
-    clippy::missing_errors_doc,
-    reason = "The visitor and archive methods share the physical-layer Result contract."
-)]
-#![allow(
-    clippy::module_name_repetitions,
-    reason = "The public names identify the clone inventory seam explicitly."
-)]
-
 use std::{fmt, mem::size_of, result::Result};
 
 use super::{

@@ -5,11 +5,6 @@
 //! to the neutral `litchi-iwa-style::chart_text` engines, so Keynote, Numbers
 //! and Pages use the same presence-preserving codec contract.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The focused chart-text transaction keeps its bounded phases together."
-)]
-
 use std::fmt;
 use std::num::NonZeroU64;
 use std::sync::Arc;

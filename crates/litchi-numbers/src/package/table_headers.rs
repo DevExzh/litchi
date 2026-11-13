@@ -1,13 +1,5 @@
 //! Exact-source transactions for one rooted table's header and footer settings.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    clippy::wildcard_enum_match_arm,
-    reason = "the focused boundary exhaustively redacts lower-layer error families"
-)]
-
 mod api;
 pub(super) mod dependencies;
 mod error;

@@ -396,13 +396,7 @@ fn index_name(name: &str) -> Option<&str> {
 }
 
 fn is_iwa_name(name: &str) -> bool {
-    #[allow(
-        clippy::case_sensitive_file_extension_comparisons,
-        reason = "IWA member names are case-sensitive protocol names."
-    )]
-    {
-        name.ends_with(".iwa")
-    }
+    name.ends_with(".iwa")
 }
 
 fn is_component(name: &str, stem: &str) -> bool {

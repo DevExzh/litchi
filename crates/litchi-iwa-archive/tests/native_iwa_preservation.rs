@@ -50,15 +50,10 @@ fn verify_fixture(name: &str) -> Result<CorpusSummary, Box<dyn Error>> {
         decompressed_bytes: 0,
     };
 
-    for entry in catalog.iter().filter(|entry| {
-        #[allow(
-            clippy::case_sensitive_file_extension_comparisons,
-            reason = "IWA member names are case-sensitive protocol names."
-        )]
-        {
-            entry.name().ends_with(".iwa")
-        }
-    }) {
+    for entry in catalog
+        .iter()
+        .filter(|entry| entry.name().ends_with(".iwa"))
+    {
         assert!(
             !entry.is_opaque(),
             "native IWA component unexpectedly remained opaque: {}",
@@ -134,15 +129,7 @@ fn verify_native_reassembly_patch(name: &str) -> Result<(), Box<dyn Error>> {
     let catalog = Catalog::from_bytes(&source, Default::default())?;
     let selected = catalog
         .iter()
-        .find(|entry| {
-            #[allow(
-                clippy::case_sensitive_file_extension_comparisons,
-                reason = "IWA member names are case-sensitive protocol names."
-            )]
-            {
-                !entry.is_opaque() && !entry.name().ends_with(".iwa")
-            }
-        })
+        .find(|entry| !entry.is_opaque() && !entry.name().ends_with(".iwa"))
         .ok_or("native fixture has no decoded non-IWA member")?;
     let selected_name = selected.name().to_owned();
     let patch = catalog.reassemble_to_patch(

@@ -7,13 +7,6 @@
 //! native object identifiers and list keys never cross this module's public
 //! boundary.
 
-#![allow(
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    clippy::too_many_arguments,
-    reason = "The package boundary deliberately redacts native failure detail."
-)]
-
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::mem::size_of;

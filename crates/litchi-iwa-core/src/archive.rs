@@ -5,27 +5,6 @@
 //! header's `TSP.MessageInfo` entries. This module owns only that physical
 //! framing. It does not resolve message types or decode application payloads.
 
-#![allow(
-    clippy::cast_possible_truncation,
-    reason = "Varint encoding masks each narrowed byte to its seven-bit wire value."
-)]
-#![allow(
-    clippy::map_err_ignore,
-    reason = "The public physical-layer error API intentionally normalizes conversion and allocation failures."
-)]
-#![allow(
-    clippy::missing_errors_doc,
-    reason = "The module's Result-returning methods share the crate-level physical framing error contract."
-)]
-#![allow(
-    clippy::module_name_repetitions,
-    reason = "These names mirror the neutral IWA wire vocabulary and remain source-compatible with the extracted layer."
-)]
-#![allow(
-    clippy::shadow_reuse,
-    reason = "Validated limit profiles deliberately retain the public parameter name."
-)]
-
 use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 use std::io::Read;
@@ -3697,10 +3676,6 @@ impl ArchiveObject {
     /// matches, an actual reorder fails atomically because the physical layer
     /// cannot select an owner. A byte-identical request delegates to the
     /// header-preserving replacement path without selecting a nested owner.
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "the physical rewrite keeps complete source and requested reference state explicit"
-    )]
     /// Replace one payload and reorder the complete aggregate data-reference
     /// list while preserving every untouched `ArchiveInfo` byte.
     ///
@@ -5534,10 +5509,6 @@ fn rewrite_message_metadata_in_header(
     Ok(output)
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "the helper keeps both old and new required MessageInfo scalars explicit"
-)]
 fn rewrite_effective_message_scalars(
     source: &[u8],
     current_type: u32,
@@ -5634,10 +5605,6 @@ fn rewrite_effective_message_scalars(
     Ok(output)
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "the raw rewrite verifies source cardinality and both old and new required scalars"
-)]
 fn rewrite_message_metadata_and_prune_references_in_header(
     source: &[u8],
     expected_message_count: usize,
@@ -5721,10 +5688,6 @@ fn rewrite_message_metadata_and_prune_references_in_header(
     )
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "the raw rewrite verifies source cardinality, both scalars, and the authorized reference order"
-)]
 fn rewrite_message_metadata_and_reorder_object_references_in_header(
     source: &[u8],
     expected_message_count: usize,
@@ -5753,10 +5716,6 @@ fn rewrite_message_metadata_and_reorder_object_references_in_header(
     )
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "the raw rewrite keeps complete source and requested data-reference state explicit"
-)]
 fn rewrite_message_metadata_and_reorder_data_references_in_header(
     source: &[u8],
     expected_message_count: usize,
@@ -5785,10 +5744,6 @@ fn rewrite_message_metadata_and_reorder_data_references_in_header(
     )
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "the raw rewrite verifies source cardinality, both scalars, and the authorized reference order"
-)]
 fn rewrite_message_metadata_and_reorder_references_in_header(
     source: &[u8],
     expected_message_count: usize,
@@ -5873,10 +5828,6 @@ fn rewrite_message_metadata_and_reorder_references_in_header(
     )
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "the raw rewrite verifies source cardinality and both required message scalars"
-)]
 fn rewrite_message_metadata_and_transition_references_in_header(
     source: &[u8],
     expected_message_count: usize,
@@ -6118,10 +6069,6 @@ fn prepare_canonical_field_data_reference_transition<'a>(
     }
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "The raw header rewrite keeps both complete data-reference states and selected FieldInfo occurrences explicit."
-)]
 fn rewrite_message_metadata_and_transition_data_references_in_header(
     source: &[u8],
     expected_message_count: usize,
@@ -6203,10 +6150,6 @@ fn rewrite_message_metadata_and_transition_data_references_in_header(
     )
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "The raw MessageInfo rewrite keeps scalar and complete data-reference authorization explicit."
-)]
 fn rewrite_effective_message_scalars_and_data_reference_transition(
     source: &[u8],
     current_type: u32,
@@ -6867,10 +6810,6 @@ fn encode_packed_reference_field(
     Ok(output)
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "the raw rewrite verifies both required scalars and exact nested reference state"
-)]
 fn rewrite_effective_message_scalars_and_reference_transition(
     source: &[u8],
     current_type: u32,
@@ -7135,10 +7074,6 @@ fn rewrite_field_info_reference_transition(
     )
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "the raw rewrite verifies both scalars and the complete authorized reference order"
-)]
 fn rewrite_effective_message_scalars_and_reference_order(
     source: &[u8],
     current_type: u32,
@@ -7899,10 +7834,6 @@ fn validate_reordered_data_reference_multiset(
     Ok(())
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "the raw rewrite verifies both old and new required MessageInfo scalars"
-)]
 fn rewrite_effective_message_scalars_and_references(
     source: &[u8],
     current_type: u32,
@@ -8211,10 +8142,6 @@ fn assign_header_field_rewrite(
     Ok(())
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "the assembler retains source-bound fields under format-level limits and diagnostics"
-)]
 fn assemble_header_field_rewrites(
     source: &[u8],
     fields: &[WireField],
@@ -8502,10 +8429,6 @@ fn verify_pruned_archive_info(
     )
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "directional verification keeps the authorized before and requested after orders explicit"
-)]
 fn verify_reordered_archive_info(
     before: &ArchiveInfo,
     after: &ArchiveInfo,
@@ -8565,10 +8488,6 @@ fn verify_reordered_archive_info(
     Ok(())
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "directional verification keeps the authorized before and requested data-reference orders explicit"
-)]
 fn verify_reordered_data_archive_info(
     before: &ArchiveInfo,
     after: &ArchiveInfo,
@@ -8660,10 +8579,6 @@ fn verify_reordered_data_archive_info(
     Ok(())
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "directional verification keeps both authorized states and message scalars explicit"
-)]
 fn verify_transitioned_archive_info(
     before: &ArchiveInfo,
     after: &ArchiveInfo,

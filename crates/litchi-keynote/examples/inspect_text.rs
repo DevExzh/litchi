@@ -1,10 +1,5 @@
 //! Inspect reachable Keynote text without exposing native object identities.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example intentionally prints semantic inspection results"
-)]
-
 use std::env;
 use std::io;
 

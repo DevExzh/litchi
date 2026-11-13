@@ -9,11 +9,6 @@
 //! component dependency; the native writer retains the author object and its
 //! author-storage member.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The private planner keeps source validation, census, and closure facts together."
-)]
-
 use std::mem::size_of;
 
 use litchi_iwa_common::WireLimits;

@@ -6,15 +6,6 @@
 //! strict codec in `litchi_iwa_protos`.  No native identifier, archive object,
 //! or protobuf value crosses this module's public API.
 
-#![allow(
-    clippy::cast_sign_loss,
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    clippy::shadow_reuse,
-    clippy::wildcard_enum_match_arm,
-    reason = "The transaction redacts lower-layer failures and keeps native graph adapters private."
-)]
-
 use std::sync::Arc;
 use std::{fmt, mem::size_of};
 

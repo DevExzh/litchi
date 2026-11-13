@@ -8,12 +8,6 @@
 //! native document uses, while keeping authored values out of the public
 //! transaction API.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    clippy::too_many_lines,
-    reason = "The fixture and its invariant checks intentionally stay in one integration module."
-)]
-
 use std::collections::BTreeMap;
 use std::error::Error as StdError;
 use std::sync::Arc;

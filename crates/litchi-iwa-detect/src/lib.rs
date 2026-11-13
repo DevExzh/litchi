@@ -4,11 +4,6 @@
 //! ingress, nested `Index.zip` inspection, root `Document.iwa` validation, and
 //! filesystem safety checks. It does not depend on a format facade.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Detection classifiers stay beside the ingress routines they support."
-)]
-
 use litchi_iwa_archive::{
     self, ComponentCatalog, DetectionRoot, DirectoryMarkers, DirectoryMetadataSidecars,
     FrozenDirectoryBundle, LogicalEntryLimits, LogicalSourceCatalog, SemanticMetadataSidecars,
@@ -1155,10 +1150,6 @@ fn check_prepared_candidate(value: &[u8], limits: Limits) -> Result<bool> {
 /// ordinary media-heavy documents. Callers may tighten any ceiling, but the
 /// checked constructor never permits a limit above the format-wide hard
 /// ceiling. Detection remains fail-closed when a limit is exceeded.
-#[allow(
-    clippy::struct_field_names,
-    reason = "The max_* vocabulary makes each detection ceiling self-documenting."
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Limits {
     max_input_bytes: u64,
@@ -1885,10 +1876,6 @@ struct Marks {
 }
 
 impl Marks {
-    #[allow(
-        clippy::case_sensitive_file_extension_comparisons,
-        reason = "IWA member names are case-sensitive protocol names."
-    )]
     fn see_index(&mut self, name: &str) {
         if !name.ends_with(".iwa") {
             return;
@@ -1904,10 +1891,6 @@ impl Marks {
     }
 }
 
-#[allow(
-    clippy::case_sensitive_file_extension_comparisons,
-    reason = "IWA member names are case-sensitive protocol names."
-)]
 fn is_component(component_name: &str, stem: &str) -> bool {
     let Some(name_without_suffix) = component_name.strip_suffix(".iwa") else {
         return false;
@@ -2001,12 +1984,6 @@ fn kind(value: &Path) -> Result<Kind> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    clippy::shadow_unrelated,
-    clippy::unwrap_used,
-    reason = "detector tests use fixed fallible package fixtures and compare independent failures"
-)]
 mod tests {
     use super::*;
     use litchi_iwa_core::{ArchiveObject, RawMessage};

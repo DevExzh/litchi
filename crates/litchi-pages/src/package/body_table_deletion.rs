@@ -8,11 +8,6 @@
 //! transaction ledger, one physical reassembly, candidate reopening, and the
 //! exact reversible patch.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the deletion transaction keeps public evidence beside its private plan"
-)]
-
 mod archive;
 mod formula;
 mod graph;

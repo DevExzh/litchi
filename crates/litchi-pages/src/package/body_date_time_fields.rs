@@ -514,7 +514,6 @@ fn varint(view: &WireView<'_>, number: u32) -> Result<Option<u64>, Error> {
         .map_err(Error::from)
 }
 
-#[allow(clippy::cast_possible_truncation, reason = "native enums are 32-bit")]
 fn enum_value(value: Option<u64>) -> Option<i32> {
     value.map(|value| value as i64 as i32)
 }

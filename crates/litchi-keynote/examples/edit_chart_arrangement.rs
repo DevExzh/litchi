@@ -3,11 +3,6 @@
 //! Selection stays semantic (`index:N` or `name:NAME`); native object
 //! identifiers never enter this command-line interface or its diagnostics.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports its committed semantic change"
-)]
-
 use std::error::Error;
 use std::ffi::OsString;
 use std::io;

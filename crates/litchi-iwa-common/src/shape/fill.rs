@@ -6,10 +6,6 @@ use std::f32::consts::TAU;
 use crate::color::Rgba;
 use crate::shape::geometry::Size;
 
-#[allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The macro keeps three identical validated scalar declarations concise"
-)]
 macro_rules! normalized_value {
     ($name:ident, $non_finite:ident, $out_of_range:ident, $doc:literal) => {
         #[doc = $doc]

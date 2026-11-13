@@ -454,7 +454,6 @@ fn insert_target_media(
 
 /// Replace the slide's materialized layout media with the target layout's
 /// (host `slide_layout_media::materialize`).
-#[allow(clippy::too_many_arguments, reason = "one step of the host port")]
 fn materialize_media(
     workspace: &mut Workspace<'_>,
     member: &str,

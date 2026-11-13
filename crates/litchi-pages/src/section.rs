@@ -359,10 +359,6 @@ pub enum Background {
 }
 
 /// A logical Pages document section.
-#[allow(
-    clippy::struct_field_names,
-    reason = "The focused Section API names its semantic kind section_type"
-)]
 #[derive(Debug, Clone)]
 pub struct Section {
     /// Zero-based section index.
@@ -671,10 +667,6 @@ impl Builder {
 
 /// Semantic section kinds used by Pages.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "SectionType is the established public semantic name for this module."
-)]
 pub enum SectionType {
     /// Main body content.
     Body,

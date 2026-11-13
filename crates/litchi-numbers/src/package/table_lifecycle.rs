@@ -12,11 +12,6 @@
 //! refuses the removal ([`Error::UnsupportedDependency`]). Components the
 //! removal empties are deleted with their registry records.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the focused transaction keeps its public types beside the staged rewrite"
-)]
-
 use std::collections::BTreeSet;
 use std::fmt;
 use std::num::NonZeroU64;

@@ -220,7 +220,6 @@ fn staged_object<'w>(working: &'w Working<'_>, identifier: u64) -> Option<author
     })
 }
 
-#[allow(clippy::too_many_lines, reason = "one staged publication")]
 pub(super) fn publish(edit: &Edit<'_>) -> Result<Package, Error> {
     let target = edit.target.as_ref().ok_or(Error::InvalidSource)?;
     let package = edit.source;

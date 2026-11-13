@@ -15,10 +15,6 @@ pub mod creation;
 /// The selector is deliberately archive-free: it contains a typed semantic
 /// position only. Native object identifiers, component names, and protobuf
 /// values remain in the adapter that resolves the selector against a package.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "MovieSelector keeps the selected Keynote domain explicit at the public boundary"
-)]
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MovieSelector {

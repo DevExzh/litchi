@@ -393,7 +393,6 @@ pub(super) fn synthetic_package() -> TestResult<Vec<u8>> {
         stylesheet: reference(STYLESHEET),
         ..Default::default()
     };
-    #[allow(deprecated)]
     let node = kn::SlideNodeArchive {
         slide: Some(reference(SLIDE)),
         ..Default::default()

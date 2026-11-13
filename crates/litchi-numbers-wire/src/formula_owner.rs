@@ -62,10 +62,6 @@ impl Uuid {
 
     /// The four words of a native `CFUUIDArchive`.
     #[must_use]
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the CFUUID words are the four 32-bit quarters of the UUID"
-    )]
     pub const fn cfuuid_words(self) -> [u32; 4] {
         [
             self.lower as u32,
@@ -88,10 +84,6 @@ impl Uuid {
     /// `replacement` one, keeping its 128-bit wrapping offset (the native
     /// duplication rule for a table's derived owners).
     #[must_use]
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the 128-bit sum is split back into its two 64-bit words"
-    )]
     pub const fn translate_from(self, source: Self, replacement: Self) -> Self {
         let owner = ((self.upper as u128) << 64) | self.lower as u128;
         let source = ((source.upper as u128) << 64) | source.lower as u128;

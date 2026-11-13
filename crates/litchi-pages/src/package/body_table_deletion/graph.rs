@@ -6,11 +6,6 @@
 //! for the later archive/metadata phases.  Formula payload rewrites and
 //! package-component registration remain in their sibling phases.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The graph proof keeps its source-index, topology, and census helpers together."
-)]
-
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::num::NonZeroU64;

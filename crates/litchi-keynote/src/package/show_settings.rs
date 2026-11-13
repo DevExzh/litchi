@@ -1462,10 +1462,6 @@ fn rewrite_show_payload(
     Ok(output)
 }
 
-#[allow(
-    clippy::float_cmp,
-    reason = "semantic equality intentionally treats positive and negative zero as the same setting"
-)]
 fn inspect_size_payload(source: &[u8], limits: WireLimits) -> Result<usize, Error> {
     let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let field_work = view
@@ -1493,10 +1489,6 @@ fn inspect_size_payload(source: &[u8], limits: WireLimits) -> Result<usize, Erro
     Ok(rewrite_work)
 }
 
-#[allow(
-    clippy::float_cmp,
-    reason = "semantic equality intentionally treats positive and negative zero as the same setting"
-)]
 fn rewrite_size_payload(
     source: &[u8],
     before: Size,
@@ -1641,10 +1633,6 @@ fn allocate_bytes(capacity: usize) -> Result<Vec<u8>, Error> {
     Ok(output)
 }
 
-#[allow(
-    clippy::unnecessary_wraps,
-    reason = "the internal prepared-source feature adds a semantic-only failure branch"
-)]
 fn physical_source_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
@@ -1747,10 +1735,6 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     }
 }
 
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "used directly as a Result::map_err conversion"
-)]
 fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
@@ -1786,10 +1770,6 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     }
 }
 
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "used directly as a Result::map_err conversion"
-)]
 fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
     match error {
         litchi_iwa_common::Error::LimitExceeded {

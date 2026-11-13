@@ -6,11 +6,6 @@
 //! against an immutable source snapshot and publishes a new, reopened
 //! [`Package`] only after the complete media closure has been checked again.
 
-#![allow(
-    clippy::too_many_lines,
-    reason = "The transaction is kept in one source-authoritative adapter so its preflight and publication invariants stay adjacent."
-)]
-
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 

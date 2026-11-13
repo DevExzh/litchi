@@ -5,11 +5,6 @@
 //! with an Apple-authored two-sheet fixture without manufacturing a package or
 //! depending on a migration host.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports its committed semantic change"
-)]
-
 use std::error::Error;
 use std::ffi::OsString;
 use std::io;
@@ -157,10 +152,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "the example verifies both sheet cardinalities and the exact destination position"
-)]
 fn assert_relocation(
     package: &Package,
     source_sheet: usize,

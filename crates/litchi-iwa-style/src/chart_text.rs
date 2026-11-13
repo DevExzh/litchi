@@ -6,11 +6,6 @@
 //! generated codecs, preserves unknown bytes during rewrites, and reports the
 //! complete bounded payload cost to the owner.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The payload engine keeps limits, reports, and wire phases together."
-)]
-
 use std::fmt;
 
 use litchi_iwa_common::chart::axis::Axis;

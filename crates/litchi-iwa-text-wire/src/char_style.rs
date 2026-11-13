@@ -766,11 +766,6 @@ pub fn character_style_properties(style: &[u8], limits: WireLimits) -> Result<Ch
                         (1, 0) => model = Some(varint(channel.payload())?),
                         (number @ 3..=5, 5) => {
                             let value = float(channel.payload())?.clamp(0.0, 1.0);
-                            #[allow(
-                                clippy::cast_possible_truncation,
-                                clippy::cast_sign_loss,
-                                reason = "a clamped unit channel scales into 0..=255"
-                            )]
                             let byte = (value * 255.0).round() as u8;
                             channels[number as usize - 3] = Some(byte);
                         },

@@ -267,10 +267,6 @@ const STORAGE_PATHS: [&[u32]; 5] = [&[4, 1, 2], &[4, 2], &[4, 3, 1, 2], &[46], &
 /// `TST.TableDataList.ListType.FORMULA`.
 const FORMULA_LIST_TYPE: u64 = 3;
 
-#[allow(
-    clippy::too_many_lines,
-    reason = "the port keeps the host editor's single clone sequence"
-)]
 fn clone<P: TableLeaf>(
     working: &mut Working<'_, P>,
     transition: &mut Transition,
@@ -577,10 +573,6 @@ fn allocate_table_uuid(seed: u64, existing: &HashSet<String>) -> String {
     }
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "splitting a 128-bit UUID into its halves"
-)]
 fn parse_table_uuid(value: &str) -> R<Uuid> {
     let compact: String = value
         .chars()
@@ -605,10 +597,6 @@ const fn owner_uuid_for_table(table: &Uuid) -> Uuid {
     }
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "splitting a 128-bit UUID into its halves"
-)]
 const fn translate_owner_uuid(owner: &Uuid, source: &Uuid, replacement: &Uuid) -> Uuid {
     let owner = ((owner.upper as u128) << 64) | owner.lower as u128;
     let source = ((source.upper as u128) << 64) | source.lower as u128;
@@ -629,10 +617,6 @@ fn uuid_bytes(uuid: &Uuid) -> [u8; 16] {
 }
 
 /// The `(lower, upper)` key of a `TSP.CFUUIDArchive` payload.
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "splitting a 128-bit UUID into its halves"
-)]
 fn cfuuid_key(data: &[u8]) -> R<Option<(u64, u64)>> {
     let words = [
         varint(data, 2)?,
@@ -937,10 +921,6 @@ fn owner_family<P: TableLeaf>(working: &Working<'_, P>, component: &str, info: u
 /// identifier, source and component. The new internal owner identifiers
 /// start above every owner and every owner-map entry (the host
 /// allocates above the owners only).
-#[allow(
-    clippy::too_many_lines,
-    reason = "the port keeps the host editor's clone_table_formula_graph sequence"
-)]
 fn clone_owner_family<P: TableLeaf>(
     working: &mut Working<'_, P>,
     component: &str,

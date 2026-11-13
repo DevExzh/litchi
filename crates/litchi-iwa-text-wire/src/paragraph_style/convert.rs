@@ -251,7 +251,6 @@ pub(super) fn paragraph_borders(
     }
     let offset = match properties.historical_rule_offset.as_ref() {
         Some(point) => {
-            #[allow(clippy::float_cmp, reason = "the host requires exactly equal axes")]
             let equal = point.x == point.y;
             if !point.x.is_finite() || !point.y.is_finite() || !equal {
                 return invalid("native paragraph-border offset must contain equal finite axes");

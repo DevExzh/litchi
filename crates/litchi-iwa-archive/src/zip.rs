@@ -815,13 +815,7 @@ pub(crate) fn nested_index_name(archive: &ZipArchive<'_>) -> Result<Option<Strin
 }
 
 pub(crate) fn is_iwa_name(name: &str) -> bool {
-    #[allow(
-        clippy::case_sensitive_file_extension_comparisons,
-        reason = "IWA member names are case-sensitive protocol names."
-    )]
-    {
-        name.ends_with(".iwa")
-    }
+    name.ends_with(".iwa")
 }
 
 #[cfg(test)]

@@ -17,11 +17,6 @@
 //! image:<file>:<x>,<y>,<width>,<height>
 //! ```
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports the slide inventory and its committed change"
-)]
-
 use std::error::Error;
 use std::fs::OpenOptions;
 use std::path::Path;

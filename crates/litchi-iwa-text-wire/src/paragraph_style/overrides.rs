@@ -198,10 +198,6 @@ fn transpose<T, E>(value: Option<Result<T, E>>, reason: &'static str) -> NativeR
 /// overrides. Anything else (a named style, foreign or unknown fields, a
 /// non-canonical encoding) is `None`, and the engine derives a child
 /// variation instead of rewriting it.
-#[allow(
-    clippy::too_many_lines,
-    reason = "a single field-by-field port of the host recogniser"
-)]
 pub(super) fn direct_overrides(
     style: &native::ParagraphStyle,
     raw: &[u8],

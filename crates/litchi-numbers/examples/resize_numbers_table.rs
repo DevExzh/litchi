@@ -4,11 +4,6 @@
 //! reopens the saved output before this command reports success. Its inverse
 //! is checked against the exact input package.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports its committed semantic change"
-)]
-
 use std::env;
 use std::error::Error;
 use std::io;

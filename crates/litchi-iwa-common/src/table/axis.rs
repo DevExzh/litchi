@@ -7,10 +7,6 @@
 use std::fmt;
 
 /// One zero-based row or column position in a table.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "AxisIndex distinguishes a table position from the enclosing axis module"
-)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum AxisIndex {
     /// A zero-based row index.

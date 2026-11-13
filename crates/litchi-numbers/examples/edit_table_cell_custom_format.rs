@@ -12,11 +12,6 @@
 //! only the format family and transaction counters; custom names, patterns,
 //! affixes, and native identifiers are never printed.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports its committed semantic change"
-)]
-
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
 use std::fmt::Display;

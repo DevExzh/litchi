@@ -1,10 +1,5 @@
 //! Bounded protobuf wire mutations that retain untouched fields byte-for-byte.
 
-#![allow(
-    clippy::missing_errors_doc,
-    reason = "All fallible wire operations return the shared structured Error; callers can match its variants"
-)]
-
 use std::cell::Cell;
 use std::collections::HashMap;
 
@@ -15,10 +10,6 @@ use crate::{Error, LimitKind, Result, WireLimits};
 /// The view borrows the input once and retains only compact private spans for
 /// its fields. Field views are consequently tied to this source and cannot
 /// accidentally be used with a different byte slice after parsing.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "WireView is the explicit borrowed container name used at format boundaries"
-)]
 #[derive(Debug)]
 pub struct WireView<'a> {
     source: &'a [u8],
@@ -87,10 +78,6 @@ impl<'a> WireView<'a> {
 /// This value contains a compact span and a borrow of the parsed view's
 /// source, not an independently supplied byte slice. It is cheap to copy and
 /// remains valid only while that source is valid.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "WireFieldView is the explicit borrowed counterpart to WireField"
-)]
 #[derive(Debug, Clone, Copy)]
 pub struct WireFieldView<'a> {
     source: &'a [u8],
@@ -179,10 +166,6 @@ impl<'a> WireFieldView<'a> {
 /// supplies the missing schema knowledge by selecting only payloads that are
 /// deferred submessages in the caller's generated model.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "WireDescent remains explicit when imported by schema adapters"
-)]
 pub enum WireDescent {
     /// Treat this field as an opaque scalar payload.
     Skip,
@@ -198,10 +181,6 @@ pub enum WireDescent {
 /// remains bound to the exact source slice parsed by the scanner and cannot be
 /// paired with caller-supplied bytes.
 #[derive(Debug, Clone, Copy)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "WireVisit names the wire-specific callback value at schema boundaries"
-)]
 pub struct WireVisit<'source, 'path> {
     path: &'path [u32],
     field: WireFieldView<'source>,
@@ -234,10 +213,6 @@ impl<'source, 'path> WireVisit<'source, 'path> {
 /// matching the aggregate work performed by subsequent deferred decodes
 /// rather than merely checking the size of the root allocation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "WirePreflight distinguishes this report from format-level package preflights"
-)]
 pub struct WirePreflight {
     scanned_bytes: usize,
     fields: usize,
@@ -352,10 +327,6 @@ struct WireSpan {
     end: u32,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "WireField is the stable, explicit name of a parsed protobuf field"
-)]
 #[derive(Debug, Clone, Copy)]
 pub struct WireField {
     number: u32,
@@ -1270,10 +1241,6 @@ impl NestedFieldReplacement<'_> {
         }
     }
 
-    #[allow(
-        clippy::match_same_arms,
-        reason = "The variants carry three different Option scalar types plus one borrowed slice"
-    )]
     const fn is_some(self) -> bool {
         match self {
             Self::Varint(value) => value.is_some(),
@@ -2099,10 +2066,6 @@ fn build_batch_edit_trie(
     Ok((trie, work))
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "The recursive planner carries one explicit source range, trie node, depth, and shared bounded state"
-)]
 fn plan_batch_message(
     data: &[u8],
     start: usize,
@@ -3840,11 +3803,6 @@ fn remove_fields(data: &[u8], mut fields: Vec<WireField>) -> Result<Vec<u8>> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::shadow_unrelated,
-    clippy::unwrap_used,
-    reason = "Wire tests intentionally use concise fixture assertions"
-)]
 mod tests {
     use super::*;
     use std::mem::size_of;

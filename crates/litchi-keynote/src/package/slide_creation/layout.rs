@@ -742,10 +742,6 @@ fn prepare_slide_number(
 /// Register the fresh slide component: the layout component's records for
 /// the cloned objects, the cloned notes graph, the slide-number attachment,
 /// and external references recomputed from the component's objects.
-#[allow(
-    clippy::too_many_arguments,
-    reason = "the registry step joins the layout, notes and attachment identities of one slide"
-)]
 fn register(
     workspace: &mut Workspace<'_>,
     record: &Record,

@@ -4,13 +4,6 @@
 //! content-free diagnostics only. This implementation keeps retained artifact
 //! identity and format details private.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    clippy::map_err_ignore,
-    clippy::wildcard_enum_match_arm,
-    reason = "the focused boundary redacts lower-layer physical error families"
-)]
-
 mod error;
 mod resolve;
 mod rewrite;

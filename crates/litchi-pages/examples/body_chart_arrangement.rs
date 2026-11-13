@@ -7,11 +7,6 @@
 //! committed target, and applies the inverse in memory before publishing the
 //! requested output. Existing output paths are never overwritten.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports its committed semantic change"
-)]
-
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
 use std::io;

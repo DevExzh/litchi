@@ -69,10 +69,6 @@ fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
     )?)
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "each emitted byte intentionally retains only the low seven varint bits"
-)]
 fn push_varint(mut value: u64, output: &mut Vec<u8>) {
     while value >= 0x80 {
         output.push(((value as u8) & 0x7f) | 0x80);

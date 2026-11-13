@@ -207,7 +207,6 @@ fn source() -> R<Vec<u8>> {
         stylesheet: r(81),
         ..Default::default()
     };
-    #[allow(deprecated)]
     let node = kn::SlideNodeArchive {
         slide: Some(r(SLIDE)),
         ..Default::default()

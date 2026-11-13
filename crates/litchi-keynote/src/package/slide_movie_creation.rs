@@ -5,11 +5,6 @@
 //! node-cache update, exact reassembly, and candidate publication helpers.
 //! Only the media-specific metadata plan, movie payload, and witness differ.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The transaction keeps admission, staging, and publication phases together."
-)]
-
 use std::sync::Arc;
 
 use litchi_core::Position;

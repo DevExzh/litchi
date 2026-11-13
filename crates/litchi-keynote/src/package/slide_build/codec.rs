@@ -231,10 +231,6 @@ fn stage_text(stage: &Stage) -> &str {
 }
 
 fn point_writer(x: f64, y: f64) -> Writer {
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "TSP.Point stores 32-bit floats"
-    )]
     Writer::new().float(1, x as f32).float(2, y as f32)
 }
 
@@ -382,7 +378,6 @@ fn as_u32(value: Option<u64>) -> Option<u32> {
     value.and_then(|value| u32::try_from(value).ok())
 }
 
-#[allow(clippy::cast_possible_truncation, reason = "protobuf int32 varints")]
 fn as_i32(value: Option<u64>) -> Option<i32> {
     value.map(|value| value as i32)
 }
@@ -816,7 +811,6 @@ pub(super) fn encode_build(drawable: u64, settings: &Settings, seed: u32) -> Vec
         .finish()
 }
 
-#[allow(clippy::cast_sign_loss, reason = "protobuf int32 varint encoding")]
 fn int_varint(value: i32) -> u64 {
     i64::from(value) as u64
 }

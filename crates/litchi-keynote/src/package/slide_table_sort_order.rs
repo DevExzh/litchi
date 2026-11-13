@@ -7,13 +7,6 @@
 //! checked slide/table selectors.  Field 45 (the native tracker) and every
 //! other model field are intentionally opaque and are never rewritten.
 
-#![allow(
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    clippy::wildcard_enum_match_arm,
-    reason = "the package boundary redacts lower-layer failure details"
-)]
-
 use std::fmt;
 use std::mem::size_of;
 use std::sync::Arc;

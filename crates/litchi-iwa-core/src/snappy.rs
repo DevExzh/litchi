@@ -8,10 +8,6 @@ const FRAME_HEADER_BYTES: usize = 4;
 
 /// Caller-selectable bounds for Apple's checksum-free IWA Snappy framing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(
-    clippy::struct_field_names,
-    reason = "The max_* vocabulary makes the resource-budget fields self-documenting."
-)]
 pub struct SnappyLimits {
     max_uncompressed_chunk: usize,
     max_decompressed_stream: usize,

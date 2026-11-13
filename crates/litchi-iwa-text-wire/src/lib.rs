@@ -69,10 +69,6 @@ pub const DEFAULT_MAX_TEXT_BYTES: usize = 64 * 1024 * 1024;
 /// The profile governs the allocation-free common-wire preflight, Buffa's
 /// borrowed repeated-string metadata, and the final semantic allocation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(
-    clippy::struct_field_names,
-    reason = "Each finite maximum has a matching explicit accessor"
-)]
 pub struct Limits {
     max_message_bytes: usize,
     max_fields: usize,

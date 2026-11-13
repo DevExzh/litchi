@@ -4,11 +4,6 @@
 //! column labels, and the rectangular shape are copied from the source grid
 //! and therefore remain unchanged. Use `empty` to clear a cell.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports its committed semantic change"
-)]
-
 use std::error::Error;
 use std::ffi::OsString;
 use std::io;

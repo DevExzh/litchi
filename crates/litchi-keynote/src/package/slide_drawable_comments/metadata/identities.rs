@@ -9,11 +9,6 @@
 //! raw-preserving rewrite and candidate verification to the neutral identity
 //! codec.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The helper keeps its source witness and one atomic identity rewrite together."
-)]
-
 use litchi_iwa_protos::package_metadata_codec as identity_codec;
 use std::mem::size_of;
 
@@ -344,10 +339,6 @@ pub(in crate::package::slide_drawable_comments) fn remove_storage_identity(
 /// missing source registration is a no-op.  A present registration must agree
 /// with the source payload and the candidate UUID must remain unique; any
 /// mismatch is rejected before the candidate metadata is replaced.
-#[allow(
-    clippy::too_many_arguments,
-    reason = "Source and candidate identity witnesses remain explicit so callers cannot confuse their component or UUID roles."
-)]
 pub(in crate::package::slide_drawable_comments) fn register_storage_identity_if_registered(
     source: &Package,
     working: &mut WorkingSet<'_>,

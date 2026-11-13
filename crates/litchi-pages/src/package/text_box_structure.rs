@@ -9,11 +9,6 @@
 //! the macro that declares a family's `LimitKind`, `Patch`, `Diagnostics`
 //! and `Commit`.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the toolkit keeps the family macro beside the artifacts it uses"
-)]
-
 use std::sync::Arc;
 
 use litchi_iwa_archive::package::{OwnedExactArtifacts, SharedBytes};

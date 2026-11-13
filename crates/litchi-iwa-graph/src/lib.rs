@@ -668,11 +668,6 @@ fn graph_statistics(state: &GraphState) -> ReferenceGraphStats {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "The unit tests use fixed valid identifiers."
-)]
 mod tests {
     use super::*;
     use std::mem::size_of;

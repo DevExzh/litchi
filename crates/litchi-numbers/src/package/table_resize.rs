@@ -10,11 +10,6 @@
 //! extents. This is the host editor's `resize_table`; the staged rewrite is
 //! the shared `litchi_iwa_table::topology::stage_resize`.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the focused transaction keeps its public types beside the staged rewrite"
-)]
-
 use std::fmt;
 
 use thiserror::Error as ThisError;

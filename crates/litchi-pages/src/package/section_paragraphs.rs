@@ -442,10 +442,6 @@ impl<'a> Edit<'a> {
     /// conditions of [`Self::commit`] for the whole sequence, checked
     /// without replaying it); `None` sends the commit to the per-group
     /// path.
-    #[allow(
-        clippy::option_option,
-        reason = "`None` sends the commit to the per-group path; `Some(None)` publishes nothing"
-    )]
     fn single_splice(&self) -> Result<Option<Option<(TextSpan, String)>>, Error> {
         let mut touched: Option<(usize, usize)> = None;
         for operation in &self.operations {

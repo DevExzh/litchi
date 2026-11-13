@@ -13,14 +13,6 @@
 //! temporary Snappy streams are reserved locally from their exact archive
 //! bounds before decompression.
 
-#![allow(
-    clippy::cast_sign_loss,
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    clippy::wildcard_enum_match_arm,
-    reason = "The package boundary redacts native graph failures."
-)]
-
 use std::fmt;
 use std::mem::size_of;
 use std::sync::{Arc, OnceLock};

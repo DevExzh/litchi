@@ -304,10 +304,6 @@ fn replace_stylesheet<P: TableLeaf>(
 /// style graph the engine does not rewrite; [`Refusal::UnsupportedSource`]
 /// without a package metadata registry; source, resource and candidate
 /// errors.
-#[allow(
-    clippy::too_many_lines,
-    reason = "one staged change: plan, then the rewrite, derive or collapse publication"
-)]
 pub fn apply<P: TableLeaf>(
     mut working: Working<'_, P>,
     model: u64,

@@ -182,18 +182,10 @@ impl<'a> Field<'a> {
         varint(self.expect(VARINT)?)
     }
 
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "protobuf uint32 decoding truncates a wider varint"
-    )]
     pub(crate) fn uint32(self) -> NativeResult<u32> {
         Ok(self.uint64()? as u32)
     }
 
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "protobuf int32 decoding truncates the sign-extended varint"
-    )]
     pub(crate) fn int32(self) -> NativeResult<i32> {
         Ok(self.uint64()? as i32)
     }
@@ -400,10 +392,6 @@ impl Writer {
     fn raw_varint(&mut self, mut value: u64) -> NativeResult<()> {
         self.reserve(litchi_iwa_common::varint::encoded_len(value))?;
         loop {
-            #[allow(
-                clippy::cast_possible_truncation,
-                reason = "the low seven bits fit in a byte"
-            )]
             let byte = (value & 0x7f) as u8;
             value >>= 7;
             if value == 0 {
@@ -427,10 +415,6 @@ impl Writer {
         self.uint64(number, u64::from(value))
     }
 
-    #[allow(
-        clippy::cast_sign_loss,
-        reason = "protobuf int32 encodes the sign-extended 64-bit value"
-    )]
     pub(crate) fn int32(&mut self, number: u32, value: i32) -> NativeResult<()> {
         self.uint64(number, i64::from(value) as u64)
     }
@@ -548,7 +532,6 @@ impl Point {
 
 /// `TSP.Color`.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
-#[allow(clippy::struct_field_names, reason = "the schema's channel names")]
 pub(crate) struct Color {
     pub(crate) model: i32,
     pub(crate) r: Option<f32>,

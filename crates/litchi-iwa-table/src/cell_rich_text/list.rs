@@ -547,11 +547,6 @@ fn storage_references(stylesheet: u64, paragraph_style: u64, list_style: u64) ->
 
 /// Promote the plain cell at `position` to a rich-text storage holding
 /// `text` (the host editor's `promote_plain_cell`); returns the storage.
-#[allow(
-    clippy::too_many_lines,
-    clippy::too_many_arguments,
-    reason = "one promotion: rich-text list, storage, payload, entry, cell, string release"
-)]
 fn promote<P: TableLeaf>(
     working: &mut Working<'_, P>,
     registry: &metadata::Registry,

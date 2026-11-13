@@ -1,10 +1,5 @@
 //! Edit one rooted Pages body table's title visibility and outline settings.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports its committed semantic change"
-)]
-
 use std::error::Error;
 use std::io;
 use std::path::{Path, PathBuf};

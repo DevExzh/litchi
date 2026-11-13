@@ -1,14 +1,5 @@
 //! Bounded, byte-preserving mutation of native TSWP text storage.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Wire validation types stay adjacent to the passes that consume them"
-)]
-#![allow(
-    clippy::struct_field_names,
-    reason = "Every retained maximum has a matching explicit accessor"
-)]
-
 use std::{borrow::Cow, mem::size_of, ops::Range};
 
 #[cfg(test)]
@@ -70,10 +61,6 @@ impl RewriteLimits {
     /// Returns [`RewriteError::InvalidLimit`] when a value is zero or exceeds
     /// its hard ceiling. A nesting limit below the four schema levels needed
     /// by storage, table, entry, and reference/range messages is also rejected.
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Every independently retained resource bound is explicit at the trust boundary"
-    )]
     pub fn new(
         max_message_bytes: usize,
         max_fields: usize,
@@ -3049,10 +3036,6 @@ fn preflight_storage_execution(
     Ok(())
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "each retained and intermediate storage vector remains explicit"
-)]
 fn storage_execution_report(
     bytes: &Vec<u8>,
     object_references_before: &Vec<u64>,
@@ -3654,11 +3637,6 @@ fn sorted_identifier_difference(before: &[u64], after: &[u64]) -> RewriteResult<
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::ref_option,
-    clippy::shadow_reuse,
-    reason = "Compact Prost-oracle helpers mirror generated optional field names"
-)]
 mod tests {
     use super::*;
     use litchi_iwa_protos::{

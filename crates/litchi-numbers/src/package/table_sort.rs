@@ -8,11 +8,6 @@
 //! the sort-rule reference tracker, is opaque and is never synthesized or
 //! removed by this owner.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "The focused transaction keeps its public value types beside the exact-source machinery."
-)]
-
 use std::{fmt, mem::size_of};
 
 use litchi_iwa_archive::package::{

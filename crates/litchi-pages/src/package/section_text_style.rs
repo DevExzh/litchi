@@ -742,10 +742,6 @@ pub(super) fn component_name_of(package: &Package, identifier: u64) -> Result<St
 
 /// Stage, publish and reopen the styled candidate; returns the number of
 /// styles created.
-#[allow(
-    clippy::too_many_lines,
-    reason = "one staged publication: styles, stylesheet, storage, registry"
-)]
 fn publish(
     source: &Package,
     spans: &[(std::ops::Range<usize>, &CharacterProperties)],

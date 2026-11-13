@@ -4,12 +4,6 @@
 //! Selection and authority proof live in [`super::slide_table_core`]; this
 //! module only owns the semantic name projection and the field-8 rewrite.
 
-#![allow(
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    reason = "the package boundary deliberately redacts native failure detail"
-)]
-
 use std::fmt;
 use std::sync::Arc;
 

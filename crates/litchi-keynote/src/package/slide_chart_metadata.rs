@@ -5,12 +5,6 @@
 //! metadata value; native object identifiers and protobuf values stay inside
 //! this module.
 
-#![allow(
-    clippy::map_err_ignore,
-    clippy::needless_pass_by_value,
-    reason = "The package boundary maps native failures to content-redacted semantic errors."
-)]
-
 use std::fmt;
 
 use litchi_core::Position;

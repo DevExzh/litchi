@@ -1,14 +1,5 @@
 //! Exact-source, selector-first Keynote speaker-notes text transactions.
 
-#![allow(
-    clippy::map_err_ignore,
-    clippy::missing_errors_doc,
-    clippy::needless_pass_by_value,
-    clippy::shadow_reuse,
-    clippy::wildcard_enum_match_arm,
-    reason = "The transaction redacts lower-layer failures and maps non-exhaustive cross-crate error families into a content-free format-owned boundary."
-)]
-
 use std::fmt;
 use std::ops::Range;
 use std::sync::Arc;
@@ -1353,10 +1344,6 @@ fn utf16_len(text: &str) -> Result<u32, Error> {
     })
 }
 
-#[allow(
-    clippy::unnecessary_wraps,
-    reason = "the semantic-only source feature adds a typed unsupported-source branch"
-)]
 fn physical_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),

@@ -5,11 +5,6 @@
 //! provides the table-context import without exposing a concrete peer crate or
 //! introducing a wrapper allocation.
 
-#![allow(
-    clippy::module_name_repetitions,
-    reason = "ADR 4 keeps Formula-prefixed names explicit in shared formula facades"
-)]
-
 /// A typed whole-row or whole-column reference.
 pub use litchi_iwa_common::formula::FormulaAxisReference;
 /// A typed binary operator.

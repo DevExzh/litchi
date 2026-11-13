@@ -17,11 +17,6 @@
 //!     [--full | --rows START END] [--inverse PATH] [--dry-run]
 //! ```
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example reports a content-free transaction diagnostic"
-)]
-
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
 use std::fs;

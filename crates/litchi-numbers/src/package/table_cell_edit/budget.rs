@@ -956,7 +956,6 @@ fn publication_usage_cost(value: PublicationCost) -> Result<Usage, Error> {
     )
 }
 
-#[allow(clippy::too_many_arguments)]
 fn publication_usage(
     components_reassembled: u64,
     reassembly_bytes: u64,
