@@ -313,6 +313,9 @@ __marimo__/
 # Transient git worktrees created for isolated agent runs.
 .claude/worktrees/
 
+# Linux perf captures.
+/perf.data*
+
 # Performance evidence packets retain their command logs. Keep this negation
 # after every broad log rule; callers still choose which historical or new
 # result logs to add explicitly.
