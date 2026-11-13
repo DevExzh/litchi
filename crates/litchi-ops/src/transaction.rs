@@ -311,6 +311,253 @@ impl Patch {
     }
 }
 
+/// The coalesced native run an [`Edit`] has staged and not yet published.
+///
+/// An edit holds at most one run. Consecutive compatible commands stage into
+/// it; every other command, every read and the end of the closure publish it
+/// first, so each command resolves against the result of the ones before it.
+/// Each variant is the run of one kind and carries that run's staged work.
+///
+/// ```text
+/// Idle  --first coalescible set, remove or Keynote add (Edit::begin)-->  Kind(run)
+/// Kind  --next command the run admits (run.stage)-->                     Kind(run)
+/// Kind  --barrier, read or end of closure (Edit::flush_pending)-->       Idle
+/// Kind  --failed isolated command (Edit::rollback_to)-->                 Idle
+/// ```
+///
+/// A run never turns into a run of another kind directly: the kinds that
+/// share a file format (RTF sets and picture removals, XLSB cell values and
+/// sheet states) publish the other one first.
+#[derive(Default)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "an edit holds one run inline; boxing would allocate once per run"
+)]
+enum RunState {
+    /// No staged work.
+    #[default]
+    Idle,
+    #[cfg(feature = "doc")]
+    Doc(crate::format::doc::write::Run),
+    #[cfg(feature = "docx")]
+    DocxFormatting(crate::format::docx::write::coalesce::Run),
+    #[cfg(feature = "rtf")]
+    Rtf(crate::format::rtf::write::coalesce::Run),
+    /// Direct RTF picture removals published as one native removal
+    /// (record 0280).
+    #[cfg(feature = "rtf")]
+    RtfPictures(crate::format::rtf::write::removal::PictureRun),
+    #[cfg(feature = "odt")]
+    Odt(crate::format::odt::write::coalesce::Run),
+    #[cfg(feature = "xlsx")]
+    XlsxCells(crate::format::xlsx::write::coalesce::Run),
+    #[cfg(feature = "xlsb")]
+    XlsbCells(crate::format::xlsb::write::coalesce::Run),
+    #[cfg(feature = "xls")]
+    XlsCells(crate::format::xls::write::coalesce::Run),
+    #[cfg(feature = "xlsb")]
+    XlsbSheets(crate::format::xlsb::write::sheet_coalesce::Run),
+    #[cfg(feature = "pptx")]
+    PptxShapes(crate::format::pptx::write::coalesce::Run),
+    #[cfg(feature = "ppt")]
+    PptShapes(crate::format::ppt::write::coalesce::Run),
+    #[cfg(feature = "odp")]
+    Odp(crate::format::odp::write::coalesce::Run),
+    #[cfg(feature = "ods")]
+    OdsCells(crate::format::ods::write::coalesce::Run),
+    /// Coalesced object-format sets (record 0288).
+    #[cfg(odf_objects)]
+    OdfTree(crate::format::odf_tree::coalesce::Run),
+    /// Coalesced Numbers cell values and formulas (record 0297).
+    #[cfg(feature = "numbers")]
+    NumbersCells(crate::format::iwork::numbers::coalesce::Run),
+    /// Coalesced Pages paragraph text sets (record 0299).
+    #[cfg(feature = "pages")]
+    Pages(crate::format::iwork::pages::Run),
+    /// Coalesced Keynote sets, new drawables and new slides (record 0298).
+    #[cfg(feature = "keynote")]
+    Keynote(crate::format::iwork::keynote::Run),
+}
+
+/// What a published run adds to the transaction.
+struct Published {
+    /// The item index of the run's first command, for error attribution.
+    first: Option<usize>,
+    step: Step,
+    /// Item changes the run reported at its commit (record 0348).
+    reported: Vec<(usize, bool)>,
+}
+
+/// A failed publication and the item index it belongs to, when known.
+type PublishError = (crate::Error, Option<usize>);
+
+impl RunState {
+    /// `Kind(run) --> Idle`: commit the native run as one step. The only
+    /// place a run is published; `Idle` publishes nothing.
+    fn commit(
+        self,
+        _limits: &SemanticLimits,
+    ) -> std::result::Result<Option<Published>, PublishError> {
+        match self {
+            Self::Idle => Ok(None),
+            #[cfg(feature = "doc")]
+            Self::Doc(run) => published(
+                run.first_index(),
+                run.commit()
+                    .and_then(|commit| wrap_doc(&commit.before.clone(), commit, ())),
+            ),
+            #[cfg(feature = "docx")]
+            Self::DocxFormatting(run) => published(
+                run.first_index(),
+                run.commit()
+                    .and_then(|(base, commit)| wrap(&base, commit, ())),
+            ),
+            #[cfg(feature = "rtf")]
+            Self::Rtf(run) => published(
+                run.first_index(),
+                run.commit()
+                    .and_then(|(base, commit)| wrap_rtf(&base, commit, ())),
+            ),
+            #[cfg(feature = "rtf")]
+            Self::RtfPictures(run) => published(
+                run.first_index(),
+                run.commit(_limits)
+                    .and_then(|(base, commit)| wrap_rtf(&base, commit, ())),
+            ),
+            #[cfg(feature = "pages")]
+            Self::Pages(run) => published(
+                run.first_index(),
+                run.commit()
+                    .and_then(|(base, commit)| wrap_iwork(&base, commit, ())),
+            ),
+            #[cfg(feature = "keynote")]
+            Self::Keynote(run) => {
+                let first = run.first_index();
+                // A Keynote commit names the failing item itself.
+                let (base, commit) = run
+                    .commit()
+                    .map_err(|(error, index)| (error, Some(index)))?;
+                published(first, wrap_iwork(&base, commit, ()))
+            },
+            #[cfg(feature = "odt")]
+            Self::Odt(run) => published(
+                run.first_index(),
+                run.commit()
+                    .and_then(|(base, commit)| wrap_odt(&base, commit, ())),
+            ),
+            #[cfg(feature = "xlsb")]
+            Self::XlsbSheets(run) => published(
+                run.first_index(),
+                run.commit()
+                    .and_then(|(base, commit)| wrap_xlsb(&base, commit, ())),
+            ),
+            #[cfg(feature = "xlsb")]
+            Self::XlsbCells(run) => published(
+                run.first_index(),
+                run.commit()
+                    .and_then(|(base, commit)| wrap_xlsb(&base, commit, ())),
+            ),
+            #[cfg(feature = "xls")]
+            Self::XlsCells(run) => published(
+                run.first_index(),
+                run.commit()
+                    .and_then(|(base, commit)| wrap_xls(&base, commit, ())),
+            ),
+            #[cfg(feature = "xlsx")]
+            Self::XlsxCells(run) => published(
+                run.first_index(),
+                run.commit()
+                    .and_then(|(base, commit)| wrap_xlsx(&base, commit, ())),
+            ),
+            #[cfg(feature = "pptx")]
+            Self::PptxShapes(run) => {
+                let first = run.first_index();
+                run.commit()
+                    .and_then(|(base, commit, reported)| {
+                        let (step, ()) = wrap_pptx(&base, commit, ())?;
+                        Ok(Some(Published {
+                            first,
+                            step,
+                            reported,
+                        }))
+                    })
+                    .map_err(|error| (error, first))
+            },
+            #[cfg(feature = "ods")]
+            Self::OdsCells(run) => published(
+                run.first_index(),
+                run.commit()
+                    .and_then(|(base, commit)| wrap_ods(&base, commit, ())),
+            ),
+            #[cfg(feature = "ppt")]
+            Self::PptShapes(run) => published(
+                run.first_index(),
+                run.commit()
+                    .and_then(|(base, commit)| wrap_ppt(&base, commit, ())),
+            ),
+            #[cfg(feature = "numbers")]
+            Self::NumbersCells(run) => published(
+                run.first_index(),
+                run.commit()
+                    .and_then(|(base, commit)| wrap_iwork(&base, commit, ())),
+            ),
+            #[cfg(odf_objects)]
+            Self::OdfTree(run) => published(
+                run.first_index(),
+                run.commit(_limits)
+                    .and_then(|(base, commit)| wrap_object(&base, commit, ())),
+            ),
+            #[cfg(feature = "odp")]
+            Self::Odp(run) => published(
+                run.first_index(),
+                run.commit(_limits)
+                    .and_then(|(base, commit)| wrap_odp(&base, commit, ())),
+            ),
+        }
+    }
+}
+
+/// The publication of a run whose first command is item `first`.
+#[cfg(any(
+    feature = "doc",
+    feature = "docx",
+    feature = "rtf",
+    feature = "odt",
+    feature = "xlsx",
+    feature = "xlsb",
+    feature = "xls",
+    feature = "ppt",
+    feature = "odp",
+    feature = "ods",
+    odf_objects,
+    feature = "numbers",
+    feature = "pages",
+    feature = "keynote"
+))]
+fn published(
+    first: Option<usize>,
+    step: Result<(Step, ())>,
+) -> std::result::Result<Option<Published>, PublishError> {
+    match step {
+        Ok((step, ())) => Ok(Some(Published {
+            first,
+            step,
+            reported: Vec::new(),
+        })),
+        Err(error) => Err((error, first)),
+    }
+}
+
+/// The rollback point of one isolated command: everything a failed command
+/// can have changed in its [`Edit`], apart from the pending run, which is
+/// `Idle` when the point is taken and is reset with it.
+struct Savepoint {
+    current: File,
+    steps: usize,
+    snapshot_bytes: usize,
+    operations: usize,
+}
+
 /// Atomic transaction proxy, created only by [`File::edit`].
 ///
 /// Every mutation resolves against the preceding immutable result. The first
@@ -325,46 +572,7 @@ pub struct Edit {
     failure: Option<crate::Error>,
     snapshot_bytes: usize,
     operations: usize,
-    #[cfg(feature = "doc")]
-    doc: Option<crate::format::doc::write::Run>,
-    #[cfg(feature = "docx")]
-    formatting: Option<crate::format::docx::write::coalesce::Run>,
-    #[cfg(feature = "rtf")]
-    rtf: Option<crate::format::rtf::write::coalesce::Run>,
-    /// Direct RTF picture removals published as one native removal
-    /// (record 0280).
-    #[cfg(feature = "rtf")]
-    rtf_pictures: Option<crate::format::rtf::write::removal::PictureRun>,
-    #[cfg(feature = "odt")]
-    odt: Option<crate::format::odt::write::coalesce::Run>,
-    #[cfg(feature = "xlsx")]
-    cells: Option<crate::format::xlsx::write::coalesce::Run>,
-    #[cfg(feature = "xlsb")]
-    xlsb_cells: Option<crate::format::xlsb::write::coalesce::Run>,
-    #[cfg(feature = "xls")]
-    xls_cells: Option<crate::format::xls::write::coalesce::Run>,
-    #[cfg(feature = "xlsb")]
-    xlsb_sheets: Option<crate::format::xlsb::write::sheet_coalesce::Run>,
-    #[cfg(feature = "pptx")]
-    shapes: Option<crate::format::pptx::write::coalesce::Run>,
-    #[cfg(feature = "ppt")]
-    ppt_shapes: Option<crate::format::ppt::write::coalesce::Run>,
-    #[cfg(feature = "odp")]
-    odp: Option<crate::format::odp::write::coalesce::Run>,
-    #[cfg(feature = "ods")]
-    ods_cells: Option<crate::format::ods::write::coalesce::Run>,
-    /// Coalesced object-format sets (record 0288).
-    #[cfg(odf_objects)]
-    odf_tree: Option<crate::format::odf_tree::coalesce::Run>,
-    /// Coalesced Numbers cell values and formulas (record 0297).
-    #[cfg(feature = "numbers")]
-    numbers_cells: Option<crate::format::iwork::numbers::coalesce::Run>,
-    /// Coalesced Pages paragraph text sets (record 0299).
-    #[cfg(feature = "pages")]
-    pages: Option<crate::format::iwork::pages::Run>,
-    /// Coalesced Keynote sets, new drawables and new slides (record 0298).
-    #[cfg(feature = "keynote")]
-    keynote: Option<crate::format::iwork::keynote::Run>,
+    pending: RunState,
     /// The match count of the last `find=` set (record 0273).
     matched: Option<usize>,
     /// Coalesced items whose change a native run reported at its commit,
@@ -475,40 +683,7 @@ impl File {
                 failure: None,
                 snapshot_bytes: 0,
                 operations: 0,
-                #[cfg(feature = "doc")]
-                doc: None,
-                #[cfg(feature = "docx")]
-                formatting: None,
-                #[cfg(feature = "rtf")]
-                rtf: None,
-                #[cfg(feature = "rtf")]
-                rtf_pictures: None,
-                #[cfg(feature = "odt")]
-                odt: None,
-                #[cfg(feature = "xlsx")]
-                cells: None,
-                #[cfg(feature = "xlsb")]
-                xlsb_cells: None,
-                #[cfg(feature = "xls")]
-                xls_cells: None,
-                #[cfg(feature = "xlsb")]
-                xlsb_sheets: None,
-                #[cfg(feature = "pptx")]
-                shapes: None,
-                #[cfg(feature = "ppt")]
-                ppt_shapes: None,
-                #[cfg(feature = "odp")]
-                odp: None,
-                #[cfg(feature = "ods")]
-                ods_cells: None,
-                #[cfg(odf_objects)]
-                odf_tree: None,
-                #[cfg(feature = "numbers")]
-                numbers_cells: None,
-                #[cfg(feature = "pages")]
-                pages: None,
-                #[cfg(feature = "keynote")]
-                keynote: None,
+                pending: RunState::Idle,
                 matched: None,
                 reported: Vec::new(),
             };
@@ -1138,6 +1313,9 @@ impl Edit {
         let index = self.operations;
         let result = (|| {
             if index >= self.limits.max_operations() {
+                // A deferred native coalescer failure belongs to the earlier
+                // wire item and must surface before this admission error.
+                self.flush_pending()?;
                 return Err(Error::Limit {
                     kind: LimitKind::Operations,
                     observed: index.checked_add(1).unwrap_or(usize::MAX),
@@ -1281,12 +1459,12 @@ impl Edit {
     ) -> Result<Option<bool>> {
         #[cfg(feature = "xlsb")]
         if let File::Xlsb(_) = &self.current {
-            if self.xlsb_sheets.is_some() {
+            if matches!(self.pending, RunState::XlsbSheets(_)) {
                 self.flush_pending()?;
             }
-            let planned = match &self.xlsb_cells {
-                Some(run) => run.remove_plan(target, &self.limits),
-                None => {
+            let planned = match &self.pending {
+                RunState::XlsbCells(run) => run.remove_plan(target, &self.limits),
+                _ => {
                     let File::Xlsb(handle) = &self.current else {
                         return Err(pending());
                     };
@@ -1301,39 +1479,39 @@ impl Edit {
             let Some(plan) = planned? else {
                 return Ok(None);
             };
-            if self
-                .xlsb_cells
-                .as_ref()
-                .is_some_and(|run| run.requires_barrier(&plan, &self.limits))
-            {
+            if matches!(
+                &self.pending,
+                RunState::XlsbCells(run) if run.requires_barrier(&plan, &self.limits)
+            ) {
                 self.flush_pending()?;
             }
-            if self.xlsb_cells.is_none() {
-                let File::Xlsb(handle) = &self.current else {
-                    return Err(pending());
-                };
-                self.xlsb_cells = Some(crate::format::xlsb::write::coalesce::Run::new(
-                    handle,
-                    plan.target.sheet,
-                    &self.limits,
-                    self.limits
-                        .max_snapshot_bytes()
-                        .saturating_sub(self.snapshot_bytes),
-                )?);
-            }
-            let run = self
-                .xlsb_cells
-                .as_mut()
-                .ok_or_else(|| crate::Error::new(Code::InternalError, "XLSB cell run missing"))?;
-            let changed = run.stage(plan, index)?;
+            let changed = match &mut self.pending {
+                RunState::XlsbCells(run) => run.stage(plan, index)?,
+                _ => {
+                    let File::Xlsb(handle) = &self.current else {
+                        return Err(pending());
+                    };
+                    let mut run = crate::format::xlsb::write::coalesce::Run::new(
+                        handle,
+                        plan.target.sheet,
+                        &self.limits,
+                        self.limits
+                            .max_snapshot_bytes()
+                            .saturating_sub(self.snapshot_bytes),
+                    )?;
+                    let staged = run.stage(plan, index);
+                    self.begin(RunState::XlsbCells(run));
+                    staged?
+                },
+            };
             self.operations += 1;
             return Ok(Some(changed));
         }
         #[cfg(feature = "xls")]
         if let File::Xls(_) = &self.current {
-            let planned = match &self.xls_cells {
-                Some(run) => run.remove_plan(target, &self.limits),
-                None => {
+            let planned = match &self.pending {
+                RunState::XlsCells(run) => run.remove_plan(target, &self.limits),
+                _ => {
                     let File::Xls(handle) = &self.current else {
                         return Err(pending());
                     };
@@ -1356,11 +1534,10 @@ impl Edit {
                 }
                 .into());
             }
-            if self
-                .xls_cells
-                .as_ref()
-                .is_some_and(|run| run.requires_barrier(&plan, &self.limits))
-            {
+            if matches!(
+                &self.pending,
+                RunState::XlsCells(run) if run.requires_barrier(&plan, &self.limits)
+            ) {
                 self.flush_pending()?;
                 let File::Xls(handle) = &self.current else {
                     return Err(pending());
@@ -1370,23 +1547,23 @@ impl Edit {
                 };
                 plan = replanned;
             }
-            if self.xls_cells.is_none() {
-                let File::Xls(handle) = &self.current else {
-                    return Err(pending());
-                };
-                self.xls_cells = Some(crate::format::xls::write::coalesce::Run::new(
-                    handle,
-                    &self.limits,
-                    self.limits
-                        .max_snapshot_bytes()
-                        .saturating_sub(self.snapshot_bytes),
-                )?);
-            }
-            let (had_prior, staged) = {
-                let run = self.xls_cells.as_mut().ok_or_else(|| {
-                    crate::Error::new(Code::InternalError, "XLS cell run missing")
-                })?;
-                (run.first_index().is_some(), run.stage(plan, index))
+            let (had_prior, staged) = match &mut self.pending {
+                RunState::XlsCells(run) => (run.first_index().is_some(), run.stage(plan, index)),
+                _ => {
+                    let File::Xls(handle) = &self.current else {
+                        return Err(pending());
+                    };
+                    let mut run = crate::format::xls::write::coalesce::Run::new(
+                        handle,
+                        &self.limits,
+                        self.limits
+                            .max_snapshot_bytes()
+                            .saturating_sub(self.snapshot_bytes),
+                    )?;
+                    let staged = (run.first_index().is_some(), run.stage(plan, index));
+                    self.begin(RunState::XlsCells(run));
+                    staged
+                },
             };
             let changed = match staged {
                 Ok(changed) => changed,
@@ -1425,15 +1602,15 @@ impl Edit {
         index: usize,
     ) -> Result<Option<bool>> {
         use crate::format::rtf::write::removal::PictureRun;
-        if self.rtf.is_some() {
+        if matches!(self.pending, RunState::Rtf(_)) {
             self.flush_pending()?;
         }
-        if self.rtf_pictures.as_ref().is_some_and(PictureRun::is_full) {
+        if matches!(&self.pending, RunState::RtfPictures(run) if run.is_full()) {
             self.flush_pending()?;
         }
-        let planned = match &self.rtf_pictures {
-            Some(run) => run.plan(target),
-            None => PictureRun::new(handle).plan(target),
+        let planned = match &self.pending {
+            RunState::RtfPictures(run) => run.plan(target),
+            _ => PictureRun::new(handle).plan(target),
         };
         let Some(picture) = planned else {
             // Not a remaining direct picture: publish the staged removals so
@@ -1441,13 +1618,17 @@ impl Edit {
             self.flush_pending()?;
             return Ok(None);
         };
-        let File::Rtf(current) = &self.current else {
-            return Err(pending());
-        };
-        let run = self
-            .rtf_pictures
-            .get_or_insert_with(|| PictureRun::new(current));
-        run.stage(picture, index);
+        match &mut self.pending {
+            RunState::RtfPictures(run) => run.stage(picture, index),
+            _ => {
+                let File::Rtf(current) = &self.current else {
+                    return Err(pending());
+                };
+                let mut run = PictureRun::new(current);
+                run.stage(picture, index);
+                self.begin(RunState::RtfPictures(run));
+            },
+        }
         self.operations += 1;
         Ok(Some(true))
     }
@@ -1820,15 +2001,15 @@ impl Edit {
             // so direct `text` assignments can share one variable-width leaf
             // edit. Queries and non-text properties close the run before the
             // ordinary setter resolves them against the published candidate.
-            let planned = match self.doc.as_ref() {
-                Some(run) => run.plan(_spelling, _target, _props),
-                None => handle.paragraph_plan(_target, _props),
+            let planned = match &self.pending {
+                RunState::Doc(run) => run.plan(_spelling, _target, _props),
+                _ => handle.paragraph_plan(_target, _props),
             };
             if planned.is_err() {
                 self.flush_pending()?;
             }
             let Some(plan) = planned? else {
-                if self.doc.is_some() {
+                if matches!(self.pending, RunState::Doc(_)) {
                     self.flush_pending()?;
                 }
                 return Ok(None);
@@ -1841,21 +2022,27 @@ impl Edit {
                 }
                 .into());
             }
-            if self.doc.is_none() {
-                self.doc = Some(crate::format::doc::write::Run::new(
-                    &handle,
-                    &self.limits,
-                    self.limits
-                        .max_snapshot_bytes()
-                        .saturating_sub(self.snapshot_bytes),
-                )?);
-            }
-            let run = self
-                .doc
-                .as_mut()
-                .ok_or_else(|| crate::Error::new(Code::InternalError, "DOC body run missing"))?;
-            let changed = run.stage(plan, _index, _spelling)?;
-            let bytes = self.snapshot_bytes.saturating_add(run.snapshot_bytes()?);
+            let stage = |run: &mut crate::format::doc::write::Run| {
+                let changed = run.stage(plan, _index, _spelling)?;
+                Ok::<_, crate::Error>((changed, run.snapshot_bytes()?))
+            };
+            let staged = match &mut self.pending {
+                RunState::Doc(run) => stage(run),
+                _ => {
+                    let mut run = crate::format::doc::write::Run::new(
+                        &handle,
+                        &self.limits,
+                        self.limits
+                            .max_snapshot_bytes()
+                            .saturating_sub(self.snapshot_bytes),
+                    )?;
+                    let staged = stage(&mut run);
+                    self.begin(RunState::Doc(run));
+                    staged
+                },
+            };
+            let (changed, run_bytes) = staged?;
+            let bytes = self.snapshot_bytes.saturating_add(run_bytes);
             if bytes > self.limits.max_snapshot_bytes() {
                 return Err(Error::Limit {
                     kind: LimitKind::SnapshotBytes,
@@ -1881,7 +2068,11 @@ impl Edit {
             let text = _props
                 .iter()
                 .any(|(key, _)| key.eq_ignore_ascii_case("text"));
-            let planned = match (&self.formatting, _spelling, text) {
+            let run = match &self.pending {
+                RunState::DocxFormatting(run) => Some(run),
+                _ => None,
+            };
+            let planned = match (run, _spelling, text) {
                 (Some(run), _, true) => run.text_plan(_target, _props),
                 (None, _, true) => handle.text_plan(_target, _props),
                 (Some(run), Some(spelling), false) => {
@@ -1889,11 +2080,10 @@ impl Edit {
                 },
                 (_, _, false) => handle.formatting_plan(_target, _props),
             };
-            if self.formatting.as_ref().is_some_and(|run| run.has_text())
+            if run.is_some_and(|run| run.has_text())
                 && planned.as_ref().map_or(true, |plan| {
-                    plan.as_ref().is_none_or(|plan| {
-                        !self.formatting.as_ref().is_some_and(|run| run.admits(plan))
-                    })
+                    plan.as_ref()
+                        .is_none_or(|plan| !run.is_some_and(|run| run.admits(plan)))
                 })
             {
                 // Resolve against the published candidate instead.
@@ -1911,32 +2101,36 @@ impl Edit {
                 }
                 .into());
             }
-            if self
-                .formatting
-                .as_ref()
-                .is_some_and(|run| plan.operation_bound() > run.remaining_operations())
-            {
+            if matches!(
+                &self.pending,
+                RunState::DocxFormatting(run) if plan.operation_bound() > run.remaining_operations()
+            ) {
                 self.flush_pending()?;
             }
-            if self.formatting.is_none() {
-                let File::Docx(handle) = &self.current else {
-                    return Err(pending());
-                };
-                self.formatting = Some(
-                    crate::format::docx::write::coalesce::Run::new_with_snapshot_budget(
-                        handle,
-                        self.limits
-                            .max_snapshot_bytes()
-                            .saturating_sub(self.snapshot_bytes),
-                    )?,
-                );
-            }
-            let run = self
-                .formatting
-                .as_mut()
-                .ok_or_else(|| crate::Error::new(Code::InternalError, "formatting run missing"))?;
-            let changed = run.stage(plan, _index, _spelling)?;
-            let bytes = self.snapshot_bytes.saturating_add(run.snapshot_bytes()?);
+            let stage = |run: &mut crate::format::docx::write::coalesce::Run| {
+                let changed = run.stage(plan, _index, _spelling)?;
+                Ok::<_, crate::Error>((changed, run.snapshot_bytes()?))
+            };
+            let staged = match &mut self.pending {
+                RunState::DocxFormatting(run) => stage(run),
+                _ => {
+                    let File::Docx(handle) = &self.current else {
+                        return Err(pending());
+                    };
+                    let mut run =
+                        crate::format::docx::write::coalesce::Run::new_with_snapshot_budget(
+                            handle,
+                            self.limits
+                                .max_snapshot_bytes()
+                                .saturating_sub(self.snapshot_bytes),
+                        )?;
+                    let staged = stage(&mut run);
+                    self.begin(RunState::DocxFormatting(run));
+                    staged
+                },
+            };
+            let (changed, run_bytes) = staged?;
+            let bytes = self.snapshot_bytes.saturating_add(run_bytes);
             if bytes > self.limits.max_snapshot_bytes() {
                 return Err(Error::Limit {
                     kind: LimitKind::SnapshotBytes,
@@ -1950,7 +2144,7 @@ impl Edit {
         }
         // A set closes pending picture removals (record 0280).
         #[cfg(feature = "rtf")]
-        if self.rtf_pictures.is_some() {
+        if matches!(self.pending, RunState::RtfPictures(_)) {
             self.flush_pending()?;
         }
         #[cfg(feature = "rtf")]
@@ -1958,12 +2152,12 @@ impl Edit {
             if _props.is_empty() {
                 // Preserve the direct adapter's exact no-op path without
                 // constructing a whole-document coalescer index.
-                if self.rtf.is_some() {
+                if matches!(self.pending, RunState::Rtf(_)) {
                     self.flush_pending()?;
                 }
                 return Ok(None);
             }
-            let mut planned = if let Some(run) = self.rtf.as_ref() {
+            let mut planned = if let RunState::Rtf(run) = &self.pending {
                 run.plan(_target, _props)
             } else if crate::format::rtf::write::coalesce::direct_candidate(_target, _props)? {
                 let Some(run) =
@@ -1972,7 +2166,7 @@ impl Edit {
                     return Ok(None);
                 };
                 let plan = run.plan(_target, _props)?;
-                self.rtf = Some(run);
+                self.begin(RunState::Rtf(run));
                 Ok(plan)
             } else {
                 Ok(None)
@@ -2000,7 +2194,7 @@ impl Edit {
                         return Ok(None);
                     };
                     let plan = run.plan(_target, _props)?;
-                    self.rtf = Some(run);
+                    self.begin(RunState::Rtf(run));
                     Ok(plan)
                 } else {
                     Ok(None)
@@ -2017,11 +2211,7 @@ impl Edit {
                 }
                 .into());
             }
-            if self
-                .rtf
-                .as_ref()
-                .is_some_and(|run| run.requires_barrier(&plan))
-            {
+            if matches!(&self.pending, RunState::Rtf(run) if run.requires_barrier(&plan)) {
                 self.flush_pending()?;
                 let File::Rtf(handle) = self.current.clone() else {
                     return Err(pending());
@@ -2037,27 +2227,28 @@ impl Edit {
                 plan = run.plan(_target, _props)?.ok_or_else(|| {
                     crate::Error::new(Code::InternalError, "RTF set plan disappeared")
                 })?;
-                self.rtf = Some(run);
+                self.begin(RunState::Rtf(run));
             }
-            if self.rtf.is_none() {
-                let File::Rtf(handle) = self.current.clone() else {
-                    return Err(pending());
-                };
-                let Some(run) =
-                    crate::format::rtf::write::coalesce::Run::new(&handle, &self.limits)?
-                else {
-                    return Ok(None);
-                };
-                plan = run.plan(_target, _props)?.ok_or_else(|| {
-                    crate::Error::new(Code::InternalError, "RTF set plan disappeared")
-                })?;
-                self.rtf = Some(run);
-            }
-            let run = self
-                .rtf
-                .as_mut()
-                .ok_or_else(|| crate::Error::new(Code::InternalError, "RTF run missing"))?;
-            let changed = match run.stage(plan, _index) {
+            let staged = match &mut self.pending {
+                RunState::Rtf(run) => run.stage(plan, _index),
+                _ => {
+                    let File::Rtf(handle) = self.current.clone() else {
+                        return Err(pending());
+                    };
+                    let Some(mut run) =
+                        crate::format::rtf::write::coalesce::Run::new(&handle, &self.limits)?
+                    else {
+                        return Ok(None);
+                    };
+                    let plan = run.plan(_target, _props)?.ok_or_else(|| {
+                        crate::Error::new(Code::InternalError, "RTF set plan disappeared")
+                    })?;
+                    let staged = run.stage(plan, _index);
+                    self.begin(RunState::Rtf(run));
+                    staged
+                },
+            };
+            let changed = match staged {
                 Ok(changed) => changed,
                 Err(error) => {
                     self.flush_pending()?;
@@ -2074,7 +2265,7 @@ impl Edit {
             let plan = match crate::format::iwork::pages::plan(handle, _target, _props) {
                 Ok(Some(plan)) => plan,
                 Ok(None) => {
-                    if self.pages.is_some() {
+                    if matches!(self.pending, RunState::Pages(_)) {
                         self.flush_pending()?;
                     }
                     return Ok(None);
@@ -2092,13 +2283,18 @@ impl Edit {
                 }
                 .into());
             }
-            let File::Pages(handle) = &self.current else {
-                return Err(pending());
+            let changed = match &mut self.pending {
+                RunState::Pages(run) => run.stage(plan, _index)?,
+                _ => {
+                    let File::Pages(handle) = &self.current else {
+                        return Err(pending());
+                    };
+                    let mut run = crate::format::iwork::pages::Run::new(handle, &self.limits);
+                    let staged = run.stage(plan, _index);
+                    self.begin(RunState::Pages(run));
+                    staged?
+                },
             };
-            let run = self
-                .pages
-                .get_or_insert_with(|| crate::format::iwork::pages::Run::new(handle, &self.limits));
-            let changed = run.stage(plan, _index)?;
             self.operations += 1;
             return Ok(Some(changed));
         }
@@ -2107,14 +2303,14 @@ impl Edit {
             // Direct text, paragraph, frame and visibility sets join one
             // run: one slide-drawable commit plus one commit per text
             // (record 0298). A run holding new slides publishes first.
-            let plan = match self.keynote.as_mut() {
+            let plan = match &mut self.pending {
                 // Record 0314: the run memoizes the paths it resolved.
-                Some(run) if run.accepts_sets() => run.plan_set(_target, _props),
-                Some(_) => None,
-                None => crate::format::iwork::keynote::coalesce::plan_set(&handle, _target, _props),
+                RunState::Keynote(run) if run.accepts_sets() => run.plan_set(_target, _props),
+                RunState::Keynote(_) => None,
+                _ => crate::format::iwork::keynote::coalesce::plan_set(&handle, _target, _props),
             };
             let Some(mut node) = plan else {
-                if self.keynote.is_some() {
+                if matches!(self.pending, RunState::Keynote(_)) {
                     self.flush_pending()?;
                 }
                 return Ok(None);
@@ -2128,11 +2324,11 @@ impl Edit {
                 .into());
             }
             let mut handle = handle;
-            if self
-                .keynote
-                .as_mut()
-                .is_some_and(|run| run.requires_barrier(node, _props))
-            {
+            let barrier = match &mut self.pending {
+                RunState::Keynote(run) => run.requires_barrier(node, _props),
+                _ => false,
+            };
+            if barrier {
                 // Record 0314: publish the run, then plan on its result.
                 self.flush_pending()?;
                 let File::Keynote(current) = self.current.clone() else {
@@ -2145,10 +2341,15 @@ impl Edit {
                 };
                 (node, handle) = (replanned, current);
             }
-            let run = self.keynote.get_or_insert_with(|| {
-                crate::format::iwork::keynote::Run::new(&handle, &self.limits)
-            });
-            run.stage_set(node, _props, _index)?;
+            match &mut self.pending {
+                RunState::Keynote(run) => run.stage_set(node, _props, _index)?,
+                _ => {
+                    let mut run = crate::format::iwork::keynote::Run::new(&handle, &self.limits);
+                    let staged = run.stage_set(node, _props, _index);
+                    self.begin(RunState::Keynote(run));
+                    staged?;
+                },
+            }
             self.operations += 1;
             return Ok(Some(true));
         }
@@ -2174,10 +2375,7 @@ impl Edit {
                 }
                 .into());
             }
-            let plan = if self
-                .odt
-                .as_ref()
-                .is_some_and(|run| run.requires_barrier(&plan))
+            let plan = if matches!(&self.pending, RunState::Odt(run) if run.requires_barrier(&plan))
             {
                 self.flush_pending()?;
                 let Some(handle) = self.current.odt_family().cloned() else {
@@ -2190,20 +2388,20 @@ impl Edit {
             } else {
                 plan
             };
-            if self.odt.is_none() {
-                let Some(handle) = self.current.odt_family() else {
-                    return Err(pending());
-                };
-                self.odt = Some(crate::format::odt::write::coalesce::Run::new(
-                    handle,
-                    &self.limits,
-                )?);
-            }
-            let run = self
-                .odt
-                .as_mut()
-                .ok_or_else(|| crate::Error::new(Code::InternalError, "ODT run missing"))?;
-            let changed = match run.stage(plan, _index) {
+            let staged = match &mut self.pending {
+                RunState::Odt(run) => run.stage(plan, _index),
+                _ => {
+                    let Some(handle) = self.current.odt_family() else {
+                        return Err(pending());
+                    };
+                    let mut run =
+                        crate::format::odt::write::coalesce::Run::new(handle, &self.limits)?;
+                    let staged = run.stage(plan, _index);
+                    self.begin(RunState::Odt(run));
+                    staged
+                },
+            };
+            let changed = match staged {
                 Ok(changed) => changed,
                 Err(error) => {
                     self.flush_pending()?;
@@ -2216,7 +2414,7 @@ impl Edit {
         #[cfg(feature = "xlsb")]
         if let File::Xlsb(_) = &self.current {
             let sheet_shape = crate::format::xlsb::write::sheet_state_shape(_target, _props);
-            if sheet_shape && self.xlsb_cells.is_some() {
+            if sheet_shape && matches!(self.pending, RunState::XlsbCells(_)) {
                 // Sheet resolution must see the candidate after a pending
                 // cell run; the two native owners cannot share a transaction.
                 self.flush_pending()?;
@@ -2226,9 +2424,9 @@ impl Edit {
                     let File::Xlsb(handle) = &self.current else {
                         return Err(pending());
                     };
-                    match self.xlsb_sheets.as_ref() {
-                        Some(run) => run.sheet_plan(_target, _props, &self.limits),
-                        None => handle.sheet_plan(_target, _props, &self.limits),
+                    match &self.pending {
+                        RunState::XlsbSheets(run) => run.sheet_plan(_target, _props, &self.limits),
+                        _ => handle.sheet_plan(_target, _props, &self.limits),
                     }
                 };
                 if planned.is_err() {
@@ -2252,7 +2450,7 @@ impl Edit {
                     .into());
                 }
                 let barrier = (|| -> Result<Option<(bool, bool)>> {
-                    let Some(run) = self.xlsb_sheets.as_ref() else {
+                    let RunState::XlsbSheets(run) = &self.pending else {
                         return Ok(None);
                     };
                     let requires_barrier = run.requires_barrier(&plan, &self.limits);
@@ -2293,25 +2491,26 @@ impl Edit {
                         return Err(error);
                     }
                 }
-                if self.xlsb_sheets.is_none() {
-                    let File::Xlsb(handle) = &self.current else {
-                        return Err(pending());
-                    };
-                    self.xlsb_sheets = Some(crate::format::xlsb::write::sheet_coalesce::Run::new(
-                        handle,
-                        plan.state,
-                        &self.limits,
-                        self.limits
-                            .max_snapshot_bytes()
-                            .saturating_sub(self.snapshot_bytes),
-                    )?);
-                }
-                let (had_prior, staged) = {
-                    let run = self.xlsb_sheets.as_mut().ok_or_else(|| {
-                        crate::Error::new(Code::InternalError, "XLSB sheet run missing")
-                    })?;
-                    let had_prior = run.first_index().is_some();
-                    (had_prior, run.stage(plan, _index))
+                let (had_prior, staged) = match &mut self.pending {
+                    RunState::XlsbSheets(run) => {
+                        (run.first_index().is_some(), run.stage(plan, _index))
+                    },
+                    _ => {
+                        let File::Xlsb(handle) = &self.current else {
+                            return Err(pending());
+                        };
+                        let mut run = crate::format::xlsb::write::sheet_coalesce::Run::new(
+                            handle,
+                            plan.state,
+                            &self.limits,
+                            self.limits
+                                .max_snapshot_bytes()
+                                .saturating_sub(self.snapshot_bytes),
+                        )?;
+                        let staged = (run.first_index().is_some(), run.stage(plan, _index));
+                        self.begin(RunState::XlsbSheets(run));
+                        staged
+                    },
                 };
                 let changed = match staged {
                     Ok(changed) => changed,
@@ -2326,14 +2525,14 @@ impl Edit {
                 return Ok(Some(changed));
             }
 
-            if self.xlsb_sheets.is_some() {
+            if matches!(self.pending, RunState::XlsbSheets(_)) {
                 // A cell plan must resolve against the package published by
                 // the sheet run, never against its stale pre-edit snapshot.
                 self.flush_pending()?;
             }
-            let planned = match &self.xlsb_cells {
-                Some(run) => run.cell_plan(_target, _props, &self.limits),
-                None => {
+            let planned = match &self.pending {
+                RunState::XlsbCells(run) => run.cell_plan(_target, _props, &self.limits),
+                _ => {
                     let File::Xlsb(handle) = &self.current else {
                         return Err(pending());
                     };
@@ -2356,39 +2555,39 @@ impl Edit {
                 }
                 .into());
             }
-            if self
-                .xlsb_cells
-                .as_ref()
-                .is_some_and(|run| run.requires_barrier(&plan, &self.limits))
-            {
+            if matches!(
+                &self.pending,
+                RunState::XlsbCells(run) if run.requires_barrier(&plan, &self.limits)
+            ) {
                 self.flush_pending()?;
             }
-            if self.xlsb_cells.is_none() {
-                let File::Xlsb(handle) = &self.current else {
-                    return Err(pending());
-                };
-                self.xlsb_cells = Some(crate::format::xlsb::write::coalesce::Run::new(
-                    handle,
-                    plan.target.sheet,
-                    &self.limits,
-                    self.limits
-                        .max_snapshot_bytes()
-                        .saturating_sub(self.snapshot_bytes),
-                )?);
-            }
-            let run = self
-                .xlsb_cells
-                .as_mut()
-                .ok_or_else(|| crate::Error::new(Code::InternalError, "XLSB cell run missing"))?;
-            let changed = run.stage(plan, _index)?;
+            let changed = match &mut self.pending {
+                RunState::XlsbCells(run) => run.stage(plan, _index)?,
+                _ => {
+                    let File::Xlsb(handle) = &self.current else {
+                        return Err(pending());
+                    };
+                    let mut run = crate::format::xlsb::write::coalesce::Run::new(
+                        handle,
+                        plan.target.sheet,
+                        &self.limits,
+                        self.limits
+                            .max_snapshot_bytes()
+                            .saturating_sub(self.snapshot_bytes),
+                    )?;
+                    let staged = run.stage(plan, _index);
+                    self.begin(RunState::XlsbCells(run));
+                    staged?
+                },
+            };
             self.operations += 1;
             return Ok(Some(changed));
         }
         #[cfg(feature = "xls")]
         if let File::Xls(_) = &self.current {
-            let planned = match &self.xls_cells {
-                Some(run) => run.cell_plan(_target, _props, &self.limits),
-                None => {
+            let planned = match &self.pending {
+                RunState::XlsCells(run) => run.cell_plan(_target, _props, &self.limits),
+                _ => {
                     let File::Xls(handle) = &self.current else {
                         return Err(pending());
                     };
@@ -2411,11 +2610,10 @@ impl Edit {
                 }
                 .into());
             }
-            if self
-                .xls_cells
-                .as_ref()
-                .is_some_and(|run| run.requires_barrier(&plan, &self.limits))
-            {
+            if matches!(
+                &self.pending,
+                RunState::XlsCells(run) if run.requires_barrier(&plan, &self.limits)
+            ) {
                 self.flush_pending()?;
                 let File::Xls(handle) = &self.current else {
                     return Err(pending());
@@ -2425,23 +2623,23 @@ impl Edit {
                 };
                 plan = replanned;
             }
-            if self.xls_cells.is_none() {
-                let File::Xls(handle) = &self.current else {
-                    return Err(pending());
-                };
-                self.xls_cells = Some(crate::format::xls::write::coalesce::Run::new(
-                    handle,
-                    &self.limits,
-                    self.limits
-                        .max_snapshot_bytes()
-                        .saturating_sub(self.snapshot_bytes),
-                )?);
-            }
-            let (had_prior, staged) = {
-                let run = self.xls_cells.as_mut().ok_or_else(|| {
-                    crate::Error::new(Code::InternalError, "XLS cell run missing")
-                })?;
-                (run.first_index().is_some(), run.stage(plan, _index))
+            let (had_prior, staged) = match &mut self.pending {
+                RunState::XlsCells(run) => (run.first_index().is_some(), run.stage(plan, _index)),
+                _ => {
+                    let File::Xls(handle) = &self.current else {
+                        return Err(pending());
+                    };
+                    let mut run = crate::format::xls::write::coalesce::Run::new(
+                        handle,
+                        &self.limits,
+                        self.limits
+                            .max_snapshot_bytes()
+                            .saturating_sub(self.snapshot_bytes),
+                    )?;
+                    let staged = (run.first_index().is_some(), run.stage(plan, _index));
+                    self.begin(RunState::XlsCells(run));
+                    staged
+                },
             };
             let changed = match staged {
                 Ok(changed) => changed,
@@ -2462,15 +2660,15 @@ impl Edit {
         }
         #[cfg(feature = "numbers")]
         if let File::Numbers(handle) = &self.current {
-            let planned = match &mut self.numbers_cells {
-                Some(run) => run.cell_plan(_target, _props),
-                None => handle.numbers_cell_plan(_target, _props, None),
+            let planned = match &mut self.pending {
+                RunState::NumbersCells(run) => run.cell_plan(_target, _props),
+                _ => handle.numbers_cell_plan(_target, _props, None),
             };
             if planned.is_err() {
                 self.flush_pending()?;
             }
             let Some(mut plan) = planned? else {
-                if self.numbers_cells.is_some() {
+                if matches!(self.pending, RunState::NumbersCells(_)) {
                     self.flush_pending()?;
                 }
                 return Ok(None);
@@ -2483,11 +2681,7 @@ impl Edit {
                 }
                 .into());
             }
-            if self
-                .numbers_cells
-                .as_ref()
-                .is_some_and(|run| run.requires_barrier(&plan))
-            {
+            if matches!(&self.pending, RunState::NumbersCells(run) if run.requires_barrier(&plan)) {
                 self.flush_pending()?;
                 let File::Numbers(handle) = &self.current else {
                     return Err(pending());
@@ -2497,27 +2691,27 @@ impl Edit {
                 };
                 plan = replanned;
             }
-            if self.numbers_cells.is_none() {
-                let File::Numbers(handle) = &self.current else {
-                    return Err(pending());
-                };
-                self.numbers_cells = Some(crate::format::iwork::numbers::coalesce::Run::new(
-                    handle,
-                    &self.limits,
-                )?);
-            }
-            let run = self.numbers_cells.as_mut().ok_or_else(|| {
-                crate::Error::new(Code::InternalError, "Numbers cell run missing")
-            })?;
-            let changed = run.stage(plan, _index)?;
+            let changed = match &mut self.pending {
+                RunState::NumbersCells(run) => run.stage(plan, _index)?,
+                _ => {
+                    let File::Numbers(handle) = &self.current else {
+                        return Err(pending());
+                    };
+                    let mut run =
+                        crate::format::iwork::numbers::coalesce::Run::new(handle, &self.limits)?;
+                    let staged = run.stage(plan, _index);
+                    self.begin(RunState::NumbersCells(run));
+                    staged?
+                },
+            };
             self.operations += 1;
             return Ok(Some(changed));
         }
         #[cfg(feature = "ods")]
         if let File::Ods(_) = &self.current {
-            let planned = match &self.ods_cells {
-                Some(run) => run.cell_plan(_target, _props, &self.limits),
-                None => {
+            let planned = match &self.pending {
+                RunState::OdsCells(run) => run.cell_plan(_target, _props, &self.limits),
+                _ => {
                     let File::Ods(handle) = &self.current else {
                         return Err(pending());
                     };
@@ -2540,11 +2734,10 @@ impl Edit {
                 }
                 .into());
             }
-            if self
-                .ods_cells
-                .as_ref()
-                .is_some_and(|run| run.requires_barrier(&plan, &self.limits))
-            {
+            if matches!(
+                &self.pending,
+                RunState::OdsCells(run) if run.requires_barrier(&plan, &self.limits)
+            ) {
                 self.flush_pending()?;
                 let File::Ods(handle) = &self.current else {
                     return Err(pending());
@@ -2554,28 +2747,27 @@ impl Edit {
                 };
                 plan = replanned;
             }
-            if self.ods_cells.is_none() {
-                let File::Ods(handle) = &self.current else {
-                    return Err(pending());
-                };
-                self.ods_cells = Some(crate::format::ods::write::coalesce::Run::new(
-                    handle,
-                    &self.limits,
-                )?);
-            }
-            let run = self
-                .ods_cells
-                .as_mut()
-                .ok_or_else(|| crate::Error::new(Code::InternalError, "ODS cell run missing"))?;
-            let changed = run.stage(plan, _index)?;
+            let changed = match &mut self.pending {
+                RunState::OdsCells(run) => run.stage(plan, _index)?,
+                _ => {
+                    let File::Ods(handle) = &self.current else {
+                        return Err(pending());
+                    };
+                    let mut run =
+                        crate::format::ods::write::coalesce::Run::new(handle, &self.limits)?;
+                    let staged = run.stage(plan, _index);
+                    self.begin(RunState::OdsCells(run));
+                    staged?
+                },
+            };
             self.operations += 1;
             return Ok(Some(changed));
         }
         #[cfg(feature = "xlsx")]
         if let File::Xlsx(handle) = &self.current {
-            let planned = match &self.cells {
-                Some(run) => run.cell_plan(_target, _props, &self.limits),
-                None => handle.cell_plan_with_snapshot_limit(
+            let planned = match &self.pending {
+                RunState::XlsxCells(run) => run.cell_plan(_target, _props, &self.limits),
+                _ => handle.cell_plan_with_snapshot_limit(
                     _target,
                     _props,
                     &self.limits,
@@ -2600,40 +2792,40 @@ impl Edit {
                 }
                 .into());
             }
-            if self
-                .cells
-                .as_ref()
-                .is_some_and(|run| run.requires_barrier(&plan, &self.limits))
-            {
+            if matches!(
+                &self.pending,
+                RunState::XlsxCells(run) if run.requires_barrier(&plan, &self.limits)
+            ) {
                 self.flush_pending()?;
             }
-            if self.cells.is_none() {
-                let File::Xlsx(handle) = &self.current else {
-                    return Err(pending());
-                };
-                let promoted_source = plan.take_promoted_source();
-                self.cells = Some(crate::format::xlsx::write::coalesce::Run::new(
-                    handle,
-                    &self.limits,
-                    self.limits
-                        .max_snapshot_bytes()
-                        .saturating_sub(self.snapshot_bytes),
-                    promoted_source,
-                )?);
-            }
-            let run = self
-                .cells
-                .as_mut()
-                .ok_or_else(|| crate::Error::new(Code::InternalError, "cell run missing"))?;
-            let changed = run.stage(plan, _index)?;
+            let changed = match &mut self.pending {
+                RunState::XlsxCells(run) => run.stage(plan, _index)?,
+                _ => {
+                    let File::Xlsx(handle) = &self.current else {
+                        return Err(pending());
+                    };
+                    let promoted_source = plan.take_promoted_source();
+                    let mut run = crate::format::xlsx::write::coalesce::Run::new(
+                        handle,
+                        &self.limits,
+                        self.limits
+                            .max_snapshot_bytes()
+                            .saturating_sub(self.snapshot_bytes),
+                        promoted_source,
+                    )?;
+                    let staged = run.stage(plan, _index);
+                    self.begin(RunState::XlsxCells(run));
+                    staged?
+                },
+            };
             self.operations += 1;
             return Ok(Some(changed));
         }
         #[cfg(feature = "pptx")]
         if let File::Pptx(handle) = &self.current {
-            let planned = match &mut self.shapes {
-                Some(run) => run.shape_plan(_target, _props, &self.limits),
-                None => handle.shape_plan(_target, _props, &self.limits),
+            let planned = match &mut self.pending {
+                RunState::PptxShapes(run) => run.shape_plan(_target, _props, &self.limits),
+                _ => handle.shape_plan(_target, _props, &self.limits),
             };
             if planned.is_err() {
                 // Preserve an earlier deferred native failure's wire index.
@@ -2650,11 +2842,10 @@ impl Edit {
                 }
                 .into());
             }
-            if self
-                .shapes
-                .as_ref()
-                .is_some_and(|run| run.requires_barrier(&plan, &self.limits))
-            {
+            if matches!(
+                &self.pending,
+                RunState::PptxShapes(run) if run.requires_barrier(&plan, &self.limits)
+            ) {
                 self.flush_pending()?;
                 // A repeated shape may merge partial geometry with earlier
                 // assignments. Resolve it again against the published run.
@@ -2666,31 +2857,32 @@ impl Edit {
                 };
                 plan = replanned;
             }
-            if self.shapes.is_none() {
-                let File::Pptx(handle) = &self.current else {
-                    return Err(pending());
-                };
-                self.shapes = Some(crate::format::pptx::write::coalesce::Run::new(
-                    handle,
-                    &self.limits,
-                    self.limits
-                        .max_snapshot_bytes()
-                        .saturating_sub(self.snapshot_bytes),
-                )?);
-            }
-            let run = self
-                .shapes
-                .as_mut()
-                .ok_or_else(|| crate::Error::new(Code::InternalError, "shape run missing"))?;
-            let changed = run.stage(plan, _index)?;
+            let changed = match &mut self.pending {
+                RunState::PptxShapes(run) => run.stage(plan, _index)?,
+                _ => {
+                    let File::Pptx(handle) = &self.current else {
+                        return Err(pending());
+                    };
+                    let mut run = crate::format::pptx::write::coalesce::Run::new(
+                        handle,
+                        &self.limits,
+                        self.limits
+                            .max_snapshot_bytes()
+                            .saturating_sub(self.snapshot_bytes),
+                    )?;
+                    let staged = run.stage(plan, _index);
+                    self.begin(RunState::PptxShapes(run));
+                    staged?
+                },
+            };
             self.operations += 1;
             return Ok(Some(changed));
         }
         #[cfg(feature = "ppt")]
         if let File::Ppt(handle) = &self.current {
-            let planned = match &mut self.ppt_shapes {
-                Some(run) => run.shape_plan(_target, _props, &self.limits),
-                None => handle.shape_plan(_target, _props, &self.limits),
+            let planned = match &mut self.pending {
+                RunState::PptShapes(run) => run.shape_plan(_target, _props, &self.limits),
+                _ => handle.shape_plan(_target, _props, &self.limits),
             };
             if planned.is_err() {
                 // Preserve an earlier deferred native failure's wire index.
@@ -2707,11 +2899,10 @@ impl Edit {
                 }
                 .into());
             }
-            if self
-                .ppt_shapes
-                .as_ref()
-                .is_some_and(|run| run.requires_barrier(&plan, &self.limits))
-            {
+            if matches!(
+                &self.pending,
+                RunState::PptShapes(run) if run.requires_barrier(&plan, &self.limits)
+            ) {
                 self.flush_pending()?;
                 // A repeated shape may merge partial geometry with earlier
                 // assignments. Resolve it again against the published run.
@@ -2723,23 +2914,24 @@ impl Edit {
                 };
                 plan = replanned;
             }
-            if self.ppt_shapes.is_none() {
-                let File::Ppt(handle) = &self.current else {
-                    return Err(pending());
-                };
-                self.ppt_shapes = Some(crate::format::ppt::write::coalesce::Run::new(
-                    handle,
-                    &self.limits,
-                    self.limits
-                        .max_snapshot_bytes()
-                        .saturating_sub(self.snapshot_bytes),
-                )?);
-            }
-            let run = self
-                .ppt_shapes
-                .as_mut()
-                .ok_or_else(|| crate::Error::new(Code::InternalError, "shape run missing"))?;
-            let changed = run.stage(plan, _index)?;
+            let changed = match &mut self.pending {
+                RunState::PptShapes(run) => run.stage(plan, _index)?,
+                _ => {
+                    let File::Ppt(handle) = &self.current else {
+                        return Err(pending());
+                    };
+                    let mut run = crate::format::ppt::write::coalesce::Run::new(
+                        handle,
+                        &self.limits,
+                        self.limits
+                            .max_snapshot_bytes()
+                            .saturating_sub(self.snapshot_bytes),
+                    )?;
+                    let staged = run.stage(plan, _index);
+                    self.begin(RunState::PptShapes(run));
+                    staged?
+                },
+            };
             self.operations += 1;
             return Ok(Some(changed));
         }
@@ -2747,9 +2939,9 @@ impl Edit {
         if let File::Odp(handle) = &self.current {
             // Sets resolve against the pending run's base: the run holds
             // only sets that do not change any positional address.
-            let planned = match &self.odp {
-                Some(run) => run.base().set_plan(_target, _props, &self.limits),
-                None => handle.set_plan(_target, _props, &self.limits),
+            let planned = match &self.pending {
+                RunState::Odp(run) => run.base().set_plan(_target, _props, &self.limits),
+                _ => handle.set_plan(_target, _props, &self.limits),
             };
             if planned.is_err() {
                 // Preserve an earlier deferred native failure's wire index.
@@ -2766,11 +2958,10 @@ impl Edit {
                 }
                 .into());
             }
-            if self
-                .odp
-                .as_ref()
-                .is_some_and(|run| run.requires_barrier(&plan, &self.limits))
-            {
+            if matches!(
+                &self.pending,
+                RunState::Odp(run) if run.requires_barrier(&plan, &self.limits)
+            ) {
                 self.flush_pending()?;
                 let File::Odp(handle) = &self.current else {
                     return Err(pending());
@@ -2780,17 +2971,17 @@ impl Edit {
                 };
                 plan = replanned;
             }
-            if self.odp.is_none() {
-                let File::Odp(handle) = &self.current else {
-                    return Err(pending());
-                };
-                self.odp = Some(crate::format::odp::write::coalesce::Run::new(handle));
+            match &mut self.pending {
+                RunState::Odp(run) => run.stage(plan, _index),
+                _ => {
+                    let File::Odp(handle) = &self.current else {
+                        return Err(pending());
+                    };
+                    let mut run = crate::format::odp::write::coalesce::Run::new(handle);
+                    run.stage(plan, _index);
+                    self.begin(RunState::Odp(run));
+                },
             }
-            let run = self
-                .odp
-                .as_mut()
-                .ok_or_else(|| crate::Error::new(Code::InternalError, "ODP run missing"))?;
-            run.stage(plan, _index);
             self.operations += 1;
             return Ok(Some(true));
         }
@@ -2798,9 +2989,9 @@ impl Edit {
         if let Some(handle) = self.current.odf_tree() {
             // Sets resolve against the pending run's base: the run holds
             // only sets that change no address and read no pending value.
-            let planned = match &self.odf_tree {
-                Some(run) => run.base().set_plan(_target, _props),
-                None => handle.set_plan(_target, _props),
+            let planned = match &self.pending {
+                RunState::OdfTree(run) => run.base().set_plan(_target, _props),
+                _ => handle.set_plan(_target, _props),
             };
             if planned.is_err() {
                 self.flush_pending()?;
@@ -2817,11 +3008,10 @@ impl Edit {
                 }
                 .into());
             }
-            if self
-                .odf_tree
-                .as_ref()
-                .is_some_and(|run| run.requires_barrier(node, _props, &self.limits))
-            {
+            if matches!(
+                &self.pending,
+                RunState::OdfTree(run) if run.requires_barrier(node, _props, &self.limits)
+            ) {
                 self.flush_pending()?;
                 let Some(handle) = self.current.odf_tree() else {
                     return Err(pending());
@@ -2831,462 +3021,124 @@ impl Edit {
                 };
                 node = replanned;
             }
-            if self.odf_tree.is_none() {
-                let Some(handle) = self.current.odf_tree() else {
-                    return Err(pending());
-                };
-                self.odf_tree = Some(crate::format::odf_tree::coalesce::Run::new(handle));
+            match &mut self.pending {
+                RunState::OdfTree(run) => run.stage(node, _props, _index),
+                _ => {
+                    let Some(handle) = self.current.odf_tree() else {
+                        return Err(pending());
+                    };
+                    let mut run = crate::format::odf_tree::coalesce::Run::new(handle);
+                    run.stage(node, _props, _index);
+                    self.begin(RunState::OdfTree(run));
+                },
             }
-            let run = self
-                .odf_tree
-                .as_mut()
-                .ok_or_else(|| crate::Error::new(Code::InternalError, "object run missing"))?;
-            run.stage(node, _props, _index);
             self.operations += 1;
             return Ok(Some(true));
         }
         Ok(None)
     }
 
+    /// `Idle --> Kind(run)`: hold a new run. The caller has published any
+    /// run of another kind, so nothing staged is dropped here.
+    #[cfg(any(
+        feature = "doc",
+        feature = "docx",
+        feature = "rtf",
+        feature = "odt",
+        feature = "xlsx",
+        feature = "xlsb",
+        feature = "xls",
+        feature = "pptx",
+        feature = "ppt",
+        feature = "odp",
+        feature = "ods",
+        odf_objects,
+        feature = "numbers",
+        feature = "pages",
+        feature = "keynote"
+    ))]
+    fn begin(&mut self, run: RunState) {
+        debug_assert!(
+            matches!(self.pending, RunState::Idle),
+            "a pending run was replaced before it was published"
+        );
+        self.pending = run;
+    }
+
+    /// `Kind(run) --> Idle`: publish the pending run as one step of the
+    /// transaction. A failure poisons the transaction with the item index of
+    /// the run's first command.
     pub(crate) fn flush_pending(&mut self) -> Result<()> {
-        #[cfg(feature = "doc")]
-        if let Some(run) = self.doc.take() {
-            let index = run.first_index();
-            let result = (|| -> Result<()> {
-                let commit = run.commit()?;
-                let (step, ()) = wrap_doc(&commit.before.clone(), commit, ())?;
-                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
-                if bytes > self.limits.max_snapshot_bytes() {
-                    return Err(Error::Limit {
-                        kind: LimitKind::SnapshotBytes,
-                        observed: bytes,
-                        maximum: self.limits.max_snapshot_bytes(),
-                    }
-                    .into());
-                }
-                self.steps
-                    .try_reserve(1)
-                    .map_err(|source| Error::Allocation { source })?;
-                self.current = step.after.clone();
-                self.steps.push(step);
-                self.snapshot_bytes = bytes;
-                Ok(())
-            })();
-            result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
+        if matches!(self.pending, RunState::Idle) {
+            // The common case: do not move the state out to learn that.
+            return Ok(());
         }
-        #[cfg(feature = "docx")]
-        if let Some(run) = self.formatting.take() {
-            let index = run.first_index();
-            let result = (|| -> Result<()> {
-                let (base, commit) = run.commit()?;
-                let (step, ()) = wrap(&base, commit, ())?;
-                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
-                if bytes > self.limits.max_snapshot_bytes() {
-                    return Err(Error::Limit {
-                        kind: LimitKind::SnapshotBytes,
-                        observed: bytes,
-                        maximum: self.limits.max_snapshot_bytes(),
-                    }
-                    .into());
-                }
-                self.steps
-                    .try_reserve(1)
-                    .map_err(|source| Error::Allocation { source })?;
-                self.current = step.after.clone();
-                self.steps.push(step);
-                self.snapshot_bytes = bytes;
-                Ok(())
-            })();
-            result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
+        let result = std::mem::take(&mut self.pending)
+            .commit(&self.limits)
+            .and_then(|published| {
+                let Some(Published {
+                    first,
+                    step,
+                    reported,
+                }) = published
+                else {
+                    return Ok(());
+                };
+                self.admit_published(step, reported)
+                    .map_err(|error| (error, first))
+            });
+        result.map_err(|(error, index)| self.poison(error, index.unwrap_or(self.operations)))
+    }
+
+    /// Charge and append the step of a published run.
+    fn admit_published(&mut self, step: Step, reported: Vec<(usize, bool)>) -> Result<()> {
+        let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
+        if bytes > self.limits.max_snapshot_bytes() {
+            return Err(Error::Limit {
+                kind: LimitKind::SnapshotBytes,
+                observed: bytes,
+                maximum: self.limits.max_snapshot_bytes(),
+            }
+            .into());
         }
-        #[cfg(feature = "rtf")]
-        if let Some(run) = self.rtf.take() {
-            let index = run.first_index();
-            let result = (|| -> Result<()> {
-                let (base, commit) = run.commit()?;
-                let (step, ()) = wrap_rtf(&base, commit, ())?;
-                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
-                if bytes > self.limits.max_snapshot_bytes() {
-                    return Err(Error::Limit {
-                        kind: LimitKind::SnapshotBytes,
-                        observed: bytes,
-                        maximum: self.limits.max_snapshot_bytes(),
-                    }
-                    .into());
-                }
-                self.steps
-                    .try_reserve(1)
-                    .map_err(|source| Error::Allocation { source })?;
-                self.current = step.after.clone();
-                self.steps.push(step);
-                self.snapshot_bytes = bytes;
-                Ok(())
-            })();
-            result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
-        }
-        #[cfg(feature = "rtf")]
-        if let Some(run) = self.rtf_pictures.take() {
-            let index = run.first_index();
-            let result = (|| -> Result<()> {
-                let (base, commit) = run.commit(&self.limits)?;
-                let (step, ()) = wrap_rtf(&base, commit, ())?;
-                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
-                if bytes > self.limits.max_snapshot_bytes() {
-                    return Err(Error::Limit {
-                        kind: LimitKind::SnapshotBytes,
-                        observed: bytes,
-                        maximum: self.limits.max_snapshot_bytes(),
-                    }
-                    .into());
-                }
-                self.steps
-                    .try_reserve(1)
-                    .map_err(|source| Error::Allocation { source })?;
-                self.current = step.after.clone();
-                self.steps.push(step);
-                self.snapshot_bytes = bytes;
-                Ok(())
-            })();
-            result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
-        }
-        #[cfg(feature = "pages")]
-        if let Some(run) = self.pages.take() {
-            let index = run.first_index();
-            let result = (|| -> Result<()> {
-                let (base, commit) = run.commit()?;
-                let (step, ()) = wrap_iwork(&base, commit, ())?;
-                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
-                if bytes > self.limits.max_snapshot_bytes() {
-                    return Err(Error::Limit {
-                        kind: LimitKind::SnapshotBytes,
-                        observed: bytes,
-                        maximum: self.limits.max_snapshot_bytes(),
-                    }
-                    .into());
-                }
-                self.steps
-                    .try_reserve(1)
-                    .map_err(|source| Error::Allocation { source })?;
-                self.current = step.after.clone();
-                self.steps.push(step);
-                self.snapshot_bytes = bytes;
-                Ok(())
-            })();
-            result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
-        }
-        #[cfg(feature = "keynote")]
-        if let Some(run) = self.keynote.take() {
-            let first = run.first_index();
-            let result = (|| -> std::result::Result<(), (crate::Error, Option<usize>)> {
-                let (base, commit) = run
-                    .commit()
-                    .map_err(|(error, index)| (error, Some(index)))?;
-                let (step, ()) = wrap_iwork(&base, commit, ()).map_err(|error| (error, first))?;
-                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
-                if bytes > self.limits.max_snapshot_bytes() {
-                    return Err((
-                        Error::Limit {
-                            kind: LimitKind::SnapshotBytes,
-                            observed: bytes,
-                            maximum: self.limits.max_snapshot_bytes(),
-                        }
-                        .into(),
-                        first,
-                    ));
-                }
-                self.steps
-                    .try_reserve(1)
-                    .map_err(|source| (Error::Allocation { source }.into(), first))?;
-                self.current = step.after.clone();
-                self.steps.push(step);
-                self.snapshot_bytes = bytes;
-                Ok(())
-            })();
-            result
-                .map_err(|(error, index)| self.poison(error, index.unwrap_or(self.operations)))?;
-        }
-        #[cfg(feature = "odt")]
-        if let Some(run) = self.odt.take() {
-            let index = run.first_index();
-            let result = (|| -> Result<()> {
-                let (base, commit) = run.commit()?;
-                let (step, ()) = wrap_odt(&base, commit, ())?;
-                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
-                if bytes > self.limits.max_snapshot_bytes() {
-                    return Err(Error::Limit {
-                        kind: LimitKind::SnapshotBytes,
-                        observed: bytes,
-                        maximum: self.limits.max_snapshot_bytes(),
-                    }
-                    .into());
-                }
-                self.steps
-                    .try_reserve(1)
-                    .map_err(|source| Error::Allocation { source })?;
-                self.current = step.after.clone();
-                self.steps.push(step);
-                self.snapshot_bytes = bytes;
-                Ok(())
-            })();
-            result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
-        }
-        #[cfg(feature = "xlsb")]
-        if let Some(run) = self.xlsb_sheets.take() {
-            let index = run.first_index();
-            let result = (|| -> Result<()> {
-                let (base, commit) = run.commit()?;
-                let (step, ()) = wrap_xlsb(&base, commit, ())?;
-                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
-                if bytes > self.limits.max_snapshot_bytes() {
-                    return Err(Error::Limit {
-                        kind: LimitKind::SnapshotBytes,
-                        observed: bytes,
-                        maximum: self.limits.max_snapshot_bytes(),
-                    }
-                    .into());
-                }
-                self.steps
-                    .try_reserve(1)
-                    .map_err(|source| Error::Allocation { source })?;
-                self.current = step.after.clone();
-                self.steps.push(step);
-                self.snapshot_bytes = bytes;
-                Ok(())
-            })();
-            result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
-        }
-        #[cfg(feature = "xlsb")]
-        if let Some(run) = self.xlsb_cells.take() {
-            let index = run.first_index();
-            let result = (|| -> Result<()> {
-                let (base, commit) = run.commit()?;
-                let (step, ()) = wrap_xlsb(&base, commit, ())?;
-                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
-                if bytes > self.limits.max_snapshot_bytes() {
-                    return Err(Error::Limit {
-                        kind: LimitKind::SnapshotBytes,
-                        observed: bytes,
-                        maximum: self.limits.max_snapshot_bytes(),
-                    }
-                    .into());
-                }
-                self.steps
-                    .try_reserve(1)
-                    .map_err(|source| Error::Allocation { source })?;
-                self.current = step.after.clone();
-                self.steps.push(step);
-                self.snapshot_bytes = bytes;
-                Ok(())
-            })();
-            result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
-        }
-        #[cfg(feature = "xls")]
-        if let Some(run) = self.xls_cells.take() {
-            let index = run.first_index();
-            let result = (|| -> Result<()> {
-                let (base, commit) = run.commit()?;
-                let (step, ()) = wrap_xls(&base, commit, ())?;
-                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
-                if bytes > self.limits.max_snapshot_bytes() {
-                    return Err(Error::Limit {
-                        kind: LimitKind::SnapshotBytes,
-                        observed: bytes,
-                        maximum: self.limits.max_snapshot_bytes(),
-                    }
-                    .into());
-                }
-                self.steps
-                    .try_reserve(1)
-                    .map_err(|source| Error::Allocation { source })?;
-                self.current = step.after.clone();
-                self.steps.push(step);
-                self.snapshot_bytes = bytes;
-                Ok(())
-            })();
-            result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
-        }
-        #[cfg(feature = "xlsx")]
-        if let Some(run) = self.cells.take() {
-            let index = run.first_index();
-            let result = (|| -> Result<()> {
-                let (base, commit) = run.commit()?;
-                let (step, ()) = wrap_xlsx(&base, commit, ())?;
-                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
-                if bytes > self.limits.max_snapshot_bytes() {
-                    return Err(Error::Limit {
-                        kind: LimitKind::SnapshotBytes,
-                        observed: bytes,
-                        maximum: self.limits.max_snapshot_bytes(),
-                    }
-                    .into());
-                }
-                self.steps
-                    .try_reserve(1)
-                    .map_err(|source| Error::Allocation { source })?;
-                self.current = step.after.clone();
-                self.steps.push(step);
-                self.snapshot_bytes = bytes;
-                Ok(())
-            })();
-            result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
-        }
-        #[cfg(feature = "pptx")]
-        if let Some(run) = self.shapes.take() {
-            let index = run.first_index();
-            let result = (|| -> Result<()> {
-                let (base, commit, reported) = run.commit()?;
-                let (step, ()) = wrap_pptx(&base, commit, ())?;
-                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
-                if bytes > self.limits.max_snapshot_bytes() {
-                    return Err(Error::Limit {
-                        kind: LimitKind::SnapshotBytes,
-                        observed: bytes,
-                        maximum: self.limits.max_snapshot_bytes(),
-                    }
-                    .into());
-                }
-                self.steps
-                    .try_reserve(1)
-                    .map_err(|source| Error::Allocation { source })?;
-                self.reported
-                    .try_reserve(reported.len())
-                    .map_err(|source| Error::Allocation { source })?;
-                self.reported.extend(reported);
-                self.current = step.after.clone();
-                self.steps.push(step);
-                self.snapshot_bytes = bytes;
-                Ok(())
-            })();
-            result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
-        }
-        #[cfg(feature = "ods")]
-        if let Some(run) = self.ods_cells.take() {
-            let index = run.first_index();
-            let result = (|| -> Result<()> {
-                let (base, commit) = run.commit()?;
-                let (step, ()) = wrap_ods(&base, commit, ())?;
-                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
-                if bytes > self.limits.max_snapshot_bytes() {
-                    return Err(Error::Limit {
-                        kind: LimitKind::SnapshotBytes,
-                        observed: bytes,
-                        maximum: self.limits.max_snapshot_bytes(),
-                    }
-                    .into());
-                }
-                self.steps
-                    .try_reserve(1)
-                    .map_err(|source| Error::Allocation { source })?;
-                self.current = step.after.clone();
-                self.steps.push(step);
-                self.snapshot_bytes = bytes;
-                Ok(())
-            })();
-            result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
-        }
-        #[cfg(feature = "ppt")]
-        if let Some(run) = self.ppt_shapes.take() {
-            let index = run.first_index();
-            let result = (|| -> Result<()> {
-                let (base, commit) = run.commit()?;
-                let (step, ()) = wrap_ppt(&base, commit, ())?;
-                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
-                if bytes > self.limits.max_snapshot_bytes() {
-                    return Err(Error::Limit {
-                        kind: LimitKind::SnapshotBytes,
-                        observed: bytes,
-                        maximum: self.limits.max_snapshot_bytes(),
-                    }
-                    .into());
-                }
-                self.steps
-                    .try_reserve(1)
-                    .map_err(|source| Error::Allocation { source })?;
-                self.current = step.after.clone();
-                self.steps.push(step);
-                self.snapshot_bytes = bytes;
-                Ok(())
-            })();
-            result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
-        }
-        #[cfg(feature = "numbers")]
-        if let Some(run) = self.numbers_cells.take() {
-            let index = run.first_index();
-            let result = (|| -> Result<()> {
-                let (base, commit) = run.commit()?;
-                let (step, ()) = wrap_iwork(&base, commit, ())?;
-                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
-                if bytes > self.limits.max_snapshot_bytes() {
-                    return Err(Error::Limit {
-                        kind: LimitKind::SnapshotBytes,
-                        observed: bytes,
-                        maximum: self.limits.max_snapshot_bytes(),
-                    }
-                    .into());
-                }
-                self.steps
-                    .try_reserve(1)
-                    .map_err(|source| Error::Allocation { source })?;
-                self.current = step.after.clone();
-                self.steps.push(step);
-                self.snapshot_bytes = bytes;
-                Ok(())
-            })();
-            result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
-        }
-        #[cfg(odf_objects)]
-        if let Some(run) = self.odf_tree.take() {
-            let index = run.first_index();
-            let limits = self.limits;
-            let result = (|| -> Result<()> {
-                let (base, commit) = run.commit(&limits)?;
-                let (step, ()) = wrap_object(&base, commit, ())?;
-                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
-                if bytes > self.limits.max_snapshot_bytes() {
-                    return Err(Error::Limit {
-                        kind: LimitKind::SnapshotBytes,
-                        observed: bytes,
-                        maximum: self.limits.max_snapshot_bytes(),
-                    }
-                    .into());
-                }
-                self.steps
-                    .try_reserve(1)
-                    .map_err(|source| Error::Allocation { source })?;
-                self.current = step.after.clone();
-                self.steps.push(step);
-                self.snapshot_bytes = bytes;
-                Ok(())
-            })();
-            result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
-        }
-        #[cfg(feature = "odp")]
-        if let Some(run) = self.odp.take() {
-            let index = run.first_index();
-            let limits = self.limits;
-            let result = (|| -> Result<()> {
-                let (base, commit) = run.commit(&limits)?;
-                let (step, ()) = wrap_odp(&base, commit, ())?;
-                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
-                if bytes > self.limits.max_snapshot_bytes() {
-                    return Err(Error::Limit {
-                        kind: LimitKind::SnapshotBytes,
-                        observed: bytes,
-                        maximum: self.limits.max_snapshot_bytes(),
-                    }
-                    .into());
-                }
-                self.steps
-                    .try_reserve(1)
-                    .map_err(|source| Error::Allocation { source })?;
-                self.current = step.after.clone();
-                self.steps.push(step);
-                self.snapshot_bytes = bytes;
-                Ok(())
-            })();
-            result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
-        }
+        self.steps
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation { source })?;
+        self.reported
+            .try_reserve(reported.len())
+            .map_err(|source| Error::Allocation { source })?;
+        self.reported.extend(reported);
+        self.current = step.after.clone();
+        self.steps.push(step);
+        self.snapshot_bytes = bytes;
         Ok(())
+    }
+
+    /// The rollback point of an isolated command. The pending run is `Idle`:
+    /// the caller has just published it.
+    fn savepoint(&self) -> Savepoint {
+        Savepoint {
+            current: self.current.clone(),
+            steps: self.steps.len(),
+            snapshot_bytes: self.snapshot_bytes,
+            operations: self.operations,
+        }
+    }
+
+    /// Discard everything staged or published since `savepoint`, including
+    /// the pending run of whatever kind.
+    fn rollback_to(&mut self, savepoint: Savepoint) {
+        let Savepoint {
+            current,
+            steps,
+            snapshot_bytes,
+            operations,
+        } = savepoint;
+        self.pending = RunState::Idle;
+        self.current = current;
+        self.steps.truncate(steps);
+        self.snapshot_bytes = snapshot_bytes;
+        self.operations = operations;
     }
 
     /// Isolate one command without allowing its poison or candidate to escape.
@@ -3297,15 +3149,12 @@ impl Edit {
     ) -> Result<(T, bool)> {
         self.check()?;
         self.flush_pending()?;
-        let start = self.steps.len();
-        let operations = self.operations;
-        let before = self.current.clone();
-        let bytes = self.snapshot_bytes;
+        let savepoint = self.savepoint();
         let reported = self.reported.len();
         let result = operation(self).and_then(|value| {
             self.check()?;
             self.flush_pending()?;
-            Ok((value, changed(&self.steps[start..])?))
+            Ok((value, changed(&self.steps[savepoint.steps..])?))
         });
         // The isolated command's change is its steps' (record 0348).
         self.reported.truncate(reported);
@@ -3313,73 +3162,10 @@ impl Edit {
             Some(error) => Err(error),
             None => result,
         };
-        match result {
-            Ok(value) => Ok(value),
-            Err(error) => {
-                #[cfg(feature = "doc")]
-                {
-                    self.doc = None;
-                }
-                #[cfg(feature = "docx")]
-                {
-                    self.formatting = None;
-                }
-                #[cfg(feature = "rtf")]
-                {
-                    self.rtf = None;
-                }
-                #[cfg(feature = "odt")]
-                {
-                    self.odt = None;
-                }
-                #[cfg(feature = "pages")]
-                {
-                    self.pages = None;
-                }
-                #[cfg(feature = "keynote")]
-                {
-                    self.keynote = None;
-                }
-                #[cfg(feature = "xlsx")]
-                {
-                    self.cells = None;
-                }
-                #[cfg(feature = "xlsb")]
-                {
-                    self.xlsb_cells = None;
-                    self.xlsb_sheets = None;
-                }
-                #[cfg(feature = "xls")]
-                {
-                    self.xls_cells = None;
-                }
-                #[cfg(feature = "pptx")]
-                {
-                    self.shapes = None;
-                }
-                #[cfg(feature = "ppt")]
-                {
-                    self.ppt_shapes = None;
-                }
-                #[cfg(feature = "ods")]
-                {
-                    self.ods_cells = None;
-                }
-                #[cfg(feature = "numbers")]
-                {
-                    self.numbers_cells = None;
-                }
-                #[cfg(feature = "odp")]
-                {
-                    self.odp = None;
-                }
-                self.current = before;
-                self.steps.truncate(start);
-                self.snapshot_bytes = bytes;
-                self.operations = operations;
-                Err(error)
-            },
+        if result.is_err() {
+            self.rollback_to(savepoint);
         }
+        result
     }
 
     /// The match count of the last `find=` set, taken (record 0273).
@@ -3521,13 +3307,13 @@ impl Edit {
                 }
                 .into());
             }
-            let staged = match self.keynote.as_mut() {
-                Some(run) => run.stage_add(&parent, &node, index),
-                None => {
+            let staged = match &mut self.pending {
+                RunState::Keynote(run) => run.stage_add(&parent, &node, index),
+                _ => {
                     let mut run = crate::format::iwork::keynote::Run::new(&handle, &self.limits);
                     let staged = run.stage_add(&parent, &node, index);
                     if matches!(staged, Ok(Some(_))) {
-                        self.keynote = Some(run);
+                        self.begin(RunState::Keynote(run));
                     }
                     staged
                 },
@@ -4405,4 +4191,71 @@ fn xls_staging_full(error: &crate::Error) -> bool {
             ..
         })
     )
+}
+
+#[cfg(all(test, any(feature = "rtf", feature = "odb")))]
+mod tests {
+    #![allow(
+        clippy::expect_used,
+        clippy::unwrap_used,
+        reason = "test assertions panic by design"
+    )]
+
+    use crate::{Code, File};
+
+    fn refused() -> crate::Error {
+        crate::Error::new(Code::InvalidArgument, "refused")
+    }
+
+    /// A failed isolated command leaves nothing behind: neither a published
+    /// step nor a staged run that a later flush would publish.
+    fn assert_discarded(source: &File, stage: impl FnOnce(&mut super::Edit) -> crate::Result<()>) {
+        let commit = source
+            .edit(|edit| {
+                let error = edit
+                    .isolated(|edit| {
+                        stage(edit)?;
+                        Err::<(), _>(refused())
+                    })
+                    .unwrap_err();
+                assert_eq!(error.code(), Code::InvalidArgument);
+                Ok(())
+            })
+            .unwrap();
+        assert!(!commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().operations(), 0);
+        assert_eq!(commit.diagnostics().commits(), 0);
+        assert_eq!(
+            commit.file().to_bytes().unwrap(),
+            source.to_bytes().unwrap()
+        );
+    }
+
+    #[cfg(feature = "rtf")]
+    #[test]
+    fn a_failed_isolated_command_discards_its_staged_picture_removal() {
+        let source = crate::open_bytes(
+            br"{\rtf1\ansi\pard A{\pict\pngblip 89504e470d0a1a0a0000000d49484452}B\par}".to_vec(),
+        )
+        .unwrap();
+        assert_discarded(&source, |edit| edit.remove("/body/p[1]/picture[1]"));
+    }
+
+    #[cfg(feature = "odb")]
+    #[test]
+    fn a_failed_isolated_command_discards_its_staged_object_set() {
+        let source = crate::create(litchi_core::FileFormat::Odb)
+            .unwrap()
+            .add(
+                "/",
+                crate::NewNode::new("query")
+                    .prop("name", "q")
+                    .prop("command", "SELECT 1"),
+            )
+            .unwrap()
+            .file;
+        assert_discarded(&source, |edit| {
+            edit.set("/query[1]", crate::props! { "command" => "SELECT 2" })
+        });
+    }
 }

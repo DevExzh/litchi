@@ -447,6 +447,36 @@ fn an_earlier_deferred_native_failure_precedes_later_set_admission_errors() {
 }
 
 #[test]
+fn an_earlier_deferred_native_failure_precedes_a_later_remove_operation_limit() {
+    let bytes = rewrite_final_transform(&fixture(3));
+    let limits = SemanticLimits::builder()
+        .max_operations(2)
+        .expect("valid operation limit")
+        .build()
+        .expect("build operation limit");
+    for eager in [false, true] {
+        let source = open(&bytes, eager);
+        let before = source.to_bytes().expect("serialize malformed source");
+        let error = source
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |edit| {
+                    edit.set(shape_path(1).as_str(), full_bounds("1in"))?;
+                    edit.set(shape_path(3).as_str(), full_bounds("2in"))?;
+                    edit.remove(shape_path(2).as_str())
+                },
+            )
+            .expect_err("the pending native failure must win");
+        assert_eq!(error.item(), Some(1));
+        assert!(matches!(
+            error.code(),
+            Code::CorruptFile | Code::MissingProperty | Code::InvalidValue
+        ));
+        assert_eq!(source.to_bytes().expect("source remains unchanged"), before);
+    }
+}
+
+#[test]
 fn best_effort_isolates_a_late_malformed_transform_from_valid_shape_sets() {
     let bytes = rewrite_final_transform(&fixture(3));
     for eager in [false, true] {
