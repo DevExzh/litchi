@@ -446,6 +446,9 @@ fn commit_from_body(source: Package, body_commit: body_text::PackageCommit) -> R
 pub struct Edit<'a, S = OrdinaryEditState> {
     package: Package,
     options: EditOptions,
+    /// `None` while the open is deferred: construction reads nothing, and the
+    /// first body operation, conversion or commit opens the body edit through
+    /// `state`. Once open it stays open until a commit takes it.
     inner: Option<body_text::Edit>,
     state: S,
     _profile: std::marker::PhantomData<&'a ()>,
@@ -543,24 +546,24 @@ impl<'a> Edit<'a, ProfiledOpen<'a>> {
 
 #[allow(private_bounds)]
 impl<'a, S: DeferredOpenState> Edit<'a, S> {
+    /// The body edit, opened now if no body operation has needed it yet. A
+    /// failed open leaves it deferred, so the next use tries again.
     fn inner_mut(&mut self) -> Result<&mut body_text::Edit> {
-        if self.inner.is_none() {
-            self.inner = Some(self.state.open(&self.package, &self.options)?);
+        match self.inner {
+            Some(ref mut inner) => Ok(inner),
+            None => {
+                let opened = self.state.open(&self.package, &self.options)?;
+                Ok(self.inner.insert(opened))
+            },
         }
-        self.inner.as_mut().ok_or_else(|| {
-            Error::Package(PackageError::InvalidFormat(
-                "DOC edit was not initialized".into(),
-            ))
-        })
     }
 
+    /// The body edit for a commit, opened now if it is still deferred.
     fn take_inner(&mut self) -> Result<body_text::Edit> {
-        self.inner_mut()?;
-        self.inner.take().ok_or_else(|| {
-            Error::Package(PackageError::InvalidFormat(
-                "DOC edit was not initialized".into(),
-            ))
-        })
+        match self.inner.take() {
+            Some(inner) => Ok(inner),
+            None => self.state.open(&self.package, &self.options),
+        }
     }
 
     /// Immutable package snapshot that authorizes this transaction.

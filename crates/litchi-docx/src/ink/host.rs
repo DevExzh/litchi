@@ -317,16 +317,123 @@ struct Children {
     group_ext: usize,
     group_ch_off: usize,
     group_ch_ext: usize,
-    group_order_next: u8,
-    group_order_bad: bool,
-    group_transform_order_next: u8,
-    group_transform_order_bad: bool,
+    group_stage: GroupChildStage,
+    group_properties_stage: GroupPropertiesChildStage,
+    group_transform_stage: GroupTransformChildStage,
     content_part: usize,
     pict: usize,
     vml_shape: usize,
     vml_object: usize,
     vml_unknown: usize,
     other: usize,
+}
+
+/// Which child a `wpg:wgp` group expects next.
+///
+/// ```text
+/// NonVisualProperties --cNvGrpSpPr--------------> Properties
+/// Properties ----------grpSpPr-----------------> ContentPart
+/// ContentPart ---------generic contentPart-----> Complete
+/// any stage -----------any other child---------> OutOfOrder
+/// ```
+///
+/// Each child is required and occurs once. `OutOfOrder` is terminal; only a
+/// group that closes in `Complete` is valid.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum GroupChildStage {
+    #[default]
+    NonVisualProperties,
+    Properties,
+    ContentPart,
+    Complete,
+    OutOfOrder,
+}
+
+impl GroupChildStage {
+    fn after(self, child: Kind) -> Self {
+        match (self, child) {
+            (Self::NonVisualProperties, Kind::GroupCnvGrpSpPr) => Self::Properties,
+            (Self::Properties, Kind::GroupSpPr) => Self::ContentPart,
+            (Self::ContentPart, Kind::ContentPart(Form::GenericDrawing)) => Self::Complete,
+            (
+                Self::NonVisualProperties
+                | Self::Properties
+                | Self::ContentPart
+                | Self::Complete
+                | Self::OutOfOrder,
+                _,
+            ) => Self::OutOfOrder,
+        }
+    }
+}
+
+/// Which child the `wpg:grpSpPr` of a group expects next.
+///
+/// ```text
+/// Transform --xfrm-------------> Complete
+/// any stage --any other child--> OutOfOrder
+/// ```
+///
+/// The transform is required and occurs once. `OutOfOrder` is terminal; only
+/// properties that close in `Complete` are valid.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum GroupPropertiesChildStage {
+    #[default]
+    Transform,
+    Complete,
+    OutOfOrder,
+}
+
+impl GroupPropertiesChildStage {
+    fn after(self, child: Kind) -> Self {
+        match (self, child) {
+            (Self::Transform, Kind::GroupXfrm) => Self::Complete,
+            (Self::Transform | Self::Complete | Self::OutOfOrder, _) => Self::OutOfOrder,
+        }
+    }
+}
+
+/// Which child the `a:xfrm` of a group expects next.
+///
+/// ```text
+/// Offset ------off--------------> Extent
+/// Extent ------ext--------------> ChildOffset
+/// ChildOffset -chOff------------> ChildExtent
+/// ChildExtent -chExt------------> Complete
+/// any stage ---any other child--> OutOfOrder
+/// ```
+///
+/// Each child is required and occurs once. `OutOfOrder` is terminal; only a
+/// transform that closes in `Complete` is valid.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum GroupTransformChildStage {
+    #[default]
+    Offset,
+    Extent,
+    ChildOffset,
+    ChildExtent,
+    Complete,
+    OutOfOrder,
+}
+
+impl GroupTransformChildStage {
+    fn after(self, child: Kind) -> Self {
+        match (self, child) {
+            (Self::Offset, Kind::GroupOff) => Self::Extent,
+            (Self::Extent, Kind::GroupExt) => Self::ChildOffset,
+            (Self::ChildOffset, Kind::GroupChOff) => Self::ChildExtent,
+            (Self::ChildExtent, Kind::GroupChExt) => Self::Complete,
+            (
+                Self::Offset
+                | Self::Extent
+                | Self::ChildOffset
+                | Self::ChildExtent
+                | Self::Complete
+                | Self::OutOfOrder,
+                _,
+            ) => Self::OutOfOrder,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1144,21 +1251,15 @@ fn note_child(stack: &mut [Frame], child: Kind) {
     };
     let parent_kind = stack[parent_index].kind;
     note_kind(&mut stack[parent_index].children, child);
+    let children = &mut stack[parent_index].children;
     match parent_kind {
-        Kind::Group => note_group_child_order(&mut stack[parent_index].children, child),
+        Kind::Group => children.group_stage = children.group_stage.after(child),
         Kind::GroupSpPr => {
-            note_group_metadata_order(&mut stack[parent_index].children, child, [Kind::GroupXfrm]);
+            children.group_properties_stage = children.group_properties_stage.after(child);
         },
-        Kind::GroupXfrm => note_group_metadata_order(
-            &mut stack[parent_index].children,
-            child,
-            [
-                Kind::GroupOff,
-                Kind::GroupExt,
-                Kind::GroupChOff,
-                Kind::GroupChExt,
-            ],
-        ),
+        Kind::GroupXfrm => {
+            children.group_transform_stage = children.group_transform_stage.after(child);
+        },
         _ => {},
     }
     if parent_kind != Kind::Pict {
@@ -1178,33 +1279,6 @@ fn note_group_metadata_bad(stack: &mut [Frame], aggregates: &mut [Aggregate]) {
     }
     if let Some(host_id) = stack.iter().rev().find_map(|frame| frame.host_id) {
         aggregates[host_id].path_bad = true;
-    }
-}
-
-fn note_group_child_order(children: &mut Children, child: Kind) {
-    let expected = match children.group_order_next {
-        0 => Kind::GroupCnvGrpSpPr,
-        1 => Kind::GroupSpPr,
-        2 => Kind::ContentPart(Form::GenericDrawing),
-        _ => Kind::Other,
-    };
-    if expected != child {
-        children.group_order_bad = true;
-    } else {
-        children.group_order_next = children.group_order_next.saturating_add(1);
-    }
-}
-
-fn note_group_metadata_order<const N: usize>(
-    children: &mut Children,
-    child: Kind,
-    expected: [Kind; N],
-) {
-    let index = usize::from(children.group_transform_order_next);
-    if expected.get(index).copied() != Some(child) {
-        children.group_transform_order_bad = true;
-    } else {
-        children.group_transform_order_next = children.group_transform_order_next.saturating_add(1);
     }
 }
 
@@ -1386,8 +1460,7 @@ fn pict_children_bad(children: Children) -> bool {
 
 fn group_children_valid(children: Children) -> bool {
     !children.metadata_bad
-        && !children.group_order_bad
-        && children.group_order_next == 3
+        && children.group_stage == GroupChildStage::Complete
         && children.total == 3
         && children.group_cnv_grp_sp_pr == 1
         && children.group_sp_pr == 1
@@ -1396,16 +1469,14 @@ fn group_children_valid(children: Children) -> bool {
 
 fn group_properties_children_valid(children: Children) -> bool {
     !children.metadata_bad
-        && !children.group_transform_order_bad
-        && children.group_transform_order_next == 1
+        && children.group_properties_stage == GroupPropertiesChildStage::Complete
         && children.total == 1
         && children.group_xfrm == 1
 }
 
 fn group_transform_children_valid(children: Children) -> bool {
     !children.metadata_bad
-        && !children.group_transform_order_bad
-        && children.group_transform_order_next == 4
+        && children.group_transform_stage == GroupTransformChildStage::Complete
         && children.total == 4
         && children.group_off == 1
         && children.group_ext == 1
