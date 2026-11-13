@@ -9117,4 +9117,297 @@ mod picture_fragment_tests {
             Ok(_) => panic!("a span without its bindings must not parse standalone"),
         }
     }
+
+    const ORDER: &str = r#"Invalid("picture descriptor direct children must be nvPicPr, blipFill, and spPr in schema order")"#;
+    const EXACT: &str =
+        r#"Invalid("picture descriptor requires exactly nvPicPr, blipFill, and spPr children")"#;
+    const FILL_ORDER: &str = r#"Invalid("picture blipFill direct children are an ordered blip, srcRect, and stretch/tile set")"#;
+    const NO_BLIP: &str =
+        r#"Relationship("picture descriptor is missing its a:blip relationship")"#;
+    const EMPTY_STRETCH: &str = r#"Invalid("picture blipFill stretch must contain one fillRect")"#;
+    const NO_FILL_RECTANGLE: &str =
+        r#"Invalid("picture stretch requires exactly one direct fillRect")"#;
+
+    /// A standalone `p:pic` descriptor around `children`.
+    fn picture(children: &str) -> String {
+        format!(r#"<p:pic xmlns:p="{PML}" xmlns:a="{DML}" xmlns:r="{REL}">{children}</p:pic>"#)
+    }
+
+    /// The relationship ID a descriptor resolves to, or its refusal with the
+    /// error variant and exact message.
+    fn outcome(xml: &str) -> String {
+        match parse_picture_relationship(xml.as_bytes()) {
+            Ok(relationship) => format!("ok {}", relationship.id),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    /// Every sequence of one to `longest` letters of `alphabet`, repeats
+    /// included.
+    fn sequences(alphabet: &str, longest: usize) -> Vec<String> {
+        let mut all = Vec::new();
+        let mut last = vec![String::new()];
+        for _ in 0..longest {
+            let mut next = Vec::new();
+            for prefix in &last {
+                for letter in alphabet.chars() {
+                    next.push(format!("{prefix}{letter}"));
+                }
+            }
+            all.extend(next.iter().cloned());
+            last = next;
+        }
+        all
+    }
+
+    /// Direct `p:pic` children by letter: `N` nvPicPr, `B` blipFill, `S`
+    /// spPr and `U` a child this parser does not know (`p:style`).
+    fn picture_children(sequence: &str) -> String {
+        sequence
+            .chars()
+            .map(|letter| match letter {
+                'N' => "<p:nvPicPr/>",
+                'B' => r#"<p:blipFill><a:blip r:embed="rId1"/></p:blipFill>"#,
+                'S' => "<p:spPr/>",
+                'U' => "<p:style/>",
+                other => panic!("unknown picture child letter {other}"),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn picture_children_are_accepted_in_exactly_one_order() {
+        // Every sequence of up to four children that is not refused at a
+        // child for being out of order.
+        let not_refused_at_a_child = [
+            ("N", EXACT),
+            ("NB", EXACT),
+            ("NBS", "ok rId1"),
+            ("NBSU", EXACT),
+        ];
+        let mut accepted = 0;
+        let mut refused = 0;
+        for sequence in sequences("NBSU", 4) {
+            let expected = not_refused_at_a_child
+                .iter()
+                .find(|(listed, _)| *listed == sequence)
+                .map_or(ORDER, |(_, expected)| expected);
+            let actual = outcome(&picture(&picture_children(&sequence)));
+            assert_eq!(actual, expected, "children {sequence}");
+            if actual.starts_with("ok") {
+                accepted += 1;
+            } else {
+                refused += 1;
+            }
+        }
+        assert_eq!((accepted, refused), (1, 339));
+    }
+
+    #[test]
+    fn a_picture_without_children_is_refused() {
+        assert_eq!(outcome(&picture("")), EXACT);
+        assert_eq!(
+            outcome(&format!(
+                r#"<p:pic xmlns:p="{PML}" xmlns:a="{DML}" xmlns:r="{REL}"/>"#
+            )),
+            r#"Invalid("picture descriptor requires nvPicPr, blipFill, and spPr children")"#
+        );
+    }
+
+    #[test]
+    fn unknown_children_after_the_shape_properties_are_refused_only_at_the_end() {
+        // An unknown child after spPr is not refused where it stands, so a
+        // later known child is still reported as out of order, and a later
+        // defect inside an unknown child is reported first.
+        for (trailing, expected) in [
+            ("U", EXACT),
+            ("UU", EXACT),
+            ("UUU", EXACT),
+            ("UN", ORDER),
+            ("UB", ORDER),
+            ("US", ORDER),
+            ("UUS", ORDER),
+        ] {
+            let children = picture_children(&format!("NBS{trailing}"));
+            assert_eq!(outcome(&picture(&children)), expected, "NBS{trailing}");
+        }
+        assert_eq!(
+            outcome(&picture(&format!(
+                "{}<p:style><p:pic/></p:style>",
+                picture_children("NBS")
+            ))),
+            r#"Invalid("picture descriptor contains a nested p:pic")"#
+        );
+        // However many unknown children follow, the count never comes back
+        // around to an accepted picture.
+        for extra in [252, 253, 254, 255, 256, 257, 300, 509, 512] {
+            let children = format!("{}{}", picture_children("NBS"), "<p:style/>".repeat(extra));
+            assert_eq!(outcome(&picture(&children)), EXACT, "{extra} unknown");
+        }
+    }
+
+    /// Direct `p:blipFill` children by letter: `L` blip, `R` srcRect, `T`
+    /// stretch with its fillRect, `I` tile and `U` an unknown child.
+    fn blip_fill_children(sequence: &str) -> String {
+        sequence
+            .chars()
+            .map(|letter| match letter {
+                'L' => r#"<a:blip r:embed="rId1"/>"#,
+                'R' => "<a:srcRect/>",
+                'T' => "<a:stretch><a:fillRect/></a:stretch>",
+                'I' => "<a:tile/>",
+                'U' => "<a:effectLst/>",
+                other => panic!("unknown blipFill child letter {other}"),
+            })
+            .collect()
+    }
+
+    /// A complete picture whose `p:blipFill` holds `children`.
+    fn picture_with_blip_fill(children: &str) -> String {
+        picture(&format!(
+            "<p:nvPicPr/><p:blipFill>{children}</p:blipFill><p:spPr/>"
+        ))
+    }
+
+    #[test]
+    fn blip_fill_children_follow_one_order_with_each_child_at_most_once() {
+        // Every sequence of up to four children that is not refused at a
+        // child. A fill without a blip is refused only after the picture.
+        let not_refused_at_a_child = [
+            ("L", "ok rId1"),
+            ("LR", "ok rId1"),
+            ("LT", "ok rId1"),
+            ("LI", "ok rId1"),
+            ("LRT", "ok rId1"),
+            ("LRI", "ok rId1"),
+            ("R", NO_BLIP),
+            ("T", NO_BLIP),
+            ("I", NO_BLIP),
+            ("RT", NO_BLIP),
+            ("RI", NO_BLIP),
+        ];
+        let mut accepted = 0;
+        let mut refused = 0;
+        for sequence in sequences("LRTI", 4) {
+            let expected = not_refused_at_a_child
+                .iter()
+                .find(|(listed, _)| *listed == sequence)
+                .map_or(FILL_ORDER, |(_, expected)| expected);
+            let actual = outcome(&picture_with_blip_fill(&blip_fill_children(&sequence)));
+            assert_eq!(actual, expected, "children {sequence}");
+            if actual.starts_with("ok") {
+                accepted += 1;
+            } else {
+                refused += 1;
+            }
+        }
+        assert_eq!((accepted, refused), (6, 334));
+    }
+
+    #[test]
+    fn an_empty_blip_fill_and_unknown_blip_fill_children_are_refused() {
+        assert_eq!(outcome(&picture_with_blip_fill("")), NO_BLIP);
+        assert_eq!(
+            outcome(&picture("<p:nvPicPr/><p:blipFill/><p:spPr/>")),
+            NO_BLIP
+        );
+        for sequence in ["U", "UL", "LU", "LRU", "LTU", "LIU", "RU", "LUT"] {
+            assert_eq!(
+                outcome(&picture_with_blip_fill(&blip_fill_children(sequence))),
+                FILL_ORDER,
+                "children {sequence}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_stretch_is_checked_for_its_place_before_its_fill_rectangle() {
+        for (children, expected) in [
+            ("<a:stretch/>", EMPTY_STRETCH),
+            (r#"<a:blip r:embed="rId1"/><a:stretch/>"#, EMPTY_STRETCH),
+            (
+                r#"<a:blip r:embed="rId1"/><a:srcRect/><a:stretch/>"#,
+                EMPTY_STRETCH,
+            ),
+            (
+                r#"<a:blip r:embed="rId1"/><a:tile/><a:stretch/>"#,
+                FILL_ORDER,
+            ),
+            (
+                r#"<a:blip r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch><a:stretch/>"#,
+                FILL_ORDER,
+            ),
+            // A stretch without its fillRect is refused after the picture,
+            // and only once the blip is known to be present.
+            (
+                r#"<a:blip r:embed="rId1"/><a:stretch></a:stretch>"#,
+                NO_FILL_RECTANGLE,
+            ),
+            ("<a:stretch></a:stretch>", NO_BLIP),
+            (
+                r#"<a:blip r:embed="rId1"/><a:stretch><a:fillRect/><a:fillRect/></a:stretch>"#,
+                NO_FILL_RECTANGLE,
+            ),
+        ] {
+            assert_eq!(
+                outcome(&picture_with_blip_fill(children)),
+                expected,
+                "children {children}"
+            );
+        }
+    }
+
+    #[test]
+    fn every_blip_fill_element_of_a_picture_shares_one_child_order() {
+        // A `p:blipFill` nested in another picture child is read with the
+        // same order state as the direct one, wherever it stands.
+        for (children, expected) in [
+            (
+                r#"<p:nvPicPr><p:blipFill><a:blip r:embed="rId9"/></p:blipFill></p:nvPicPr><p:blipFill/><p:spPr/>"#,
+                "ok rId9",
+            ),
+            (
+                r#"<p:nvPicPr><p:blipFill><a:blip r:embed="rId9"/></p:blipFill></p:nvPicPr><p:blipFill><a:blip r:embed="rId1"/></p:blipFill><p:spPr/>"#,
+                FILL_ORDER,
+            ),
+            (
+                r#"<p:nvPicPr><p:blipFill><a:blip r:embed="rId9"/></p:blipFill></p:nvPicPr><p:blipFill><a:srcRect/><a:tile/></p:blipFill><p:spPr/>"#,
+                "ok rId9",
+            ),
+            (
+                r#"<p:nvPicPr><p:blipFill><a:srcRect/></p:blipFill></p:nvPicPr><p:blipFill><a:blip r:embed="rId1"/></p:blipFill><p:spPr/>"#,
+                FILL_ORDER,
+            ),
+            (
+                r#"<p:nvPicPr><p:blipFill><a:srcRect/></p:blipFill></p:nvPicPr><p:blipFill><a:tile/></p:blipFill><p:spPr/>"#,
+                NO_BLIP,
+            ),
+            (
+                r#"<p:nvPicPr/><p:blipFill><a:blip r:embed="rId1"/></p:blipFill><p:spPr><p:blipFill><a:srcRect/><a:stretch><a:fillRect/></a:stretch></p:blipFill></p:spPr>"#,
+                "ok rId1",
+            ),
+            (
+                r#"<p:nvPicPr/><p:blipFill><a:blip r:embed="rId1"/><a:tile/></p:blipFill><p:spPr><p:blipFill><a:srcRect/></p:blipFill></p:spPr>"#,
+                FILL_ORDER,
+            ),
+            (
+                r#"<p:nvPicPr/><p:blipFill><a:blip r:embed="rId1"/><a:tile/></p:blipFill><p:spPr><p:blipFill><a:tile/></p:blipFill></p:spPr>"#,
+                FILL_ORDER,
+            ),
+            (
+                r#"<p:nvPicPr/><p:blipFill><a:blip r:embed="rId1"/></p:blipFill><p:spPr><p:blipFill><a:stretch></a:stretch></p:blipFill></p:spPr>"#,
+                NO_FILL_RECTANGLE,
+            ),
+            (
+                r#"<p:nvPicPr/><p:blipFill><a:blip r:embed="rId1"/></p:blipFill><p:spPr/><p:style><p:blipFill><a:tile/></p:blipFill></p:style>"#,
+                EXACT,
+            ),
+            (
+                r#"<p:nvPicPr/><p:blipFill><a:blip r:embed="rId1"/><a:tile/></p:blipFill><p:spPr/><p:style><p:blipFill><a:tile/></p:blipFill></p:style>"#,
+                FILL_ORDER,
+            ),
+        ] {
+            assert_eq!(outcome(&picture(children)), expected, "children {children}");
+        }
+    }
 }
