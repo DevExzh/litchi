@@ -26,10 +26,6 @@ pub(in crate::web) use super::validation::{
     validate_panes_budget, validate_snapshot_resources_with, validate_store_reference,
     validate_task_pane, validate_task_pane_with,
 };
-#[allow(
-    unused_imports,
-    reason = "The private codec facade preserves the parent-facing package helper paths."
-)]
 pub(in crate::web) use package::{
     checked_internal_target, load_snapshot_resources, require_content_type,
 };

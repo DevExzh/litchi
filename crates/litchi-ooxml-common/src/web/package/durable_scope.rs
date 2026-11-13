@@ -307,7 +307,6 @@ fn escaped_attribute(value: &str, emit: &mut impl FnMut(&[u8]) -> Result<()>) ->
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, reason = "bounded hashing fixtures must succeed")]
 mod tests {
     use super::*;
 

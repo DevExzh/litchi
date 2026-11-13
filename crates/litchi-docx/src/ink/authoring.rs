@@ -1801,11 +1801,6 @@ impl VerticalAlignment {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "authoring tests use direct fixture assertions"
-)]
 mod tests {
     use super::*;
 

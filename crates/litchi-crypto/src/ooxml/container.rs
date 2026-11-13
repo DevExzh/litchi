@@ -498,10 +498,6 @@ fn allocation_io() -> std::io::Error {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::expect_used,
-        reason = "test code panics on failure; expect keeps assertions concise"
-    )]
     use super::*;
     use crate::spaces::{ENCRYPTION_ID, Limits as DataSpacesLimits, inspect_bytes};
 

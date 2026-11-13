@@ -374,10 +374,6 @@ fn append_byte_checked(
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        reason = "test fixtures and assertions panic intentionally on failure"
-    )]
 
     use super::*;
 

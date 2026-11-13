@@ -43,10 +43,6 @@ enum Role {
     Other,
 }
 
-#[allow(
-    clippy::ref_option,
-    reason = "the fragment prefix is the shared tri-state of the paragraph scanners"
-)]
 fn role(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,

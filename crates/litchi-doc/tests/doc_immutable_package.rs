@@ -1,5 +1,3 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, reason = "test assertions")]
-
 use litchi_doc::{Builder, Document, Error, OpenOptions, Package, SourceLimitKind, SourceLimits};
 use std::io::Cursor;
 

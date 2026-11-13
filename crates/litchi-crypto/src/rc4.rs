@@ -386,10 +386,6 @@ fn test_context(secret: [u8; 20], key_bits: usize) -> Context {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        reason = "test code panics on failure; unwrap keeps assertions concise"
-    )]
     use super::*;
 
     fn assert_send_sync<T: Send + Sync>() {}

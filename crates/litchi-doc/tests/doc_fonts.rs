@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::indexing_slicing,
-    reason = "integration-test fixtures favor concise panic-driven assertions over production-style ergonomics"
-)]
-
 //! The font table (`SttbfFfn`) and `font_name(ftc)`.
 
 use litchi_core::Position;

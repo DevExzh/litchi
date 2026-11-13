@@ -1,8 +1,4 @@
 //! Typed semantic `SpreadsheetDrawing` shape models.
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Public re-exports and parser limits are kept beside their supporting model code."
-)]
 //!
 //! The model is context-first: anchors own objects, groups own direct children,
 //! and unknown markup remains inert and bounded rather than being discarded.
@@ -13,10 +9,6 @@ use std::str::FromStr;
 use crate::{Error, Result};
 use litchi_drawingml::geometry::Limits as GeometryLimits;
 
-#[allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Public re-exports stay adjacent to their supporting imports."
-)]
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
@@ -72,10 +64,6 @@ impl fmt::Display for Aspect {
     }
 }
 
-#[allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "Parser limits remain next to the model definitions that use them."
-)]
 pub(crate) const MAX_DRAWING_PART_BYTES: usize = 32 * 1024 * 1024;
 pub(crate) const MAX_ANCHORS_PER_DRAWING: usize = 100_000;
 pub(crate) const MAX_OBJECTS_PER_DRAWING: usize = 100_000;

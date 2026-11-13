@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "this ignored interoperability probe uses fixture failures as assertions"
-)]
-
 //! Bounded interoperability coverage for an independently produced ZIP64 OPC
 //! source.  The test is ignored because the corpus is supplied by the
 //! external-producer harness rather than checked into this repository.

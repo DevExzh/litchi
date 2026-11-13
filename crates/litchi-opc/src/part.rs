@@ -21,10 +21,6 @@ use std::sync::Arc;
 /// users implement [`Clone`]; the blanket implementation supplies the erased
 /// clone operation.
 #[doc(hidden)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "supertrait name intentionally mirrors the Part trait it supports"
-)]
 pub trait PartClone {
     fn clone_part(&self) -> Box<dyn Part + Send + Sync>;
 }
@@ -252,10 +248,6 @@ pub trait Part: PartClone + Send + Sync {
 /// content as a byte vector and manages relationships. Uses Arc for
 /// efficient sharing of blob data.
 #[derive(Debug, Clone)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "name mirrors the Part trait role; renaming would break the public API"
-)]
 pub struct BlobPart {
     /// The partname (URI) of this part
     partname: PackURI,
@@ -406,10 +398,6 @@ impl Part for BlobPart {
 /// using quick-xml with zero-copy parsing where possible. Uses Arc for efficient
 /// sharing of XML data.
 #[derive(Debug)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "name mirrors the Part trait role; renaming would break the public API"
-)]
 pub struct XmlPart {
     /// The partname (URI) of this part
     partname: PackURI,
@@ -788,10 +776,6 @@ impl<'part> PartMetadata<'part> {
 ///
 /// The factory uses a type-based dispatch system to create the appropriate
 /// Part implementation (`BlobPart` for binary content, `XmlPart` for XML content).
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "factory name mirrors the Part trait it constructs; renaming would break the public API"
-)]
 pub struct PartFactory;
 
 impl PartFactory {
@@ -869,11 +853,6 @@ impl PartFactory {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        reason = "test assertions panic on failure by design"
-    )]
     use super::*;
 
     #[test]

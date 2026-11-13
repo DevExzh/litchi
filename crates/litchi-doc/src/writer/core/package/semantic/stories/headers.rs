@@ -14,10 +14,6 @@ impl Builder {
     ///
     /// Appends header/footer text to `text_stream`, extends CHPX/PAPX entries and pieces.
     /// Returns (`plcfhdd_bytes`, `header_cp_length`). If no header/footer set, returns None.
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "parameters map one-to-one to a fixed DOC record or semantic construction"
-    )] // TODO: Refactor to reduce arguments
     pub(in crate::writer::core::package) fn build_header_story(
         &self,
         text_fc_start: u32,

@@ -1251,10 +1251,6 @@ fn xml_error(message: impl Into<String>) -> Error {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        reason = "test code panics on failure; unwrap keeps assertions concise"
-    )]
     use super::*;
 
     const SITE: &str = "12345678-1234-5678-90ab-1234567890ab";

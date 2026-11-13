@@ -229,11 +229,6 @@ impl Run {
     }
 }
 
-#[allow(
-    clippy::option_option,
-    clippy::ref_option,
-    reason = "three states distinguish unobserved, unprefixed, and prefixed XML fragments"
-)]
 fn classify(
     namespace: &quick_xml::name::ResolveResult<'_>,
     name: quick_xml::name::QName<'_>,
@@ -260,11 +255,6 @@ fn classify(
     Kind::Unknown
 }
 
-#[allow(
-    clippy::option_option,
-    clippy::ref_option,
-    reason = "three states distinguish unobserved, unprefixed, and prefixed XML fragments"
-)]
 fn push_content(
     contents: &mut Vec<RunContent>,
     source: &XmlRef,
@@ -347,11 +337,6 @@ fn push_content(
     Ok(())
 }
 
-#[allow(
-    clippy::option_option,
-    clippy::ref_option,
-    reason = "three states distinguish unobserved, unprefixed, and prefixed XML fragments"
-)]
 fn note_id(
     raw: &[u8],
     fragment_prefix: &Option<Option<Vec<u8>>>,

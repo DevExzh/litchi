@@ -745,7 +745,6 @@ impl OwnProperties {
 #[path = "run_scope_tests.rs"]
 mod scope_tests;
 
-#[allow(clippy::ref_option, reason = "the fragment fallback has three states")]
 pub(super) fn parse_break(
     element: &BytesStart<'_>,
     decoder: quick_xml::encoding::Decoder,

@@ -3,7 +3,6 @@
 //! These tests keep the semantic topology operation and its lexical metadata
 //! image separate.  The former describes the effective graph; the latter is
 //! admitted only when its parsed graph is the same candidate.
-#![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use std::io;
 use std::num::{NonZeroU64, NonZeroUsize};

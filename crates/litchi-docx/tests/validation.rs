@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "validation assertions intentionally panic on fixture failure"
-)]
-
 use std::{
     io,
     sync::{

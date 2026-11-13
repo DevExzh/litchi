@@ -1,5 +1,4 @@
 //! Independent admission checks for public metadata plans.
-#![allow(clippy::unwrap_used, clippy::expect_used, reason = "test assertions")]
 
 use litchi_opc::{
     ContentTypeEdit, OpcError, OpcPackage, PackURI, RelationshipEdit, Relationships,

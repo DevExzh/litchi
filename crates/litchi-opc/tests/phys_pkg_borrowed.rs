@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "focused physical-reader assertions intentionally fail on fixture errors"
-)]
-
 //! Public borrowed-access tests for the physical OPC package reader.
 //!
 //! The archive is deliberately small.  Lower-layer tests own the exhaustive

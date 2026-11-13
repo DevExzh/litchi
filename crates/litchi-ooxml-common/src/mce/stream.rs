@@ -1971,7 +1971,6 @@ impl<'a> Processor<'a> {
         self.raw_state_valid && matches!(error, Error::NonConformant(_) | Error::MustUnderstand(_))
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn start<RawE, ActiveE, Raw, Active>(
         &mut self,
         element: &BytesStart<'_>,
@@ -2012,7 +2011,6 @@ impl<'a> Processor<'a> {
         result
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn start_element<RawE, ActiveE, Raw, Active>(
         &mut self,
         element: &BytesStart<'_>,
@@ -2427,7 +2425,6 @@ impl<'a> Processor<'a> {
         Ok(())
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn text<ActiveE, Active>(
         &mut self,
         raw: &[u8],
@@ -2580,7 +2577,6 @@ impl<'a> Processor<'a> {
         self.position.end()
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn raw_start<RawE, Raw>(
         &mut self,
         element: &BytesStart<'_>,
@@ -2759,7 +2755,6 @@ impl<'a> Processor<'a> {
         self.raw_position.end()
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn raw_event<RawE, Raw>(
         &mut self,
         event: Event<'_>,

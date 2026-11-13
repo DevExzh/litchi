@@ -363,10 +363,6 @@ impl Repairs<'_> {
     }
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "signature mirrors the corresponding OOXML record"
-)]
 fn begin_element(
     namespace: &ResolveResult<'_>,
     element: &BytesStart<'_>,
@@ -610,10 +606,6 @@ fn empty_element(
 /// to the default Word and LibreOffice substitute — and is recorded; it never
 /// fails the numbering part. A repeated singleton property keeps the first
 /// occurrence, matching LibreOffice's first-match lookups.
-#[allow(
-    clippy::too_many_arguments,
-    reason = "signature mirrors the corresponding OOXML record"
-)]
 fn apply_child(
     element: &BytesStart<'_>,
     decoder: Decoder,

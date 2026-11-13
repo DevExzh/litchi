@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "focused topology assertions intentionally fail on fixture errors"
-)]
-
 //! Integration coverage for the public source-backed prepared-topology seam.
 //!
 //! The tests inspect the logical candidate before publication, then reopen the

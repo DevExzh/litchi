@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    reason = "the checked-in interoperability fixture is bounded and deterministic"
-)]
-
 //! Source-backed OPC preservation against a Python `force_zip64` corpus.
 //!
 //! The selected document part is the final physical member.  A targeted edit

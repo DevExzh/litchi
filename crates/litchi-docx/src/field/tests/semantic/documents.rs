@@ -1,9 +1,5 @@
 //! Document variables, properties, information, and context semantics.
 
-#[allow(
-    clippy::wildcard_imports,
-    reason = "tests exercise the complete public field vocabulary"
-)]
 use super::super::*;
 
 #[test]

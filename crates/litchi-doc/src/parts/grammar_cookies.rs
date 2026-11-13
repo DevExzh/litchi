@@ -81,10 +81,6 @@ impl GrammarCookie {
     const LID_PRIMARY_MAX: u8 = 0x7F;
 
     /// Create a cookie descriptor, validating the bit-field widths.
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "parameters map one-to-one to a fixed DOC record or semantic construction"
-    )]
     pub fn try_new(
         dcp: i16,
         dcp_sent: i16,

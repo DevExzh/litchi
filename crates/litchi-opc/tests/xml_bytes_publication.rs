@@ -1,5 +1,4 @@
 //! Admission and source checks for shared XML publication.
-#![allow(clippy::unwrap_used, clippy::expect_used, reason = "test assertions")]
 
 use std::sync::Arc;
 

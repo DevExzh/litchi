@@ -1943,11 +1943,6 @@ fn relationship_offset(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        reason = "test assertions panic on failure"
-    )]
     use super::*;
     use crate::packuri::PACKAGE_URI;
     use crate::{BlobPart, PackageWriter};

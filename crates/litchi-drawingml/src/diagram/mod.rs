@@ -76,7 +76,6 @@ impl Limits {
     /// zero and over-hard-cap values then return `Error::InvalidLimit` with
     /// the corresponding `LimitKind`.
     #[must_use]
-    #[allow(clippy::too_many_arguments)]
     pub const fn new(
         input_bytes: usize,
         output_bytes: usize,

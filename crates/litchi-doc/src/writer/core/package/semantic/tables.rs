@@ -131,10 +131,6 @@ impl Builder {
         Ok(())
     }
 
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "parameters map one-to-one to a fixed DOC record or semantic construction"
-    )]
     pub(in crate::writer::core::package) fn append_table_paragraph(
         paragraph: &WritableParagraph,
         terminator: u16,

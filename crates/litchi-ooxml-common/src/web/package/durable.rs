@@ -99,10 +99,6 @@ pub enum WebIntent {
 }
 
 /// Attach semantic intent to a planned package transaction.
-#[allow(
-    dead_code,
-    reason = "planner owners bind intent in their integration hook"
-)]
 pub(in crate::web::package) fn bind_intent(patch: Patch, intent: WebIntent) -> Patch {
     patch.with_durable_intent(intent)
 }

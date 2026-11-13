@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::indexing_slicing,
-    reason = "integration-test fixtures favor concise panic-driven assertions over production-style ergonomics"
-)]
-
 //! Per-story reads, character-position ranges, and the memoized story index.
 
 use litchi_core::Position;

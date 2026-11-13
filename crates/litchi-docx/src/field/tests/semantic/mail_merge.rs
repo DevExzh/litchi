@@ -1,9 +1,5 @@
 //! Mail-merge instruction families and inert metadata parsing.
 
-#[allow(
-    clippy::wildcard_imports,
-    reason = "tests exercise the complete public field vocabulary"
-)]
 use super::super::*;
 
 #[test]

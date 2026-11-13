@@ -14,8 +14,4 @@ mod tests;
 
 pub use codec::{parse, write};
 pub use model::{NameError, NcName, QualifiedName};
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "the public predicate names explicitly identify their XML grammar"
-)]
 pub use validation::{is_ncname, is_qualified_name, is_xml_name};

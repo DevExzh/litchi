@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "Tests use unwrap to keep successful chart-construction assertions concise."
-)]
-
 use super::anchor::{validate, write_all};
 use super::builder::{Anchor, Chart, Series};
 use super::relationship::{

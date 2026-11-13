@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "unit tests panic on fixture failure"
-)]
-
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 

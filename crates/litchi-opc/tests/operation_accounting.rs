@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 //! Focused propagation checks for the bounded OPC accounting surface.
 
 use std::io::{self, Write};

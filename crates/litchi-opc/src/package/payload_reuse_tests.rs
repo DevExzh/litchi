@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "payload-reuse fixtures and assertions panic on malformed test setup"
-)]
-
 use super::*;
 use crate::part::{BlobPart, Part};
 use crate::{PackageWriter, SourceLimitKind, TargetMode};

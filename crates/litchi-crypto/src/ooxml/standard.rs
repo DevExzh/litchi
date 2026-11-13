@@ -560,10 +560,6 @@ fn array_slice(bytes: &[u8], offset: usize, length: usize) -> Result<&[u8]> {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::expect_used,
-        reason = "test code panics on failure; expect keeps assertions concise"
-    )]
     use super::*;
     use crate::ooxml::{Kind, inspect, open};
 

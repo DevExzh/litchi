@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "focused proof assertions intentionally fail on fixture errors"
-)]
-
 //! The source XML audit proofs a source-backed package keeps.
 //!
 //! * An effective revision keeps its replacement's proof, with the boundaries

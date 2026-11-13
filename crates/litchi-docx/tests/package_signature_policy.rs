@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::too_many_lines,
-    reason = "integration tests use panic-on-failure extraction"
-)]
-
 //! The package-level families refuse a change to a signed document instead of
 //! removing its signature (ADR 0006).
 //!

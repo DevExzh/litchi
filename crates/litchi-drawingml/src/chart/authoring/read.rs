@@ -177,10 +177,6 @@ impl Spec {
 }
 
 /// The authoring spec of a typed chart.
-#[allow(
-    clippy::too_many_lines,
-    reason = "one mapping per authored field, read in the writer's order"
-)]
 fn of_chart(chart: &Chart) -> Result<Spec> {
     let variant = Variant::of(chart)
         .ok_or_else(|| Error::Invalid("the chart family has no authoring form".into()))?;

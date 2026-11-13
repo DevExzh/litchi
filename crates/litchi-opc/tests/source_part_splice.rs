@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    reason = "focused source-splice assertions intentionally panic on fixture errors"
-)]
-
 //! Contract coverage for bounded decoded-member source splicing.
 //!
 //! These tests deliberately construct both Store and Deflate members, retain

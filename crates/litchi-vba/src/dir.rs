@@ -2502,10 +2502,6 @@ fn read_u32_at(data: &[u8], position: usize) -> Option<u32> {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        reason = "test fixtures and assertions panic intentionally on failure"
-    )]
 
     use super::*;
 

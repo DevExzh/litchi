@@ -220,10 +220,6 @@ impl InlineKind {
     }
 
     /// Classify a resolved paragraph child name.
-    #[allow(
-        clippy::ref_option,
-        reason = "the fragment prefix is the shared tri-state of the paragraph scanners"
-    )]
     pub(super) fn classify(
         namespace: &ResolveResult<'_>,
         name: QName<'_>,

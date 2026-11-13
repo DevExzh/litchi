@@ -701,11 +701,6 @@ fn unsupported_add(reason: &'static str) -> Error {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        reason = "bounded graph tests use panic-on-failure assertions"
-    )]
 
     use super::*;
     use crate::ink::CONTENT_TYPE;

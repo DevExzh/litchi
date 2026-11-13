@@ -1,10 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    reason = "test assertions panic on failure by design"
-)]
-
 use super::*;
 use crate::diagram::Limits;
 use crate::diagram::edit::{self, Outline};

@@ -231,10 +231,6 @@ fn derive_block_key(context: &Context, block: u32) -> Zeroizing<[u8; 16]> {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        reason = "test code panics on failure; unwrap keeps assertions concise"
-    )]
 
     use super::*;
 

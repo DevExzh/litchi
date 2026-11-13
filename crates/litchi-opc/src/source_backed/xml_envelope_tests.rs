@@ -5,11 +5,6 @@
 //! expected line is the row label followed by the reader's result. The
 //! readers are private, so the rows are run from inside the module.
 
-#![allow(
-    clippy::expect_used,
-    reason = "a fixture part name that fails to parse is a broken test"
-)]
-
 use super::content_types_plan::ContentTypesPlan;
 use super::*;
 

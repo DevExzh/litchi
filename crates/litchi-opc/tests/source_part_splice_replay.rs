@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    reason = "focused replay-boundary assertions intentionally panic on fixture errors"
-)]
-
 //! Public-boundary coverage for the format-neutral authored replay payload.
 //!
 //! The fixture is deliberately small.  It has one XML target and one opaque

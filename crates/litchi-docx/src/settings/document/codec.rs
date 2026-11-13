@@ -1499,10 +1499,6 @@ fn document_variables_element(
     Ok(output)
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "signature mirrors the corresponding OOXML record"
-)]
 fn capture_settings_root(
     namespace: &ResolveResult<'_>,
     element: &BytesStart<'_>,

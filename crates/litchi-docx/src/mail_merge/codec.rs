@@ -956,10 +956,6 @@ impl Node {
 
 // The Text/CData arms keep their `?`-bearing whitespace checks out of the
 // match guards on purpose; guards cannot use `?`.
-#[allow(
-    clippy::collapsible_match,
-    reason = "separate arms document distinct OOXML states"
-)]
 fn parse_tree(xml: &[u8], limits: &MceLimits) -> Result<Node> {
     let processed =
         process_markup_compatibility(xml, &Capabilities::default(), limits).map_err(Error::Mce)?;

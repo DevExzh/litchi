@@ -99,10 +99,6 @@ pub fn verify(info: &Info, property_stream: &[u8]) -> Option<bool> {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        reason = "test code panics on failure; unwrap keeps assertions concise"
-    )]
     use super::*;
 
     #[test]

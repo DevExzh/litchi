@@ -1138,10 +1138,6 @@ fn rotation(degrees: Option<f64>) -> Result<Option<i64>> {
                 return Err(invalid("a rotation must be a finite number of degrees"));
             }
             let normalized = degrees.rem_euclid(360.0);
-            #[allow(
-                clippy::cast_possible_truncation,
-                reason = "a normalized rotation is below 21,600,000"
-            )]
             Ok((normalized * 60_000.0).round() as i64)
         })
         .transpose()
@@ -1268,7 +1264,6 @@ fn write_font_properties<C: Color, W: fmt::Write>(
         if !size.is_finite() || !(1.0..=4000.0).contains(&size) {
             return Err(invalid("a font size must be 1 to 4000 points"));
         }
-        #[allow(clippy::cast_possible_truncation, reason = "bounded above")]
         let _ = write!(out, " sz=\"{}\"", (size * 100.0).round() as i64);
     }
     if let Some(bold) = font.bold {

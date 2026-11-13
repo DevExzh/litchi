@@ -1777,7 +1777,6 @@ fn rejects_empty_plot_containers_without_consuming_following_content() {
 
 // This intentionally exercises every chart-group variant in one shared
 // round trip so additions cannot silently escape the exhaustive matrix.
-#[allow(clippy::cognitive_complexity)]
 #[test]
 fn writer_round_trips_every_modeled_chart_group() {
     let mut area_3d = Area3DTypeGroup::new(BarGrouping::Stacked);

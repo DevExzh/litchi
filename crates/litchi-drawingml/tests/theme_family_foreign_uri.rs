@@ -1,5 +1,3 @@
-#![allow(clippy::expect_used, reason = "regression fixture assertions")]
-
 //! Foreign URI ownership must be checked before rejecting QName lookalikes.
 
 use litchi_drawingml::theme::family::{Family, part};

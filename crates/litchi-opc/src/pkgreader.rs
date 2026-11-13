@@ -626,11 +626,6 @@ pub(crate) struct ValidationCatalogError {
 
 #[cfg(test)]
 mod physical_part_tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        reason = "test assertions panic on failure by design"
-    )]
     use super::PackageReader;
     use crate::{BlobPart, OpcPackage, PackURI, PackageWriter, SourceLimits};
     use std::sync::Arc;
@@ -2705,11 +2700,6 @@ fn relationship_xml_totals(
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        reason = "test assertions panic on failure by design"
-    )]
     use super::*;
     use std::cell::Cell;
     use std::io::{self, Cursor, Read, Seek, SeekFrom};

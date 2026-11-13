@@ -1,9 +1,5 @@
 //! Automation, embedded-content, form, and inert action field semantics.
 
-#[allow(
-    clippy::wildcard_imports,
-    reason = "tests exercise the complete public field vocabulary"
-)]
 use super::super::*;
 
 #[test]

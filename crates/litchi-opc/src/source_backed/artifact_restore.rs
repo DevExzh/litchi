@@ -3313,11 +3313,6 @@ fn copy_authenticated(
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::expect_used,
-        clippy::unwrap_used,
-        reason = "focused policy tests deliberately panic on fixture errors"
-    )]
 
     use super::super::{PolicyAppendedEntry, SourceCacheLimits};
     use super::*;

@@ -4,12 +4,6 @@
 //! tests exercise the MS-OVBA codec directly, with finite input and output
 //! budgets, so the runtime crate does not depend on an OOXML ZIP reader.
 
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "fixture setup and assertions intentionally panic on failure"
-)]
-
 use litchi_cfb::OleFile;
 use litchi_vba::{Limits, codec, project::Project};
 use std::io::Cursor;

@@ -9,24 +9,6 @@
 // quick-xml's checked attribute iteration is quadratic on hostile tags; read
 // attributes through `BytesStartExt` (workspace `clippy.toml`).
 #![cfg_attr(not(test), deny(clippy::disallowed_methods))]
-#![allow(
-    clippy::missing_errors_doc,
-    reason = "all fallible public APIs use the crate's typed Error taxonomy documented at the variant level"
-)]
-#![allow(
-    clippy::shadow_reuse,
-    clippy::shadow_same,
-    clippy::shadow_unrelated,
-    reason = "signature codecs reuse XML and container field names in short, non-overlapping scopes"
-)]
-#![cfg_attr(
-    test,
-    allow(
-        clippy::expect_used,
-        clippy::unwrap_used,
-        reason = "unit-test fixture construction and assertions panic by design"
-    )
-)]
 
 pub mod cfb;
 pub mod xml;
@@ -575,10 +557,6 @@ impl Signer {
     }
 
     /// Parse a zeroizing PKCS#8 RSA buffer once and retain the parsed key.
-    #[allow(
-        clippy::needless_pass_by_value,
-        reason = "consuming the sensitive buffer guarantees it is zeroized when parsing finishes"
-    )]
     pub fn rsa_pkcs8(der: Zeroizing<Vec<u8>>) -> Result<Self> {
         let key =
             RsaPrivateKey::from_pkcs8_der(&der).map_err(|error| Error::Key(error.to_string()))?;
@@ -586,10 +564,6 @@ impl Signer {
     }
 
     /// Parse a zeroizing PKCS#8 P-256 buffer once and retain the parsed key.
-    #[allow(
-        clippy::needless_pass_by_value,
-        reason = "consuming the sensitive buffer guarantees it is zeroized when parsing finishes"
-    )]
     pub fn p256_pkcs8(der: Zeroizing<Vec<u8>>) -> Result<Self> {
         let key =
             EcSigningKey::from_pkcs8_der(&der).map_err(|error| Error::Key(error.to_string()))?;

@@ -1,5 +1,4 @@
 //! Entry transport preserves destination overlays and exact source spelling.
-#![allow(clippy::unwrap_used, clippy::expect_used, reason = "test assertions")]
 use litchi_opc::{
     OpcPackage, PackURI, PackageWriter, RelationshipFragmentEdit as Edit, RelationshipFragments,
     SourceLimits,

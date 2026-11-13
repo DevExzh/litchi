@@ -1,13 +1,3 @@
-#![allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::panic,
-    clippy::unwrap_used,
-    reason = "focused source-proof tests deliberately panic on fixture errors"
-)]
-
 //! Focused coverage for `PartView::source_xml_with_hint`.
 //!
 //! The hint is an optimization aid, not an authority transfer.  These tests

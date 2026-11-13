@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "publication tests use direct assertions for short-lived fixtures"
-)]
-
 use litchi_doc::{Builder, Error, Package};
 use std::io::{self, Write};
 

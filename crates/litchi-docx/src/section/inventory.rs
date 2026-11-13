@@ -1393,7 +1393,6 @@ fn validate_namespace_bindings(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn inspect_reference(
     element: &BytesStart<'_>,
     namespace: &ResolveResult<'_>,

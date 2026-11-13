@@ -8,11 +8,6 @@
 //! Clean `Editor::finish` returns the caller's original `Vec` allocation and
 //! does not render the compound file.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "container types and helpers are arranged in CFB verification and transaction flow"
-)]
-
 use crate::xml::{self, Profile, Ref};
 use crate::{Coverage, Error, Limits, Policy, Result, Signer, Status, Trust};
 use litchi_cfb::{DirectoryEntry, OleFile, OleWriter};

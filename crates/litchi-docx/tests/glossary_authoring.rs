@@ -1,7 +1,3 @@
-#![allow(
-    clippy::redundant_closure_call,
-    reason = "raw OPC test edits stage one closure over the edit's graph"
-)]
 use litchi_docx::Package;
 use litchi_docx::glossary::{
     Catalog, Category, Conformance, Entry, Gallery, Id, Insert, Kind, Limits, Name, Props, raw,

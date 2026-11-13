@@ -60,10 +60,6 @@ impl Anchor {
     }
 
     /// Create a chart anchor with precise offsets.
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "The OOXML two-cell anchor has four coordinates and four offsets."
-    )]
     #[must_use]
     pub fn with_offsets(
         from_col: u32,

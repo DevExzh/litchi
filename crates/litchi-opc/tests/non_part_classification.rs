@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 //! Where the reader draws the line between an OPC part and archive junk.
 //!
 //! Each case builds a minimal package so the rule under test is the only thing

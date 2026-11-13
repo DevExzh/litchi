@@ -8,11 +8,6 @@
 //! another copy.
 
 #![cfg(feature = "ooxml")]
-#![allow(
-    clippy::expect_used,
-    clippy::panic,
-    reason = "corpus tests report the exact missing or incompatible fixture"
-)]
 
 use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};

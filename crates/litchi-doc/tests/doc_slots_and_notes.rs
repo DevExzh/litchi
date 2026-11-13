@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::indexing_slicing,
-    reason = "integration-test fixtures favor concise panic-driven assertions over production-style ergonomics"
-)]
-
 //! Header and footer slots by section and kind, and notes and comments by
 //! index, one malformed comment failing only itself.
 

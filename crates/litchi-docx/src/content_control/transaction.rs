@@ -390,10 +390,6 @@ fn plan_checksum(
     )
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "signature mirrors the corresponding OOXML record"
-)]
 fn replace_extension(
     source: &[u8],
     tag: Span,

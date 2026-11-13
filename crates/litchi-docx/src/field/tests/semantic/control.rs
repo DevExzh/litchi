@@ -1,9 +1,5 @@
 //! Conditional, assignment, sequence, and formula field semantics.
 
-#[allow(
-    clippy::wildcard_imports,
-    reason = "tests exercise the complete public field vocabulary"
-)]
 use super::super::*;
 
 #[test]

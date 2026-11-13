@@ -137,10 +137,6 @@ fn validate_ciphertext(plaintext_size: u64, ciphertext: &[u8]) -> Result<(), Err
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        reason = "test code panics on failure; unwrap keeps assertions concise"
-    )]
     use super::*;
 
     #[test]

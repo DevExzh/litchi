@@ -866,10 +866,6 @@ fn read_hash_statistics<'a>(cursor: &mut Cursor<'a>) -> NativeResult<HashStatist
     })
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "arguments mirror the fixed-width native XLDM record layout"
-)]
 fn validate_hash_statistics(
     statistics: &HashStatistics<'_>,
     records: u64,

@@ -24,11 +24,6 @@ enum Child {
     Opaque(InlineKind),
 }
 
-#[allow(
-    clippy::option_option,
-    clippy::ref_option,
-    reason = "three states distinguish unobserved, unprefixed, and prefixed XML fragments"
-)]
 fn classify(
     namespace: &quick_xml::name::ResolveResult<'_>,
     name: quick_xml::name::QName<'_>,

@@ -1,11 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::panic,
-    clippy::unwrap_used,
-    reason = "focused fingerprint controls use small generated fixtures"
-)]
-
 //! Focused controls for the source-artifact fingerprint boundary.
 //!
 //! These controls intentionally open through the public source-backed API.  The

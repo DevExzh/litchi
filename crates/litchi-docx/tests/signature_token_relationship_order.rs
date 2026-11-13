@@ -1,12 +1,3 @@
-#![allow(
-    clippy::redundant_closure_call,
-    reason = "raw OPC test edits stage one closure over the edit's graph"
-)]
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 //! The signature staleness token must be a function of the signature graph.
 //!
 //! `content_control::package::signature_token` serializes the reachable

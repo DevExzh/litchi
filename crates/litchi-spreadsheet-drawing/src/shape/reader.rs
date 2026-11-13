@@ -1,15 +1,3 @@
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    clippy::map_err_ignore,
-    clippy::match_same_arms,
-    clippy::shadow_reuse,
-    clippy::similar_names,
-    clippy::too_many_lines,
-    clippy::wildcard_enum_match_arm,
-    clippy::wildcard_imports,
-    reason = "The streaming parser keeps its grammar and stable diagnostics together."
-)]
-
 //! Bounded `SpreadsheetDrawingML` XML codec.
 //!
 //! Parsing is inert and namespace-aware. Every source is subject to byte,
@@ -650,10 +638,6 @@ impl<'x> Parser<'x> {
         self.attach_object(object)
     }
 
-    #[allow(
-        clippy::too_many_lines,
-        reason = "The parser grammar is intentionally kept in one exhaustive dispatch function."
-    )]
     fn start(
         &mut self,
         parent: Context,

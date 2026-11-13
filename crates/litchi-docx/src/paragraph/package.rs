@@ -23,10 +23,6 @@ impl Paragraph {
     ///
     /// Returns an error when paragraph XML is malformed or a hyperlink cannot
     /// be resolved safely.
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "non-exhaustive public Inline values must pass through unchanged"
-    )]
     pub fn inlines_with_relationships(&self, rels: &Relationships) -> Result<Vec<Inline>> {
         let inlines = self.inlines()?;
         let _parser_admission = self.parser_admission()?;

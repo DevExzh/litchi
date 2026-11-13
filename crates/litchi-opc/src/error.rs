@@ -6,10 +6,6 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 #[non_exhaustive]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "the error type is named for the OPC domain it covers; renaming the public `OpcError` type would break the crate's public API"
-)]
 pub enum OpcError {
     #[error("invalid OPC source limit for {kind}: {value} (expected 1..={maximum})")]
     InvalidLimit {

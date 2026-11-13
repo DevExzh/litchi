@@ -1,5 +1,3 @@
-#![allow(clippy::expect_used, reason = "regression fixtures must fail loudly")]
-
 //! Direct complete-Theme scanner regressions, independent of XSD validation.
 
 use litchi_drawingml::theme::family::{self, Family, part};

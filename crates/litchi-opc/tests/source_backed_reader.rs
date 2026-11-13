@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "focused sequential-reader assertions intentionally fail on fixture errors"
-)]
-
 //! Sequential-reader ingress tests for the lazy source-backed OPC package.
 
 use std::io::{self, Read, Write};

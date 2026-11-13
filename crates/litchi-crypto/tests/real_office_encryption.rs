@@ -4,12 +4,6 @@
 //! upstream fixtures. Keep them in `Zeroizing` owners and never include them
 //! in diagnostics or assertions.
 
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use std::fs::File;
 use std::path::{Path, PathBuf};
 

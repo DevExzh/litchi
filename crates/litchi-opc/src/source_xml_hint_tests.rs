@@ -4,14 +4,6 @@
 //! under `source_backed` so they can independently alter one proof field at a
 //! time and show that every field in the admission predicate is authoritative.
 
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::panic,
-    clippy::unwrap_used,
-    reason = "focused internal proof tests deliberately panic on fixture errors"
-)]
-
 use super::*;
 use crate::SourceCacheLimits;
 use crate::content_type::ContentType;

@@ -13,10 +13,6 @@ use crate::writer::piece_table::Piece;
 use std::collections::HashMap;
 impl Builder {
     /// Append the comment subdocument and build its owner, reference, and text tables.
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "parameters map one-to-one to a fixed DOC record or semantic construction"
-    )]
     pub(in crate::writer::core::package) fn build_comment_story(
         entries: &[CommentEntry],
         actual_ref_cps: &[u32],

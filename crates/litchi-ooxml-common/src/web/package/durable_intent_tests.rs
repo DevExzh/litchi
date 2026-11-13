@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    reason = "these tests construct deliberately small durable intent fixtures"
-)]
-
 use crate::web::custom_function;
 use std::ops::Range;
 use std::sync::Arc;

@@ -12,10 +12,6 @@
 )]
 //! Bounded Word field-instruction and document XML codecs.
 
-#[allow(
-    clippy::wildcard_imports,
-    reason = "the codec shares the field model vocabulary with its parent"
-)]
 use super::*;
 
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
@@ -427,10 +423,6 @@ pub(super) fn parse_field_operand_and_switches(
     Ok(Some((operand, switches)))
 }
 
-#[allow(
-    clippy::type_complexity,
-    reason = "tuple layout mirrors the parsed OOXML grammar"
-)]
 pub(super) fn parse_mail_merge_data_field_parts(
     instruction: &str,
 ) -> Result<Option<(String, Option<String>, Vec<Switch>)>> {
@@ -463,10 +455,6 @@ pub(super) fn parse_mail_merge_data_field_parts(
     Ok(Some((data_source, header_source, switches)))
 }
 
-#[allow(
-    clippy::type_complexity,
-    reason = "tuple layout mirrors the parsed OOXML grammar"
-)]
 pub(super) fn parse_info_field_parts(
     instruction: &str,
 ) -> Result<Option<(String, Option<String>, Vec<Switch>)>> {
@@ -533,10 +521,6 @@ pub(super) fn parse_go_to_button_operands(instruction: &str) -> Result<Option<(S
     Ok(Some((target, button_text)))
 }
 
-#[allow(
-    clippy::type_complexity,
-    reason = "tuple layout mirrors the parsed OOXML grammar"
-)]
 pub(super) fn parse_user_identity_field_parts(
     instruction: &str,
 ) -> Result<Option<(UserIdentityKind, Option<String>, Option<UserIdentityFormat>)>> {
@@ -630,20 +614,12 @@ pub(super) fn parse_advance_field_adjustments(
     Ok(Some(adjustments))
 }
 
-#[allow(
-    clippy::type_complexity,
-    reason = "tuple layout mirrors the parsed OOXML grammar"
-)]
 pub(super) fn parse_link_operands_and_switches(
     instruction: &str,
 ) -> Result<Option<(String, String, Option<String>, Vec<Switch>)>> {
     parse_external_link_operands_and_switches(instruction, "LINK")
 }
 
-#[allow(
-    clippy::type_complexity,
-    reason = "tuple layout mirrors the parsed OOXML grammar"
-)]
 pub(super) fn parse_dde_operands_and_switches(
     instruction: &str,
 ) -> Result<Option<(DdeKind, String, String, Option<String>, Vec<Switch>)>> {
@@ -668,10 +644,6 @@ pub(super) fn parse_dde_operands_and_switches(
     )
 }
 
-#[allow(
-    clippy::type_complexity,
-    reason = "tuple layout mirrors the parsed OOXML grammar"
-)]
 pub(super) fn parse_external_include_operands_and_switches(
     instruction: &str,
 ) -> Result<Option<(IncludeKind, String, Option<String>, Vec<Switch>)>> {
@@ -716,10 +688,6 @@ pub(super) fn required_external_include_option_argument(
     })
 }
 
-#[allow(
-    clippy::type_complexity,
-    reason = "tuple layout mirrors the parsed OOXML grammar"
-)]
 pub(super) fn parse_external_link_operands_and_switches(
     instruction: &str,
     field_type: &str,

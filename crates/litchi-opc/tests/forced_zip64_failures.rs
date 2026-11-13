@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    reason = "focused ZIP64 failure assertions intentionally fail on fixture errors"
-)]
-
 //! Failure-atomicity coverage for Python's small forced-ZIP64 OPC shape.
 //!
 //! The fixture is generated independently with `zipfile.ZipFile.open(...,

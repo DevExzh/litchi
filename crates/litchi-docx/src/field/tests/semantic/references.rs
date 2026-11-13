@@ -1,9 +1,5 @@
 //! Reference, link, DDE, and external-source field semantics.
 
-#[allow(
-    clippy::wildcard_imports,
-    reason = "tests exercise the complete public field vocabulary"
-)]
 use super::super::*;
 
 #[test]

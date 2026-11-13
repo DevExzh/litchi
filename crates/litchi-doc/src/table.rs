@@ -42,10 +42,6 @@ pub struct Table {
 
 impl Table {
     /// Create a new Table.
-    #[allow(
-        dead_code,
-        reason = "reserved DOC structure retained for format completeness or future round-trip support"
-    )]
     pub(crate) fn new(rows: Vec<Row>) -> Self {
         Self {
             rows: Arc::new(rows),
@@ -55,10 +51,6 @@ impl Table {
     }
 
     /// Create a new Table with properties.
-    #[allow(
-        dead_code,
-        reason = "reserved DOC structure retained for format completeness or future round-trip support"
-    )]
     pub(crate) fn with_properties(rows: Vec<Row>, properties: TableProperties) -> Self {
         Self {
             rows: Arc::new(rows),
@@ -287,10 +279,6 @@ pub struct Cell {
 
 impl Cell {
     /// Create a new Cell.
-    #[allow(
-        unused,
-        reason = "parsed DOC metadata is retained for format completeness and future round-trip support"
-    )]
     pub(crate) fn new(text: String) -> Self {
         let para = Paragraph::new(text.clone());
         Self {
@@ -302,10 +290,6 @@ impl Cell {
     }
 
     /// Create a new Cell with paragraphs and properties.
-    #[allow(
-        unused,
-        reason = "parsed DOC metadata is retained for format completeness and future round-trip support"
-    )]
     pub(crate) fn with_properties(
         paragraphs: Vec<Paragraph>,
         properties: Option<CellProperties>,

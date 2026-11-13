@@ -76,10 +76,6 @@ pub(in crate::document) struct DocumentState {
     pub(in crate::document) fib: FileInformationBlock,
     /// The `WordDocument` stream - main document binary data
     /// Used during initialization for `TextExtractor` and `ChpBinTable` parsing
-    #[allow(
-        dead_code,
-        reason = "reserved DOC structure retained for format completeness or future round-trip support"
-    )]
     pub(in crate::document) word_document: Arc<Vec<u8>>,
     /// The Data stream - contains embedded objects, pictures, etc.
     /// According to Apache POI, pictures are stored here, not in `WordDocument` stream.

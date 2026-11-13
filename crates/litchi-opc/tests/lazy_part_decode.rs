@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    reason = "focused lazy-decoding assertions intentionally panic on fixture errors"
-)]
-
 //! Contract tests for the owned-source lazy OPC payload representation.
 //!
 //! These tests keep the package small enough to make the read boundary

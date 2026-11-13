@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "differential assertions intentionally panic on fixture failures"
-)]
-
 //! Relationship, content-type and owned XML parts that begin with a UTF-8
 //! byte-order mark are edited exactly like the same parts without one.
 //!

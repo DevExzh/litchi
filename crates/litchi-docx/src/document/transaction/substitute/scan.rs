@@ -415,7 +415,6 @@ fn is_silent(local: &[u8]) -> bool {
 }
 
 impl Scanner<'_> {
-    #[allow(clippy::too_many_arguments, reason = "one element's event data")]
     fn open(
         &mut self,
         reader: &NsReader<&[u8]>,

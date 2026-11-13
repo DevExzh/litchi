@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::indexing_slicing,
-    reason = "integration-test fixtures favor concise panic-driven assertions over production-style ergonomics"
-)]
-
 //! Table paragraphs that store no table depth form top-level tables.
 //!
 //! Word 97 predates nested tables and marks every table paragraph with

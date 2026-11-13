@@ -1,11 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::shadow_reuse,
-    clippy::shadow_unrelated,
-    reason = "integration fixtures use contextual fail-fast assertions"
-)]
-
 //! Correctness and ownership coverage for the bounded DOC rendered handoff.
 //!
 //! These tests intentionally exercise the public body-text transaction. They

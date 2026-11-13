@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 //! Real-world packages whose archives carry items that are not OPC parts.
 //!
 //! Each case checks two things: the package opens, and the content that is

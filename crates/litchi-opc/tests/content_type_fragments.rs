@@ -1,5 +1,4 @@
 //! Durable content-type deltas retain source spelling and destination overlays.
-#![allow(clippy::unwrap_used, clippy::expect_used, reason = "test assertions")]
 use litchi_opc::{
     ContentTypeFragmentEdit as Edit, ContentTypeFragmentKey as Key, ContentTypeFragments,
     OpcPackage, PackageWriter, SourceLimitKind, SourceLimits,

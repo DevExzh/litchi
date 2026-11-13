@@ -1835,11 +1835,6 @@ fn limit(resource: &'static str, actual: usize, maximum: usize) -> Error {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::expect_used,
-        clippy::unwrap_used,
-        reason = "test code panics on failure; assertions stay concise"
-    )]
     use super::*;
     use crate::ooxml::{Mode, open};
 

@@ -1,11 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::panic,
-    clippy::unwrap_used,
-    reason = "focused artifact-restore assertions intentionally panic on fixture errors"
-)]
-
 //! Contract coverage for the public exact-artifact restoration boundary.
 //!
 //! The original and current packages in these tests are opened through

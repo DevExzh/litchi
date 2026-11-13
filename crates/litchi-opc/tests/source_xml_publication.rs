@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    reason = "focused source-publication assertions intentionally panic on fixture errors"
-)]
-
 //! Public API coverage for source-preserving XML publication.
 //!
 //! These tests keep the source bytes deliberately formatted and exercise the

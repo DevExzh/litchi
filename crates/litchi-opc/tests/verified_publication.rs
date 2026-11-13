@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "focused publication assertions intentionally panic on fixture errors"
-)]
-
 //! A part replaced through `Part::set_blob_verified` carries the proof that
 //! its exact allocation passed the source publication audit, and the eager
 //! writer skips its own audit of that part only while the bytes it publishes

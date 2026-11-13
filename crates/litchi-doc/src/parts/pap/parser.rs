@@ -353,10 +353,6 @@ impl ParagraphProperties {
 /// * `sprm` - The SPRM operation to apply
 // This is the specification-indexed SPRM dispatch table. Keeping opcode
 // handling together makes overlap and precedence reviewable.
-#[allow(
-    clippy::cognitive_complexity,
-    reason = "the parser keeps branch order aligned with the MS-DOC record grammar"
-)]
 impl ParagraphProperties {
     pub(super) fn apply_sprm(pap: &mut ParagraphProperties, sprm: &Sprm) -> Result<()> {
         match sprm.opcode {

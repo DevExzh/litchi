@@ -263,7 +263,6 @@ impl Resolver for FixtureGraph {
     }
 }
 
-#[allow(dead_code)]
 fn _metadata_is_constructible() -> Metadata {
     Metadata::new(Reference::none())
 }

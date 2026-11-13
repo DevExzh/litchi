@@ -284,7 +284,6 @@ mod tests {
 
     type Item = Result<(Vec<u8>, Vec<u8>), AttrError>;
 
-    #[allow(clippy::disallowed_methods)]
     fn checked(tag: &BytesStart<'_>) -> Vec<Item> {
         tag.attributes()
             .map(|item| {

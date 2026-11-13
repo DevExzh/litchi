@@ -1023,13 +1023,6 @@ impl Snapshot {
     ///
     /// Returns [`Error::Invalid`] when the complete package or its safe edit
     /// basis cannot be reopened.
-    #[cfg_attr(
-        not(test),
-        allow(
-            dead_code,
-            reason = "the unit tests drive the engine directly; Package is the public route"
-        )
-    )]
     pub(crate) fn open_bounded(
         input: impl Into<Vec<u8>>,
         limits: Limits,
@@ -1049,13 +1042,6 @@ impl Snapshot {
     /// under the default policy. Supplying
     /// [`ProtectionPolicy::AllowProtected`] is an explicit capability that
     /// authorizes changed publication.
-    #[cfg_attr(
-        not(test),
-        allow(
-            dead_code,
-            reason = "the unit tests drive the engine directly; Package is the public route"
-        )
-    )]
     pub(crate) fn open_bounded_with_policy(
         input: impl Into<Vec<u8>>,
         limits: Limits,
@@ -1462,13 +1448,6 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns [`Error::Invalid`] if the retained source no longer validates.
-    #[cfg_attr(
-        not(test),
-        allow(
-            dead_code,
-            reason = "the unit tests drive the engine directly; Package is the public route"
-        )
-    )]
     #[allow(
         dead_code,
         reason = "the test crate exercises the engine through its public package route"

@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    reason = "focused source-backed append fixtures intentionally panic on invalid test data"
-)]
-
 //! Integration coverage for the bounded source-backed DOCX tail append.
 //!
 //! The fixture builders in this file deliberately stay on the public OPC and

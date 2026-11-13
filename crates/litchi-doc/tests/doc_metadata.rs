@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::shadow_unrelated,
-    reason = "integration tests favor concise panic-driven assertions"
-)]
-
 //! DOC metadata: fresh authoring through `Builder::set_metadata` and the
 //! opened-package `metadata` transaction family (ADR 0034 §7).
 

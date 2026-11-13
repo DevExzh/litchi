@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::panic,
-    reason = "focused publication-audit assertions intentionally panic on fixture errors"
-)]
-
 //! Caller-supplied XML that a package records as source provenance.
 //!
 //! The writer publishes retained source bytes without its audit, while

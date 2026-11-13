@@ -1,11 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::panic,
-    clippy::unwrap_used,
-    reason = "focused transfer assertions intentionally fail on fixture errors"
-)]
-
 //! Adversarial coverage for source-authorized compressed Part transfer.
 //!
 //! The compressed bytes accepted by these tests always come from a ZIP reader

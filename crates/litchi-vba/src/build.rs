@@ -1119,10 +1119,6 @@ fn push_upper_hex(output: &mut String, bytes: &[u8]) {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        reason = "test fixtures and assertions panic intentionally on failure"
-    )]
 
     use super::*;
     use litchi_cfb::OleFile;

@@ -1,14 +1,5 @@
 //! Bounded, source-checked `RgDofr` edit regressions.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    clippy::expect_used,
-    clippy::items_after_statements,
-    clippy::manual_let_else,
-    clippy::uninlined_format_args,
-    reason = "integration fixtures fail fast with contextual assertions"
-)]
-
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_core::Position;
 use litchi_doc::Package;

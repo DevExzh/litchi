@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    reason = "focused XML fixtures make source spans and rejected probes explicit"
-)]
-
 //! Public and source-bound coverage for the X14 Custom Data Properties leaf.
 //!
 //! The fixtures follow [MS-XLSX] §§2.1.2–2.1.3, 2.4.35, and 2.6.66: the

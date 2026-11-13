@@ -1,7 +1,3 @@
-#![allow(
-    clippy::redundant_closure_call,
-    reason = "raw OPC test edits stage one closure over the edit's graph"
-)]
 use std::io::{self, Cursor, Write};
 
 use litchi_docx::Package;

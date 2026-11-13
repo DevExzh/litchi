@@ -808,10 +808,6 @@ impl OwnedContentTypes {
 /// `OpcPackage` represents an Open Packaging Convention package in memory,
 /// providing access to parts, relationships, and package-level operations.
 /// Uses efficient data structures and minimal cloning for best performance.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "OpcPackage is the established public name for the package module's main type."
-)]
 pub struct OpcPackage {
     /// Read policy captured at ingress, retained for format-level edit checks.
     read_limits: SourceLimits,

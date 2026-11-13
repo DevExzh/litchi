@@ -93,11 +93,6 @@ impl<'package> PartReadSession<'package> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "these tests use direct fixture assertions"
-)]
 mod tests {
     use super::{OpcError, SourceBackedPackage};
     use crate::{

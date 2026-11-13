@@ -70,10 +70,6 @@ pub struct FieldCounts {
 
 impl FieldCounts {
     /// Construct counts in the story order used by the MS-DOC FIB.
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "parameters map one-to-one to a fixed DOC record or semantic construction"
-    )]
     #[must_use]
     pub const fn new(
         main: u32,
@@ -120,10 +116,6 @@ impl Flags {
     const FIFLD: u16 = 1 << 0;
 
     /// Construct the flag word from its individual semantic bits.
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "parameters map one-to-one to a fixed DOC record or semantic construction"
-    )]
     #[must_use]
     pub const fn new(
         eats_return: bool,
@@ -407,10 +399,6 @@ pub struct Persist1 {
 
 impl Persist1 {
     /// Construct a validated bitfield while retaining undefined bits.
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "parameters map one-to-one to a fixed DOC record or semantic construction"
-    )]
     pub fn try_new(
         default_handler: bool,
         linked: bool,

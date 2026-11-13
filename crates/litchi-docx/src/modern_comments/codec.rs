@@ -1313,10 +1313,6 @@ fn build_dom(xml: &[u8], limits: &MceLimits) -> Result<XmlDocument> {
     Ok(document)
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "signature mirrors the corresponding OOXML record"
-)]
 fn push_node(
     reader: &Reader<&[u8]>,
     element: &BytesStart<'_>,

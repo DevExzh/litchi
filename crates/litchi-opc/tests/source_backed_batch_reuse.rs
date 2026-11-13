@@ -1,12 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::panic,
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    reason = "focused scheduler tests deliberately fail on fixture or contract errors"
-)]
-
 //! Worker-lifetime and terminal-boundary tests for ordered source-backed reads.
 //!
 //! The source probe records only positional reads that overlap selected payload

@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "contract assertions intentionally panic on reader errors"
-)]
-
 //! `litchi_core::xml::ReaderOrigin` models how the `quick-xml` build this
 //! workspace links reports positions for an input that begins with a UTF-8
 //! byte-order mark. Every OOXML crate converts reader positions to byte

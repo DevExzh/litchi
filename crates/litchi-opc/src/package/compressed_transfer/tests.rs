@@ -5,11 +5,6 @@
 //! that the published member carries exactly the source member's compressed
 //! span inside fresh known-size framing; and that any mutation of a
 //! transferred part discards its capture.
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "compressed-transfer tests use panic-on-fixture-failure assertions"
-)]
 
 use std::io::Write as _;
 

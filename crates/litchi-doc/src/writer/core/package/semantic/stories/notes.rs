@@ -18,10 +18,6 @@ impl Builder {
     ///
     /// `actual_ref_cps`: actual CPs in main doc where U+0002 refs were injected (entry order).
     /// `ccp_text`: FibRgLw97.ccpText — needed for the mandatory final CP in `PlcffndRef`.
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "parameters map one-to-one to a fixed DOC record or semantic construction"
-    )]
     pub(in crate::writer::core::package) fn build_note_story(
         entries: &[FootnoteEntry],
         actual_ref_cps: &[u32],

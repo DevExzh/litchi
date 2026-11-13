@@ -412,11 +412,6 @@ fn map_parallel_read_error(error: soapberry_zip::Error) -> OpcError {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::expect_used,
-        clippy::unwrap_used,
-        reason = "test assertions panic by design"
-    )]
 
     use super::*;
     use crate::{BlobPart, PackURI, PackageWriter};

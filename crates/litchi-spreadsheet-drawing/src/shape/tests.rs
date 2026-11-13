@@ -1,5 +1,3 @@
-#![allow(clippy::unwrap_used, reason = "test assertions require direct values")]
-
 //! Regression tests for typed `SpreadsheetDrawing` models and bounded codecs.
 
 use super::*;

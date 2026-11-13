@@ -1,14 +1,3 @@
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    clippy::missing_errors_doc,
-    clippy::ref_option,
-    clippy::return_self_not_must_use,
-    clippy::shadow_reuse,
-    clippy::shadow_unrelated,
-    clippy::unreadable_literal,
-    reason = "The compact XML authoring implementation preserves its established public API."
-)]
-
 //! Shared `SpreadsheetDrawing` authoring model for XLSX and XLSB shapes.
 //!
 //! [`ShapeSpec`] describes one text-box shape to embed in a worksheet

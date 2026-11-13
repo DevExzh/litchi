@@ -13,30 +13,7 @@
 // would break every host format without changing wire correctness.
 #![allow(
     clippy::double_must_use,
-    clippy::module_name_repetitions,
-    clippy::ref_option,
-    clippy::return_self_not_must_use,
-    clippy::struct_excessive_bools,
     reason = "shared DrawingML APIs retain specification-shaped names, ownership, and centrally documented failure contracts"
-)]
-// Streaming chart, theme, geometry, and transform parsers reuse event-local
-// names as raw XML becomes typed vocabulary.
-#![allow(
-    clippy::shadow_reuse,
-    clippy::shadow_same,
-    clippy::shadow_unrelated,
-    reason = "short-lived parser bindings track successive XML events and semantic projections"
-)]
-// Codec declarations and string emitters follow schema traversal order. These
-// bounded serializers favor direct append operations and explicit cases so the
-// output can be audited against the standard.
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    clippy::doc_markdown,
-    clippy::format_push_string,
-    clippy::items_after_statements,
-    clippy::unreadable_literal,
-    reason = "DrawingML codecs retain schema order and bounded direct XML emission for specification auditability"
 )]
 
 pub mod blip;

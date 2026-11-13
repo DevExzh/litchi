@@ -6,14 +6,6 @@
 //! topology tests continue to cover archive/security/output behavior; this
 //! module isolates the XML-proof decision and its accounting contract.
 
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::panic,
-    clippy::unwrap_used,
-    reason = "focused publication-proof tests deliberately panic on fixture errors"
-)]
-
 use super::*;
 use crate::source_backed::SourceBackedPackage;
 use crate::{SourceCacheLimits, SourceReadPolicy};

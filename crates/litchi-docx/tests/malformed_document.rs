@@ -1,7 +1,3 @@
-#![allow(
-    clippy::redundant_closure_call,
-    reason = "raw OPC test edits stage one closure over the edit's graph"
-)]
 use litchi_docx::{Package, Result};
 use litchi_opc::PackURI;
 use tempfile::NamedTempFile;

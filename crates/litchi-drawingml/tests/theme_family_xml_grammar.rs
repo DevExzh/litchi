@@ -1,5 +1,3 @@
-#![allow(clippy::expect_used, reason = "regression fixture assertions")]
-
 //! Exercise complete-part grammar independently of the family fragment codec.
 use litchi_drawingml::{
     Error, LimitKind,

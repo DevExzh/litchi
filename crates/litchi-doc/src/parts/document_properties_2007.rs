@@ -96,10 +96,6 @@ impl MathJustification {
 
 /// Document-wide equation settings (`DopMth`, MS-DOC 2.7.17).
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "the independent Boolean fields are exact DopMth wire flags"
-)]
 pub struct DopMth {
     raw: [u8; 34],
     pub break_placement: MathBreakPlacement,
@@ -251,10 +247,6 @@ impl StyleSortMethod {
 
 /// Typed, lossless Word 2007 DOP extension.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "the independent Boolean fields are exact Dop2007 wire flags"
-)]
 pub struct Dop2007 {
     raw: [u8; EXTENSION_SIZE],
     pub track_formatting: bool,

@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "focused publication assertions intentionally panic on fixture errors"
-)]
-
 //! Source-backed publication audits a replaced Part's original bytes and its
 //! replacement with one `verify_source_replacement` call. The verdict, the
 //! refusal identity and the emitted archive are those of the two

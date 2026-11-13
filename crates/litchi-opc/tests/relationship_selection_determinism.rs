@@ -1,8 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
 //! Reusing an existing relationship must pick the same one on every run.
 //!
 //! `Relationships` stores its relationships in a `HashMap` keyed by rId, so

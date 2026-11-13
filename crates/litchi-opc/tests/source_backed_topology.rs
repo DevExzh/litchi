@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use std::collections::BTreeMap;
 use std::io::{self, Write};
 use std::num::{NonZeroU64, NonZeroUsize};

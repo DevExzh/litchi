@@ -1,9 +1,5 @@
 //! Table-of-contents, bibliography, authority, and index field semantics.
 
-#[allow(
-    clippy::wildcard_imports,
-    reason = "tests exercise the complete public field vocabulary"
-)]
 use super::super::*;
 
 #[test]

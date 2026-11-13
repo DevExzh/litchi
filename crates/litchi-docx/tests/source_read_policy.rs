@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    reason = "the focused fixture uses infallible test setup"
-)]
-
 //! Focused DOCX coverage for the opt-in source read-ahead policy.
 //!
 //! The test keeps the semantic read path managed, then publishes one bounded

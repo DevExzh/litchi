@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "the focused ingress tests use fixture construction assertions"
-)]
-
 //! Cross-check the sequential reader boundary shared by the eager, physical,
 //! and source-backed OPC constructors.
 

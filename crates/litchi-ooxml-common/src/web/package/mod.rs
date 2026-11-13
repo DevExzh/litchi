@@ -21,9 +21,5 @@ pub(in crate::web) use naming::*;
     reason = "the package facade preserves planning helpers for sibling owners"
 )]
 pub(in crate::web) use planning::*;
-#[allow(
-    unused_imports,
-    reason = "the package facade preserves transaction helpers for sibling owners"
-)]
 pub(in crate::web) use transaction::*;
 pub(in crate::web) use validation::*;

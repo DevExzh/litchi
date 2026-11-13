@@ -186,10 +186,6 @@ pub struct Metadata {
 
 impl Metadata {
     /// Construct a route slip and validate all encoded bounds.
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "matches the fixed MS-DOC structure"
-    )]
     pub fn try_new(
         routed: bool,
         return_original: bool,

@@ -1,10 +1,5 @@
 //! Bounded `XMLDSig` processing with caller-resolved reference bytes.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "XML model types and helpers are arranged in authoring, verification, and parser flow"
-)]
-
 use crate::xml_attributes::BytesStartExt as _;
 use crate::{
     Cert, Coverage, Error, Limits, Policy, Reference, Report, Result, Signer, Status, Weak,
@@ -1360,10 +1355,6 @@ impl Document {
         })
     }
 
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "the parser threads all bounded document-construction state through one event handler"
-    )]
     fn start(
         start: &BytesStart<'_>,
         decoder: quick_xml::encoding::Decoder,

@@ -3426,10 +3426,6 @@ fn invalid(message: impl Into<String>) -> Error {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        reason = "test code panics on failure; unwrap keeps assertions concise"
-    )]
     use super::*;
     use litchi_cfb::OleWriter;
     use std::io::Cursor;

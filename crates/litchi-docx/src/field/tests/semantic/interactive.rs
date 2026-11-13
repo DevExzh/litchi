@@ -1,9 +1,5 @@
 //! Prompt, AutoText, and user-identity field semantics.
 
-#[allow(
-    clippy::wildcard_imports,
-    reason = "tests exercise the complete public field vocabulary"
-)]
 use super::super::*;
 
 #[test]

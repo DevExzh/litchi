@@ -1,5 +1,3 @@
-#![allow(clippy::unwrap_used, reason = "test assertions require direct values")]
-
 use super::{ConnectionEndSpec, ConnectionShapeSpec, Emitter, GroupSpec, ObjectSpec, ShapeSpec};
 use crate::shape::{Anchor, CellMarker, EditAs, Emu};
 use litchi_drawingml::geom::Preset;

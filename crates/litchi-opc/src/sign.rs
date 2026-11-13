@@ -1143,11 +1143,6 @@ fn next_relationship_id(relationships: &Relationships) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        reason = "test assertions panic on failure by design"
-    )]
     use p256::ecdsa::SigningKey;
 
     use super::*;

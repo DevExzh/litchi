@@ -778,10 +778,6 @@ fn malformed(message: impl Into<String>) -> Error {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::expect_used,
-        reason = "test code panics on failure; expect keeps assertions concise"
-    )]
     use std::io::Cursor;
 
     use super::*;

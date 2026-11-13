@@ -563,10 +563,6 @@ fn scan(source: &[u8], limits: &Limits) -> Result<Vec<SourceOccurrence>> {
     Ok(occurrences)
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "signature mirrors the corresponding OOXML record"
-)]
 fn inspect_child(
     source: &[u8],
     begin: usize,

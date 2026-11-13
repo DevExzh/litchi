@@ -1,13 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::panic,
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    clippy::too_many_lines,
-    reason = "focused integration assertions deliberately fail on fixture or contract errors"
-)]
-
 //! Integration coverage for the bounded source-backed multi-Part read.
 //!
 //! The provider wrappers in this file are deliberately positional and

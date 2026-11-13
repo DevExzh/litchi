@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "focused probe assertions intentionally fail the test on fixture errors"
-)]
-
 //! Reader-level tests for the metadata-only OPC package catalog probe.
 
 use std::io::{self, Cursor, Read, Seek, SeekFrom};

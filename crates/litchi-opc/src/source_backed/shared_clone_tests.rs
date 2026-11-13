@@ -6,13 +6,6 @@
 //! follow the budget of a managed package across clones, and run concurrent
 //! compression waves on the one write session that every clone shares.
 
-#![allow(
-    clippy::expect_used,
-    clippy::panic,
-    clippy::unwrap_used,
-    reason = "focused internal sharing tests deliberately panic on fixture errors"
-)]
-
 use super::*;
 use crate::SourceCacheLimits;
 use litchi_core::{Budget, CancellationSource, ExecutionLimits, Limits};

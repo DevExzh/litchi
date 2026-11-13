@@ -8,11 +8,6 @@
 //! of a fixture here means either a real producer writes a spelling the audit
 //! should accept, or a fixture is not well-formed; the pinned list says which
 //! members are known to be malformed or outside the audit's encoding profile.
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "a census fails at the first unexpected fixture"
-)]
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};

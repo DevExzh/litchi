@@ -286,10 +286,6 @@ pub struct MacroCommand {
 
 impl MacroCommand {
     /// Construct a descriptor while retaining all ignored wire fields.
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "parameters map one-to-one to a fixed DOC record or semantic construction"
-    )]
     #[must_use]
     pub const fn new(
         macro_name_index: u16,
@@ -654,10 +650,6 @@ pub struct ToolbarDelta {
 }
 
 impl ToolbarDelta {
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "parameters map one-to-one to a fixed DOC record or semantic construction"
-    )]
     #[must_use]
     pub const fn new(
         operation: Operation,

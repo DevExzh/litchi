@@ -175,10 +175,6 @@ pub(crate) fn pack_dttm(value: Option<DateTime>) -> Result<u32, WriteError> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

@@ -108,10 +108,6 @@ impl fmt::Display for SourceLimitKind {
 /// relationship parsing and traversal. Its ceilings are a Litchi safety policy
 /// rather than maxima defined by ECMA-376 Part 2 sections 7.3.6 and 10 or
 /// MS-OI29500 sections 2.1.1749-1752.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "physical ingress profile follows the shared SourceLimits vocabulary"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SourceLimits {
     input_bytes: u64,
@@ -337,10 +333,6 @@ impl SourceLimits {
         }
     }
 
-    #[allow(
-        clippy::unused_self,
-        reason = "kept as a method so crate-internal callers write limits.check(...)"
-    )]
     pub(crate) fn check(self, resource: SourceLimitKind, actual: u64, maximum: u64) -> Result<()> {
         if actual > maximum {
             return Err(OpcError::Limit {
@@ -707,11 +699,6 @@ fn validate_count(resource: SourceLimitKind, value: usize) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        reason = "test assertions panic"
-    )]
     use super::*;
 
     #[test]

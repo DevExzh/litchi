@@ -118,10 +118,6 @@ impl Edit<Package> {
 
 /// The synthetic document's opening and closing markup, the story's
 /// content, and the content's bounds in the part.
-#[allow(
-    clippy::type_complexity,
-    reason = "a private five-part split of one part payload"
-)]
 fn wrapper<'x>(
     xml: &'x [u8],
     story: StoryTarget<'_>,

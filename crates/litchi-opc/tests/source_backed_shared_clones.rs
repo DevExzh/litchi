@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::panic,
-    clippy::unwrap_used,
-    reason = "focused sharing assertions intentionally fail on fixture errors"
-)]
-
 //! A cloned [`SourceBackedPackage`] is the same opened package.
 //!
 //! These tests drive the public API on real-producer fixtures and on one

@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "these tests construct deliberately small wire fixtures"
-)]
-
 use super::*;
 
 fn push_u64(output: &mut Vec<u8>, value: usize) {

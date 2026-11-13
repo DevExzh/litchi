@@ -252,10 +252,6 @@ fn root_owner(package: &SourceBackedPackage) -> Result<StoryOwner> {
     Ok(owner)
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "signature mirrors the corresponding OOXML ownership record"
-)]
 fn discover_owned(
     package: &SourceBackedPackage,
     owner: &PackURI,

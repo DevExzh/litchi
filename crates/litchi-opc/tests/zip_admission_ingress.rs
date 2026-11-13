@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::panic,
-    reason = "ingress admission assertions intentionally panic on fixture errors"
-)]
-
 //! ZIP admission on every OPC ingress, and when each framing fault surfaces.
 //!
 //! Every ingress shares one admission: the declared entry count is checked

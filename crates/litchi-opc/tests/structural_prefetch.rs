@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    reason = "these integration tests fail explicitly when their small OPC fixture is invalid"
-)]
-
 //! Public contract coverage for the run-coalesced structural prefetch.
 //!
 //! Every test here drives the source-backed package through its ordinary

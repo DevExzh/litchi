@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "integration fixture and invariant assertions"
-)]
-
 //! First additions must work for valid empty source containers.
 
 use std::sync::Arc;

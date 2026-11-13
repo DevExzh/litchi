@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "MCE ownership fixtures are deliberately checked and fail fast"
-)]
-
 //! Mutation-boundary coverage for DrawingML Theme Family ownership through
 //! markup-compatibility wrappers.
 //!

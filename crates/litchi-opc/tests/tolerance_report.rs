@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 //! Packages carrying cataloged OPC non-conformities (docs/LENIENCY_AUDIT.md
 //! section 8) open by default, and every repair is recorded in the package's
 //! tolerance report. A conformant control package reports clean through every

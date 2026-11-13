@@ -1,9 +1,4 @@
 #![cfg(feature = "sign")]
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 
 use litchi_opc::SourceLimits;
 use litchi_opc::{OpcPackage, sign::Report};

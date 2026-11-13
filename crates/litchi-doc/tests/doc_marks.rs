@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::indexing_slicing,
-    reason = "integration-test fixtures favor concise panic-driven assertions over production-style ergonomics"
-)]
-
 //! Paragraph and character styles, tab stops, `HYPERLINK` fields, standard
 //! bookmarks and section page setup through the primary DOC package
 //! transaction. Every edit is read back from the published bytes, inverted

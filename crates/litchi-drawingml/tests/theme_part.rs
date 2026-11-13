@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "theme-part fixtures are deliberately checked and fail fast"
-)]
-
 //! Independent coverage for a complete DrawingML Theme part carrying the
 //! shared DrawingML 2012 `themeFamily` fragment.
 //!

@@ -1,7 +1,3 @@
-#![allow(
-    clippy::redundant_closure_call,
-    reason = "raw OPC test edits stage one closure over the edit's graph"
-)]
 #![cfg(feature = "encryption")]
 
 use litchi_docx::content_control::{Checksum, Limits, PackageChecksumStatus};

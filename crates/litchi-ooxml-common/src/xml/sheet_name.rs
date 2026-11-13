@@ -2443,10 +2443,6 @@ fn is_xml_whitespace(text: &str) -> bool {
         .all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "arguments carry the complete source and span context for one title edit"
-)]
 fn finish_reordered_title<F>(
     index: usize,
     actual: &str,
@@ -2495,10 +2491,6 @@ where
     }))
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "arguments describe all axes and bounds of one reference edit"
-)]
 fn attribute_replacement(
     element: &BytesStart<'_>,
     decoder: Decoder,

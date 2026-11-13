@@ -30,10 +30,6 @@ impl XmlMapInfo {
         self.to_xml_with_limits(strict, &XmlMapLimits::DEFAULT)
     }
 
-    #[allow(
-        dead_code,
-        reason = "the crate-local bounded writer facade is retained for host integrations"
-    )]
     pub(crate) fn to_xml_with_limits(
         &self,
         strict: bool,
@@ -395,10 +391,6 @@ fn parse_processed(xml: &[u8], limits: &XmlMapLimits) -> Result<ParsedXmlMapInfo
     })
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "one schema start event updates the complete bounded XML Maps parser state"
-)]
 fn handle_start(
     stack: &mut Vec<Context>,
     schemas: &mut Vec<SchemaBuilder>,

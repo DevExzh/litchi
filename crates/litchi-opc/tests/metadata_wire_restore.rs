@@ -1,5 +1,4 @@
 //! Untrusted durable metadata restoration must retain exact source guards.
-#![allow(clippy::unwrap_used, clippy::expect_used, reason = "test assertions")]
 
 use std::sync::Arc;
 

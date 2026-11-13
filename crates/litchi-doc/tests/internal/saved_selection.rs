@@ -1,11 +1,5 @@
 //! Public and deferred-reader coverage for the inert DOC `Selsf` cache.
 
-#![allow(
-    clippy::expect_used,
-    clippy::uninlined_format_args,
-    reason = "bounded binary fixtures fail fast with contextual assertions"
-)]
-
 use litchi_core::Position;
 use litchi_doc::body_text::{Error, Projection, Refusal, Snapshot};
 use litchi_doc::builder::Builder;

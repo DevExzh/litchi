@@ -103,10 +103,6 @@ pub(in crate::writer::core) struct TextRun {
 
 /// Represents a paragraph
 #[derive(Debug, Clone)]
-#[allow(
-    dead_code,
-    reason = "reserved DOC structure retained for format completeness or future round-trip support"
-)] // Reserved for future implementation
 pub(in crate::writer::core) struct WritableParagraph {
     /// Text runs in this paragraph
     pub(in crate::writer::core) runs: Vec<TextRun>,
