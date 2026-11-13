@@ -945,6 +945,48 @@ fn build_info(info: &Info, limits: &Limits) -> Result<Vec<u8>> {
     Ok(output)
 }
 
+/// Position in the Agile `EncryptionInfo` descriptor grammar.
+///
+/// The descriptor is one fixed sequence of elements; `dataIntegrity` is the
+/// only optional one. Each variant names where the parser stands, and the
+/// only legal moves are the ones listed here, in document order:
+///
+/// ```text
+/// BeforeRoot         --<encryption>-------> InEncryption
+/// InEncryption       --<keyData>----------> InKeyData
+/// InKeyData          --</keyData>---------> AfterKeyData
+/// AfterKeyData       --<dataIntegrity>----> InDataIntegrity
+/// AfterKeyData       --<keyEncryptors>----> InKeyEncryptors
+/// InDataIntegrity    --</dataIntegrity>---> AfterDataIntegrity
+/// AfterDataIntegrity --<keyEncryptors>----> InKeyEncryptors
+/// InKeyEncryptors    --<keyEncryptor>-----> InKeyEncryptor
+/// InKeyEncryptor     --<p:encryptedKey>---> InEncryptedKey
+/// InEncryptedKey     --</p:encryptedKey>--> AfterEncryptedKey
+/// AfterEncryptedKey  --</keyEncryptor>----> AfterKeyEncryptor
+/// AfterKeyEncryptor  --</keyEncryptors>---> AfterKeyEncryptors
+/// AfterKeyEncryptors --</encryption>------> Done
+/// ```
+///
+/// Any other start or end element is rejected, and the descriptor is
+/// complete only in `Done`. `InKeyEncryptors` is entered once and never
+/// re-entered, so the descriptor holds exactly one `keyEncryptor`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum AgilePhase {
+    BeforeRoot,
+    InEncryption,
+    InKeyData,
+    AfterKeyData,
+    InDataIntegrity,
+    AfterDataIntegrity,
+    InKeyEncryptors,
+    InKeyEncryptor,
+    InEncryptedKey,
+    AfterEncryptedKey,
+    AfterKeyEncryptor,
+    AfterKeyEncryptors,
+    Done,
+}
+
 fn parse(bytes: &[u8], limits: &Limits) -> Result<Info> {
     Limits::bytes("EncryptionInfo", bytes.len(), limits.max_info_bytes)?;
     let prefix = bytes
@@ -974,14 +1016,13 @@ fn parse(bytes: &[u8], limits: &Limits) -> Result<Info> {
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().check_comments = true;
     reader.config_mut().expand_empty_elements = true;
-    let mut phase = 0u8;
+    let mut phase = AgilePhase::BeforeRoot;
     let mut depth = 0usize;
     let mut nodes = 0usize;
     let mut attributes = 0usize;
     let mut declaration_seen = false;
     let mut first_event = true;
     let mut parsed = Parsed::default();
-    let mut key_encryptors = 0u8;
 
     loop {
         let decoder = reader.decoder();
@@ -993,7 +1034,7 @@ fn parse(bytes: &[u8], limits: &Limits) -> Result<Info> {
         match event {
             Event::Decl(declaration) => {
                 count(&mut nodes, limits.max_xml_nodes, "Agile XML nodes")?;
-                if !was_first || declaration_seen || phase != 0 {
+                if !was_first || declaration_seen || phase != AgilePhase::BeforeRoot {
                     return Err(malformed(
                         "Agile XML declaration must be the first event and occur once",
                     ));
@@ -1010,7 +1051,7 @@ fn parse(bytes: &[u8], limits: &Limits) -> Result<Info> {
                     return Err(limit("Agile XML depth", child_depth, limits.max_xml_depth));
                 }
                 match phase {
-                    0 => {
+                    AgilePhase::BeforeRoot => {
                         element_is(&namespace, &element, ENC_NS, b"encryption")?;
                         exact_attributes(
                             &reader,
@@ -1021,17 +1062,17 @@ fn parse(bytes: &[u8], limits: &Limits) -> Result<Info> {
                             limits,
                             |_, _| Ok(()),
                         )?;
-                        phase = 1;
+                        phase = AgilePhase::InEncryption;
                     },
-                    1 => {
+                    AgilePhase::InEncryption => {
                         element_is(&namespace, &element, ENC_NS, b"keyData")?;
                         let (salt, profile) =
                             parse_key_data(&reader, &element, decoder, &mut attributes, limits)?;
                         parsed.key_salt = Some(salt);
                         parsed.profile = Some(profile);
-                        phase = 2;
+                        phase = AgilePhase::InKeyData;
                     },
-                    3 => {
+                    AgilePhase::AfterKeyData => {
                         if element.local_name().as_ref() == b"keyEncryptors" {
                             element_is(&namespace, &element, ENC_NS, b"keyEncryptors")?;
                             exact_attributes(
@@ -1043,7 +1084,7 @@ fn parse(bytes: &[u8], limits: &Limits) -> Result<Info> {
                                 limits,
                                 |_, _| Ok(()),
                             )?;
-                            phase = 6;
+                            phase = AgilePhase::InKeyEncryptors;
                         } else {
                             element_is(&namespace, &element, ENC_NS, b"dataIntegrity")?;
                             let profile = parsed
@@ -1059,10 +1100,10 @@ fn parse(bytes: &[u8], limits: &Limits) -> Result<Info> {
                             )?;
                             parsed.encrypted_hmac_key = Some(key);
                             parsed.encrypted_hmac_value = Some(value);
-                            phase = 4;
+                            phase = AgilePhase::InDataIntegrity;
                         }
                     },
-                    5 => {
+                    AgilePhase::AfterDataIntegrity => {
                         element_is(&namespace, &element, ENC_NS, b"keyEncryptors")?;
                         exact_attributes(
                             &reader,
@@ -1073,20 +1114,14 @@ fn parse(bytes: &[u8], limits: &Limits) -> Result<Info> {
                             limits,
                             |_, _| Ok(()),
                         )?;
-                        phase = 6;
+                        phase = AgilePhase::InKeyEncryptors;
                     },
-                    6 => {
+                    AgilePhase::InKeyEncryptors => {
                         element_is(&namespace, &element, ENC_NS, b"keyEncryptor")?;
-                        if key_encryptors != 0 {
-                            return Err(malformed(
-                                "Agile XML contains multiple keyEncryptor elements",
-                            ));
-                        }
-                        key_encryptors = 1;
                         parse_key_encryptor(&reader, &element, decoder, &mut attributes, limits)?;
-                        phase = 7;
+                        phase = AgilePhase::InKeyEncryptor;
                     },
-                    7 => {
+                    AgilePhase::InKeyEncryptor => {
                         element_is(&namespace, &element, PASSWORD_NS, b"encryptedKey")?;
                         let profile = parsed
                             .profile
@@ -1100,40 +1135,56 @@ fn parse(bytes: &[u8], limits: &Limits) -> Result<Info> {
                             profile,
                             &mut parsed,
                         )?;
-                        phase = 8;
+                        phase = AgilePhase::InEncryptedKey;
                     },
-                    _ => return Err(malformed("Agile XML element order is invalid")),
+                    AgilePhase::InKeyData
+                    | AgilePhase::InDataIntegrity
+                    | AgilePhase::InEncryptedKey
+                    | AgilePhase::AfterEncryptedKey
+                    | AgilePhase::AfterKeyEncryptor
+                    | AgilePhase::AfterKeyEncryptors
+                    | AgilePhase::Done => {
+                        return Err(malformed("Agile XML element order is invalid"));
+                    },
                 }
                 depth = child_depth;
             },
             Event::End(element) => {
                 count(&mut nodes, limits.max_xml_nodes, "Agile XML nodes")?;
                 match phase {
-                    2 => {
+                    AgilePhase::InKeyData => {
                         end_is(&namespace, &element, ENC_NS, b"keyData")?;
-                        phase = 3;
+                        phase = AgilePhase::AfterKeyData;
                     },
-                    4 => {
+                    AgilePhase::InDataIntegrity => {
                         end_is(&namespace, &element, ENC_NS, b"dataIntegrity")?;
-                        phase = 5;
+                        phase = AgilePhase::AfterDataIntegrity;
                     },
-                    8 => {
+                    AgilePhase::InEncryptedKey => {
                         end_is(&namespace, &element, PASSWORD_NS, b"encryptedKey")?;
-                        phase = 9;
+                        phase = AgilePhase::AfterEncryptedKey;
                     },
-                    9 => {
+                    AgilePhase::AfterEncryptedKey => {
                         end_is(&namespace, &element, ENC_NS, b"keyEncryptor")?;
-                        phase = 10;
+                        phase = AgilePhase::AfterKeyEncryptor;
                     },
-                    10 => {
+                    AgilePhase::AfterKeyEncryptor => {
                         end_is(&namespace, &element, ENC_NS, b"keyEncryptors")?;
-                        phase = 11;
+                        phase = AgilePhase::AfterKeyEncryptors;
                     },
-                    11 => {
+                    AgilePhase::AfterKeyEncryptors => {
                         end_is(&namespace, &element, ENC_NS, b"encryption")?;
-                        phase = 12;
+                        phase = AgilePhase::Done;
                     },
-                    _ => return Err(malformed("Agile XML end-element order is invalid")),
+                    AgilePhase::BeforeRoot
+                    | AgilePhase::InEncryption
+                    | AgilePhase::AfterKeyData
+                    | AgilePhase::AfterDataIntegrity
+                    | AgilePhase::InKeyEncryptors
+                    | AgilePhase::InKeyEncryptor
+                    | AgilePhase::Done => {
+                        return Err(malformed("Agile XML end-element order is invalid"));
+                    },
                 }
                 depth = depth
                     .checked_sub(1)
@@ -1168,7 +1219,7 @@ fn parse(bytes: &[u8], limits: &Limits) -> Result<Info> {
             Event::Eof => break,
         }
     }
-    if phase != 12 || depth != 0 || key_encryptors != 1 {
+    if phase != AgilePhase::Done || depth != 0 {
         return Err(malformed("Agile XML descriptor is incomplete"));
     }
     if parsed.encrypted_hmac_key.is_some() != parsed.encrypted_hmac_value.is_some() {
@@ -2037,6 +2088,189 @@ mod tests {
             parse(&malformed, &limits),
             Err(Error::Xml(_)) | Err(Error::Malformed(_))
         ));
+    }
+
+    /// Elements of one valid descriptor, cut apart so the grammar tests can
+    /// reassemble them in any order.
+    struct Pieces {
+        declaration: String,
+        root: String,
+        key_data: String,
+        data_integrity: String,
+        key_encryptor: String,
+        encrypted_key: String,
+    }
+
+    fn pieces() -> Pieces {
+        let limits = Limits::default();
+        let profile = Profile::from_mode(Mode::AgileSha256).expect("profile");
+        let material = Zeroizing::new(Material {
+            verifier_salt: MATERIAL.verifier_salt,
+            verifier: MATERIAL.verifier,
+            key_salt: MATERIAL.key_salt,
+            content_key: MATERIAL.content_key,
+            integrity_salt: MATERIAL.integrity_salt,
+            integrity_len: profile.integrity_bytes(),
+        });
+        let (info, _) = encrypt_parts(
+            b"PK\x03\x04grammar".to_vec(),
+            "correct horse",
+            profile,
+            &material,
+            &limits,
+        )
+        .expect("encrypt profile");
+        let xml = std::str::from_utf8(&info[8..]).expect("UTF-8 Agile XML");
+        let element = |open: &str| {
+            let start = xml.find(open).expect("element start");
+            let end = xml[start..].find('>').expect("element end") + start + 1;
+            xml[start..end].to_owned()
+        };
+        Pieces {
+            declaration: element("<?xml"),
+            root: element("<encryption "),
+            key_data: element("<keyData "),
+            data_integrity: element("<dataIntegrity "),
+            key_encryptor: element("<keyEncryptor "),
+            encrypted_key: element("<p:encryptedKey "),
+        }
+    }
+
+    /// `"ok"`, the `Malformed` message, or `"xml"` for a tokenizer error.
+    fn grammar_outcome(xml: &str) -> String {
+        let mut info = Vec::new();
+        info.extend_from_slice(&4u16.to_le_bytes());
+        info.extend_from_slice(&4u16.to_le_bytes());
+        info.extend_from_slice(&0x40u32.to_le_bytes());
+        info.extend_from_slice(xml.as_bytes());
+        match parse(&info, &Limits::default()) {
+            Ok(_) => "ok".to_owned(),
+            Err(Error::Malformed(message)) => message,
+            Err(Error::Xml(_)) => "xml".to_owned(),
+            Err(other) => format!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn agile_xml_grammar_accepts_and_rejects_each_element_order() {
+        const ENC: &str = "http://schemas.microsoft.com/office/2006/encryption";
+        const PASSWORD: &str = "http://schemas.microsoft.com/office/2006/keyEncryptor/password";
+        const START_ORDER: &str = "Agile XML element order is invalid";
+        const END_ORDER: &str = "Agile XML end-element order is invalid";
+        const INCOMPLETE: &str = "Agile XML descriptor is incomplete";
+        const DECLARATION: &str = "Agile XML declaration must be the first event and occur once";
+        const KES: &str = "<keyEncryptors>";
+        const TAIL: &str = "</keyEncryptor></keyEncryptors></encryption>";
+
+        let Pieces {
+            declaration,
+            root,
+            key_data,
+            data_integrity,
+            key_encryptor,
+            encrypted_key,
+        } = pieces();
+        let decl = declaration.as_str();
+        let root = root.as_str();
+        let kd = key_data.as_str();
+        let di = data_integrity.as_str();
+        let ke = key_encryptor.as_str();
+        let ek = encrypted_key.as_str();
+        // Open forms of the self-closing elements, for nesting a child.
+        let kd_open = format!("{}>", kd.strip_suffix("/>").expect("empty keyData"));
+        let di_open = format!("{}>", di.strip_suffix("/>").expect("empty dataIntegrity"));
+        let ek_open = format!("{}>", ek.strip_suffix("/>").expect("empty encryptedKey"));
+        let kd_open = kd_open.as_str();
+        let di_open = di_open.as_str();
+        let ek_open = ek_open.as_str();
+        let kd_root = kd.replacen("<keyData ", &format!("<keyData xmlns=\"{ENC}\" "), 1);
+        let kd_root = kd_root.as_str();
+        let unexpected = |name: &str| format!("unexpected Agile XML element '{name}'");
+        let wrong_namespace = |name: &str| format!("unexpected Agile XML namespace '{name}'");
+        let order = || START_ORDER.to_owned();
+        let end_order = || END_ORDER.to_owned();
+        let incomplete = || INCOMPLETE.to_owned();
+        let misplaced = || DECLARATION.to_owned();
+        let ok = || "ok".to_owned();
+        let xml_error = || "xml".to_owned();
+
+        #[rustfmt::skip]
+        let cases: Vec<(&str, Vec<&str>, String)> = vec![
+            // Accepted orders.
+            ("full descriptor", vec![decl, root, kd, di, KES, ke, ek, TAIL], ok()),
+            ("no dataIntegrity", vec![decl, root, kd, KES, ke, ek, TAIL], ok()),
+            ("no declaration", vec![root, kd, di, KES, ke, ek, TAIL], ok()),
+            (
+                "explicit end tags, whitespace and comments",
+                vec![
+                    decl, "\n<!-- a -->", root, " ", kd_open, " </keyData>\n", di_open,
+                    "</dataIntegrity><!-- b -->", KES, " ", ke, ek_open, "</p:encryptedKey> ",
+                    TAIL, "\n<!-- c -->",
+                ],
+                ok(),
+            ),
+            // Start elements out of order, at least one per phase.
+            ("root is keyData", vec![decl, kd_root], unexpected("keyData")),
+            ("dataIntegrity before keyData", vec![decl, root, di], unexpected("dataIntegrity")),
+            ("keyEncryptors before keyData", vec![decl, root, KES], unexpected("keyEncryptors")),
+            ("child inside keyData", vec![decl, root, kd_open, kd], order()),
+            ("second keyData", vec![decl, root, kd, kd], unexpected("keyData")),
+            ("keyEncryptor outside keyEncryptors", vec![decl, root, kd, ke], unexpected("keyEncryptor")),
+            ("child inside dataIntegrity", vec![decl, root, kd, di_open, kd], order()),
+            ("second dataIntegrity", vec![decl, root, kd, di, di], unexpected("dataIntegrity")),
+            ("keyData after dataIntegrity", vec![decl, root, kd, di, kd], unexpected("keyData")),
+            ("nested keyEncryptors", vec![decl, root, kd, di, KES, KES], unexpected("keyEncryptors")),
+            ("encryptedKey outside keyEncryptor", vec![decl, root, kd, di, KES, ek], wrong_namespace(PASSWORD)),
+            ("nested keyEncryptor", vec![decl, root, kd, di, KES, ke, ke], wrong_namespace(ENC)),
+            ("child inside encryptedKey", vec![decl, root, kd, di, KES, ke, ek_open, ek], order()),
+            ("second encryptedKey", vec![decl, root, kd, di, KES, ke, ek, ek], order()),
+            ("second keyEncryptor", vec![decl, root, kd, di, KES, ke, ek, "</keyEncryptor>", ke], order()),
+            (
+                "dataIntegrity after keyEncryptors",
+                vec![decl, root, kd, KES, ke, ek, "</keyEncryptor></keyEncryptors>", di],
+                order(),
+            ),
+            ("second root", vec![decl, root, kd, di, KES, ke, ek, TAIL, root], order()),
+            // End elements out of order, one per phase that has no end transition.
+            ("empty encryption", vec![decl, root, "</encryption>"], end_order()),
+            ("encryption ends after keyData", vec![decl, root, kd, "</encryption>"], end_order()),
+            ("encryption ends after dataIntegrity", vec![decl, root, kd, di, "</encryption>"], end_order()),
+            ("empty keyEncryptors", vec![decl, root, kd, di, KES, "</keyEncryptors>"], end_order()),
+            ("empty keyEncryptor", vec![decl, root, kd, di, KES, ke, "</keyEncryptor>"], end_order()),
+            ("stray end before the root", vec![decl, "</encryption>"], xml_error()),
+            ("stray end after the root", vec![decl, root, kd, di, KES, ke, ek, TAIL, "</encryption>"], xml_error()),
+            // Truncation after each element: every phase short of the last.
+            ("declaration only", vec![decl], incomplete()),
+            ("ends in encryption", vec![decl, root], incomplete()),
+            ("ends inside keyData", vec![decl, root, kd_open], incomplete()),
+            ("ends after keyData", vec![decl, root, kd], incomplete()),
+            ("ends inside dataIntegrity", vec![decl, root, kd, di_open], incomplete()),
+            ("ends after dataIntegrity", vec![decl, root, kd, di], incomplete()),
+            ("ends in keyEncryptors", vec![decl, root, kd, di, KES], incomplete()),
+            ("ends in keyEncryptor", vec![decl, root, kd, di, KES, ke], incomplete()),
+            ("ends inside encryptedKey", vec![decl, root, kd, di, KES, ke, ek_open], incomplete()),
+            ("ends after encryptedKey", vec![decl, root, kd, di, KES, ke, ek], incomplete()),
+            ("ends after keyEncryptor", vec![decl, root, kd, di, KES, ke, ek, "</keyEncryptor>"], incomplete()),
+            (
+                "ends after keyEncryptors",
+                vec![decl, root, kd, di, KES, ke, ek, "</keyEncryptor></keyEncryptors>"],
+                incomplete(),
+            ),
+            // Declaration placement.
+            ("declaration after a comment", vec!["<!-- a -->", decl, root, kd, di, KES, ke, ek, TAIL], misplaced()),
+            ("two declarations", vec![decl, decl, root, kd, di, KES, ke, ek, TAIL], misplaced()),
+            ("declaration inside the root", vec![root, decl, kd, di, KES, ke, ek, TAIL], misplaced()),
+            ("declaration after the root", vec![root, kd, di, KES, ke, ek, TAIL, decl], misplaced()),
+        ];
+
+        let mut failures = Vec::new();
+        for (name, parts, expected) in cases {
+            let actual = grammar_outcome(&parts.concat());
+            if actual != expected {
+                failures.push(format!("{name}: expected {expected:?}, got {actual:?}"));
+            }
+        }
+        assert!(failures.is_empty(), "{}", failures.join("\n"));
     }
 
     #[test]
