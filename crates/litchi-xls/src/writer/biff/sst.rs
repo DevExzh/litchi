@@ -186,10 +186,6 @@ pub(crate) fn write_sst<W: Write, S: AsRef<str>>(
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

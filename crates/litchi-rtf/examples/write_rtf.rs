@@ -1,8 +1,3 @@
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example intentionally prints its results"
-)]
-
 //! Build a small RTF document using the public `write::Writer` API and write it to disk.
 //!
 //! This example demonstrates direct streaming of RTF control words through

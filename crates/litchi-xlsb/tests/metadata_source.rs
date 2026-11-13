@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "integration tests use panic-on-failure extraction"
-)]
-
 //! Document-property edits of a source-backed XLSB owner.
 
 use std::io::Cursor;

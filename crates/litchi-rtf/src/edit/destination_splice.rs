@@ -437,10 +437,6 @@ pub(super) fn encode_text(text: &str, paragraphs: bool, output: &mut Vec<u8>) ->
                 let mut units = [0u16; 2];
                 for unit in character.encode_utf16(&mut units) {
                     output.extend_from_slice(br"\u");
-                    #[allow(
-                        clippy::cast_possible_wrap,
-                        reason = "RTF \\uN parameters are signed 16-bit UTF-16 units"
-                    )]
                     let signed = *unit as i16;
                     output.extend_from_slice(signed.to_string().as_bytes());
                     output.push(b'?');

@@ -110,10 +110,6 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn parse_info_time(&mut self, field: InfoTimeField) -> crate::Result<()> {
         let duplicate = match field {
             InfoTimeField::Creation => self.info.creation_timestamp.is_some(),

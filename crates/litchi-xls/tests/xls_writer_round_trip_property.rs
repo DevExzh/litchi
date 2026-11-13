@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "property checks panic with the failing case"
-)]
-
 //! A writer-to-reader round-trip property over random workbooks.
 //!
 //! Each case drives one [`Builder`] through a random sequence of registration

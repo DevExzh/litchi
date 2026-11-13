@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 //! Exact-source publication of retained destination text edits.
 
 use litchi_rtf::{

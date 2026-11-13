@@ -1,10 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::shadow_reuse,
-    clippy::shadow_unrelated,
-    reason = "test assertions use bounded fixtures and rebind policy variants"
-)]
-
 use litchi_core::Position;
 use litchi_rtf::{OpenOptions, Package, SourceLimits};
 

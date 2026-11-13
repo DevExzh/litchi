@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::panic,
-    reason = "tab-structure fixtures intentionally fail fast"
-)]
-
 use super::*;
 use litchi_core::Position;
 use litchi_core::sheet::WorkbookTrait;

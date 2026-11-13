@@ -1,8 +1,3 @@
-#![allow(
-    clippy::shadow_same,
-    clippy::shadow_unrelated,
-    reason = "decoding steps deliberately rebind a working value as it is refined through the parse pipeline"
-)]
 use super::{
     ControlWord, Cow, Formatting, MAX_STORY_GROUP_DEPTH, MAX_TEXT_INTERMEDIATE_BYTES,
     ParsedBodyStoryEvent, Parser, RtfEncoding, SmallVec, State, Token, control_symbol_text,
@@ -509,11 +504,6 @@ impl<'a> Parser<'a> {
         }
     }
 
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "RTF \\uN parameters are signed 16-bit; the u16 wrap implements the specified negative-value conversion"
-    )]
     pub(super) fn parse_destination_unicode_sequence(
         &mut self,
         first_code: i32,

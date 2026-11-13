@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "focused unit tests use panic-on-failure assertions"
-)]
-
 use super::*;
 
 const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";

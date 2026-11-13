@@ -25,10 +25,6 @@ fn reject_numeric_parameter(word: &str, param: Option<i32>) -> crate::Result<()>
 /// parameter through the [`super::repair`] helpers, which apply the
 /// Word-compatible interpretation of a malformed shape and report it through
 /// `repair`.
-#[allow(
-    clippy::too_many_lines,
-    reason = "the RTF specification's flat control-word dispatch table is inherently long; keeping entries together aids auditing"
-)]
 pub(in crate::codec::lexer::codec) fn match_control_word<'a>(
     word: &'a str,
     param: Option<i32>,
@@ -37,10 +33,6 @@ pub(in crate::codec::lexer::codec) fn match_control_word<'a>(
     let param_value = param.unwrap_or(1);
     let param_bool = param.unwrap_or(1) != 0;
 
-    #[allow(
-        clippy::match_same_arms,
-        reason = "distinct RTF control words may map to equal tokens; keeping one arm per spelling keeps the table auditable"
-    )]
     let control = match word {
         // Document
         "rtf" => ControlWord::Rtf(param.ok_or_else(|| {

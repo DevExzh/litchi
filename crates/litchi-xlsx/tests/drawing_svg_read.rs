@@ -5,11 +5,6 @@
 //! this file is kept read-only so source/typed pairing, package graph
 //! validation, and bounded XML ingress remain independently reviewable.
 
-#![allow(
-    clippy::unwrap_used,
-    reason = "focused integration fixtures use panic-on-failure assertions"
-)]
-
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::phys_pkg::{PhysPkgReader, PhysPkgWriter};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, TargetMode};

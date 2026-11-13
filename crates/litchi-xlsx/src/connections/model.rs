@@ -238,10 +238,6 @@ impl std::fmt::Debug for WebQueryProperties {
     }
 }
 
-#[allow(
-    clippy::missing_fields_in_debug,
-    reason = "sensitive text-import fields are deliberately omitted or redacted"
-)]
 impl std::fmt::Debug for TextImportProperties {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
@@ -258,10 +254,6 @@ impl std::fmt::Debug for TextImportProperties {
     }
 }
 
-#[allow(
-    clippy::missing_fields_in_debug,
-    reason = "all parameter payload alternatives are intentionally represented by one redacted value field"
-)]
 impl std::fmt::Debug for ConnectionParameter {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter

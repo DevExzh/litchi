@@ -1,9 +1,5 @@
 //! RTF body-content output.
 
-#![allow(
-    clippy::shadow_reuse,
-    reason = "serialization helpers deliberately rebind a working value as the output is assembled"
-)]
 use super::super::{
     Alignment, AnimatedTextEffect, AssociatedCharacterBaseline, AssociatedUnderlineStyle, Border,
     BorderStyle, Borders, CharacterBaseline, CharacterExpansion, CharacterGrid, CharacterType,

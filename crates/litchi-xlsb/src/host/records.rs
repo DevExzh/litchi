@@ -93,10 +93,6 @@ impl WorkbookPropRecord {
 
 /// Bundle sheet record (worksheet metadata)
 #[derive(Debug, Clone)]
-#[allow(
-    dead_code,
-    reason = "retained for BIFF12 codec completeness and staged host integration"
-)]
 pub struct BundleSheetRecord {
     pub id: u32,
     pub name: String,
@@ -663,7 +659,6 @@ impl NameRecord {
 #[allow(
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
-    clippy::float_cmp,
     reason = "record fixtures intentionally construct exact bounded BIFF12 bit patterns and floating sentinels"
 )]
 mod tests {

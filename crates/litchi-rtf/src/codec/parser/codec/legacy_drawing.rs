@@ -4,10 +4,6 @@ use super::{
 };
 
 impl<'a> Parser<'a> {
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn apply_legacy_text_box_control(
         builder: &mut LegacyTextBoxBuilder,
         control: &ControlWord<'_>,

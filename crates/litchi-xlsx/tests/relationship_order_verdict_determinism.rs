@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "test assertions panic on failure by design"
-)]
 //! A value-only patch must be accepted or refused by what the workbook is, not
 //! by which hash seed a particular load happened to draw.
 //!

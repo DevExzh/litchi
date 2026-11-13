@@ -1,12 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::shadow_reuse,
-    clippy::shadow_same,
-    clippy::shadow_unrelated,
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design and rebind fixture names across steps"
-)]
-
 use litchi_core::Position;
 use litchi_rtf::write::Writer;
 use litchi_rtf::{Document, OpenOptions, Package, SourceLimits};

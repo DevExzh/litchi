@@ -24,10 +24,6 @@ pub use character_positioning::{
     CharacterBaseline as Baseline, CharacterExpansion as Expansion,
     CharacterPositioning as Positioning,
 };
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 pub use types::{
     Alignment, AnimatedTextEffect, AssociatedCharacterFormatting, CharacterGrid, CharacterType,
     EmphasisMark, FitText, Indentation, MAX_PARAGRAPH_FRAME_TWIPS, ParagraphDropCap,

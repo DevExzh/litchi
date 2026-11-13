@@ -8,16 +8,6 @@
 //! Compressed RTF is commonly used in email attachments and other scenarios
 //! where file size reduction is important.
 
-#![allow(
-    clippy::shadow_reuse,
-    clippy::shadow_unrelated,
-    reason = "decoding steps deliberately rebind a working value as it is refined through the parse pipeline"
-)]
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "items stay grouped by RTF feature area rather than by item kind"
-)]
-
 use zerocopy::{FromBytes, IntoBytes};
 use zerocopy_derive::{
     FromBytes as DeriveFromBytes, Immutable, IntoBytes as DeriveIntoBytes, KnownLayout,
@@ -903,15 +893,6 @@ fn crc32(data: &[u8]) -> crate::Result<u32> {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        reason = "test assertions panic on failure by design"
-    )]
-    #![allow(
-        clippy::cast_possible_truncation,
-        reason = "test PRNG fixtures intentionally truncate wide state into bytes"
-    )]
     use super::*;
 
     const SPEC_RAW: &[u8] = b"{\\rtf1\\ansi\\ansicpg1252\\pard hello world}\r\n";

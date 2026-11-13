@@ -1,8 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    reason = "integration assertions report fixture failures"
-)]
-
 use litchi_core::sheet::traits::WorkbookTrait as _;
 use litchi_xlsb::Package;
 use litchi_xlsb::cell_values::TransferLimits;

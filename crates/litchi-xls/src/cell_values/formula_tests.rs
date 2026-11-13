@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "formula fixtures intentionally fail fast"
-)]
-
 use super::*;
 
 fn fixture() -> Vec<u8> {

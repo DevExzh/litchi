@@ -148,10 +148,6 @@ const DEFAULT_RETAINED_OBJECTS: usize = MAX_COLLECTION_ITEMS * 6 + MAX_XLSB_EXTE
 /// operations, concurrent operations, or caller-requested semantic clones
 /// made after the governed operation completes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(
-    clippy::struct_field_names,
-    reason = "The max_* vocabulary makes the resource-policy fields explicit."
-)]
 pub struct ExternalLinkLimits {
     max_part_bytes: usize,
     max_total_part_bytes: usize,

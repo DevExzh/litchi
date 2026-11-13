@@ -651,10 +651,6 @@ fn needs_namespace_resolution(parent: Option<Context>) -> bool {
     )
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "arguments correspond directly to the x14ac worksheet attributes"
-)]
 fn start(
     parent: Option<Context>,
     namespace: &ResolveResult<'_>,

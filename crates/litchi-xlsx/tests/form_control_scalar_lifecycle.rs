@@ -4,14 +4,6 @@
 //! They exercise the public worksheet/source-backed owners and assert package
 //! preservation around the two-part properties/VML scalar closure.  Nothing in
 //! this file claims acceptance by Excel or another native application.
-#![allow(
-    clippy::expect_used,
-    reason = "focused fixture assertions panic on failure"
-)]
-#![allow(
-    clippy::unwrap_used,
-    reason = "focused fixture assertions panic on failure"
-)]
 
 use std::io::{self, Cursor, Write};
 use std::path::{Path, PathBuf};

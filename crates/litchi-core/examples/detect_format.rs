@@ -10,12 +10,6 @@
 //! cargo run -p litchi-core --example detect_format -- test-data/ooxml/docx
 //! ```
 
-#![allow(
-    clippy::print_stderr,
-    clippy::print_stdout,
-    reason = "this command-line example reports detection results and usage to the terminal"
-)]
-
 use litchi_core::FileFormat;
 use litchi_core::detection::simd_utils::check_office_signatures;
 use std::fs;

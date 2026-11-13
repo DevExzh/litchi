@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "structural-order fixtures deliberately fail at the assertion site"
-)]
-
 //! Native complete-catalog sheet-order transactions.
 //!
 //! These tests keep the workbook's physical relationship identities visible:

@@ -1,16 +1,4 @@
-#![allow(
-    clippy::pedantic,
-    clippy::unwrap_used,
-    clippy::wildcard_enum_match_arm,
-    reason = "integration tests use panic-on-failure extraction and exhaustive fixture diagnostics"
-)]
-
 //! Real-workbook regression coverage for the bounded `BrtCellReal` seam.
-
-#![allow(
-    clippy::expect_used,
-    reason = "the regression fixture must fail immediately when its checked corpus assumptions break"
-)]
 
 use litchi_core::sheet::traits::WorkbookTrait;
 use litchi_xlsb::{
@@ -419,10 +407,6 @@ fn real_fixture_publication_rejects_missing_style_and_shared_string_dependencies
     assert!(invalid_shared.commit().is_err());
 }
 
-#[allow(
-    clippy::wildcard_enum_match_arm,
-    reason = "Value is deliberately non-exhaustive across this public-API integration boundary"
-)]
 fn replacement_for(value: &Value) -> Option<Value> {
     match value {
         Value::RkNumber(number) => {

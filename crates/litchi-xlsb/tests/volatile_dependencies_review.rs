@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::pedantic,
-    clippy::unwrap_used,
-    reason = "the focused integration fixtures fail fast while asserting the public signature policy"
-)]
-
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
 use litchi_xlsb::Package;
 use litchi_xlsb::raw::{Encoder, Records, kind};

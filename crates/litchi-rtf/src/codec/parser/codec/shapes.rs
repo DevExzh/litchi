@@ -1,9 +1,3 @@
-#![allow(
-    clippy::shadow_reuse,
-    clippy::shadow_same,
-    clippy::shadow_unrelated,
-    reason = "decoding steps deliberately rebind a working value as it is refined through the parse pipeline"
-)]
 use super::{
     ColorRef, ControlWord, Cow, MAX_GROUPS_PER_GROUP, MAX_SHAPE_GROUP_DEPTH, MAX_SHAPE_GROUPS,
     MAX_SHAPE_PROPERTIES, MAX_SHAPE_PROPERTY_BYTES, MAX_SHAPE_TEXT_BYTES, MAX_SHAPES,
@@ -437,10 +431,6 @@ impl<'a> Parser<'a> {
         Ok(shape)
     }
 
-    #[allow(
-        clippy::type_complexity,
-        reason = "shape destination parsers return the full story-content tuple in one result"
-    )]
     pub(super) fn parse_shape_text_destination(
         &mut self,
     ) -> crate::Result<(
@@ -886,10 +876,6 @@ impl<'a> Parser<'a> {
         }
     }
 
-    #[allow(
-        clippy::type_complexity,
-        reason = "shape destination parsers return the full story-content tuple in one result"
-    )]
     pub(super) fn parse_shape_property_group(
         &mut self,
     ) -> crate::Result<(

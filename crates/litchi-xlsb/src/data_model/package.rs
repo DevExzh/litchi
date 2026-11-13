@@ -484,7 +484,6 @@ fn invalid(message: &'static str) -> Error {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used)]
 mod tests {
     use super::*;
     use litchi_opc::{BlobPart, PackURI, Part};

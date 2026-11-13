@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "package fixtures deliberately fail at the assertion that owns the contract"
-)]
-
 //! OPC-topology regressions for complete-catalog worksheet insertion.
 //!
 //! The structural insertion tests cover the workbook record contract.  These

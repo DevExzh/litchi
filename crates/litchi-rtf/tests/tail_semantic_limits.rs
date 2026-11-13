@@ -1,5 +1,3 @@
-#![allow(clippy::unwrap_used, reason = "test assertions panic on failure")]
-
 use litchi_rtf::{
     Package,
     tail_append::{

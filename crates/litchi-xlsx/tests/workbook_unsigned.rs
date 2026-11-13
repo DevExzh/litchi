@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "integration tests use panic-on-failure extraction"
-)]
-
 //! `Workbook::unsigned` is the explicit signature removal that authorizes
 //! editing a signed workbook (ADR 0006).
 

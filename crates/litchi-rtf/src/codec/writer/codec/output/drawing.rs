@@ -128,10 +128,6 @@ impl<W: Write> Writer<W> {
         self.write_str("}")
     }
 
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "the writer threads the full drawing context through the pipeline"
-    )]
     pub(in super::super) fn write_field_story(
         &mut self,
         text: &str,

@@ -331,10 +331,6 @@ impl StreamCounter {
     }
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "arguments correspond directly to the cell-format wire attributes"
-)]
 fn stream_start(
     parent: Context,
     element: &SemanticElement<'_>,
@@ -396,10 +392,6 @@ fn is_spreadsheetml_name_semantic(name: &ExpandedName, local_name: &[u8]) -> boo
             || name.namespace.as_bytes() == crate::raw::namespace::STRICT_SPREADSHEETML_NAMESPACE)
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "arguments correspond directly to the cell-format wire attributes"
-)]
 fn start(
     parent: Context,
     namespace: &ResolveResult<'_>,

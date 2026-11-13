@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::float_cmp,
-    reason = "integration tests use panic-on-failure extraction and exact fixture values"
-)]
-
 //! Partial cell formats and formula text through package cell edits.
 
 use litchi_core::sheet::{Cell as _, CellValue};

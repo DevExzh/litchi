@@ -796,10 +796,6 @@ pub(crate) fn targets_for_sheets(sheets: &[Vec<OleObjectRecord>]) -> Result<Targ
     Ok(Targets::new(targets)?)
 }
 
-#[allow(
-    clippy::type_complexity,
-    reason = "type mirrors the decoded BIFF record structure"
-)]
 fn parse_workbook(
     input: &[u8],
 ) -> Result<(
@@ -1148,10 +1144,6 @@ fn rewrite_sheet(
     Ok(output)
 }
 
-#[allow(
-    clippy::type_complexity,
-    reason = "type mirrors the decoded BIFF record structure"
-)]
 fn bindings(input: &[u8]) -> Result<(Vec<(usize, usize)>, Vec<(usize, bool)>)> {
     let mut refs = Vec::new();
     for (start, _, kind, body_start, body_end) in ranges(input)? {

@@ -19,10 +19,6 @@ pub const MAX_PICTURE_SHAPE_PROPERTIES: usize = 4_096;
 /// Maximum aggregate name/value bytes on one inline picture.
 pub const MAX_PICTURE_SHAPE_PROPERTY_BYTES: usize = 1024 * 1024;
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Ordered `OfficeArt` properties from a picture's starred `picprop` destination.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct PictureShapeProperties<'a> {
@@ -91,10 +87,6 @@ impl PictureShapeProperties<'_> {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Inert identity metadata attached to one RTF picture payload.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct PictureIdentity<'a> {
@@ -159,10 +151,6 @@ pub enum ImageType {
     Unknown,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Passive crop distances in twips from the four source-picture edges.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct PictureCrop {
@@ -172,10 +160,6 @@ pub struct PictureCrop {
     pub bottom: Option<i32>,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Passive legacy bitmap header controls carried by a `pict` destination.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct PictureBitmapMetadata {

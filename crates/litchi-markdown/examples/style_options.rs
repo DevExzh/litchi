@@ -1,8 +1,3 @@
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example intentionally prints its results"
-)]
-
 //! Compare `MarkdownOptions` style variants on a single input.
 //!
 //! Renders a tiny `MathSnippet` (a subscript fragment + a superscript fragment +

@@ -58,14 +58,6 @@ impl Length {
     /// ```
     #[inline]
     #[must_use]
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "float-to-int truncation toward zero is the intended conversion semantics"
-    )]
-    #[allow(
-        clippy::cast_precision_loss,
-        reason = "EMUS_PER_INCH (914_400) is exactly representable as f64"
-    )]
     pub fn from_inches(inches: f64) -> Self {
         Self {
             emus: (inches * EMUS_PER_INCH as f64) as i64,
@@ -83,14 +75,6 @@ impl Length {
     /// ```
     #[inline]
     #[must_use]
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "float-to-int truncation toward zero is the intended conversion semantics"
-    )]
-    #[allow(
-        clippy::cast_precision_loss,
-        reason = "EMUS_PER_CM (360_000) is exactly representable as f64"
-    )]
     pub fn from_cm(cm: f64) -> Self {
         Self {
             emus: (cm * EMUS_PER_CM as f64) as i64,
@@ -107,10 +91,6 @@ impl Length {
     /// Convert to inches.
     #[inline]
     #[must_use]
-    #[allow(
-        clippy::cast_precision_loss,
-        reason = "f64 precision is sufficient for document dimensions; EMUS_PER_INCH is exactly representable"
-    )]
     pub fn inches(&self) -> f64 {
         self.emus as f64 / EMUS_PER_INCH as f64
     }
@@ -118,10 +98,6 @@ impl Length {
     /// Convert to centimeters.
     #[inline]
     #[must_use]
-    #[allow(
-        clippy::cast_precision_loss,
-        reason = "f64 precision is sufficient for document dimensions; EMUS_PER_CM is exactly representable"
-    )]
     pub fn cm(&self) -> f64 {
         self.emus as f64 / EMUS_PER_CM as f64
     }

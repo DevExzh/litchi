@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "focused shared-traversal boundary assertions"
-)]
-
 use std::{fmt::Write as _, sync::Arc};
 
 use litchi_core::OwnedSource;

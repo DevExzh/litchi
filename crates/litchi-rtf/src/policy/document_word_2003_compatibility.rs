@@ -1,7 +1,3 @@
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "independent RTF feature flags stay flat for direct access"
-)]
 /// Passive compatibility requests for Word 2003-era layout behavior.
 ///
 /// These flags are retained for round trips only. This crate does not alter

@@ -447,10 +447,6 @@ pub struct ValidationReport {
 
 impl ValidationReport {
     /// Parse UTF-8 RTF once with the caller's explicit opening profile.
-    #[allow(
-        clippy::should_implement_trait,
-        reason = "the inherent constructor keeps the validation API parallel with Package::parse"
-    )]
     pub fn from_str(input: &str, options: OpenOptions) -> crate::Result<Self> {
         let document = crate::Package::parse_with_options(input, options)?;
         Ok(document.validation_report())

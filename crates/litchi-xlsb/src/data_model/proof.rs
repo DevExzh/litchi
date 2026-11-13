@@ -90,7 +90,6 @@ fn invalid(message: &'static str) -> Error {
     Error::InvalidFormat(message)
 }
 
-#[allow(clippy::wildcard_enum_match_arm)]
 pub(crate) fn map_xldm_error(error: litchi_xldm::Error) -> Error {
     match error {
         litchi_xldm::Error::Limit {
@@ -124,7 +123,6 @@ pub(crate) fn map_xldm_error(error: litchi_xldm::Error) -> Error {
     }
 }
 
-#[allow(clippy::wildcard_enum_match_arm)]
 fn map_xldm_proof_error(error: litchi_xldm::Error) -> Error {
     match error {
         litchi_xldm::Error::Limit {

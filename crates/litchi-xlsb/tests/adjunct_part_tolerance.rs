@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "test assertions use panic-on-failure extraction by design"
-)]
-
 //! Audit finding F3.11 in adjunct parts: trailing payload bytes in table,
 //! PivotCache, connections, and comments parts, and reserved `Cell` flag bits
 //! on the binary-index point lookup, are repaired and recorded. Each fixture

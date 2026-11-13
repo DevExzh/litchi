@@ -53,11 +53,6 @@ impl DocumentLanguageDefaults {
         Self::default()
     }
 
-    #[allow(
-        clippy::unused_self,
-        clippy::unnecessary_wraps,
-        reason = "keeps the metadata validate() call symmetry; language defaults currently have no fallible checks"
-    )]
     pub(crate) fn validate(&self) -> crate::Result<()> {
         Ok(())
     }

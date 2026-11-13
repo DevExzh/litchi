@@ -1,6 +1,4 @@
 #![allow(
-    clippy::expect_used,
-    clippy::float_cmp,
     clippy::wildcard_enum_match_arm,
     reason = "test fixture uses bounded literal casts, panic-on-failure extraction, exact floating sentinels, or explicit negative fallback solely to state its assertion"
 )]

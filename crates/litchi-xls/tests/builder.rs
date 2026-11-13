@@ -1,9 +1,4 @@
 //! Fresh authoring publishes through a validated immutable owner.
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "acceptance assertions fail fast"
-)]
 
 use litchi_core::sheet::CellValue;
 use litchi_xls::cell_values::Reference;

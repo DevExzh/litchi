@@ -47,10 +47,6 @@ impl<W: Write> Writer<W> {
         Ok(())
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn validate_table_story_metadata_ownership(doc: &Tree<'_>) -> io::Result<()> {
         let mut navigation_owners = vec![0u8; doc.navigation_entries().len()];
         let mut revision_owners = vec![0u8; doc.revisions().len()];

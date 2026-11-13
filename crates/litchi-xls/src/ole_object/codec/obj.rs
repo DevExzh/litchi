@@ -553,10 +553,6 @@ fn serialize_subrecord(value: &ObjSubrecord) -> Result<(u16, Vec<u8>)> {
     })
 }
 
-#[allow(
-    clippy::type_complexity,
-    reason = "type mirrors the decoded BIFF record structure"
-)]
 pub(crate) fn ranges(input: &[u8]) -> Result<Vec<(usize, usize, u16, usize, usize)>> {
     let mut output = Vec::new();
     let mut offset = 0usize;

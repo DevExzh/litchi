@@ -194,10 +194,6 @@ pub(super) fn scan(content: &[u8]) -> Result<Layout> {
 }
 
 impl Scanner {
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "arguments are the complete catalog rewrite state"
-    )]
     fn start(
         &mut self,
         parent: Option<Kind>,
@@ -331,10 +327,6 @@ impl Scanner {
         Ok(Kind::Other)
     }
 
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "arguments are the complete catalog relationship rewrite state"
-    )]
     fn empty(
         &mut self,
         parent: Option<Kind>,

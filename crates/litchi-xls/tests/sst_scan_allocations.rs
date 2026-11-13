@@ -6,11 +6,6 @@
 //! allocations per shared string. This test pins the property that replaced
 //! that: one open allocates fewer times than the workbook has shared strings.
 
-#![allow(
-    unsafe_code,
-    reason = "The test-only allocator is the measurement boundary; production crates remain safe"
-)]
-
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 use std::path::{Path, PathBuf};

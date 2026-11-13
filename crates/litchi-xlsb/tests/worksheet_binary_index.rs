@@ -1,11 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::pedantic,
-    clippy::shadow_reuse,
-    clippy::unwrap_used,
-    reason = "binary-index integration tests use small, checked fixtures and panic-on-failure extraction"
-)]
-
 //! Integration coverage for worksheet binary-index lookup and maintenance.
 //!
 //! The index is an internal wire codec, so these tests exercise it through

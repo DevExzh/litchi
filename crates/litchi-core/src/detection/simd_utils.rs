@@ -444,12 +444,6 @@ pub fn content_type_matches_any(content_type: &[u8], valid_types: &[&[u8]]) -> b
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        reason = "test assertions panic by design"
-    )]
-
     use super::*;
 
     #[test]

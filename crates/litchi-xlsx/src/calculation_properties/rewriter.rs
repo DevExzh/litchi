@@ -429,10 +429,6 @@ fn inspect_start(
     Ok(())
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "arguments are the complete calculation-property rewrite state"
-)]
 fn close_frame(
     frame: Frame,
     end: usize,

@@ -1,10 +1,5 @@
 //! RTF metadata and destination output.
 
-#![allow(
-    clippy::shadow_reuse,
-    clippy::shadow_same,
-    reason = "serialization helpers deliberately rebind a working value as the output is assembled"
-)]
 use super::super::{
     Annotation, AnnotationType, Bookmark, CustomXmlTag, DocumentInfo, DocumentProtection,
     DocumentVariable, DrawingStoryTextMode, FieldOwner, HashSet, MathElement, MathElementRole,

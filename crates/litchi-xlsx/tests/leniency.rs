@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "fixture assertions intentionally panic on failure"
-)]
-
 //! Acceptance tests for the litchi-xlsx section of `docs/LENIENCY_AUDIT.md`.
 //!
 //! Each test patches one member of a conformant workbook so that it carries a

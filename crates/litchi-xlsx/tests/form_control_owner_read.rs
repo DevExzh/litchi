@@ -4,14 +4,6 @@
 //! facades.  ZIP rewrites below only create bounded, structurally valid test
 //! inputs for a single targeted refusal or fallback rule; no test writes an
 //! XLSX result or claims native application acceptance.
-#![allow(
-    clippy::unwrap_used,
-    reason = "focused fixture assertions panic on failure"
-)]
-#![allow(
-    clippy::expect_used,
-    reason = "focused fixture assertions panic on failure"
-)]
 
 use std::io::{self, Cursor};
 use std::num::{NonZeroU64, NonZeroUsize};

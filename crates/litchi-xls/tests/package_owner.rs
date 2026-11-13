@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "owner acceptance fixtures intentionally fail fast"
-)]
-
 use litchi_cfb::{OleFile, OleFileLimits, OleWriter, SharedOleFile, consts::STGTY_STREAM};
 use litchi_core::{ReadAt, SourceVersion};
 use litchi_xls::package::{Error as PackageError, Package};

@@ -1,8 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    reason = "focused owner tests construct small exact package graphs and panic on fixture setup"
-)]
-
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{BlobPart, PackURI, Part, TargetMode};
 

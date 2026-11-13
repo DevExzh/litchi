@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::too_many_lines,
-    reason = "one constructed witness per construct of the dependency rule"
-)]
 //! One constructed witness per construct of the dependency rule.
 //!
 //! Each test builds the smallest package that carries exactly one producer

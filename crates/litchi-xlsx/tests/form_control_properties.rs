@@ -4,7 +4,6 @@
 //! These tests intentionally stop at the XML part boundary.  A worksheet
 //! control, relationship graph, and package writer are not part of the leaf
 //! owner's contract yet.
-#![allow(clippy::unwrap_used, reason = "test assertions use panic-on-failure")]
 
 use std::fs;
 use std::path::{Path, PathBuf};

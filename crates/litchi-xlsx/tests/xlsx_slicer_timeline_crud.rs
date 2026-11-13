@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    reason = "focused raw-package assertions intentionally panic on fixture errors"
-)]
-
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, Part, SourceLimits};
 use litchi_xlsx::slicer::{self, Definition, Slicer};

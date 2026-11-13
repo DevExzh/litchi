@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use litchi_core::Position;
 use litchi_rtf::raw::Tree;
 use litchi_rtf::{

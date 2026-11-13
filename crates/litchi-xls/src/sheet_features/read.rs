@@ -995,7 +995,6 @@ fn bare(formula: &str) -> &str {
 /// fraction.
 pub(super) fn format_number(number: f64) -> String {
     if number.fract() == 0.0 && number.abs() < 1e15 {
-        #[allow(clippy::cast_possible_truncation, reason = "bounded above")]
         let integer = number as i64;
         integer.to_string()
     } else {

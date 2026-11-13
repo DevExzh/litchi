@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "focused integration tests use panic-on-failure assertions"
-)]
-
 use std::io;
 use std::io::Write;
 use std::num::{NonZeroU64, NonZeroUsize};

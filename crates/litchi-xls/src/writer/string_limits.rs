@@ -157,10 +157,6 @@ pub(crate) fn u16_len(units: usize, field: &'static str) -> Result<u16> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::*;
 

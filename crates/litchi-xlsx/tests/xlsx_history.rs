@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "focused integration tests use panic-on-failure assertions"
-)]
-
 use litchi_xlsx::cell::{Cell, Value};
 use litchi_xlsx::{History, HistoryLimits};
 

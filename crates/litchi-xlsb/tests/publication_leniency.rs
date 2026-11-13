@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "publication regressions use immediate fixture diagnostics"
-)]
-
 //! Changed-publication regressions for the opt-in cached-number policy.
 //!
 //! A tolerant read turns an invalid cached `Xnum` into the documented typed

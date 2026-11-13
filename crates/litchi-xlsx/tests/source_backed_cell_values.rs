@@ -1,5 +1,3 @@
-#![allow(clippy::unwrap_used, reason = "focused integration assertions")]
-
 #[path = "support/source_editors.rs"]
 mod source_editors;
 #[allow(

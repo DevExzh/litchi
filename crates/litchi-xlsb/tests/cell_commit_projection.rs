@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "projection regressions use compact generated fixtures and immediate diagnostics"
-)]
-
 //! Regressions for the package projection retained by a cell-values commit.
 //!
 //! A package-owned cell commit has already validated the candidate workbook.

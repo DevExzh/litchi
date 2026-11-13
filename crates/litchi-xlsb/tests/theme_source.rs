@@ -1,11 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::pedantic,
-    clippy::shadow_reuse,
-    clippy::unwrap_used,
-    reason = "source theme integration tests use checked fixtures and panic-on-failure assertions"
-)]
-
 use std::io::{self, Cursor};
 use std::path::Path;
 use std::sync::Arc;

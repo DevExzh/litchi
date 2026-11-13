@@ -1,12 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::shadow_reuse,
-    clippy::shadow_same,
-    clippy::shadow_unrelated,
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design and rebind fixture names across steps"
-)]
-
 //! Round-trip tests for extended section page numbering: the full RTF 1.9.1
 //! `\pgn*` format family, `\pgnrestart`/`\pgncont`, and `\pgnxN`/`\pgnyN`.
 

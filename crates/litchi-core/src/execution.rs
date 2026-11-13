@@ -474,12 +474,6 @@ pub enum ExecutionError {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::expect_used,
-        clippy::unwrap_used,
-        reason = "test assertions panic by design"
-    )]
-
     use std::{
         num::{NonZeroU64, NonZeroUsize},
         sync::{Arc, Barrier},

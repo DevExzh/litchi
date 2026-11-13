@@ -7,17 +7,6 @@
 //! an independent process and retains this program's JSON as the raw sample
 //! evidence.
 
-#![allow(
-    unsafe_code,
-    clippy::arbitrary_source_item_ordering,
-    clippy::cast_possible_truncation,
-    clippy::cast_precision_loss,
-    clippy::print_stdout,
-    clippy::shadow_reuse,
-    clippy::similar_names,
-    reason = "this opt-in profile owns a process allocator wrapper and deliberately emits machine-readable stdout"
-)]
-
 use litchi_core::sheet::{
     Cell as SheetCell, CellValue, WorkbookTrait, Worksheet as WorksheetTrait,
 };

@@ -3,10 +3,6 @@
 //! This module provides support for document sections, headers, footers,
 //! page breaks, and section formatting in RTF documents.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "items stay grouped by RTF feature area rather than by item kind"
-)]
 use super::types::{Formatting, Paragraph, TextDirection};
 use std::borrow::Cow;
 
@@ -31,10 +27,6 @@ pub const MAX_PAGE_NUMBER_HEADING_LEVEL: i32 = 9;
 /// Maximum accepted section line-grid pitch, in twips.
 pub const MAX_SECTION_LINE_GRID_TWIPS: i32 = 31_680;
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// One explicitly sized section column.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SectionColumn {
@@ -76,10 +68,6 @@ impl SectionColumn {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Equal- or variable-width column layout for an RTF section.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SectionColumns {
@@ -176,10 +164,6 @@ impl Default for SectionColumns {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Section break type
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SectionBreakType {
@@ -346,10 +330,6 @@ pub enum VerticalAlignment {
     Bottom,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Restart behavior for section line numbering.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SectionLineNumberRestart {
@@ -361,10 +341,6 @@ pub enum SectionLineNumberRestart {
     Continuous,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Complete explicit section line-numbering state.
 ///
 /// `increment == None` means numbering is disabled. Other fields retain
@@ -437,10 +413,6 @@ impl SectionLineNumbering {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Section-level footnote placement override.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SectionFootnotePlacement {
@@ -448,10 +420,6 @@ pub enum SectionFootnotePlacement {
     BottomOfPage,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Explicit section-level footnote and endnote overrides.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct SectionNoteOptions {
@@ -517,10 +485,6 @@ impl PageNumberHeadingSeparator {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Heading-number prefix applied to section page numbers (`pgnhn` family).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct SectionPageNumberHeading {
@@ -555,10 +519,6 @@ impl SectionPageNumberHeading {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Document grid used to lay out a section.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SectionDocumentGridType {
@@ -585,10 +545,6 @@ impl SectionDocumentGridType {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Explicit section document-grid settings.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct SectionDocumentGrid {
@@ -626,10 +582,6 @@ impl SectionDocumentGrid {
 /// Maximum printer paper-bin index accepted for `\binfsxnN` / `\binsxnN`.
 pub const MAX_SECTION_PAPER_BIN: i32 = u16::MAX as i32;
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Printer paper-source bins selected for a section.
 ///
 /// `\binfsxnN` picks the bin feeding the section's first page and `\binsxnN`
@@ -651,10 +603,6 @@ impl SectionPaperSource {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Section rendering direction from `\vertsect` and `\horzsect`.
 ///
 /// Vertical rendering is used for East Asian vertical-writing sections. The
@@ -667,10 +615,6 @@ pub enum SectionRendering {
     Vertical,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Section properties
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SectionProperties {

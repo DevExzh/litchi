@@ -170,10 +170,6 @@ impl BlobLimits {
 
 /// Finite limits applied before a durable patch is parsed or retained.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "the type is re-exported as the public bounds for durable patches"
-)]
 pub struct PatchLimits {
     blobs: BlobLimits,
     json_bytes: usize,
@@ -392,10 +388,6 @@ pub enum BlobLimitKind {
 /// A semantic operation. Formats define the operation vocabulary and target
 /// selectors; this common representation carries it durably.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "the type is re-exported as a format-neutral public patch operation"
-)]
 pub struct PatchOperation {
     /// Format-owned operation name, such as `cell.set`.
     pub op: String,
@@ -992,10 +984,6 @@ impl<T> History<T> {
 
 /// Failures while constructing, decoding, or retaining a durable patch.
 #[derive(Debug, Error)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "the error is re-exported separately from litchi_core::Error"
-)]
 #[non_exhaustive]
 pub enum PatchError {
     /// A required semantic identifier was empty, contained a control code, or
@@ -2623,12 +2611,6 @@ const fn hex_nibble(value: u8) -> Option<u8> {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::expect_used,
-        clippy::unwrap_used,
-        reason = "test assertions unwrap expected success"
-    )]
-
     use serde_json::json;
 
     use super::*;

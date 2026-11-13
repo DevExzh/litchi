@@ -1,8 +1,3 @@
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example intentionally prints its results"
-)]
-
 //! Render a simple in-memory "document" to Markdown using `ToMarkdown`.
 //!
 //! `litchi-markdown` is format-agnostic: it ships the [`ToMarkdown`] trait and

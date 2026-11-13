@@ -557,10 +557,6 @@ pub(super) fn write_autofilterinfo<W: Write>(writer: &mut W, c_entries: u16) -> 
 /// 24      var   rgch1      — string for condition 1 (if applicable)
 ///         var   rgch2      — string for condition 2 (if applicable)
 /// ```
-#[allow(
-    clippy::too_many_arguments,
-    reason = "arguments map positionally to BIFF fields"
-)]
 pub(super) fn write_autofilter<W: Write>(
     writer: &mut W,
     column_index: u16,

@@ -672,12 +672,6 @@ fn evict_unpinned(state: &mut CacheState, needed: u64) {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::expect_used,
-        clippy::unwrap_used,
-        reason = "cache lifecycle assertions intentionally panic"
-    )]
-
     use super::*;
     use litchi_core::{Budget, CancellationSource, ExecutionLimits, Limits, OwnedSource};
     use std::num::{NonZeroU64, NonZeroUsize};

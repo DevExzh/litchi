@@ -23,10 +23,6 @@ use std::str::FromStr;
 /// let yellow = RGBColor::from_name("yellow").unwrap();
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "public API name is stable and used by dependent crates; renaming would be a breaking change"
-)]
 pub struct RGBColor {
     /// Red component (0-255)
     pub r: u8,
@@ -282,12 +278,6 @@ impl fmt::Display for RGBColor {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        reason = "test assertions panic by design"
-    )]
-
     use super::*;
 
     #[test]

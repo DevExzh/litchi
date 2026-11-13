@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "test assertions use panic-on-failure extraction by design"
-)]
-
 //! Packaging repairs applied by the OPC layer are folded into the
 //! workbook-scope report on every open path, and a conformant package
 //! contributes nothing.

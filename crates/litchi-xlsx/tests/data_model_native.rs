@@ -1,5 +1,4 @@
 //! Native version-150 read, descriptor publication, and compatibility boundaries.
-#![allow(clippy::unwrap_used, reason = "test assertions panic on failure")]
 
 use litchi_opc::{OpcPackage, PackURI, SourceLimits};
 use litchi_xlsx::{Error, Package};

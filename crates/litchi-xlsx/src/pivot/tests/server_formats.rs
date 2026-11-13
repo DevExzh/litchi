@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "focused integration tests use panic-on-failure assertions"
-)]
-
 //! Public fixtures and contract checks for the first pivot extension owner.
 //!
 //! The owner under test is the `pivotTableDefinition/extLst/ext` payload with

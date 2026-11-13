@@ -1,10 +1,5 @@
 #![allow(
-    clippy::pedantic,
-    clippy::expect_used,
     clippy::field_reassign_with_default,
-    clippy::shadow_reuse,
-    clippy::shadow_unrelated,
-    clippy::unwrap_used,
     reason = "integration tests use panic-on-failure extraction and exact worksheet fixture comparisons"
 )]
 

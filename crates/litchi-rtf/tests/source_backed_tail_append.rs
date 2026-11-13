@@ -2,12 +2,6 @@
 //! nothing, the committed package writes the planned tail splice, edits chain,
 //! and the patch is an exact pair.
 
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "these tests intentionally panic on an unexpected result"
-)]
-
 use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits as CoreLimits,
     OwnedSource, ReadAt,

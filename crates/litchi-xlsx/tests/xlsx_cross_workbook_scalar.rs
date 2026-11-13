@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "focused integration tests use panic-on-failure assertions"
-)]
-
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, TargetMode};
 use litchi_xlsx::{Cell, DurablePatch, Error, Formula, Number, Value};

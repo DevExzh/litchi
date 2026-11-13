@@ -856,11 +856,6 @@ pub type SheetSelector<'a, Id> = Selector<'a, Id>;
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::expect_used,
-        reason = "tests deliberately panic on unexpected parse and validation failures"
-    )]
-
     use super::*;
 
     #[test]

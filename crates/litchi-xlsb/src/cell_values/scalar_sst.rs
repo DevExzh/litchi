@@ -8,11 +8,6 @@
 //! from the worksheet stream editor so that the latter can continue to copy
 //! opaque records byte for byte.
 
-#![allow(
-    clippy::cast_lossless,
-    reason = "BIFF12 count fields are checked below before their wire conversion"
-)]
-
 use super::Limits;
 use crate::package::error::{Error, Result};
 use crate::raw::{Header, Kind, Limits as RawLimits, Records, kind};

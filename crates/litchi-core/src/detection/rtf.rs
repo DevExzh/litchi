@@ -90,12 +90,6 @@ pub fn detect_rtf_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<F
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        reason = "test assertions panic by design"
-    )]
-
     use super::*;
     use std::io::Cursor;
 

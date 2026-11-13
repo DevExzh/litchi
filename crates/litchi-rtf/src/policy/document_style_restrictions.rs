@@ -1,7 +1,3 @@
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "independent RTF feature flags stay flat for direct access"
-)]
 /// Passive document-level style and formatting restriction declarations.
 ///
 /// These values preserve RTF metadata only. They do not restrict editing or

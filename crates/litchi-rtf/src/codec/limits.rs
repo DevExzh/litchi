@@ -51,10 +51,6 @@ impl std::fmt::Display for SourceLimitKind {
 /// allocation or counter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[must_use]
-#[allow(
-    clippy::struct_field_names,
-    reason = "every source limit is a maximum, so the shared max_ prefix is intentional"
-)]
 pub struct SourceLimits {
     max_input_bytes: usize,
     max_events: usize,

@@ -1,9 +1,5 @@
 //! Error types for RTF parsing.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "items stay grouped by RTF feature area rather than by item kind"
-)]
 use std::fmt;
 use std::hash::{BuildHasher, Hash};
 

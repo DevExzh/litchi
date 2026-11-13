@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "limit fixtures favor explicit inputs and panic-driven assertions"
-)]
-
 //! The fresh XLS writer's remaining length fields, counts and indices. Every
 //! limit is tested at N - 1, N and N + 1, with a surrogate pair straddling it
 //! where the field counts UTF-16 code units; every accepted input is read back

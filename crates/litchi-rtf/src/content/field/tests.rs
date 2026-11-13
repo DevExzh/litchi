@@ -1,16 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::shadow_reuse,
-    clippy::shadow_same,
-    clippy::shadow_unrelated,
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design and rebind fixture names across steps"
-)]
-#![allow(
-    clippy::let_underscore_must_use,
-    reason = "totality smoke tests deliberately discard view results"
-)]
-
 use super::*;
 use crate::codec::limits::OpenOptions;
 use std::borrow::Cow;

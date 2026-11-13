@@ -1,8 +1,3 @@
-#![allow(
-    clippy::shadow_reuse,
-    clippy::shadow_same,
-    reason = "decoding steps deliberately rebind a working value as it is refined through the parse pipeline"
-)]
 use super::{
     Alignment, CharacterType, ColorRef, ControlWord, Destination, FontRef, Formatting, HeaderItem,
     Paragraph, ParagraphFontAlignment, ParagraphFrame, ParagraphFrameHorizontalPosition,
@@ -68,19 +63,6 @@ impl Parser<'_> {
     /// Apply a control word to the current state.
     // This exhaustive state-transition table mirrors the RTF control-word
     // specification; splitting it would obscure coverage and precedence.
-    #[allow(
-        clippy::too_many_lines,
-        reason = "exhaustive control-word dispatch stays in one auditable table"
-    )]
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "match guards and adjacent range checks bound the remaining raw color and font conversions"
-    )]
     pub(super) fn apply_control_word(&mut self, control: &ControlWord<'_>) -> crate::Result<()> {
         if let ControlWord::Page(parameter) = control {
             require_parameterless(*parameter, "page")?;
@@ -2260,11 +2242,6 @@ impl Parser<'_> {
                 state.formatting.character_positioning.set_kerning(*n)?;
                 state.formatting.kerning = *n;
             },
-            #[allow(
-                clippy::cast_possible_truncation,
-                clippy::cast_sign_loss,
-                reason = "the raw control-word parameter wraps to 16 bits by design"
-            )]
             ControlWord::Highlight(c) => state.formatting.highlight_color = Some(*c as ColorRef),
             ControlWord::Plain => {
                 // Reset to default formatting

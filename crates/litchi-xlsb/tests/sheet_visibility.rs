@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "these integration fixtures deliberately fail at the assertion site"
-)]
-
 //! Native workbook-tab visibility transactions.
 //!
 //! The fixtures in this file exercise the complete tab catalog, including

@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "package-owner regressions use compact generated fixtures and immediate diagnostics"
-)]
-
 //! Regressions for the package-owned cell-value transaction.
 //!
 //! The worksheet codec remains available under [`cell_values::worksheet`],

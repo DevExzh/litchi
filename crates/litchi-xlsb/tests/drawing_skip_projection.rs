@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "integration regressions use immediate fixture diagnostics"
-)]
-
 //! Public integration coverage for the opt-in drawing-skipped Workbook view.
 //!
 //! The fixture has a valid standard drawing.  The tests make that part

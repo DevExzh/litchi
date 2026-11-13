@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::pedantic,
-    clippy::unwrap_used,
-    reason = "integration fixtures deliberately fail fast while asserting public package contracts"
-)]
-
 //! Public, source-preserving Volatile Dependencies package contracts.
 //!
 //! The owner is described by [MS-XLSB] 2.1.7.60 and the hierarchy in

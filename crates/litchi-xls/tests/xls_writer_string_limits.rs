@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "limit fixtures favor explicit inputs and panic-driven assertions"
-)]
-
 //! Every bounded string field of the fresh XLS writer at its limit: one code
 //! unit below and exactly at the limit are written whole and read back, and
 //! one unit past it is refused with a typed error, before any output and

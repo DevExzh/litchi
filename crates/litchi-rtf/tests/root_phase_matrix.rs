@@ -7,13 +7,6 @@
 //! marked "kept behaviour", which look inconsistent but are relied upon by
 //! existing files.
 
-#![allow(
-    clippy::expect_used,
-    clippy::panic,
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use litchi_rtf::raw::Tree;
 
 use Cell::{Accepted as A, Rejected as R, RejectedWith as X};

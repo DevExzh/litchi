@@ -104,10 +104,6 @@ impl XmlArenaBuilder {
     /// Returns the start position for this element.
     #[inline]
     #[must_use]
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the arena format stores offsets as u32 by design; buffers over 4 GiB are out of scope"
-    )]
     pub fn start_element(&self) -> u32 {
         self.buffer.len() as u32
     }
@@ -121,10 +117,6 @@ impl XmlArenaBuilder {
     /// Finish writing an element and record its position.
     /// Returns the index of this element.
     #[inline]
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the arena format stores offsets as u32 by design; buffers over 4 GiB are out of scope"
-    )]
     pub fn finish_element(&mut self, start: u32) -> usize {
         let len = self.buffer.len() as u32 - start;
         let idx = self.positions.len();

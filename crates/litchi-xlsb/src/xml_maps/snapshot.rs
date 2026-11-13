@@ -1,11 +1,3 @@
-#![cfg_attr(
-    test,
-    allow(
-        clippy::expect_used,
-        reason = "snapshot-only test constructors use panic-on-failure extraction for asserted valid fixtures"
-    )
-)]
-
 //! Immutable XLSB XML Maps package snapshots.
 
 use std::ops::Range;
@@ -150,18 +142,10 @@ impl Snapshot {
         self.conformance
     }
 
-    #[allow(
-        dead_code,
-        reason = "retained for BIFF12 codec completeness and staged host integration"
-    )]
     pub(crate) fn source(&self) -> &SourceState {
         &self.source
     }
 
-    #[allow(
-        dead_code,
-        reason = "retained for BIFF12 codec completeness and staged host integration"
-    )]
     pub(crate) fn same_source(&self, other: &Self) -> bool {
         self.source == other.source
     }

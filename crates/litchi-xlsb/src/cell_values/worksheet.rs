@@ -2546,11 +2546,6 @@ fn xnum_error(_context: &'static str) -> Error {
     )
 }
 
-#[allow(
-    clippy::cognitive_complexity,
-    clippy::too_many_lines,
-    reason = "one record-order state machine keeps structural BIFF12 rewriting and unknown-record copying auditable"
-)]
 fn rebuild_stream(edit: &Draft) -> Result<Vec<u8>> {
     let final_columns = final_row_columns(edit)?;
     let existing_rows = source_rows(&edit.source, edit.limits)?;
@@ -3424,11 +3419,6 @@ fn storage_error(_reference: Reference, _expected: &'static str) -> Error {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    clippy::float_cmp,
-    reason = "unit fixtures unwrap only values whose validity is the assertion setup"
-)]
 mod tests {
     use super::*;
     use crate::raw::{Encoder, Kind};

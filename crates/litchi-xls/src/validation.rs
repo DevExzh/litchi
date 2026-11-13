@@ -91,10 +91,6 @@ pub struct Limits {
 impl Limits {
     /// Creates explicit finite XLS validation limits.
     #[must_use]
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "each independent untrusted-resource bound is explicit"
-    )]
     pub const fn new(
         max_input_bytes: u64,
         max_workbook_stream_bytes: u64,

@@ -126,7 +126,6 @@ impl Snapshot {
         Ok(snapshot)
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn from_parts(
         sheet_name: &str,
         sheet_position: usize,

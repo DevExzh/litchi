@@ -1,10 +1,5 @@
 //! Eager XLSB tab catalog coverage (L-XLSB-R1).
 
-#![allow(
-    clippy::unwrap_used,
-    reason = "the compact package fixtures and assertions intentionally panic on construction failures"
-)]
-
 use std::io::Cursor;
 
 use litchi_core::Position;

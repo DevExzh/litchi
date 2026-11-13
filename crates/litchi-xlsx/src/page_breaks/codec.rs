@@ -1,12 +1,5 @@
 //! Bounded `SpreadsheetML` page-break parsing and byte-minimal rewriting.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    clippy::shadow_reuse,
-    clippy::shadow_unrelated,
-    reason = "the streaming parser keeps wire-state declarations and transitions in scan order"
-)]
-
 use std::ops::Range;
 
 use litchi_core::xml::ReaderOrigin;

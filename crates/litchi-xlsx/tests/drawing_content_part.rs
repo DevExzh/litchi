@@ -5,12 +5,6 @@
 //! `xdr14:contentPart` group profile remains deliberately out of this test
 //! owner until its relationship contract is closed by the design record.
 
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "focused XML/OPC fixtures use panic-on-failure assertions"
-)]
-
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::phys_pkg::{PhysPkgReader, PhysPkgWriter};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, TargetMode};

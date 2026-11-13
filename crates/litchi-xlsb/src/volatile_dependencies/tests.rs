@@ -1,8 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    reason = "synthetic package fixtures use panic-on-failure extraction for asserted valid input"
-)]
-
 use super::*;
 use crate::package::error::Error;
 use crate::raw::{Encoder, kind};

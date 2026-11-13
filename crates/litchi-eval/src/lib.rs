@@ -1,4 +1,3 @@
-#![allow(missing_docs)]
 //! Formula evaluation engine shared across spreadsheet formats.
 //!
 //! This module provides a small, format-agnostic evaluation layer that works
@@ -887,10 +886,6 @@ where
     }
 
     #[cfg(not(feature = "web_functions"))]
-    #[allow(
-        clippy::unused_async,
-        reason = "the evaluation entry points stay async for the transport"
-    )]
     async fn resume(&self, _session: EvalSession) -> bool {
         false
     }

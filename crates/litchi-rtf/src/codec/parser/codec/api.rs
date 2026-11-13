@@ -269,10 +269,6 @@ impl<'a> Parser<'a> {
     /// Parse the token stream into a document.
     pub(crate) fn parse(mut self) -> crate::Result<ParsedDocument<'a>> {
         // Validate document structure
-        #[allow(
-            clippy::struct_excessive_bools,
-            reason = "independent RTF feature flags stay flat for direct access"
-        )]
         #[derive(Clone, Copy)]
         struct NoteGuardContext {
             body_flow: bool,

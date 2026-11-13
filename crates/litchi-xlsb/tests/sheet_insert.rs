@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "structural insertion fixtures deliberately fail at the assertion site"
-)]
-
 //! Native complete-catalog worksheet insertion transactions.
 //!
 //! Insertion is a workbook-structure operation.  These tests keep the source

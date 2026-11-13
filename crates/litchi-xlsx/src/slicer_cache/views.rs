@@ -788,10 +788,6 @@ fn parse_attributes(
     Ok(attributes)
 }
 
-#[allow(
-    clippy::type_complexity,
-    reason = "the tuple components correspond directly to slicer-cache view wire fields"
-)]
 fn parse_known_attributes(
     element: &BytesStart<'_>,
     known: &[&str],

@@ -1,9 +1,3 @@
-#![allow(
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    reason = "fixed fixtures and test assertions are intentionally direct"
-)]
-
 use litchi_core::Position;
 use litchi_rtf::{
     Package,

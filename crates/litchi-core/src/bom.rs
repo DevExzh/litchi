@@ -19,10 +19,6 @@ pub const UTF32_BE_BOM: [u8; 4] = [0x00, 0x00, 0xFE, 0xFF];
 
 /// Supported BOM encodings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "public API name is stable and used by dependent crates; renaming would be a breaking change"
-)]
 pub enum BomKind {
     Utf8,
     Utf16Le,
@@ -66,10 +62,6 @@ impl BomKind {
 /// # Errors
 ///
 /// Returns an error if reading from or seeking in the reader fails.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "public API name is stable and used by dependent crates; renaming would be a breaking change"
-)]
 pub fn strip_bom<R: Read + Seek>(reader: &mut R) -> Result<Option<(BomKind, usize)>> {
     let start = reader.stream_position()?;
     let mut buf = [0u8; 4];
@@ -96,10 +88,6 @@ pub fn strip_bom<R: Read + Seek>(reader: &mut R) -> Result<Option<(BomKind, usiz
 /// # Errors
 ///
 /// Returns an error if writing to the writer fails.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "public API name is stable and used by dependent crates; renaming would be a breaking change"
-)]
 pub fn write_bom<W: Write>(writer: &mut W, kind: BomKind) -> Result<()> {
     writer.write_all(kind.as_bytes())?;
     Ok(())

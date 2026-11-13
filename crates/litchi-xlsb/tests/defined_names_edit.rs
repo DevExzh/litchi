@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "integration tests use panic-on-failure extraction"
-)]
-
 //! Defined names through the primary workbook transaction.
 
 use std::path::PathBuf;

@@ -1,5 +1,4 @@
 //! Native XLDM outer storage and explicitly framed XPRESS validation.
-#![allow(clippy::unwrap_used, reason = "test assertions panic on failure")]
 
 use litchi_opc::{OpcPackage, PackURI};
 const SOURCE: &[u8] = include_bytes!("data/data_model/tdf167689_x15_namespace.xlsx");

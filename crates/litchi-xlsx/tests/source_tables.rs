@@ -1,5 +1,3 @@
-#![allow(clippy::unwrap_used, reason = "focused fixture assertions")]
-
 //! Worksheet tables on the source-backed owner, case-insensitive lookup on
 //! both owners, and the typed header, data and totals ranges of a table.
 

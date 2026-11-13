@@ -4,10 +4,6 @@
 //! adapters own formulas, colors, XML/BRT encoding, and lexical preservation.
 
 /// The visual form of a sparkline group.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "`SparklineType` is the public cross-format schema name; shortening it to `Type` would make imports ambiguous"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SparklineType {
     /// A line sparkline.

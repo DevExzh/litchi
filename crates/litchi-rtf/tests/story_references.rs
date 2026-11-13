@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 //! Read accessors for story anchors and style/list references.
 
 use litchi_rtf::Package;

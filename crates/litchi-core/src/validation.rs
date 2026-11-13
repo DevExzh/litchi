@@ -43,10 +43,6 @@ pub struct ValidationLimits {
 impl ValidationLimits {
     /// Creates explicit finite validation-report limits.
     #[must_use]
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "every independent wire bound is explicit"
-    )]
     pub const fn new(
         max_checks: usize,
         max_issues: usize,
@@ -272,10 +268,6 @@ pub struct IssueLocation {
 impl IssueLocation {
     /// Creates a location. At least one field must be present, byte length
     /// requires byte offset, and the byte range must not overflow.
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "the five orthogonal location coordinates are explicit"
-    )]
     pub fn try_new(
         part: Option<&str>,
         path: Option<&str>,
@@ -631,10 +623,6 @@ pub struct ValidationIssue {
 impl ValidationIssue {
     /// Creates an issue, canonically sorting and de-duplicating its locations
     /// and evidence before computing its stable identifier.
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "the issue schema is explicit at construction"
-    )]
     pub fn try_new(
         check: CheckCapabilityId,
         code: &str,

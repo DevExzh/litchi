@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "format fixtures intentionally fail fast"
-)]
-
 use super::*;
 use crate::{BorderStyle, Color, FillPattern, HorizontalAlignment, VerticalAlignment};
 

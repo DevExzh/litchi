@@ -14,10 +14,6 @@ impl<'a> Parser<'a> {
         }
     }
 
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the crate nesting-depth constant is defined within the u8 range"
-    )]
     pub(super) fn ensure_nested_builder(
         &mut self,
         level: u8,

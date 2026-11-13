@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::float_cmp,
-    reason = "test assertions use panic-on-failure extraction and exact literal values by design"
-)]
-
 //! Audit finding F3.10: cached `Xnum` values that are NaN, infinite,
 //! denormalized, or negative zero. The repair is opt-in
 //! (`Leniency::TolerateCachedNumbers`); by default the cell-value snapshot and

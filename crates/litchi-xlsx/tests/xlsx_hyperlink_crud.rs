@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "focused integration tests use panic-on-failure assertions"
-)]
-
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{PackURI, TargetMode};
 use litchi_xlsx::{Hyperlink, HyperlinkReference, Package};

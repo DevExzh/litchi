@@ -1095,10 +1095,6 @@ fn regenerate_caches(caches: &[PivotCache], dirty: &HashSet<u16>) -> Result<Hash
     Ok(result)
 }
 
-#[allow(
-    clippy::type_complexity,
-    reason = "type mirrors the decoded BIFF record structure"
-)]
 fn record_ranges(data: &[u8]) -> Result<Vec<(usize, usize, u16, usize, usize)>> {
     let mut out = Vec::new();
     let mut offset = 0usize;

@@ -136,10 +136,6 @@ pub fn parse_worksheet_data_consolidation(xml: &[u8]) -> Result<Option<DataConso
     builder.map(finish_builder).transpose()
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "arguments correspond directly to the data-consolidation wire attributes"
-)]
 fn begin_element(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,

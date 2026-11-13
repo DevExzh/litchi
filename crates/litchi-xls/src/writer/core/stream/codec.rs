@@ -21,7 +21,6 @@ const DEFAULT_WRITE_ACCESS_USER: &str = "litchi";
 // BIFF requires records to be emitted in a strict workbook-stream order. Keep
 // that ordering visible in one coordinator while leaf encoders stay separate.
 #[allow(
-    clippy::cognitive_complexity,
     clippy::too_many_arguments,
     reason = "single-pass BIFF stream encoding keeps state transitions together"
 )]

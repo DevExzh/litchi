@@ -1,7 +1,3 @@
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "independent RTF feature flags stay flat for direct access"
-)]
 /// Passive document style and theme-editing policies.
 ///
 /// These values are retained for round-tripping only. This crate does not

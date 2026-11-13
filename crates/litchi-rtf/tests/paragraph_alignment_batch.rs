@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use litchi_core::Position;
 use litchi_rtf::edit::{Error, ParagraphAlignmentUpdate, TextSpan};
 use litchi_rtf::{Alignment, EditOptions, Package, SemanticLimitKind, SemanticLimits};

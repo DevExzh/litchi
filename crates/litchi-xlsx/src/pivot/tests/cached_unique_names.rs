@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "focused integration fixtures deliberately fail fast"
-)]
-
 //! Source-bound tests for the diagnostic `cachedUniqueNames` owner.
 //!
 //! The fixtures in this file are intentionally synthetic OPC packages.  They

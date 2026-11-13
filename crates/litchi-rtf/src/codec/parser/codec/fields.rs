@@ -1,7 +1,3 @@
-#![allow(
-    clippy::shadow_unrelated,
-    reason = "decoding steps deliberately rebind a working value as it is refined through the parse pipeline"
-)]
 use super::{
     ControlWord, Cow, Destination, DrawingStoryCapture, FormFieldBuilder, MAX_GROUP_NESTING_DEPTH,
     ParsedBodyStoryEvent, Parser, SmallVec, Token, control_symbol_text,
@@ -13,10 +9,6 @@ impl Parser<'_> {
     ///
     /// Fields in RTF have the format:
     /// {\field{\*\fldinst INSTRUCTION}{\fldrslt RESULT}}
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn parse_field(&mut self) -> crate::Result<()> {
         if self.field_nesting_depth >= MAX_GROUP_NESTING_DEPTH {
             return Err(crate::Error::MalformedDocument(
@@ -585,10 +577,6 @@ impl Parser<'_> {
         Ok(())
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn parse_form_field_destination(&mut self) -> crate::Result<FormFieldBuilder> {
         self.expect_token(&Token::OpenBrace)?;
         if !matches!(

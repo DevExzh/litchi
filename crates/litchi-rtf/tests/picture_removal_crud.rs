@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 use litchi_rtf::{
     EditOptions, Package, SemanticLimitKind, SemanticLimits,
     edit::{Error, MAX_PICTURE_REMOVAL_OPERATIONS},

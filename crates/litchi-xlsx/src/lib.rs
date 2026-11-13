@@ -9,63 +9,13 @@
 // quick-xml's checked attribute iteration is quadratic on hostile tags; read
 // attributes through `BytesStartExt` (workspace `clippy.toml`).
 #![cfg_attr(not(test), deny(clippy::disallowed_methods))]
-// The public model deliberately mirrors the names and shapes in the ECMA-376
-// schemas. Renaming these items or reshaping their signatures solely for style
-// would make the wire model less recognizable and would break the young public
-// API without changing correctness.
-#![allow(
-    clippy::fn_params_excessive_bools,
-    clippy::implicit_hasher,
-    clippy::module_name_repetitions,
-    clippy::needless_pass_by_value,
-    clippy::ref_option,
-    clippy::return_self_not_must_use,
-    clippy::struct_excessive_bools,
-    clippy::struct_field_names,
-    clippy::trivially_copy_pass_by_ref,
-    clippy::unnecessary_wraps,
-    reason = "the stable schema-shaped API follows ECMA-376 rather than Clippy's generic API heuristics"
-)]
 // These documentation suggestions do not affect the package parser or writer.
 // Public error behavior is already expressed by the crate-wide Error type and
 // adding hundreds of identical boilerplate sections would obscure the schema
 // documentation that callers actually need.
 #![allow(
-    clippy::doc_markdown,
     clippy::empty_docs,
-    clippy::missing_errors_doc,
-    clippy::missing_panics_doc,
     reason = "the crate documents shared failure contracts centrally and keeps field documentation aligned with schema terminology"
-)]
-// Streaming XML codecs intentionally keep names aligned with the current wire
-// token (`event`, `attribute`, `value`, and similar). Shadowing marks state
-// transitions and keeps each token's lifetime as short as possible.
-#![allow(
-    clippy::many_single_char_names,
-    clippy::shadow_reuse,
-    clippy::shadow_same,
-    clippy::shadow_unrelated,
-    clippy::similar_names,
-    reason = "short-lived streaming parser bindings mirror wire tokens and their successive decoded forms"
-)]
-// Codec declarations are ordered by wire traversal and package transaction
-// phases, not alphabetically or by Rust item kind.
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "wire codecs keep declarations in parse/write and transaction order for auditability"
-)]
-// OPC part names and relationship suffixes are case-sensitive ASCII wire names;
-// treating them as case-insensitive would accept a different package member.
-#![allow(
-    clippy::case_sensitive_file_extension_comparisons,
-    reason = "OPC part-name suffix comparisons intentionally preserve case-sensitive package identity"
-)]
-// A map with unit values is used where callers need deterministic keyed lookup,
-// not merely set membership, and identical arms keep schema variants explicit.
-#![allow(
-    clippy::match_same_arms,
-    clippy::zero_sized_map_values,
-    reason = "schema variants stay explicit and keyed unit maps preserve the required lookup representation"
 )]
 
 // Unit tests drive the source-backed families through the integration

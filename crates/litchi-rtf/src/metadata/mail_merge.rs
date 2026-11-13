@@ -1,10 +1,5 @@
 //! Inert RTF 1.9.1 mail-merge metadata.
 
-#![allow(
-    clippy::shadow_reuse,
-    reason = "builder-style helpers deliberately rebind a working value as it is refined"
-)]
-
 use std::borrow::Cow;
 
 /// Maximum decoded size of one mail-merge text destination.

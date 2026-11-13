@@ -319,11 +319,6 @@ impl<'a> Parser<'a> {
         Ok(Cow::Owned(characters))
     }
 
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "RTF \\uN parameters are signed 16-bit; the u16 wrap implements the specified negative-value conversion"
-    )]
     pub(super) fn parse_ignorable_text_destination(&mut self) -> crate::Result<String> {
         self.pos += 2; // ignorable marker and destination control word
         let mut value = String::new();

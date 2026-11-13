@@ -1,10 +1,5 @@
 //! RTF story event and legacy drawing output.
 
-#![allow(
-    clippy::shadow_reuse,
-    clippy::shadow_unrelated,
-    reason = "serialization helpers deliberately rebind a working value as the output is assembled"
-)]
 use super::super::{
     Annotation, BodyEvent, BodyEventKind, BodyStoryEvent, BookmarkTable, CustomXmlTag,
     DrawingStoryTextMode, EditableRegion, EmbeddedObject, Field, FieldOwner, FormField,
@@ -39,10 +34,6 @@ impl<W: Write> Writer<W> {
     #[allow(
         clippy::too_many_arguments,
         reason = "the writer threads the full block and markup context through the pipeline"
-    )]
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
     )]
     pub(in super::super::super) fn write_blocks_with_markup(
         &mut self,

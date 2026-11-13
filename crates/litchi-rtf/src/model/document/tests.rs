@@ -1,13 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::float_cmp,
-    clippy::shadow_reuse,
-    clippy::shadow_same,
-    clippy::shadow_unrelated,
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design, rebind fixture names across steps, and compare exact fixture fractions"
-)]
-
 use super::*;
 use crate::codec::limits::OpenOptions;
 use crate::{Alignment, ListFollow, ListJustification, ListLevelType, RevisionType, StyleType};

@@ -312,10 +312,6 @@ impl Scanner {
     /// `lane` set to the reader's own input, stop right after the
     /// `<sheetData>` start tag when its unprefixed children resolve to
     /// `SpreadsheetML`.
-    #[allow(
-        clippy::too_many_lines,
-        reason = "the historical event loop is kept intact so its refusal order is unchanged"
-    )]
     fn drive(
         &mut self,
         reader: &mut NsReader<&[u8]>,

@@ -828,10 +828,6 @@ pub(crate) fn write_sst<W: Write, S: AsRef<str>>(
 }
 
 /// Write an AUTOFILTER record (0x009E) for a single column filter condition.
-#[allow(
-    clippy::too_many_arguments,
-    reason = "arguments map positionally to BIFF fields"
-)]
 pub(crate) fn write_autofilter<W: Write>(
     writer: &mut W,
     column_index: u16,

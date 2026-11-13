@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::pedantic,
-    clippy::unwrap_used,
-    reason = "native package fixtures are checked and fail fast"
-)]
-
 //! Independent XLSB Theme-part integration coverage for DrawingML 2012
 //! `themeFamily` ownership.
 //!

@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "index fixtures intentionally fail fast"
-)]
-
 use super::*;
 use std::io::Cursor;
 

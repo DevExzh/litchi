@@ -412,7 +412,6 @@ fn validate_container_attributes(reader: &NsReader<&[u8]>, element: &BytesStart<
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn push_hyperlink(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,

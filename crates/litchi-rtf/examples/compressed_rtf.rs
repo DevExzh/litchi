@@ -1,8 +1,3 @@
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example intentionally prints its results"
-)]
-
 //! Demonstrate the `LZFu` compressed-RTF helpers: `is_compressed_rtf`, `compress`, `decompress`.
 //!
 //! The `compress`/`decompress` pair implements the algorithm used by Outlook for

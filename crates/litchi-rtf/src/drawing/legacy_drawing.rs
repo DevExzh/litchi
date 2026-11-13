@@ -228,10 +228,6 @@ pub enum LegacyCalloutAttachment {
     Absolute,
 }
 
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "independent RTF feature flags stay flat for direct access"
-)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LegacyCallout<'a> {
     pub callout_type: LegacyCalloutType,

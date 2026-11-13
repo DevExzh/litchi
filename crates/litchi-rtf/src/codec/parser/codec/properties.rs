@@ -179,11 +179,6 @@ impl<'a> Parser<'a> {
         self.parse_inert_text_group_contents(limit, "document-variable")
     }
 
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "RTF \\uN parameters are signed 16-bit; the double wrap converts them into UTF-16 code units"
-    )]
     pub(super) fn parse_inert_text_group_contents(
         &mut self,
         limit: usize,

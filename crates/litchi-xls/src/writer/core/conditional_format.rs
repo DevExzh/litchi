@@ -210,10 +210,6 @@ pub enum ConditionalFormat12Type {
 }
 
 impl ConditionalFormat12Type {
-    #[allow(
-        clippy::type_complexity,
-        reason = "type mirrors the decoded BIFF record structure"
-    )]
     pub(crate) fn biff_parts(&self) -> (u8, u8, &[u8], &[u8], &[u8], &[u8]) {
         match self {
             Self::CellValue {

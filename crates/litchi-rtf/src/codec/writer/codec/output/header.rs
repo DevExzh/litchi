@@ -1,9 +1,5 @@
 //! RTF document-header output.
 
-#![allow(
-    clippy::shadow_reuse,
-    reason = "serialization helpers deliberately rebind a working value as the output is assembled"
-)]
 use super::super::{
     AbstractNumberingCleanupStatus, Charset, DefaultTabWidthPolicy, DocumentAsianGridCompatibility,
     DocumentAutoFormatType, DocumentBookletPrinting, DocumentCompatibilityPolicy,

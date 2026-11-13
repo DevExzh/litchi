@@ -4320,10 +4320,6 @@ fn restore_relationship_provenance(package: &mut OpcPackage, snapshot: &Snapshot
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    reason = "test fixture setup uses explicit expectations to keep failure diagnostics local"
-)]
 mod tests {
     use super::*;
     use litchi_opc::{BlobPart, PackURI, TargetMode};

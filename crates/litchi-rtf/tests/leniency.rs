@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 //! The tolerance contract: Word-compatible repairs are applied and recorded by
 //! default, opt-in repairs only under a named `Leniency`, and conformant input
 //! reports clean.

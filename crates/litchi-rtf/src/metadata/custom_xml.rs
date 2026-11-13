@@ -10,11 +10,6 @@
 //! attribute names are never resolved against a schema, and no XML content is
 //! fetched, validated, or executed.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "items stay grouped by RTF feature area rather than by item kind"
-)]
-
 use std::borrow::Cow;
 use std::collections::HashSet;
 

@@ -76,10 +76,6 @@ impl OleObjectHeader<'_> {
     }
 }
 
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "independent RTF feature flags stay flat for direct access"
-)]
 /// An RTF embedded or linked object.
 #[derive(Debug, Clone)]
 pub struct EmbeddedObject<'a> {
@@ -279,11 +275,6 @@ fn read_counted_bytes<'a>(data: &'a [u8], offset: &mut usize) -> Option<&'a [u8]
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        reason = "test assertions panic on failure by design"
-    )]
     use super::*;
 
     #[test]

@@ -214,10 +214,6 @@ impl Commit {
 
 /// A reversible, source-checked byte patch for one worksheet stream.
 #[derive(Debug, Clone)]
-#[cfg_attr(
-    not(test),
-    allow(dead_code, reason = "the unit tests replay draft patches")
-)]
 pub(crate) struct Patch {
     before: Arc<[u8]>,
     after: Arc<[u8]>,

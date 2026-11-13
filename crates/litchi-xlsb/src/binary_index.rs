@@ -1683,10 +1683,6 @@ impl fmt::Display for CellOffset {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    reason = "unit fixtures use checked, local record construction and panic on an invalid test setup"
-)]
 mod tests {
     use super::*;
 
@@ -1978,10 +1974,6 @@ mod tests {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    reason = "decoder fixtures use checked, local record construction and panic on an invalid test setup"
-)]
 mod cached_value_tests {
     use super::{decode_cached_value, kind, raw};
 

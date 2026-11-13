@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "test fixtures and assertions intentionally fail fast"
-)]
-
 use super::*;
 use litchi_cfb::{
     OleFile, OleFileLimits, OleWriter, OutputProgress, OverlaySourceMode, SharedOleFile,

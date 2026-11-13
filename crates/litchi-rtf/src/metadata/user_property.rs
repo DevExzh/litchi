@@ -1,11 +1,5 @@
 //! Ordered, inert RTF user-defined document properties.
 
-#![allow(
-    clippy::shadow_reuse,
-    clippy::shadow_same,
-    reason = "builder-style helpers deliberately rebind a working value as it is refined"
-)]
-
 use std::borrow::Cow;
 
 pub(crate) const MAX_USER_PROPERTIES: usize = 65_536;

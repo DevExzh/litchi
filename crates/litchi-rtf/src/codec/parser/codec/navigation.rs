@@ -573,11 +573,6 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "RTF \\uN parameters are signed 16-bit; the u16 wrap implements the specified negative-value conversion"
-    )]
     pub(super) fn parse_navigation_unicode_sequence(
         &mut self,
         first_code: i32,

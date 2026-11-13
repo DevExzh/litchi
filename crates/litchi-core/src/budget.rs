@@ -694,12 +694,6 @@ fn release_node(node: &Node, resource: Resource, amount: u64) {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        reason = "test assertions panic by design"
-    )]
-
     use super::*;
 
     fn limits(memory: u64) -> Limits {

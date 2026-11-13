@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "native package fixtures are checked and fail fast"
-)]
-
 //! XLSB host coverage for source-preserving Theme Family removal.
 
 use std::io::Cursor;

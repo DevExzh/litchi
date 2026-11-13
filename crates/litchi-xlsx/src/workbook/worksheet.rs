@@ -445,7 +445,6 @@ mod tests {
 
 #[cfg(test)]
 mod table_lookup_tests {
-    #![allow(clippy::unwrap_used, reason = "focused table lookup fixtures")]
     use super::{TablePart, find_table, find_workbook_table};
 
     fn part(name: &str, display: &str) -> TablePart {

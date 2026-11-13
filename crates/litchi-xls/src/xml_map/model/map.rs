@@ -21,10 +21,6 @@ pub struct Map {
 }
 
 impl Map {
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "arguments map positionally to BIFF fields"
-    )]
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
@@ -54,10 +50,6 @@ impl Map {
         )
     }
 
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "arguments map positionally to BIFF fields"
-    )]
     pub(crate) fn from_parts(
         id: String,
         name: String,

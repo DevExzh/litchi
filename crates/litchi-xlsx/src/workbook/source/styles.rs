@@ -245,8 +245,6 @@ impl SourceInner {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::unwrap_used, reason = "focused source-owner fixtures")]
-
     use std::io;
     use std::sync::Arc;
     use std::sync::atomic::{AtomicU64, Ordering};

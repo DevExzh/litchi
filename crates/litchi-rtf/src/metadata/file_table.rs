@@ -7,10 +7,6 @@ pub(crate) const MAX_FILE_TABLE_ENTRIES: usize = 4_096;
 pub(crate) const MAX_FILE_NAME_BYTES: usize = 4_096;
 pub(crate) const MAX_FILE_TABLE_TEXT_BYTES: usize = 1_048_576;
 
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "independent RTF feature flags stay flat for direct access"
-)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct FileSystemValidity {
     pub mac: bool,

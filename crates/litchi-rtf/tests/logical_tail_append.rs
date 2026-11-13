@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "these tests intentionally panic on an unexpected transaction result"
-)]
-
 use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits,
     Limits as CoreLimits, Resource,

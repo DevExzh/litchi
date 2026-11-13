@@ -1,7 +1,3 @@
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "independent RTF feature flags stay flat for direct access"
-)]
 /// Passive legacy automatic-layout compatibility requests.
 ///
 /// These flags are retained for round trips only. This crate does not change

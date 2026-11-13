@@ -1,8 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    reason = "these integration tests use expect for concise public-API assertions"
-)]
-
 use litchi_xlsb::external_link::{
     DdeItem, ExternalLinkLimits, ExternalLinkLimitsError, ExternalLinkResource, Link, apply,
     parse_external_link, parse_external_link_model, parse_external_link_with_relationship, read,

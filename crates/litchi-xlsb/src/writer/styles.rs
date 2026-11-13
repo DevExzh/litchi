@@ -1,10 +1,3 @@
-#![cfg_attr(
-    test,
-    allow(
-        clippy::float_cmp,
-        reason = "style codec tests compare exact finite values just decoded from their own wire literals"
-    )
-)]
 #![allow(
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,

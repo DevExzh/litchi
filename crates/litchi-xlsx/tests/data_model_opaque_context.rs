@@ -1,5 +1,4 @@
 //! Public Data Model opaque-extension context and inverse regressions.
-#![allow(clippy::unwrap_used, reason = "fixture assertions intentionally panic")]
 
 use litchi_opc::{OpcPackage, PackURI, SourceLimits};
 use litchi_xlsx::Package;

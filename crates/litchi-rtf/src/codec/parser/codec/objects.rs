@@ -777,10 +777,6 @@ impl<'a> Parser<'a> {
         Err(crate::Error::UnexpectedEof)
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn parse_object_time_destination(&mut self) -> crate::Result<crate::Timestamp> {
         self.pos += 2; // opening brace and ignorable marker
         if !matches!(

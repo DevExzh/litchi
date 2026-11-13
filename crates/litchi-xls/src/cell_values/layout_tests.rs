@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "layout fixtures intentionally fail fast"
-)]
-
 use super::*;
 use crate::writer::{Column, Row};
 

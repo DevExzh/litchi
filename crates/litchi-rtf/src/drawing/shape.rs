@@ -5,10 +5,6 @@
 //! This module provides support for shapes, text boxes, and drawing objects
 //! in RTF documents.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "items stay grouped by RTF feature area rather than by item kind"
-)]
 use super::border::Border;
 use super::types::Formatting;
 use std::borrow::Cow;
@@ -56,10 +52,6 @@ impl OfficeArtColor {
     /// Red component of a direct RGB value.
     #[inline]
     #[must_use]
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the shift isolates the target color byte"
-    )]
     pub const fn red(self) -> u8 {
         (self.0 >> 16) as u8
     }
@@ -67,10 +59,6 @@ impl OfficeArtColor {
     /// Green component of a direct RGB value.
     #[inline]
     #[must_use]
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the shift isolates the target color byte"
-    )]
     pub const fn green(self) -> u8 {
         (self.0 >> 8) as u8
     }
@@ -78,10 +66,6 @@ impl OfficeArtColor {
     /// Blue component of a direct RGB value.
     #[inline]
     #[must_use]
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the shift isolates the target color byte"
-    )]
     pub const fn blue(self) -> u8 {
         self.0 as u8
     }
@@ -130,10 +114,6 @@ impl Default for OfficeArtOpacity {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// A signed RTF drawing coordinate measured in twentieths of a point.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct ShapeTwips(i32);
@@ -166,10 +146,6 @@ impl From<ShapeTwips> for i32 {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// A clockwise shape rotation measured in whole degrees.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct ShapeRotationDegrees(i32);
@@ -188,10 +164,6 @@ impl ShapeRotationDegrees {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// A signed root-shape stacking order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct ShapeZOrder(i32);
@@ -210,10 +182,6 @@ impl ShapeZOrder {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Shape type
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ShapeType {
@@ -333,10 +301,6 @@ impl Fill {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Exact `OfficeArt` line properties used by a shape.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ShapeLine {
@@ -361,10 +325,6 @@ impl Default for ShapeLine {
 /// Maximum decoded binary bytes retained by one `OfficeArt` property.
 pub const MAX_SHAPE_PROPERTY_BINARY_BYTES: usize = 64 * 1024 * 1024;
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Theme accent selector retained from an RTF `hsv` destination.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShapeThemeColor {
@@ -380,10 +340,6 @@ pub enum ShapeThemeColor {
     Text2,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Inert theme metadata attached to a scalar `OfficeArt` color property.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ShapeThemeValue {
@@ -406,10 +362,6 @@ impl ShapeThemeValue {
         Ok(())
     }
 }
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Typed inert Word 6/95 drawing fallback from a shape's `shprslt` destination.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShapeResult<'a> {
@@ -440,10 +392,6 @@ impl ShapeResult<'_> {
 /// Upper bound for one inert shape-hyperlink string, in bytes.
 pub const MAX_SHAPE_HYPERLINK_BYTES: usize = 65_536;
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Inert hyperlink metadata from the `\hl` group of a shape property.
 ///
 /// The RTF specification ("Hyperlink Property for Shapes") defines the
@@ -512,10 +460,6 @@ impl ShapeHyperlink<'_> {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// A scalar or binary `OfficeArt` property retained from an RTF `sp` destination.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShapeProperty<'a> {
@@ -612,10 +556,6 @@ impl<'a> ShapeProperty<'a> {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Shape position and size
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct ShapeGeometry {
@@ -734,10 +674,6 @@ pub enum WrapMode {
     InFront,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Horizontal anchoring control used by `shpbx*` shape metadata.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShapeHorizontalAnchor {
@@ -747,10 +683,6 @@ pub enum ShapeHorizontalAnchor {
     ShapeProperty,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Vertical anchoring control used by `shpby*` shape metadata.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShapeVerticalAnchor {
@@ -760,10 +692,6 @@ pub enum ShapeVerticalAnchor {
     ShapeProperty,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Typed value of the RTF `shpwr` control.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShapeWrapStyle {
@@ -804,10 +732,6 @@ impl ShapeWrapStyle {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Typed value of the RTF `shpwrk` wrap-side control.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShapeWrapSide {
@@ -842,10 +766,6 @@ impl ShapeWrapSide {
     }
 }
 
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "independent RTF feature flags stay flat for direct access"
-)]
 /// RTF shape/drawing object
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Shape<'a> {
@@ -1064,10 +984,6 @@ impl<'a> Shape<'a> {
 
     /// Return the last declared `shplid`, if present.
     #[must_use]
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub fn shape_id(&self) -> Option<i32> {
         self.info.iter().rev().find_map(|info| match info {
             ShapeGroupInfo::ShapeId(value) => Some(*value),
@@ -1282,10 +1198,6 @@ impl<'a> Shape<'a> {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Reference to a shape-group child in bottom-to-top order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShapeGroupChild {
@@ -1304,10 +1216,6 @@ pub enum StoryDrawing {
     ShapeGroup(usize),
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Shape-info control retained on a group instance.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShapeGroupInfo {
@@ -1398,10 +1306,6 @@ impl ShapeGroupInfo {
     }
 
     #[must_use]
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub const fn as_wrap(self) -> Option<ShapeWrapStyle> {
         match self {
             Self::Wrap(value) => Some(ShapeWrapStyle::from_rtf(value)),
@@ -1409,10 +1313,6 @@ impl ShapeGroupInfo {
         }
     }
     #[must_use]
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub const fn as_wrap_side(self) -> Option<ShapeWrapSide> {
         match self {
             Self::WrapSide(value) => Some(ShapeWrapSide::from_rtf(value)),
@@ -1421,10 +1321,6 @@ impl ShapeGroupInfo {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Group of shapes
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShapeGroup<'a> {

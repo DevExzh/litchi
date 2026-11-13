@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "test assertions use panic-on-failure extraction by design"
-)]
-
 use std::io::{self, Cursor};
 use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::Arc;

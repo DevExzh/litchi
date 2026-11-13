@@ -227,10 +227,6 @@ pub struct DateGroup {
     pub(crate) opaque: Option<Box<OpaqueFields>>,
 }
 impl DateGroup {
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "arguments map one-to-one to the immutable auto-filter schema fields"
-    )]
     pub fn new(
         year: u16,
         month: Option<u8>,

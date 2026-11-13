@@ -886,11 +886,6 @@ impl fmt::Debug for Document {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        reason = "test assertions panic on failure by design"
-    )]
     use super::Package;
     use crate::text::{Break, Inline, Paragraph};
 

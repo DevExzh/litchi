@@ -1,13 +1,6 @@
 #![allow(
-    clippy::pedantic,
-    clippy::expect_used,
     clippy::field_reassign_with_default,
     clippy::identity_op,
-    clippy::shadow_reuse,
-    clippy::shadow_same,
-    clippy::shadow_unrelated,
-    clippy::unwrap_used,
-    clippy::wildcard_enum_match_arm,
     reason = "integration tests use panic-on-failure extraction and successive names that mirror XML-map transaction states"
 )]
 

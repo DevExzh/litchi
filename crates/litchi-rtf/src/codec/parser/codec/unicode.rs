@@ -60,11 +60,6 @@ impl Parser<'_> {
     /// Returns how many collected units still owe their `skip` fallback
     /// characters, which follow the cursor. With `bounded`, the run is held
     /// to the shared intermediate text budget.
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "RTF \\uN parameters are signed 16-bit; the u16 wrap implements the specified negative-value conversion"
-    )]
     pub(super) fn collect_unicode_run(
         &mut self,
         first_code: i32,
@@ -102,11 +97,6 @@ impl Parser<'_> {
 
     /// The `\uN` low surrogate (and its token) that directly follows the
     /// cursor once `owed` fallback characters are skipped, if any.
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "RTF \\uN parameters are signed 16-bit; the u16 wrap implements the specified negative-value conversion"
-    )]
     fn low_surrogate_after_fallback(&self, mut owed: usize) -> Option<(usize, i32)> {
         let mut token = self.pos;
         while owed > 0 {
@@ -159,11 +149,6 @@ impl Parser<'_> {
     /// Followed by `\ucN` fallback characters (usually ANSI representation)
     ///
     /// Handles compound Unicode characters (surrogate pairs for emoji, etc.)
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "RTF \\uN parameters are signed 16-bit; the wrapping conversions implement the specified negative-value and fallback-skip behavior"
-    )]
     pub(super) fn parse_unicode_sequence(&mut self, first_code: i32) -> crate::Result<()> {
         let skip_count = self.current_state()?.unicode_skip as usize;
 

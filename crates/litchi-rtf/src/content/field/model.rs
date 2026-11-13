@@ -310,10 +310,6 @@ pub enum ParsedFieldCode<'a> {
     Malformed(FieldCodeError),
 }
 
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "independent RTF feature flags stay flat for direct access"
-)]
 /// Presence-only state carried by a generic RTF field.
 ///
 /// Each `false` value means the corresponding control word was omitted.
@@ -6074,10 +6070,6 @@ impl<'a> Field<'a> {
     /// barcode; or refreshes a field. Malformed instructions remain generic
     /// fields and return `None` here.
     #[must_use]
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub fn barcode_display_field(&self) -> Option<BarcodeDisplayField<'_>> {
         let expected_kind = match self.field_type {
             FieldType::DisplayBarcode => BarcodeDisplayFieldKind::DisplayBarcode,
@@ -6152,10 +6144,6 @@ impl<'a> Field<'a> {
     /// `\formfield` destination. It never fills a form, changes a selection or
     /// checkbox state, invokes entry or exit macros, or refreshes a field.
     #[must_use]
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub fn legacy_form_field(&self) -> Option<LegacyFormField<'_>> {
         let (kind, keyword) = match self.field_type {
             FieldType::FormText => (LegacyFormFieldKind::Text, "FORMTEXT"),
@@ -6205,10 +6193,6 @@ impl<'a> Field<'a> {
     /// executes script, renders content, accesses an external resource, or
     /// refreshes a field.
     #[must_use]
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub fn active_content_field(&self) -> Option<ActiveContentField<'_>> {
         let kind = match self.field_type {
             FieldType::AddIn => ActiveContentFieldKind::AddIn,
@@ -6233,10 +6217,6 @@ impl<'a> Field<'a> {
     /// access an external resource, or refresh a field. Malformed instructions
     /// remain generic fields and return `None` here.
     #[must_use]
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub fn auto_text_field(&self) -> Option<AutoTextField<'_>> {
         let expected_kind = match self.field_type {
             FieldType::Glossary => AutoTextFieldKind::Glossary,
@@ -6347,10 +6327,6 @@ impl<'a> Field<'a> {
     /// written back. Malformed include instructions remain generic fields and
     /// return `None` here.
     #[must_use]
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub fn external_include(&self) -> Option<ExternalIncludeField<'_>> {
         let expected_kind = match self.field_type {
             FieldType::Include | FieldType::IncludeText => IncludeFieldKind::Text,
@@ -6796,10 +6772,6 @@ impl<'a> Field<'a> {
     /// result. Malformed `MERGEREC` and `MERGESEQ` instructions remain generic
     /// fields and return `None` here.
     #[must_use]
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub fn mail_merge_counter(&self) -> Option<MailMergeCounterField<'_>> {
         let kind = match self.field_type {
             FieldType::MergeRecord => MailMergeCounterKind::Record,
@@ -6847,10 +6819,6 @@ impl<'a> Field<'a> {
     /// performs a merge, or refreshes a field result. Instructions without a
     /// comparison remain generic fields and return `None` here.
     #[must_use]
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub fn mail_merge_conditional_control(&self) -> Option<MailMergeConditionalControlField<'_>> {
         let expected_kind = match self.field_type {
             FieldType::MailMergeNextIf => MailMergeConditionalControlKind::NextIf,
@@ -7112,10 +7080,6 @@ impl<'a> Field<'a> {
     /// bookmark, perform a merge, or refresh a field. Malformed instructions
     /// remain generic fields and return `None` here.
     #[must_use]
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub fn prompt_field(&self) -> Option<PromptField<'_>> {
         let expected_kind = match self.field_type {
             FieldType::Ask => PromptFieldKind::Ask,
@@ -7147,10 +7111,6 @@ impl<'a> Field<'a> {
     /// field. Malformed instructions remain generic fields and return `None`
     /// here.
     #[must_use]
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub fn user_identity_field(&self) -> Option<UserIdentityField<'_>> {
         let expected_kind = match self.field_type {
             FieldType::UserAddress => UserIdentityFieldKind::Address,
@@ -7203,10 +7163,6 @@ impl<'a> Field<'a> {
     /// expand placeholders, generate text, or refresh a field. Malformed
     /// instructions remain generic fields and return `None` here.
     #[must_use]
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub fn mail_merge_recipient_field(&self) -> Option<MailMergeRecipientField<'_>> {
         let expected_kind = match self.field_type {
             FieldType::AddressBlock => MailMergeRecipientFieldKind::AddressBlock,

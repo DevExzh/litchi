@@ -146,7 +146,6 @@ impl Snapshot {
         self.graph == other.graph && self.source_xml == other.source_xml
     }
 
-    #[allow(dead_code, reason = "used by Workbook publication integration")]
     fn same_state(&self, other: &Self) -> bool {
         self.same_source(other) && self.theme == other.theme && self.family == other.family
     }
@@ -1163,10 +1162,6 @@ pub use edit::{Commit, Diagnostics, Edit, EditOptions, Error, LimitKind, Patch};
 mod splice_tests;
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    reason = "theme fixture assertions use immediate extraction for compact unit tests"
-)]
 mod tests {
     use super::*;
     use litchi_drawingml::theme::{Color, Face};

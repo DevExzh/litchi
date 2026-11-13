@@ -11,16 +11,6 @@
 //! element text are exposed exactly as stored. Nothing here evaluates, lays
 //! out, typesets, or renders an equation.
 
-#![allow(
-    clippy::shadow_reuse,
-    clippy::shadow_unrelated,
-    reason = "builder-style helpers deliberately rebind a working value as it is refined"
-)]
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "items stay grouped by RTF feature area rather than by item kind"
-)]
-
 /// Maximum number of switched groups in one `EQ` expression.
 const MAX_EQUATION_GROUPS: usize = 256;
 /// Maximum number of comma-separated elements in one switched group.
@@ -155,10 +145,6 @@ pub struct EquationScript {
     pub down: Option<EquationSpacing>,
 }
 
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "independent RTF feature flags stay flat for direct access"
-)]
 /// Options of the box switch (`\x`).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct EquationBox {
@@ -614,11 +600,6 @@ impl<'a> Parser<'a> {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        reason = "test assertions panic on failure by design"
-    )]
     use super::*;
 
     fn only_group<'a>(model: &'a EquationModel<'a>) -> &'a EquationGroup<'a> {

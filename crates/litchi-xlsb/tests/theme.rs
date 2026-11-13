@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "theme fixtures deliberately fail fast while asserting package contracts"
-)]
-
 //! Integration coverage for the XLSB Theme owner ([MS-XLSB] 2.1.7.52).
 //!
 //! The package graph is owned by XLSB, while the typed `a:theme` payload is

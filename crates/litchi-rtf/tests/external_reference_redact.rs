@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "redaction fixtures intentionally panic on malformed test setup"
-)]
-
 use litchi_rtf::Package;
 use litchi_rtf::edit::Error as EditError;
 use litchi_rtf::redact::{Mode, ReferenceKind, UnsupportedReference};

@@ -363,7 +363,6 @@ const fn byte_classes() -> [u8; 256] {
     let mut table = [0_u8; 256];
     let mut byte = 0;
     while byte < 256 {
-        #[allow(clippy::cast_possible_truncation, reason = "byte < 256")]
         let b = byte as u8;
         let mut class = 0;
         if matches!(b, b'/' | b'[' | b']') {

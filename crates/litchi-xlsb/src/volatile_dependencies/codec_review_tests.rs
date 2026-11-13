@@ -1,7 +1,5 @@
 #![allow(
-    clippy::expect_used,
     clippy::pedantic,
-    clippy::unwrap_used,
     reason = "codec review cases use compact synthetic BIFF12 streams and fail-fast assertions"
 )]
 

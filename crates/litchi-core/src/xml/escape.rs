@@ -14,10 +14,6 @@
 /// assert_eq!(escape_xml("<tag>\"hello\"</tag>"), "&lt;tag&gt;&quot;hello&quot;&lt;/tag&gt;");
 /// ```
 #[inline]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "public API name is stable and used by dependent crates; renaming would be a breaking change"
-)]
 pub fn escape_xml(s: &str) -> String {
     let bytes = s.as_bytes();
     let Some(mut special) = bytes

@@ -5,10 +5,6 @@
 //! This module provides functionality to write RTF documents from structured data.
 //! It supports all RTF features including formatting, tables, pictures, fields, lists, and more.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "items stay grouped by RTF feature area rather than by item kind"
-)]
 use super::super::{
     AbstractNumberingCleanupStatus, Alignment, AnimatedTextEffect, Annotation, AnnotationType,
     AssociatedCharacterBaseline, AssociatedUnderlineStyle, BodyStoryEvent, Bookmark, BookmarkTable,

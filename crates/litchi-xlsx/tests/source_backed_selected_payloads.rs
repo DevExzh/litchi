@@ -1,5 +1,3 @@
-#![allow(clippy::unwrap_used, reason = "focused selected-scanner assertions")]
-
 //! Public source-backed witnesses for the compact selected-record payload.
 //!
 //! The selected scanner keeps one of two mutually exclusive payloads for each

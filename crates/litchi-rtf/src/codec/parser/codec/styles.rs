@@ -63,10 +63,6 @@ fn style_frame_toggle(value: Option<i32>, name: &str) -> crate::Result<bool> {
 }
 
 impl<'a> Parser<'a> {
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn parse_latent_styles(&mut self) -> crate::Result<crate::LatentStyles<'a>> {
         self.pos += 1; // ignorable-destination marker
         if !matches!(
@@ -190,10 +186,6 @@ impl<'a> Parser<'a> {
         }
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn parse_latent_style_exceptions(
         &mut self,
     ) -> crate::Result<Vec<crate::LatentStyleException<'a>>> {
@@ -1562,14 +1554,6 @@ impl<'a> Parser<'a> {
         Ok(index)
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the nine-level check above bounds the level count to the u8 range"
-    )]
     pub(super) fn parse_list_definition(&mut self) -> crate::Result<()> {
         self.pos += 2; // opening brace and `list`
         let mut list = super::super::super::list::List::new(0);
@@ -1669,10 +1653,6 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn parse_list_level(
         &mut self,
         level_index: u8,
@@ -2022,10 +2002,6 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse the standard RTF stylesheet destination.
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn default_character_property_key(
         control: &ControlWord<'_>,
     ) -> Option<&'static str> {
@@ -2099,10 +2075,6 @@ impl<'a> Parser<'a> {
         })
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn default_paragraph_property_key(
         control: &ControlWord<'_>,
     ) -> Option<&'static str> {
@@ -2201,10 +2173,6 @@ impl<'a> Parser<'a> {
         })
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn parse_default_formatting_destination(
         &mut self,
         kind: crate::DefaultFormattingDestination,
@@ -2493,10 +2461,6 @@ impl<'a> Parser<'a> {
         Err(crate::Error::UnexpectedEof)
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn parse_style_entry(&mut self) -> crate::Result<()> {
         let entry_start = self.pos;
         self.pos += 1; // opening brace
@@ -2902,11 +2866,6 @@ impl<'a> Parser<'a> {
         }
     }
 
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "RTF \\uN parameters are signed 16-bit; the u16 wrap implements the specified negative-value conversion"
-    )]
     pub(super) fn parse_unicode_with_remainder(
         &mut self,
         first_code: i32,
@@ -3037,10 +2996,6 @@ impl<'a> Parser<'a> {
         Ok(parsed)
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn table_border_style(control: &ControlWord<'_>) -> Option<crate::BorderStyle> {
         use crate::BorderStyle as Style;
         Some(match control {
@@ -3075,14 +3030,6 @@ impl<'a> Parser<'a> {
         })
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the crate distance constant is defined within the u16 range"
-    )]
     pub(super) fn apply_table_decoration_control(
         state: &mut State,
         control: &ControlWord<'_>,
@@ -3265,10 +3212,6 @@ impl<'a> Parser<'a> {
         Ok(true)
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn character_border_style(
         control: &ControlWord<'_>,
     ) -> Option<crate::CharacterBorderStyle> {
@@ -3305,10 +3248,6 @@ impl<'a> Parser<'a> {
         })
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn apply_character_decoration_control(
         state: &mut State,
         control: &ControlWord<'_>,
@@ -3448,10 +3387,6 @@ impl<'a> Parser<'a> {
     /// color, spacing, shadow, and frame controls apply to (RTF 1.9.1
     /// paragraph borders). `\box` is normalized onto all four sides; the
     /// `\brdrbar` and `\brdrbtw` segments are retained separately.
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn apply_paragraph_border_control(
         state: &mut State,
         control: &ControlWord<'_>,
@@ -3555,10 +3490,6 @@ impl<'a> Parser<'a> {
         }
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn apply_paragraph_shading_control(
         state: &mut State,
         control: &ControlWord<'_>,
@@ -3603,15 +3534,6 @@ impl<'a> Parser<'a> {
         Ok(true)
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "raw font and color parameters are bounded by their established format ranges"
-    )]
     pub(super) fn apply_style_property(
         state: &mut State,
         control: &ControlWord<'_>,
@@ -4205,15 +4127,6 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "the range check above bounds the value to the u8 range"
-    )]
     pub(super) fn apply_drop_cap_control(
         state: &mut State,
         control: &ControlWord<'_>,
@@ -4273,10 +4186,6 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn apply_paragraph_tab_control(
         state: &mut State,
         control: &ControlWord<'_>,
@@ -4324,10 +4233,6 @@ impl<'a> Parser<'a> {
             Ok(())
         }
 
-        #[allow(
-            clippy::wildcard_enum_match_arm,
-            reason = "remaining variants share the same fallback by design"
-        )]
         fn append(state: &mut State, position: Option<i32>, bar: bool) -> crate::Result<()> {
             let tab_position = position.ok_or_else(|| {
                 crate::Error::MalformedDocument(format!(

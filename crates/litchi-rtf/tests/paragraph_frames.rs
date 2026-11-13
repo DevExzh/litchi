@@ -1,12 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::shadow_reuse,
-    clippy::shadow_same,
-    clippy::shadow_unrelated,
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
-
 mod repair_support;
 
 use std::borrow::Cow;

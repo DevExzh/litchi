@@ -7,10 +7,6 @@ use std::sync::Arc;
 /// XML-only resource profile used by the package-neutral Custom Data codec.
 pub use litchi_ooxml_common::custom_data::codec::Limits as XmlLimits;
 
-#[allow(
-    clippy::wildcard_enum_match_arm,
-    reason = "the shared error is non-exhaustive; host limits and allocations are mapped explicitly"
-)]
 fn map_common_error(error: litchi_ooxml_common::Error) -> Error {
     use litchi_ooxml_common::LimitKind as CommonLimit;
     match error {

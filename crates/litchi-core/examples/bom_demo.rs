@@ -13,11 +13,6 @@
 //!
 //! No CLI arguments are required — the example is fully self-contained.
 
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example exists to print its BOM walkthrough"
-)]
-
 use litchi_core::{
     BomKind, UTF8_BOM, UTF16_BE_BOM, UTF16_LE_BOM, UTF32_BE_BOM, UTF32_LE_BOM, strip_bom, write_bom,
 };

@@ -66,10 +66,6 @@ impl ToolbarSet {
     }
 
     /// Construct a header while retaining all reserved wire fields.
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "arguments map positionally to BIFF fields"
-    )]
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.

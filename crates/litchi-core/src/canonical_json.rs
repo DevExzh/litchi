@@ -86,11 +86,6 @@ fn write_string<W: io::Write + ?Sized>(writer: &mut W, text: &str) -> io::Result
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        reason = "test assertions unwrap expected success"
-    )]
-
     use serde_json::{Map, json};
 
     use super::*;

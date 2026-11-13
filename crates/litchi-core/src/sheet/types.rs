@@ -121,10 +121,6 @@ impl From<u32> for CellValue {
 }
 
 impl From<usize> for CellValue {
-    #[allow(
-        clippy::cast_possible_wrap,
-        reason = "wrapping on huge values preserves the historical behavior of this public conversion; realistic cell values always fit in i64"
-    )]
     fn from(i: usize) -> Self {
         Self::Int(i as i64)
     }
@@ -162,12 +158,6 @@ impl From<&String> for CellValue {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        reason = "test assertions panic by design"
-    )]
-
     use super::*;
 
     #[test]

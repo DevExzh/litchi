@@ -1,9 +1,5 @@
 //! Borrowed semantic text-story views.
 
-#![allow(
-    clippy::shadow_reuse,
-    reason = "builder-style helpers deliberately rebind a working value as it is refined"
-)]
 use crate::types::{
     Alignment, Formatting as RawFormat, Paragraph as RawParagraph, ParagraphFrame, StyleBlock,
     TextDirection, UnderlineStyle,

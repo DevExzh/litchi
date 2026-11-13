@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "golden fixtures favor explicit inputs and panic-driven assertions"
-)]
-
 //! Byte-exact goldens for the fresh XLS writer's shared-string path.
 //!
 //! The fixtures of `fresh_xls_writer_shared_strings_match_the_pre_0753_goldens`

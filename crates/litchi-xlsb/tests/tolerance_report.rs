@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "test assertions use panic-on-failure extraction by design"
-)]
-
 //! The tolerance report is carried by every open path, and conformant
 //! workbooks report clean on each of them.
 

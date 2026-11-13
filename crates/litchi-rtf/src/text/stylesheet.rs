@@ -24,10 +24,6 @@ pub enum StyleType {
     Table,
 }
 
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "independent RTF feature flags stay flat for direct access"
-)]
 /// Inert conditional-formatting scope and banding metadata of a table style
 /// definition (`\tsN`).
 ///
@@ -100,10 +96,6 @@ impl TableStyleConditionalFormatting {
     }
 }
 
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "independent RTF feature flags stay flat for direct access"
-)]
 /// RTF style definition
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Style<'a> {
@@ -154,10 +146,6 @@ pub struct Style<'a> {
 }
 
 impl<'a> Style<'a> {
-    #[allow(
-        clippy::large_types_passed_by_value,
-        reason = "the paragraph moves into the constructed style; borrowing would force an extra clone"
-    )]
     fn new(
         id: u16,
         name: Cow<'a, str>,

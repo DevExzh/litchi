@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "integration tests use panic-on-failure extraction"
-)]
-
 //! Changed publications refuse a signed workbook (ADR 0006). Removing a
 //! signature is explicit (`Package::unsign`, or `OpcPackage::unsign`
 //! inside an `edit_opc` update); an exact no-op keeps the source bytes,

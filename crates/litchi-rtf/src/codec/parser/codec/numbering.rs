@@ -63,10 +63,6 @@ impl<'a> Parser<'a> {
         Err(crate::Error::UnexpectedEof)
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn parse_paragraph_group_property(
         &mut self,
         id: u32,
@@ -323,10 +319,6 @@ impl<'a> Parser<'a> {
         Err(crate::Error::UnexpectedEof)
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn parse_legacy_section_numbering_level(&mut self) -> crate::Result<()> {
         let body_started = self.has_flushed_body_text();
         if !self.in_root_child_group() {
@@ -595,20 +587,12 @@ impl<'a> Parser<'a> {
         Err(crate::Error::UnexpectedEof)
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn parse_legacy_paragraph_numbering(&mut self) -> crate::Result<()> {
         fn value(parameter: Option<i32>, name: &str) -> crate::Result<i32> {
             parameter.ok_or_else(|| {
                 crate::Error::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
             })
         }
-        #[allow(
-            clippy::wildcard_enum_match_arm,
-            reason = "remaining variants share the same fallback by design"
-        )]
         fn toggle(parameter: Option<i32>, name: &str) -> crate::Result<bool> {
             match parameter {
                 None | Some(1) => Ok(true),

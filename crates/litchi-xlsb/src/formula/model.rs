@@ -392,10 +392,6 @@ pub enum UnaryOperator {
 }
 
 /// Parse Tree Generator token constants.
-#[allow(
-    dead_code,
-    reason = "retained for BIFF12 codec completeness and staged host integration"
-)]
 pub mod ptg_types {
     pub const PTG_EXP: u8 = 0x01;
     pub const PTG_TBL: u8 = 0x02;

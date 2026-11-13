@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    reason = "validation fixtures are fixed and assertions intentionally fail loudly"
-)]
-
 use litchi_rtf::{
     OpenOptions, Package, SourceLimits, ValidationDependency, ValidationStatus,
     validation::{ValidationReport, validate},

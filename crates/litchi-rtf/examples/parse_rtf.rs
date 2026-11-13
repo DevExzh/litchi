@@ -1,8 +1,3 @@
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example intentionally prints its results"
-)]
-
 //! Parse an RTF file and print summary information.
 //!
 //! Run from the workspace root:

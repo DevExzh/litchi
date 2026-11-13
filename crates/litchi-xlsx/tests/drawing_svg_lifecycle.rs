@@ -6,11 +6,6 @@
 //! inherited namespace bindings, opaque extension payload, and relationship
 //! edges which make SVG cleanup observable.
 
-#![allow(
-    clippy::unwrap_used,
-    reason = "focused integration fixtures use panic-on-failure assertions"
-)]
-
 use std::collections::HashSet;
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};

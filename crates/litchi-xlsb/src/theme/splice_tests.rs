@@ -1,8 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    reason = "focused source-splice regression assertions"
-)]
-
 use super::*;
 
 fn model() -> Theme {

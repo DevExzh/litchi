@@ -90,10 +90,6 @@ pub struct LegacyParagraphNumberingRevision {
     pub text_start: Option<i32>,
 }
 
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "independent RTF feature flags stay flat for direct access"
-)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LegacyParagraphNumbering<'a> {
     pub level: LegacyParagraphNumberingLevel,

@@ -237,7 +237,6 @@ fn fixed_rotation(degrees: f64) -> Result<i32> {
             "the rotation is not a finite angle",
         ));
     }
-    #[allow(clippy::cast_possible_truncation, reason = "bounded above")]
     Ok((degrees * 65_536.0).round() as i32)
 }
 

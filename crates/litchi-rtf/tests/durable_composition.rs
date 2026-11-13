@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "transaction assertions intentionally panic on failure"
-)]
-
 use litchi_core::Position;
 use litchi_rtf::edit::{CompositionError, DurableComposition, DurableMergePlan, MergeResolution};
 use litchi_rtf::{

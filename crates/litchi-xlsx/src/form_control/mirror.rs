@@ -16,12 +16,6 @@
 //! compose the returned pair into its package transaction without observing a
 //! one-sided edit.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    clippy::too_many_lines,
-    reason = "the mapping table and bounded source scanner follow the XML field order"
-)]
-
 use std::fmt;
 use std::mem::size_of;
 use std::ops::Range;

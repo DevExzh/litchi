@@ -1,8 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "each test is one constructed witness with a fixed expected verdict"
-)]
 //! Witnesses that neither publication audit of a replaced XML Part is a
 //! duplicate of a check that runs earlier in the same operation.
 //!

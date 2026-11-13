@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "dependency-boundary fixtures deliberately fail at the assertion site"
-)]
-
 //! Complete-catalog reorder dependency boundaries.
 //!
 //! A tab reorder changes the workbook display order, so every modeled owner

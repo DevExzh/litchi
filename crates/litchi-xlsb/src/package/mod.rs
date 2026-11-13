@@ -25,7 +25,6 @@ pub(crate) mod ingress;
 pub(crate) mod cell;
 #[path = "../host/cells_reader/mod.rs"]
 #[allow(
-    dead_code,
     unreachable_pub,
     reason = "internal host modules are shared by included package and writer implementations"
 )]
@@ -65,7 +64,6 @@ pub mod pivot;
 pub(crate) mod pivot_tables;
 #[path = "../host/records.rs"]
 #[allow(
-    dead_code,
     unreachable_pub,
     reason = "internal host modules are shared by included package and writer implementations"
 )]
@@ -86,7 +84,6 @@ pub mod table;
 pub(crate) mod template;
 #[path = "../host/utils.rs"]
 #[allow(
-    dead_code,
     unreachable_pub,
     reason = "internal host modules are shared by included package and writer implementations"
 )]
@@ -668,10 +665,6 @@ impl From<OpcPackage> for Package {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    reason = "package ingress fixtures use panic-on-failure extraction after constructing exact finite limits"
-)]
 mod tests {
     use std::io::Cursor;
 

@@ -597,10 +597,6 @@ fn escape(text: &str) -> String {
             character => {
                 let mut buffer = [0_u16; 2];
                 for unit in character.encode_utf16(&mut buffer) {
-                    #[allow(
-                        clippy::cast_possible_wrap,
-                        reason = "RTF \\u takes the signed 16-bit spelling of the UTF-16 unit"
-                    )]
                     let signed = *unit as i16;
                     out.push_str(&format!("\\u{signed}?"));
                 }

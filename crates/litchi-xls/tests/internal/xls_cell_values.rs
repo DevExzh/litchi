@@ -1,10 +1,5 @@
 //! Real-workbook coverage for the bounded BIFF8 `Number` edit seam.
 
-#![allow(
-    clippy::expect_used,
-    reason = "fixture assumptions are the assertions of this regression test"
-)]
-
 use litchi_cfb::OleFile;
 use litchi_core::Position;
 use litchi_core::sheet::{Cell as _, CellValue};

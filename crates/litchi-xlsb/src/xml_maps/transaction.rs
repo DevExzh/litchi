@@ -1012,10 +1012,6 @@ fn invalid(message: &'static str) -> Error {
     Error::InvalidFormat(message)
 }
 
-#[allow(
-    dead_code,
-    reason = "retained for BIFF12 codec completeness and staged host integration"
-)]
 fn _cell_reference_is_public(_: CellReference) {}
 
 #[cfg(test)]

@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "focused integration tests use panic-on-failure assertions"
-)]
-
 use litchi_xlsx::page_breaks::{Break, Collection, PageBreaks};
 use litchi_xlsx::{
     Cell, DurablePatch, Error, Formula, History, HistoryLimits, LocalStyle, MergeChoice,

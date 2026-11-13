@@ -1,8 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    reason = "tests deliberately panic on unexpected validation failures"
-)]
-
 use super::*;
 use crate::{Cell, Column, Rect, Row};
 

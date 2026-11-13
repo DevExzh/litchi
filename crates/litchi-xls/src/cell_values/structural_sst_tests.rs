@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "native SST regression fixtures fail fast by design"
-)]
-
 use super::*;
 use crate::cell_values::{Reference, ResourceChange, SST, Selector, Snapshot, Value};
 use crate::records::{

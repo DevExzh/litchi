@@ -1,9 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::float_cmp,
-    reason = "focused fixture assertions compare exact authored values"
-)]
-
 //! Readable cell formatting on both workbook owners.
 //!
 //! The eager owner reads it through `Style::format`, the source-backed owner

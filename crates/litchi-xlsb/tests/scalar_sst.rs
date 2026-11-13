@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "generated package fixtures fail immediately with local diagnostics"
-)]
-
 //! Shared-string closure coverage for package-owned scalar edits.
 
 use std::io::Cursor;

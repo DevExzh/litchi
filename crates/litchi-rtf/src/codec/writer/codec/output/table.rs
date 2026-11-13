@@ -1,9 +1,5 @@
 //! RTF table output.
 
-#![allow(
-    clippy::shadow_reuse,
-    reason = "serialization helpers deliberately rebind a working value as the output is assembled"
-)]
 use std::ops::Range;
 
 use super::super::{
@@ -1085,10 +1081,6 @@ impl<W: Write> Writer<W> {
         Ok(())
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(in super::super) fn write_table_shading(
         &mut self,
         prefix: &str,

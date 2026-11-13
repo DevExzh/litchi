@@ -1,5 +1,4 @@
 //! Complete tab identity and formula provenance for canonical read adapters.
-#![allow(clippy::unwrap_used, reason = "acceptance assertions fail fast")]
 use litchi_xls::{Builder, Package, SourceBackedLimits};
 use std::sync::Arc;
 

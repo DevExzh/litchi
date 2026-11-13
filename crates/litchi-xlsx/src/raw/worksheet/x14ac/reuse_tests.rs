@@ -533,7 +533,6 @@ fn reference_capture(content: &[u8], capture_rows: bool) -> Result<Values> {
     Ok(values)
 }
 
-#[allow(clippy::too_many_arguments)]
 fn reference_start(
     parent: Option<Context>,
     namespace: &ResolveResult<'_>,

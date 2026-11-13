@@ -7,10 +7,6 @@ use zerocopy::{F64, FromBytes, I16, I32, LE, U16, U32};
 
 /// Binary parsing error type
 #[derive(Debug, Clone)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "public API name is stable and used by dependent crates; renaming would be a breaking change"
-)]
 pub enum BinaryError {
     /// Not enough data to read the requested type
     InsufficientData { expected: usize, available: usize },
@@ -35,10 +31,6 @@ impl std::fmt::Display for BinaryError {
 impl std::error::Error for BinaryError {}
 
 /// Result type for binary operations
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "public API name is stable and used by dependent crates; renaming would be a breaking change"
-)]
 pub type BinaryResult<T> = Result<T, BinaryError>;
 
 /// Read a little-endian u16 from a byte slice at the given offset.

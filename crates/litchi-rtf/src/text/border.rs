@@ -2,10 +2,6 @@
 //!
 //! This module provides support for borders and shading in RTF documents.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "items stay grouped by RTF feature area rather than by item kind"
-)]
 use super::types::ColorRef;
 
 /// RTF 1.9.1 character-border line style selected after `chbrdr`.
@@ -739,16 +735,6 @@ impl TabStop {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        reason = "test assertions panic on failure by design"
-    )]
-    #![allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_possible_wrap,
-        reason = "test loop indices stay far below the i32 range"
-    )]
     use super::*;
 
     #[test]

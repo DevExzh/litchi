@@ -1,11 +1,5 @@
 //! Narrow cross-workbook transfer coverage for native BIFF8 scalar cells.
 
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "fixture construction and assertions intentionally fail fast"
-)]
-
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_core::Position;
 use litchi_ole_common::object::{

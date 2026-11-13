@@ -5,10 +5,6 @@
 //! This module provides basic table parsing for RTF documents.
 //! RTF tables use a complex row-based model with cell boundaries.
 
-#![allow(
-    clippy::shadow_unrelated,
-    reason = "builder-style helpers deliberately rebind a working value as it is refined"
-)]
 use crate::{ParagraphFrame, TextDirection};
 use std::borrow::Cow;
 use std::collections::{BTreeSet, HashSet};
@@ -73,10 +69,6 @@ impl CellParagraph {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum TablePreferredWidthUnit {
     #[default]
@@ -86,10 +78,6 @@ pub enum TablePreferredWidthUnit {
     Twips,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TablePreferredWidth {
     unit: TablePreferredWidthUnit,
@@ -142,10 +130,6 @@ impl TablePreferredWidth {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum TableRowHeight {
     #[default]
@@ -154,10 +138,6 @@ pub enum TableRowHeight {
     Exact(u16),
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableIndentUnit {
     Auto,
@@ -165,10 +145,6 @@ pub enum TableIndentUnit {
     Nil,
     Percent,
 }
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TableIndent {
     unit: TableIndentUnit,
@@ -215,10 +191,6 @@ impl TableIndent {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TableRowGeometry {
     half_gap_twips: Option<u16>,
@@ -321,30 +293,18 @@ impl TableRowGeometry {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableCellMergeAxis {
     Horizontal,
     Vertical,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableCellMergeRole {
     First,
     Continuation,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TableCellMergeState {
     pub horizontal: Option<TableCellMergeRole>,
@@ -402,10 +362,6 @@ pub struct CellRevision {
     pub metadata: crate::RevisionMetadata,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableHorizontalReference {
     Column,
@@ -413,10 +369,6 @@ pub enum TableHorizontalReference {
     Page,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableVerticalReference {
     Margin,
@@ -424,10 +376,6 @@ pub enum TableVerticalReference {
     Page,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableHorizontalPosition {
     Offset(i32),
@@ -439,10 +387,6 @@ pub enum TableHorizontalPosition {
     Right,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableVerticalPosition {
     Offset(i32),
@@ -455,10 +399,6 @@ pub enum TableVerticalPosition {
     Top,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TableWrapDistances {
     pub left: Option<u16>,
@@ -530,38 +470,22 @@ impl FloatingTablePosition {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableDistanceUnit {
     Null,
     Twips,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableDistanceScope {
     Row,
     Cell,
 }
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableDistanceKind {
     Padding,
     Spacing,
 }
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableEdge {
     Left,
@@ -570,10 +494,6 @@ pub enum TableEdge {
     Bottom,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableRowBorderSide {
     Top,
@@ -584,10 +504,6 @@ pub enum TableRowBorderSide {
     Vertical,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableCellBorderSide {
     Top,
@@ -598,10 +514,6 @@ pub enum TableCellBorderSide {
     UpperRightToLowerLeft,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Sides of the table-style default borders (`\tsbrdr*`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableStyleBorderSide {
@@ -622,10 +534,6 @@ pub(crate) enum TableBorderTarget {
     StyleDefault(TableStyleBorderSide),
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TableRowBorders {
     pub top: Option<crate::Border>,
@@ -667,10 +575,6 @@ impl TableRowBorders {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Table-style default borders declared once per row (`\tsbrdr*`).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TableStyleDefaultBorders {
@@ -739,10 +643,6 @@ impl TableStyleDefaultBorders {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Row-scoped default formatting applied to every cell in the row
 /// (`\tsbrdr*`, `\tscellpadd*`, `\tscellspc*`, and `\tscellwidth*`).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -775,10 +675,6 @@ impl TableRowCellDefaults {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TableCellBorders {
     pub top: Option<crate::Border>,
@@ -820,10 +716,6 @@ impl TableCellBorders {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TableShading {
     pub amount: Option<u16>,
@@ -859,10 +751,6 @@ impl TableShading {
         Ok(())
     }
 }
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TableDistanceTarget {
     pub scope: TableDistanceScope,
@@ -870,10 +758,6 @@ pub struct TableDistanceTarget {
     pub edge: TableEdge,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableRowAlignment {
     Left,
@@ -881,10 +765,6 @@ pub enum TableRowAlignment {
     Right,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableAutoformatFlag {
     Border,
@@ -918,10 +798,6 @@ impl TableAutoformatFlag {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TableAutoformatFlags {
     bits: u16,
@@ -945,20 +821,12 @@ impl TableAutoformatFlags {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableRowBandIndex {
     Header,
     Row(u16),
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TableRowBanding {
     pub row_index: Option<u16>,
@@ -966,10 +834,6 @@ pub struct TableRowBanding {
     pub last_row: bool,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TableRowLayout {
     pub header: bool,
@@ -978,10 +842,6 @@ pub struct TableRowLayout {
     pub alignment: Option<TableRowAlignment>,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableCellVerticalAlignment {
     Top,
@@ -989,10 +849,6 @@ pub enum TableCellVerticalAlignment {
     Bottom,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableCellTextFlow {
     LeftToRightTopToBottom,
@@ -1002,10 +858,6 @@ pub enum TableCellTextFlow {
     TopToBottomRightToLeftVertical,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TableCellLayout {
     pub vertical_alignment: Option<TableCellVerticalAlignment>,
@@ -1015,20 +867,12 @@ pub struct TableCellLayout {
     pub hide_mark: bool,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TableSideDistance {
     pub value: Option<u16>,
     pub unit: Option<TableDistanceUnit>,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TableEdgeDistances {
     pub left: TableSideDistance,
@@ -1339,10 +1183,6 @@ pub struct Cell<'a> {
     story_events: Vec<CellStoryEvent>,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// A nested table inserted between UTF-8 text bytes in its containing cell.
 #[derive(Debug, Clone)]
 pub struct CellNestedTable<'a> {
@@ -1356,10 +1196,6 @@ pub struct CellStoryReference {
     pub position: usize,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// A row/cell coordinate inside a document table or nested table.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TableCellCoordinate {
@@ -1368,10 +1204,6 @@ pub struct TableCellCoordinate {
     pub cell_index: usize,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// A stable route from a document table to an outer or nested cell.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TableCellPath {
@@ -2388,11 +2220,6 @@ impl Table<'_> {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        reason = "test assertions panic on failure by design"
-    )]
     use super::*;
 
     #[test]

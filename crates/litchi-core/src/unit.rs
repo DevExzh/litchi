@@ -18,10 +18,6 @@ pub const PPT_MASTER_UNITS_PER_INCH: i64 = 576;
 
 /// Supported length units
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "public API name is stable and used by dependent crates; renaming would be a breaking change"
-)]
 pub enum LengthUnit {
     /// Millimeter
     Millimeter,
@@ -365,78 +361,36 @@ impl PartialOrd for Length {
 
 #[inline]
 #[must_use]
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "float-to-int truncation toward zero is the intended conversion semantics"
-)]
-#[allow(
-    clippy::cast_precision_loss,
-    reason = "EMUS_PER_PT (12_700) is exactly representable as f64"
-)]
 pub fn pt_to_emu_f64(pt: f64) -> i64 {
     (pt * EMUS_PER_PT as f64) as i64
 }
 
 #[inline]
 #[must_use]
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "EMUS_PER_PT (12_700) always fits in i32"
-)]
 pub fn pt_to_emu_i32(pt: i32) -> i32 {
     pt.saturating_mul(EMUS_PER_PT as i32)
 }
 
 #[inline]
 #[must_use]
-#[allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    reason = "float-to-int truncation toward zero is the intended conversion semantics"
-)]
-#[allow(
-    clippy::cast_precision_loss,
-    reason = "EMUS_PER_PT (12_700) is exactly representable as f32"
-)]
 pub fn pt_f32_to_emu_u32(pt: f32) -> u32 {
     (pt * EMUS_PER_PT as f32) as u32
 }
 
 #[inline]
 #[must_use]
-#[allow(
-    clippy::cast_precision_loss,
-    reason = "f64 precision is sufficient for document dimensions; EMUS_PER_PT is exactly representable"
-)]
 pub fn emu_to_pt_f64(emu: i64) -> f64 {
     emu as f64 / EMUS_PER_PT as f64
 }
 
 #[inline]
 #[must_use]
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "float-to-int truncation toward zero is the intended conversion semantics"
-)]
-#[allow(
-    clippy::cast_precision_loss,
-    reason = "EMUS_PER_INCH (914_400) is exactly representable as f64"
-)]
 pub fn px_to_emu(px: u32, dpi: u32) -> i64 {
     (f64::from(px) * EMUS_PER_INCH as f64 / f64::from(dpi)) as i64
 }
 
 #[inline]
 #[must_use]
-#[allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    reason = "float-to-int truncation toward zero is the intended conversion semantics"
-)]
-#[allow(
-    clippy::cast_precision_loss,
-    reason = "f64 precision is sufficient for document dimensions; EMUS_PER_INCH is exactly representable"
-)]
 pub fn emu_to_px(emu: i64, dpi: u32) -> u32 {
     ((emu as f64) * f64::from(dpi) / EMUS_PER_INCH as f64) as u32
 }
@@ -461,60 +415,30 @@ pub fn twip_to_emu_i64(twips: i64) -> i64 {
 
 #[inline]
 #[must_use]
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "the explicit round-to-nearest conversion intentionally discards the fractional part"
-)]
-#[allow(
-    clippy::cast_precision_loss,
-    reason = "f64 precision is sufficient for document dimensions; EMUS_PER_TWIP is exactly representable"
-)]
 pub fn emu_to_twip_i64(emu: i64) -> i64 {
     (emu as f64 / EMUS_PER_TWIP as f64).round() as i64
 }
 
 #[inline]
 #[must_use]
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "the widened u64 computation is divided back down before the intentional narrowing cast"
-)]
 pub fn emu_u32_to_ppt_master_u32(emu: u32) -> u32 {
     ((u64::from(emu) * PPT_MASTER_UNITS_PER_INCH as u64) / EMUS_PER_INCH as u64) as u32
 }
 
 #[inline]
 #[must_use]
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "the explicit round-to-nearest conversion intentionally discards the fractional part"
-)]
-#[allow(
-    clippy::cast_precision_loss,
-    reason = "the conversion constants are exactly representable as f64"
-)]
 pub fn emu_i32_to_ppt_master_i16_round(emu: i32) -> i16 {
     (f64::from(emu) * PPT_MASTER_UNITS_PER_INCH as f64 / EMUS_PER_INCH as f64).round() as i16
 }
 
 #[inline]
 #[must_use]
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "the divided-down result is expected to fit in i32; narrowing is the intended semantics"
-)]
 pub fn ppt_master_i64_to_emu_i32(master: i64) -> i32 {
     ((master * EMUS_PER_INCH) / PPT_MASTER_UNITS_PER_INCH) as i32
 }
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        reason = "test assertions panic by design"
-    )]
-
     use super::*;
 
     #[test]

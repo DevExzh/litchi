@@ -4,10 +4,6 @@
 //! semantic format view.  A font edit changes a workbook-global resource, so
 //! checking only the selected cell can miss shared-font fan-out, duplicate
 //! resource allocation, stale guards, or loss of opaque stylesheet markup.
-#![allow(
-    clippy::unwrap_used,
-    reason = "focused integration tests use panic-on-failure assertions"
-)]
 
 use litchi_opc::PackURI;
 use litchi_xlsx::{Error, FontChange, Package};

@@ -1,10 +1,6 @@
 /// Largest supported document gutter width, in twips.
 pub const MAX_DOCUMENT_GUTTER_TWIPS: u32 = 31_680;
 
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "independent RTF feature flags stay flat for direct access"
-)]
 /// Passive document print-layout settings from the RTF header.
 ///
 /// These values are retained for round-tripping only. This crate does not

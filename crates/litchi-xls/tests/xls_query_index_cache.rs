@@ -5,12 +5,6 @@
 //! duplicate order, refusal identity, freshness fences, and cancellation must
 //! remain the same when admission is disabled, refused, or evicted.
 
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "fixture construction and test assertions intentionally panic"
-)]
-
 use litchi_cfb::{OleWriter, SharedOleFile};
 use litchi_core::sheet::CellValue;
 use litchi_core::{

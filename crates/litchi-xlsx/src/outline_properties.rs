@@ -105,10 +105,6 @@ enum RootPhase {
 
 /// Parse the worksheet's exact `worksheet/sheetPr/outlinePr` child path.
 // Text/CData arms keep `?`-bearing whitespace checks out of guards; guards cannot use `?`.
-#[allow(
-    clippy::collapsible_match,
-    reason = "separate event and element matches keep XML state transitions explicit"
-)]
 pub fn parse_outline_properties(xml: &[u8]) -> Result<Option<OutlineProperties>> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("worksheet XML is too large"));

@@ -2614,12 +2614,6 @@ fn publication_error(error: crate::metadata::Error) -> Error {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::expect_used,
-        clippy::unwrap_used,
-        reason = "single-flight tests use panic-on-failure thread extraction"
-    )]
-
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Barrier};
     use std::thread;

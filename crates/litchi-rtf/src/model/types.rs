@@ -1,9 +1,5 @@
 //! RTF document type definitions.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "items stay grouped by RTF feature area rather than by item kind"
-)]
 use super::border::{Borders, CharacterBorder, CharacterShading, Shading};
 
 use litchi_codepage::Mbcs;
@@ -70,10 +66,6 @@ impl ColorTable {
 
     /// Add a color to the table and return its index.
     #[inline]
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "color-table indices wrap to 16 bits by design"
-    )]
     pub fn add(&mut self, color: Color) -> ColorRef {
         let index = self.colors.len() as ColorRef;
         self.colors.push(color);
@@ -83,10 +75,6 @@ impl ColorTable {
 
     /// Add the automatic/default color entry and return its index.
     #[inline]
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "color-table indices wrap to 16 bits by design"
-    )]
     pub fn add_automatic(&mut self) -> ColorRef {
         let index = self.colors.len() as ColorRef;
         self.colors.push(Color::default());
@@ -769,10 +757,6 @@ pub struct Spacing {
     pub line_multiple: bool,
 }
 
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "independent RTF feature flags stay flat for direct access"
-)]
 /// Paragraph spacing policy layered over raw twip spacing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ParagraphSpacingPolicy {
@@ -845,10 +829,6 @@ pub enum ParagraphFontAlignment {
     Fixed,
 }
 
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "independent RTF feature flags stay flat for direct access"
-)]
 /// Effective paragraph line-breaking and automatic-spacing policy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct ParagraphLineBreaking {
@@ -900,10 +880,6 @@ impl ParagraphDropCap {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the range check above bounds the line count to the u8 range"
-    )]
     pub fn new(kind: ParagraphDropCapKind, line_count: u16) -> crate::Result<Self> {
         if !(1..=MAX_PARAGRAPH_DROP_CAP_LINES).contains(&line_count) {
             return Err(crate::Error::InvalidStructure(format!(
@@ -1164,10 +1140,6 @@ impl RevisionMetadata {
     }
 }
 
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "independent RTF feature flags stay flat for direct access"
-)]
 /// Paragraph properties.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Paragraph {
@@ -1555,10 +1527,6 @@ impl AssociatedCharacterFormatting {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "adjacent range checks bound each narrowing conversion to the target type's range"
-    )]
     pub fn set_expansion_quarter_points(&mut self, value: Option<i32>) -> crate::Result<()> {
         self.expansion_quarter_points = match value {
             None => None,
@@ -1604,10 +1572,6 @@ impl AssociatedCharacterFormatting {
     }
 }
 
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "independent RTF feature flags stay flat for direct access"
-)]
 /// Character formatting properties.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Formatting {
@@ -1944,11 +1908,6 @@ impl<'a> ParagraphContent<'a> {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        reason = "test assertions panic on failure by design"
-    )]
     use super::*;
 
     #[test]

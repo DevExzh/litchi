@@ -1667,10 +1667,6 @@ struct Sheet {
     kind: u8,
     name: String,
 }
-#[allow(
-    clippy::type_complexity,
-    reason = "type mirrors the decoded BIFF record structure"
-)]
 fn bindings(input: &[u8]) -> Result<(Vec<(usize, usize)>, Vec<Sheet>)> {
     let mut refs = Vec::new();
     for value in ranges(input)? {

@@ -81,10 +81,6 @@ pub(super) fn barcode_field_instructions(raw_instruction: &str) -> Option<&str> 
     }
 }
 
-#[allow(
-    clippy::type_complexity,
-    reason = "the returned tuple mirrors the field-instruction grammar"
-)]
 pub(super) fn barcode_display_field_parts(
     instruction: &str,
 ) -> Option<(
@@ -273,10 +269,6 @@ pub(super) fn auto_text_field_parts(
     Some((kind, entry_name, unknown_switches))
 }
 
-#[allow(
-    clippy::type_complexity,
-    reason = "the returned tuple mirrors the field-instruction grammar"
-)]
 pub(super) fn auto_text_list_field_parts(
     instruction: &str,
 ) -> Option<(
@@ -2152,10 +2144,6 @@ pub(super) fn field_argument_end(input: &str) -> Option<usize> {
     None
 }
 
-#[allow(
-    clippy::type_complexity,
-    reason = "the returned tuple mirrors the field-instruction grammar"
-)]
 pub(super) fn sequence_field_parts(
     raw_instruction: &str,
 ) -> Option<(Cow<'_, str>, Option<Cow<'_, str>>, &str)> {

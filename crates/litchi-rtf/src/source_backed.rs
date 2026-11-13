@@ -465,12 +465,6 @@ impl Report {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::expect_used,
-        clippy::unwrap_used,
-        reason = "unit tests panic on an unexpected result"
-    )]
-
     use super::*;
     use std::num::{NonZeroU64, NonZeroUsize};
 

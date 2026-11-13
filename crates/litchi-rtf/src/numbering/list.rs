@@ -11,10 +11,6 @@ pub(crate) const MAX_LIST_LEVELS: usize = 9;
 pub(crate) const MAX_LIST_TEXT_BYTES: usize = 65_536;
 pub(crate) const MAX_LIST_TABS: usize = 64;
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// List level type (bullet or numbered)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ListLevelType {
@@ -43,10 +39,6 @@ pub enum ListLevelType {
     Other(i32),
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// Text emitted after a list label.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ListFollow {
@@ -59,10 +51,6 @@ pub enum ListFollow {
     Nothing,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// List level justification
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ListJustification {
@@ -75,14 +63,6 @@ pub enum ListJustification {
     Center,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "independent RTF feature flags stay flat for direct access"
-)]
 /// A single level in a list (for multi-level lists)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ListLevel<'a> {
@@ -239,10 +219,6 @@ impl<'a> List<'a> {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// List override entry (instance of a list)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ListOverrideLevel {
@@ -251,10 +227,6 @@ pub struct ListOverrideLevel {
     pub format_override: bool,
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ListOverride {
     /// List override index
@@ -283,10 +255,6 @@ impl ListOverride {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// List table containing all list definitions
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ListTable<'a> {
@@ -406,10 +374,6 @@ impl<'a> ListTable<'a> {
     }
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "names mirror the RTF specification vocabulary"
-)]
 /// List override table containing list instances
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ListOverrideTable {

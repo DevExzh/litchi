@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::float_cmp,
-    clippy::unwrap_used,
-    reason = "focused generated fixtures use immediate diagnostics"
-)]
-
 //! Focused coverage for the package-owned scalar cell assignment.
 
 use std::io::Cursor;

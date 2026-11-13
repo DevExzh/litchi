@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "structural removal fixtures deliberately fail at the assertion site"
-)]
-
 //! Native complete-catalog worksheet removal transactions.
 //!
 //! A removal addresses the immutable source catalog, then publishes one

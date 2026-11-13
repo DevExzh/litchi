@@ -1,17 +1,9 @@
-#![allow(
-    clippy::shadow_reuse,
-    reason = "decoding steps deliberately rebind a working value as it is refined through the parse pipeline"
-)]
 use super::{
     ControlWord, Destination, MAX_SECTIONS, ParsedBodyStoryEvent, Parser, TextDirection, Token,
     is_section_control, nonnegative_author_index, paper_source_bin, parser_classification_error,
     require_parameterless, section_style_reference,
 };
 
-#[allow(
-    clippy::wildcard_enum_match_arm,
-    reason = "other controls are not page geometry"
-)]
 fn page_geometry_mask(control: &ControlWord<'_>) -> u8 {
     match control {
         ControlWord::PageWidth(_) | ControlWord::SectionPageWidth(_) => 1,
@@ -25,10 +17,6 @@ fn page_geometry_mask(control: &ControlWord<'_>) -> u8 {
     }
 }
 
-#[allow(
-    clippy::wildcard_enum_match_arm,
-    reason = "caller selects document geometry controls"
-)]
 fn apply_page_geometry(properties: &mut crate::SectionProperties, control: &ControlWord<'_>) {
     match control {
         ControlWord::PageWidth(v) => properties.page_width = *v,
@@ -43,10 +31,6 @@ fn apply_page_geometry(properties: &mut crate::SectionProperties, control: &Cont
 }
 
 impl Parser<'_> {
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn apply_review_display_control(
         &mut self,
         control: &ControlWord<'_>,
@@ -81,10 +65,6 @@ impl Parser<'_> {
         Ok(())
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn apply_document_view_control(
         &mut self,
         control: &ControlWord<'_>,
@@ -161,10 +141,6 @@ impl Parser<'_> {
         Ok(())
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn apply_document_hyphenation_control(
         &mut self,
         control: &ControlWord<'_>,
@@ -314,15 +290,6 @@ impl Parser<'_> {
         Ok(())
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "adjacent range checks bound each narrowing conversion to the target type's range"
-    )]
     pub(super) fn apply_section_control(
         &mut self,
         control: &ControlWord<'_>,
@@ -844,10 +811,6 @@ impl Parser<'_> {
         Ok(true)
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn parse_page_border_run(&mut self) -> crate::Result<crate::PageBorder> {
         let mut border = crate::PageBorder::default();
         let mut saw_style = false;

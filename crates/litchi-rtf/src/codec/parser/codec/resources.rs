@@ -1,8 +1,3 @@
-#![allow(
-    clippy::shadow_reuse,
-    clippy::shadow_unrelated,
-    reason = "decoding steps deliberately rebind a working value as it is refined through the parse pipeline"
-)]
 use super::{
     Color, ControlWord, Cow, DeferredText, EmbeddedFont, EmbeddedFontFormat, Font, FontCharset,
     FontFamily, FontPage, FontPitch, FontRef, FontTheme, HeaderItem, InfoTextField, InfoTimeField,
@@ -63,10 +58,6 @@ impl<'a> Parser<'a> {
         Err(crate::Error::UnexpectedEof)
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn parse_file_table_entry(&mut self) -> crate::Result<crate::FileTableEntry<'a>> {
         self.pos += 2; // opening brace and file
         let mut id = None;
@@ -893,10 +884,6 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse color table.
-    #[allow(
-        clippy::cast_sign_loss,
-        reason = "the clamp bounds each color component to the u8 range"
-    )]
     pub(super) fn parse_color_table(&mut self) -> crate::Result<()> {
         self.pos += 1; // Skip \colortbl
 
@@ -964,10 +951,6 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse the standard RTF `info` destination.
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn parse_info(&mut self) -> crate::Result<()> {
         if !self.header_items.claim(HeaderItem::Info) {
             return Err(crate::Error::MalformedDocument(

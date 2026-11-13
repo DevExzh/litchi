@@ -2,11 +2,6 @@
 
 //! RTF parser that builds document structure from tokens.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "items stay grouped by RTF feature area rather than by item kind"
-)]
-
 use super::super::lexer::{ControlWord, Token};
 use super::super::limits::SourceLimits;
 use super::super::types::{
@@ -381,10 +376,6 @@ fn append_transport_bytes(buffer: &mut impl Extend<u8>, text: &str) -> crate::Re
     Ok(())
 }
 
-#[allow(
-    clippy::wildcard_enum_match_arm,
-    reason = "remaining variants share the same fallback by design"
-)]
 fn control_symbol_text(control: &ControlWord<'_>) -> Option<&'static str> {
     match control {
         ControlWord::NonBreakingSpace => Some("\u{00A0}"),
@@ -656,10 +647,6 @@ enum ParsedBodyStoryEvent {
     RevisionDeletion(usize),
 }
 
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "independent RTF feature flags stay flat for direct access"
-)]
 /// Parser state for tracking formatting context.
 #[derive(Debug, Clone)]
 struct State {
@@ -841,11 +828,6 @@ fn is_section_control(control: &ControlWord<'_>) -> bool {
     )
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    reason = "adjacent range checks bound each narrowing conversion to the target type's range"
-)]
 fn apply_table_distance_side(
     distances: &mut crate::TableEdgeDistances,
     edge: crate::TableEdge,
@@ -930,11 +912,6 @@ fn table_indent_unit(parameter: Option<i32>) -> crate::Result<crate::TableIndent
         )),
     }
 }
-#[allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    reason = "the crate width constants are defined within the u16 range"
-)]
 fn resolve_preferred_width(
     unit: Option<crate::TablePreferredWidthUnit>,
     value: Option<i32>,
@@ -973,11 +950,6 @@ fn resolve_preferred_width(
         width_value,
     )?))
 }
-#[allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    reason = "the crate width constants are defined within the u16 range"
-)]
 fn resolve_invisible_width(
     unit: Option<crate::TablePreferredWidthUnit>,
     value: Option<i32>,
@@ -1062,11 +1034,6 @@ fn table_geometry_twips(parameter: Option<i32>, name: &str, signed: bool) -> cra
         )))
     }
 }
-#[allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    reason = "adjacent range checks bound each narrowing conversion to the target type's range"
-)]
 fn table_row_height(parameter: Option<i32>) -> crate::Result<crate::TableRowHeight> {
     let value = parameter.ok_or_else(|| {
         crate::Error::MalformedDocument("RTF trrh requires a parameter".to_string())
@@ -1124,11 +1091,6 @@ fn floating_table_offset(parameter: Option<i32>, negative: bool, axis: &str) -> 
     }
     Ok(value)
 }
-#[allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    reason = "adjacent range checks bound each narrowing conversion to the target type's range"
-)]
 fn floating_table_wrap_distance(parameter: Option<i32>) -> crate::Result<u16> {
     let value = parameter.ok_or_else(|| {
         crate::Error::MalformedDocument(
@@ -1391,11 +1353,6 @@ fn associated_toggle(value: Option<i32>, name: &str) -> crate::Result<bool> {
     }
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    reason = "adjacent range checks bound each narrowing conversion to the target type's range"
-)]
 fn associated_required_u16(raw_value: Option<i32>, name: &str, maximum: i32) -> crate::Result<u16> {
     let value = raw_value.ok_or_else(|| {
         crate::Error::MalformedDocument(format!("RTF {name} control requires a numeric parameter"))
@@ -1408,15 +1365,6 @@ fn associated_required_u16(raw_value: Option<i32>, name: &str, maximum: i32) -> 
     Ok(value as u16)
 }
 
-#[allow(
-    clippy::wildcard_enum_match_arm,
-    reason = "remaining variants share the same fallback by design"
-)]
-#[allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    reason = "adjacent range checks bound each narrowing conversion to the target type's range"
-)]
 fn apply_associated_character_control(
     formatting: &mut AssociatedCharacterFormatting,
     control: &ControlWord<'_>,
@@ -1590,10 +1538,6 @@ impl Default for State {
     }
 }
 
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "independent RTF feature flags stay flat for direct access"
-)]
 /// RTF Parser.
 pub(crate) struct Parser<'a> {
     /// Token stream
@@ -2355,10 +2299,6 @@ impl LegacyPropertiesBuilder {
         Ok(())
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     fn apply(&mut self, control: &ControlWord<'_>) -> crate::Result<bool> {
         match control {
             ControlWord::LegacyDrawingLineStyle(value) => {

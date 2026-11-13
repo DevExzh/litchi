@@ -50,15 +50,7 @@ impl Parser<'_> {
     /// group-nesting path and blow the stack after only a handful of levels.
     // The complexity is concentrated here intentionally so every destination
     // transition remains visible in one auditable protocol dispatch table.
-    #[allow(
-        clippy::cognitive_complexity,
-        reason = "destination dispatch keeps every state transition visible in one table"
-    )]
     #[inline(never)]
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn dispatch_group_destination(&mut self) -> crate::Result<bool> {
         if let Some(token) = self.tokens.get(self.pos) {
             match token {

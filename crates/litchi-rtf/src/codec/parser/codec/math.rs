@@ -113,10 +113,6 @@ impl<'a> Parser<'a> {
     }
 
     /// Map a structure control word to its structure kind.
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn math_structure_kind(
         control: &ControlWord<'_>,
     ) -> Option<crate::MathStructureKind> {
@@ -147,10 +143,6 @@ impl<'a> Parser<'a> {
     }
 
     /// Map a structure property-destination control to its kind.
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn math_structure_properties_kind(
         control: &ControlWord<'_>,
     ) -> Option<crate::MathStructureKind> {
@@ -181,10 +173,6 @@ impl<'a> Parser<'a> {
     }
 
     /// Map an argument control word to its element role.
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn math_element_role(control: &ControlWord<'_>) -> Option<crate::MathElementRole> {
         use crate::MathElementRole as R;
         use crate::lexer::ControlWord as C;
@@ -202,10 +190,6 @@ impl<'a> Parser<'a> {
     }
 
     /// Map a property control word to its name and numeric parameter.
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn math_property_name(
         control: &ControlWord<'_>,
     ) -> Option<(crate::MathPropertyName, Option<i32>)> {

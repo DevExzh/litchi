@@ -10,11 +10,6 @@
 //! resolves a namespace, follows a factoid, calls an action provider, or
 //! executes code.
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "items stay grouped by RTF SmartTag vocabulary"
-)]
-
 use std::borrow::Cow;
 
 pub(crate) const MAX_SMART_TAGS: usize = 65_536;

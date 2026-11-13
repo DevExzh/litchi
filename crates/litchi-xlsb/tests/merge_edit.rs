@@ -1,9 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "integration tests use panic-on-failure extraction"
-)]
-
 //! Merged ranges through the primary workbook transaction.
 
 use litchi_xlsb::Package;

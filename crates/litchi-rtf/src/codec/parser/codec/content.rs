@@ -13,10 +13,6 @@ impl<'a> Parser<'a> {
     /// table is large, and leaving it inline would charge its stack frame to
     /// every level of group nesting on the recursive path.
     #[inline(never)]
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn dispatch_content_control(
         &mut self,
         control: &ControlWord<'a>,

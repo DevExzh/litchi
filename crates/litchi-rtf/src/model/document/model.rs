@@ -2,15 +2,6 @@
 
 //! RTF document representation.
 
-#![allow(
-    clippy::shadow_reuse,
-    clippy::shadow_unrelated,
-    reason = "builder-style helpers deliberately rebind a working value as it is refined"
-)]
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "items stay grouped by RTF feature area rather than by item kind"
-)]
 use super::super::error::try_reserve_one;
 use super::super::lexer::Lexer;
 use super::super::limits::{OpenOptions, SourceLimits};
@@ -4395,10 +4386,6 @@ impl<'a> Tree<'a> {
         &self.body_boundaries
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub fn page_breaks(&self) -> impl Iterator<Item = &crate::PageBreak> {
         self.body_story_events
             .iter()
@@ -4412,10 +4399,6 @@ impl<'a> Tree<'a> {
     ///
     /// The markers are passive Galley-view layout metadata; no pagination is
     /// computed from them.
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub fn soft_breaks(&self) -> impl Iterator<Item = &crate::SoftBreak> {
         self.body_story_events
             .iter()
@@ -4429,10 +4412,6 @@ impl<'a> Tree<'a> {
     ///
     /// A boundary with `next_section == None` starts an inherited section that
     /// has no separately retained section definition.
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub fn section_breaks(&self) -> impl Iterator<Item = &crate::SectionBreak> {
         self.body_story_events
             .iter()
@@ -4461,10 +4440,6 @@ impl<'a> Tree<'a> {
             .retain(|event| !matches!(event, crate::BodyStoryEvent::PageBreak(_)));
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub fn column_breaks(&self) -> impl Iterator<Item = &crate::ColumnBreak> {
         self.body_story_events
             .iter()

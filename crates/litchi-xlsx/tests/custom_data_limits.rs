@@ -1,11 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::panic,
-    clippy::unwrap_used,
-    reason = "The bounded OPC fixtures are authored finite probes whose construction failures are test failures."
-)]
-
 //! Public host-limit coverage for the source-bound XLSX Custom Data owner.
 //!
 //! The XML and relationship members are written into a physical ZIP and then

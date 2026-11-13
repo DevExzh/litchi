@@ -1,8 +1,3 @@
-#![allow(
-    clippy::shadow_reuse,
-    clippy::shadow_unrelated,
-    reason = "decoding steps deliberately rebind a working value as it is refined through the parse pipeline"
-)]
 use super::{
     ControlWord, Cow, Destination, MAX_GROUP_NESTING_DEPTH, MAX_PICTURE_DATA_BYTES,
     ParsedBodyStoryEvent, Parser, Token, control_symbol_text,
@@ -102,10 +97,6 @@ impl<'a> Parser<'a> {
     ///
     /// Pictures in RTF have the format:
     /// {\pict\emfblip\picw<width>\pich<height>...<hex data>}
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn parse_picture(&mut self) -> crate::Result<()> {
         if self.pictures.len() >= crate::picture::MAX_PICTURES {
             return Err(crate::Error::MalformedDocument(

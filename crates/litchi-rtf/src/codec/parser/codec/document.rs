@@ -117,10 +117,6 @@ impl<'a> Parser<'a> {
         Err(crate::Error::UnexpectedEof)
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn parse_mail_merge_destination(&mut self) -> crate::Result<crate::MailMerge<'a>> {
         self.pos += 1; // ignorable-destination marker
         if !matches!(
@@ -365,10 +361,6 @@ impl<'a> Parser<'a> {
         )
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn parse_mail_merge_data_source_object(
         &mut self,
         depth: usize,
@@ -555,10 +547,6 @@ impl<'a> Parser<'a> {
         }
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn parse_mail_merge_field_mapping(
         &mut self,
         depth: usize,
@@ -704,10 +692,6 @@ impl<'a> Parser<'a> {
         }
     }
 
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "remaining variants share the same fallback by design"
-    )]
     pub(super) fn parse_math_properties_destination(
         &mut self,
     ) -> crate::Result<crate::DocumentMathProperties> {

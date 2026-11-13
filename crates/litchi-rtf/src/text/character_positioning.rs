@@ -141,11 +141,6 @@ impl Default for CharacterPositioning {
 }
 
 impl CharacterPositioning {
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "adjacent range checks bound each narrowing conversion to the target type's range"
-    )]
     fn bounded_nonnegative(value: i32, maximum: i32, name: &str) -> crate::Result<u16> {
         if !(0..=maximum).contains(&value) {
             return Err(crate::Error::MalformedDocument(format!(
@@ -195,10 +190,6 @@ impl CharacterPositioning {
         Ok(())
     }
 
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "adjacent range checks bound each narrowing conversion to the target type's range"
-    )]
     pub(crate) fn set_quarter_point_expansion(&mut self, value: i32) -> crate::Result<()> {
         if !(-MAX_CHARACTER_EXPANSION..=MAX_CHARACTER_EXPANSION).contains(&value) {
             return Err(crate::Error::MalformedDocument(
@@ -213,10 +204,6 @@ impl CharacterPositioning {
         Ok(())
     }
 
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "adjacent range checks bound each narrowing conversion to the target type's range"
-    )]
     pub(crate) fn set_twip_expansion(&mut self, value: i32) -> crate::Result<()> {
         if !(-MAX_CHARACTER_EXPANSION..=MAX_CHARACTER_EXPANSION).contains(&value) {
             return Err(crate::Error::MalformedDocument(
@@ -231,11 +218,6 @@ impl CharacterPositioning {
         Ok(())
     }
 
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "adjacent range checks bound each narrowing conversion to the target type's range"
-    )]
     pub(crate) fn set_scale(&mut self, value: i32) -> crate::Result<()> {
         if !(1..=MAX_CHARACTER_SCALE_PERCENT).contains(&value) {
             return Err(crate::Error::MalformedDocument(
@@ -254,10 +236,6 @@ impl CharacterPositioning {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "the crate scale constant is defined within the u16 range"
-    )]
     pub fn validate(&self) -> crate::Result<()> {
         match self.baseline {
             CharacterBaseline::RaisedHalfPoints(value)

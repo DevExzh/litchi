@@ -1,12 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::shadow_reuse,
-    clippy::shadow_same,
-    clippy::shadow_unrelated,
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design and rebind fixture names across steps"
-)]
-
 use litchi_rtf::raw::Tree;
 use litchi_rtf::{
     MAX_SECTION_LINE_GRID_TWIPS, Section, SectionDocumentGrid, SectionDocumentGridType,

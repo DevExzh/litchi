@@ -1,8 +1,3 @@
-#![allow(
-    clippy::print_stdout,
-    reason = "this command-line example intentionally prints its results"
-)]
-
 //! Parse the README's inline RTF snippet and inspect the resulting structure.
 //!
 //! Run from the workspace root:

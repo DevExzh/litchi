@@ -1,8 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    reason = "integration-test assertions panic on failure by design"
-)]
-
 use litchi_core::{TextOutputError, TextOutputLimitKind, TextOutputOptions};
 use litchi_rtf::Package;
 use std::io::{self, Write};

@@ -10,10 +10,6 @@ use thiserror::Error;
 /// during constant evaluation without a panicking constructor.
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "public API name is stable and used by dependent crates; renaming would be a breaking change"
-)]
 pub struct BoundedU32<const MIN: u32, const MAX: u32>(u32);
 
 impl<const MIN: u32, const MAX: u32> BoundedU32<MIN, MAX> {

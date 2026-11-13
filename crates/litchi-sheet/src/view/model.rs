@@ -236,10 +236,6 @@ impl From<Split> for f64 {
 /// Visibility settings grouped for a worksheet view.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[must_use]
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "the flags form one cohesive worksheet visibility configuration"
-)]
 pub struct Display {
     /// Whether worksheet window protection is enabled.
     pub window_protection: bool,

@@ -1,5 +1,4 @@
 //! RC4 authoring consumes caller-owned entropy, never ambient randomness.
-#![allow(clippy::unwrap_used, reason = "acceptance assertions fail fast")]
 use litchi_xls::{Builder, EncryptionEntropy, EncryptionProfile};
 
 fn builder(profile: EncryptionProfile) -> Builder {

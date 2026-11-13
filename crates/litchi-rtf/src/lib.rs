@@ -14,10 +14,6 @@
     )
 )]
 #![allow(
-    missing_docs,
-    reason = "the retained model vocabulary mirrors self-explanatory RTF specification names"
-)]
-#![allow(
     non_ascii_idents,
     reason = "zerocopy's wire-layout derives emit compiler-generated identifiers"
 )]
@@ -60,10 +56,6 @@
 //! # }
 //! ```
 
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "items stay grouped by RTF feature area rather than by item kind"
-)]
 mod api;
 pub mod builder;
 mod codec;

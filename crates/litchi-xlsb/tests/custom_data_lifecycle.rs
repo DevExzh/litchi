@@ -1,10 +1,3 @@
-#![allow(
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::unwrap_used,
-    reason = "Synthetic bounded OPC fixtures fail fast when their exact graph cannot be built."
-)]
-
 //! Public lifecycle coverage for the synthetic XLSB Custom Data profile.
 //!
 //! These fixtures are authored source/graph probes.  They make no claim that

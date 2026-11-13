@@ -260,10 +260,6 @@ impl Hasher for CachedHash {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    reason = "test assertions panic on failure by design"
-)]
 mod tests {
     use super::super::super::{CellPos, WritableCell};
     use super::*;
