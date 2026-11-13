@@ -46,6 +46,32 @@ struct Capture {
     writer: Writer<Vec<u8>>,
 }
 
+/// Where `parse_worksheet_scenarios` is relative to the root element.
+///
+/// ```text
+/// Prolog --XML declaration--> Declared
+/// Prolog --whitespace or comment--> Prolog (the declaration may still follow)
+/// Prolog | Declared --root start tag--> Open
+/// Prolog | Declared --empty-element root--> Closed
+/// Open --root end tag--> Closed
+/// Declared | Open | Closed --XML declaration--> refused
+/// Closed --start tag--> refused
+/// Closed --empty-element tag--> refused
+/// Closed --non-whitespace text--> refused
+/// Closed --CDATA--> refused
+/// Closed --processing instruction--> refused
+/// Closed --whitespace or comment--> Closed (ignored)
+/// ```
+///
+/// End of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Declared,
+    Open,
+    Closed,
+}
+
 /// Parses the direct worksheet `scenarios` child after applying shared MCE processing.
 pub fn parse_worksheet_scenarios(xml: &[u8]) -> Result<Option<Collection>> {
     if xml.len() > MAX_XML_BYTES {
@@ -66,9 +92,7 @@ pub fn parse_worksheet_scenarios(xml: &[u8]) -> Result<Option<Collection>> {
     let mut capture: Option<Capture> = None;
     let mut seen_scenarios = false;
     let mut depth = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
-    let mut declaration_seen = false;
+    let mut phase = RootPhase::Prolog;
     let mut events = 0usize;
 
     loop {
@@ -137,10 +161,10 @@ pub fn parse_worksheet_scenarios(xml: &[u8]) -> Result<Option<Collection>> {
         }
         match event {
             Event::Start(element) => {
-                if root_closed {
+                if phase == RootPhase::Closed {
                     return Err(invalid("worksheet XML contains content after root"));
                 }
-                if scopes.is_empty() && root_seen {
+                if scopes.is_empty() && matches!(phase, RootPhase::Open | RootPhase::Closed) {
                     return Err(invalid("worksheet XML contains multiple roots"));
                 }
                 let next_depth = depth
@@ -168,17 +192,17 @@ pub fn parse_worksheet_scenarios(xml: &[u8]) -> Result<Option<Collection>> {
                     &mut seen_scenarios,
                 )?;
                 if scopes.is_empty() {
-                    root_seen = true;
+                    phase = RootPhase::Open;
                 }
                 depth = next_depth;
                 scopes.push(scope);
             },
             Event::Empty(element) => {
-                if root_closed {
+                if phase == RootPhase::Closed {
                     return Err(invalid("worksheet XML contains content after root"));
                 }
                 if scopes.is_empty() {
-                    if root_seen {
+                    if matches!(phase, RootPhase::Open | RootPhase::Closed) {
                         return Err(invalid("worksheet XML contains multiple roots"));
                     }
                     let scope = begin_element(
@@ -190,8 +214,7 @@ pub fn parse_worksheet_scenarios(xml: &[u8]) -> Result<Option<Collection>> {
                         &mut seen_scenarios,
                     )?;
                     end_scope(scope, &mut state)?;
-                    root_seen = true;
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 } else {
                     if let Some(owner) = capture_owner(
                         scopes.last().copied(),
@@ -225,7 +248,7 @@ pub fn parse_worksheet_scenarios(xml: &[u8]) -> Result<Option<Collection>> {
                         {
                             return Err(invalid("mismatched worksheet end element"));
                         }
-                        root_closed = true;
+                        phase = RootPhase::Closed;
                     },
                     Scope::Collection => {
                         if namespace != NamespaceKind::Main
@@ -289,10 +312,10 @@ pub fn parse_worksheet_scenarios(xml: &[u8]) -> Result<Option<Collection>> {
                 return Err(invalid("worksheet XML CDATA is outside root"));
             },
             Event::Decl(_) => {
-                if root_seen || declaration_seen {
+                if phase != RootPhase::Prolog {
                     return Err(invalid("invalid worksheet XML declaration position"));
                 }
-                declaration_seen = true;
+                phase = RootPhase::Declared;
             },
             Event::DocType(_) | Event::PI(_) => {
                 return Err(invalid("DTD and processing instructions are rejected"));
@@ -302,8 +325,11 @@ pub fn parse_worksheet_scenarios(xml: &[u8]) -> Result<Option<Collection>> {
         }
         buffer.clear();
     }
-    if !root_seen || !root_closed || depth != 0 || !scopes.is_empty() {
-        return Err(invalid("unterminated worksheet XML"));
+    match phase {
+        RootPhase::Closed if depth == 0 && scopes.is_empty() => {},
+        RootPhase::Prolog | RootPhase::Declared | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("unterminated worksheet XML"));
+        },
     }
     state.map(finish_builder).transpose()
 }

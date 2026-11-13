@@ -24,12 +24,37 @@ enum Scope {
     Other,
 }
 
+/// Where the smart-tag `parse` is relative to the root element.
+///
+/// ```text
+/// Prolog --XML declaration--> Declared
+/// Prolog --whitespace or comment--> Prolog (the declaration may still follow)
+/// Prolog | Declared --root start tag--> Open
+/// Prolog | Declared --empty-element root--> Closed
+/// Open --root end tag--> Closed
+/// Declared | Open | Closed --XML declaration--> refused
+/// Closed --start tag--> refused
+/// Closed --empty-element tag--> refused
+/// Closed --non-whitespace text--> refused
+/// Closed --CDATA--> refused
+/// Closed --processing instruction--> refused
+/// Closed --whitespace or comment--> Closed (ignored)
+/// ```
+///
+/// End of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ParseRootPhase {
+    Prolog,
+    Declared,
+    Open,
+    Closed,
+}
+
 struct Parser {
     scopes: Vec<Scope>,
     cells: Vec<Cell>,
     seen: bool,
-    root_seen: bool,
-    root_closed: bool,
+    phase: ParseRootPhase,
 }
 
 /// Parse the direct worksheet `smartTags` collection after bounded MCE
@@ -53,10 +78,8 @@ pub fn parse(xml: &[u8]) -> Result<Option<Collection>> {
         scopes: Vec::new(),
         cells: Vec::new(),
         seen: false,
-        root_seen: false,
-        root_closed: false,
+        phase: ParseRootPhase::Prolog,
     };
-    let mut declaration_seen = false;
     loop {
         let decoder = reader.decoder();
         let event = reader.read_event().map_err(xml_error)?.into_owned();
@@ -84,10 +107,10 @@ pub fn parse(xml: &[u8]) -> Result<Option<Collection>> {
                 return Err(invalid("unexpected CDATA in smart-tag XML"));
             },
             Event::Decl(_) => {
-                if declaration_seen || parser.root_seen {
+                if parser.phase != ParseRootPhase::Prolog {
                     return Err(invalid("invalid smart-tag XML declaration position"));
                 }
-                declaration_seen = true;
+                parser.phase = ParseRootPhase::Declared;
             },
             Event::Eof => break,
             Event::CData(_)
@@ -97,8 +120,14 @@ pub fn parse(xml: &[u8]) -> Result<Option<Collection>> {
             | Event::GeneralRef(_) => {},
         }
     }
-    if !parser.scopes.is_empty() || !parser.root_seen || !parser.root_closed {
-        return Err(invalid("unterminated smart-tag worksheet XML"));
+    match parser.phase {
+        ParseRootPhase::Closed if parser.scopes.is_empty() => {},
+        ParseRootPhase::Prolog
+        | ParseRootPhase::Declared
+        | ParseRootPhase::Open
+        | ParseRootPhase::Closed => {
+            return Err(invalid("unterminated smart-tag worksheet XML"));
+        },
     }
     if !parser.seen {
         return Ok(None);
@@ -142,7 +171,7 @@ impl Parser {
     ) -> Result<()> {
         let scope = self.begin(namespace, element, decoder, resolver, true)?;
         match scope {
-            Scope::Worksheet => self.root_closed = true,
+            Scope::Worksheet => self.phase = ParseRootPhase::Closed,
             Scope::Collection => {
                 return Err(invalid("smartTags requires at least one cellSmartTags"));
             },
@@ -165,13 +194,13 @@ impl Parser {
         let local = element.local_name();
         let core = is_main(namespace);
         if self.scopes.is_empty() {
-            if self.root_seen || self.root_closed {
+            if matches!(self.phase, ParseRootPhase::Open | ParseRootPhase::Closed) {
                 return Err(invalid("smart-tag XML contains multiple roots"));
             }
             if !core || local.as_ref() != b"worksheet" {
                 return Err(invalid("smart-tag parser requires a worksheet root"));
             }
-            self.root_seen = true;
+            self.phase = ParseRootPhase::Open;
             if empty {
                 return Ok(Scope::Worksheet);
             }
@@ -231,7 +260,7 @@ impl Parser {
             .pop()
             .ok_or_else(|| invalid("unexpected smart-tag end element"))?;
         match scope {
-            Scope::Worksheet if local == b"worksheet" => self.root_closed = true,
+            Scope::Worksheet if local == b"worksheet" => self.phase = ParseRootPhase::Closed,
             Scope::Collection if local == b"smartTags" => {},
             Scope::Cell if local == b"cellSmartTags" => {},
             Scope::Tag if local == b"cellSmartTag" => {},
@@ -339,6 +368,29 @@ struct Location {
     insertion: usize,
 }
 
+/// Where the smart-tag `locate` scan is relative to the root element.
+///
+/// ```text
+/// Prolog --root start tag--> Open
+/// Prolog --empty-element root--> refused
+/// Open --root end tag--> Closed
+/// any phase --XML declaration--> unchanged (accepted anywhere, any number)
+/// Closed --start tag--> refused
+/// Closed --empty-element tag--> refused
+/// Closed --non-whitespace text--> refused
+/// Closed --CDATA--> Closed (ignored)
+/// Closed --processing instruction--> refused
+/// Closed --whitespace or comment--> Closed (ignored)
+/// ```
+///
+/// End of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum LocateRootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 fn locate(xml: &[u8]) -> Result<Location> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("smart-tag worksheet XML exceeds the size limit"));
@@ -348,8 +400,7 @@ fn locate(xml: &[u8]) -> Result<Location> {
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = LocateRootPhase::Prolog;
     let mut conformance = None;
     let mut start = None;
     let mut span = None;
@@ -368,11 +419,13 @@ fn locate(xml: &[u8]) -> Result<Location> {
         match event {
             Event::Start(element) => {
                 if depth == 0 {
-                    if root_seen || element.local_name().as_ref() != b"worksheet" {
+                    if phase != LocateRootPhase::Prolog
+                        || element.local_name().as_ref() != b"worksheet"
+                    {
                         return Err(invalid("smart-tag parser requires one worksheet root"));
                     }
                     conformance = Some(conformance_of(&namespace)?);
-                    root_seen = true;
+                    phase = LocateRootPhase::Open;
                 } else if depth == 1 && is_main(&namespace) {
                     let local = element.local_name();
                     if local.as_ref() == b"smartTags" {
@@ -419,7 +472,7 @@ fn locate(xml: &[u8]) -> Result<Location> {
                         return Err(invalid("mismatched worksheet closing element"));
                     }
                     insertion.get_or_insert(event_start);
-                    root_closed = true;
+                    phase = LocateRootPhase::Closed;
                 }
             },
             Event::Text(text)
@@ -437,8 +490,11 @@ fn locate(xml: &[u8]) -> Result<Location> {
             | Event::GeneralRef(_) => {},
         }
     }
-    if depth != 0 || !root_seen || !root_closed || start.is_some() {
-        return Err(invalid("unterminated smart-tag worksheet XML"));
+    match phase {
+        LocateRootPhase::Closed if depth == 0 && start.is_none() => {},
+        LocateRootPhase::Prolog | LocateRootPhase::Open | LocateRootPhase::Closed => {
+            return Err(invalid("unterminated smart-tag worksheet XML"));
+        },
     }
     Ok(Location {
         conformance: conformance.ok_or_else(|| invalid("missing worksheet conformance"))?,

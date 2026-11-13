@@ -97,6 +97,32 @@ struct Parser {
     seen_properties: bool,
 }
 
+/// Where `parse_phonetic_properties` is relative to the root element.
+///
+/// ```text
+/// Prolog --XML declaration--> Declared
+/// Prolog --whitespace or comment--> Prolog (the declaration may still follow)
+/// Prolog | Declared --root start tag--> Open
+/// Prolog | Declared --empty-element root--> refused
+/// Open --root end tag--> Closed
+/// Declared | Open | Closed --XML declaration--> refused
+/// Closed --start tag--> refused
+/// Closed --empty-element tag--> refused
+/// Closed --non-whitespace text--> refused
+/// Closed --CDATA--> refused
+/// Closed --processing instruction--> refused
+/// Closed --whitespace or comment--> Closed (ignored)
+/// ```
+///
+/// End of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Declared,
+    Open,
+    Closed,
+}
+
 /// Parse the worksheet's exact `worksheet/phoneticPr` child path.
 pub fn parse_phonetic_properties(xml: &[u8]) -> Result<Option<PhoneticProperties>> {
     if xml.len() > MAX_XML_BYTES {
@@ -120,9 +146,7 @@ pub fn parse_phonetic_properties(xml: &[u8]) -> Result<Option<PhoneticProperties
         properties: None,
         seen_properties: false,
     };
-    let mut root_seen = false;
-    let mut root_closed = false;
-    let mut declaration_seen = false;
+    let mut phase = RootPhase::Prolog;
     let mut events = 0usize;
     loop {
         events = events
@@ -138,10 +162,10 @@ pub fn parse_phonetic_properties(xml: &[u8]) -> Result<Option<PhoneticProperties
         let (namespace, event) = resolver.resolve_event(event);
         match event {
             Event::Start(element) => {
-                if root_closed {
+                if phase == RootPhase::Closed {
                     return Err(invalid("worksheet XML contains content after root"));
                 }
-                if parser.stack.is_empty() && root_seen {
+                if parser.stack.is_empty() && matches!(phase, RootPhase::Open | RootPhase::Closed) {
                     return Err(invalid("worksheet XML contains multiple roots"));
                 }
                 if parser.stack.len() >= MAX_DEPTH {
@@ -150,14 +174,14 @@ pub fn parse_phonetic_properties(xml: &[u8]) -> Result<Option<PhoneticProperties
                 let was_root = parser.stack.is_empty();
                 parser.start(&namespace, &element, decoder, &resolver)?;
                 if was_root {
-                    root_seen = true;
+                    phase = RootPhase::Open;
                 }
             },
             Event::Empty(element) => parser.empty(&namespace, &element, decoder, &resolver)?,
             Event::End(element) => {
                 parser.end(element.local_name().as_ref())?;
                 if parser.stack.is_empty() {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
             },
             Event::Text(text)
@@ -167,8 +191,7 @@ pub fn parse_phonetic_properties(xml: &[u8]) -> Result<Option<PhoneticProperties
                 return Err(invalid("unexpected text in worksheet phoneticPr"));
             },
             Event::Text(text) => {
-                if (!root_seen || root_closed) && !text.as_ref().iter().all(u8::is_ascii_whitespace)
-                {
+                if phase != RootPhase::Open && !text.as_ref().iter().all(u8::is_ascii_whitespace) {
                     return Err(invalid("worksheet XML text is outside root"));
                 }
                 if parser.parent() == Context::Worksheet
@@ -180,14 +203,14 @@ pub fn parse_phonetic_properties(xml: &[u8]) -> Result<Option<PhoneticProperties
             Event::CData(_) if parser.parent() == Context::PhoneticProperties => {
                 return Err(invalid("unexpected CDATA in worksheet phoneticPr"));
             },
-            Event::CData(_) if !root_seen || root_closed => {
+            Event::CData(_) if phase != RootPhase::Open => {
                 return Err(invalid("worksheet XML CDATA is outside root"));
             },
             Event::CData(_) if parser.parent() == Context::Worksheet => {
                 return Err(invalid("worksheet cannot contain direct CDATA"));
             },
             Event::GeneralRef(_) => {
-                if !root_seen || root_closed {
+                if phase != RootPhase::Open {
                     return Err(invalid("worksheet XML entity is outside root"));
                 }
                 if parser.parent() == Context::Worksheet
@@ -197,17 +220,20 @@ pub fn parse_phonetic_properties(xml: &[u8]) -> Result<Option<PhoneticProperties
                 }
             },
             Event::Decl(_) => {
-                if root_seen || declaration_seen {
+                if phase != RootPhase::Prolog {
                     return Err(invalid("invalid worksheet XML declaration position"));
                 }
-                declaration_seen = true;
+                phase = RootPhase::Declared;
             },
             Event::Eof => break,
             Event::CData(_) | Event::Comment(_) | Event::PI(_) | Event::DocType(_) => {},
         }
     }
-    if !root_seen || !root_closed || !parser.stack.is_empty() {
-        return Err(invalid("unterminated worksheet phoneticPr XML"));
+    match phase {
+        RootPhase::Closed if parser.stack.is_empty() => {},
+        RootPhase::Prolog | RootPhase::Declared | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("unterminated worksheet phoneticPr XML"));
+        },
     }
     Ok(parser.properties)
 }

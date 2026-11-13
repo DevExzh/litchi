@@ -67,6 +67,28 @@ enum XmlOwner {
     Worksheet,
 }
 
+/// Whether the validator has admitted an element yet.
+///
+/// ```text
+/// Prolog --element admitted (start or empty form)--> Rooted
+/// Rooted --nested element admitted--> Rooted
+/// Rooted --later top-level element--> Rooted   (accepted: validated like the
+///                                               first root, so a second
+///                                               `workbook` or `worksheet` root
+///                                               is admitted)
+/// any phase --XML declaration, comment or processing instruction--> unchanged
+/// any phase --DOCTYPE--> refused
+/// ```
+///
+/// Text and CDATA outside every element are refused unless they are
+/// whitespace. End of input is accepted only in `Rooted` with every
+/// element closed.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Rooted,
+}
+
 /// Validation state for the shared source traversal.
 ///
 /// The state owns only the local element names required by the existing
@@ -82,7 +104,7 @@ struct Validator {
     /// is open. Inside such a subtree nothing is modelled, so every element,
     /// namespace, attribute and text node is admitted.
     copied_from: Option<usize>,
-    saw_root: bool,
+    root: RootPhase,
     first_error: Option<Error>,
 }
 
@@ -94,7 +116,7 @@ impl Validator {
             elements: Vec::new(),
             dialect: None,
             copied_from: None,
-            saw_root: false,
+            root: RootPhase::Prolog,
             first_error: None,
         }
     }
@@ -107,7 +129,7 @@ impl Validator {
             self.first_error = Some(error);
             return false;
         }
-        if matches!(event, Event::Eof) && (!self.saw_root || self.depth != 0) {
+        if matches!(event, Event::Eof) && (self.root == RootPhase::Prolog || self.depth != 0) {
             self.first_error = Some(invalid("value-only XML has no complete root element"));
             return false;
         }
@@ -140,7 +162,12 @@ impl Validator {
                     &mut self.dialect,
                     inside_copied,
                 )?;
-                self.saw_root = true;
+                match self.root {
+                    RootPhase::Prolog => self.root = RootPhase::Rooted,
+                    // Nested elements, and a later top-level element that
+                    // `validate_element` admitted like the first root.
+                    RootPhase::Rooted => {},
+                }
                 if admission == Admission::Copied && self.copied_from.is_none() {
                     self.copied_from = Some(self.depth);
                 }
@@ -174,7 +201,12 @@ impl Validator {
                     &mut self.dialect,
                     inside_copied,
                 )?;
-                self.saw_root = true;
+                match self.root {
+                    RootPhase::Prolog => self.root = RootPhase::Rooted,
+                    // Nested elements, and a later top-level empty element
+                    // that `validate_element` admitted like the first root.
+                    RootPhase::Rooted => {},
+                }
             },
             Event::End(element) => {
                 self.depth = self
@@ -254,10 +286,12 @@ impl Validator {
         if let Some(error) = self.first_error {
             return Err(error);
         }
-        if !self.saw_root || self.depth != 0 {
-            return Err(invalid("value-only XML has no complete root element"));
+        match self.root {
+            RootPhase::Rooted if self.depth == 0 => Ok(()),
+            RootPhase::Prolog | RootPhase::Rooted => {
+                Err(invalid("value-only XML has no complete root element"))
+            },
         }
-        Ok(())
     }
 }
 

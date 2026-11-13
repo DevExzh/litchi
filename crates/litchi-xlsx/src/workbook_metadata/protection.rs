@@ -207,12 +207,34 @@ fn write_xml_attribute(xml: &mut String, name: &str, value: &str) -> Result<()> 
     Ok(())
 }
 
+/// Where the `workbookProtection` reader is relative to the root element.
+///
+/// ```text
+/// Prolog --root start tag--> Open
+/// Prolog --empty-element root--> Closed
+/// Open --root end tag--> Closed
+/// any phase --XML declaration--> unchanged (accepted anywhere, any number)
+/// Closed --start tag--> refused
+/// Closed --empty-element tag--> refused
+/// Closed --non-whitespace text--> Closed (ignored)
+/// Closed --CDATA--> Closed (ignored)
+/// Closed --processing instruction--> Closed (ignored)
+/// Closed --whitespace or comment--> Closed (ignored)
+/// ```
+///
+/// End of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 fn parse_selected(xml: &[u8]) -> Result<Option<Metadata>> {
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut protection = None;
     let mut protection_depth = None;
 
@@ -230,15 +252,14 @@ fn parse_selected(xml: &[u8]) -> Result<Option<Metadata>> {
                     return Err(invalid("workbook XML is too deep"));
                 }
                 if depth == 1 {
-                    if root_seen
-                        || root_closed
+                    if phase != RootPhase::Prolog
                         || !is_spreadsheetml_name(&namespace, element.name(), b"workbook")
                     {
                         return Err(invalid(
                             "workbook protection parser requires a SpreadsheetML workbook root",
                         ));
                     }
-                    root_seen = true;
+                    phase = RootPhase::Open;
                     continue;
                 }
                 if protection_depth.is_some() {
@@ -257,16 +278,14 @@ fn parse_selected(xml: &[u8]) -> Result<Option<Metadata>> {
                 }
             },
             Event::Empty(element) if depth == 0 => {
-                if root_seen
-                    || root_closed
+                if phase != RootPhase::Prolog
                     || !is_spreadsheetml_name(&namespace, element.name(), b"workbook")
                 {
                     return Err(invalid(
                         "workbook protection parser requires a SpreadsheetML workbook root",
                     ));
                 }
-                root_seen = true;
-                root_closed = true;
+                phase = RootPhase::Closed;
             },
             Event::Empty(element) => {
                 if protection_depth.is_some() {
@@ -302,16 +321,16 @@ fn parse_selected(xml: &[u8]) -> Result<Option<Metadata>> {
                     if !is_spreadsheetml_name(&namespace, element.name(), b"workbook") {
                         return Err(invalid("workbook XML has an invalid root closing element"));
                     }
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
                 depth -= 1;
             },
-            Event::Eof
-                if !root_seen || !root_closed || depth != 0 || protection_depth.is_some() =>
-            {
-                return Err(invalid("workbook XML is incomplete"));
+            Event::Eof => match phase {
+                RootPhase::Closed if depth == 0 && protection_depth.is_none() => break,
+                RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+                    return Err(invalid("workbook XML is incomplete"));
+                },
             },
-            Event::Eof => break,
             Event::Text(_)
             | Event::CData(_)
             | Event::Comment(_)

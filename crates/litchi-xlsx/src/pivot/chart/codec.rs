@@ -13,6 +13,29 @@ use quick_xml::events::Event;
 use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 
+/// Where `parse_binding` is relative to the root element.
+///
+/// ```text
+/// Prolog --root start tag--> Open
+/// Prolog --empty-element root--> refused
+/// Open --root end tag--> Closed
+/// any phase --XML declaration--> unchanged (accepted anywhere, any number)
+/// Closed --start tag--> refused
+/// Closed --empty-element tag--> refused
+/// Closed --non-whitespace text--> Closed (ignored)
+/// Closed --CDATA--> Closed (ignored)
+/// Closed --processing instruction--> refused
+/// Closed --whitespace or comment--> Closed (ignored)
+/// ```
+///
+/// End of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 /// Parse the pivot-chart payload of one chart part.
 ///
 /// Returns `Ok(None)` for ordinary charts that have no `c:pivotSource`.
@@ -27,8 +50,7 @@ pub fn parse_binding(xml: &[u8]) -> Result<Option<Binding>> {
     let mut reader = NsReader::from_reader(xml.as_ref());
     let mut state = BindingState::default();
     let mut stack: Vec<Context> = Vec::new();
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     loop {
         let event = reader.read_event().map_err(xml_error)?.into_owned();
         let resolver = reader.resolver().clone();
@@ -36,16 +58,16 @@ pub fn parse_binding(xml: &[u8]) -> Result<Option<Binding>> {
         let decoder = reader.decoder();
         match event {
             Event::Start(element) => {
-                if root_closed {
+                if phase == RootPhase::Closed {
                     return Err(invalid("content after pivot-chart root"));
                 }
                 if stack.is_empty() {
-                    if root_seen
+                    if phase != RootPhase::Prolog
                         || !is_drawingml_chart_name(&namespace, element.name(), b"chartSpace")
                     {
                         return Err(invalid("expected c:chartSpace root"));
                     }
-                    root_seen = true;
+                    phase = RootPhase::Open;
                     stack.push(Context::ChartSpace);
                     continue;
                 }
@@ -56,7 +78,7 @@ pub fn parse_binding(xml: &[u8]) -> Result<Option<Binding>> {
                 }
             },
             Event::Empty(element) => {
-                if root_closed {
+                if phase == RootPhase::Closed {
                     return Err(invalid("content after pivot-chart root"));
                 }
                 if stack.is_empty() {
@@ -70,10 +92,10 @@ pub fn parse_binding(xml: &[u8]) -> Result<Option<Binding>> {
                 };
                 finalize_end(context, &mut state)?;
                 if stack.is_empty() {
-                    if context != Context::ChartSpace || !root_seen {
+                    if context != Context::ChartSpace || phase == RootPhase::Prolog {
                         return Err(invalid("mismatched pivot-chart root"));
                     }
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
             },
             Event::Text(text) if stack.last() == Some(&Context::PivotSourceName) => {
@@ -96,8 +118,11 @@ pub fn parse_binding(xml: &[u8]) -> Result<Option<Binding>> {
             | Event::GeneralRef(_) => {},
         }
     }
-    if !root_seen || !root_closed || !stack.is_empty() {
-        return Err(invalid("incomplete pivot-chart XML"));
+    match phase {
+        RootPhase::Closed if stack.is_empty() => {},
+        RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("incomplete pivot-chart XML"));
+        },
     }
     Ok(state.source.map(|source| Binding {
         source,

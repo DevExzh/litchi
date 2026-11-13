@@ -162,6 +162,32 @@ fn push_scan_range(ranges: &mut Vec<ByteRange<usize>>, range: ByteRange<usize>) 
     Ok(())
 }
 
+/// Where `scan_data_validation_xml` is relative to the root element.
+///
+/// ```text
+/// Prolog --XML declaration--> Declared
+/// Prolog --whitespace or comment--> Prolog (the declaration may still follow)
+/// Prolog | Declared --root start tag--> Open
+/// Prolog | Declared --empty-element root--> refused
+/// Open --root end tag--> Closed
+/// Declared | Open | Closed --XML declaration--> refused
+/// Closed --start tag--> refused
+/// Closed --empty-element tag--> refused
+/// Closed --non-whitespace text--> refused
+/// Closed --CDATA--> refused
+/// Closed --processing instruction--> refused
+/// Closed --whitespace or comment--> Closed (ignored)
+/// ```
+///
+/// End of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Declared,
+    Open,
+    Closed,
+}
+
 fn scan_data_validation_xml(xml: &[u8]) -> Result<XmlScan> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("data-validation worksheet XML is too large"));
@@ -183,9 +209,7 @@ fn scan_data_validation_xml(xml: &[u8]) -> Result<XmlScan> {
     let mut matching_ext_close = None;
     let mut ext_lst_depth = None;
     let mut ext_lst_close = None;
-    let mut root_seen = false;
-    let mut root_closed = false;
-    let mut declaration_seen = false;
+    let mut phase = RootPhase::Prolog;
     let mut events = 0usize;
     let mut nodes = 0usize;
     loop {
@@ -217,10 +241,10 @@ fn scan_data_validation_xml(xml: &[u8]) -> Result<XmlScan> {
         }
         match event {
             Event::Start(element) => {
-                if root_closed {
+                if phase == RootPhase::Closed {
                     return Err(invalid("worksheet XML contains content after root"));
                 }
-                if depth == 0 && root_seen {
+                if depth == 0 && matches!(phase, RootPhase::Open | RootPhase::Closed) {
                     return Err(invalid("worksheet XML contains multiple roots"));
                 }
                 if depth >= MAX_DEPTH {
@@ -245,7 +269,7 @@ fn scan_data_validation_xml(xml: &[u8]) -> Result<XmlScan> {
                     if conformance.is_none() || local.as_ref() != b"worksheet" {
                         return Err(invalid("invalid worksheet namespace"));
                     }
-                    root_seen = true;
+                    phase = RootPhase::Open;
                 } else if depth == 2 {
                     if local.as_ref() == b"dataValidations" && !spreadsheet(&namespace) {
                         return Err(invalid("spoofed dataValidations element namespace"));
@@ -284,7 +308,7 @@ fn scan_data_validation_xml(xml: &[u8]) -> Result<XmlScan> {
                 }
             },
             Event::Empty(element) => {
-                if root_closed || depth == 0 {
+                if phase == RootPhase::Closed || depth == 0 {
                     return Err(invalid("worksheet XML contains an element outside root"));
                 }
                 let local = element.local_name();
@@ -345,7 +369,7 @@ fn scan_data_validation_xml(xml: &[u8]) -> Result<XmlScan> {
                     if !spreadsheet(&namespace) {
                         return Err(invalid("invalid worksheet closing namespace"));
                     }
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                     worksheet_close = Some(start);
                 } else if depth == 1 {
                     return Err(invalid("invalid worksheet closing element"));
@@ -355,9 +379,7 @@ fn scan_data_validation_xml(xml: &[u8]) -> Result<XmlScan> {
                     .ok_or_else(|| invalid("worksheet XML nesting underflow"))?;
             },
             Event::Text(value) => {
-                if (!root_seen || root_closed)
-                    && !value.as_ref().iter().all(u8::is_ascii_whitespace)
-                {
+                if phase != RootPhase::Open && !value.as_ref().iter().all(u8::is_ascii_whitespace) {
                     return Err(invalid("worksheet XML text is outside root"));
                 }
                 if depth == 1 && !value.as_ref().iter().all(u8::is_ascii_whitespace) {
@@ -371,10 +393,10 @@ fn scan_data_validation_xml(xml: &[u8]) -> Result<XmlScan> {
                 decode_xml_reference(&reference)?;
             },
             Event::Decl(_) => {
-                if root_seen || declaration_seen {
+                if phase != RootPhase::Prolog {
                     return Err(invalid("invalid worksheet XML declaration position"));
                 }
-                declaration_seen = true;
+                phase = RootPhase::Declared;
             },
             Event::DocType(_) | Event::PI(_) => {
                 return Err(invalid("DTD and processing instructions are rejected"));
@@ -383,8 +405,11 @@ fn scan_data_validation_xml(xml: &[u8]) -> Result<XmlScan> {
             Event::Eof => break,
         }
     }
-    if !root_seen || !root_closed || depth != 0 || core_start.is_some() || x14_start.is_some() {
-        return Err(invalid("incomplete worksheet data-validation XML"));
+    match phase {
+        RootPhase::Closed if depth == 0 && core_start.is_none() && x14_start.is_none() => {},
+        RootPhase::Prolog | RootPhase::Declared | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("incomplete worksheet data-validation XML"));
+        },
     }
     let worksheet_close = worksheet_close.ok_or_else(|| invalid("worksheet is not closed"))?;
     Ok(XmlScan {

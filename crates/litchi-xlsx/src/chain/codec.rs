@@ -106,6 +106,29 @@ pub fn read(xml: &[u8]) -> Result<Chain> {
     read_with_projection(xml).map(|(chain, _)| chain)
 }
 
+/// Where `read_with_projection` is relative to the root element.
+///
+/// ```text
+/// Prolog --root start tag--> Open
+/// Prolog --empty-element root--> Closed (refused later: a chain needs a cell)
+/// Open --root end tag--> Closed
+/// any phase --XML declaration--> unchanged (accepted anywhere, any number)
+/// Closed --start tag--> refused
+/// Closed --empty-element tag--> refused
+/// Closed --non-whitespace text--> refused
+/// Closed --CDATA--> refused
+/// Closed --processing instruction--> refused
+/// Closed --whitespace or comment--> Closed (ignored)
+/// ```
+///
+/// End of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 pub(crate) fn read_with_projection(xml: &[u8]) -> Result<(Chain, bool)> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid(format!(
@@ -127,8 +150,7 @@ pub(crate) fn read_with_projection(xml: &[u8]) -> Result<(Chain, bool)> {
     reader.config_mut().trim_text(false);
     let mut builder = Builder::default();
     let mut current_sheet = None;
-    let mut saw_root = false;
-    let mut closed_root = false;
+    let mut phase = RootPhase::Prolog;
     let mut saw_extensions = false;
     loop {
         let start = position(&reader, origin)?;
@@ -140,19 +162,18 @@ pub(crate) fn read_with_projection(xml: &[u8]) -> Result<(Chain, bool)> {
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
-            Event::Start(element) if !saw_root => {
-                validate_root(&namespace, &element, closed_root)?;
-                saw_root = true;
+            Event::Start(element) if phase == RootPhase::Prolog => {
+                validate_root(&namespace, &element)?;
+                phase = RootPhase::Open;
                 parse_root_attributes(&element, decoder, &resolver, &mut builder)?;
             },
-            Event::Empty(element) if !saw_root => {
-                validate_root(&namespace, &element, closed_root)?;
-                saw_root = true;
-                closed_root = true;
+            Event::Empty(element) if phase == RootPhase::Prolog => {
+                validate_root(&namespace, &element)?;
+                phase = RootPhase::Closed;
                 parse_root_attributes(&element, decoder, &resolver, &mut builder)?;
             },
             Event::Empty(element)
-                if saw_root && !closed_root && is_name(&namespace, &element, b"c") =>
+                if phase == RootPhase::Open && is_name(&namespace, &element, b"c") =>
             {
                 if saw_extensions {
                     return Err(invalid("calculation cells must precede extLst"));
@@ -162,7 +183,7 @@ pub(crate) fn read_with_projection(xml: &[u8]) -> Result<(Chain, bool)> {
                 push_cell(&mut builder, cell)?;
             },
             Event::Start(element)
-                if saw_root && !closed_root && is_name(&namespace, &element, b"c") =>
+                if phase == RootPhase::Open && is_name(&namespace, &element, b"c") =>
             {
                 if saw_extensions {
                     return Err(invalid("calculation cells must precede extLst"));
@@ -174,7 +195,7 @@ pub(crate) fn read_with_projection(xml: &[u8]) -> Result<(Chain, bool)> {
                 push_cell(&mut builder, cell)?;
             },
             Event::Empty(element)
-                if saw_root && !closed_root && is_name(&namespace, &element, b"extLst") =>
+                if phase == RootPhase::Open && is_name(&namespace, &element, b"extLst") =>
             {
                 if std::mem::replace(&mut saw_extensions, true) {
                     return Err(invalid("duplicate calculation-chain extLst"));
@@ -183,7 +204,7 @@ pub(crate) fn read_with_projection(xml: &[u8]) -> Result<(Chain, bool)> {
                 builder.extension_list_xml = Some(raw_range(bytes, start, end)?);
             },
             Event::Start(element)
-                if saw_root && !closed_root && is_name(&namespace, &element, b"extLst") =>
+                if phase == RootPhase::Open && is_name(&namespace, &element, b"extLst") =>
             {
                 if std::mem::replace(&mut saw_extensions, true) {
                     return Err(invalid("duplicate calculation-chain extLst"));
@@ -191,16 +212,16 @@ pub(crate) fn read_with_projection(xml: &[u8]) -> Result<(Chain, bool)> {
                 let end = consume_extension_list(&mut reader, origin, start)?;
                 builder.extension_list_xml = Some(raw_range(bytes, start, end)?);
             },
-            Event::Start(element) | Event::Empty(element) if saw_root && !closed_root => {
+            Event::Start(element) | Event::Empty(element) if phase == RootPhase::Open => {
                 return Err(invalid(format!(
                     "unexpected calculation-chain child '{}'",
                     String::from_utf8_lossy(element.local_name().as_ref())
                 )));
             },
             Event::End(element)
-                if saw_root && !closed_root && element.local_name().as_ref() == b"calcChain" =>
+                if phase == RootPhase::Open && element.local_name().as_ref() == b"calcChain" =>
             {
-                closed_root = true;
+                phase = RootPhase::Closed;
             },
             Event::Text(text)
                 if text
@@ -225,8 +246,11 @@ pub(crate) fn read_with_projection(xml: &[u8]) -> Result<(Chain, bool)> {
             },
         }
     }
-    if !saw_root || !closed_root {
-        return Err(invalid("calculation-chain XML has no complete root"));
+    match phase {
+        RootPhase::Closed => {},
+        RootPhase::Prolog | RootPhase::Open => {
+            return Err(invalid("calculation-chain XML has no complete root"));
+        },
     }
     Ok((builder.finish()?, projected))
 }
@@ -258,12 +282,8 @@ fn preflight_raw_attributes(xml: &[u8]) -> Result<()> {
         }
     }
 }
-fn validate_root(
-    namespace: &ResolveResult<'_>,
-    element: &BytesStart<'_>,
-    closed: bool,
-) -> Result<()> {
-    if closed || !is_name(namespace, element, b"calcChain") {
+fn validate_root(namespace: &ResolveResult<'_>, element: &BytesStart<'_>) -> Result<()> {
+    if !is_name(namespace, element, b"calcChain") {
         return Err(invalid(
             "calculation-chain XML has an invalid or trailing root",
         ));

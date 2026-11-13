@@ -396,6 +396,32 @@ impl StrictWorksheetElement {
     }
 }
 
+/// Where `ensure_strict_worksheet_surface` is relative to the root element.
+///
+/// ```text
+/// Prolog --XML declaration--> Declared
+/// Prolog | Declared --root start tag--> Open
+/// Prolog | Declared --empty-element root--> Closed
+/// Open --root end tag--> Closed
+/// Declared | Open | Closed --XML declaration--> refused
+/// Closed --start tag--> refused
+/// Closed --empty-element tag--> refused
+/// Closed --non-whitespace text--> refused
+/// Closed --CDATA--> refused
+/// Closed --processing instruction--> refused
+/// Closed --whitespace--> Closed (ignored)
+/// Closed --comment--> refused
+/// ```
+///
+/// End of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Declared,
+    Open,
+    Closed,
+}
+
 /// Validate the complete original worksheet XML surface accepted by the
 /// narrow scalar-transfer contract.
 ///
@@ -419,9 +445,7 @@ fn ensure_strict_worksheet_surface(xml: &[u8]) -> Result<()> {
     let mut buffer = Vec::new();
     let mut stack = Vec::new();
     let mut events = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
-    let mut declaration_seen = false;
+    let mut phase = RootPhase::Prolog;
 
     loop {
         events = events
@@ -437,10 +461,10 @@ fn ensure_strict_worksheet_surface(xml: &[u8]) -> Result<()> {
             .map_err(|error| invalid(format!("invalid worksheet XML: {error}")))?;
         match event {
             Event::Start(element) => {
-                if root_closed {
+                if phase == RootPhase::Closed {
                     return Err(invalid("worksheet XML contains content after root"));
                 }
-                if stack.is_empty() && root_seen {
+                if stack.is_empty() && matches!(phase, RootPhase::Open | RootPhase::Closed) {
                     return Err(invalid("worksheet XML contains multiple roots"));
                 }
                 if stack.len() >= MAX_STRICT_WORKSHEET_DEPTH {
@@ -461,13 +485,15 @@ fn ensure_strict_worksheet_surface(xml: &[u8]) -> Result<()> {
                     .try_reserve(1)
                     .map_err(|source| allocation("strict worksheet element stack", source))?;
                 stack.push(kind);
-                root_seen |= stack.len() == 1;
+                if stack.len() == 1 {
+                    phase = RootPhase::Open;
+                }
             },
             Event::Empty(element) => {
-                if root_closed {
+                if phase == RootPhase::Closed {
                     return Err(invalid("worksheet XML contains content after root"));
                 }
-                if stack.is_empty() && root_seen {
+                if stack.is_empty() && matches!(phase, RootPhase::Open | RootPhase::Closed) {
                     return Err(invalid("worksheet XML contains multiple roots"));
                 }
                 let resolver = reader.resolver().clone();
@@ -480,8 +506,7 @@ fn ensure_strict_worksheet_surface(xml: &[u8]) -> Result<()> {
                     stack.last().copied(),
                 )?;
                 if stack.is_empty() {
-                    root_seen = true;
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
             },
             Event::End(element) => {
@@ -494,7 +519,7 @@ fn ensure_strict_worksheet_surface(xml: &[u8]) -> Result<()> {
                     return Err(invalid("mismatched worksheet end element"));
                 }
                 if kind == StrictWorksheetElement::Worksheet {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
             },
             Event::Text(text) => {
@@ -505,8 +530,8 @@ fn ensure_strict_worksheet_surface(xml: &[u8]) -> Result<()> {
                     return Err(unsupported_worksheet_surface());
                 }
             },
-            Event::Decl(_) if !root_seen && !declaration_seen => {
-                declaration_seen = true;
+            Event::Decl(_) if phase == RootPhase::Prolog => {
+                phase = RootPhase::Declared;
             },
             Event::CData(_) | Event::Comment(_) | Event::DocType(_) | Event::PI(_) => {
                 return Err(unsupported_worksheet_surface());
@@ -518,8 +543,11 @@ fn ensure_strict_worksheet_surface(xml: &[u8]) -> Result<()> {
         buffer.clear();
     }
 
-    if !root_seen || !root_closed || !stack.is_empty() {
-        return Err(invalid("unterminated worksheet XML"));
+    match phase {
+        RootPhase::Closed if stack.is_empty() => {},
+        RootPhase::Prolog | RootPhase::Declared | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("unterminated worksheet XML"));
+        },
     }
     Ok(())
 }

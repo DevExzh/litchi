@@ -188,15 +188,39 @@ struct OpenBreak {
     value: Break,
 }
 
+/// Where the page-break reader is relative to the root element.
+///
+/// ```text
+/// Prolog --XML declaration--> Declared
+/// Prolog --whitespace or comment--> Prolog (the declaration may still follow)
+/// Prolog | Declared --root start tag--> Open
+/// Prolog | Declared --empty-element root--> refused
+/// Open --root end tag--> Closed
+/// Declared | Open | Closed --XML declaration--> refused
+/// Closed --start tag--> refused
+/// Closed --empty-element tag--> refused
+/// Closed --non-whitespace text--> refused
+/// Closed --CDATA--> refused
+/// Closed --processing instruction--> refused
+/// Closed --whitespace or comment--> Closed (ignored)
+/// ```
+///
+/// End of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Declared,
+    Open,
+    Closed,
+}
+
 fn parse_selected(xml: &[u8]) -> Result<Parsed> {
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
-    let mut declaration_seen = false;
+    let mut phase = RootPhase::Prolog;
     let mut events = 0usize;
     let mut value = PageBreaks::new();
     let mut dialect = None;
@@ -229,11 +253,11 @@ fn parse_selected(xml: &[u8]) -> Result<Parsed> {
         }
         match event {
             Event::Start(element) => {
-                if root_closed {
+                if phase == RootPhase::Closed {
                     return Err(invalid("page-break XML contains content after its root"));
                 }
                 if depth == 0 {
-                    if root_seen
+                    if matches!(phase, RootPhase::Open | RootPhase::Closed)
                         || dialect_of(&namespace).is_none()
                         || element.local_name().as_ref() != b"worksheet"
                     {
@@ -241,7 +265,7 @@ fn parse_selected(xml: &[u8]) -> Result<Parsed> {
                     }
                     dialect = dialect_of(&namespace);
                     worksheet_prefix = qualified_prefix(element.name().as_ref());
-                    root_seen = true;
+                    phase = RootPhase::Open;
                 } else if let Some(expected) = dialect {
                     reject_dialect_mismatch(&namespace, expected)?;
                 }
@@ -322,7 +346,7 @@ fn parse_selected(xml: &[u8]) -> Result<Parsed> {
                 }
             },
             Event::Empty(element) => {
-                if !root_seen || root_closed || depth == 0 {
+                if phase != RootPhase::Open || depth == 0 {
                     return Err(invalid(
                         "page-break XML element is outside the worksheet root",
                     ));
@@ -452,7 +476,7 @@ fn parse_selected(xml: &[u8]) -> Result<Parsed> {
                         return Err(invalid("invalid worksheet closing element"));
                     }
                     root_close = Some(start);
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
                 depth -= 1;
             },
@@ -464,7 +488,7 @@ fn parse_selected(xml: &[u8]) -> Result<Parsed> {
                     } else {
                         return Err(invalid("unexpected text in page-break XML"));
                     }
-                } else if ((!root_seen || root_closed) || depth == 1) && !whitespace {
+                } else if (phase != RootPhase::Open || depth == 1) && !whitespace {
                     return Err(invalid("unexpected text in page-break XML"));
                 }
             },
@@ -475,20 +499,20 @@ fn parse_selected(xml: &[u8]) -> Result<Parsed> {
                     return Err(invalid("unexpected CDATA in page-break XML"));
                 }
             },
-            Event::CData(_) if depth == 1 || !root_seen || root_closed => {
+            Event::CData(_) if depth == 1 || phase != RootPhase::Open => {
                 return Err(invalid("unexpected CDATA in page-break XML"));
             },
             Event::GeneralRef(_) if collection.is_some() => {
                 lossy_collection = true;
             },
-            Event::GeneralRef(_) if depth == 1 || !root_seen || root_closed => {
+            Event::GeneralRef(_) if depth == 1 || phase != RootPhase::Open => {
                 return Err(invalid("unexpected entity text in page-break XML"));
             },
             Event::Decl(_) => {
-                if root_seen || declaration_seen {
+                if phase != RootPhase::Prolog {
                     return Err(invalid("invalid page-break XML declaration position"));
                 }
-                declaration_seen = true;
+                phase = RootPhase::Declared;
             },
             Event::DocType(_) | Event::PI(_) => {
                 return Err(invalid("DTD and processing instructions are rejected"));
@@ -500,8 +524,11 @@ fn parse_selected(xml: &[u8]) -> Result<Parsed> {
             Event::Eof => break,
         }
     }
-    if !root_seen || !root_closed || depth != 0 || collection.is_some() || open_break.is_some() {
-        return Err(invalid("unterminated page-break worksheet XML"));
+    match phase {
+        RootPhase::Closed if depth == 0 && collection.is_none() && open_break.is_none() => {},
+        RootPhase::Prolog | RootPhase::Declared | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("unterminated page-break worksheet XML"));
+        },
     }
     Ok(Parsed {
         value,

@@ -69,12 +69,34 @@ pub fn parse_worksheet_header_footer(xml: &[u8]) -> Result<Option<Settings>> {
     parse_selected(selected)
 }
 
+/// Where the `headerFooter` reader is relative to the root element.
+///
+/// ```text
+/// Prolog --root start tag--> Open
+/// Prolog --empty-element tag--> Prolog (ignored, so an empty-element root is never seen)
+/// Open --root end tag--> Closed
+/// any phase --XML declaration--> unchanged (accepted anywhere, any number)
+/// Closed --start tag--> refused
+/// Closed --empty-element tag--> Closed (ignored)
+/// Closed --non-whitespace text--> Closed (ignored)
+/// Closed --CDATA--> refused
+/// Closed --processing instruction--> refused
+/// Closed --whitespace or comment--> Closed (ignored)
+/// ```
+///
+/// End of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 fn parse_selected(xml: &[u8]) -> Result<Option<Settings>> {
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut result = None;
     let mut header_footer: Option<(usize, Settings, Option<u8>)> = None;
     let mut text: Option<(usize, TextKind, String)> = None;
@@ -93,13 +115,13 @@ fn parse_selected(xml: &[u8]) -> Result<Option<Settings>> {
                     return Err(invalid("worksheet XML nesting is too deep"));
                 }
                 if depth == 1 {
-                    if root_seen
+                    if phase != RootPhase::Prolog
                         || !spreadsheet(&namespace)
                         || element.local_name().as_ref() != b"worksheet"
                     {
                         return Err(invalid("header/footer parser requires a worksheet root"));
                     }
-                    root_seen = true;
+                    phase = RootPhase::Open;
                 } else if depth == 2
                     && spreadsheet(&namespace)
                     && element.local_name().as_ref() == b"headerFooter"
@@ -208,7 +230,7 @@ fn parse_selected(xml: &[u8]) -> Result<Option<Settings>> {
                     if !spreadsheet(&namespace) || element.local_name().as_ref() != b"worksheet" {
                         return Err(invalid("invalid worksheet closing element"));
                     }
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
                 depth = depth
                     .checked_sub(1)
@@ -221,8 +243,11 @@ fn parse_selected(xml: &[u8]) -> Result<Option<Settings>> {
             Event::Eof => break,
         }
     }
-    if !root_seen || !root_closed || depth != 0 || header_footer.is_some() || text.is_some() {
-        return Err(invalid("incomplete worksheet header/footer XML"));
+    match phase {
+        RootPhase::Closed if depth == 0 && header_footer.is_none() && text.is_none() => {},
+        RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("incomplete worksheet header/footer XML"));
+        },
     }
     Ok(result)
 }

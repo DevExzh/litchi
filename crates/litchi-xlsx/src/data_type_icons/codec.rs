@@ -18,6 +18,29 @@ const CORE: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main"
 const STRICT: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
 const NAMED: &[u8] = b"http://schemas.microsoft.com/office/spreadsheetml/2019/namedsheetviews";
 
+/// Where `inspect_extension` is relative to the root element.
+///
+/// ```text
+/// Prolog --root start tag--> Open
+/// Prolog --empty-element root--> Closed
+/// Open --root end tag--> Closed
+/// any phase --XML declaration--> unchanged (accepted anywhere, any number)
+/// Closed --start tag--> refused
+/// Closed --empty-element tag--> Closed (ignored)
+/// Closed --non-whitespace text--> Closed (ignored)
+/// Closed --CDATA--> Closed (ignored)
+/// Closed --processing instruction--> refused
+/// Closed --whitespace or comment--> Closed (ignored)
+/// ```
+///
+/// End of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 /// Parse an already captured SpreadsheetML `ext` element.
 pub(crate) fn inspect_extension(
     markup: &[u8],
@@ -38,8 +61,7 @@ pub(crate) fn inspect_extension(
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut nodes = 0usize;
     let mut found = None;
 
@@ -66,17 +88,17 @@ pub(crate) fn inspect_extension(
         match event {
             Event::Start(element) => {
                 let (namespace, local) = resolve(&resolver, element.name());
-                if !root_seen {
+                if phase == RootPhase::Prolog {
                     if local != b"ext" {
                         return Err(invalid(
                             "data-type-icon markup must have a SpreadsheetML ext root",
                         ));
                     }
-                    root_seen = true;
+                    phase = RootPhase::Open;
                     stack.push(Frame::Ext);
                     continue;
                 }
-                if root_closed && stack.is_empty() {
+                if phase == RootPhase::Closed && stack.is_empty() {
                     return Err(invalid("data-type-icon extension has multiple roots"));
                 }
                 let parent = stack.last().copied();
@@ -107,14 +129,13 @@ pub(crate) fn inspect_extension(
             },
             Event::Empty(element) => {
                 let (namespace, local) = resolve(&resolver, element.name());
-                if !root_seen {
+                if phase == RootPhase::Prolog {
                     if local != b"ext" {
                         return Err(invalid(
                             "data-type-icon markup must have a SpreadsheetML ext root",
                         ));
                     }
-                    root_seen = true;
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                     continue;
                 }
                 let parent = stack.last().copied();
@@ -161,7 +182,7 @@ pub(crate) fn inspect_extension(
                     .pop()
                     .ok_or_else(|| invalid("data-type-icon extension has an unmatched end"))?;
                 if matches!(frame, Frame::Ext) {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
             },
             Event::Eof => break,
@@ -173,8 +194,11 @@ pub(crate) fn inspect_extension(
             },
         }
     }
-    if !root_seen || !root_closed || !stack.is_empty() {
-        return Err(invalid("unterminated data-type-icon extension"));
+    match phase {
+        RootPhase::Closed if stack.is_empty() => {},
+        RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("unterminated data-type-icon extension"));
+        },
     }
     Ok(found)
 }

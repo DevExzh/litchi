@@ -214,15 +214,39 @@ pub fn parse_print_options(xml: &[u8]) -> Result<Option<PrintOptions>> {
     parse_selected(selected)
 }
 
+/// Where the `printOptions` reader is relative to the root element.
+///
+/// ```text
+/// Prolog --XML declaration--> Declared
+/// Prolog --whitespace or comment--> Prolog (the declaration may still follow)
+/// Prolog | Declared --root start tag--> Open
+/// Prolog | Declared --empty-element root--> refused
+/// Open --root end tag--> Closed
+/// Declared | Open | Closed --XML declaration--> refused
+/// Closed --start tag--> refused
+/// Closed --empty-element tag--> refused
+/// Closed --non-whitespace text--> refused
+/// Closed --CDATA--> refused
+/// Closed --processing instruction--> refused
+/// Closed --whitespace or comment--> Closed (ignored)
+/// ```
+///
+/// End of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Declared,
+    Open,
+    Closed,
+}
+
 fn parse_selected(xml: &[u8]) -> Result<Option<PrintOptions>> {
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut result = None;
     let mut open: Option<(usize, PrintOptions)> = None;
-    let mut declaration_seen = false;
     let mut events = 0usize;
     reader.config_mut().check_end_names = true;
 
@@ -239,7 +263,7 @@ fn parse_selected(xml: &[u8]) -> Result<Option<PrintOptions>> {
         let (namespace, event) = resolver.resolve_event(event);
         match event {
             Event::Start(element) => {
-                if root_closed {
+                if phase == RootPhase::Closed {
                     return Err(invalid("worksheet XML contains content after root"));
                 }
                 depth = depth
@@ -249,13 +273,13 @@ fn parse_selected(xml: &[u8]) -> Result<Option<PrintOptions>> {
                     return Err(invalid("worksheet XML nesting is too deep"));
                 }
                 if depth == 1 {
-                    if root_seen
+                    if matches!(phase, RootPhase::Open | RootPhase::Closed)
                         || !spreadsheet(&namespace)
                         || element.local_name().as_ref() != b"worksheet"
                     {
                         return Err(invalid("print-options parser requires a worksheet root"));
                     }
-                    root_seen = true;
+                    phase = RootPhase::Open;
                 } else if depth == 2
                     && spreadsheet(&namespace)
                     && element.local_name().as_ref() == b"printOptions"
@@ -269,10 +293,10 @@ fn parse_selected(xml: &[u8]) -> Result<Option<PrintOptions>> {
                 }
             },
             Event::Empty(element) => {
-                if root_closed {
+                if phase == RootPhase::Closed {
                     return Err(invalid("worksheet XML contains content after root"));
                 }
-                if !root_seen {
+                if matches!(phase, RootPhase::Prolog | RootPhase::Declared) {
                     return Err(invalid("worksheet root cannot be empty"));
                 }
                 if depth == 0 {
@@ -291,8 +315,7 @@ fn parse_selected(xml: &[u8]) -> Result<Option<PrintOptions>> {
                 }
             },
             Event::Text(text) => {
-                if (!root_seen || root_closed) && !text.as_ref().iter().all(u8::is_ascii_whitespace)
-                {
+                if phase != RootPhase::Open && !text.as_ref().iter().all(u8::is_ascii_whitespace) {
                     return Err(invalid("worksheet XML text is outside root"));
                 }
                 if open.is_some() && !text.as_ref().iter().all(u8::is_ascii_whitespace) {
@@ -308,7 +331,7 @@ fn parse_selected(xml: &[u8]) -> Result<Option<PrintOptions>> {
             Event::CData(_) if depth == 1 => {
                 return Err(invalid("worksheet cannot contain direct CDATA"));
             },
-            Event::CData(_) if !root_seen || root_closed => {
+            Event::CData(_) if phase != RootPhase::Open => {
                 return Err(invalid("worksheet XML CDATA is outside root"));
             },
             Event::End(element) => {
@@ -332,14 +355,14 @@ fn parse_selected(xml: &[u8]) -> Result<Option<PrintOptions>> {
                     if !spreadsheet(&namespace) || element.local_name().as_ref() != b"worksheet" {
                         return Err(invalid("invalid worksheet closing element"));
                     }
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
                 depth = depth
                     .checked_sub(1)
                     .ok_or_else(|| invalid("unexpected XML end element"))?;
             },
             Event::GeneralRef(reference) => {
-                if !root_seen || root_closed {
+                if phase != RootPhase::Open {
                     return Err(invalid("worksheet XML entity is outside root"));
                 }
                 if reference.resolve_char_ref().map_err(xml_error)?.is_none()
@@ -355,10 +378,10 @@ fn parse_selected(xml: &[u8]) -> Result<Option<PrintOptions>> {
                 }
             },
             Event::Decl(_) => {
-                if root_seen || declaration_seen {
+                if phase != RootPhase::Prolog {
                     return Err(invalid("invalid worksheet XML declaration position"));
                 }
-                declaration_seen = true;
+                phase = RootPhase::Declared;
             },
             Event::DocType(_) | Event::PI(_) => {
                 return Err(invalid("DTD and processing instructions are rejected"));
@@ -367,8 +390,11 @@ fn parse_selected(xml: &[u8]) -> Result<Option<PrintOptions>> {
             Event::Eof => break,
         }
     }
-    if !root_seen || !root_closed || depth != 0 || open.is_some() {
-        return Err(invalid("incomplete worksheet print-options XML"));
+    match phase {
+        RootPhase::Closed if depth == 0 && open.is_none() => {},
+        RootPhase::Prolog | RootPhase::Declared | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("incomplete worksheet print-options XML"));
+        },
     }
     Ok(result)
 }

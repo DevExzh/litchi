@@ -27,6 +27,29 @@ fn is_spreadsheetml_name(spreadsheet_namespace: bool, name: QName<'_>, local_nam
     spreadsheet_namespace && name.local_name().as_ref() == local_name
 }
 
+/// Where `parse_styles` is relative to the root element.
+///
+/// ```text
+/// Prolog --root start tag--> Open
+/// Prolog --empty-element root--> refused
+/// Open --root end tag--> Closed
+/// any phase --XML declaration--> unchanged (accepted anywhere, any number)
+/// Closed --start tag--> refused
+/// Closed --empty-element tag--> refused
+/// Closed --non-whitespace text--> Closed (ignored)
+/// Closed --CDATA--> Closed (ignored)
+/// Closed --processing instruction--> refused
+/// Closed --whitespace or comment--> Closed (ignored)
+/// ```
+///
+/// End of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 /// Parse styles from `xl/styles.xml` XML content.
 pub fn parse_styles(content: &str) -> Result<Styles> {
     let differential_formats =
@@ -36,8 +59,7 @@ pub fn parse_styles(content: &str) -> Result<Styles> {
         std::str::from_utf8(processed.as_ref()).map_err(|e| Error::Invalid(e.to_string()))?;
     let mut reader = NsReader::from_reader(content.as_bytes());
     let mut styles = Styles::new();
-    let mut seen_root = false;
-    let mut closed_root = false;
+    let mut phase = RootPhase::Prolog;
     let mut depth = 0usize;
     let mut sections = 0u8;
 
@@ -48,13 +70,13 @@ pub fn parse_styles(content: &str) -> Result<Styles> {
             Event::Start(element)
                 if is_spreadsheetml_name(namespace, element.name(), b"styleSheet") =>
             {
-                if seen_root || depth != 0 {
+                if phase != RootPhase::Prolog || depth != 0 {
                     return Err(invalid("duplicate SpreadsheetML styleSheet element"));
                 }
-                seen_root = true;
+                phase = RootPhase::Open;
                 depth = 1;
             },
-            Event::Start(element) if seen_root && !closed_root && depth == 1 => {
+            Event::Start(element) if phase == RootPhase::Open && depth == 1 => {
                 match element.local_name().as_ref() {
                     b"numFmts" if is_spreadsheetml_name(namespace, element.name(), b"numFmts") => {
                         mark_section(&mut sections, 1, "numFmts")?;
@@ -102,12 +124,12 @@ pub fn parse_styles(content: &str) -> Result<Styles> {
                     },
                 }
             },
-            Event::Start(_) if seen_root && !closed_root => {
+            Event::Start(_) if phase == RootPhase::Open => {
                 depth = depth
                     .checked_add(1)
                     .ok_or_else(|| invalid("SpreadsheetML style nesting is too deep"))?;
             },
-            Event::Empty(element) if seen_root && !closed_root && depth == 1 => {
+            Event::Empty(element) if phase == RootPhase::Open && depth == 1 => {
                 match element.local_name().as_ref() {
                     b"numFmts" if is_spreadsheetml_name(namespace, element.name(), b"numFmts") => {
                         mark_section(&mut sections, 1, "numFmts")?;
@@ -143,24 +165,26 @@ pub fn parse_styles(content: &str) -> Result<Styles> {
                     && is_spreadsheetml_name(namespace, element.name(), b"styleSheet") =>
             {
                 depth = 0;
-                closed_root = true;
+                phase = RootPhase::Closed;
             },
-            Event::End(_) if seen_root && !closed_root => {
+            Event::End(_) if phase == RootPhase::Open => {
                 depth = depth
                     .checked_sub(1)
                     .ok_or_else(|| invalid("invalid SpreadsheetML style nesting"))?;
             },
-            Event::Start(_) | Event::Empty(_) if !seen_root || closed_root => {
+            Event::Start(_) | Event::Empty(_) if phase != RootPhase::Open => {
                 return Err(invalid(
                     "styles XML must contain exactly one SpreadsheetML styleSheet root",
                 ));
             },
-            Event::Eof if !seen_root || !closed_root || depth != 0 => {
-                return Err(invalid(
-                    "styles XML has a missing or unterminated SpreadsheetML styleSheet root",
-                ));
+            Event::Eof => match phase {
+                RootPhase::Closed if depth == 0 => break,
+                RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+                    return Err(invalid(
+                        "styles XML has a missing or unterminated SpreadsheetML styleSheet root",
+                    ));
+                },
             },
-            Event::Eof => break,
             Event::Start(_)
             | Event::End(_)
             | Event::Empty(_)

@@ -158,6 +158,32 @@ fn retain_capture(
     Ok(())
 }
 
+/// Where `capture_collections` is relative to the root element.
+///
+/// ```text
+/// Prolog --XML declaration--> Declared
+/// Prolog --whitespace or comment--> Prolog (the declaration may still follow)
+/// Prolog | Declared --root start tag--> Open
+/// Prolog | Declared --empty-element root--> Closed
+/// Open --root end tag--> Closed
+/// Declared | Open | Closed --XML declaration--> refused
+/// Closed --start tag--> refused
+/// Closed --empty-element tag--> refused
+/// Closed --non-whitespace text--> refused
+/// Closed --CDATA--> refused
+/// Closed --processing instruction--> refused
+/// Closed --whitespace or comment--> Closed (ignored)
+/// ```
+///
+/// End of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Declared,
+    Open,
+    Closed,
+}
+
 pub(super) fn capture_collections(xml: &[u8]) -> Result<Vec<Captured>> {
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
@@ -169,9 +195,7 @@ pub(super) fn capture_collections(xml: &[u8]) -> Result<Vec<Captured>> {
     let mut events = 0usize;
     let mut nodes = 0usize;
     let mut retained = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
-    let mut declaration_seen = false;
+    let mut phase = RootPhase::Prolog;
     loop {
         events = events
             .checked_add(1)
@@ -300,17 +324,17 @@ pub(super) fn capture_collections(xml: &[u8]) -> Result<Vec<Captured>> {
                 )?;
             },
             Event::Start(element) => {
-                if root_closed {
+                if phase == RootPhase::Closed {
                     return Err(invalid("worksheet XML contains content after root"));
                 }
                 if depth == 0 {
-                    if root_seen
+                    if matches!(phase, RootPhase::Open | RootPhase::Closed)
                         || !spreadsheet(&namespace)
                         || element.local_name().as_ref() != b"worksheet"
                     {
                         return Err(invalid("data-validation parser requires a worksheet root"));
                     }
-                    root_seen = true;
+                    phase = RootPhase::Open;
                 }
                 if depth >= MAX_DEPTH {
                     return Err(invalid("worksheet nesting is too deep"));
@@ -326,14 +350,13 @@ pub(super) fn capture_collections(xml: &[u8]) -> Result<Vec<Captured>> {
                 }
             },
             Event::Empty(element) if depth == 0 => {
-                if root_seen
+                if matches!(phase, RootPhase::Open | RootPhase::Closed)
                     || !spreadsheet(&namespace)
                     || element.local_name().as_ref() != b"worksheet"
                 {
                     return Err(invalid("data-validation parser requires a worksheet root"));
                 }
-                root_seen = true;
-                root_closed = true;
+                phase = RootPhase::Closed;
             },
             Event::End(element) => {
                 if depth == 0 {
@@ -353,30 +376,28 @@ pub(super) fn capture_collections(xml: &[u8]) -> Result<Vec<Captured>> {
                 if depth == 0 {
                     // The namespace/local-name check is performed by the XML reader for
                     // qualified names; this branch only records the root boundary.
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
             },
             Event::Text(value) => {
-                if (!root_seen || root_closed)
-                    && !value.as_ref().iter().all(u8::is_ascii_whitespace)
-                {
+                if phase != RootPhase::Open && !value.as_ref().iter().all(u8::is_ascii_whitespace) {
                     return Err(invalid("worksheet XML text is outside root"));
                 }
                 if depth == 1 && !value.as_ref().iter().all(u8::is_ascii_whitespace) {
                     return Err(invalid("worksheet cannot contain direct text"));
                 }
             },
-            Event::CData(_) if depth == 1 || !root_seen || root_closed => {
+            Event::CData(_) if depth == 1 || phase != RootPhase::Open => {
                 return Err(invalid("worksheet XML contains unexpected CDATA"));
             },
             Event::DocType(_) | Event::PI(_) => {
                 return Err(invalid("DTD and processing instructions are rejected"));
             },
             Event::Decl(_) => {
-                if root_seen || declaration_seen {
+                if phase != RootPhase::Prolog {
                     return Err(invalid("invalid worksheet XML declaration position"));
                 }
-                declaration_seen = true;
+                phase = RootPhase::Declared;
             },
             Event::GeneralRef(reference) => {
                 decode_xml_reference(&reference)?;
@@ -384,8 +405,11 @@ pub(super) fn capture_collections(xml: &[u8]) -> Result<Vec<Captured>> {
             Event::Empty(_) | Event::CData(_) | Event::Comment(_) | Event::Eof => {},
         }
     }
-    if !root_seen || !root_closed || depth != 0 {
-        return Err(invalid("incomplete worksheet data-validation XML"));
+    match phase {
+        RootPhase::Closed if depth == 0 => {},
+        RootPhase::Prolog | RootPhase::Declared | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("incomplete worksheet data-validation XML"));
+        },
     }
     Ok(values)
 }

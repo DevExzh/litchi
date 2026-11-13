@@ -57,6 +57,29 @@ fn admit_workbook(workbook: &dyn Part, limits: &SourceLimits) -> Result<()> {
     Ok(())
 }
 
+/// Where the workbook `layout` scan is relative to the root element.
+///
+/// ```text
+/// Prolog --root start tag--> Open
+/// Prolog --empty-element root--> Closed
+/// Open --root end tag--> Closed
+/// any phase --XML declaration--> unchanged (accepted anywhere, any number)
+/// Closed --start tag--> refused
+/// Closed --empty-element tag--> refused
+/// Closed --non-whitespace text--> Closed (ignored)
+/// Closed --CDATA--> Closed (ignored)
+/// Closed --processing instruction--> Closed (ignored)
+/// Closed --whitespace or comment--> Closed (ignored)
+/// ```
+///
+/// End of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 fn layout(xml: &[u8], limits: &SourceLimits) -> Result<Layout> {
     let maximum = limits.max_part_bytes().min(MAX_XML_BYTES as u64) as usize;
     if xml.len() > maximum {
@@ -81,8 +104,7 @@ fn layout(xml: &[u8], limits: &SourceLimits) -> Result<Layout> {
         relationship_namespace: REL,
         opaque: false,
     };
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     loop {
         let start = origin
             .offset(reader.buffer_position())
@@ -104,10 +126,10 @@ fn layout(xml: &[u8], limits: &SourceLimits) -> Result<Layout> {
                 }
                 let (ns, local) = reader.resolver().resolve_element(element.name());
                 if level == 1 {
-                    if root_seen || root_closed || !is_sml(&ns) || local.as_ref() != b"workbook" {
+                    if phase != RootPhase::Prolog || !is_sml(&ns) || local.as_ref() != b"workbook" {
                         return Err(invalid("external links require one workbook root"));
                     }
-                    root_seen = true;
+                    phase = RootPhase::Open;
                     result.root_open = start..end;
                     result.root_empty = empty;
                     result.relationship_namespace = if matches!(ns,ResolveResult::Bound(Namespace(value)) if value==STRICT)
@@ -122,7 +144,7 @@ fn layout(xml: &[u8], limits: &SourceLimits) -> Result<Layout> {
                             .to_owned();
                     }
                     if empty {
-                        root_closed = true;
+                        phase = RootPhase::Closed;
                         result.insertion = end;
                     }
                 }
@@ -236,7 +258,7 @@ fn layout(xml: &[u8], limits: &SourceLimits) -> Result<Layout> {
                     result.owner_close_start = start;
                 }
                 if depth == 1 {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                     if result.insertion == usize::MAX {
                         result.insertion = start;
                     }
@@ -260,8 +282,11 @@ fn layout(xml: &[u8], limits: &SourceLimits) -> Result<Layout> {
             Event::Decl(_) => {},
         }
     }
-    if !root_seen || !root_closed || depth != 0 || owner_start.is_some() {
-        return Err(invalid("incomplete workbook external-reference source"));
+    match phase {
+        RootPhase::Closed if depth == 0 && owner_start.is_none() => {},
+        RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("incomplete workbook external-reference source"));
+        },
     }
     if result.owner.is_some() && result.ids.is_empty() {
         return Err(invalid("workbook externalReferences cannot be empty"));

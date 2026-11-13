@@ -277,6 +277,29 @@ impl DefinitionStage {
     }
 }
 
+/// Where the slicer-cache `parse` is relative to the root element.
+///
+/// ```text
+/// Prolog --root start tag--> Open
+/// Prolog --empty-element root--> refused
+/// Open --root end tag--> Closed
+/// any phase --XML declaration--> unchanged (accepted anywhere, any number)
+/// Closed --start tag--> refused
+/// Closed --empty-element tag--> refused
+/// Closed --non-whitespace text--> refused
+/// Closed --CDATA--> refused
+/// Closed --processing instruction--> refused
+/// Closed --whitespace or comment--> Closed (ignored)
+/// ```
+///
+/// End of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 pub fn parse(xml: &[u8]) -> Result<Definition> {
     if xml.len() > MAX_PART_BYTES {
         return Err(limit("part bytes"));
@@ -287,8 +310,7 @@ pub fn parse(xml: &[u8]) -> Result<Definition> {
     reader.config_mut().check_end_names = true;
     let decoder = reader.decoder();
     let mut depth = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut definition: Option<Definition> = None;
     let mut stage = DefinitionStage::Start;
     let mut in_pivots = false;
@@ -332,7 +354,7 @@ pub fn parse(xml: &[u8]) -> Result<Definition> {
         validate_event_xml(&event, &resolver, decoder, capture.is_some())?;
         match event {
             Event::Start(element) => {
-                if root_closed {
+                if phase == RootPhase::Closed {
                     return Err(invalid("content after Slicer Cache root"));
                 }
                 if let Some(active) = capture.as_mut() {
@@ -347,13 +369,13 @@ pub fn parse(xml: &[u8]) -> Result<Definition> {
                         return Err(invalid("pivotTable must be empty"));
                     }
                 } else if depth == 0 {
-                    if root_seen
+                    if phase != RootPhase::Prolog
                         || !exact(&namespace, X14)
                         || element.local_name().as_ref() != b"slicerCacheDefinition"
                     {
                         return Err(invalid("expected x14:slicerCacheDefinition root"));
                     }
-                    root_seen = true;
+                    phase = RootPhase::Open;
                     definition = Some(parse_root_attributes(&element, &resolver, decoder)?);
                 } else if depth == 1 {
                     match element.local_name().as_ref() {
@@ -400,7 +422,7 @@ pub fn parse(xml: &[u8]) -> Result<Definition> {
                 }
             },
             Event::Empty(element) => {
-                if root_closed {
+                if phase == RootPhase::Closed {
                     return Err(invalid("content after Slicer Cache root"));
                 }
                 if let Some(active) = capture.as_mut() {
@@ -499,10 +521,12 @@ pub fn parse(xml: &[u8]) -> Result<Definition> {
                     }
                     in_pivots = false;
                 } else if depth == 0 {
-                    if element.local_name().as_ref() != b"slicerCacheDefinition" || !root_seen {
+                    if element.local_name().as_ref() != b"slicerCacheDefinition"
+                        || phase == RootPhase::Prolog
+                    {
                         return Err(invalid("mismatched Slicer Cache root"));
                     }
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 } else {
                     return Err(invalid("unexpected Slicer Cache closing depth"));
                 }
@@ -524,14 +548,12 @@ pub fn parse(xml: &[u8]) -> Result<Definition> {
             Event::Text(_) | Event::CData(_) | Event::GeneralRef(_) => {},
         }
     }
-    if !root_seen
-        || !root_closed
-        || depth != 0
-        || capture.is_some()
-        || in_pivots
-        || open_pivot.is_some()
-    {
-        return Err(invalid("incomplete Slicer Cache XML"));
+    match phase {
+        RootPhase::Closed
+            if depth == 0 && capture.is_none() && !in_pivots && open_pivot.is_none() => {},
+        RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("incomplete Slicer Cache XML"));
+        },
     }
     let value = definition.ok_or_else(|| invalid("missing Slicer Cache definition"))?;
     validate(&value)?;

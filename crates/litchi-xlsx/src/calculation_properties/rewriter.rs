@@ -76,6 +76,29 @@ struct Frame {
     projected: bool,
 }
 
+/// Where `inspect_layout` is relative to the root element.
+///
+/// ```text
+/// Prolog --root start tag--> Open
+/// Prolog --empty-element root--> refused
+/// Open --root end tag--> Closed
+/// any phase --XML declaration--> unchanged (accepted anywhere, any number)
+/// Closed --start tag--> refused
+/// Closed --empty-element tag--> refused
+/// Closed --non-whitespace text--> refused
+/// Closed --CDATA--> Closed (ignored)
+/// Closed --processing instruction--> refused
+/// Closed --whitespace or comment--> Closed (ignored)
+/// ```
+///
+/// End of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 pub(super) fn inspect_layout(xml: &[u8], limits: &Limits) -> Result<Layout> {
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
@@ -88,8 +111,7 @@ pub(super) fn inspect_layout(xml: &[u8], limits: &Limits) -> Result<Layout> {
             source,
         })?;
     let mut events = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut root_qname = Vec::new();
     let mut root_close = 0usize;
     let mut calc = None;
@@ -133,8 +155,7 @@ pub(super) fn inspect_layout(xml: &[u8], limits: &Limits) -> Result<Layout> {
                     &resolver,
                     limits,
                     &mut stack,
-                    &mut root_seen,
-                    &mut root_closed,
+                    &mut phase,
                     &mut root_qname,
                     &mut calc,
                     &mut calc_insert,
@@ -159,8 +180,7 @@ pub(super) fn inspect_layout(xml: &[u8], limits: &Limits) -> Result<Layout> {
                     &resolver,
                     limits,
                     &mut stack,
-                    &mut root_seen,
-                    &mut root_closed,
+                    &mut phase,
                     &mut root_qname,
                     &mut calc,
                     &mut calc_insert,
@@ -181,7 +201,7 @@ pub(super) fn inspect_layout(xml: &[u8], limits: &Limits) -> Result<Layout> {
                     .ok_or_else(|| invalid("unexpected workbook end element"))?;
                 if matches!(frame.kind, Kind::Root) {
                     root_close = start;
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
                 close_frame(
                     frame,
@@ -238,8 +258,11 @@ pub(super) fn inspect_layout(xml: &[u8], limits: &Limits) -> Result<Layout> {
             Event::Comment(_) | Event::Decl(_) | Event::PI(_) | Event::DocType(_) => {},
         }
     }
-    if !root_seen || !root_closed || !stack.is_empty() {
-        return Err(invalid("unterminated workbook XML"));
+    match phase {
+        RootPhase::Closed if stack.is_empty() => {},
+        RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("unterminated workbook XML"));
+        },
     }
     // Projection is recognized on namespace values as written; a binding
     // spelled with references may project either owner all the same.
@@ -272,8 +295,7 @@ fn inspect_start(
     resolver: &quick_xml::name::NamespaceResolver,
     limits: &Limits,
     stack: &mut Vec<Frame>,
-    root_seen: &mut bool,
-    root_closed: &mut bool,
+    phase: &mut RootPhase,
     root_qname: &mut Vec<u8>,
     calc: &mut Option<Element>,
     calc_insert: &mut Option<usize>,
@@ -287,7 +309,7 @@ fn inspect_start(
     mixed_target: &mut bool,
     opaque_bytes: &mut usize,
 ) -> Result<()> {
-    if *root_closed {
+    if *phase == RootPhase::Closed {
         return Err(invalid("content follows the closed workbook root"));
     }
     let depth = stack.len();
@@ -314,12 +336,12 @@ fn inspect_start(
     let qname = element.name().as_ref().to_vec();
     let kind;
     if depth == 0 {
-        if *root_seen || !core || local.as_ref() != b"workbook" || empty {
+        if *phase != RootPhase::Prolog || !core || local.as_ref() != b"workbook" || empty {
             return Err(invalid(
                 "calculation metadata rewriter requires a nonempty workbook root",
             ));
         }
-        *root_seen = true;
+        *phase = RootPhase::Open;
         root_qname.clone_from(&qname);
         kind = Kind::Root;
     } else if depth == 1 && core && local.as_ref() == b"calcPr" {

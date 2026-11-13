@@ -103,6 +103,29 @@ fn inspect_with_policy<'a>(
     })
 }
 
+/// Where `parse_semantic` is relative to the root element.
+///
+/// ```text
+/// Prolog --root start tag--> Open
+/// Prolog --empty-element root--> refused
+/// Open --root end tag--> Closed
+/// any phase --XML declaration--> unchanged (accepted anywhere, any number)
+/// Closed --start tag--> refused
+/// Closed --empty-element tag--> refused
+/// Closed --non-whitespace text--> refused
+/// Closed --CDATA--> Closed (ignored)
+/// Closed --processing instruction--> refused
+/// Closed --whitespace or comment--> Closed (ignored)
+/// ```
+///
+/// End of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 fn parse_semantic(
     xml: &[u8],
     limits: &Limits,
@@ -112,8 +135,7 @@ fn parse_semantic(
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
     let mut events = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut root_dialect = None;
     let mut last_core_rank = None;
     let mut calc_depth = None;
@@ -135,7 +157,7 @@ fn parse_semantic(
         let (namespace, event) = resolver.resolve_event(event);
         match event {
             Event::Start(element) => {
-                if root_closed {
+                if phase == RootPhase::Closed {
                     return Err(invalid("content follows the closed workbook root"));
                 }
                 check_attribute_count(&element, limits)?;
@@ -143,12 +165,15 @@ fn parse_semantic(
                 let dialect = spreadsheet_dialect(&namespace);
                 let core = dialect.is_some() && dialect == root_dialect;
                 if depth == 0 {
-                    if root_seen || dialect.is_none() || local.as_ref() != b"workbook" {
+                    if phase != RootPhase::Prolog
+                        || dialect.is_none()
+                        || local.as_ref() != b"workbook"
+                    {
                         return Err(invalid(
                             "calculation metadata parser requires a workbook root",
                         ));
                     }
-                    root_seen = true;
+                    phase = RootPhase::Open;
                     root_dialect = dialect;
                 } else if depth == 1 && dialect.is_some() && !core {
                     return Err(invalid("workbook child uses a mixed SpreadsheetML dialect"));
@@ -229,7 +254,7 @@ fn parse_semantic(
                     .ok_or_else(|| invalid("XML depth overflow"))?;
             },
             Event::Empty(element) => {
-                if root_closed || depth == 0 {
+                if phase == RootPhase::Closed || depth == 0 {
                     return Err(invalid(
                         "workbook root cannot be empty or followed by content",
                     ));
@@ -330,7 +355,7 @@ fn parse_semantic(
                 }
                 depth -= 1;
                 if depth == 0 {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
             },
             Event::Text(text) => {
@@ -370,8 +395,11 @@ fn parse_semantic(
             | Event::GeneralRef(_) => {},
         }
     }
-    if !root_seen || !root_closed || depth != 0 || calc_depth.is_some() || feature_depth.is_some() {
-        return Err(invalid("unterminated workbook XML"));
+    match phase {
+        RootPhase::Closed if depth == 0 && calc_depth.is_none() && feature_depth.is_none() => {},
+        RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("unterminated workbook XML"));
+        },
     }
     let features = if target_feature_list_seen {
         Some(Features::try_from_vec(feature_values)?)

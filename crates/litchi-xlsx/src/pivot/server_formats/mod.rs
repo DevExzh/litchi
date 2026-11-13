@@ -5435,6 +5435,29 @@ fn scan_xml_with_mce(
     scan_xml_config(bytes, expected_root, read_limits, true)
 }
 
+/// Where `scan_xml_config` is relative to the root element.
+///
+/// ```text
+/// Prolog --root start tag--> Open
+/// Prolog --empty-element root--> Closed
+/// Open --root end tag--> Closed
+/// any phase --XML declaration--> unchanged (accepted anywhere, any number)
+/// Closed --start tag--> refused
+/// Closed --empty-element tag--> refused
+/// Closed --non-whitespace text--> Closed (ignored)
+/// Closed --CDATA--> Closed (ignored)
+/// Closed --processing instruction--> Closed (ignored)
+/// Closed --whitespace or comment--> Closed (ignored)
+/// ```
+///
+/// End of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 fn scan_xml_config(
     bytes: &[u8],
     expected_root: &str,
@@ -5478,8 +5501,7 @@ fn scan_xml_config(
         parent: None,
         namespaces: Vec::new(),
     });
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut nodes = 0usize;
     let mut events = 0usize;
     loop {
@@ -5514,7 +5536,7 @@ fn scan_xml_config(
                 // preserving the event/depth accounting for empty elements,
                 // this keeps a second root from making unbounded namespace
                 // work before it is rejected.
-                if root_seen && (root_closed || stack.is_empty()) {
+                if phase != RootPhase::Prolog && (phase == RootPhase::Closed || stack.is_empty()) {
                     return Err(invalid("PivotTable XML has multiple roots"));
                 }
                 if stack.len() >= MAX_DEPTH {
@@ -5525,8 +5547,8 @@ fn scan_xml_config(
                 }
                 begin_namespace_scope(&mut resolver, &element, limits, &mut namespace_interner)?;
                 let (ns, local) = resolved_name(&resolver, element.name(), limits)?;
-                if !root_seen {
-                    root_seen = true;
+                if phase == RootPhase::Prolog {
+                    phase = RootPhase::Open;
                     if local.as_slice() != expected_root.as_bytes() {
                         return Err(invalid(format!(
                             "PivotTable XML root must be {expected_root}"
@@ -5642,7 +5664,7 @@ fn scan_xml_config(
                         mce_context,
                     });
                 } else if stack.is_empty() {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
                 if !is_start {
                     resolver.pop();
@@ -5671,7 +5693,7 @@ fn scan_xml_config(
                     element.end = end;
                 }
                 if stack.is_empty() {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
                 resolver.pop();
             },
@@ -5721,8 +5743,11 @@ fn scan_xml_config(
             Event::Comment(_) | Event::Decl(_) => {},
         }
     }
-    if !root_seen || !root_closed || !stack.is_empty() {
-        return Err(invalid("PivotTable XML is unterminated"));
+    match phase {
+        RootPhase::Closed if stack.is_empty() => {},
+        RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("PivotTable XML is unterminated"));
+        },
     }
     Ok(XmlScan {
         elements,

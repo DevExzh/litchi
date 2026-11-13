@@ -67,6 +67,32 @@ enum NamespaceKind {
     Other,
 }
 
+/// Where the `sheetCalcPr` reader is relative to the root element.
+///
+/// ```text
+/// Prolog --XML declaration--> Declared
+/// Prolog --whitespace or comment--> Prolog (the declaration may still follow)
+/// Prolog | Declared --root start tag--> Open
+/// Prolog | Declared --empty-element root--> Closed
+/// Open --root end tag--> Closed
+/// Declared | Open | Closed --XML declaration--> refused
+/// Closed --start tag--> refused
+/// Closed --empty-element tag--> refused
+/// Closed --non-whitespace text--> refused
+/// Closed --CDATA--> refused
+/// Closed --processing instruction--> refused
+/// Closed --whitespace or comment--> Closed (ignored)
+/// ```
+///
+/// End of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Declared,
+    Open,
+    Closed,
+}
+
 /// Parses the direct worksheet `sheetCalcPr` child after applying shared MCE processing.
 pub fn parse(xml: &[u8]) -> Result<Option<Properties>> {
     let source = std::str::from_utf8(xml)
@@ -79,9 +105,7 @@ pub fn parse(xml: &[u8]) -> Result<Option<Properties>> {
     let mut scopes = Vec::new();
     let mut properties: Option<Properties> = None;
     let mut depth = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
-    let mut declaration_seen = false;
+    let mut phase = RootPhase::Prolog;
 
     loop {
         let (resolved, event) = reader
@@ -90,10 +114,10 @@ pub fn parse(xml: &[u8]) -> Result<Option<Properties>> {
         let namespace = namespace_kind(resolved)?;
         match event {
             Event::Start(element) => {
-                if root_closed {
+                if phase == RootPhase::Closed {
                     return Err(invalid("worksheet XML contains content after root"));
                 }
-                if scopes.is_empty() && root_seen {
+                if scopes.is_empty() && matches!(phase, RootPhase::Open | RootPhase::Closed) {
                     return Err(invalid("worksheet XML contains multiple roots"));
                 }
                 let next_depth = depth
@@ -110,22 +134,21 @@ pub fn parse(xml: &[u8]) -> Result<Option<Properties>> {
                     &mut properties,
                 )?;
                 if scopes.is_empty() {
-                    root_seen = true;
+                    phase = RootPhase::Open;
                 }
                 depth = next_depth;
                 scopes.push(scope);
             },
             Event::Empty(element) => {
-                if root_closed {
+                if phase == RootPhase::Closed {
                     return Err(invalid("worksheet XML contains content after root"));
                 }
                 if scopes.is_empty() {
-                    if root_seen {
+                    if matches!(phase, RootPhase::Open | RootPhase::Closed) {
                         return Err(invalid("worksheet XML contains multiple roots"));
                     }
                     begin_element(&reader, &element, namespace, None, &mut properties)?;
-                    root_seen = true;
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 } else {
                     begin_element(
                         &reader,
@@ -147,7 +170,7 @@ pub fn parse(xml: &[u8]) -> Result<Option<Properties>> {
                         {
                             return Err(invalid("mismatched worksheet end element"));
                         }
-                        root_closed = true;
+                        phase = RootPhase::Closed;
                     },
                     Scope::SheetCalculationProperties => {
                         if namespace != NamespaceKind::Main
@@ -202,10 +225,10 @@ pub fn parse(xml: &[u8]) -> Result<Option<Properties>> {
                 }
             },
             Event::Decl(_) => {
-                if root_seen || declaration_seen {
+                if phase != RootPhase::Prolog {
                     return Err(invalid("invalid worksheet XML declaration position"));
                 }
-                declaration_seen = true;
+                phase = RootPhase::Declared;
             },
             Event::DocType(_) | Event::PI(_) => {
                 return Err(invalid("DTD and processing instructions are rejected"));
@@ -215,8 +238,11 @@ pub fn parse(xml: &[u8]) -> Result<Option<Properties>> {
         }
         buffer.clear();
     }
-    if !root_seen || !root_closed || depth != 0 || !scopes.is_empty() {
-        return Err(invalid("unterminated worksheet XML"));
+    match phase {
+        RootPhase::Closed if depth == 0 && scopes.is_empty() => {},
+        RootPhase::Prolog | RootPhase::Declared | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("unterminated worksheet XML"));
+        },
     }
     Ok(properties)
 }

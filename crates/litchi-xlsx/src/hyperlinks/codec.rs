@@ -89,6 +89,30 @@ pub(crate) fn parse_with_relationship_ids(
         .collect())
 }
 
+/// Where the hyperlink reader is relative to the root element.
+///
+/// ```text
+/// Prolog --root start tag--> Open
+/// Prolog --empty-element root--> Closed
+/// Open --root end tag--> Closed
+/// Prolog --XML declaration--> Prolog (repeatable)
+/// Open | Closed --XML declaration--> refused
+/// Closed --start tag--> refused
+/// Closed --empty-element tag--> refused
+/// Closed --non-whitespace text--> refused
+/// Closed --CDATA--> refused
+/// Closed --processing instruction--> Closed (ignored)
+/// Closed --whitespace or comment--> Closed (ignored)
+/// ```
+///
+/// End of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 fn parse_with_event_limit(
     xml: &[u8],
     relationships: &Relationships,
@@ -104,8 +128,7 @@ fn parse_with_event_limit(
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
     let mut event_count = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut conformance = None;
     let mut seen_container = false;
     let mut container_depth = None;
@@ -135,12 +158,12 @@ fn parse_with_event_limit(
                 let namespace = resolve_namespace(&namespace)?;
                 open_names.push(element.name().as_ref().to_vec().into_boxed_slice());
                 if depth == 0 {
-                    if root_seen || root_closed {
+                    if phase != RootPhase::Prolog {
                         return Err(invalid("XLSX worksheet XML has more than one root"));
                     }
                     let parsed = parse_root(namespace.as_deref(), &local)?;
                     conformance = Some(parsed);
-                    root_seen = true;
+                    phase = RootPhase::Open;
                 } else if depth == 1 && local == "hyperlinks" {
                     let parsed =
                         conformance.ok_or_else(|| invalid("XLSX worksheet root is missing"))?;
@@ -191,12 +214,11 @@ fn parse_with_event_limit(
                 let local = decode_element_local(&element)?;
                 let namespace = resolve_namespace(&namespace)?;
                 if depth == 0 {
-                    if root_seen || root_closed {
+                    if phase != RootPhase::Prolog {
                         return Err(invalid("XLSX worksheet XML has more than one root"));
                     }
                     conformance = Some(parse_root(namespace.as_deref(), &local)?);
-                    root_seen = true;
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 } else if depth == 1 && local == "hyperlinks" {
                     let parsed =
                         conformance.ok_or_else(|| invalid("XLSX worksheet root is missing"))?;
@@ -251,7 +273,7 @@ fn parse_with_event_limit(
                     container_depth = None;
                 }
                 if depth == 1 {
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 }
                 depth -= 1;
             },
@@ -301,7 +323,7 @@ fn parse_with_event_limit(
                     "XLSX worksheet XML has character data outside its root",
                 ));
             },
-            Event::Decl(_) if root_seen => {
+            Event::Decl(_) if phase != RootPhase::Prolog => {
                 return Err(invalid(
                     "XLSX worksheet XML declaration must precede the root",
                 ));
@@ -317,14 +339,15 @@ fn parse_with_event_limit(
     }
 
     let conformance = conformance.ok_or_else(|| invalid("XLSX worksheet root is missing"))?;
-    if !root_seen
-        || !root_closed
-        || depth != 0
-        || !open_names.is_empty()
-        || container_depth.is_some()
-        || open_hyperlink_depth.is_some()
-    {
-        return Err(invalid("XLSX worksheet hyperlink XML is not balanced"));
+    match phase {
+        RootPhase::Closed
+            if depth == 0
+                && open_names.is_empty()
+                && container_depth.is_none()
+                && open_hyperlink_depth.is_none() => {},
+        RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("XLSX worksheet hyperlink XML is not balanced"));
+        },
     }
     for relationship in relationships.iter().filter(|relationship| {
         matches!(relationship.reltype(), rt::HYPERLINK | rt::STRICT_HYPERLINK)

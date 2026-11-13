@@ -105,6 +105,29 @@ pub fn write_refresh_intervals(value: &RefreshIntervals, limits: &SourceLimits) 
     Ok(output)
 }
 
+/// Where the refresh-interval `inspect` scan is relative to the root element.
+///
+/// ```text
+/// Prolog --root start tag--> Open
+/// Prolog --empty-element root--> Closed
+/// Open --root end tag--> Closed
+/// any phase --XML declaration--> unchanged (accepted anywhere, any number)
+/// Closed --start tag--> refused
+/// Closed --empty-element tag--> refused
+/// Closed --non-whitespace text--> refused
+/// Closed --CDATA--> refused
+/// Closed --processing instruction--> refused
+/// Closed --whitespace or comment--> Closed (ignored)
+/// ```
+///
+/// End of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 /// Inspect `rvTypesInfo` while retaining source spans for a later local edit.
 pub(crate) fn inspect(xml: &[u8], limits: &SourceLimits) -> Result<Inspection> {
     // The common DOM pass enforces the package XML byte, depth, node, string,
@@ -120,8 +143,7 @@ pub(crate) fn inspect(xml: &[u8], limits: &SourceLimits) -> Result<Inspection> {
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
     let mut types = Vec::<TypeInspection>::new();
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut types_seen = false;
 
     loop {
@@ -133,7 +155,7 @@ pub(crate) fn inspect(xml: &[u8], limits: &SourceLimits) -> Result<Inspection> {
         match event {
             Event::Start(element) => {
                 let info = ElementInfo::new(&reader, &element)?;
-                if root_closed && stack.is_empty() {
+                if phase == RootPhase::Closed && stack.is_empty() {
                     return Err(invalid("rich-value types document has multiple roots"));
                 }
                 let parent = stack.last();
@@ -142,12 +164,12 @@ pub(crate) fn inspect(xml: &[u8], limits: &SourceLimits) -> Result<Inspection> {
                 {
                     return Err(invalid("refreshInterval must not contain child elements"));
                 }
-                let kind = if !root_seen {
+                let kind = if phase == RootPhase::Prolog {
                     if info.namespace != RICH_DATA_2 || info.name != "rvTypesInfo" {
                         return Err(invalid("rich-value types root must be rvTypesInfo"));
                     }
                     no_non_namespace_attributes(&reader, &element, "rvTypesInfo")?;
-                    root_seen = true;
+                    phase = RootPhase::Open;
                     FrameKind::Root
                 } else if parent.is_some_and(|parent| {
                     matches!(parent.kind, FrameKind::Root)
@@ -259,16 +281,15 @@ pub(crate) fn inspect(xml: &[u8], limits: &SourceLimits) -> Result<Inspection> {
             },
             Event::Empty(element) => {
                 let info = ElementInfo::new(&reader, &element)?;
-                if root_closed && stack.is_empty() {
+                if phase == RootPhase::Closed && stack.is_empty() {
                     return Err(invalid("rich-value types document has multiple roots"));
                 }
-                if !root_seen {
+                if phase == RootPhase::Prolog {
                     if info.namespace != RICH_DATA_2 || info.name != "rvTypesInfo" {
                         return Err(invalid("rich-value types root must be rvTypesInfo"));
                     }
                     no_non_namespace_attributes(&reader, &element, "rvTypesInfo")?;
-                    root_seen = true;
-                    root_closed = true;
+                    phase = RootPhase::Closed;
                 } else if let Some(parent) = stack.last() {
                     if matches!(parent.kind, FrameKind::RefreshInterval(_, _)) {
                         return Err(invalid("refreshInterval must not contain child elements"));
@@ -436,7 +457,7 @@ pub(crate) fn inspect(xml: &[u8], limits: &SourceLimits) -> Result<Inspection> {
                     FrameKind::Extension(type_index, extension_index) => {
                         types[type_index].extensions[extension_index].close_tag = Some(start..end);
                     },
-                    FrameKind::Root => root_closed = true,
+                    FrameKind::Root => phase = RootPhase::Closed,
                     FrameKind::Types
                     | FrameKind::Type(_)
                     | FrameKind::ExtensionList(_)
@@ -453,8 +474,11 @@ pub(crate) fn inspect(xml: &[u8], limits: &SourceLimits) -> Result<Inspection> {
         }
         buffer.clear();
     }
-    if !root_seen || !root_closed || !stack.is_empty() {
-        return Err(invalid("unterminated rich-value types XML"));
+    match phase {
+        RootPhase::Closed if stack.is_empty() => {},
+        RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("unterminated rich-value types XML"));
+        },
     }
     Ok(Inspection { types })
 }

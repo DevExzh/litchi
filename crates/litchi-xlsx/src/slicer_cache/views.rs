@@ -154,6 +154,29 @@ pub struct SlicerPart {
     pub slicers: Slicers,
 }
 
+/// Where `parse_slicers` is relative to the root element.
+///
+/// ```text
+/// Prolog --root start tag--> Open
+/// Prolog --empty-element root--> refused
+/// Open --root end tag--> Closed
+/// any phase --XML declaration--> unchanged (accepted anywhere, any number)
+/// Closed --start tag--> refused
+/// Closed --empty-element tag--> refused
+/// Closed --non-whitespace text--> refused
+/// Closed --CDATA--> refused
+/// Closed --processing instruction--> refused
+/// Closed --whitespace or comment--> Closed (ignored)
+/// ```
+///
+/// End of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 /// Parses one MS-XLSX Slicers part.
 pub fn parse_slicers(xml: &[u8]) -> Result<Slicers> {
     if xml.len() > MAX_PART_BYTES {
@@ -163,8 +186,7 @@ pub fn parse_slicers(xml: &[u8]) -> Result<Slicers> {
     let origin = ReaderOrigin::of(xml);
     let decoder = reader.decoder();
     let mut depth = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = RootPhase::Prolog;
     let mut root_attributes = Vec::new();
     let mut slicers = Vec::new();
     let mut current: Option<Slicer> = None;
@@ -184,19 +206,19 @@ pub fn parse_slicers(xml: &[u8]) -> Result<Slicers> {
 
         match event {
             Event::Start(element) => {
-                if root_closed {
+                if phase == RootPhase::Closed {
                     return Err(invalid("content after Slicers root"));
                 }
                 if extension_start.is_none() {
                     match depth {
                         0 => {
-                            if root_seen
+                            if phase != RootPhase::Prolog
                                 || !exact(&namespace, SLICERS_NS)
                                 || element.local_name().as_ref() != b"slicers"
                             {
                                 return Err(invalid("expected x14:slicers root"));
                             }
-                            root_seen = true;
+                            phase = RootPhase::Open;
                             root_attributes = parse_attributes(&element, &[], decoder)?;
                         },
                         1 => {
@@ -233,7 +255,7 @@ pub fn parse_slicers(xml: &[u8]) -> Result<Slicers> {
                 }
             },
             Event::Empty(element) => {
-                if root_closed {
+                if phase == RootPhase::Closed {
                     return Err(invalid("content after Slicers root"));
                 }
                 if extension_start.is_some() {
@@ -289,10 +311,11 @@ pub fn parse_slicers(xml: &[u8]) -> Result<Slicers> {
                 }
                 match depth {
                     0 => {
-                        if element.local_name().as_ref() != b"slicers" || !root_seen {
+                        if element.local_name().as_ref() != b"slicers" || phase == RootPhase::Prolog
+                        {
                             return Err(invalid("mismatched Slicers root"));
                         }
-                        root_closed = true;
+                        phase = RootPhase::Closed;
                     },
                     1 => {
                         if element.local_name().as_ref() != b"slicer" {
@@ -324,8 +347,11 @@ pub fn parse_slicers(xml: &[u8]) -> Result<Slicers> {
         }
     }
 
-    if !root_seen || !root_closed || depth != 0 || extension_start.is_some() || current.is_some() {
-        return Err(invalid("incomplete Slicers XML"));
+    match phase {
+        RootPhase::Closed if depth == 0 && extension_start.is_none() && current.is_none() => {},
+        RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("incomplete Slicers XML"));
+        },
     }
     let value = Slicers {
         slicers,
