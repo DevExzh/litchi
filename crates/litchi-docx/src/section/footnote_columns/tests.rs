@@ -497,3 +497,129 @@ fn public_snapshot_bytes_survive_source_part_drop() {
         br#"<w:sectPr><w12:footnoteColumns w:val="5"/></w:sectPr>"#
     );
 }
+
+/// Outcome of `codec::read_with_context` for one input, as frozen text.
+fn footnote_columns_section_envelope_outcome(xml: &str) -> String {
+    match codec::read_with_context(xml.as_bytes(), &Context::default()) {
+        Ok(_) => "Ok".to_owned(),
+        Err(error) => format!("{error:?}"),
+    }
+}
+
+#[test]
+fn footnote_columns_section_xml_envelope_matrix() {
+    let rows: [(&str, &str, &str); 21] = [
+        (
+            "empty input",
+            "",
+            r#"InvalidFormat("section XML has an incomplete sectPr")"#,
+        ),
+        (
+            "whitespace only",
+            " \n",
+            r#"InvalidFormat("section XML has an incomplete sectPr")"#,
+        ),
+        (
+            "declaration only",
+            r#"<?xml version="1.0" encoding="UTF-8"?>"#,
+            r#"InvalidFormat("section XML has an incomplete sectPr")"#,
+        ),
+        (
+            "empty-element root",
+            r#"<w:sectPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+            "Ok",
+        ),
+        (
+            "start and end root",
+            r#"<w:sectPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:sectPr>"#,
+            "Ok",
+        ),
+        (
+            "root then whitespace",
+            "<w:sectPr xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"></w:sectPr>\n ",
+            "Ok",
+        ),
+        (
+            "root then comment",
+            r#"<w:sectPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:sectPr><!--c-->"#,
+            "Ok",
+        ),
+        (
+            "root then processing instruction",
+            r#"<w:sectPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:sectPr><?pi x?>"#,
+            "Ok",
+        ),
+        (
+            "root then text",
+            r#"<w:sectPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:sectPr>text"#,
+            r#"InvalidFormat("section XML has text outside sectPr")"#,
+        ),
+        (
+            "root then a second identical root",
+            r#"<w:sectPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:sectPr><w:sectPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:sectPr>"#,
+            r#"InvalidFormat("section XML has an invalid sectPr root")"#,
+        ),
+        (
+            "root then a foreign start element",
+            r#"<w:sectPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:sectPr><foreign></foreign>"#,
+            r#"InvalidFormat("section XML has an invalid sectPr root")"#,
+        ),
+        (
+            "root then a foreign empty element",
+            r#"<w:sectPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:sectPr><foreign/>"#,
+            r#"InvalidFormat("section XML has an invalid sectPr root")"#,
+        ),
+        (
+            "declaration after the root",
+            r#"<w:sectPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:sectPr><?xml version="1.0" encoding="UTF-8"?>"#,
+            "Ok",
+        ),
+        (
+            "two declarations",
+            r#"<?xml version="1.0" encoding="UTF-8"?><?xml version="1.0" encoding="UTF-8"?><w:sectPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:sectPr>"#,
+            "Ok",
+        ),
+        (
+            "comment before the declaration",
+            r#"<!--c--><?xml version="1.0" encoding="UTF-8"?><w:sectPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:sectPr>"#,
+            "Ok",
+        ),
+        (
+            "text before the root",
+            r#"text<w:sectPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:sectPr>"#,
+            r#"InvalidFormat("section XML has text outside sectPr")"#,
+        ),
+        (
+            "unterminated root",
+            r#"<w:sectPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">"#,
+            r#"InvalidFormat("section XML has an incomplete sectPr")"#,
+        ),
+        (
+            "stray end tag",
+            r#"<w:sectPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:sectPr></w:sectPr>"#,
+            r#"Xml("ill-formed document: close tag `</w:sectPr>` does not match any open tag")"#,
+        ),
+        (
+            "document type declaration",
+            r#"<!DOCTYPE x><w:sectPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:sectPr>"#,
+            "Ok",
+        ),
+        (
+            "top-level character data section",
+            r#"<![CDATA[x]]><w:sectPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:sectPr>"#,
+            r#"InvalidFormat("section XML has text outside sectPr")"#,
+        ),
+        (
+            "declaration then root",
+            r#"<?xml version="1.0" encoding="UTF-8"?><w:sectPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:sectPr>"#,
+            "Ok",
+        ),
+    ];
+    for (name, xml, expected) in rows {
+        assert_eq!(
+            footnote_columns_section_envelope_outcome(xml),
+            expected,
+            "{name}"
+        );
+    }
+}

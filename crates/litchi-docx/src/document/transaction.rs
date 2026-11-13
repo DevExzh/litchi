@@ -16585,4 +16585,121 @@ mod tests {
             assert_eq!(edit.projected().xml_bytes(), base.xml_bytes());
         }
     }
+
+    /// Outcome of `body_child_shape` for one input, as frozen text.
+    fn body_child_shape_envelope_outcome(xml: &str) -> String {
+        match body_child_shape(xml.as_bytes()) {
+            Some(shape) => format!(
+                "Some(nodes={}, depth={}, tag={})",
+                shape.nodes, shape.max_depth, shape.root_tag_len
+            ),
+            None => "None".to_owned(),
+        }
+    }
+
+    #[test]
+    fn body_child_shape_xml_envelope_matrix() {
+        let rows: [(&str, &str, &str); 21] = [
+            ("empty input", "", "None"),
+            ("whitespace only", " \n", "None"),
+            (
+                "declaration only",
+                r#"<?xml version="1.0" encoding="UTF-8"?>"#,
+                "None",
+            ),
+            (
+                "empty-element root",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+                "Some(nodes=1, depth=1, tag=77)",
+            ),
+            (
+                "start and end root",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p>"#,
+                "Some(nodes=2, depth=2, tag=76)",
+            ),
+            (
+                "root then whitespace",
+                "<w:p xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:r/></w:p>\n ",
+                "None",
+            ),
+            (
+                "root then comment",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p><!--c-->"#,
+                "None",
+            ),
+            (
+                "root then processing instruction",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p><?pi x?>"#,
+                "None",
+            ),
+            (
+                "root then text",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p>text"#,
+                "None",
+            ),
+            (
+                "root then a second identical root",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p><w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p>"#,
+                "None",
+            ),
+            (
+                "root then a foreign start element",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p><foreign></foreign>"#,
+                "None",
+            ),
+            (
+                "root then a foreign empty element",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p><foreign/>"#,
+                "None",
+            ),
+            (
+                "declaration after the root",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p><?xml version="1.0" encoding="UTF-8"?>"#,
+                "None",
+            ),
+            (
+                "two declarations",
+                r#"<?xml version="1.0" encoding="UTF-8"?><?xml version="1.0" encoding="UTF-8"?><w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p>"#,
+                "None",
+            ),
+            (
+                "comment before the declaration",
+                r#"<!--c--><?xml version="1.0" encoding="UTF-8"?><w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p>"#,
+                "None",
+            ),
+            (
+                "text before the root",
+                r#"text<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p>"#,
+                "None",
+            ),
+            (
+                "unterminated root",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/>"#,
+                "None",
+            ),
+            (
+                "stray end tag",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p></w:p>"#,
+                "None",
+            ),
+            (
+                "document type declaration",
+                r#"<!DOCTYPE x><w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p>"#,
+                "None",
+            ),
+            (
+                "top-level character data section",
+                r#"<![CDATA[x]]><w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p>"#,
+                "None",
+            ),
+            (
+                "declaration then root",
+                r#"<?xml version="1.0" encoding="UTF-8"?><w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p>"#,
+                "None",
+            ),
+        ];
+        for (name, xml, expected) in rows {
+            assert_eq!(body_child_shape_envelope_outcome(xml), expected, "{name}");
+        }
+    }
 }

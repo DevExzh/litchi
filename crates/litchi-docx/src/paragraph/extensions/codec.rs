@@ -352,3 +352,130 @@ pub(crate) fn parse_paragraph_start(
         other => other,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Outcome of `parse_root` for one input, as frozen text.
+    fn parse_root_envelope_outcome(xml: &str) -> String {
+        match parse_root(xml.as_bytes(), b"p", true) {
+            Ok(_) => "Ok".to_owned(),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_root_xml_envelope_matrix() {
+        let rows: [(&str, &str, &str); 21] = [
+            (
+                "empty input",
+                "",
+                r#"InvalidFormat("Word extension XML is missing a complete root")"#,
+            ),
+            (
+                "whitespace only",
+                " \n",
+                r#"InvalidFormat("Word extension XML is missing a complete root")"#,
+            ),
+            (
+                "declaration only",
+                r#"<?xml version="1.0" encoding="UTF-8"?>"#,
+                r#"InvalidFormat("Word extension XML is missing a complete root")"#,
+            ),
+            (
+                "empty-element root",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+                "Ok",
+            ),
+            (
+                "start and end root",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:p>"#,
+                "Ok",
+            ),
+            (
+                "root then whitespace",
+                "<w:p xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"></w:p>\n ",
+                "Ok",
+            ),
+            (
+                "root then comment",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:p><!--c-->"#,
+                "Ok",
+            ),
+            (
+                "root then processing instruction",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:p><?pi x?>"#,
+                r#"InvalidFormat("Word extension XML cannot contain a DTD or processing instruction")"#,
+            ),
+            (
+                "root then text",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:p>text"#,
+                r#"InvalidFormat("Word extension XML has text outside its root")"#,
+            ),
+            (
+                "root then a second identical root",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:p><w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:p>"#,
+                r#"InvalidFormat("Word extension XML must have one [112] root")"#,
+            ),
+            (
+                "root then a foreign start element",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:p><foreign></foreign>"#,
+                r#"InvalidFormat("Word extension XML must have one [112] root")"#,
+            ),
+            (
+                "root then a foreign empty element",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:p><foreign/>"#,
+                r#"InvalidFormat("Word extension XML must have one [112] root")"#,
+            ),
+            (
+                "declaration after the root",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:p><?xml version="1.0" encoding="UTF-8"?>"#,
+                "Ok",
+            ),
+            (
+                "two declarations",
+                r#"<?xml version="1.0" encoding="UTF-8"?><?xml version="1.0" encoding="UTF-8"?><w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:p>"#,
+                "Ok",
+            ),
+            (
+                "comment before the declaration",
+                r#"<!--c--><?xml version="1.0" encoding="UTF-8"?><w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:p>"#,
+                "Ok",
+            ),
+            (
+                "text before the root",
+                r#"text<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:p>"#,
+                r#"InvalidFormat("Word extension XML has text outside its root")"#,
+            ),
+            (
+                "unterminated root",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">"#,
+                r#"InvalidFormat("Word extension XML is missing a complete root")"#,
+            ),
+            (
+                "stray end tag",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:p></w:p>"#,
+                r#"Xml("ill-formed document: close tag `</w:p>` does not match any open tag")"#,
+            ),
+            (
+                "document type declaration",
+                r#"<!DOCTYPE x><w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:p>"#,
+                r#"InvalidFormat("Word extension XML cannot contain a DTD or processing instruction")"#,
+            ),
+            (
+                "top-level character data section",
+                r#"<![CDATA[x]]><w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:p>"#,
+                r#"InvalidFormat("Word extension XML has content outside its root")"#,
+            ),
+            (
+                "declaration then root",
+                r#"<?xml version="1.0" encoding="UTF-8"?><w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:p>"#,
+                "Ok",
+            ),
+        ];
+        for (name, xml, expected) in rows {
+            assert_eq!(parse_root_envelope_outcome(xml), expected, "{name}");
+        }
+    }
+}

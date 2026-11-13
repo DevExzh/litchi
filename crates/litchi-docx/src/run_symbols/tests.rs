@@ -101,3 +101,125 @@ impl RunBytes for Run {
         self.xml_bytes()
     }
 }
+
+/// Outcome of `codec::read` for one input, as frozen text.
+fn run_symbols_envelope_outcome(xml: &str) -> String {
+    match codec::read(xml.as_bytes()) {
+        Ok(_) => "Ok".to_owned(),
+        Err(error) => format!("{error:?}"),
+    }
+}
+
+#[test]
+fn run_symbols_xml_envelope_matrix() {
+    let rows: [(&str, &str, &str); 21] = [
+        (
+            "empty input",
+            "",
+            r#"InvalidFormat("unterminated Word run XML")"#,
+        ),
+        (
+            "whitespace only",
+            " \n",
+            r#"InvalidFormat("unterminated Word run XML")"#,
+        ),
+        (
+            "declaration only",
+            r#"<?xml version="1.0" encoding="UTF-8"?>"#,
+            r#"InvalidFormat("unterminated Word run XML")"#,
+        ),
+        (
+            "empty-element root",
+            r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+            "Ok",
+        ),
+        (
+            "start and end root",
+            r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r>"#,
+            "Ok",
+        ),
+        (
+            "root then whitespace",
+            "<w:r xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"></w:r>\n ",
+            "Ok",
+        ),
+        (
+            "root then comment",
+            r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r><!--c-->"#,
+            "Ok",
+        ),
+        (
+            "root then processing instruction",
+            r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r><?pi x?>"#,
+            "Ok",
+        ),
+        (
+            "root then text",
+            r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r>text"#,
+            r#"InvalidFormat("Word run XML has text outside its root")"#,
+        ),
+        (
+            "root then a second identical root",
+            r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r><w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r>"#,
+            r#"InvalidFormat("Word run XML has multiple roots")"#,
+        ),
+        (
+            "root then a foreign start element",
+            r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r><foreign></foreign>"#,
+            r#"InvalidFormat("Word run XML has multiple roots")"#,
+        ),
+        (
+            "root then a foreign empty element",
+            r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r><foreign/>"#,
+            r#"InvalidFormat("Word run XML has multiple roots")"#,
+        ),
+        (
+            "declaration after the root",
+            r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r><?xml version="1.0" encoding="UTF-8"?>"#,
+            "Ok",
+        ),
+        (
+            "two declarations",
+            r#"<?xml version="1.0" encoding="UTF-8"?><?xml version="1.0" encoding="UTF-8"?><w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r>"#,
+            "Ok",
+        ),
+        (
+            "comment before the declaration",
+            r#"<!--c--><?xml version="1.0" encoding="UTF-8"?><w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r>"#,
+            "Ok",
+        ),
+        (
+            "text before the root",
+            r#"text<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r>"#,
+            r#"InvalidFormat("Word run XML has text outside its root")"#,
+        ),
+        (
+            "unterminated root",
+            r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">"#,
+            r#"InvalidFormat("unterminated Word run XML")"#,
+        ),
+        (
+            "stray end tag",
+            r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r></w:r>"#,
+            r#"Xml("ill-formed document: close tag `</w:r>` does not match any open tag")"#,
+        ),
+        (
+            "document type declaration",
+            r#"<!DOCTYPE x><w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r>"#,
+            "Ok",
+        ),
+        (
+            "top-level character data section",
+            r#"<![CDATA[x]]><w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r>"#,
+            r#"InvalidFormat("Word run XML has character data outside its root")"#,
+        ),
+        (
+            "declaration then root",
+            r#"<?xml version="1.0" encoding="UTF-8"?><w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r>"#,
+            "Ok",
+        ),
+    ];
+    for (name, xml, expected) in rows {
+        assert_eq!(run_symbols_envelope_outcome(xml), expected, "{name}");
+    }
+}

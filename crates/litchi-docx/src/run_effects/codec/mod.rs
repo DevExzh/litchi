@@ -1250,3 +1250,135 @@ fn path_str(value: PathKind) -> &'static str {
 fn on_off_str(value: bool) -> &'static str {
     if value { "1" } else { "0" }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::parse;
+
+    /// Outcome of `parse` for one input, as frozen text.
+    fn run_effects_parse_envelope_outcome(xml: &str) -> String {
+        match parse(xml.as_bytes()) {
+            Ok(effects) => format!("Ok({effects:?})"),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    #[test]
+    fn run_effects_parse_xml_envelope_matrix() {
+        let rows: [(&str, &str, &str); 22] = [
+            (
+                "empty input",
+                "",
+                r#"InvalidFormat("Word run effects XML is not one complete element")"#,
+            ),
+            (
+                "whitespace only",
+                " \n",
+                r#"InvalidFormat("Word run effects XML is not one complete element")"#,
+            ),
+            (
+                "declaration only",
+                r#"<?xml version="1.0" encoding="UTF-8"?>"#,
+                r#"InvalidFormat("Word run effects XML cannot contain declarations or processing instructions")"#,
+            ),
+            (
+                "empty-element root",
+                r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+                "Ok(Effects { values: [] })",
+            ),
+            (
+                "start and end root",
+                r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr><w:b/></w:rPr></w:r>"#,
+                "Ok(Effects { values: [Unknown(OpaqueExtension { xml: [60, 119, 58, 98, 47, 62] })] })",
+            ),
+            (
+                "root then whitespace",
+                "<w:r xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:rPr><w:b/></w:rPr></w:r>\n ",
+                "Ok(Effects { values: [Unknown(OpaqueExtension { xml: [60, 119, 58, 98, 47, 62] })] })",
+            ),
+            (
+                "root then comment",
+                r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr><w:b/></w:rPr></w:r><!--c-->"#,
+                "Ok(Effects { values: [Unknown(OpaqueExtension { xml: [60, 119, 58, 98, 47, 62] })] })",
+            ),
+            (
+                "root then processing instruction",
+                r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr><w:b/></w:rPr></w:r><?pi x?>"#,
+                r#"InvalidFormat("Word run effects XML cannot contain declarations or processing instructions")"#,
+            ),
+            (
+                "root then text",
+                r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr><w:b/></w:rPr></w:r>text"#,
+                "Ok(Effects { values: [Unknown(OpaqueExtension { xml: [60, 119, 58, 98, 47, 62] })] })",
+            ),
+            (
+                "root then a second identical root",
+                r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr><w:b/></w:rPr></w:r><w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr><w:b/></w:rPr></w:r>"#,
+                "Ok(Effects { values: [Unknown(OpaqueExtension { xml: [60, 119, 58, 98, 47, 62] }), Unknown(OpaqueExtension { xml: [60, 119, 58, 98, 47, 62] })] })",
+            ),
+            (
+                "root then a foreign start element",
+                r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr><w:b/></w:rPr></w:r><foreign></foreign>"#,
+                "Ok(Effects { values: [Unknown(OpaqueExtension { xml: [60, 119, 58, 98, 47, 62] })] })",
+            ),
+            (
+                "root then a foreign empty element",
+                r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr><w:b/></w:rPr></w:r><foreign/>"#,
+                "Ok(Effects { values: [Unknown(OpaqueExtension { xml: [60, 119, 58, 98, 47, 62] })] })",
+            ),
+            (
+                "declaration after the root",
+                r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr><w:b/></w:rPr></w:r><?xml version="1.0" encoding="UTF-8"?>"#,
+                r#"InvalidFormat("Word run effects XML cannot contain declarations or processing instructions")"#,
+            ),
+            (
+                "two declarations",
+                r#"<?xml version="1.0" encoding="UTF-8"?><?xml version="1.0" encoding="UTF-8"?><w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr><w:b/></w:rPr></w:r>"#,
+                r#"InvalidFormat("Word run effects XML cannot contain declarations or processing instructions")"#,
+            ),
+            (
+                "comment before the declaration",
+                r#"<!--c--><?xml version="1.0" encoding="UTF-8"?><w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr><w:b/></w:rPr></w:r>"#,
+                r#"InvalidFormat("Word run effects XML cannot contain declarations or processing instructions")"#,
+            ),
+            (
+                "text before the root",
+                r#"text<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr><w:b/></w:rPr></w:r>"#,
+                "Ok(Effects { values: [Unknown(OpaqueExtension { xml: [60, 119, 58, 98, 47, 62] })] })",
+            ),
+            (
+                "unterminated root",
+                r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr><w:b/></w:rPr>"#,
+                r#"InvalidFormat("Word run effects XML is not one complete element")"#,
+            ),
+            (
+                "stray end tag",
+                r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr><w:b/></w:rPr></w:r></w:r>"#,
+                r#"Xml("ill-formed document: close tag `</w:r>` does not match any open tag")"#,
+            ),
+            (
+                "document type declaration",
+                r#"<!DOCTYPE x><w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr><w:b/></w:rPr></w:r>"#,
+                r#"InvalidFormat("Word run effects XML cannot contain declarations or processing instructions")"#,
+            ),
+            (
+                "top-level character data section",
+                r#"<![CDATA[x]]><w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr><w:b/></w:rPr></w:r>"#,
+                "Ok(Effects { values: [Unknown(OpaqueExtension { xml: [60, 119, 58, 98, 47, 62] })] })",
+            ),
+            (
+                "declaration then root",
+                r#"<?xml version="1.0" encoding="UTF-8"?><w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr><w:b/></w:rPr></w:r>"#,
+                r#"InvalidFormat("Word run effects XML cannot contain declarations or processing instructions")"#,
+            ),
+            (
+                "root then a later run with an effect",
+                r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/><w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"><w14:ligatures w14:val="all"/></w:rPr>"#,
+                "Ok(Effects { values: [Unknown(OpaqueExtension { xml: [60, 119, 49, 52, 58, 108, 105, 103, 97, 116, 117, 114, 101, 115, 32, 119, 49, 52, 58, 118, 97, 108, 61, 34, 97, 108, 108, 34, 47, 62] })] })",
+            ),
+        ];
+        for (name, xml, expected) in rows {
+            assert_eq!(run_effects_parse_envelope_outcome(xml), expected, "{name}");
+        }
+    }
+}

@@ -341,3 +341,145 @@ fn reference_values_include_inactive_branches_and_unknown_attribute_tokens() {
         assert!(values.iter().any(|candidate| candidate == value), "{value}");
     }
 }
+
+/// Outcome of `reference_values` for one input, as frozen text.
+fn reference_values_envelope_outcome(xml: &str) -> String {
+    match reference_values(xml.as_bytes(), Limits::default()) {
+        Ok(values) => format!("Ok({})", values.len()),
+        Err(error) => format!("{error:?}"),
+    }
+}
+
+#[test]
+fn reference_values_xml_envelope_matrix() {
+    let rows: [(&str, &str, &str); 25] = [
+        (
+            "empty input",
+            "",
+            r#"Invalid("DOCX story has an unterminated XML root")"#,
+        ),
+        (
+            "whitespace only",
+            " \n",
+            r#"Invalid("DOCX story has an unterminated XML root")"#,
+        ),
+        (
+            "declaration only",
+            r#"<?xml version="1.0" encoding="UTF-8"?>"#,
+            r#"Invalid("DOCX story has an unterminated XML root")"#,
+        ),
+        (
+            "empty-element root",
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+            "Ok(1)",
+        ),
+        (
+            "start and end root",
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+            "Ok(1)",
+        ),
+        (
+            "root then whitespace",
+            "<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body><w:p/></w:body></w:document>\n ",
+            "Ok(1)",
+        ),
+        (
+            "root then comment",
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><!--c-->"#,
+            "Ok(1)",
+        ),
+        (
+            "root then processing instruction",
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><?pi x?>"#,
+            r#"Invalid("DOCX story rejects processing instructions")"#,
+        ),
+        (
+            "root then text",
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>text"#,
+            r#"Invalid("DOCX story has non-whitespace text outside its root")"#,
+        ),
+        (
+            "root then a second identical root",
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+            r#"Invalid("DOCX story has more than one XML root")"#,
+        ),
+        (
+            "root then a foreign start element",
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><foreign></foreign>"#,
+            r#"Invalid("DOCX story has more than one XML root")"#,
+        ),
+        (
+            "root then a foreign empty element",
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><foreign/>"#,
+            r#"Invalid("DOCX story has more than one XML root")"#,
+        ),
+        (
+            "declaration after the root",
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><?xml version="1.0" encoding="UTF-8"?>"#,
+            r#"Invalid("DOCX story has an XML declaration outside its prolog")"#,
+        ),
+        (
+            "two declarations",
+            r#"<?xml version="1.0" encoding="UTF-8"?><?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+            r#"Invalid("DOCX story has an XML declaration outside its prolog")"#,
+        ),
+        (
+            "comment before the declaration",
+            r#"<!--c--><?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+            r#"Invalid("DOCX story has an XML declaration outside its prolog")"#,
+        ),
+        (
+            "text before the root",
+            r#"text<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+            r#"Invalid("DOCX story has non-whitespace text outside its root")"#,
+        ),
+        (
+            "unterminated root",
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body>"#,
+            r#"Invalid("DOCX story has an unterminated XML root")"#,
+        ),
+        (
+            "stray end tag",
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document></w:document>"#,
+            r#"Xml("ill-formed document: close tag `</w:document>` does not match any open tag")"#,
+        ),
+        (
+            "document type declaration",
+            r#"<!DOCTYPE x><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+            r#"Invalid("DOCX story rejects DTDs")"#,
+        ),
+        (
+            "top-level character data section",
+            r#"<![CDATA[x]]><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+            r#"Invalid("DOCX story has CDATA outside its root")"#,
+        ),
+        (
+            "declaration then root",
+            r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+            "Ok(1)",
+        ),
+        (
+            "whitespace before the declaration",
+            r#" <?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+            r#"Invalid("DOCX story has an XML declaration outside its prolog")"#,
+        ),
+        (
+            "comment then root",
+            r#"<!--c--><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+            "Ok(1)",
+        ),
+        (
+            "declaration then comment then root",
+            r#"<?xml version="1.0" encoding="UTF-8"?><!--c--><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+            "Ok(1)",
+        ),
+        (
+            "root then a nested stray declaration",
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><?xml version="1.0" encoding="UTF-8"?></w:document>"#,
+            r#"Invalid("DOCX story has an XML declaration outside its prolog")"#,
+        ),
+    ];
+    for (name, xml, expected) in rows {
+        assert_eq!(reference_values_envelope_outcome(xml), expected, "{name}");
+    }
+}

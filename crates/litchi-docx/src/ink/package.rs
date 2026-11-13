@@ -2055,4 +2055,130 @@ mod tests {
         let source = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions><i:brush><i:brushProperty/></i:brush></i:definitions></i:ink>"##;
         assert!(validate_content_part(source).is_err());
     }
+
+    /// Outcome of `validate_content_part` for one input, as frozen text.
+    fn validate_content_part_envelope_outcome(xml: &str) -> String {
+        match validate_content_part(xml.as_bytes()) {
+            Ok(_) => "Ok".to_owned(),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    #[test]
+    fn validate_content_part_xml_envelope_matrix() {
+        let rows: [(&str, &str, &str); 21] = [
+            (
+                "empty input",
+                "",
+                r#"Invalid("DOCX Ink content part root is absent or unterminated")"#,
+            ),
+            (
+                "whitespace only",
+                " \n",
+                r#"Invalid("DOCX Ink content part root is absent or unterminated")"#,
+            ),
+            (
+                "declaration only",
+                r#"<?xml version="1.0" encoding="UTF-8"?>"#,
+                r#"Invalid("DOCX Ink content part root is absent or unterminated")"#,
+            ),
+            (
+                "empty-element root",
+                r#"<i:ink xmlns:i="http://www.w3.org/2003/InkML"/>"#,
+                "Ok",
+            ),
+            (
+                "start and end root",
+                r#"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions/></i:ink>"#,
+                "Ok",
+            ),
+            (
+                "root then whitespace",
+                "<i:ink xmlns:i=\"http://www.w3.org/2003/InkML\"><i:definitions/></i:ink>\n ",
+                "Ok",
+            ),
+            (
+                "root then comment",
+                r#"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions/></i:ink><!--c-->"#,
+                "Ok",
+            ),
+            (
+                "root then processing instruction",
+                r#"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions/></i:ink><?pi x?>"#,
+                "Ok",
+            ),
+            (
+                "root then text",
+                r#"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions/></i:ink>text"#,
+                "Ok",
+            ),
+            (
+                "root then a second identical root",
+                r#"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions/></i:ink><i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions/></i:ink>"#,
+                r#"Invalid("DOCX Ink content part has content after its root")"#,
+            ),
+            (
+                "root then a foreign start element",
+                r#"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions/></i:ink><foreign></foreign>"#,
+                r#"Invalid("DOCX Ink content part has content after its root")"#,
+            ),
+            (
+                "root then a foreign empty element",
+                r#"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions/></i:ink><foreign/>"#,
+                r#"Invalid("DOCX Ink content part has content after its root")"#,
+            ),
+            (
+                "declaration after the root",
+                r#"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions/></i:ink><?xml version="1.0" encoding="UTF-8"?>"#,
+                "Ok",
+            ),
+            (
+                "two declarations",
+                r#"<?xml version="1.0" encoding="UTF-8"?><?xml version="1.0" encoding="UTF-8"?><i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions/></i:ink>"#,
+                "Ok",
+            ),
+            (
+                "comment before the declaration",
+                r#"<!--c--><?xml version="1.0" encoding="UTF-8"?><i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions/></i:ink>"#,
+                "Ok",
+            ),
+            (
+                "text before the root",
+                r#"text<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions/></i:ink>"#,
+                "Ok",
+            ),
+            (
+                "unterminated root",
+                r#"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions/>"#,
+                r#"Invalid("DOCX Ink content part root is absent or unterminated")"#,
+            ),
+            (
+                "stray end tag",
+                r#"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions/></i:ink></i:ink>"#,
+                r#"Xml("ill-formed document: close tag `</i:ink>` does not match any open tag")"#,
+            ),
+            (
+                "document type declaration",
+                r#"<!DOCTYPE x><i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions/></i:ink>"#,
+                "Ok",
+            ),
+            (
+                "top-level character data section",
+                r#"<![CDATA[x]]><i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions/></i:ink>"#,
+                "Ok",
+            ),
+            (
+                "declaration then root",
+                r#"<?xml version="1.0" encoding="UTF-8"?><i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions/></i:ink>"#,
+                "Ok",
+            ),
+        ];
+        for (name, xml, expected) in rows {
+            assert_eq!(
+                validate_content_part_envelope_outcome(xml),
+                expected,
+                "{name}"
+            );
+        }
+    }
 }

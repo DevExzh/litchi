@@ -86,3 +86,125 @@ fn run_facade_reads_and_edits_open_type_features() {
     assert_eq!(value.cntxt_alts, Some(OnOff::off()));
     assert!(run.text().unwrap().contains("Office"));
 }
+
+/// Outcome of `codec::parse` for one input, as frozen text.
+fn open_type_run_envelope_outcome(xml: &str) -> String {
+    match super::codec::parse(xml.as_bytes()) {
+        Ok(_) => "Ok".to_owned(),
+        Err(error) => format!("{error:?}"),
+    }
+}
+
+#[test]
+fn open_type_run_xml_envelope_matrix() {
+    let rows: [(&str, &str, &str); 21] = [
+        (
+            "empty input",
+            "",
+            r#"InvalidFormat("Word OpenType XML is not one complete element")"#,
+        ),
+        (
+            "whitespace only",
+            " \n",
+            r#"InvalidFormat("Word OpenType XML is not one complete element")"#,
+        ),
+        (
+            "declaration only",
+            r#"<?xml version="1.0" encoding="UTF-8"?>"#,
+            r#"InvalidFormat("Word OpenType XML cannot contain declarations or processing instructions")"#,
+        ),
+        (
+            "empty-element root",
+            r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+            "Ok",
+        ),
+        (
+            "start and end root",
+            r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r>"#,
+            "Ok",
+        ),
+        (
+            "root then whitespace",
+            "<w:r xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"></w:r>\n ",
+            "Ok",
+        ),
+        (
+            "root then comment",
+            r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r><!--c-->"#,
+            "Ok",
+        ),
+        (
+            "root then processing instruction",
+            r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r><?pi x?>"#,
+            r#"InvalidFormat("Word OpenType XML cannot contain declarations or processing instructions")"#,
+        ),
+        (
+            "root then text",
+            r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r>text"#,
+            r#"InvalidFormat("Word OpenType XML has text outside its root")"#,
+        ),
+        (
+            "root then a second identical root",
+            r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r><w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r>"#,
+            r#"InvalidFormat("Word OpenType XML must have one w:r or w:rPr root")"#,
+        ),
+        (
+            "root then a foreign start element",
+            r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r><foreign></foreign>"#,
+            r#"InvalidFormat("Word OpenType XML must have one w:r or w:rPr root")"#,
+        ),
+        (
+            "root then a foreign empty element",
+            r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r><foreign/>"#,
+            r#"InvalidFormat("Word OpenType XML must have one w:r or w:rPr root")"#,
+        ),
+        (
+            "declaration after the root",
+            r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r><?xml version="1.0" encoding="UTF-8"?>"#,
+            r#"InvalidFormat("Word OpenType XML cannot contain declarations or processing instructions")"#,
+        ),
+        (
+            "two declarations",
+            r#"<?xml version="1.0" encoding="UTF-8"?><?xml version="1.0" encoding="UTF-8"?><w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r>"#,
+            r#"InvalidFormat("Word OpenType XML cannot contain declarations or processing instructions")"#,
+        ),
+        (
+            "comment before the declaration",
+            r#"<!--c--><?xml version="1.0" encoding="UTF-8"?><w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r>"#,
+            r#"InvalidFormat("Word OpenType XML cannot contain declarations or processing instructions")"#,
+        ),
+        (
+            "text before the root",
+            r#"text<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r>"#,
+            r#"InvalidFormat("Word OpenType XML has text outside its root")"#,
+        ),
+        (
+            "unterminated root",
+            r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">"#,
+            r#"InvalidFormat("Word OpenType XML is not one complete element")"#,
+        ),
+        (
+            "stray end tag",
+            r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r></w:r>"#,
+            r#"Xml("ill-formed document: close tag `</w:r>` does not match any open tag")"#,
+        ),
+        (
+            "document type declaration",
+            r#"<!DOCTYPE x><w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r>"#,
+            r#"InvalidFormat("Word OpenType XML cannot contain declarations or processing instructions")"#,
+        ),
+        (
+            "top-level character data section",
+            r#"<![CDATA[x]]><w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r>"#,
+            r#"InvalidFormat("Word OpenType XML has unexpected character data")"#,
+        ),
+        (
+            "declaration then root",
+            r#"<?xml version="1.0" encoding="UTF-8"?><w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:r>"#,
+            r#"InvalidFormat("Word OpenType XML cannot contain declarations or processing instructions")"#,
+        ),
+    ];
+    for (name, xml, expected) in rows {
+        assert_eq!(open_type_run_envelope_outcome(xml), expected, "{name}");
+    }
+}

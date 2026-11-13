@@ -780,3 +780,157 @@ fn map_execution_error(error: ExecutionError) -> Error {
         error => Error::Opc(litchi_opc::OpcError::Execution(error)),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::guard_settings_source;
+
+    /// Outcome of `guard_settings_source` for one input, as frozen text.
+    fn guard_settings_source_envelope_outcome(xml: &str) -> String {
+        match guard_settings_source(xml.as_bytes(), None) {
+            Ok(facts) => format!(
+                "Ok(events={}, track_revisions={})",
+                facts.event_count, facts.track_revisions
+            ),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    #[test]
+    fn guard_settings_source_xml_envelope_matrix() {
+        let rows: [(&str, &str, &str); 25] = [
+            (
+                "empty input",
+                "",
+                r#"InvalidFormat("settings XML does not contain one complete root")"#,
+            ),
+            (
+                "whitespace only",
+                " \n",
+                r#"InvalidFormat("settings XML does not contain one complete root")"#,
+            ),
+            (
+                "declaration only",
+                r#"<?xml version="1.0" encoding="UTF-8"?>"#,
+                r#"InvalidFormat("settings XML does not contain one complete root")"#,
+            ),
+            (
+                "empty-element root",
+                r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+                "Ok(events=2, track_revisions=false)",
+            ),
+            (
+                "start and end root",
+                r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:trackRevisions/></w:settings>"#,
+                "Ok(events=4, track_revisions=true)",
+            ),
+            (
+                "root then whitespace",
+                "<w:settings xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:trackRevisions/></w:settings>\n ",
+                "Ok(events=5, track_revisions=true)",
+            ),
+            (
+                "root then comment",
+                r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:trackRevisions/></w:settings><!--c-->"#,
+                "Ok(events=5, track_revisions=true)",
+            ),
+            (
+                "root then processing instruction",
+                r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:trackRevisions/></w:settings><?pi x?>"#,
+                r#"Refused(Refusal { kind: UnsupportedContent, operation: "changed document publication", reason: "processing instructions are not admitted in source-bound settings" })"#,
+            ),
+            (
+                "root then text",
+                r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:trackRevisions/></w:settings>text"#,
+                r#"InvalidFormat("settings XML has character data outside its root")"#,
+            ),
+            (
+                "root then a second identical root",
+                r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:trackRevisions/></w:settings><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:trackRevisions/></w:settings>"#,
+                r#"InvalidFormat("settings XML has multiple roots")"#,
+            ),
+            (
+                "root then a foreign start element",
+                r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:trackRevisions/></w:settings><foreign></foreign>"#,
+                r#"InvalidFormat("settings XML has multiple roots")"#,
+            ),
+            (
+                "root then a foreign empty element",
+                r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:trackRevisions/></w:settings><foreign/>"#,
+                r#"InvalidFormat("settings XML has multiple roots")"#,
+            ),
+            (
+                "declaration after the root",
+                r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:trackRevisions/></w:settings><?xml version="1.0" encoding="UTF-8"?>"#,
+                r#"InvalidFormat("settings XML declaration is not in its prolog")"#,
+            ),
+            (
+                "two declarations",
+                r#"<?xml version="1.0" encoding="UTF-8"?><?xml version="1.0" encoding="UTF-8"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:trackRevisions/></w:settings>"#,
+                r#"InvalidFormat("settings XML declaration is not in its prolog")"#,
+            ),
+            (
+                "comment before the declaration",
+                r#"<!--c--><?xml version="1.0" encoding="UTF-8"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:trackRevisions/></w:settings>"#,
+                "Ok(events=6, track_revisions=true)",
+            ),
+            (
+                "text before the root",
+                r#"text<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:trackRevisions/></w:settings>"#,
+                r#"InvalidFormat("settings XML has character data outside its root")"#,
+            ),
+            (
+                "unterminated root",
+                r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:trackRevisions/>"#,
+                r#"InvalidFormat("settings XML does not contain one complete root")"#,
+            ),
+            (
+                "stray end tag",
+                r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:trackRevisions/></w:settings></w:settings>"#,
+                r#"Xml("ill-formed document: close tag `</w:settings>` does not match any open tag")"#,
+            ),
+            (
+                "document type declaration",
+                r#"<!DOCTYPE x><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:trackRevisions/></w:settings>"#,
+                r#"Refused(Refusal { kind: UnsupportedContent, operation: "changed document publication", reason: "DTD declarations are not admitted in source-bound settings" })"#,
+            ),
+            (
+                "top-level character data section",
+                r#"<![CDATA[x]]><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:trackRevisions/></w:settings>"#,
+                r#"InvalidFormat("settings XML has CDATA outside its root")"#,
+            ),
+            (
+                "declaration then root",
+                r#"<?xml version="1.0" encoding="UTF-8"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:trackRevisions/></w:settings>"#,
+                "Ok(events=5, track_revisions=true)",
+            ),
+            (
+                "whitespace before the declaration",
+                r#" <?xml version="1.0" encoding="UTF-8"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:trackRevisions/></w:settings>"#,
+                "Ok(events=6, track_revisions=true)",
+            ),
+            (
+                "comment then root",
+                r#"<!--c--><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:trackRevisions/></w:settings>"#,
+                "Ok(events=5, track_revisions=true)",
+            ),
+            (
+                "declaration then comment then root",
+                r#"<?xml version="1.0" encoding="UTF-8"?><!--c--><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:trackRevisions/></w:settings>"#,
+                "Ok(events=6, track_revisions=true)",
+            ),
+            (
+                "root then a nested stray declaration",
+                r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><?xml version="1.0" encoding="UTF-8"?></w:settings>"#,
+                r#"InvalidFormat("settings XML declaration is not in its prolog")"#,
+            ),
+        ];
+        for (name, xml, expected) in rows {
+            assert_eq!(
+                guard_settings_source_envelope_outcome(xml),
+                expected,
+                "{name}"
+            );
+        }
+    }
+}

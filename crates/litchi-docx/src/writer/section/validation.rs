@@ -373,4 +373,130 @@ mod tests {
         });
         assert!(section.validate().is_err());
     }
+
+    /// Outcome of `validate_header_footer_xml` for one input, as frozen text.
+    fn validate_header_footer_xml_envelope_outcome(xml: &str) -> String {
+        match super::validate_header_footer_xml(xml, true) {
+            Ok(_) => "Ok".to_owned(),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    #[test]
+    fn validate_header_footer_xml_xml_envelope_matrix() {
+        let rows: [(&str, &str, &str); 21] = [
+            (
+                "empty input",
+                "",
+                r#"InvalidFormat("unterminated section header/footer XML")"#,
+            ),
+            (
+                "whitespace only",
+                " \n",
+                r#"InvalidFormat("unterminated section header/footer XML")"#,
+            ),
+            (
+                "declaration only",
+                r#"<?xml version="1.0" encoding="UTF-8"?>"#,
+                r#"InvalidFormat("unterminated section header/footer XML")"#,
+            ),
+            (
+                "empty-element root",
+                r#"<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+                "Ok",
+            ),
+            (
+                "start and end root",
+                r#"<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p/></w:hdr>"#,
+                "Ok",
+            ),
+            (
+                "root then whitespace",
+                "<w:hdr xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:p/></w:hdr>\n ",
+                "Ok",
+            ),
+            (
+                "root then comment",
+                r#"<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p/></w:hdr><!--c-->"#,
+                r#"InvalidFormat("header/footer XML has trailing markup")"#,
+            ),
+            (
+                "root then processing instruction",
+                r#"<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p/></w:hdr><?pi x?>"#,
+                r#"InvalidFormat("header/footer XML has trailing markup")"#,
+            ),
+            (
+                "root then text",
+                r#"<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p/></w:hdr>text"#,
+                r#"InvalidFormat("header/footer XML has trailing non-whitespace text")"#,
+            ),
+            (
+                "root then a second identical root",
+                r#"<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p/></w:hdr><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p/></w:hdr>"#,
+                r#"InvalidFormat("section header/footer XML has an invalid root")"#,
+            ),
+            (
+                "root then a foreign start element",
+                r#"<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p/></w:hdr><foreign></foreign>"#,
+                r#"InvalidFormat("section header/footer XML has an invalid root")"#,
+            ),
+            (
+                "root then a foreign empty element",
+                r#"<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p/></w:hdr><foreign/>"#,
+                r#"InvalidFormat("section header/footer XML has an invalid root")"#,
+            ),
+            (
+                "declaration after the root",
+                r#"<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p/></w:hdr><?xml version="1.0" encoding="UTF-8"?>"#,
+                r#"InvalidFormat("header/footer XML has trailing markup")"#,
+            ),
+            (
+                "two declarations",
+                r#"<?xml version="1.0" encoding="UTF-8"?><?xml version="1.0" encoding="UTF-8"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p/></w:hdr>"#,
+                "Ok",
+            ),
+            (
+                "comment before the declaration",
+                r#"<!--c--><?xml version="1.0" encoding="UTF-8"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p/></w:hdr>"#,
+                "Ok",
+            ),
+            (
+                "text before the root",
+                r#"text<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p/></w:hdr>"#,
+                r#"InvalidFormat("header/footer XML has trailing non-whitespace text")"#,
+            ),
+            (
+                "unterminated root",
+                r#"<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p/>"#,
+                r#"InvalidFormat("unterminated section header/footer XML")"#,
+            ),
+            (
+                "stray end tag",
+                r#"<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p/></w:hdr></w:hdr>"#,
+                r#"Xml("ill-formed document: close tag `</w:hdr>` does not match any open tag")"#,
+            ),
+            (
+                "document type declaration",
+                r#"<!DOCTYPE x><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p/></w:hdr>"#,
+                r#"InvalidFormat("header/footer XML has invalid content outside its root")"#,
+            ),
+            (
+                "top-level character data section",
+                r#"<![CDATA[x]]><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p/></w:hdr>"#,
+                r#"InvalidFormat("header/footer XML has invalid content outside its root")"#,
+            ),
+            (
+                "declaration then root",
+                r#"<?xml version="1.0" encoding="UTF-8"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p/></w:hdr>"#,
+                "Ok",
+            ),
+        ];
+        for (name, xml, expected) in rows {
+            assert_eq!(
+                validate_header_footer_xml_envelope_outcome(xml),
+                expected,
+                "{name}"
+            );
+        }
+    }
 }

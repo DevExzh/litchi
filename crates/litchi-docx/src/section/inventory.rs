@@ -1779,4 +1779,130 @@ mod tests {
         assert_eq!(add_arc_slice_bytes(usize::MAX, 1, 1), None);
         assert_eq!(add_vec_bytes(usize::MAX, 1, 1), None);
     }
+
+    /// Outcome of `scan_visible_document` for one input, as frozen text.
+    fn scan_visible_document_envelope_outcome(xml: &str) -> String {
+        match scan_visible_document(xml.as_bytes(), &Limits::default()) {
+            Ok(inventory) => format!("Ok({})", inventory.sections.len()),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    #[test]
+    fn scan_visible_document_xml_envelope_matrix() {
+        let rows: [(&str, &str, &str); 21] = [
+            (
+                "empty input",
+                "",
+                r#"InvalidFormat("main-document section inventory requires one w:document/w:body")"#,
+            ),
+            (
+                "whitespace only",
+                " \n",
+                r#"InvalidFormat("main-document section inventory requires one w:document/w:body")"#,
+            ),
+            (
+                "declaration only",
+                r#"<?xml version="1.0" encoding="UTF-8"?>"#,
+                r#"InvalidFormat("main-document section inventory requires one w:document/w:body")"#,
+            ),
+            (
+                "empty-element root",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+                r#"InvalidFormat("main-document root omits w:body")"#,
+            ),
+            (
+                "start and end root",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                "Ok(1)",
+            ),
+            (
+                "root then whitespace",
+                "<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body><w:p/></w:body></w:document>\n ",
+                "Ok(1)",
+            ),
+            (
+                "root then comment",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><!--c-->"#,
+                "Ok(1)",
+            ),
+            (
+                "root then processing instruction",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><?pi x?>"#,
+                "Ok(1)",
+            ),
+            (
+                "root then text",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>text"#,
+                r#"InvalidFormat("main-document XML has trailing character data")"#,
+            ),
+            (
+                "root then a second identical root",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                r#"InvalidFormat("main-document XML has content after w:document")"#,
+            ),
+            (
+                "root then a foreign start element",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><foreign></foreign>"#,
+                r#"InvalidFormat("main-document XML has content after w:document")"#,
+            ),
+            (
+                "root then a foreign empty element",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><foreign/>"#,
+                r#"InvalidFormat("main-document XML has content after w:document")"#,
+            ),
+            (
+                "declaration after the root",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><?xml version="1.0" encoding="UTF-8"?>"#,
+                "Ok(1)",
+            ),
+            (
+                "two declarations",
+                r#"<?xml version="1.0" encoding="UTF-8"?><?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                "Ok(1)",
+            ),
+            (
+                "comment before the declaration",
+                r#"<!--c--><?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                "Ok(1)",
+            ),
+            (
+                "text before the root",
+                r#"text<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                "Ok(1)",
+            ),
+            (
+                "unterminated root",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body>"#,
+                r#"InvalidFormat("unterminated main-document XML")"#,
+            ),
+            (
+                "stray end tag",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document></w:document>"#,
+                r#"Xml("ill-formed document: close tag `</w:document>` does not match any open tag")"#,
+            ),
+            (
+                "document type declaration",
+                r#"<!DOCTYPE x><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                "Ok(1)",
+            ),
+            (
+                "top-level character data section",
+                r#"<![CDATA[x]]><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                "Ok(1)",
+            ),
+            (
+                "declaration then root",
+                r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                "Ok(1)",
+            ),
+        ];
+        for (name, xml, expected) in rows {
+            assert_eq!(
+                scan_visible_document_envelope_outcome(xml),
+                expected,
+                "{name}"
+            );
+        }
+    }
 }

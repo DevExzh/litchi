@@ -2298,4 +2298,130 @@ mod tests {
         .ok()?;
         reader.read("word/document.xml").ok()
     }
+
+    /// Outcome of `preflight_semantic_xml` for one input, as frozen text.
+    fn preflight_semantic_xml_envelope_outcome(xml: &str) -> String {
+        match preflight_semantic_xml(xml.as_bytes(), &mut || Ok(())) {
+            Ok(_) => "Ok".to_owned(),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    #[test]
+    fn preflight_semantic_xml_xml_envelope_matrix() {
+        let rows: [(&str, &str, &str); 21] = [
+            (
+                "empty input",
+                "",
+                r#"InvalidFormat("semantic DOCX XML lacks an element root")"#,
+            ),
+            (
+                "whitespace only",
+                " \n",
+                r#"InvalidFormat("semantic DOCX XML lacks an element root")"#,
+            ),
+            (
+                "declaration only",
+                r#"<?xml version="1.0" encoding="UTF-8"?>"#,
+                r#"InvalidFormat("semantic DOCX XML lacks an element root")"#,
+            ),
+            (
+                "empty-element root",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+                "Ok",
+            ),
+            (
+                "start and end root",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p>"#,
+                "Ok",
+            ),
+            (
+                "root then whitespace",
+                "<w:p xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:r/></w:p>\n ",
+                "Ok",
+            ),
+            (
+                "root then comment",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p><!--c-->"#,
+                "Ok",
+            ),
+            (
+                "root then processing instruction",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p><?pi x?>"#,
+                "Ok",
+            ),
+            (
+                "root then text",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p>text"#,
+                "Ok",
+            ),
+            (
+                "root then a second identical root",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p><w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p>"#,
+                r#"InvalidFormat("semantic DOCX XML has multiple roots")"#,
+            ),
+            (
+                "root then a foreign start element",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p><foreign></foreign>"#,
+                r#"InvalidFormat("semantic DOCX XML has multiple roots")"#,
+            ),
+            (
+                "root then a foreign empty element",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p><foreign/>"#,
+                r#"InvalidFormat("semantic DOCX XML has multiple roots")"#,
+            ),
+            (
+                "declaration after the root",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p><?xml version="1.0" encoding="UTF-8"?>"#,
+                "Ok",
+            ),
+            (
+                "two declarations",
+                r#"<?xml version="1.0" encoding="UTF-8"?><?xml version="1.0" encoding="UTF-8"?><w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p>"#,
+                "Ok",
+            ),
+            (
+                "comment before the declaration",
+                r#"<!--c--><?xml version="1.0" encoding="UTF-8"?><w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p>"#,
+                "Ok",
+            ),
+            (
+                "text before the root",
+                r#"text<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p>"#,
+                "Ok",
+            ),
+            (
+                "unterminated root",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/>"#,
+                r#"InvalidFormat("semantic DOCX XML has unbalanced elements")"#,
+            ),
+            (
+                "stray end tag",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p></w:p>"#,
+                r#"Xml("ill-formed document: close tag `</w:p>` does not match any open tag")"#,
+            ),
+            (
+                "document type declaration",
+                r#"<!DOCTYPE x><w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p>"#,
+                "Ok",
+            ),
+            (
+                "top-level character data section",
+                r#"<![CDATA[x]]><w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p>"#,
+                "Ok",
+            ),
+            (
+                "declaration then root",
+                r#"<?xml version="1.0" encoding="UTF-8"?><w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:r/></w:p>"#,
+                "Ok",
+            ),
+        ];
+        for (name, xml, expected) in rows {
+            assert_eq!(
+                preflight_semantic_xml_envelope_outcome(xml),
+                expected,
+                "{name}"
+            );
+        }
+    }
 }

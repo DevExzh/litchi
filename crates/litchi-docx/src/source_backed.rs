@@ -3874,3 +3874,303 @@ fn is_comments_relationship(relationship: &litchi_opc::rel::Relationship) -> boo
                 | litchi_opc::constants::relationship_type::STRICT_COMMENTS
         )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{ensure_source_document_xml, ensure_source_section_inventory_xml};
+
+    /// Outcome of `ensure_source_document_xml` for one input, as frozen text.
+    fn ensure_source_document_xml_envelope_outcome(xml: &str) -> String {
+        match ensure_source_document_xml(xml.as_bytes(), None) {
+            Ok(()) => "Ok".to_owned(),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    #[test]
+    fn ensure_source_document_xml_xml_envelope_matrix() {
+        let rows: [(&str, &str, &str); 25] = [
+            (
+                "empty input",
+                "",
+                r#"InvalidFormat("source-backed document XML does not contain exactly one root")"#,
+            ),
+            (
+                "whitespace only",
+                " \n",
+                r#"InvalidFormat("source-backed document XML does not contain exactly one root")"#,
+            ),
+            (
+                "declaration only",
+                r#"<?xml version="1.0" encoding="UTF-8"?>"#,
+                r#"InvalidFormat("source-backed document XML does not contain exactly one root")"#,
+            ),
+            (
+                "empty-element root",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+                "Ok",
+            ),
+            (
+                "start and end root",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                "Ok",
+            ),
+            (
+                "root then whitespace",
+                "<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body><w:p/></w:body></w:document>\n ",
+                "Ok",
+            ),
+            (
+                "root then comment",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><!--c-->"#,
+                "Ok",
+            ),
+            (
+                "root then processing instruction",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><?pi x?>"#,
+                r#"Refused(Refusal { kind: UnsupportedContent, operation: "source-backed document read", reason: "processing instructions are not accepted in a managed source-backed document" })"#,
+            ),
+            (
+                "root then text",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>text"#,
+                r#"InvalidFormat("source-backed document XML has character data outside its root")"#,
+            ),
+            (
+                "root then a second identical root",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                r#"InvalidFormat("source-backed document XML has multiple roots")"#,
+            ),
+            (
+                "root then a foreign start element",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><foreign></foreign>"#,
+                r#"InvalidFormat("source-backed document XML has multiple roots")"#,
+            ),
+            (
+                "root then a foreign empty element",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><foreign/>"#,
+                r#"InvalidFormat("source-backed document XML has multiple roots")"#,
+            ),
+            (
+                "declaration after the root",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><?xml version="1.0" encoding="UTF-8"?>"#,
+                r#"InvalidFormat("source-backed document XML declaration is not in the prolog")"#,
+            ),
+            (
+                "two declarations",
+                r#"<?xml version="1.0" encoding="UTF-8"?><?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                r#"InvalidFormat("source-backed document XML declaration is not in the prolog")"#,
+            ),
+            (
+                "comment before the declaration",
+                r#"<!--c--><?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                "Ok",
+            ),
+            (
+                "text before the root",
+                r#"text<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                r#"InvalidFormat("source-backed document XML has character data outside its root")"#,
+            ),
+            (
+                "unterminated root",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body>"#,
+                r#"InvalidFormat("unclosed source-backed document XML element")"#,
+            ),
+            (
+                "stray end tag",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document></w:document>"#,
+                r#"Xml("ill-formed document: close tag `</w:document>` does not match any open tag")"#,
+            ),
+            (
+                "document type declaration",
+                r#"<!DOCTYPE x><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                r#"Refused(Refusal { kind: UnsupportedContent, operation: "source-backed document read", reason: "DTD declarations are not accepted in a managed source-backed document" })"#,
+            ),
+            (
+                "top-level character data section",
+                r#"<![CDATA[x]]><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                r#"InvalidFormat("source-backed document XML has CDATA outside its root")"#,
+            ),
+            (
+                "declaration then root",
+                r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                "Ok",
+            ),
+            (
+                "whitespace before the declaration",
+                r#" <?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                "Ok",
+            ),
+            (
+                "comment then root",
+                r#"<!--c--><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                "Ok",
+            ),
+            (
+                "declaration then comment then root",
+                r#"<?xml version="1.0" encoding="UTF-8"?><!--c--><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                "Ok",
+            ),
+            (
+                "root then a nested stray declaration",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><?xml version="1.0" encoding="UTF-8"?></w:document>"#,
+                r#"InvalidFormat("source-backed document XML declaration is not in the prolog")"#,
+            ),
+        ];
+        for (name, xml, expected) in rows {
+            assert_eq!(
+                ensure_source_document_xml_envelope_outcome(xml),
+                expected,
+                "{name}"
+            );
+        }
+    }
+
+    /// Outcome of `ensure_source_section_inventory_xml` for one input, as frozen text.
+    fn ensure_source_section_inventory_xml_envelope_outcome(xml: &str) -> String {
+        match ensure_source_section_inventory_xml(
+            xml.as_bytes(),
+            &crate::section::Limits::default(),
+        ) {
+            Ok(()) => "Ok".to_owned(),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    #[test]
+    fn ensure_source_section_inventory_xml_xml_envelope_matrix() {
+        let rows: [(&str, &str, &str); 25] = [
+            (
+                "empty input",
+                "",
+                r#"InvalidFormat("source-backed section XML does not contain exactly one root")"#,
+            ),
+            (
+                "whitespace only",
+                " \n",
+                r#"InvalidFormat("source-backed section XML does not contain exactly one root")"#,
+            ),
+            (
+                "declaration only",
+                r#"<?xml version="1.0" encoding="UTF-8"?>"#,
+                r#"InvalidFormat("source-backed section XML does not contain exactly one root")"#,
+            ),
+            (
+                "empty-element root",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+                "Ok",
+            ),
+            (
+                "start and end root",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                "Ok",
+            ),
+            (
+                "root then whitespace",
+                "<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body><w:p/></w:body></w:document>\n ",
+                "Ok",
+            ),
+            (
+                "root then comment",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><!--c-->"#,
+                "Ok",
+            ),
+            (
+                "root then processing instruction",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><?pi x?>"#,
+                "Ok",
+            ),
+            (
+                "root then text",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>text"#,
+                r#"InvalidFormat("source-backed section XML has character data outside its root")"#,
+            ),
+            (
+                "root then a second identical root",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                r#"InvalidFormat("source-backed section XML has multiple roots")"#,
+            ),
+            (
+                "root then a foreign start element",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><foreign></foreign>"#,
+                r#"InvalidFormat("source-backed section XML has multiple roots")"#,
+            ),
+            (
+                "root then a foreign empty element",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><foreign/>"#,
+                r#"InvalidFormat("source-backed section XML has multiple roots")"#,
+            ),
+            (
+                "declaration after the root",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><?xml version="1.0" encoding="UTF-8"?>"#,
+                r#"InvalidFormat("source-backed section XML declaration is not in the prolog")"#,
+            ),
+            (
+                "two declarations",
+                r#"<?xml version="1.0" encoding="UTF-8"?><?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                r#"InvalidFormat("source-backed section XML declaration is not in the prolog")"#,
+            ),
+            (
+                "comment before the declaration",
+                r#"<!--c--><?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                "Ok",
+            ),
+            (
+                "text before the root",
+                r#"text<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                r#"InvalidFormat("source-backed section XML has character data outside its root")"#,
+            ),
+            (
+                "unterminated root",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body>"#,
+                r#"InvalidFormat("unclosed source-backed section XML element")"#,
+            ),
+            (
+                "stray end tag",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document></w:document>"#,
+                r#"Xml("ill-formed document: close tag `</w:document>` does not match any open tag")"#,
+            ),
+            (
+                "document type declaration",
+                r#"<!DOCTYPE x><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                r#"Refused(Refusal { kind: UnsupportedContent, operation: "source-backed section inventory", reason: "DTD declarations are not accepted in a source-bound inventory" })"#,
+            ),
+            (
+                "top-level character data section",
+                r#"<![CDATA[x]]><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                r#"InvalidFormat("source-backed section XML has CDATA outside its root")"#,
+            ),
+            (
+                "declaration then root",
+                r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                "Ok",
+            ),
+            (
+                "whitespace before the declaration",
+                r#" <?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                "Ok",
+            ),
+            (
+                "comment then root",
+                r#"<!--c--><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                "Ok",
+            ),
+            (
+                "declaration then comment then root",
+                r#"<?xml version="1.0" encoding="UTF-8"?><!--c--><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                "Ok",
+            ),
+            (
+                "root then a nested stray declaration",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><?xml version="1.0" encoding="UTF-8"?></w:document>"#,
+                r#"InvalidFormat("source-backed section XML declaration is not in the prolog")"#,
+            ),
+        ];
+        for (name, xml, expected) in rows {
+            assert_eq!(
+                ensure_source_section_inventory_xml_envelope_outcome(xml),
+                expected,
+                "{name}"
+            );
+        }
+    }
+}

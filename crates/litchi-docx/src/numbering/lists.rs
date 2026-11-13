@@ -482,4 +482,136 @@ mod tests {
         assert!(opened.ends_with("</w:num></w:numbering>"), "{opened}");
         assert!(opened.contains("\u{2022}"));
     }
+
+    /// Outcome of `scan` for one input, as frozen text.
+    fn numbering_scan_envelope_outcome(xml: &str) -> String {
+        match scan(xml.as_bytes()) {
+            Ok(layout) => format!(
+                "Ok(root_end={}, abstract={}, instances={})",
+                layout.root_end,
+                layout.abstract_ids.len(),
+                layout.instance_ids.len()
+            ),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    #[test]
+    fn numbering_scan_xml_envelope_matrix() {
+        let rows: [(&str, &str, &str); 22] = [
+            (
+                "empty input",
+                "",
+                r#"InvalidFormat("numbering XML has no root element")"#,
+            ),
+            (
+                "whitespace only",
+                " \n",
+                r#"InvalidFormat("numbering XML has no root element")"#,
+            ),
+            (
+                "declaration only",
+                r#"<?xml version="1.0" encoding="UTF-8"?>"#,
+                r#"InvalidFormat("numbering XML has no root element")"#,
+            ),
+            (
+                "empty-element root",
+                r#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+                "Ok(root_end=85, abstract=0, instances=0)",
+            ),
+            (
+                "start and end root",
+                r#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"/></w:numbering>"#,
+                "Ok(root_end=120, abstract=1, instances=0)",
+            ),
+            (
+                "root then whitespace",
+                "<w:numbering xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:abstractNum w:abstractNumId=\"1\"/></w:numbering>\n ",
+                "Ok(root_end=120, abstract=1, instances=0)",
+            ),
+            (
+                "root then comment",
+                r#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"/></w:numbering><!--c-->"#,
+                "Ok(root_end=120, abstract=1, instances=0)",
+            ),
+            (
+                "root then processing instruction",
+                r#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"/></w:numbering><?pi x?>"#,
+                "Ok(root_end=120, abstract=1, instances=0)",
+            ),
+            (
+                "root then text",
+                r#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"/></w:numbering>text"#,
+                "Ok(root_end=120, abstract=1, instances=0)",
+            ),
+            (
+                "root then a second identical root",
+                r#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"/></w:numbering><w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"/></w:numbering>"#,
+                "Ok(root_end=120, abstract=1, instances=0)",
+            ),
+            (
+                "root then a foreign start element",
+                r#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"/></w:numbering><foreign></foreign>"#,
+                "Ok(root_end=120, abstract=1, instances=0)",
+            ),
+            (
+                "root then a foreign empty element",
+                r#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"/></w:numbering><foreign/>"#,
+                "Ok(root_end=120, abstract=1, instances=0)",
+            ),
+            (
+                "declaration after the root",
+                r#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"/></w:numbering><?xml version="1.0" encoding="UTF-8"?>"#,
+                "Ok(root_end=120, abstract=1, instances=0)",
+            ),
+            (
+                "two declarations",
+                r#"<?xml version="1.0" encoding="UTF-8"?><?xml version="1.0" encoding="UTF-8"?><w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"/></w:numbering>"#,
+                "Ok(root_end=196, abstract=1, instances=0)",
+            ),
+            (
+                "comment before the declaration",
+                r#"<!--c--><?xml version="1.0" encoding="UTF-8"?><w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"/></w:numbering>"#,
+                "Ok(root_end=166, abstract=1, instances=0)",
+            ),
+            (
+                "text before the root",
+                r#"text<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"/></w:numbering>"#,
+                "Ok(root_end=124, abstract=1, instances=0)",
+            ),
+            (
+                "unterminated root",
+                r#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"/>"#,
+                r#"InvalidFormat("numbering XML has no root element")"#,
+            ),
+            (
+                "stray end tag",
+                r#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"/></w:numbering></w:numbering>"#,
+                "Ok(root_end=120, abstract=1, instances=0)",
+            ),
+            (
+                "document type declaration",
+                r#"<!DOCTYPE x><w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"/></w:numbering>"#,
+                r#"InvalidFormat("DTD is not allowed in numbering XML")"#,
+            ),
+            (
+                "top-level character data section",
+                r#"<![CDATA[x]]><w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"/></w:numbering>"#,
+                "Ok(root_end=133, abstract=1, instances=0)",
+            ),
+            (
+                "declaration then root",
+                r#"<?xml version="1.0" encoding="UTF-8"?><w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"/></w:numbering>"#,
+                "Ok(root_end=158, abstract=1, instances=0)",
+            ),
+            (
+                "root then a later definition",
+                r#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:numbering><w:abstractNum xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:abstractNumId="7"/>"#,
+                "Ok(root_end=84, abstract=0, instances=0)",
+            ),
+        ];
+        for (name, xml, expected) in rows {
+            assert_eq!(numbering_scan_envelope_outcome(xml), expected, "{name}");
+        }
+    }
 }

@@ -1230,3 +1230,130 @@ fn write_namespace(output: &mut String, prefix: &str, namespace: &str, wrote: &m
         *wrote = true;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Outcome of `locate_layout` for one input, as frozen text.
+    fn locate_layout_envelope_outcome(xml: &str) -> String {
+        match locate_layout(xml.as_bytes()) {
+            Ok(_) => "Ok".to_owned(),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    #[test]
+    fn locate_layout_xml_envelope_matrix() {
+        let rows: [(&str, &str, &str); 21] = [
+            (
+                "empty input",
+                "",
+                r#"Invalid("settings XML is not one complete root element")"#,
+            ),
+            (
+                "whitespace only",
+                " \n",
+                r#"Invalid("settings XML is not one complete root element")"#,
+            ),
+            (
+                "declaration only",
+                r#"<?xml version="1.0" encoding="UTF-8"?>"#,
+                r#"Invalid("settings XML is not one complete root element")"#,
+            ),
+            (
+                "empty-element root",
+                r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+                "Ok",
+            ),
+            (
+                "start and end root",
+                r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:settings>"#,
+                "Ok",
+            ),
+            (
+                "root then whitespace",
+                "<w:settings xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"></w:settings>\n ",
+                "Ok",
+            ),
+            (
+                "root then comment",
+                r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:settings><!--c-->"#,
+                "Ok",
+            ),
+            (
+                "root then processing instruction",
+                r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:settings><?pi x?>"#,
+                r#"Invalid("settings XML cannot contain a DTD or processing instruction")"#,
+            ),
+            (
+                "root then text",
+                r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:settings>text"#,
+                r#"Invalid("settings XML has text outside its root")"#,
+            ),
+            (
+                "root then a second identical root",
+                r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:settings><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:settings>"#,
+                r#"Invalid("settings part has an invalid or trailing root element")"#,
+            ),
+            (
+                "root then a foreign start element",
+                r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:settings><foreign></foreign>"#,
+                r#"Invalid("settings part has an invalid or trailing root element")"#,
+            ),
+            (
+                "root then a foreign empty element",
+                r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:settings><foreign/>"#,
+                r#"Invalid("settings part has an invalid or trailing root element")"#,
+            ),
+            (
+                "declaration after the root",
+                r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:settings><?xml version="1.0" encoding="UTF-8"?>"#,
+                "Ok",
+            ),
+            (
+                "two declarations",
+                r#"<?xml version="1.0" encoding="UTF-8"?><?xml version="1.0" encoding="UTF-8"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:settings>"#,
+                "Ok",
+            ),
+            (
+                "comment before the declaration",
+                r#"<!--c--><?xml version="1.0" encoding="UTF-8"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:settings>"#,
+                "Ok",
+            ),
+            (
+                "text before the root",
+                r#"text<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:settings>"#,
+                r#"Invalid("settings XML has text outside its root")"#,
+            ),
+            (
+                "unterminated root",
+                r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">"#,
+                r#"Invalid("settings XML is not one complete root element")"#,
+            ),
+            (
+                "stray end tag",
+                r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:settings></w:settings>"#,
+                r#"Xml("ill-formed document: close tag `</w:settings>` does not match any open tag")"#,
+            ),
+            (
+                "document type declaration",
+                r#"<!DOCTYPE x><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:settings>"#,
+                r#"Invalid("settings XML cannot contain a DTD or processing instruction")"#,
+            ),
+            (
+                "top-level character data section",
+                r#"<![CDATA[x]]><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:settings>"#,
+                r#"Invalid("settings XML has content outside its root")"#,
+            ),
+            (
+                "declaration then root",
+                r#"<?xml version="1.0" encoding="UTF-8"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:settings>"#,
+                "Ok",
+            ),
+        ];
+        for (name, xml, expected) in rows {
+            assert_eq!(locate_layout_envelope_outcome(xml), expected, "{name}");
+        }
+    }
+}

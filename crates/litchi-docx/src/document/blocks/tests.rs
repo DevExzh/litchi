@@ -610,3 +610,131 @@ fn direct_character_content_prevents_math_only_classification() {
         }
     }
 }
+
+/// Outcome of `index` for one input, as frozen text.
+fn block_index_envelope_outcome(xml: &str) -> String {
+    match index(
+        xml.as_bytes(),
+        0,
+        &[],
+        ContainerRoot::Document,
+        RawPositions::Preserved,
+    ) {
+        Ok(_) => "Ok".to_owned(),
+        Err(error) => format!("{error:?}"),
+    }
+}
+
+#[test]
+fn block_index_xml_envelope_matrix() {
+    let rows: [(&str, &str, &str); 21] = [
+        (
+            "empty input",
+            "",
+            r#"InvalidFormat("block container does not contain exactly one complete root")"#,
+        ),
+        (
+            "whitespace only",
+            " \n",
+            r#"InvalidFormat("block container does not contain exactly one complete root")"#,
+        ),
+        (
+            "declaration only",
+            r#"<?xml version="1.0" encoding="UTF-8"?>"#,
+            r#"InvalidFormat("block container does not contain exactly one complete root")"#,
+        ),
+        (
+            "empty-element root",
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+            "Ok",
+        ),
+        (
+            "start and end root",
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+            "Ok",
+        ),
+        (
+            "root then whitespace",
+            "<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body><w:p/></w:body></w:document>\n ",
+            "Ok",
+        ),
+        (
+            "root then comment",
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><!--c-->"#,
+            "Ok",
+        ),
+        (
+            "root then processing instruction",
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><?pi x?>"#,
+            r#"InvalidFormat("block XML contains a prohibited declaration or instruction")"#,
+        ),
+        (
+            "root then text",
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>text"#,
+            r#"InvalidFormat("block container has character data outside its root")"#,
+        ),
+        (
+            "root then a second identical root",
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+            r#"InvalidFormat("block container has multiple roots")"#,
+        ),
+        (
+            "root then a foreign start element",
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><foreign></foreign>"#,
+            r#"InvalidFormat("block container has multiple roots")"#,
+        ),
+        (
+            "root then a foreign empty element",
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><foreign/>"#,
+            r#"InvalidFormat("block container has multiple roots")"#,
+        ),
+        (
+            "declaration after the root",
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><?xml version="1.0" encoding="UTF-8"?>"#,
+            r#"InvalidFormat("misplaced block XML declaration")"#,
+        ),
+        (
+            "two declarations",
+            r#"<?xml version="1.0" encoding="UTF-8"?><?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+            r#"InvalidFormat("misplaced block XML declaration")"#,
+        ),
+        (
+            "comment before the declaration",
+            r#"<!--c--><?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+            r#"InvalidFormat("misplaced block XML declaration")"#,
+        ),
+        (
+            "text before the root",
+            r#"text<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+            r#"InvalidFormat("block container has character data outside its root")"#,
+        ),
+        (
+            "unterminated root",
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body>"#,
+            r#"InvalidFormat("block container does not contain exactly one complete root")"#,
+        ),
+        (
+            "stray end tag",
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document></w:document>"#,
+            r#"Xml("malformed block XML")"#,
+        ),
+        (
+            "document type declaration",
+            r#"<!DOCTYPE x><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+            r#"InvalidFormat("block XML contains a prohibited declaration or instruction")"#,
+        ),
+        (
+            "top-level character data section",
+            r#"<![CDATA[x]]><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+            r#"InvalidFormat("block container has CDATA outside its root")"#,
+        ),
+        (
+            "declaration then root",
+            r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+            "Ok",
+        ),
+    ];
+    for (name, xml, expected) in rows {
+        assert_eq!(block_index_envelope_outcome(xml), expected, "{name}");
+    }
+}

@@ -3725,4 +3725,126 @@ mod tests {
             .expect("publish package inverse");
         assert_eq!(restored.source(), snapshot.source());
     }
+
+    /// Outcome of `parse` for one input, as frozen text.
+    fn revision_parse_envelope_outcome(xml: &str) -> String {
+        match super::parse(xml.as_bytes(), Limits::default()) {
+            Ok(groups) => format!("Ok({})", groups.len()),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    #[test]
+    fn revision_parse_xml_envelope_matrix() {
+        let rows: [(&str, &str, &str); 21] = [
+            (
+                "empty input",
+                "",
+                r#"InvalidFormat("tracked revision XML has no complete document root")"#,
+            ),
+            (
+                "whitespace only",
+                " \n",
+                r#"InvalidFormat("tracked revision XML has no complete document root")"#,
+            ),
+            (
+                "declaration only",
+                r#"<?xml version="1.0" encoding="UTF-8"?>"#,
+                r#"InvalidFormat("tracked revision XML has no complete document root")"#,
+            ),
+            (
+                "empty-element root",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+                "Ok(0)",
+            ),
+            (
+                "start and end root",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                "Ok(0)",
+            ),
+            (
+                "root then whitespace",
+                "<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body><w:p/></w:body></w:document>\n ",
+                "Ok(0)",
+            ),
+            (
+                "root then comment",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><!--c-->"#,
+                "Ok(0)",
+            ),
+            (
+                "root then processing instruction",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><?pi x?>"#,
+                "Ok(0)",
+            ),
+            (
+                "root then text",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>text"#,
+                r#"InvalidFormat("tracked revision XML has top-level text")"#,
+            ),
+            (
+                "root then a second identical root",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                r#"InvalidFormat("tracked revision XML has multiple root elements")"#,
+            ),
+            (
+                "root then a foreign start element",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><foreign></foreign>"#,
+                r#"InvalidFormat("tracked revision XML has multiple root elements")"#,
+            ),
+            (
+                "root then a foreign empty element",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><foreign/>"#,
+                r#"InvalidFormat("tracked revision XML has multiple root elements")"#,
+            ),
+            (
+                "declaration after the root",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document><?xml version="1.0" encoding="UTF-8"?>"#,
+                "Ok(0)",
+            ),
+            (
+                "two declarations",
+                r#"<?xml version="1.0" encoding="UTF-8"?><?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                "Ok(0)",
+            ),
+            (
+                "comment before the declaration",
+                r#"<!--c--><?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                "Ok(0)",
+            ),
+            (
+                "text before the root",
+                r#"text<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                r#"InvalidFormat("tracked revision XML has top-level text")"#,
+            ),
+            (
+                "unterminated root",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body>"#,
+                r#"InvalidFormat("tracked revision XML has unterminated elements")"#,
+            ),
+            (
+                "stray end tag",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document></w:document>"#,
+                r#"Xml("ill-formed document: close tag `</w:document>` does not match any open tag")"#,
+            ),
+            (
+                "document type declaration",
+                r#"<!DOCTYPE x><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                r#"InvalidFormat("DTD and general entity references are unsupported in a revision owner")"#,
+            ),
+            (
+                "top-level character data section",
+                r#"<![CDATA[x]]><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                r#"InvalidFormat("tracked revision XML has top-level text")"#,
+            ),
+            (
+                "declaration then root",
+                r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+                "Ok(0)",
+            ),
+        ];
+        for (name, xml, expected) in rows {
+            assert_eq!(revision_parse_envelope_outcome(xml), expected, "{name}");
+        }
+    }
 }
