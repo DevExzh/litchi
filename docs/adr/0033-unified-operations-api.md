@@ -1,7 +1,7 @@
 # ADR 0033: Unified operations API over the per-format owners
 
 - Status: Accepted (2026-10-04, by the owner's decision recorded in
-  [unified-ops record 0006](../unified-ops/0006-owner-accepts-adr-0033.md);
+  unified-ops record 0006;
   proposed 2026-10-04)
 - Date: 2026-10-04
 - Supersedes: nothing. Amends: nothing. It fulfils the outstanding facade

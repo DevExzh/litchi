@@ -69,15 +69,15 @@ the table.
 
 ADR 0033, proposed on 2026-10-04 by unified-ops change record 0004, was
 accepted the same day by the owner's decision recorded in
-[unified-ops record 0006](../unified-ops/0006-owner-accepts-adr-0033.md).
+unified-ops record 0006.
 
 Earlier proposals have all been accepted. ADR 0030 and ADR 0031, proposed on
 2026-09-15, were accepted on 2026-09-16 by the owner's decision recorded in
-[change 0652](../performance/0652-owner-decisions-for-the-third-wave.md). ADR
+change 0652. ADR
 0032, proposed on 2026-09-23 by
-[change 0743](../performance/0743-pptx-semantic-text-and-edit-path.md), was
+change 0743, was
 accepted on 2026-09-24 by the owner's decision recorded in
-[change 0758](../performance/0758-owner-decisions-2026-09-24.md). All three now
+change 0758. All three now
 appear in the table above.
 
 ## Decision hierarchy

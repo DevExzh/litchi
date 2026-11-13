@@ -1,7 +1,0 @@
-*.json -text
-*.log -text
-*.rss -text
-*.lock -text
-*.csv -text
-*.log -whitespace
-**/*.log -whitespace

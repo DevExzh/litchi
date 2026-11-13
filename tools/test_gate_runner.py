@@ -1,4 +1,4 @@
-"""Tests for the coordinator gate runner (tools/gate, record 0365)."""
+"""Tests for the coordinator gate runner (tools/gate)."""
 from __future__ import annotations
 
 import os
@@ -20,10 +20,10 @@ def list_rows(env: dict[str, str] | None = None) -> list[str]:
 
 
 class GateRunnerTests(unittest.TestCase):
-    def test_row_table_has_53_unique_rows_at_stable_indices(self) -> None:
+    def test_row_table_has_51_unique_rows_at_stable_indices(self) -> None:
         rows = list_rows()
-        self.assertEqual(len(rows), 53)
-        self.assertEqual(len(set(rows)), 53)
+        self.assertEqual(len(rows), 51)
+        self.assertEqual(len(set(rows)), 51)
         expected = {
             0: "fmt",
             1: "clippy-all-features",
@@ -33,20 +33,19 @@ class GateRunnerTests(unittest.TestCase):
             28: "clippy-leaves",
             38: "python-bindings",
             41: "fuzz",
-            46: "api-glossary",
-            47: "iwork-leaf-api",
-            48: "tooling-unit",
-            49: "crate-boundaries",
-            50: "non-iwork-gate",
-            51: "bench-matrix",
-            52: "corpus-dispositions",
+            45: "api-glossary",
+            46: "iwork-leaf-api",
+            47: "tooling-unit",
+            48: "crate-boundaries",
+            49: "non-iwork-gate",
+            50: "corpus-dispositions",
         }
         for index, name in expected.items():
             self.assertEqual(rows[index], name, index)
 
     def test_runner_needs_no_login_environment(self) -> None:
         # A systemd scope may start with no HOME and a minimal PATH.
-        self.assertEqual(len(list_rows(env={})), 53)
+        self.assertEqual(len(list_rows(env={})), 51)
 
     def test_every_fuzz_workspace_has_a_tracked_lock(self) -> None:
         tracked = set(

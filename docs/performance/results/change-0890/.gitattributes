@@ -1,4 +1,0 @@
-# Preserve byte-exact captured evidence and unified patch context.
-*.gz -text
-*.log -whitespace
-*.patch -whitespace

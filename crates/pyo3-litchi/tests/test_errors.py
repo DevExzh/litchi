@@ -10,9 +10,8 @@ Contract tier (keep green through S8a):
 
 Snapshot tier: ``MessageSnapshotTests`` pins the exact messages. S8a changed
 them deliberately (design §8: errors carry code/message/suggestion, and
-``str()`` is the message followed by the suggestion); the S8a record
-(docs/unified-ops/s8a-python-on-file.md) lists the differences. Change the
-table only on purpose, and list the difference in a record.
+``str()`` is the message followed by the suggestion). Change the table only
+on purpose, and name the difference in the commit message.
 
 The exception classes, codes and suggestions are pinned in test_exceptions.py;
 the fixed class drift (D4, F10) in test_known_drift.py.

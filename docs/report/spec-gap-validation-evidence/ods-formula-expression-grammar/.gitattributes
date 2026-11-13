@@ -1,3 +1,0 @@
-# Preserve unified-diff context and captured Cargo output verbatim.
-candidate.patch -whitespace
-gates/*.log -whitespace

@@ -13,30 +13,31 @@ XLSB against XLSX, PPT against PPTX. An optional ``<format>-encryption.json``
 snapshot contributes feature-gated operation gaps that are absent from the
 default export. Each property row carries a read status (Litchi's ``get``
 against OfficeCLI's) and a write status (Litchi's ``add``/``set`` against
-OfficeCLI's). It writes ``docs/unified-ops/officecli-capability-delta.md``.
+OfficeCLI's). It writes ``officecli-capability-delta.md`` into the directory
+named by ``--output-dir``; the tables are a working report and are not kept
+in the repository.
 
 The OfficeCLI help schemas it reads are vendored, unchanged, under
 ``test-data/officecli/`` (record 0257; provenance, license and the pinned
 upstream commit sit next to them), so the script runs anywhere::
 
-    python3 tools/officecli_capability_delta.py
+    python3 tools/officecli_capability_delta.py --output-dir <directory>
+    python3 tools/officecli_capability_delta.py --check
 
 ``--officecli`` (default ``$LITCHI_OFFICECLI``, then ``test-data/officecli``)
 names another OfficeCLI tree, such as a newer upstream checkout; refresh the
-vendored copy from it before regenerating the committed table. The table
-records the SHA-256 of every registry snapshot it read and of the schema
-tree, and ``tools/test_officecli_capability_delta.py`` fails when a snapshot
-no longer matches the hash recorded here. Rerun the script whenever the
-registry changes and its snapshots are blessed with ``LITCHI_BLESS=1``
-(``cargo test -p litchi-ops --test registry``). ``--check`` regenerates the
-table in memory and fails if the committed one differs.
+vendored copy from it before regenerating the table. The table records the
+SHA-256 of every registry snapshot it read and of the schema tree. Run
+``--check`` whenever the registry changes and its snapshots are blessed with
+``LITCHI_BLESS=1`` (``cargo test -p litchi-ops --test registry``): it builds
+the table in memory, writes nothing, and fails when the inputs need triage.
 
 Every gap row carries a disposition from the curated
 ``tools/officecli_dispositions.json`` (record 0332): ``planned`` (with a work
 package or record id), ``deferred-P1``/``deferred-P2`` (by design §13 tier),
 ``wontfix`` or ``out-of-scope`` (with a reason). The property tables are
 long, so each format's sits in its own page under
-``docs/unified-ops/officecli-capability-delta/``. ``--check`` also fails on
+``officecli-capability-delta/`` next to the main table. ``--check`` fails on
 an untriaged (``missing``) row, a gap without a disposition, a P0 row that is
 deferred or wontfix, a milestone-only follow-up without a current id, and a
 disposition or tier key that matches nothing. Record 0344 (audit WP13)
@@ -68,14 +69,15 @@ VENDORED_OFFICECLI = Path("test-data/officecli")
 # The vendored tree has no git metadata; this file pins its upstream commit.
 UPSTREAM_COMMIT = "UPSTREAM_COMMIT"
 GOLDEN_DIR = Path("crates/litchi-ops/tests/golden/registry")
-OUTPUT = Path("docs/unified-ops/officecli-capability-delta.md")
+# Both are relative to the caller's ``--output-dir``.
+OUTPUT = Path("officecli-capability-delta.md")
 # Per-format property tables, next to the main table.
-PROPERTY_DIR = Path("docs/unified-ops/officecli-capability-delta")
+PROPERTY_DIR = Path("officecli-capability-delta")
 DISPOSITIONS = Path("tools/officecli_dispositions.json")
 # The capability goldens (`File::capabilities()` per format); record 0344
 # reads their follow-ups for the milestone rule.
 CAPABILITY_DIR = Path("crates/litchi-ops/tests/golden/capabilities")
-# Generated files stay below the repository's 1 MiB evidence limit.
+# Generated files stay below 1 MiB each.
 SIZE_LIMIT = 1 << 20
 # Table order: each OfficeCLI format, then the formats compared against its
 # vocabulary. A registry snapshot of another format is appended, sorted.
@@ -1072,9 +1074,7 @@ def render(
         f"a separate page under `{PROPERTY_DIR.as_posix()}/`.",
         "",
         "Rerun the script after blessing the registry snapshots (`LITCHI_BLESS=1`);",
-        "`tools/test_officecli_capability_delta.py` fails while a snapshot",
-        "differs from the hash recorded below, and `--check` fails while a gap",
-        "row has no disposition.",
+        "`--check` fails while a gap row has no disposition.",
         "",
         "## Inputs",
         "",
@@ -1453,7 +1453,7 @@ def generate(officecli: Path, repo: Path, dispositions_path: Path | None = None)
             files[property_page(delta.name)] = render_properties(delta)
     for path, text in files.items():
         if len(text.encode()) >= SIZE_LIMIT:
-            raise SystemExit(f"{path} would reach 1 MiB; split it before committing")
+            raise SystemExit(f"{path} would reach 1 MiB; split it")
     return Generated(files, problems, deltas)
 
 
@@ -1465,36 +1465,28 @@ def main(argv: list[str] | None = None) -> int:
         default=Path(os.environ.get("LITCHI_OFFICECLI", REPO / VENDORED_OFFICECLI)),
         help="the OfficeCLI tree (default: $LITCHI_OFFICECLI, then test-data/officecli)",
     )
-    parser.add_argument("--root", type=Path, default=REPO,
-                        help="where the generated files go (default: the repository)")
+    parser.add_argument("--output-dir", type=Path,
+                        help="directory the generated tables are written to (outside the "
+                        "repository); required unless --check is given")
     parser.add_argument("--dispositions", type=Path, default=REPO / DISPOSITIONS)
     parser.add_argument(
         "--check",
         action="store_true",
-        help="fail if the committed tables differ from fresh ones, or a gap lacks a valid disposition",
+        help="write nothing; fail if a gap lacks a valid disposition",
     )
     arguments = parser.parse_args(argv)
+    if not arguments.check and arguments.output_dir is None:
+        parser.error("--output-dir is required unless --check is given")
     generated = generate(arguments.officecli, REPO, arguments.dispositions)
-    root = arguments.root
     status = 0
     for problem in generated.problems:
         print(f"disposition: {problem}", file=sys.stderr)
     if generated.problems:
         status = 1
-    expected = {root / path for path in generated.files}
     if arguments.check:
-        for path, text in generated.files.items():
-            target = root / path
-            current = target.read_text(encoding="utf-8") if target.exists() else ""
-            if current != text:
-                print(f"{target} is stale; rerun {Path(__file__).name}", file=sys.stderr)
-                status = 1
-        directory = root / PROPERTY_DIR
-        if directory.is_dir():
-            for extra in sorted(set(directory.glob("*.md")) - expected):
-                print(f"{extra} is not generated any more; delete it", file=sys.stderr)
-                status = 1
         return status
+    root = arguments.output_dir
+    expected = {root / path for path in generated.files}
     (root / PROPERTY_DIR).mkdir(parents=True, exist_ok=True)
     for extra in sorted(set((root / PROPERTY_DIR).glob("*.md")) - expected):
         extra.unlink()

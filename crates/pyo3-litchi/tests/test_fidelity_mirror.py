@@ -3,7 +3,8 @@
 ``crates/litchi-ops/tests/corpus_fidelity.rs`` opens every claimed-format
 file under ``test-data/``, runs an empty edit, saves it and requires the
 saved bytes to equal the input; it writes the outcome of each file to
-``docs/unified-ops/results/0289/fidelity.tsv`` (column ``noop``: ``exact``,
+``fidelity.tsv``, kept under ``test-data/unified-ops/checklists/`` (column
+``noop``: ``exact``,
 ``refused``, ``signed-exact``, ``locked``, ...). This module replays a
 deterministic sample of that report through ``litchi_py``:
 
@@ -31,7 +32,7 @@ import unittest
 
 from _support import L, REPO_ROOT, TEST_DATA
 
-TSV = REPO_ROOT / "docs" / "unified-ops" / "results" / "0289" / "fidelity.tsv"
+TSV = REPO_ROOT / "test-data" / "unified-ops" / "checklists" / "fidelity.tsv"
 
 #: Exact no-op files replayed per format.
 PER_FORMAT = 4

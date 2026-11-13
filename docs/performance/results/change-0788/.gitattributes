@@ -1,7 +1,0 @@
-* -text
-**/* -text
-*.log -whitespace
-**/*.log -whitespace
-*.patch -whitespace
-*.smaps -whitespace
-*.txt -whitespace

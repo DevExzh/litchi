@@ -1,3 +1,0 @@
-    Finished `test` profile [unoptimized] target(s) in 0.07s
-   Doc-tests litchi_iwa_archive
-   Doc-tests litchi_iwa_core

@@ -2,9 +2,8 @@
 
 The oracle pins the read-only Python API of ``crates/pyo3-litchi`` as it
 behaves before M0a step S8a moves the bindings onto the unified
-``litchi::File``. Run it with ``crates/pyo3-litchi/tests/run_tests.sh``; see
-``docs/unified-ops/s8a-python-oracle.md`` for the test tiers (contract,
-snapshot, known drift) and the coverage table.
+``litchi::File``. Run it with ``crates/pyo3-litchi/tests/run_tests.sh``. The
+tests come in three tiers: contract, snapshot and known drift.
 
 This module is a helper, not a test module: its name does not match the
 ``test*.py`` discovery pattern of unittest or pytest.

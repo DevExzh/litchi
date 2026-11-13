@@ -35,7 +35,7 @@
 *.wmf binary
 
 # A final tab in this generated report represents an empty last TSV field.
-docs/unified-ops/results/0289/fidelity.tsv whitespace=-blank-at-eol
+test-data/unified-ops/checklists/fidelity.tsv whitespace=-blank-at-eol
 
 # Keep vendored upstream artifacts byte-identical to their licensed snapshot.
 vendor/zlib-rs/LICENSE whitespace=-blank-at-eol

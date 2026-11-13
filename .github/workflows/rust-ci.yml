@@ -43,7 +43,6 @@ on:
       - 'tools/native_odf_resave.py'
       - 'tools/test_native_odf_resave.py'
       - 'tools/test_no_3rdparty_references.py'
-      - 'docs/performance/BASELINE.md'
     branches:
       - main
   pull_request:
@@ -88,7 +87,6 @@ on:
       - 'tools/native_odf_resave.py'
       - 'tools/test_native_odf_resave.py'
       - 'tools/test_no_3rdparty_references.py'
-      - 'docs/performance/BASELINE.md'
     branches:
       - main
 
@@ -190,12 +188,9 @@ jobs:
           python3 tools/non_iwork_gate.py print
           python3 tools/non_iwork_gate.py verify
 
-      # The facade's default feature set is empty and the performance harness
-      # is a separate Cargo project, so neither suite is reachable from any
-      # per-package selection below. These focused modes run first so stale
-      # expectations fail before the 46-root sweeps. The allocator subcommand
-      # is deliberately serialized inside the harness mode because its tests
-      # inspect a process-global counter.
+      # The facade's default feature set is empty, so its suite is not
+      # reachable from any per-package selection below. These focused modes
+      # run first so stale expectations fail before the 46-root sweeps.
       - name: Test the facade with the Office format leaves
         run: python3 tools/non_iwork_gate.py --record-file target/non-iwork-gate-reports/facade-format-tests.json facade-format-tests
 
@@ -204,9 +199,6 @@ jobs:
 
       - name: Test the facade's DOCX/ODT polyglot feature closure
         run: python3 tools/non_iwork_gate.py --record-file target/non-iwork-gate-reports/facade-polyglot-tests.json facade-polyglot-tests
-
-      - name: Test the standalone performance harness
-        run: python3 tools/non_iwork_gate.py --record-file target/non-iwork-gate-reports/harness-tests.json harness-tests
 
       - name: Check non-iWork workspace and safe facade
         run: python3 tools/non_iwork_gate.py --record-file target/non-iwork-gate-reports/check.json check
@@ -311,9 +303,9 @@ jobs:
         run: python3 -m unittest tools.test_check_api_glossary tools.test_api_debt_inventory tools.test_validate_api_disposition
       - name: Check capability delta inputs and generator
         run: python3 -m unittest tools.test_officecli_capability_delta
-      - name: Check the capability delta table is current
+      - name: Check the capability delta dispositions
         run: python3 tools/officecli_capability_delta.py --check
-      - name: Check the OfficeCLI corpus classifier and its table (record 0265)
+      - name: Check the OfficeCLI corpus classifier and its dispositions
         run: |
           python3 -m unittest tools.test_officecli_corpus
           python3 tools/officecli_corpus.py --check

@@ -1,1 +1,0 @@
-../corpus/slide1.xml

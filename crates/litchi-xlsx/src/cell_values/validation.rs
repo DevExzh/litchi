@@ -2,7 +2,7 @@
 //!
 //! # The dependency rule
 //!
-//! Change [0602]'s D4, authorized by decision 7 of change 0652, replaced the
+//! Change 0602's D4, authorized by decision 7 of change 0652, replaced the
 //! name allow-list this module used to carry with the property that
 //! allow-list was a proxy for. A value-only rewrite composes exactly three
 //! spans: the worksheet's `<dimension>` `ref` attribute, the `<sheetData>`
@@ -33,8 +33,6 @@
 //! cells are guarded by the edit stage. The vocabulary cannot see the other
 //! constructs; they are decided by the relationship and edit gates in
 //! [`super::snapshot`](super::snapshot) and by the raw editor's own guards.
-//!
-//! [0602]: ../../../../docs/performance/0602-xlsx-real-producer-admission-design.md
 
 use quick_xml::events::BytesStart;
 use quick_xml::events::Event;

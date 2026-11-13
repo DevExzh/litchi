@@ -1,9 +1,0 @@
-{
-  "argv": [
-    "python3",
-    "-B",
-    "docs/performance/results/change-0557/analyze.py",
-    "--self-test"
-  ],
-  "exit_code": 0
-}

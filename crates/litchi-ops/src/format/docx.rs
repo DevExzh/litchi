@@ -559,8 +559,7 @@ impl Docx {
     pub fn text(&self) -> Result<String> {
         // One validating pass over the main story, which writes the
         // separator before every paragraph after the first; the leaf's
-        // `extract_text` joins the runs with no separator at all (oracle drift
-        // B3 in `docs/unified-ops/s8a-python-oracle.md`).
+        // `extract_text` joins the runs with no separator at all.
         match &self.0.owner {
             DocxOwner::Eager(package) => Ok(package
                 .document()?

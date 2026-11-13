@@ -1,1 +1,0 @@
-*** Zstandard CLI (64-bit) v1.5.7, by Yann Collet ***

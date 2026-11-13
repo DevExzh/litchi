@@ -1,12 +1,11 @@
 """Known drift and bugs in the read API, and their fixes.
 
-The oracle (docs/unified-ops/s8a-python-oracle.md) recorded each item as a
-pair of tests:
+The oracle recorded each item as a pair of tests:
 
   test_<id>_..._today       asserted what the bindings did then;
   test_<id>_..._intended    asserted the fix, marked @unittest.expectedFailure.
 
-S8a (docs/unified-ops/s8a-python-on-file.md) fixed every item: each ``_today``
+S8a fixed every item: each ``_today``
 test is deleted and each ``_intended`` test is now an ordinary test. A new
 item is added the same way, as a pair.
 

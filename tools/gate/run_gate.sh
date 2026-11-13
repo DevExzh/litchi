@@ -1,5 +1,5 @@
 #!/bin/bash
-# Coordinator gate: the 53 rows, run serially, one summary file.
+# Coordinator gate: the 51 rows, run serially, one summary file.
 #
 # Usage: tools/gate/run_gate.sh <name> [row ...]
 #   <name>   result directory name.
@@ -13,7 +13,6 @@
 #   GATE_OFFLINE   set to 1 to forbid network access (CARGO_NET_OFFLINE).
 #   GATE_LOCK_SEED Cargo.lock to copy into a checkout that has none (the root
 #                  lock is untracked by policy, ADR 0028).
-#   HARNESS_TESTS  set to run the perf-harness tests instead of `cargo check`.
 #   CARGO_HOME, RUSTUP_HOME, HOME  toolchain location (defaults derived from
 #                  the passwd entry, so a systemd scope with an empty
 #                  environment works the same as a login shell).
@@ -47,7 +46,7 @@ CHUNKED="python3 $S/chunked_cargo_tests.py"
 FEATURES=$(python3 -c 'import tomllib;f=tomllib.load(open("crates/litchi-ops/Cargo.toml","rb"))["features"];print(",".join(k for k in f if k not in ("default","encryption")))')
 SUBS=("" xlsx pptx docx xls xlsb doc ppt rtf odt ods odp oth odm odg odc odi odb odf-formula pages keynote numbers)
 LEAF="-p litchi-docx -p litchi-pptx -p litchi-xlsx -p litchi-xlsb -p litchi-doc -p litchi-xls -p litchi-ppt -p litchi-rtf -p litchi-odt -p litchi-odp -p litchi-opc -p xml-minifier -p litchi-drawingml -p litchi-spreadsheet-drawing -p litchi-keynote -p litchi-pages -p litchi-numbers -p litchi-numbers-wire -p litchi-iwa-text-wire"
-TOOL_MODULES="tools.test_check_api_glossary tools.test_api_debt_inventory tools.test_validate_api_disposition tools.test_final_api_inventory tools.test_raw_api_coverage tools.test_w8_file_provenance tools.test_w8_original_baseline tools.test_w8_projection_policy tools.test_w8_quiet_abba tools.test_officecli_corpus tools.test_officecli_capability_delta tools.test_no_3rdparty_references tools.test_check_crate_boundaries tools.test_non_iwork_gate tools.test_unified_bench_matrix tools.test_check_iwork_leaf_public_api tools.test_native_qualification_runner tools.test_prepare_xlsx_raw_inputs tools.test_xlsx_raw_native_qualification tools.test_prepare_ole_owner_inputs tools.test_ole_owner_paired_runner tools.test_validate_ole_owner_run tools.test_ppt_lazy_build_receipt_adapter tools.test_ppt_lazy_cold_first_commit tools.test_ppt_lazy_native_qualification tools.test_prepare_ppt_lazy_native_inputs tools.test_drawingml_compile_driver tools.test_drawingml_raw_qualification tools.test_drawingml_raw_policy_v2 tools.test_current_native_policy_v2 docs/unified-ops/results/0362ul29/tooling/test_safe_chunked_tests.py docs/unified-ops/results/0362ul29/tooling/test_run_safe_gate_ppt.py tools.test_ink_safe_runner docs/unified-ops/results/0362ul24/test_prepare_signed_native_consumer.py tools.test_opc_read_ahead_timing_guard tools.test_xls_f3_qualification_abba docs/unified-ops/results/0362ul24/test_validate_signed_native.py tools.test_gate_runner tools.test_iwa_exit_ledger tools.test_mac_queue tools.test_mac_control_kit"
+TOOL_MODULES="tools.test_check_api_glossary tools.test_api_debt_inventory tools.test_validate_api_disposition tools.test_final_api_inventory tools.test_raw_api_coverage tools.test_officecli_corpus tools.test_officecli_capability_delta tools.test_no_3rdparty_references tools.test_check_crate_boundaries tools.test_non_iwork_gate tools.test_check_iwork_leaf_public_api tools.test_gate_runner"
 # Every crates/*/fuzz workspace has a tracked Cargo.lock; all are checked --locked.
 FUZZ='set -e; export CARGO_TARGET_DIR="$CARGO_TARGET_DIR/fuzz"
 for m in crates/*/fuzz/Cargo.toml; do echo "+ check $m"; cargo check -q --locked --manifest-path "$m" --bins; done
@@ -82,21 +81,15 @@ row feature-matrix-clippy "python3 tools/check_feature_matrix.py --only facade,f
 row fuzz "$FUZZ"
 row goldens "bash $S/check_goldens.sh"
 row golden-clean 'test -z "$(git status --short | grep -v "^[AMDR] ")"'
-if [ -n "${HARNESS_TESTS:-}" ]; then
-    row perf-harness-check "cd tools/perf-baseline && cargo test --locked --lib --tests --no-fail-fast"
-else
-    row perf-harness-check "cd tools/perf-baseline && cargo check --locked --all-targets"
-fi
 row native-resave-check "cd tools/native-resave && cargo check --locked --all-targets"
 row api-glossary 'RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --target-dir "$CARGO_TARGET_DIR"'
 row iwork-leaf-api "python3 -m unittest tools.test_check_iwork_leaf_public_api"
-row tooling-unit "python3 -m unittest $TOOL_MODULES && python3 tools/iwa_exit_ledger.py --check && python3 tools/mac_queue/generate.py --check"
+row tooling-unit "python3 -m unittest $TOOL_MODULES"
 row crate-boundaries "python3 tools/check_crate_boundaries.py"
 row non-iwork-gate "python3 tools/non_iwork_gate.py verify"
-row bench-matrix "python3 tools/unified_bench_matrix.py --check"
 row corpus-dispositions "python3 tools/officecli_capability_delta.py --check && python3 tools/officecli_corpus.py --check"
 
-if [ "${#ROWS[@]}" -ne 53 ]; then echo "gate defines ${#ROWS[@]} rows, expected 53" >&2; exit 2; fi
+if [ "${#ROWS[@]}" -ne 51 ]; then echo "gate defines ${#ROWS[@]} rows, expected 51" >&2; exit 2; fi
 if [ "$NAME" = --list ]; then
     for i in "${!ROWS[@]}"; do printf '%02d %s\n' "$i" "${ROWS[$i]%%$'\t'*}"; done
     exit 0

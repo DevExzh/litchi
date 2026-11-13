@@ -173,7 +173,7 @@ class ClassifyTests(unittest.TestCase):
 
 
 class GenerateTests(unittest.TestCase):
-    def test_committed_table_is_current(self):
+    def test_committed_outcomes_pass_check(self):
         self.assertEqual(corpus.main(["--check"]), 0)
 
     def test_render_is_deterministic_and_counts(self):
@@ -183,11 +183,13 @@ class GenerateTests(unittest.TestCase):
         self.assertEqual(first, corpus.render(calls, verdicts, "abc"))
         self.assertIn("| word | 2 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 1/1 |", first)
 
-    def test_check_detects_a_stale_table(self):
+    def test_the_table_is_written_only_to_the_named_file(self):
+        with self.assertRaises(SystemExit):
+            corpus.main([])
         with tempfile.TemporaryDirectory() as tmp:
-            stale = Path(tmp) / "table.md"
-            stale.write_text("stale", encoding="utf-8")
-            self.assertEqual(corpus.main(["--check", "--output", str(stale)]), 1)
+            table = Path(tmp) / "table.md"
+            self.assertEqual(corpus.main(["--output", str(table)]), 0)
+            self.assertIn("## Summary by script", table.read_text(encoding="utf-8"))
 
 
 def classes(entries: list[dict], scripts: list[dict] | None = None, deltas: list | None = None,

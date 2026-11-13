@@ -6,8 +6,7 @@
 //! is the smallest possible output, but it moves every stream's bytes even
 //! when an edit touched one of them.
 //!
-//! This module adds the other half of the policy pair required by decision 10
-//! of `docs/performance/0652-owner-decisions-for-the-third-wave.md`: when the
+//! This module adds the other half of the policy pair: when the
 //! caller adopts the artifact it is republishing with
 //! [`OleWriter::adopt_source_layout`](super::OleWriter::adopt_source_layout),
 //! the writer reuses that artifact's sector assignment. Streams whose byte

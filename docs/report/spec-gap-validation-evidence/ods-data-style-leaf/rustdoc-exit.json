@@ -1,1 +1,0 @@
-{"command": ["cargo", "doc", "--locked", "-p", "litchi-ods", "--offline", "--no-deps"], "exit_code": 0}

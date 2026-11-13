@@ -1,3 +1,0 @@
-0824 failure audit PASS: original failure retained; only cold-path test assertion repaired; fresh baseline restarted
-{"final": true, "reports": 342, "samples": 7106, "status": "accepted"}
-0824 seal PASS: 1278 owned paths including seal

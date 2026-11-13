@@ -1,1 +1,0 @@
-cargo +1.95.0 fmt --manifest-path probe-v2/Cargo.toml -- --check

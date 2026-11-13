@@ -1,7 +1,7 @@
 # ADR 0032: Snapshot memos of small derived values of payload bytes
 
 - Status: Accepted (2026-09-24, by the owner's decision recorded in
-  [change 0758](../performance/0758-owner-decisions-2026-09-24.md); proposed
+  change 0758; proposed
   2026-09-23)
 - Date: 2026-09-23
 - Supersedes: nothing. Amends: the 2026-09-16 amendment of
@@ -9,7 +9,7 @@
   memos on an opened-presentation snapshot and its facade", by widening the one
   noun it admits. Every other sentence of ADR 0005, and every other accepted
   record, is untouched.
-- Raised by: [change 0743](../performance/0743-pptx-semantic-text-and-edit-path.md),
+- Raised by: change 0743,
   whose commit `99ce9c5e34` implemented such a memo, measured it, and was
   reverted by `07207d2aef` because no accepted record admits it.
 

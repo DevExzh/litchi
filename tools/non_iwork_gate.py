@@ -27,12 +27,8 @@ own cheap modes.  ``facade-format-tests`` compiles the facade with all eight
 Office format leaves and encryption, while ``facade-polyglot-tests`` covers the separate
 ``docx,odt`` feature closure.  ``litchi``'s default feature set is empty and a
 bare ``cargo test --package litchi`` therefore compiles almost none of its
-library tests.  ``harness-tests`` runs the performance harness in
-``tools/perf-baseline``, which is a separate Cargo project that no workspace
-selection reaches; its allocator-instrumented binary is run by a second,
-explicitly serial command because it owns a process-global test allocator.
-These modes are placed before the long-running package sweeps so a stale
-expectation fails fast.
+library tests.  These modes are placed before the long-running package
+sweeps so a stale expectation fails fast.
 """
 
 from __future__ import annotations
@@ -313,7 +309,6 @@ MODES = (
     "doc",
     "facade-format-tests",
     "facade-polyglot-tests",
-    "harness-tests",
     "lib-tests",
     "doc-tests",
     "deprecated",
@@ -333,13 +328,6 @@ FACADE_FORMAT_TEST_FEATURES = ("doc", "docx", "encryption", "eval", "ppt", "pptx
 # this as a named gate so a default-feature test cannot silently omit those
 # tests again.
 FACADE_POLYGLOT_TEST_FEATURES = ("docx", "odt")
-
-# The performance harness is its own Cargo project with its own workspace
-# table, so no `--workspace`, `--package` or exclusion selection in this gate
-# reaches its suite.  Change 0619 found a test there red for 54 records.  Its
-# manifest declares only non-iWork path dependencies, which is what keeps the
-# suite inside this gate's slice; `test_non_iwork_gate` asserts that.
-HARNESS_MANIFEST_RELATIVE_PATH = "tools/perf-baseline/Cargo.toml"
 
 
 class GateError(RuntimeError):
@@ -1687,53 +1675,6 @@ def command_specs(cargo: str, plan: WorkspacePlan, mode: str) -> tuple[CommandSp
                     "--lib",
                     "--tests",
                     "--no-fail-fast",
-                    "--",
-                    "--test-threads=1",
-                ),
-            ),
-        )
-    if mode == "harness-tests":
-        manifest = ROOT / HARNESS_MANIFEST_RELATIVE_PATH
-        if not manifest.is_file():
-            raise GateError(
-                f"the performance harness manifest {HARNESS_MANIFEST_RELATIVE_PATH} is missing"
-            )
-        # Commands run with ROOT as the working directory, so the manifest
-        # path stays relative and never encodes this checkout's location.
-        #
-        # Unlike the workspace modes this main command does not serialize its
-        # test threads.  The bulk modes serialize because a single invocation
-        # over 47 roots keeps every test binary alive until the final link; one
-        # standalone project has no such fan-out, and serializing its 531-test
-        # default suite measured 1,870 s against 581 s at Cargo's default
-        # parallelism.  The allocator binary is a separate command below: its
-        # tests touch a process-global allocator counter and must run with one
-        # test thread.  Build parallelism stays bounded by the gate's
-        # CARGO_BUILD_JOBS invariant either way.
-        return (
-            CommandSpec(
-                "harness-tests",
-                (
-                    cargo,
-                    "test",
-                    "--manifest-path",
-                    HARNESS_MANIFEST_RELATIVE_PATH,
-                    "--lib",
-                    "--tests",
-                    "--no-fail-fast",
-                ),
-            ),
-            CommandSpec(
-                "harness-allocator-tests",
-                (
-                    cargo,
-                    "test",
-                    "--manifest-path",
-                    HARNESS_MANIFEST_RELATIVE_PATH,
-                    "--features",
-                    "allocator-metrics",
-                    "--bin",
-                    "docx_bounded_tail_append_compare",
                     "--",
                     "--test-threads=1",
                 ),

@@ -1,3 +1,0 @@
-supported_backend_cases=26
-processes_per_case=3
-completed_invocations=78

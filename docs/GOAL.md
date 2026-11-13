@@ -746,7 +746,7 @@ Produce and maintain:
 
 1. A benchmark harness and deterministic corpus/generator manifest.
 
-2. docs/performance/BASELINE.md containing:
+2. A baseline report (kept outside the repository) containing:
    - hardware and software environment;
    - corpus descriptions and hashes;
    - commands;
@@ -755,7 +755,7 @@ Produce and maintain:
    - allocation and I/O summaries;
    - Amdahl and scaling analyses.
 
-3. docs/performance/HOTSPOTS.md containing:
+3. A hotspot report (kept outside the repository) containing:
    - end-to-end path maps;
    - confirmed bottlenecks;
    - disproven hypotheses;

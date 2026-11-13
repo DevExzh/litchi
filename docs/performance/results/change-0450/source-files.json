@@ -1,4 +1,0 @@
-[
-  "crates/soapberry-zip/src/office.rs",
-  "crates/soapberry-zip/fuzz/fuzz_targets/parse_zip.rs"
-]

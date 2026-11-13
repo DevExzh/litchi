@@ -38,18 +38,18 @@ every script a design §13 tier; the scripts of tier P0 or v1 form the
 v1-scope subset (design §14), reported green when every line passes or
 carries only wontfix, deferred or out-of-scope classes, red otherwise.
 
-It writes ``docs/unified-ops/officecli-corpus-deltas.md``: the summary per
-script family, per format and per script, the v1-scope subset, the deltas,
+It writes the table named by ``--output`` (a working report that is not kept
+in the repository): the summary per script family, per format and per script, the v1-scope subset, the deltas,
 the gaps with their registry follow-ups and dispositions, the bugs, and the
-record 0256 follow-ups the corpus hits. ``--check`` regenerates it in memory
-and fails when the committed file differs, when any call is a panic or
+record 0256 follow-ups the corpus hits. ``--check`` builds it in memory,
+writes nothing, and fails when any call is a panic or
 ``internal_error`` (the Rust test refuses those before they can be
 recorded), when a class has no valid disposition (a P0 or v1 class is never
 deferred or wontfix, a recorded delta is wontfix or out-of-scope), or when
 a ``corpus:`` disposition or tier key or a script key matches nothing::
 
     LITCHI_BLESS=1 cargo test -p litchi-cli --test officecli_corpus
-    python3 tools/officecli_corpus.py           # or --check
+    python3 tools/officecli_corpus.py --check   # or --output <file>
 
 The output is deterministic: no timestamps, stable orders.
 """
@@ -75,7 +75,6 @@ REGISTRY = Path("crates/litchi-ops/tests/golden/registry")
 VENDORED = Path("test-data/officecli")
 HELP = VENDORED / "schemas" / "help"
 UPSTREAM_COMMIT = Path("test-data/officecli/UPSTREAM_COMMIT")
-OUTPUT = Path("docs/unified-ops/officecli-corpus-deltas.md")
 
 FORMATS = ("docx", "xlsx", "pptx")
 LITCHI_VERBS = {
@@ -1063,7 +1062,7 @@ def render(calls: list[Call], verdicts: list[Verdict], commit: str,
         "",
         "```sh",
         "LITCHI_BLESS=1 cargo test -p litchi-cli --test officecli_corpus",
-        "python3 tools/officecli_corpus.py      # --check verifies this file",
+        "python3 tools/officecli_corpus.py --output <file>   # --check verifies the inputs",
         "```",
         "",
         f"The corpus is every OfficeCLI example script (`examples/{{word,excel,ppt}}/**/*.sh`, "
@@ -1254,13 +1253,17 @@ def generate(repo: Path, outcomes: Path, dispositions_path: Path | None = None,
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--outcomes", type=Path, default=REPO / OUTCOMES)
-    parser.add_argument("--output", type=Path, default=REPO / OUTPUT)
+    parser.add_argument("--output", type=Path,
+                        help="file the table is written to (outside the repository); "
+                        "required unless --check is given")
     parser.add_argument("--dispositions", type=Path,
                         default=REPO / capability_delta.DISPOSITIONS)
     parser.add_argument("--check", action="store_true",
-                        help="fail if the committed table differs from a fresh one, or a gap "
-                        "class lacks a valid disposition")
+                        help="write nothing; fail if a call is fatal or a gap class lacks "
+                        "a valid disposition")
     arguments = parser.parse_args(argv)
+    if not arguments.check and arguments.output is None:
+        parser.error("--output is required unless --check is given")
     problems: list[str] = []
     text, calls, verdicts = generate(REPO, arguments.outcomes, arguments.dispositions, problems)
     fatal = [call.cite for call, verdict in zip(calls, verdicts) if verdict.rule == "fatal"]
@@ -1268,15 +1271,11 @@ def main(argv: list[str] | None = None) -> int:
         print("panics or internal errors recorded: " + ", ".join(fatal), file=sys.stderr)
         return 1
     if len(text.encode()) >= capability_delta.SIZE_LIMIT:
-        raise SystemExit("the corpus table would reach 1 MiB; split it before committing")
+        raise SystemExit("the corpus table would reach 1 MiB; split it")
     for problem in problems:
         print(f"disposition: {problem}", file=sys.stderr)
     status = 1 if problems else 0
     if arguments.check:
-        current = arguments.output.read_text(encoding="utf-8") if arguments.output.exists() else ""
-        if current != text:
-            print(f"{arguments.output} is stale; rerun {Path(__file__).name}", file=sys.stderr)
-            return 1
         return status
     arguments.output.write_text(text, encoding="utf-8")
     return status

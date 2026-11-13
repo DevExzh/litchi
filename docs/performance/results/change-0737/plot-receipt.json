@@ -1,6 +1,0 @@
-{
-  "matplotlib": "3.10.7+dfsg1",
-  "processes": 90,
-  "samples": 4500,
-  "scope": "All 50-sample processes; 18 fresh one-sample controls reported separately."
-}

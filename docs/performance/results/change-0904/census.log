@@ -1,2 +1,0 @@
-usage: census.py [-h] [--manifest MANIFEST] --output OUTPUT input_dir
-census.py: error: unrecognized arguments: --input-dir

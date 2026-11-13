@@ -1,1 +1,0 @@
-{"command": ["cargo", "clippy", "--locked", "-p", "litchi-ooxml-common", "-p", "litchi-xlsx", "--lib", "--offline", "--", "-D", "warnings"], "exit_code": 0}

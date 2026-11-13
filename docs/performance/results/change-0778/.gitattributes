@@ -1,2 +1,0 @@
-# Retain command logs byte-for-byte, including terminal blank lines.
-*.log -whitespace

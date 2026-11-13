@@ -44,8 +44,7 @@ named metadata subset.
 
 The final pre-rebase run passed all 87 ODG tests, ODG doctests and rustdoc,
 the ODF umbrella feature check, workspace formatting, and both 47-phase
-non-iWork check/Clippy sweeps. The retained
-[validation receipts](../../../docs/performance/results/change-0502/validation/)
+non-iWork check/Clippy sweeps. Those runs
 are correctness/build evidence; their elapsed times are not performance claims.
 The dependency-boundary checker passed for 64 workspace packages and 239
 internal declarations, retaining the 11 explicitly recorded iWork debt items.
@@ -66,7 +65,7 @@ python3 tools/non_iwork_gate.py check
 python3 tools/non_iwork_gate.py clippy
 ```
 
-The [0502 performance record](../../../docs/performance/changes/0502-odg-metadata-open.md)
-retains separate before/after measurements and limitations. The existing ODF
+Before/after performance measurements were taken separately and are not kept
+in this repository. The existing ODF
 `parse_odt` fuzz target does not exercise the ODG-specific metadata parser;
 hostile ODG owner coverage comes from the focused tests above.

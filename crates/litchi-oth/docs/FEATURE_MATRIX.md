@@ -36,6 +36,6 @@ temporary and retained storage, shares unknown namespace URI values, and measure
 text and collection sizes before allocation. Hash collection charges are logical
 budget estimates, not exact allocator or RSS bounds. Rich metadata interoperability
 is covered by synthetic fixtures; the native template's empty body does not prove
-that case. The [recorded validation](../../../docs/report/spec-gap-validation-evidence/oth-body-metadata-fidelity-20260912/README.md)
-contains 98 passing tests, strict lint/documentation checks, source hashes, and
-independent review scope; it makes no runtime performance claim.
+that case. Validation
+covered 98 passing tests and strict lint/documentation checks;
+it makes no runtime performance claim.

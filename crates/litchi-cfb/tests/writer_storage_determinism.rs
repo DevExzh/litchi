@@ -9,8 +9,7 @@
 //! Change 0617 measured the defect these tests guard: building the same
 //! eight-storage document in twelve separate processes produced twelve distinct
 //! files of identical length, because `OleWriter` held its storage paths in a
-//! `HashSet` whose iteration order is seeded per process
-//! (`docs/performance/results/change-0617/determinism.txt`). ADR 0006 requires
+//! `HashSet` whose iteration order is seeded per process. ADR 0006 requires
 //! serialization to be deterministic unless a `Clock`, actor identity, or
 //! cryptographic RNG is explicitly supplied, and the writer is supplied none.
 //!

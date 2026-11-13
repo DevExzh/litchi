@@ -1,2 +1,0 @@
-    533 < open-cost
-    533 > open-cost

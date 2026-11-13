@@ -12352,21 +12352,19 @@ without lint exceptions.
 
 ## 2026-11-03 amendment: the host is deleted (unified-ops record 0429, W3)
 
-Unified-ops record [0429](../unified-ops/0429-iwa-w3-delete-host.md) executes
-W3 of the exit plan ([0363](../unified-ops/0363-iwa-monolith-exit-plan.md))
+Unified-ops record 0429 executes
+W3 of the exit plan (0363)
 on branch `uo2/iwa-w3`, brought up to trunk `4d8a3e161f`, the last commit that
-contains `crates/litchi-iwa`. Every row of the macOS queue
-([`0363-mac-queue.md`](../unified-ops/0363-mac-queue.md)) has Mac evidence
-(owner decision D1; record [0434](../unified-ops/0434-mac-run-3-results.md)).
+contains `crates/litchi-iwa`. Every row of the macOS queue has Mac evidence
+(owner decision D1; record 0434).
 Deletion gate:
 
 1. No manifest depends on `litchi-iwa`: held before the deletion (no
    workspace crate, fuzz workspace, `tools/perf-baseline` or
    `tools/native-resave` manifest named it) and now holds trivially.
 2. Every module, example, test and fixture has an owner: the exit ledger
-   (`docs/unified-ops/results/0363/iwa-exit-ledger.tsv`) has 0 host-only rows,
-   2,117 migrated and 119 retired, and `tools/iwa_exit_ledger.py --check` now
-   validates it without the crate. The host's tests and examples are deleted
+   had 0 host-only rows, 2,117 migrated and 119 retired when the crate was
+   deleted. The host's tests and examples are deleted
    with it; the generated-schema build path no longer reads host sources
    (`crates/litchi-iwa-protos/build.rs`). The 797 inputs the host built for
    the macOS queue packages (records 0433, 0434) are kept outside the repository and

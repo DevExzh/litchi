@@ -1,4 +1,0 @@
-# Keep exact captured bytes, including diagnostic whitespace.
-raw/** -text -whitespace
-build-logs/** -text -whitespace
-quality/** -text -whitespace

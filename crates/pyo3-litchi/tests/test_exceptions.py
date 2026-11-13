@@ -3,8 +3,8 @@
 Every error the bindings raise for a file is a ``LitchiError`` carrying the
 unified error's ``code``, ``message`` and ``suggestion``. Each family class
 also derives from the built-in exception the oracle contract pins, so
-``except OSError`` and ``except ValueError`` keep working. The class names are
-recorded in docs/unified-ops/s8a-python-on-file.md for the editing API (M3).
+``except OSError`` and ``except ValueError`` keep working. The editing API
+relies on these class names.
 """
 
 from __future__ import annotations

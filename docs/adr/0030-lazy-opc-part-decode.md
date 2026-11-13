@@ -1,11 +1,11 @@
 # ADR 0030: Lazy OPC part decode behind the fallible package accessors
 
-- Status: Accepted (2026-09-16, by the owner's decision recorded in [change 0652](../performance/0652-owner-decisions-for-the-third-wave.md); proposed 2026-09-15)
+- Status: Accepted (2026-09-16, by the owner's decision recorded in change 0652; proposed 2026-09-15)
 - Date: 2026-09-15
 - Supersedes: nothing. Amends: nothing.
-- Raised by: [change 0610](../performance/0610-opc-lazy-part-decode-design.md),
+- Raised by: change 0610,
   which carries the site enumeration, the predicted retention and the sizing
-  probe. Gate 1 of [change 0581](../performance/0581-opc-package-retention.md)
+  probe. Gate 1 of change 0581
   requires this record to exist before candidate C2 or C2′ may be implemented.
 
 ## Context

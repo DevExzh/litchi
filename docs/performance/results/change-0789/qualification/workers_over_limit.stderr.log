@@ -1,1 +1,0 @@
-usage: probe --mib {0,1,4,16,64} --workers {0,4,32} --touch {main,workers}

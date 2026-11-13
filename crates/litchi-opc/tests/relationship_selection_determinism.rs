@@ -21,8 +21,7 @@
 //! `OpcPackage::relate_to_external`), so the published bytes varied per process.
 //!
 //! That input shape is not hypothetical: four packages in this repository's own
-//! corpus carry it, all of them external hyperlink or mail-merge relationships
-//! (`docs/performance/results/change-0628/corpus-duplicate-relationships.txt`).
+//! corpus carry it, all of them external hyperlink or mail-merge relationships.
 //!
 //! ADR 0006 requires serialization to be deterministic unless a `Clock`, actor
 //! identity, or cryptographic RNG is explicitly supplied, and none of these

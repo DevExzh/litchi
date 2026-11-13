@@ -1,4 +1,0 @@
-plain: capturing
-plain: pass
-media_rich: capturing
-media_rich: pass

@@ -2,8 +2,8 @@
 
 ``crates/litchi-ops/tests/crud_matrix.rs`` exercises every claimed
 (format, element, verb) cell of the 21 claimed formats through the Rust
-unified API and writes what passed to
-``docs/unified-ops/results/0289/crud-checklist.tsv`` (columns ``format``,
+unified API and writes what passed to ``crud-checklist.tsv``, kept under
+``test-data/unified-ops/checklists/`` (columns ``format``,
 ``element``, ``verb``, ``claim``, ``follow_up``, ``observed``). This module
 reads that TSV and replays every successful cell (``observed`` starting
 ``ok `` with claim ``supported`` or ``format-verb``) through ``litchi_py``,
@@ -72,8 +72,8 @@ import unittest
 
 from _support import L, REPO_ROOT, TEST_DATA
 
-TSV = REPO_ROOT / "docs" / "unified-ops" / "results" / "0289" / "crud-checklist.tsv"
-ADR_TSV = REPO_ROOT / "docs" / "unified-ops" / "results" / "0289" / "crud-adr0008.tsv"
+TSV = REPO_ROOT / "test-data" / "unified-ops" / "checklists" / "crud-checklist.tsv"
+ADR_TSV = REPO_ROOT / "test-data" / "unified-ops" / "checklists" / "crud-adr0008.tsv"
 
 #: ``PNG`` of crud_matrix.rs; the TSV abbreviates it to ``<PNG>``.
 PNG = (

@@ -1,8 +1,6 @@
 //! Independent integration coverage for the OpenFormula 1.4 complex-number
 //! functions.
 //!
-//! The contract for this file is recorded in
-//! `docs/report/spec-gap-validation-evidence/ods-formula-complex-functions/contract.md`.
 //! Complex results are observed through `IMREAL` and `IMAGINARY`, which keeps
 //! these tests independent of the public representation chosen for a complex
 //! scalar.  Formula errors remain values; evaluator cancellation and resource

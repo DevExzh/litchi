@@ -110,8 +110,8 @@ with (0001, 0002/0024, 0003, 0004, 0005/0031, 0006, 0007, 0008, 0009/0010/0023/
 7. iWork crates (`litchi-iwa*`, `litchi-numbers*`, `litchi-pages`,
    `litchi-keynote`) are owned by other concurrent agents: do not modify them.
    The unified layer consumes their public read and edit APIs. Where a write
-   verb needs an iWork API that does not exist yet, record the request in
-   docs/unified-ops/IWORK_API_REQUESTS.md for those owners and keep the gap
+   verb needs an iWork API that does not exist yet, hand the request to those
+   owners and keep the gap
    visible in `capabilities()`; do not patch the iWork crates yourself.
    The same rule applies to any leaf crate whose missing write API would need
    a new leaf engine: prefer adding the API in the leaf crate (allowed for
@@ -278,10 +278,9 @@ WORKING RULES
   scratchpad), branched from feat/unified-ops-api, and is merged back by the
   coordinator after review. Implementers do not edit shared logs; they hand
   log sections to the coordinator.
-- Keep a progress log at docs/unified-ops/PROGRESS.md and numbered records at
-  docs/unified-ops/NNNN-*.md (what changed, evidence, deltas vs OfficeCLI,
-  what is not claimed). Performance evidence goes under
-  docs/unified-ops/results/.
+- Keep the progress log, the numbered records (what changed, evidence, deltas
+  vs OfficeCLI, what is not claimed) and performance evidence outside the
+  repository (see AGENTS.md).
 - Periodically merge feat/office-format-completeness into this branch to
   stay current; resolve conflicts in favour of the base branch's leaf-crate
   changes and adapt the unified layer.

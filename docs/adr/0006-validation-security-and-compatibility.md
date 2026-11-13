@@ -23,17 +23,17 @@ relationship members retain compactness as a debug-checked serializer quality
 property.
 
 > **Amended 2026-09-16** by performance change
-> [0654](../performance/0654-opc-original-bytes-audit-loosened.md) under change
-> [0652](../performance/0652-owner-decisions-for-the-third-wave.md) decision 2,
+> 0654 under change
+> 0652 decision 2,
 > *"Original byte contract: loose the audit, accept non-compact XMLs."* Until
 > that amendment the compact output contract was asserted against original part
 > bytes as well, which refused 94 of 95 real OOXML packages at publication
-> (change [0602](../performance/0602-xlsx-real-producer-admission-design.md)).
+> (change 0602).
 > "Malformed known payloads fail before publication" below is the surviving
 > rule.
 >
 > **Amended again 2026-09-16** by performance change
-> [0665](../performance/0665-opc-eager-writer-publication-audit.md) under the
+> 0665 under the
 > same decision. Decision 2 names original part bytes; 0665 records its
 > implementation interpretation for eager planned payloads, including
 > source-spliced replacements, informed by 0654 and the source-backed
@@ -48,7 +48,7 @@ property.
 > any byte is emitted. 0665 measured the breadth the eager change admits: its
 > 59 `NotCompact` refusals over 180 real `.xlsx` fixtures become 0, and a
 > preserved DOCX main part publishes on 54 of the 55 openable fixtures where
-> change [0660](../performance/0660-docx-compaction-policy.md)'s default policy
+> change 0660's default policy
 > had to fall back to whole-document compaction on all 54.
 
 Validation never mutates. It returns a deterministic `Report` of structured

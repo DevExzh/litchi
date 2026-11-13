@@ -17,15 +17,15 @@ Rules of reading:
   processing, `Workbook` for spreadsheets, `Presentation` for decks).
 - Status: ✅ already conformant · 🔴 pending rename/change · ⏸ deferred by
   a numbered decision of record 0343 (Dn) that the owner memo
-  (`unified-ops/0331-owner-decision-memo.md`) lists for confirmation · ➖ not
+  lists for confirmation · ➖ not
   applicable to that family. The **Wave** column names the rollout wave
   (W1 DOCX, W2 PPTX, W3 PPT, W4 XLSX/XLSB, W5 legacy, W6 ODF, W7 iWork,
   W8 File) in which a 🔴 flips. Record 0343
   closed every 🔴 cell: each is now ✅ or ⏸. Owner decision
-  [0350](unified-ops/0350-owner-api-debt-decision.md) (2026-10-20) made
+  0350 (2026-10-20) made
   D1–D7, D10 and D11 required work: their cells are 🔴 again, and the cells
   of D1–D6 point at the migration waves of
-  [record 0351](unified-ops/0351-api-contract.md), tracked line by line in
+  record 0351, tracked line by line in
   §2a.
 - Any public API change must update this table in the same commit; once
   `tools/check_api_glossary.py` lands, drift is a CI failure.
@@ -118,7 +118,7 @@ and redaction vocabulary remain pending.
 
 ## 2a. Edit, commit and refusal contract (record 0351)
 
-[Record 0351](unified-ops/0351-api-contract.md) is the normative contract for
+Record 0351 is the normative contract for
 owner decision 0350 items 14–19. Its foundation is shared code in
 `litchi_core::edit`; the format crates migrate onto it in the waves listed
 below.
@@ -198,7 +198,7 @@ line. A line is ✅ when the wave's gate registrations pass.
 This glossary reconciliation is now bound to the fresh all-68 API capture at
 `472b6705475b073e7fe08f6e11ee17fb1e29f838`, tree
 `ebc1cee05f124c0c63977aff07a23288c19e7d00`, recorded in
-[0362ul21](unified-ops/0362ul21-final-api-capture-and-glossary-return.md).
+0362ul21.
 All 68 packages ran fresh with hidden items, all features, offline/locked
 Cargo, one job and the 20 GB cap; no capture artifact was reused. The fresh
 84-row inventory is SHA-256
@@ -538,7 +538,7 @@ This verifies the gate mechanism; it does not certify any pending rename or
 policy migration in the table above. M0a and M0b
 already landed, so the leaf waves adapt the existing facade in the same
 changes as leaf renames. iWork remains independently owned and must be
-coordinated through API requests. See [record 0016](unified-ops/0016-rebase-and-glossary-adoption.md).
+coordinated through API requests.
 
 
 ## 11. Registering and running a migration gate
@@ -650,7 +650,7 @@ or family violations, and 2 for invalid policy/input or a failed build.
 Regression tests: `python3 -m unittest tools.test_check_api_glossary`.
 They compile a small temporary Rust library with the installed rustdoc; no
 compiled fixture or rustdoc JSON is committed. CI runs the tests and checker
-in the Rust-toolchain job. See [record 0017](unified-ops/0017-glossary-gate.md).
+in the Rust-toolchain job.
 
 
 ## 12. W2 DOCX entry and focused error names (record 0018)
@@ -1465,7 +1465,6 @@ finalization; font discovery/embedding errors propagate from `build()`.
 Native authoring fixtures still use the legacy mutable `Package::new` and
 `presentation_mut` surface. Removing that surface and making `Package::new`
 canonical remain required; this consumer wave does not mark them conformant.
-See [record 0126](unified-ops/0126-pptx-builder-consumer-migration.md).
 
 
 ## PPTX canonical constructor and private authoring (0127)
@@ -1482,7 +1481,7 @@ Both PPTX glossary profiles ban the removed names. This completes the constructo
 package-writer separation described as pending in 0125–0126. Remaining package
 mutators and authoring verbs still require migration into edit/commit families;
 this change does not claim the full single-write-path policy or removal of every
-`UnsafeEdit` variant. See [record 0127](unified-ops/0127-pptx-canonical-constructor.md).
+`UnsafeEdit` variant.
 
 
 Native PPTX slide selection now uses `slide::Selector` with borrowed/owned names
@@ -1582,7 +1581,7 @@ output methods are removed. `Package` owns byte, sequential-stream and atomic
 path publication, and `from_bytes` borrows its input slice. The DOC minimal and
 full glossary profiles guard this completed naming slice. Native package
 transaction ownership and the merged ingress envelope follow in records
-0190–0191. See [0188](unified-ops/0188-doc-paragraph-loop.md).
+0190–0191.
 
 
 ## DOC primary package transactions (record 0191)
@@ -1611,8 +1610,7 @@ reads, including metadata and opaque streams. Already-parsed adoption cannot
 retroactively constrain CFB parsing allocations. Record 0193 extends this preflight to the focused body Snapshot's strict
 owner before payload capture, including candidate and profiled reopens.
 Complete allocation-budget coverage for raw escape paths and full DOC
-acceptance remain open. See [0192](unified-ops/0192-doc-source-limits.md) and
-[0193](unified-ops/0193-doc-strict-owner-admission.md).
+acceptance remain open.
 
 ## XLS focused cell edits (record 0194)
 
@@ -1623,8 +1621,7 @@ focused commit splits into `(Snapshot, Patch)`, with diagnostics read before
 consumption. The XLS glossary profile guards these removed spellings. The
 immutable `Package`/read-only `Workbook` migration, package commit accessors,
 source/options vocabulary, and remaining focused aliases are still pending;
-this family is not yet registered as fully conformant. See
-[0194](unified-ops/0194-xls-edit-vocabulary.md).
+this family is not yet registered as fully conformant.
 
 ## XLS retained policies (record 0195)
 
@@ -1634,7 +1631,7 @@ profile; joins and history recording refuse mismatched profiles. Shared CFB
 and OLE ownership retains the selected bounds through candidate validation,
 copy-through and layout changes. This policy fix precedes the canonical XLS
 SourceLimits/OpenOptions and Package migration; it does not mark that API
-family complete. See [0195](unified-ops/0195-xls-retained-limits.md).
+family complete.
 
 ## XLS eager source policies (record 0196)
 
@@ -1650,7 +1647,6 @@ The XLS glossary gate bans all three replaced setters.
 This applies to eager reader ingress and raw CFB adoption. Positional-reader
 options, focused edit profile convergence, and the immutable Package/Workbook
 split remain open; this is not a complete canonical owner registration.
-See [0196](unified-ops/0196-xls-source-limits.md).
 
 ## XLS package ownership (record 0197)
 
@@ -1660,7 +1656,7 @@ constructors are banned on the canonical Workbook. Native Package publication
 preserves exact source bytes and applies source/encryption fences. Facade reads
 delegate to this owner. Package primary edits, Builder creation and positional
 option-envelope migration remain open; no complete transaction family is
-registered by this wave. See [0197](unified-ops/0197-xls-immutable-owner.md).
+registered by this wave.
 
 ## XLS primary transactions (record 0198)
 
@@ -1669,8 +1665,7 @@ Error and LimitKind. Package owns edit/apply; Commit exposes the canonical
 triad and pair split, while Workbook remains read-only. No-op and inverse
 operations retain the recipient's effective profiles. The operation bound is
 an inline typed error; physical admission errors keep their typed source.
-Builder and full option-envelope unification remain open. See
-[0198](unified-ops/0198-xls-primary-transactions.md).
+Builder and full option-envelope unification remain open.
 
 Record 0199 adds XLS `Package::new()` for one empty worksheet and connects the
 unified creator and publisher to that owner. Option-bearing XLS authoring still
@@ -1682,20 +1677,20 @@ including explicit encrypted image export. The old builder output methods are
 removed and covered by the glossary audit.
 
 
-Record [0203](unified-ops/0203-xls-unified-reads.md) connects unified XLS
+Record 0203 connects unified XLS
 `get`/`find`/`query`/`view` to canonical `Package` reads. Native `Workbook::sheets()`
 returns the complete tab catalog, independent of parsed worksheet ordinals;
 source-backed cell projections retain `is_formula()`. The first read adapter
 still materializes sparse grids for traversal; early termination and measured
 facade overhead remain open acceptance work.
 
-Record [0204](unified-ops/0204-xls-eager-query-cursors.md) adds complete-catalog
+Record 0204 adds complete-catalog
 `Workbook::sheet_count()` and selector-based `Workbook::sheet()`, distinct from
 ordinary worksheet ordinals. Eager cell-only queries now consume the native
 iterator without a facade grid. Source-backed and axis projections still need
 bounded cursor work before full read-performance acceptance.
 
-Record [0205](unified-ops/0205-xls-unified-writes.md) connects unified XLS scalar
+Record 0205 connects unified XLS scalar
 `set`, clear/null, sheet names and generic edit/batch/history to the same
 canonical native `Package::edit` family. Scalar record replacements preserve
 XF styles; native SST closure owns string-table publication. Formula-cell
@@ -1720,8 +1715,7 @@ W4 residue: the scoped XLS families name their transaction `Edit`; the
 `sheet_visibility::Snapshot::transaction` are removed and banned in the
 `xls-minimal` profile. The `cell_values` and `sheet_visibility` selectors
 carry a checked `litchi_core::Position`. `property_set::Transaction` remains
-because the record 0254 metadata owner uses it. See
-[0259](unified-ops/0259-xls-unified-p0.md).
+because the record 0254 metadata owner uses it.
 
 ## Unified PPT navigation (0215)
 
@@ -1769,7 +1763,7 @@ paragraph `text`, and adds slides. Removed and banned in both PPT profiles:
 `text_edit::{Transaction, SourceTransaction}` and `slide_order::Transaction`,
 and `slide_order::Snapshot::from_bytes_with_limits`. `ppt-full` now also
 bans `Builder::set_property` and checks the `package::metadata` family, as
-`ppt-minimal` already did. See [0260](unified-ops/0260-ppt-p0-surface.md).
+`ppt-minimal` already did.
 
 ## Unified PPT shape runs (0218)
 
@@ -1967,8 +1961,7 @@ merge_metadata}`; fields without a property-set slot (`identifier`,
 `hyperlink_base`, unzoned timestamps) are refused with
 `MetadataError::Unsupported`, never dropped. The unified layer accepts
 initial metadata in `create_with` and `set("/metadata", ..)` with
-root-metadata keys and `custom.<name>`. See
-[0254](unified-ops/0254-legacy-ole-metadata.md).
+root-metadata keys and `custom.<name>`.
 
 The inert `_PID_LINKBASE` and `_PID_HLINKS` overlay uses
 `litchi_ole_common::property_set::user_defined::{Properties, Edit}` with a
@@ -2015,7 +2008,6 @@ with `open_with_options`; their positional `from_path_*`/`from_read_at_*`
 constructors remain a pending migration. `Error::StaleSource` is renamed
 `Error::PatchConflict`. Both PPTX profiles ban the removed names, and
 pptx-full now carries the primary-transaction bans pptx-minimal had.
-See [record 0252](unified-ops/0252-pptx-w2-residue-and-p0-writes.md).
 
 ## PPTX primary family completion and rich text edits (0252)
 
@@ -2110,8 +2102,7 @@ SourceBackedOptions)`; the raw owner's configured open is
 bounded `Snapshot::parse_with_options_and_policy` result through
 `Editor::from_snapshot`. `open_with_limits`, `open_with_limits_and_policy`
 and every `rollback` are removed and banned in both DOC profiles (dropping a
-transaction is the rollback). See
-[0258](unified-ops/0258-doc-p0-surface.md).
+transaction is the rollback).
 
 ## Registry schema export (record 0263)
 
@@ -2124,8 +2115,7 @@ registered, elements, element, gaps}` reuses the capability report's
 and `write_gap()`, and `capabilities::Constraint` (`None`, `Int`, `Number`,
 `Length`, `Chars`, `NotEmpty`) names the registry's value domain. The
 format-level report stays `Capabilities::of`; the file-level one stays
-`File::capabilities`. No alias names are added. See
-[0263](unified-ops/0263-registry-schema-export.md).
+`File::capabilities`. No alias names are added.
 
 ## DOCX metadata transaction, Builder and stream output (0251)
 
@@ -2362,8 +2352,6 @@ names. No second grid type or alias is introduced.
 | `litchi_xlsb::sheet::CellCursor`, `SourceBackedWorksheet::cell_cursor() -> Result<CellCursor>` (items `(u32, u32)`; `CellCursor::{grid, is_complete}`) | adopted (0267) |
 | `litchi_xls::CellCursor`, `SourceBackedWorksheet::cell_cursor() -> Result<Option<CellCursor>>` (items `SourceBackedCell`; `CellCursor::needs_formula_context`) | adopted (0267) |
 
-See [0267](unified-ops/0267-streaming-cell-cursors.md).
-
 ## Unified template merge (record 0274)
 
 `File::merge(&merge::Record, &merge::Options)` and `File::merge_with_options`
@@ -2399,8 +2387,6 @@ owning package once for these writes (`Docx` keeps the promotion).
 | `litchi_docx::document::Edit::{story, substitute}`; `Edit<Package>::{story_parts, part_story, substitute_part}` | adopted (0274); `story_parts` returns `StoryPart`s (0285) |
 | `litchi_docx::document::substitute::{Story, Paragraph, Field, FieldKind, Replacement, Outcome, OBJECT}` | adopted (0274) |
 | CLI `litchi merge`, Python `File.merge` | adopted (0274) |
-
-See [0274](unified-ops/0274-template-merge.md).
 
 ## Field and table-of-contents refresh (record 0279)
 
@@ -2442,8 +2428,6 @@ field run (`a:fld`) as their target, writing its cached result.
 | `litchi_xlsx::WorksheetEdit::set_cached` | adopted (0279) |
 | `litchi_pptx::opened::TextTarget::Run` text on `a:fld` runs | adopted (0279) |
 
-See [0279](unified-ops/0279-field-refresh.md).
-
 ## Formatting-aware find/replace (record 0273)
 
 Find/replace is not a verb: as OfficeCLI's `set --find`, a `File::set`
@@ -2472,8 +2456,6 @@ copy of the run's properties); XLSX worksheets report rich-text cells
 | `litchi_pptx::opened::TextTarget::RunSpan` | adopted (0273) |
 | `litchi_xlsx::Worksheet::has_rich_text` | adopted (0273) |
 
-See [0273](unified-ops/0273-find-replace.md).
-
 ## Find/replace and template merge on one primitive (record 0285)
 
 Find/replace and template merge share one DOCX leaf primitive, the story
@@ -2501,8 +2483,6 @@ table-cell runs (`opened::TextTarget::{CellRun, CellRunSpan}`, read through
 | `litchi_pptx::opened::TextTarget::{CellRun, CellRunSpan}`, `litchi_pptx::table::Cell::text_body` | adopted (0285) |
 | `litchi_pptx::opened::Edit::set_notes_text_properties` | adopted (0285) |
 
-See [0285](unified-ops/0285-find-merge-consolidation.md).
-
 ## DOCX run-level markup compatibility (record 0307)
 
 Document transactions admit a main document whose `mc:AlternateContent`
@@ -2521,8 +2501,6 @@ AlternateContentText`.
 | `litchi_ooxml_common::mce::admission::{admit_held, Holder, Held}` | adopted (0307) |
 | `litchi_docx::document::substitute::Paragraph::alternate_content` | adopted (0307) |
 | `litchi_docx::document::Refusal::AlternateContentText` | adopted (0307) |
-
-See [0307](unified-ops/0307-docx-run-markup-compatibility.md).
 
 ## Typed SmartArt CRUD (record 0284)
 
@@ -2544,8 +2522,6 @@ through the primary `opened::Edit`.
 | `litchi_drawingml::diagram::edit::{Outline, Entry, set_text, drawing_text, set_drawing_reference}` | adopted (0284) |
 | `litchi_pptx::opened::Edit::{add_smartart, smartart, set_smartart}`, `litchi_pptx::opened::SmartArtParts` | adopted (0284) |
 | `litchi_pptx::slide::Slide::diagram_xml`, `SourceSlide::diagram_xml`, `source::Slide::diagram_xml` | adopted (0284) |
-
-See [0284](unified-ops/0284-typed-smartart-crud.md).
 
 ## Remaining ODF leaves, W3 (record 0282)
 
@@ -2614,8 +2590,6 @@ generator so DOCX shares it.
 | `litchi_docx::chart::InlineChart`, `Paragraph::charts`, `Package::chart_xml`, `source_backed::Package::chart_xml` | adopted (0283) |
 | `litchi_docx::document::{NewChart, chart_workbook}`, `Edit::{insert_chart_at, chart_parts, set_chart, set_chart_extent_at, remove_chart_at}` | adopted (0283) |
 
-See [0283](unified-ops/0283-docx-charts-and-chartex.md).
-
 ## Find/replace and merge on every text format (record 0295)
 
 Find/replace (`set` with `find=`) and template merge (`File::merge`) cover
@@ -2639,8 +2613,6 @@ string.
 | `litchi_docx::document::NewSmartArt` (`new`, `with_size`, `with_name`, `with_description`, `size`), `Edit::insert_smartart_at` | adopted (0295): DOCX SmartArt insertion |
 | DOCX `smartart` element (`/smartart[N]`, `/body/smartart[N]`; `layout`, `layoutId`, `nodeCount`, `text`; add-only `name`, `alt`, `width`, `height`) | adopted (0295) |
 | `litchi_xlsb` cell-value formula caches changing type (`set_formula_*_cache` across the four `BrtFmla*` families) | behaviour (0295): XLSB cache write-back |
-
-See [0295](unified-ops/0295-m4-engines-on-more-formats.md).
 
 ## W1 Numbers (record 0297)
 
@@ -3063,8 +3035,7 @@ POI's `AnchorType` and ECMA-376 `ST_EditAs`; wire values are unchanged.
 | `litchi_xls::AnchorBehavior::Absolute` (wire 3, `absolute`) | `AnchorBehavior::MoveAndSize` | ✅ 0316 |
 | `litchi_xls::writer::shape::Anchor::{new, cells, behavior}` take and return `AnchorBehavior` | `litchi_xls::writer::shape::Behavior` | ✅ 0316 |
 
-The `xls-minimal` profile bans the old spellings. See
-[0316](unified-ops/0316-xls-odp-structural-follow-ups.md).
+The `xls-minimal` profile bans the old spellings.
 
 ## ODP character formatting through styles, links and fields (record 0316)
 
@@ -3156,8 +3127,6 @@ Action}`); the authored relationship ID of a `Click` stays crate-private.
 | `litchi_pptx::media_parts::{Summary, summary}`; `opened::{Edit::add_media, MediaFile}` | adopted (0321) |
 | `litchi_pptx::shape::math::{Equation, equations}`; `Slide::equations`, `SourceSlide::equations`, `source::Slide::equations` | adopted (0321) |
 
-See [0321](unified-ops/0321-pptx-element-gaps.md).
-
 ## PPTX P0 residue: text structure, rows, cell properties, comments, pictures (record 0333)
 
 New verbs live on the primary `opened::Edit`, and the slide-local ones also
@@ -3177,8 +3146,6 @@ native comment identities stay behind the positional verbs.
 | `litchi_pptx::opened::Edit::{remove_comment_at, remove_modern_comment_at, remove_modern_comment_reply_at}` | adopted (0333), positional siblings of `set_comment_at` |
 | `litchi_pptx::opened::Edit::{set_picture_image, set_shape_description, set_shape_name}` | adopted (0333) |
 | `litchi_ops` PPTX kinds: `paragraph` and `run` under `tc` and `notes` (by path), `tr` (`height`, `cols`, `c1`…`c20`), `table` add (`rows`, `cols`, `data`), `tc` `valign`/`padding.*`, `picture` `alt`/`src`/frame set | adopted (0333) |
-
-See [0333](unified-ops/0333-pptx-p0-residue.md).
 
 ## XLSB worksheet feature families (record 0322)
 
@@ -3369,8 +3336,6 @@ to the metadata writers. No banned name is introduced.
 | `litchi_ops::PathArg` `Display` | a fixed point of `PathArg::parse`: a relative first step that would read as sheet notation is quoted | behaviour (0338) |
 | workspace `serde_json` `float_roundtrip` | JSON numbers decode correctly rounded | behaviour (0338) |
 
-See [0338](unified-ops/0338-xlsx-p0-root-metadata-json-paths.md).
-
 ## DOCX and PPTX v1 closure (record 0342)
 
 No new transaction family: the DOCX verbs live on the primary
@@ -3407,8 +3372,6 @@ values are assigned by the leaf and never addressed.
 | DOCX hyperlink `tooltip` add and set | OfficeCLI's `hyperlink.tooltip` (add only there) | ✅ 0345 |
 | DOCX comment `anchoredTo` (read), `done` (alias `resolved`; read, add, set), `parentId` (read, add), `runStart`, `range` (add) | OfficeCLI's `comment` schema; the record 0335 property gaps are deleted | ✅ 0345 |
 
-See [0345](unified-ops/0345-docx-p0-final.md).
-
 ## Numbers swap, Python patches (record 0347)
 
 No new transaction family. Numbers `swap` composes the existing sheet-order,
@@ -3423,8 +3386,6 @@ gain the ADR 0034 §3 patch vocabulary over `litchi_ops::transaction::Patch`.
 | Numbers `swap` of `sheet`s and `table`s | adopted (0347): two moves applied one at a time (four leaf steps across sheets) |
 | `litchi_xlsx::drawing::edit::Edit::replace_element_image` | adopted (0347): `replace_image` for a picture element the caller already read; `replace_image` delegates to it |
 | `litchi_rtf::Error::UnsupportedCodePage` | adopted (0347): an `\ansicpg` with no exact codec (10001, 10007); `unsupported_capability` in the unified layer |
-
-See [0347](unified-ops/0347-numbers-swap-python-patch-xlsx-picture.md).
 
 ## PPTX P0 closure: comments, modern comments, notes, placeholders, slides (record 0346)
 
@@ -3445,8 +3406,6 @@ raw query surface only).
 | `litchi_pptx::table::Table::cell_contents` | adopted (0346): every cell's properties and text body, by row; a table without namespace declarations resolves its scope once |
 | `litchi_ops` PPTX `placeholder` add (`phType`, alias `type`; `text`), returning the canonical `/slide[N]/shape[K]`; `notes` add (`text`); slide `title`/`text` on add and `layout` set | adopted (0346) |
 
-See [0346](unified-ops/0346-pptx-p0-final.md).
-
 ## Sheet traits: static dispatch (record 0353)
 
 Owner decision 0350 (memo item 29): the `litchi-core::sheet` traits no
@@ -3464,8 +3423,6 @@ concrete formats. The removed iterator traits are deleted, not aliased.
 | `litchi_ops::view::sheet::{Worksheet, Cell, Cells, Rows, Worksheets}` | adopted (0353): the associated types of `WorkbookView`, `Xlsx`, `Xlsb` and `Xls`, enums over the per-format types |
 | `litchi_xls::worksheet::{Cells, Rows}`, `litchi_xls::workbook::Worksheets` | adopted (0353): the XLS reader's trait iterators (`Worksheet::cell` lends `Cow<'_, Cell>`, `WorkbookTrait` lends `&Worksheet`) |
 | `litchi_xlsb::sheet::{StoredCells, Rows}`, `litchi_xlsb::workbook::Worksheets` | adopted (0353); `litchi_xlsb::workbook::WorksheetIterator` renamed `Worksheets`. The eager `Workbook` lends the cache's `Arc<Worksheet>` instead of a clone of the worksheet |
-
-See [0353](unified-ops/0353-sheet-trait-static-dispatch.md).
 
 ## Text workbooks in their own leaf (record 0354)
 
@@ -3507,8 +3464,6 @@ Structured keywords (owner decision 0350, memo item 20):
 | `litchi_odf_common::metadata::{Assignments::set_keywords, Edit::set_keywords}`, `litchi_odt::metadata::Edit::set_keywords` | adopted (0354): one `meta:keyword` per keyword |
 | `litchi_pages::metadata::Edit::set_keywords(&[String])`, `metadata::Error::InvalidKeyword`; `litchi_ods::metadata::Editor::set_keywords(Vec<String>)`; `litchi_odi` `set_keywords(Vec<String>)` and `MetadataFields::keywords() -> &[String]` | adopted (0354) |
 
-See [0354](unified-ops/0354-sheet-text-and-structured-keywords.md).
-
 ## Sheet traits: typed errors and a synchronous engine (record 0353a)
 
 Owner decision 0350 and coordinator decision 0353a: no boxed error on the
@@ -3522,8 +3477,6 @@ sheet traits and no boxed future in the formula engine.
 | `impl From<litchi_ops::Error \| litchi_xls::Error \| litchi_xlsb::package::PackageError \| litchi_sheet_text::Error> for litchi_core::sheet::Error` | adopted (0353a): classification with static reasons, which `FormulaEvaluator` requires (`sheet::Error: From<W::Error>`) |
 | `litchi_eval::DepthLimit` | deleted (0353a): a too-deep chain is `sheet::Error::Limit { kind: LimitKind::Depth, .. }` |
 | `litchi_eval::FormulaEvaluator::{evaluate_cell, evaluate_sheet}` | kept `async` (0353a); the engine core is synchronous and the futures only await the caller's `Fetch` for `WEBSERVICE` between passes |
-
-See [0353a](unified-ops/0353a-sheet-errors-and-sync-engine.md).
 
 ## Numbers-wire raw boundaries (records 0362ul66, 0362ul66a)
 
@@ -3550,9 +3503,6 @@ consumers carry their owner-selected profile through every raw call; the
 profile is derived from the package ingress and semantic budgets at the owner
 boundary. The raw leaf's source tests cover exact and one-under input,
 field, tail and output caps plus owned round-trip fidelity.
-
-See [0362ul66](unified-ops/0362ul66-numbers-wire-raw.md) and the review return
-[0362ul66a](unified-ops/0362ul66a-numbers-wire-raw-review.md).
 
 ## Unified `File` configuration and commit accessors (record 0362)
 
@@ -3623,8 +3573,6 @@ their existing construction and serialization behavior, while package and
 projection owners retain their immutable API. All examples, tests, facade
 consumers and performance harness imports were migrated in the same change.
 
-See [0362zab](unified-ops/0362zab-spreadsheet-chart-builder.md).
-
 ## PPTX raw property and model3d limits (record 0362ul63)
 
 PPTX view-properties and presentation-properties codecs expose one explicit
@@ -3642,8 +3590,6 @@ relationships, links and embedded model/preview payloads.
 | `litchi_pptx::presentation_properties::Properties::{parse, parse_with_tolerance, parse_strict, to_xml}`; `presentation_properties::{load_from_package, load_from_package_with_tolerance}` | adopted (0362ul63); strict/tolerant paths share the selected `presentation_properties::Limits` |
 | `litchi_pptx::presentation_properties::read_only_recommended::Snapshot::{from_xml, from_xml_owned}` | adopted (0362ul63); detached source snapshots require the presentation-properties limits policy |
 | `litchi_pptx::model3d::codec::{read, write}`; `model3d::validation::validate` | adopted (0362ul63); model3d package, selected-shape and edit consumers propagate the retained owner policy, including payload and relationship ceilings |
-
-See [0362ul63](unified-ops/0362ul63-pptx-raw-properties.md).
 
 ## PPTX structural metadata policies (record 0362ul81)
 
@@ -3663,8 +3609,6 @@ profile and exact bytes without a second semantic rewrite.
 | `color_map::{parse_master, parse_override}` and `color_map::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | adopted (0362ul81); master/layout/slide sources retain their exact owner bytes and apply changed payloads under recipient limits |
 | `handout::Master::{parse_xml, to_xml}`, `protection::Settings::{parse_xml, to_xml, to_pres_props_xml}`, `template::pres_props_xml_with_handout` | adopted (0362ul81); required limits cover input, output, attributes, strings, nodes and password verifier fields; detached handout/protection writers retain canonical typed-model semantics, while static template constants remain format-invariant |
 | `custom_show`, `guides`, `structure` and `color_map` replay | adopted (0362ul81); no-op patches preserve exact recipient content and policy, changed patches perform bounded recipient validation, and no public `_with_limits`/default twins remain; `Snapshot::read`, projection aliases and draft `snapshot` wrappers (including `color_map::Draft::snapshot`) are banned in these scopes |
-
-See [0362ul81](unified-ops/0362ul81-pptx-metadata-structural.md).
 
 ## PPTX metadata history limits (record 0362ul82)
 
@@ -3686,8 +3630,6 @@ only twin, alias or `_with_limits` entry point was added.
 | `litchi_pptx::presentation_properties::metadata::events::{load,load_snapshot}` | adopted (0362ul82); slide XML event admission remains inert and opaque outside the typed island |
 | `OpenOptions::{changes_limits,revision_limits,slide_sync_limits,tracks_limits,events_limits}` and each family's `EditOptions::limits` | adopted (0362ul82); profiles survive owners, projections, edits, snapshots, patches and replay |
 
-See [0362ul82](unified-ops/0362ul82-pptx-metadata-history.md).
-
 ## PPTX metadata history bounded admission (record 0362ul82a)
 
 The 82a correction applies the selected semantic profile before MCE
@@ -3702,8 +3644,6 @@ additional default entry points.
 | `litchi_pptx::modern_comments::{load_modern_comment_changes, Edit::{changes, update_changes}}` | adopted (0362ul82a); selected Changes limits are intersected with physical source limits and used for reads and writes |
 | `litchi_pptx::presentation_properties::metadata::{changes,revision,slide_sync}::Limits` | adopted (0362ul82a); bounded MCE admission uses the selected profile before expansion |
 | `litchi_pptx::presentation_properties::metadata::events::store` and slide extension splice | adopted (0362ul82a); checked exact sizing and fallible reservation use the selected output ceiling |
-
-See [0362ul82a](unified-ops/0362ul82a-pptx-metadata-history-admission.md).
 
 ## Public support projections and owned record views (record 0362ul157)
 

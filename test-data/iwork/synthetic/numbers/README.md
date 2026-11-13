@@ -11,11 +11,11 @@ This is a synthetic graph for host/owner interoperability tests. It was not
 created by Numbers and must not be used as evidence of native application
 compatibility.
 
-# Synthetic Numbers benchmark grid (record 0297)
+# Synthetic Numbers benchmark grid
 
 `bench-grid.numbers` (11482 bytes, SHA-256
 `9c17aba05afe42dd03ae048a42b94974abdaef7368d9ea207b40c277ca38582a`) is a
-test-only package for `crates/litchi-ops/examples/numbers_unified_bench.rs`.
+test-only package read by the `litchi-ops` and `litchi-numbers` tests.
 It holds one sheet `Bench` with one 101 x 11 table `Grid`: row 1 holds the
 headings `C1`..`C10` in columns B..K, column A holds `R1`..`R100`, and the
 rest is empty. No Numbers corpus fixture has a table of 1000 cells, which the

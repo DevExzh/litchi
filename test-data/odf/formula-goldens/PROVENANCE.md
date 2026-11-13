@@ -2,9 +2,7 @@
 
 Expected values compiled into the `litchi-ods` formula tests
 (`crates/litchi-ods/tests/ods_formula_*.rs`). Each directory is one function
-family and keeps the layout it had under
-`docs/report/spec-gap-validation-evidence/ods-formula-<family>/`, where these
-files lived before they moved here.
+family.
 
 Two kinds of file:
 

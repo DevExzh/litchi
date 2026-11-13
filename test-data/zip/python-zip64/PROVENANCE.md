@@ -8,5 +8,4 @@ descriptors, and a member whose CRC equals the descriptor signature
 from that output by rewriting the central directory framing.
 
 They are project-generated and carry no third-party content. The
-`soapberry-zip` and `litchi-opc` ZIP64 tests compile them in. They moved here
-from `docs/performance/results/change-0416/corpus/`.
+`soapberry-zip` and `litchi-opc` ZIP64 tests compile them in.

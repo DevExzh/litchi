@@ -1,5 +1,4 @@
-//! Slide-list text resolved into the shapes that reference it (L-PPT-R1,
-//! finding F-10 of `docs/unified-ops/0010-m1-unified-read-plan.md`).
+//! Slide-list text resolved into the shapes that reference it (L-PPT-R1).
 //!
 //! `PowerPoint` keeps the text of title and body placeholders in the
 //! `SlideListWithTextContainer`; the placeholder's text box holds only an

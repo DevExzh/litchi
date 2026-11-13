@@ -1,15 +1,15 @@
 # ADR 0031: I/O concurrency, CPU task and executor budgets in the execution context
 
-- Status: Accepted (2026-09-16, by the owner's decision recorded in [change 0652](../performance/0652-owner-decisions-for-the-third-wave.md); proposed 2026-09-15)
+- Status: Accepted (2026-09-16, by the owner's decision recorded in change 0652; proposed 2026-09-15)
 - Date: 2026-09-15
 - Supersedes: nothing. Amends: the execution paragraph of
   [ADR 0005](0005-io-memory-and-performance.md) only. Every other paragraph of
   that record, and every other accepted record, is untouched.
-- Raised by: [change 0615](../performance/0615-execution-context-completeness-design.md),
+- Raised by: change 0615,
   which carries the capability matrix against `docs/GOAL.md` Workstream F, the
   retained scaling evidence, and the coexistence probe whose counts are quoted
   below. Item CORE-3 of
-  [change 0587](../performance/0587-remaining-opportunity-survey.md) ranks this
+  change 0587 ranks this
   as a prerequisite rather than a speedup.
 
 ## Context

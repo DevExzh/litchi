@@ -1,5 +1,0 @@
-# Raw tool output is retained verbatim.
-*.log -diff
-*.stdout -diff
-*.stderr -diff
-*.summary -diff

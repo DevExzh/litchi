@@ -1,2 +1,0 @@
-cross-copy: running
-cross-copy: exit 0

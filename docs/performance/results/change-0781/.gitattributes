@@ -1,3 +1,0 @@
-*.log -whitespace
-*.patch -whitespace
-candidate/*.rs -whitespace

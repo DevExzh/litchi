@@ -15046,8 +15046,7 @@ mod tests {
 
     /// Change 0575's adversarial witness, byte for byte.
     ///
-    /// `docs/performance/results/change-0575/overlap_witness.py` builds the
-    /// same 4,405-byte archive. `A.bin`'s local extra field is 4,096 bytes, so
+    /// The archive is 4,405 bytes. `A.bin`'s local extra field is 4,096 bytes, so
     /// A's declared local span `[0, 4163)` physically contains `B.bin`'s entire
     /// local record at offset 2,048. A's *central* record declares an extra
     /// length of 0, so no central-directory-only analysis can see the overlap.

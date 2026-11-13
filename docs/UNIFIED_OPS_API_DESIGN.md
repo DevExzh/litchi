@@ -436,11 +436,11 @@ The following migration issues were resolved through M0a and subsequent waves.
 
 - Pages, Keynote and Numbers use `File` and their immutable leaf `Package`
   owners. The former `litchi::iwork::Document` facade is retired
-  ([record 0306](unified-ops/0306-iwork-facade-retirement.md)).
+  (record 0306).
 - CSV/TSV reader/writer tooling lives in the independent `litchi-sheet-text`
   crate, re-exported as `litchi::sheet::text` by the `sheet-text` feature.
   Unified `import` consumes that leaf
-  ([record 0354](unified-ops/0354-sheet-text-and-structured-keywords.md)).
+  (record 0354).
 - All leaf re-export modules (`litchi::docx`, `litchi::xlsx`, …) — leaf APIs
   remain reachable for format-specific work.
 

@@ -145,14 +145,10 @@ Litchi table mutation, native byte parity, or broader table support.
 
 ## Retired migration host
 
-The broad `litchi-iwa` migration host was deleted by record
-[0429](../../../docs/unified-ops/0429-iwa-w3-delete-host.md) (W3 of the exit plan, record
-[0363](../../../docs/unified-ops/0363-iwa-monolith-exit-plan.md)); the last commit that contains it
-is `4d8a3e161f`. Every host public function is accounted for in the checked exit ledger
-[`iwa-exit-ledger.tsv`](../../../docs/unified-ops/results/0363/iwa-exit-ledger.tsv): migrated to a
-leaf or shared owner (with the destination API named) or retired with a reason. Record
-[0436](../../../docs/unified-ops/0436-post-w3-cleanup.md) re-audited the rows that claimed no
-support against that ledger; a row's mark still describes its own scope, not general CRUD.
+The broad `litchi-iwa` migration host has been deleted; the last commit that contains it
+is `4d8a3e161f`. Before the deletion every host public function was accounted for: migrated to a
+leaf or shared owner or retired with a reason. The rows that claimed no support were re-audited
+against that inventory; a row's mark still describes its own scope, not general CRUD.
 
 ## Evidence and current verification blockers
 

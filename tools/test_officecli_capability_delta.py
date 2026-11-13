@@ -114,11 +114,11 @@ class SchemaLoading(unittest.TestCase):
         (root / delta.UPSTREAM_COMMIT).write_text("0123456789abcdef\n", encoding="utf-8")
         self.assertEqual(delta.officecli_commit(root), "01234567")
 
-    def test_the_vendored_schemas_match_the_committed_table(self) -> None:
+    def test_the_generated_table_records_the_vendored_schemas(self) -> None:
         vendored = delta.REPO / delta.VENDORED_OFFICECLI
         tree, count = delta.schema_tree_hash(vendored / "schemas" / "help")
         commit = delta.officecli_commit(vendored)
-        table = (delta.REPO / delta.OUTPUT).read_text(encoding="utf-8")
+        table = delta.generate(vendored, delta.REPO).files[delta.OUTPUT]
         self.assertIn(
             f"| officecli | `schemas/help` ({count} files, OfficeCLI commit `{commit}`) | `{tree}` |",
             table,
@@ -261,7 +261,7 @@ class Comparison(unittest.TestCase):
         self.assertEqual(len(existing["gaps"]), 1)
 
     def test_generated_table_tracks_current_golden_reports(self) -> None:
-        table = (delta.REPO / delta.OUTPUT).read_text()
+        table = delta.generate(delta.REPO / delta.VENDORED_OFFICECLI, delta.REPO).files[delta.OUTPUT]
         snapshots = sorted((delta.REPO / delta.GOLDEN_DIR).glob("*.json"))
         self.assertGreaterEqual(len(snapshots), 8)
         for path in snapshots:
@@ -651,8 +651,17 @@ class ApplyingDispositions(unittest.TestCase):
         self.assertIn("| cell | `fill` | color | -sg |  | unlisted | gap | P1 | planned WP16 (cells) |  |", page)
         self.assertTrue(all(len(text.encode()) < delta.SIZE_LIMIT for text in (main, page)))
 
-    def test_the_committed_tables_pass_check(self) -> None:
+    def test_the_committed_inputs_pass_check(self) -> None:
         self.assertEqual(delta.main(["--check"]), 0)
+
+    def test_tables_are_written_only_to_the_named_directory(self) -> None:
+        with self.assertRaises(SystemExit):
+            delta.main([])
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(delta.main(["--output-dir", tmp]), 0)
+            written = Path(tmp)
+            self.assertTrue((written / delta.OUTPUT).is_file())
+            self.assertTrue((written / delta.property_page("xlsx")).is_file())
 
 
 if __name__ == "__main__":

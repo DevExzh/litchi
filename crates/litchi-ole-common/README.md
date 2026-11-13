@@ -72,12 +72,12 @@ and a uniquely owned unchanged finish returns that allocation.
 
 ## Validation evidence
 
-The checked-in evidence batches bind their source files, commands, and logs:
+Validation covered:
 
-- [OLE1 streams](../../docs/report/spec-gap-validation-evidence/ole1-streams-v1/README.md), including the read/preserve-only compatibility profiles and reversible edits ([receipt](../../docs/report/spec-gap-validation-evidence/ole1-streams-v1/receipt.json)).
-- [OLE2 streams](../../docs/report/spec-gap-validation-evidence/ole2-streams-v1/README.md), covering presentation, TOC, native-stream, and target-selected object integration ([receipt](../../docs/report/spec-gap-validation-evidence/ole2-streams-v1/receipt.json)).
-- [Common CFB and DOC source admission](../../docs/report/spec-gap-validation-evidence/doc-source-admission-v1/README.md), including original allocation retention and prepared replacement validation.
-- [OLEPS binding names](../../docs/report/spec-gap-validation-evidence/oleps-binding-v1/README.md) and [alternate-stream metadata](../../docs/report/spec-gap-validation-evidence/oleps-alternate-stream-v1/README.md).
+- OLE1 streams, including the read/preserve-only compatibility profiles and reversible edits.
+- OLE2 streams, covering presentation, TOC, native-stream, and target-selected object integration.
+- Common CFB and DOC source admission, including original allocation retention and prepared replacement validation.
+- OLEPS binding names and alternate-stream metadata.
 - In-repository integration coverage for [property-set editing](tests/property_set_editor.rs), [object integration](tests/object_streams.rs), [OLEDS streams](tests/ole_streams.rs), and [OLE1 objects](tests/ole1.rs).
 
 These batches validate the bounded APIs and their refusal paths. They do not

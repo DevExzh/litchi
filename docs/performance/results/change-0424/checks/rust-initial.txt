@@ -1,4 +1,0 @@
-opc-topology: running
-opc-topology: exit 0
-pptx-reuse: running
-pptx-reuse: exit 101

@@ -1,3 +1,0 @@
-4
-0
-cat: /sys/bus/event_source/devices/cpu/cpus: No such file or directory

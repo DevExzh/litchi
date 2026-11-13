@@ -1,3 +1,0 @@
-# Preserve verbatim tool output, including final blank lines.
-*.log -whitespace
-*.txt -whitespace

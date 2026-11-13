@@ -1,8 +1,0 @@
-branch-instructions
-branch-misses
-cache-misses
-cache-references
-cpu-cycles
-instructions
-ref-cycles
-stalled-cycles-frontend

@@ -6,8 +6,7 @@
 //! Data transaction.  A rewrite is a single ordered splice over that source;
 //! it does not re-emit unknown records or search the source for UTF-16 text.
 //!
-//! The admitted wire profile is the one pinned by
-//! `docs/report/spec-gap-validation-evidence/xlsb-extconn14-grammar`: a
+//! The admitted wire profile is: a
 //! `BrtBeginExtConn14` record has a reserved `FRTBlank`, an `irstCulture`
 //! `XLWideString`, and an `irstClientCubeUrn` `XLWideString`, in that order.
 //! The record is effective only when it is a direct child of the known

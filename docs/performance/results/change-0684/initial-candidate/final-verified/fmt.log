@@ -1,4 +1,0 @@
-HEAD 5805d54a1d8435e1bee96cde1303310703440d16
-$ cargo fmt --all --check
-
-exit 0

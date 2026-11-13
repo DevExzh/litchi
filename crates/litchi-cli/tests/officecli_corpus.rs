@@ -33,8 +33,7 @@
 //! (newly passing lines, changed refusal codes) are printed and do not fail
 //! the test; re-record them with
 //! `LITCHI_BLESS=1 cargo test -p litchi-cli --test officecli_corpus`, then
-//! regenerate `docs/unified-ops/officecli-corpus-deltas.md` with
-//! `python3 tools/officecli_corpus.py`.
+//! check their dispositions with `python3 tools/officecli_corpus.py --check`.
 //!
 //! The harness needs `bash` and `python3`, and runs on Unix only.
 

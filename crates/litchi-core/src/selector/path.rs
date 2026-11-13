@@ -709,7 +709,7 @@ mod plain_tests {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let mut inputs = std::collections::BTreeSet::new();
         collect(&root.join("crates"), &mut inputs);
-        collect(&root.join("docs/unified-ops/results/0289"), &mut inputs);
+        collect(&root.join("test-data/unified-ops/checklists"), &mut inputs);
         assert!(
             inputs.len() > 2_000,
             "only {} path strings found",

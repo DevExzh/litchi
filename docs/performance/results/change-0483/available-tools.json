@@ -1,8 +1,0 @@
-{
-  "libreoffice": "/usr/bin/libreoffice",
-  "soffice": "/usr/bin/soffice",
-  "perf": "/usr/bin/perf",
-  "heaptrack": "/usr/bin/heaptrack",
-  "strace": "/usr/bin/strace",
-  "cargo-fuzz": null
-}

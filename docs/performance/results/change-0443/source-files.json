@@ -1,5 +1,0 @@
-[
-  "crates/litchi-odp/src/codec/content_source/scanner.rs",
-  "crates/litchi-odp/src/codec/content_source/mod.rs",
-  "crates/litchi-odp/src/codec/content_source/scanner_reference.rs"
-]

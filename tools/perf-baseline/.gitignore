@@ -1,4 +1,0 @@
-/target/
-
-# This standalone Cargo package is invoked with --locked.
-!Cargo.lock

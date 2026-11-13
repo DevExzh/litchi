@@ -1,1 +1,0 @@
-FAIL: cases[1].default changed members outside the fixed mutation closure: ['xl/workbook.xml']

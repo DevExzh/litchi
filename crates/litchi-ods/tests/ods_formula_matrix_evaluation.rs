@@ -1,7 +1,6 @@
 //! Integration coverage for the OpenFormula 1.4 matrix-function family.
 //!
-//! The expected values in this file follow the profile recorded in
-//! `docs/report/spec-gap-validation-evidence/ods-formula-matrix-functions/`:
+//! The expected values in this file follow this profile:
 //! numeric matrix elements are finite `f64` values, matrix errors are formula
 //! values, and `MUNIT` truncates its scalar input toward zero.  The fixtures
 //! use only integer matrix elements so no locale-dependent element coercion is

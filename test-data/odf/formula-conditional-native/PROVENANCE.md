@@ -2,10 +2,10 @@
 
 `observations.json` is a lossless re-encoding of the 64 selected LibreOffice
 conditional-aggregate observations (`SUMIF`, `SUMIFS`, `COUNTIF`, `COUNTIFS`,
-`AVERAGEIF`, `AVERAGEIFS`) that
-`docs/report/spec-gap-validation-evidence/ods-formula-conditional-aggregates/native/cached-results.json`
-held before the 2026-10-05 history rewrite purged it (5,510,619 bytes,
-SHA-256 `8a93522797d5f3cd6a61d13305d15bd2f77a4bf7057f12d96d65ab908174e369`).
+`AVERAGEIF`, `AVERAGEIFS`) of the original `cached-results.json` capture
+(5,510,619 bytes,
+SHA-256 `8a93522797d5f3cd6a61d13305d15bd2f77a4bf7057f12d96d65ab908174e369`),
+which is too large to keep in the repository.
 Every field is kept; only each observation's literal cell closure is stored
 as row-major blocks instead of one JSON object per cell (`compact.py`
 documents the format, rebuilds the file and asserts the decoded closure

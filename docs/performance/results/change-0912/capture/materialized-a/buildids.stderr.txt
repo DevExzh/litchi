@@ -1,5 +1,0 @@
-Warning:
-Processed 19931 events and lost 6 chunks!
-
-Check IO/CPU overload!
-

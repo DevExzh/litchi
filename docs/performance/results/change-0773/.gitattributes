@@ -1,3 +1,0 @@
-# Preserve raw tool logs verbatim, including trailing whitespace.
-*.log -diff
-*.strace -diff
