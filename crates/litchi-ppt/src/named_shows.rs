@@ -56,7 +56,7 @@ impl NamedShows {
     /// # Errors
     /// The structural errors of [`Self::parse`] and aggregate record,
     /// nesting, or payload budget exhaustion.
-    pub fn parse_with_limits(
+    pub(crate) fn parse_with_limits(
         document: &Record,
         limits: crate::SourceLimits,
     ) -> Result<Option<Self>> {
