@@ -96,9 +96,9 @@ pub(crate) fn run(cli: Cli, out: &mut impl Write) -> Result<u8> {
             )
         },
         Command::Batch(args) => batch(&args, json, out),
-        Command::Import(args) => crate::m4::import(&args, json, out),
-        Command::Evaluate(args) => crate::m4::evaluate(&args, json, out),
-        Command::Recalculate(args) => crate::m4::recalculate(&args, json, out),
+        Command::Import(args) => crate::import_eval::import(&args, json, out),
+        Command::Evaluate(args) => crate::import_eval::evaluate(&args, json, out),
+        Command::Recalculate(args) => crate::import_eval::recalculate(&args, json, out),
         Command::Merge(args) => crate::merge::merge(&args, json, out),
         Command::Refresh(args) => crate::refresh::refresh(&args, json, out),
         Command::Dump(args) => crate::raw::dump(&args, json, out),

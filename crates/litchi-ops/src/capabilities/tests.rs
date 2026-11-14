@@ -100,7 +100,7 @@ fn every_format_has_one_answer_for_its_reads() {
                 );
             },
         }
-        // Import is a worksheet verb with its own answer (`m4_verbs_...`);
+        // Import is a worksheet verb with its own answer (`import_eval_verbs_...`);
         // merge is a template verb (`merge_is_a_template_verb`); refresh
         // has its own answer (`refresh_is_supported_where_fields_are_computed`);
         // the raw-layer writes answer by package kind
@@ -779,7 +779,7 @@ fn replace_is_supported_where_a_find_adapter_exists() {
 
 /// Import and evaluation answer for worksheets only.
 #[test]
-fn m4_verbs_are_worksheet_verbs() {
+fn import_eval_verbs_are_worksheet_verbs() {
     for format in [FileFormat::Xlsx, FileFormat::Xlsb, FileFormat::Xls] {
         let capabilities = Capabilities::of(format);
         let workbook = crate::read::Adapter::of(format).is_some();

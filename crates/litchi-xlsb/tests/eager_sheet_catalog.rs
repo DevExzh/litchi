@@ -1,4 +1,4 @@
-//! Eager XLSB tab catalog coverage (L-XLSB-R1).
+//! Eager XLSB tab catalog coverage.
 
 use std::io::Cursor;
 

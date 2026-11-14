@@ -34,7 +34,7 @@ const NO_ENGINE: Refusal = Refusal {
 
 impl Capabilities {
     /// Whether `verb` ([`Verb::Import`] or [`Verb::Evaluate`]) is available.
-    pub(super) fn m4_support(&self, verb: Verb) -> Support {
+    pub(super) fn import_eval_support(&self, verb: Verb) -> Support {
         if let Some(refusal) = self.read_refusal() {
             return refusal.support();
         }

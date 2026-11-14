@@ -372,8 +372,7 @@ impl Edit {
         Ok(true)
     }
 
-    /// Rename a shape-tree element of a slide (`p:cNvPr@name`, record
-    /// 0333). Returns whether the slide changed; an equal name is an exact
+    /// Rename a shape-tree element of a slide (`p:cNvPr@name`). Returns whether the slide changed; an equal name is an exact
     /// no-op.
     ///
     /// # Errors

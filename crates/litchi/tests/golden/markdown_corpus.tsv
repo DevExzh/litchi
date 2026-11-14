@@ -1,19 +1,19 @@
 # Markdown of every DOCX, DOC, RTF, ODT, PPTX, PPT and ODP fixture under test-data, as
-# the facade's Document and Presentation types produced it (M0a step S8c). Columns:
+# the facade's Document and Presentation types produced it. Columns:
 # fixture, then default/path, default/bytes, plain/path, plain/bytes,
 # metadata+html/path, metadata+html/bytes, where `plain` is `with_styles(false)` and
 # `metadata+html` is `with_metadata(true)` plus `TableStyle::StyledHtml`.
 # An outcome is `<bytes>:<FNV-1a 64 hex>` for Markdown or `!<facade error variant>`
 # for a refusal; `=` repeats the outcome to its left.
-# Record 0260 (reviewed behaviour change): ole/ppt/text_shapes.ppt and
+# Reviewed behaviour change: ole/ppt/text_shapes.ppt and
 # poi/test-data/slideshow/41246-1.ppt now include the title/body placeholder text
-# PowerPoint keeps in the slide list (L-PPT-R1), which the facade dropped.
-# Record 0278 (reviewed behaviour change): ODP Markdown with metadata now carries
+# PowerPoint keeps in the slide list, which the facade dropped.
+# Reviewed behaviour change: ODP Markdown with metadata now carries
 # the document properties projected from meta.xml; the facade reported none.
-# Record 0290 (reviewed behaviour change): the shared ODF meta.xml conversion now
+# Reviewed behaviour change: the shared ODF meta.xml conversion now
 # carries dc:language, so metadata+html front matter of six ODT/ODP fixtures gains a
 # `language:` line (empty for tdf169979's empty <dc:language/>).
-# Record 0354 (reviewed behaviour change): `Metadata.keywords` is a list, so the
+# Reviewed behaviour change: `Metadata.keywords` is a list, so the
 # metadata+html front matter of 11 fixtures writes `keywords:` as a YAML sequence, and
 # of 32 whose keyword text is empty (or only separators) omits it.
 # Metadata scalars use YAML 1.1-compatible quoting, including timestamps.

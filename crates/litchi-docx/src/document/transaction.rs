@@ -189,8 +189,8 @@ pub enum Refusal {
     /// so replacing the content's text would either keep that text or drop
     /// the object.
     AlternateContentText,
-    /// The change names a property the operation does not write (record
-    /// 0342: a table edit writes its style and borders, a row edit its
+    /// The change names a property the operation does not write (a table
+    /// edit writes its style and borders, a row edit its
     /// height and flags).
     UnmodelledProperty,
 }

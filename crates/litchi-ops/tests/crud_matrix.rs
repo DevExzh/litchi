@@ -139,8 +139,8 @@ const SPECS: &[Spec] = &[
             "libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx",
             "libreoffice-core/sd/qa/unit/data/pptx/tdf169496_hidden_graphic.pptx",
             "ooxml/pptx/sample.pptx",
-            // A generated fixture (test-data/unified-ops/0294).
-            "unified-ops/0294/modern-comments.pptx",
+            // A generated fixture (test-data/unified-ops/acceptance-fixtures).
+            "unified-ops/acceptance-fixtures/modern-comments.pptx",
             // Office Math in a markup-compatibility choice, and
             // embedded audio and video (Apache POI, Apache-2.0).
             "libreoffice-core/oox/qa/unit/data/import-mce.pptx",
@@ -157,8 +157,8 @@ const SPECS: &[Spec] = &[
             "libreoffice-core/sc/qa/unit/data/xlsb/shared_formula.xlsb",
             "libreoffice-core/sc/qa/unit/data/xlsb/tdf94627.xlsb",
             "poi/test-data/spreadsheet/testVarious.xlsb",
-            // A generated fixture (test-data/unified-ops/0294).
-            "unified-ops/0294/table.xlsb",
+            // A generated fixture (test-data/unified-ops/acceptance-fixtures).
+            "unified-ops/acceptance-fixtures/table.xlsb",
         ],
     },
     Spec {
@@ -181,7 +181,7 @@ const SPECS: &[Spec] = &[
             "ole/doc/watermark.doc",
             "poi/test-data/document/Bug53453Section.doc",
             "ole/doc/FloatingPictures.doc",
-            "unified-ops/0294/marks.doc",
+            "unified-ops/acceptance-fixtures/marks.doc",
         ],
     },
     Spec {
@@ -217,17 +217,17 @@ const SPECS: &[Spec] = &[
             "poi/test-data/slideshow/42485.ppt",
             // A POI table deck, copied with provenance.
             "poi/test-data/slideshow/bug61881.ppt",
-            // A generated fixture (test-data/unified-ops/0294).
-            "unified-ops/0294/connectors.ppt",
+            // A generated fixture (test-data/unified-ops/acceptance-fixtures).
+            "unified-ops/acceptance-fixtures/connectors.ppt",
             // Comments, shape and text hyperlinks, a table and a
             // Graph chart (generated); the round-trip theme, an OLE workbook
             // and a sound frame (Apache POI).
-            "unified-ops/0294/elements.ppt",
+            "unified-ops/acceptance-fixtures/elements.ppt",
             "poi/test-data/slideshow/headers_footers_2007.ppt",
             "poi/test-data/slideshow/testPPT_oleWorkbook.ppt",
             "poi/test-data/slideshow/sound.ppt",
             // POI's sound frame rewritten to play a movie.
-            "unified-ops/0294/video.ppt",
+            "unified-ops/acceptance-fixtures/video.ppt",
         ],
     },
     Spec {
@@ -248,7 +248,7 @@ const SPECS: &[Spec] = &[
             "libreoffice-core/sw/qa/extras/rtfexport/data/n192129.rtf",
             // Sections, bookmarks, fields, a table of contents,
             // tab stops, a shape and a text box (hand-written).
-            "unified-ops/0294/parts.rtf",
+            "unified-ops/acceptance-fixtures/parts.rtf",
         ],
     },
     Spec {
@@ -264,8 +264,8 @@ const SPECS: &[Spec] = &[
             "libreoffice-core/sw/qa/extras/layout/data/tdf124423.odt",
             // Headers and footers, numbering, fields, a table of
             // contents, tab stops, shapes, equations and table columns
-            // (generated, test-data/unified-ops/0294).
-            "unified-ops/0294/parts.odt",
+            // (generated, test-data/unified-ops/acceptance-fixtures).
+            "unified-ops/acceptance-fixtures/parts.odt",
         ],
     },
     Spec {
@@ -293,11 +293,11 @@ const SPECS: &[Spec] = &[
             "libreoffice-core/sd/qa/unit/data/odp/trailing-paragraphs.odp",
             "libreoffice-core/sd/qa/unit/data/odp/group_rotation.odp",
             "libreoffice-core/sd/qa/unit/data/odp/tdf53970_linked.odp",
-            // A generated fixture (test-data/unified-ops/0294).
-            "unified-ops/0294/comments.odp",
+            // A generated fixture (test-data/unified-ops/acceptance-fixtures).
+            "unified-ops/acceptance-fixtures/comments.odp",
             // Hyperlinks, line breaks, columns, video and audio,
             // equations and chart series and axes (generated).
-            "unified-ops/0294/parts.odp",
+            "unified-ops/acceptance-fixtures/parts.odp",
         ],
     },
     Spec {
@@ -308,8 +308,8 @@ const SPECS: &[Spec] = &[
             "libreoffice-core/desktop/qa/data/BlankDrawDocument.odg",
             "libreoffice-core/svx/qa/unit/data/FontWork.odg",
             "libreoffice-core/desktop/qa/data/3page.odg",
-            // A generated fixture (test-data/unified-ops/0294).
-            "unified-ops/0294/layers.odg",
+            // A generated fixture (test-data/unified-ops/acceptance-fixtures).
+            "unified-ops/acceptance-fixtures/layers.odg",
         ],
     },
     Spec {
@@ -341,10 +341,10 @@ const SPECS: &[Spec] = &[
         name: "oth",
         extension: "oth",
         fixtures: &[
-            // A generated fixture (test-data/unified-ops/0294).
-            "unified-ops/0294/frames.oth",
+            // A generated fixture (test-data/unified-ops/acceptance-fixtures).
+            "unified-ops/acceptance-fixtures/frames.oth",
             // The ODT parts fixture as a web template.
-            "unified-ops/0294/parts.oth",
+            "unified-ops/acceptance-fixtures/parts.oth",
         ],
     },
     Spec {
@@ -354,10 +354,10 @@ const SPECS: &[Spec] = &[
         fixtures: &[
             "libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm",
             "libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm",
-            // A generated fixture (test-data/unified-ops/0294).
-            "unified-ops/0294/frames.odm",
+            // A generated fixture (test-data/unified-ops/acceptance-fixtures).
+            "unified-ops/acceptance-fixtures/frames.odm",
             // The ODT parts fixture as a master document.
-            "unified-ops/0294/parts.odm",
+            "unified-ops/acceptance-fixtures/parts.odm",
         ],
     },
     Spec {
@@ -403,7 +403,7 @@ const SPECS: &[Spec] = &[
             "iwork/keynote/media-lifecycle-audio-remove-native.key",
             "iwork/keynote/media-lifecycle-remove-native.key",
             // A line and a group (generated).
-            "unified-ops/0294/shapes.key",
+            "unified-ops/acceptance-fixtures/shapes.key",
         ],
     },
     Spec {
@@ -471,7 +471,7 @@ const RECIPES: &[Recipe] = &[
     Recipe {
         format: "ppt",
         element: "comment",
-        fixture: "unified-ops/0294/elements.ppt",
+        fixture: "unified-ops/acceptance-fixtures/elements.ppt",
         parent: "/slide[2]",
         props: &[("author", "Ada"), ("text", "Check")],
         start: false,
@@ -479,7 +479,7 @@ const RECIPES: &[Recipe] = &[
     Recipe {
         format: "ppt",
         element: "hyperlink",
-        fixture: "unified-ops/0294/elements.ppt",
+        fixture: "unified-ops/acceptance-fixtures/elements.ppt",
         parent: "/slide[1]/shape[1]",
         props: &[("link", "https://example.test/added")],
         start: false,
@@ -983,7 +983,7 @@ const RECIPES: &[Recipe] = &[
     Recipe {
         format: "pptx",
         element: "modernComment",
-        fixture: "unified-ops/0294/modern-comments.pptx",
+        fixture: "unified-ops/acceptance-fixtures/modern-comments.pptx",
         parent: "/slide[1]",
         props: &[
             ("author", "Ada"),

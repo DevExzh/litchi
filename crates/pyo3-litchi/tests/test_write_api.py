@@ -322,7 +322,7 @@ class DocxVerbTests(WriteAssertions):
 
 
 class OoxmlFollowUpTests(WriteAssertions):
-    def test_record_0325_follow_ups(self):
+    def test_story_marks_links_and_note_runs(self):
         """Story paragraphs, marks, level keys, links, note runs."""
         doc = L.create("docx")
         doc, _ = doc.add("/body", "paragraph", {"text": "Body"})
@@ -418,7 +418,7 @@ class PptxVerbTests(WriteAssertions):
         file = file.remove("/slide[1]/smartart[1]/node[2]")
         self.assertEqual(self.assertReopens(file).get(art, 0)["text"], "Plan\n\tSize\nLearn")
 
-    def test_record_0321_elements(self):
+    def test_theme_master_links_and_media(self):
         # Theme, master and layout names, hyperlinks and media.
         theme = self.file.set("/theme", {"accent1": "FF0000", "majorFont": "Georgia"})
         view = self.assertReopens(theme).get("/theme", 0)["format"]
@@ -442,7 +442,7 @@ class PptxVerbTests(WriteAssertions):
         error = raised(lambda: self.file.add(self.first, "video", {"src": mp4}))
         self.assertError(error, L.PropertyError, "missing_property")
 
-    def test_record_0333_p0_residue(self):
+    def test_shape_text_table_and_comment_edits(self):
         # Paragraph, run, table and row adds, removals, cell
         # properties and comment removal.
         file, shape = self.file.add(self.first, "shape", {"text": "alpha", "width": "2in", "height": "1in"})

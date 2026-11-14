@@ -1629,8 +1629,8 @@ The native leg adds `package::edit::Edit::{insert_slide, set_notes_text}` (and
 the same methods on `slide_order::Transaction`), named after the PPTX
 `Edit::insert_slide` verb; `insert_slide(position)` creates a blank-layout
 slide. Shapes expose `ShapeEnum::{name, description, source_index, id}`
-(L-PPT-R3/R4) and slide-list placeholder text is read and written through
-`OutlineTextBody` (L-PPT-R1). `text_edit::Refusal::NoNotesPage` names the
+and slide-list placeholder text is read and written through
+`OutlineTextBody`. `text_edit::Refusal::NoNotesPage` names the
 missing-notes refusal. The unified PPT adapter reads `/slide[N]/notes`,
 `.../paragraph[N]`, `name`, `alt` and raw `sourceIndex`, sets notes and
 paragraph `text`, and adds slides. Removed and banned in both PPT profiles:

@@ -29,7 +29,7 @@ use pyo3::types::{PyBytes, PyDict, PyList, PyModule, PyString};
 use crate::common::FileFormat;
 use crate::errors::Failure;
 use crate::write::{self, Commit, Edit, Items, Where};
-use crate::{m4, merge, nodes, props, pyser, refresh};
+use crate::{import_eval, merge, nodes, props, pyser, refresh};
 
 /// Registers `File`, `open` and `open_bytes`.
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -779,8 +779,8 @@ impl File {
         max_bytes: Option<usize>,
     ) -> PyResult<Commit> {
         let file = self.handle()?;
-        let data = m4::source(&data)?;
-        let (options, limits) = m4::options(
+        let data = import_eval::source(&data)?;
+        let (options, limits) = import_eval::options(
             delimiter, quote, header, encoding, infer, formulas, max_cells, max_bytes,
         )?;
         let commit = py.detach(|| {
@@ -792,7 +792,7 @@ impl File {
             )
             .map_err(|error| Failure::read(&error))
         })?;
-        m4::import_commit(py, commit)
+        import_eval::import_commit(py, commit)
     }
 
     /// Fill this template's ``{{key}}`` placeholders (and, for DOCX, its
@@ -962,12 +962,12 @@ impl File {
         recalculate: bool,
     ) -> PyResult<Bound<'py, PyDict>> {
         let file = self.handle()?;
-        let options = m4::calc_options(recalculate);
+        let options = import_eval::calc_options(recalculate);
         let evaluated = py.detach(|| {
             file.evaluate(&*path, &options)
                 .map_err(|error| Failure::read(&error))
         })?;
-        m4::evaluated(py, &evaluated)
+        import_eval::evaluated(py, &evaluated)
     }
 
     /// Recalculate every formula of the workbook and compare each result
@@ -981,12 +981,12 @@ impl File {
     ///     ``formula``, ``cached_value``, ``computed_value``, ``status``)
     fn recalculate<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let file = self.handle()?;
-        let options = m4::calc_options(true);
+        let options = import_eval::calc_options(true);
         let report = py.detach(|| {
             file.recalculate(&options)
                 .map_err(|error| Failure::read(&error))
         })?;
-        m4::report(py, &report)
+        import_eval::report(py, &report)
     }
 
     /// Save the File atomically, in its own format; return the bytes

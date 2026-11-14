@@ -22,7 +22,7 @@
 //! reader still drains and CRC/size-verifies the whole part, because that
 //! fence belongs to the reader and not to this scan.
 //!
-//! # Inert worksheet children (M1 L-XLSX-R1)
+//! # Inert worksheet children
 //!
 //! A read scan (a coordinate or a rectangle, not an edit verifier's target
 //! list) also admits the worksheet children the materialized parser does not

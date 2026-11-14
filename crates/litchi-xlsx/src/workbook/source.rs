@@ -53,7 +53,7 @@ mod cursor;
 pub(crate) mod deferred;
 mod grid;
 #[cfg(test)]
-mod m1_tests;
+mod retained_grid_tests;
 mod values;
 
 pub use cursor::CellCursor;
@@ -3311,7 +3311,7 @@ mod tests {
         assert_eq!(budget.used(Resource::Memory), 0);
     }
 
-    mod streaming_0363_tests {
+    mod streaming_scalar_cell_tests {
         use std::io::Cursor;
         use std::sync::Arc;
         use std::sync::atomic::Ordering;
@@ -3369,7 +3369,7 @@ mod tests {
         }
 
         #[test]
-        fn eligible_scalar_cell_queries_0363_preserve_sparse_states_without_store() {
+        fn eligible_scalar_cell_queries_preserve_sparse_states_without_store() {
             let bytes = one_sheet_xlsx(&format!(
                 r#"<worksheet xmlns="{SPREADSHEETML_NAMESPACE}"><sheetData><row r="1"><c r="A1"><v>7</v></c><c r="B1"/></row></sheetData></worksheet>"#,
             ));
@@ -3398,7 +3398,7 @@ mod tests {
         }
 
         #[test]
-        fn eligible_scalar_cell_queries_0363_rescan_without_cache() {
+        fn eligible_scalar_cell_queries_rescan_without_cache() {
             let source = Arc::new(CountingSource::new(source_backed_xlsx()));
             let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
             let sheet = workbook.sheet("First").unwrap().unwrap();
@@ -3432,7 +3432,7 @@ mod tests {
         }
 
         #[test]
-        fn dimension_metadata_0400_keeps_scalar_and_range_queries_streaming() {
+        fn dimension_metadata_keeps_scalar_and_range_queries_streaming() {
             let bytes = one_sheet_xlsx(&format!(
                 r#"<worksheet xmlns="{SPREADSHEETML_NAMESPACE}"><dimension ref="$B$2:F9"/><sheetData><row r="2"><c r="B2"><v>-0.000</v></c><c r="F2"><v>6.02E+23</v></c></row></sheetData></worksheet>"#,
             ));
@@ -3459,7 +3459,7 @@ mod tests {
         }
 
         #[test]
-        fn unsupported_dimension_metadata_0400_preserves_eager_fallback() {
+        fn unsupported_dimension_metadata_preserves_eager_fallback() {
             let bytes = one_sheet_xlsx(&format!(
                 r#"<worksheet xmlns="{SPREADSHEETML_NAMESPACE}"><dimension ref="A1" future="preserve"/><sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData></worksheet>"#,
             ));
@@ -3475,7 +3475,7 @@ mod tests {
         }
 
         #[test]
-        fn merge_not_eligible_0363_falls_back_and_initializes_store() {
+        fn merge_not_eligible_falls_back_and_initializes_store() {
             let bytes = one_sheet_xlsx(&format!(
                 r#"<worksheet xmlns="{SPREADSHEETML_NAMESPACE}"><sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData><mergeCells count="1"><mergeCell ref="A1:B1" futureAttr="preserve"/></mergeCells></worksheet>"#,
             ));
@@ -3498,7 +3498,7 @@ mod tests {
         }
 
         #[test]
-        fn malformed_tail_0363_does_not_publish_store() {
+        fn malformed_tail_does_not_publish_store() {
             let bytes = one_sheet_xlsx(&format!(
                 r#"<worksheet xmlns="{SPREADSHEETML_NAMESPACE}"><sheetData><row r="1"><c r="A1"><v>7</v></c>"#,
             ));
@@ -3515,7 +3515,7 @@ mod tests {
         }
 
         #[test]
-        fn crc_failure_0363_does_not_publish_store() {
+        fn crc_failure_does_not_publish_store() {
             let mut bytes = source_backed_xlsx();
             let value = b"<v>7</v>";
             let offset = bytes
@@ -3536,7 +3536,7 @@ mod tests {
         }
 
         #[test]
-        fn source_change_0363_does_not_publish_store() {
+        fn source_change_does_not_publish_store() {
             let source = Arc::new(CountingSource::new(source_backed_xlsx()));
             let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
             let sheet = workbook.sheet("First").unwrap().unwrap();
@@ -3555,7 +3555,7 @@ mod tests {
         }
 
         #[test]
-        fn cancellation_0363_does_not_publish_store() {
+        fn cancellation_does_not_publish_store() {
             let source = Arc::new(CountingSource::new(source_backed_xlsx()));
             let (_budget, cancellation_source, context) = managed_context(u64::MAX);
             let workbook = SourceBackedWorkbook::from_read_at_with_options(
@@ -3581,7 +3581,7 @@ mod tests {
         }
     }
 
-    mod streaming_0364_tests {
+    mod streaming_dependency_tests {
         use std::io::Cursor;
         use std::sync::Arc;
         use std::sync::atomic::Ordering;
@@ -3736,7 +3736,7 @@ mod tests {
         }
 
         #[test]
-        fn plain_shared_string_and_style_stream_0364_avoids_materialization() {
+        fn plain_shared_string_and_style_stream_avoids_materialization() {
             let bytes = dependency_xlsx(
                 &worksheet(r#"<c r="A1" t="s" s="0"><v>0</v></c>"#),
                 Some(&plain_shared_strings(&["plain"])),
@@ -3764,7 +3764,7 @@ mod tests {
         }
 
         #[test]
-        fn unselected_dependency_maxima_0364_are_validated() {
+        fn unselected_dependency_maxima_are_validated() {
             let valid = dependency_xlsx(
                 &worksheet(r#"<c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c>"#),
                 Some(&plain_shared_strings(&["selected", "unselected"])),
@@ -3790,7 +3790,7 @@ mod tests {
         }
 
         #[test]
-        fn requested_plain_and_rich_sst_0364_have_eager_parity() {
+        fn requested_plain_and_rich_sst_have_eager_parity() {
             let plain = dependency_xlsx(
                 &worksheet(r#"<c r="A1" t="s"><v>0</v></c>"#),
                 Some(&plain_shared_strings(&["rich text"])),
@@ -3821,7 +3821,7 @@ mod tests {
         }
 
         #[test]
-        fn invalid_and_missing_dependency_refs_0364_fall_back_to_a_recorded_repair() {
+        fn invalid_and_missing_dependency_refs_fall_back_to_a_recorded_repair() {
             use crate::leniency::{CellDefect, Defect};
             // An irregular dependency makes the
             // selected scanner fall back to the materializing parse, which
@@ -3880,7 +3880,7 @@ mod tests {
         }
 
         #[test]
-        fn late_dependency_errors_0364_are_primary_without_publication() {
+        fn late_dependency_errors_are_primary_without_publication() {
             let late_shared = format!(
                 r#"<sst xmlns="{SPREADSHEETML_NAMESPACE}" count="2" uniqueCount="2"><si><t>ready</t></si><si><t>late"#,
             );
@@ -3927,7 +3927,7 @@ mod tests {
         }
 
         #[test]
-        fn dependency_crc_errors_0364_do_not_publish_semantics() {
+        fn dependency_crc_errors_do_not_publish_semantics() {
             let mut shared = dependency_xlsx(
                 &worksheet(r#"<c r="A1" t="s"><v>0</v></c>"#),
                 Some(&plain_shared_strings(&["crc"])),
@@ -3980,7 +3980,7 @@ mod tests {
         }
 
         #[test]
-        fn dependency_source_change_and_cancellation_0364_stay_primary() {
+        fn dependency_source_change_and_cancellation_stay_primary() {
             let bytes = dependency_xlsx(
                 &worksheet(r#"<c r="A1" t="s"><v>0</v></c>"#),
                 Some(&plain_shared_strings(&["changed"])),
@@ -4025,7 +4025,7 @@ mod tests {
         }
 
         #[test]
-        fn repeated_eligible_dependency_query_0364_rescans_source() {
+        fn repeated_eligible_dependency_query_rescans_source() {
             let bytes = dependency_xlsx(
                 &worksheet(r#"<c r="A1" t="s"><v>0</v></c>"#),
                 Some(&plain_shared_strings(&["repeat"])),
@@ -4056,7 +4056,7 @@ mod tests {
         }
 
         #[test]
-        fn semantic_dependency_caches_0364_survive_payload_eviction() {
+        fn semantic_dependency_caches_survive_payload_eviction() {
             let bytes = dependency_xlsx(
                 &worksheet(r#"<c r="A1" t="s" s="0"><v>0</v></c>"#),
                 Some(&rich_shared_strings()),
@@ -4108,7 +4108,7 @@ mod tests {
         }
 
         #[test]
-        fn final_fence_0364_outranks_parser_error() {
+        fn final_fence_outranks_parser_error() {
             let first = std::str::from_utf8(super::FIRST_MARKER).unwrap();
             let second = std::str::from_utf8(super::SECOND_MARKER).unwrap();
             let worksheet = format!(
@@ -4134,14 +4134,14 @@ mod tests {
         }
     }
 
-    mod streaming_0365_tests {
+    mod streaming_cold_cell_tests {
         use std::sync::Arc;
         use std::sync::atomic::Ordering;
 
         use litchi_opc::{OpcError, SourceBackedPackage, SourceCacheLimits, SourceReadPolicy};
 
         use super::super::SourceCell;
-        use super::streaming_0364_tests::{dependency_xlsx, plain_shared_strings, styles};
+        use super::streaming_dependency_tests::{dependency_xlsx, plain_shared_strings, styles};
         use super::{
             CountingSource, SourceBackedWorkbook, SourceCellView, SourceLimits, managed_context,
         };
@@ -4149,7 +4149,7 @@ mod tests {
 
         const SPREADSHEETML_NAMESPACE: &str =
             "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-        const CALLBACK_ERROR: &str = "streaming_0365 callback: stop";
+        const CALLBACK_ERROR: &str = "streaming_cold_cells callback: stop";
 
         fn worksheet_xml(sheet_data: &str) -> String {
             worksheet_xml_after(sheet_data, "")
@@ -4221,7 +4221,7 @@ mod tests {
         }
 
         #[test]
-        fn cold_cells_0365_are_sparse_row_major_and_area_bounded() {
+        fn cold_cells_are_sparse_row_major_and_area_bounded() {
             let (_source, workbook) = source_workbook(&stored_fixture(), None, None);
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
 
@@ -4255,7 +4255,7 @@ mod tests {
         }
 
         #[test]
-        fn cold_visit_cells_0365_matches_sparse_sequence_and_count() {
+        fn cold_visit_cells_matches_sparse_sequence_and_count() {
             let (_source, workbook) = source_workbook(&stored_fixture(), None, None);
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             let expected = sheet.cells("A1:D4").unwrap();
@@ -4278,7 +4278,7 @@ mod tests {
         }
 
         #[test]
-        fn multiple_dependencies_0365_stay_cold_without_store_or_part_cache() {
+        fn multiple_dependencies_stay_cold_without_store_or_part_cache() {
             let worksheet = worksheet_xml(
                 r#"<sheetData>
                     <row r="1">
@@ -4339,7 +4339,7 @@ mod tests {
         }
 
         #[test]
-        fn repeated_cells_0365_rescan_without_cache() {
+        fn repeated_cells_rescan_without_cache() {
             let (source, workbook) = source_workbook(&stored_fixture(), None, None);
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             let before = workbook.cache_diagnostics();
@@ -4360,7 +4360,7 @@ mod tests {
         }
 
         #[test]
-        fn warm_store_cells_0365_match_cold_selection() {
+        fn warm_store_cells_match_cold_selection() {
             let (_source, workbook) = source_workbook(&stored_fixture(), None, None);
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
 
@@ -4374,7 +4374,7 @@ mod tests {
         }
 
         #[test]
-        fn merge_and_shared_formula_0365_fall_back_to_store() {
+        fn merge_and_shared_formula_fall_back_to_store() {
             let merge = worksheet_xml(
                 r#"<sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData><mergeCells count="1"><mergeCell ref="A1:B1" futureAttr="preserve"/></mergeCells>"#,
             );
@@ -4404,7 +4404,7 @@ mod tests {
         }
 
         #[test]
-        fn malformed_tail_and_worksheet_0365_have_zero_callbacks() {
+        fn malformed_tail_and_worksheet_have_zero_callbacks() {
             let malformed_tail = dependency_xlsx(
                 &worksheet_xml_after(
                     r#"<sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData>"#,
@@ -4424,7 +4424,7 @@ mod tests {
         }
 
         #[test]
-        fn dependency_crc_0365_has_zero_callbacks_without_publication() {
+        fn dependency_crc_has_zero_callbacks_without_publication() {
             let mut bytes = dependency_xlsx(
                 &worksheet_xml(
                     r#"<sheetData><row r="1"><c r="A1" t="s"><v>0</v></c></row></sheetData>"#,
@@ -4466,7 +4466,7 @@ mod tests {
         }
 
         #[test]
-        fn source_change_and_cancellation_0365_have_zero_callbacks() {
+        fn source_change_and_cancellation_have_zero_callbacks() {
             let (source, workbook) = source_workbook(&stored_fixture(), None, None);
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             let before = workbook.cache_diagnostics();
@@ -4524,7 +4524,7 @@ mod tests {
         }
 
         #[test]
-        fn callback_error_0365_preserves_exact_prefix() {
+        fn callback_error_preserves_exact_prefix() {
             let (_source, workbook) = source_workbook(&stored_fixture(), None, None);
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             let mut callbacks = 0usize;
@@ -4544,7 +4544,7 @@ mod tests {
         }
 
         #[test]
-        fn callback_cancellation_0365_uses_package_owned_context() {
+        fn callback_cancellation_uses_package_owned_context() {
             let source = Arc::new(CountingSource::new(dependency_xlsx(
                 &stored_fixture(),
                 None,
@@ -4578,7 +4578,7 @@ mod tests {
         }
 
         #[test]
-        fn final_source_change_0365_outranks_callback_error() {
+        fn final_source_change_outranks_callback_error() {
             let source = Arc::new(CountingSource::new(dependency_xlsx(
                 &stored_fixture(),
                 None,
@@ -4614,13 +4614,13 @@ mod tests {
         }
     }
 
-    mod streaming_0366_tests {
+    mod streaming_reference_tests {
         use std::sync::Arc;
 
         use litchi_opc::SourceCacheDiagnostics;
 
         use super::super::SourceCell;
-        use super::streaming_0364_tests::dependency_xlsx;
+        use super::streaming_dependency_tests::dependency_xlsx;
         use super::{CountingSource, SourceBackedWorkbook, SourceCellView};
         use crate::{Cell, Value};
 
@@ -4672,7 +4672,7 @@ mod tests {
         }
 
         #[test]
-        fn cold_cell_0366_decodes_references_with_exact_eager_parity() {
+        fn cold_cell_decodes_references_with_exact_eager_parity() {
             let (_source, workbook) = source_workbook(&reference_fixture());
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             let before = workbook.cache_diagnostics();
@@ -4728,7 +4728,7 @@ mod tests {
         }
 
         #[test]
-        fn cold_cells_0366_are_sparse_row_major_and_stay_cold() {
+        fn cold_cells_are_sparse_row_major_and_stay_cold() {
             let (_source, workbook) = source_workbook(&reference_fixture());
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             let before = workbook.cache_diagnostics();
@@ -4761,7 +4761,7 @@ mod tests {
         }
 
         #[test]
-        fn cold_visit_cells_0366_stages_decoded_callbacks_without_admission() {
+        fn cold_visit_cells_stages_decoded_callbacks_without_admission() {
             let (_source, workbook) = source_workbook(&reference_fixture());
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             let before = workbook.cache_diagnostics();
@@ -4828,7 +4828,7 @@ mod tests {
         }
 
         #[test]
-        fn valid_overlong_and_numeric_inline_refs_0366_require_eager_fallback() {
+        fn valid_overlong_and_numeric_inline_refs_require_eager_fallback() {
             assert_eager_fallback_parity(
                 &worksheet_xml(
                     r#"<sheetData><row r="1"><c r="A1" t="str"><v>&#00000000065;</v></c></row></sheetData>"#,
@@ -4874,7 +4874,7 @@ mod tests {
         }
 
         #[test]
-        fn malformed_reference_tail_and_crc_0366_have_no_callbacks_or_publication() {
+        fn malformed_reference_tail_and_crc_have_no_callbacks_or_publication() {
             assert_zero_callbacks_without_publication(dependency_xlsx(
                 &worksheet_xml(
                     r#"<sheetData><row r="1"><c r="A1" t="str"><v>&unknown;</v></c></row></sheetData>"#,
@@ -4904,13 +4904,13 @@ mod tests {
         }
     }
 
-    mod streaming_0367_tests {
+    mod streaming_merge_cell_tests {
         use std::sync::Arc;
 
         use litchi_opc::{OpcError, SourceCacheDiagnostics};
 
         use super::super::SourceCell;
-        use super::streaming_0364_tests::dependency_xlsx;
+        use super::streaming_dependency_tests::dependency_xlsx;
         use super::{
             CountingSource, SourceBackedWorkbook, SourceCellView, SourceLimits, managed_context,
         };
@@ -4987,7 +4987,7 @@ mod tests {
         }
 
         #[test]
-        fn cold_merge_cell_views_0367_match_forced_eager_without_admission() {
+        fn cold_merge_cell_views_match_forced_eager_without_admission() {
             let worksheet = worksheet_xml(
                 r#"<sheetData><row r="1"><c r="A1"><v>7</v></c><c r="B1"><v>8</v></c><c r="E1"/></row></sheetData><mergeCells count="1"><mergeCell ref="A1:C1"/></mergeCells>"#,
             );
@@ -5036,7 +5036,7 @@ mod tests {
         }
 
         #[test]
-        fn cold_cells_and_visit_0367_are_sparse_physical_and_merge_coverage_is_not_synthetic() {
+        fn cold_cells_and_visit_are_sparse_physical_and_merge_coverage_is_not_synthetic() {
             let worksheet = worksheet_xml(
                 r#"<sheetData><row r="1"><c r="A1"><v>7</v></c><c r="B1"><v>8</v></c><c r="E1"/></row><row r="3"><c r="C3"><v>9</v></c></row></sheetData><mergeCells count="1"><mergeCell ref="A1:C1"/></mergeCells>"#,
             );
@@ -5090,7 +5090,7 @@ mod tests {
         }
 
         #[test]
-        fn malformed_merge_metadata_0367_has_zero_callbacks_and_publication() {
+        fn malformed_merge_metadata_has_zero_callbacks_and_publication() {
             let malformed = worksheet_xml(
                 r#"<sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData><mergeCells count="1"><mergeCell ref="A1:B1">"#,
             );
@@ -5113,7 +5113,7 @@ mod tests {
         }
 
         #[test]
-        fn crc_source_change_and_cancellation_0367_have_zero_callbacks() {
+        fn crc_source_change_and_cancellation_have_zero_callbacks() {
             let valid = worksheet_xml(
                 r#"<sheetData><row r="1"><c r="A1"><v>7</v></c><c r="B1"><v>8</v></c></row></sheetData><mergeCells count="1"><mergeCell ref="A1:B1"/></mergeCells>"#,
             );
@@ -5198,7 +5198,7 @@ mod tests {
         }
 
         #[test]
-        fn merge_and_unsupported_semantics_0367_match_eager_with_store_admission() {
+        fn merge_and_unsupported_semantics_match_eager_with_store_admission() {
             let shared_formula = worksheet_xml(
                 r#"<sheetData><row r="1"><c r="A1"><f t="shared" ref="A1:A2" si="7">B1</f><v>1</v></c><c r="B1"><v>2</v></c></row><row r="2"><c r="A2"><f t="shared" si="7"/><v>3</v></c></row></sheetData><mergeCells count="1"><mergeCell ref="A1:B1"/></mergeCells>"#,
             );
@@ -5212,7 +5212,7 @@ mod tests {
             );
             let unstyled =
                 worksheet_xml(r#"<sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData>"#);
-            let style_catalog = super::streaming_0364_tests::styles(1);
+            let style_catalog = super::streaming_dependency_tests::styles(1);
             assert_fallback_parity(&row_style, Some(&style_catalog), &unstyled, &["A1"]);
 
             let general_reference = worksheet_xml(
@@ -5225,7 +5225,7 @@ mod tests {
         }
 
         #[test]
-        fn numeric_value_scratch_0400_preserves_late_fallback_parity() {
+        fn numeric_value_scratch_preserves_late_fallback_parity() {
             let numeric_with_late_date = worksheet_xml(
                 r#"<sheetData><row r="1"><c r="A1"><v>-0.000</v></c><c r="B1" t="d"><v>2026-07-31T12:34:56.250-07:00</v></c></row></sheetData>"#,
             );
@@ -5243,10 +5243,10 @@ mod tests {
     /// routes, and the rule that a refusal the whole-range read raises still
     /// arrives before any cell is visited, including a refusal that the
     /// worksheet raises after the requested rectangle.
-    mod streaming_0642_tests {
+    mod streaming_visit_cells_tests {
         use std::sync::Arc;
 
-        use super::streaming_0364_tests::{dependency_xlsx, plain_shared_strings};
+        use super::streaming_dependency_tests::{dependency_xlsx, plain_shared_strings};
         use super::{CountingSource, SourceBackedWorkbook};
         use crate::Cell;
 
@@ -5301,7 +5301,7 @@ mod tests {
         }
 
         #[test]
-        fn visit_cells_0642_matches_cells_on_both_routes() {
+        fn visit_cells_matches_cells_on_both_routes() {
             let fixture = stored_fixture();
             let strings = plain_shared_strings(&["shared"]);
 
@@ -5331,7 +5331,7 @@ mod tests {
         /// A worksheet that refuses after the requested rectangle must refuse
         /// before the first callback, exactly as the whole-range read does.
         #[test]
-        fn visit_cells_0642_refuses_a_later_row_before_any_visit() {
+        fn visit_cells_refuses_a_later_row_before_any_visit() {
             let fixture = worksheet_xml(
                 r#"<sheetData>
                     <row r="1"><c r="A1"><v>7</v></c></row>
@@ -5364,7 +5364,7 @@ mod tests {
 
         /// The stored route counts and stops exactly like the streamed one.
         #[test]
-        fn visit_cells_0642_stops_on_the_stored_route_at_the_failing_cell() {
+        fn visit_cells_stops_on_the_stored_route_at_the_failing_cell() {
             let strings = plain_shared_strings(&["shared"]);
             let (_source, workbook) = source_workbook(&stored_fixture(), Some(&strings));
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
@@ -5376,7 +5376,9 @@ mod tests {
                 .visit_cells("A1:D4", |_address, _cell| {
                     callbacks += 1;
                     if callbacks == 3 {
-                        return Err(crate::error::invalid("streaming_0642 callback: stop"));
+                        return Err(crate::error::invalid(
+                            "streaming_visit_cells callback: stop",
+                        ));
                     }
                     Ok(())
                 })
@@ -5385,13 +5387,13 @@ mod tests {
 
             assert_eq!(callbacks, 3);
             assert!(
-                error.contains("streaming_0642 callback: stop"),
+                error.contains("streaming_visit_cells callback: stop"),
                 "unexpected refusal: {error}"
             );
         }
 
         #[test]
-        fn cells_0672_reserve_exactly_the_stored_selection() {
+        fn cells_reserve_exactly_the_stored_selection() {
             let fixture = worksheet_xml(
                 r#"<sheetData><row r="1">
                     <c r="A1"><v>1</v></c><c r="B1"><v>2</v></c>

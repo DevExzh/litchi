@@ -1335,7 +1335,7 @@ fn numeric_sheets_do_not_load_an_unneeded_shared_string_table() {
     ));
 }
 
-mod streaming_0361_tests {
+mod streaming_capture_tests {
     use std::io::{self, BufRead, Cursor, Read};
 
     use litchi_ooxml_common::mce::{Capabilities, Error as MceError, StreamError, StreamLimits};
@@ -1406,7 +1406,7 @@ mod streaming_0361_tests {
     }
 
     #[test]
-    fn streaming_0361_captures_start_and_empty_structural_events() {
+    fn streaming_captures_start_and_empty_structural_events() {
         let xml = worksheet(
             r#"<sheetFormatPr x14ac:dyDescent="0.2"></sheetFormatPr><sheetData><row r="2" x14ac:dyDescent="0.3"></row><row r="3" x14ac:dyDescent="0.4"/></sheetData>"#,
         );
@@ -1416,7 +1416,7 @@ mod streaming_0361_tests {
     }
 
     #[test]
-    fn streaming_0361_focused_defaults_skip_malformed_rows_but_keep_raw_guards() {
+    fn streaming_focused_defaults_skip_malformed_rows_but_keep_raw_guards() {
         let malformed_rows = worksheet(
             r#"<sheetFormatPr x14ac:dyDescent="0.2"/><sheetData><row r="0" x14ac:dyDescent="-1"/><row r="not-a-row" x14ac:dyDescent="NaN"/></sheetData>"#,
         );
@@ -1455,7 +1455,7 @@ mod streaming_0361_tests {
     }
 
     #[test]
-    fn streaming_0361_selects_supported_choice_or_fallback_and_ignores_inactive_bad_values() {
+    fn streaming_selects_supported_choice_or_fallback_and_ignores_inactive_bad_values() {
         let xml = format!(
             r#"<worksheet xmlns="{S}" xmlns:mc="{MC}" xmlns:x14ac="{X14AC}" mc:Ignorable="x14ac"><mc:AlternateContent><mc:Choice Requires="x14ac"><sheetFormatPr x14ac:dyDescent="NaN"/><sheetData><row r="0" x14ac:dyDescent="-1"/></sheetData></mc:Choice><mc:Fallback><sheetFormatPr x14ac:dyDescent="0.25"/><sheetData><row r="2" x14ac:dyDescent="0.35"/></sheetData></mc:Fallback></mc:AlternateContent></worksheet>"#
         );
@@ -1478,7 +1478,7 @@ mod streaming_0361_tests {
     }
 
     #[test]
-    fn streaming_0361_raw_errors_survive_inactive_branches_and_later_malformed_tail() {
+    fn streaming_raw_errors_survive_inactive_branches_and_later_malformed_tail() {
         let duplicate = format!(
             r#"<worksheet xmlns="{S}" xmlns:mc="{MC}" xmlns:x14ac="{X14AC}" xmlns:a="{X14AC}" xmlns:future="urn:future" mc:Ignorable="x14ac"><mc:AlternateContent><mc:Choice Requires="future"><sheetFormatPr x14ac:dyDescent="-1" a:dyDescent="NaN"/></mc:Choice><mc:Fallback><sheetFormatPr/></mc:Fallback></mc:AlternateContent></worksheet><tail/>"#
         );
@@ -1514,7 +1514,7 @@ mod streaming_0361_tests {
     }
 
     #[test]
-    fn streaming_0361_uses_expanded_namespace_after_prefix_rebinding() {
+    fn streaming_uses_expanded_namespace_after_prefix_rebinding() {
         let xml = format!(
             r#"<worksheet xmlns="{S}" xmlns:mc="{MC}" xmlns:x14ac="{X14AC}" mc:Ignorable="x14ac"><sheetFormatPr xmlns:x14ac="urn:not-x14ac" x14ac:dyDescent="NaN"/><sheetData><row xmlns:x14ac="{X14AC}" x14ac:dyDescent="0.3"/></sheetData></worksheet>"#
         );
@@ -1523,7 +1523,7 @@ mod streaming_0361_tests {
     }
 
     #[test]
-    fn streaming_0361_preserves_legacy_row_inference_and_order_semantics() {
+    fn streaming_preserves_legacy_row_inference_and_order_semantics() {
         let continuity = worksheet(
             r#"<sheetData><row r="3" x14ac:dyDescent="0.3"/><row x14ac:dyDescent="0.4"/></sheetData>"#,
         );
@@ -1568,7 +1568,7 @@ mod streaming_0361_tests {
     }
 
     #[test]
-    fn streaming_0361_rejects_zero_and_grid_overflow_only_when_rows_are_captured() {
+    fn streaming_rejects_zero_and_grid_overflow_only_when_rows_are_captured() {
         for row in ["0".to_owned(), (ROWS + 1).to_string()] {
             let xml = worksheet(&format!(
                 r#"<sheetData><row r="{row}" x14ac:dyDescent="0.2"/></sheetData>"#
@@ -1590,7 +1590,7 @@ mod streaming_0361_tests {
     }
 
     #[test]
-    fn streaming_0361_accepts_exact_depth_event_and_input_limits_but_rejects_one_under() {
+    fn streaming_accepts_exact_depth_event_and_input_limits_but_rejects_one_under() {
         let xml = worksheet(r#"<sheetData><row r="1" x14ac:dyDescent="0.2"/></sheetData>"#);
         let exact_events = StreamLimits {
             max_events: 5,
@@ -1704,7 +1704,7 @@ mod streaming_0361_tests {
     }
 
     #[test]
-    fn streaming_0361_split_bom_and_chunk_sizes_match_cursor() {
+    fn streaming_split_bom_and_chunk_sizes_match_cursor() {
         let body = worksheet(
             r#"<sheetFormatPr x14ac:dyDescent="0.2"/><sheetData><row r="1" x14ac:dyDescent="0.3"/></sheetData>"#,
         );
@@ -1734,7 +1734,7 @@ mod streaming_0361_tests {
     }
 
     #[test]
-    fn streaming_0361_valid_fixture_matches_legacy_capture_and_defaults() {
+    fn streaming_valid_fixture_matches_legacy_capture_and_defaults() {
         let xml = worksheet(
             r#"<sheetFormatPr x14ac:dyDescent="0.2"/><sheetData><row r="2" x14ac:dyDescent="0.3"/><row r="4" x14ac:dyDescent="0.4"/></sheetData>"#,
         );
@@ -1799,7 +1799,7 @@ mod streaming_0361_tests {
     }
 
     #[test]
-    fn streaming_0361_diagnostics_keep_primary_input_or_mce_and_callback_secondaries() {
+    fn streaming_diagnostics_keep_primary_input_or_mce_and_callback_secondaries() {
         let body = dual_callback_failure_xml();
         let mut input = FailAfter::new(body.as_bytes());
         let input_error = stream_reader(
@@ -1844,7 +1844,7 @@ mod streaming_0361_tests {
     }
 
     #[test]
-    fn streaming_0361_legacy_adapter_maps_clean_eof_raw_then_active_errors() {
+    fn streaming_legacy_adapter_maps_clean_eof_raw_then_active_errors() {
         let body = dual_callback_failure_xml();
         let error = default_stream(body.as_bytes(), true).expect_err("two callbacks");
         assert!(matches!(
@@ -1890,7 +1890,7 @@ mod streaming_0361_tests {
 }
 
 #[cfg(test)]
-mod streaming_0362_selected_tests {
+mod streaming_selected_tests {
     use std::io::{self, BufRead, Cursor, Read};
 
     use litchi_ooxml_common::mce::{Capabilities, Limits, StreamLimits};
@@ -1974,7 +1974,7 @@ mod streaming_0362_selected_tests {
     }
 
     #[test]
-    fn streaming_0362_selected_outcomes_cover_first_last_missing_and_empty() {
+    fn streaming_selected_outcomes_cover_first_last_missing_and_empty() {
         let xml = worksheet(
             r#"<sheetData><row r="1"><c r="A1"><v>-0.000</v></c></row><row r="3"><c r="C3"/></row></sheetData>"#,
         );
@@ -1993,7 +1993,7 @@ mod streaming_0362_selected_tests {
     }
 
     #[test]
-    fn streaming_0362_selected_payloads_cover_scalar_variants() {
+    fn streaming_selected_payloads_cover_scalar_variants() {
         let boolean = eligible(
             &worksheet(r#"<sheetData><row r="1"><c r="A1" t="b"><v>1</v></c></row></sheetData>"#),
             "A1",
@@ -2057,7 +2057,7 @@ mod streaming_0362_selected_tests {
     }
 
     #[test]
-    fn streaming_0362_selected_rejects_ordering_and_adjacent_duplicates() {
+    fn streaming_selected_rejects_ordering_and_adjacent_duplicates() {
         let decreasing_rows = worksheet(
             r#"<sheetData><row r="2"><c r="A2"><v>2</v></c></row><row r="1"><c r="A1"><v>1</v></c></row></sheetData>"#,
         );
@@ -2079,7 +2079,7 @@ mod streaming_0362_selected_tests {
     }
 
     #[test]
-    fn streaming_0362_selected_marks_unsupported_structures_not_eligible() {
+    fn streaming_selected_marks_unsupported_structures_not_eligible() {
         let cases = [
             (
                 worksheet(
@@ -2128,7 +2128,7 @@ mod streaming_0362_selected_tests {
     }
 
     #[test]
-    fn streaming_0362_selected_chooses_supported_choice_or_fallback() {
+    fn streaming_selected_chooses_supported_choice_or_fallback() {
         let choice_supported = alternate_content(
             r#"<sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData>"#,
             r#"<mergeCells count="1"><mergeCell ref="A1:B1"/></mergeCells>"#,
@@ -2158,7 +2158,7 @@ mod streaming_0362_selected_tests {
     }
 
     #[test]
-    fn streaming_0362_selected_validates_x14ac_without_retaining_rows() {
+    fn streaming_selected_validates_x14ac_without_retaining_rows() {
         let valid = x14ac_worksheet(
             r#"<sheetData><row r="1" x14ac:dyDescent="0.3"><c r="A1"><v>9</v></c></row></sheetData>"#,
         );
@@ -2191,7 +2191,7 @@ mod streaming_0362_selected_tests {
     }
 
     #[test]
-    fn streaming_0362_selected_does_not_return_early_before_malformed_tail() {
+    fn streaming_selected_does_not_return_early_before_malformed_tail() {
         let xml = format!(
             r#"<worksheet xmlns="{SPREADSHEETML}"><sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData></worksheet><tail>"#
         );
@@ -2199,7 +2199,7 @@ mod streaming_0362_selected_tests {
     }
 
     #[test]
-    fn streaming_0362_selected_respects_exact_limits_and_split_input() {
+    fn streaming_selected_respects_exact_limits_and_split_input() {
         let explicit_empty = worksheet(r#"<sheetData><row r="1"><c r="A1"/></row></sheetData>"#);
         let exact_events = StreamLimits {
             max_events: 7,
@@ -2334,7 +2334,7 @@ mod streaming_0362_selected_tests {
 }
 
 #[cfg(test)]
-mod streaming_0364_dependency_metadata_tests {
+mod streaming_dependency_metadata_tests {
     use std::io::Cursor;
 
     use litchi_ooxml_common::mce::{Capabilities, StreamLimits};
@@ -2366,7 +2366,7 @@ mod streaming_0364_dependency_metadata_tests {
     }
 
     #[test]
-    fn streaming_0364_dependency_metadata_tracks_global_maxima_and_target_states() {
+    fn streaming_dependency_metadata_tracks_global_maxima_and_target_states() {
         let xml = worksheet(
             r#"<sheetData>
                 <row r="1">
@@ -2405,7 +2405,7 @@ mod streaming_0364_dependency_metadata_tests {
     }
 
     #[test]
-    fn streaming_0364_dependency_metadata_keeps_valid_direct_styles_eligible() {
+    fn streaming_dependency_metadata_keeps_valid_direct_styles_eligible() {
         let xml = worksheet(
             r#"<sheetData><row r="1">
                 <c r="A1" s="2"><v>1</v></c>
@@ -2427,7 +2427,7 @@ mod streaming_0364_dependency_metadata_tests {
     }
 
     #[test]
-    fn streaming_0364_dependency_metadata_marks_invalid_lexicals_not_eligible() {
+    fn streaming_dependency_metadata_marks_invalid_lexicals_not_eligible() {
         let cases = [
             (
                 worksheet(
@@ -2458,7 +2458,7 @@ mod streaming_0364_dependency_metadata_tests {
     }
 
     #[test]
-    fn change_0658_late_malformed_xml_after_the_mark_moves_to_the_materialized_parser() {
+    fn late_malformed_xml_after_the_mark_moves_to_the_materialized_parser() {
         // This was once pinned as "late malformed XML stays primary": the
         // `s="not-a-style"` cell marks the worksheet ineligible and the second
         // root after it used to be reported by the scan as an MCE failure. The
@@ -2482,7 +2482,7 @@ mod streaming_0364_dependency_metadata_tests {
 }
 
 #[cfg(test)]
-mod streaming_0365_range_tests {
+mod streaming_range_tests {
     use std::io::Cursor;
 
     use litchi_ooxml_common::mce::{Capabilities, Error as MceError, StreamError, StreamLimits};
@@ -3151,7 +3151,7 @@ mod streaming_0365_range_tests {
     }
 
     #[test]
-    fn streaming_0365_range_is_sparse_row_major_with_explicit_empty_records() {
+    fn streaming_range_is_sparse_row_major_with_explicit_empty_records() {
         let xml = worksheet(
             r#"<sheetData>
                 <row r="1"><c r="C1"><v>31</v></c><c r="E1"/></row>
@@ -3188,7 +3188,7 @@ mod streaming_0365_range_tests {
     }
 
     #[test]
-    fn streaming_0365_range_handles_first_last_grid_edges_and_empty_selection() {
+    fn streaming_range_handles_first_last_grid_edges_and_empty_selection() {
         let xml = worksheet(
             r#"<sheetData>
                 <row r="1"><c r="A1"><v>1</v></c></row>
@@ -3216,7 +3216,7 @@ mod streaming_0365_range_tests {
     }
 
     #[test]
-    fn streaming_0365_range_defers_multiple_shared_strings_and_keeps_global_maxima() {
+    fn streaming_range_defers_multiple_shared_strings_and_keeps_global_maxima() {
         let xml = worksheet(
             r#"<sheetData>
                 <row r="1">
@@ -3253,7 +3253,7 @@ mod streaming_0365_range_tests {
     }
 
     #[test]
-    fn streaming_0365_single_cell_scan_wrapper_matches_one_cell_ranges() {
+    fn streaming_single_cell_scan_wrapper_matches_one_cell_ranges() {
         let xml = worksheet(
             r#"<sheetData><row r="1">
                 <c r="A1"><v>7</v></c>
@@ -3293,7 +3293,7 @@ mod streaming_0365_range_tests {
     }
 
     #[test]
-    fn streaming_0365_range_validates_global_duplicates_order_and_late_xml_errors() {
+    fn streaming_range_validates_global_duplicates_order_and_late_xml_errors() {
         let duplicate_row =
             worksheet(r#"<sheetData><row r="1"/><row r="2"/><row r="2"/></sheetData>"#);
         // Repaired last-wins by the materialized parser.
@@ -3338,7 +3338,7 @@ mod streaming_0365_range_tests {
     }
 
     #[test]
-    fn streaming_0365_range_marks_formula_and_inherited_styles_not_eligible() {
+    fn streaming_range_marks_formula_and_inherited_styles_not_eligible() {
         let merged = worksheet(
             r#"<sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData><mergeCells count="1"><mergeCell ref="A1:B1"/></mergeCells>"#,
         );
@@ -3371,7 +3371,7 @@ mod streaming_0365_range_tests {
     }
 
     #[test]
-    fn streaming_0365_range_accepts_max_cell_style_and_falls_back_above_it() {
+    fn streaming_range_accepts_max_cell_style_and_falls_back_above_it() {
         let valid = worksheet(&format!(
             r#"<sheetData><row r="1"><c r="A1" s="{MAX_CELL_STYLE}"><v>1</v></c></row></sheetData>"#
         ));
@@ -3390,7 +3390,7 @@ mod streaming_0365_range_tests {
     }
 
     #[test]
-    fn streaming_0365_range_preserves_inline_and_escape_heavy_empty_boundaries() {
+    fn streaming_range_preserves_inline_and_escape_heavy_empty_boundaries() {
         let xml = worksheet(
             r#"<sheetData><row r="1">
                 <c r="A1" t="inlineStr"/>
@@ -3430,7 +3430,7 @@ mod streaming_0365_range_tests {
 }
 
 #[cfg(test)]
-mod streaming_0367_merge_tests {
+mod streaming_merge_tests {
     use std::fmt::{Debug, Write as _};
     use std::io::Cursor;
 
@@ -3539,7 +3539,7 @@ mod streaming_0367_merge_tests {
     }
 
     #[test]
-    fn streaming_0367_accepts_unsorted_adjacent_merges() {
+    fn streaming_accepts_unsorted_adjacent_merges() {
         let xml = worksheet(
             r#"<sheetData><row r="1"><c r="A1"><v>1</v></c><c r="C1"><v>3</v></c></row></sheetData><mergeCells count="2"><mergeCell ref="C1:D1"/><mergeCell ref="A1:B1"/></mergeCells>"#,
         );
@@ -3554,7 +3554,7 @@ mod streaming_0367_merge_tests {
     }
 
     #[test]
-    fn streaming_0367_single_cell_wrapper_classifies_anchor_covered_missing_and_follower() {
+    fn streaming_single_cell_wrapper_classifies_anchor_covered_missing_and_follower() {
         let xml = worksheet(
             r#"<sheetData><row r="1"><c r="A1"><v>7</v></c></row><row r="2"><c r="B2"><v>9</v></c></row></sheetData><mergeCells count="1"><mergeCell ref="A1:B2"/></mergeCells>"#,
         );
@@ -3577,7 +3577,7 @@ mod streaming_0367_merge_tests {
     }
 
     #[test]
-    fn streaming_0367_range_selection_remains_sparse_and_physical() {
+    fn streaming_range_selection_remains_sparse_and_physical() {
         let xml = worksheet(
             r#"<sheetData><row r="1"><c r="A1"><v>1</v></c><c r="E1"><v>5</v></c></row><row r="2"><c r="C2"><v>3</v></c></row></sheetData><mergeCells count="2"><mergeCell ref="A1:C2"/><mergeCell ref="E1:F1"/></mergeCells>"#,
         );
@@ -3606,7 +3606,7 @@ mod streaming_0367_merge_tests {
     }
 
     #[test]
-    fn streaming_0367_merge_count_is_optional_exact_and_nonempty_but_not_mismatched() {
+    fn streaming_merge_count_is_optional_exact_and_nonempty_but_not_mismatched() {
         let optional =
             worksheet(r#"<sheetData/><mergeCells><mergeCell ref="A1:B1"/></mergeCells>"#);
         assert!(matches!(
@@ -3639,7 +3639,7 @@ mod streaming_0367_merge_tests {
     }
 
     #[test]
-    fn streaming_0367_rejects_invalid_merge_references_and_placement() {
+    fn streaming_rejects_invalid_merge_references_and_placement() {
         // Every case here reaches the scan unmarked, so the scan still raises
         // the refusal itself; stopping the scan at the mark moves nothing for
         // them.
@@ -3683,7 +3683,7 @@ mod streaming_0367_merge_tests {
     }
 
     #[test]
-    fn change_0597_marked_worksheet_keeps_a_correctly_placed_mergecells() {
+    fn marked_worksheet_keeps_a_correctly_placed_mergecells() {
         // `<cols>` marks the worksheet ineligible at worksheet level, before
         // `<sheetData>`. Every later event is skipped, so the scanner never
         // records that `<sheetData>` was seen; asking the "appears before
@@ -3704,7 +3704,7 @@ mod streaming_0367_merge_tests {
     }
 
     #[test]
-    fn change_0658_marked_worksheet_hands_merge_placement_to_the_materialized_parser() {
+    fn marked_worksheet_hands_merge_placement_to_the_materialized_parser() {
         // The scanner once kept two post-mark placement clauses. The scan
         // stops at the mark, so those clauses can no longer fire and were
         // removed; the materialized parser the caller must fall back to
@@ -3761,7 +3761,7 @@ mod streaming_0367_merge_tests {
     }
 
     #[test]
-    fn streaming_0367_merge_nested_and_payload_markup_falls_back() {
+    fn streaming_merge_nested_and_payload_markup_falls_back() {
         let nested = worksheet(
             r#"<sheetData/><mergeCells><mergeCell ref="A1:B1"><mergeCell ref="C1:D1"/></mergeCell></mergeCells>"#,
         );
@@ -3774,7 +3774,7 @@ mod streaming_0367_merge_tests {
     }
 
     #[test]
-    fn streaming_0367_unknown_merge_attributes_and_children_fall_back() {
+    fn streaming_unknown_merge_attributes_and_children_fall_back() {
         let attribute = format!(
             r#"<worksheet xmlns="{SPREADSHEETML}" xmlns:z="urn:future"><sheetData/><mergeCells z:opaque="yes"><mergeCell ref="A1:B1"/></mergeCells></worksheet>"#
         );
@@ -3787,7 +3787,7 @@ mod streaming_0367_merge_tests {
     }
 
     #[test]
-    fn streaming_0367_late_malformed_tail_is_not_published_as_eligible() {
+    fn streaming_late_malformed_tail_is_not_published_as_eligible() {
         let xml = format!(
             r#"{}<tail>"#,
             worksheet(
@@ -3798,7 +3798,7 @@ mod streaming_0367_merge_tests {
     }
 
     #[test]
-    fn streaming_0367_merge_cap_is_bounded_without_area_expansion() {
+    fn streaming_merge_cap_is_bounded_without_area_expansion() {
         for (count, expected_eligible) in [
             (STREAMING_MERGE_CAP, true),
             (STREAMING_MERGE_CAP + 1, false),
@@ -3818,7 +3818,7 @@ mod streaming_0367_merge_tests {
 }
 
 #[cfg(test)]
-mod streaming_0366_general_reference_tests {
+mod streaming_general_reference_tests {
     use std::fmt::Debug;
     use std::io::Cursor;
 
@@ -3982,7 +3982,7 @@ mod streaming_0366_general_reference_tests {
     }
 
     #[test]
-    fn streaming_0366_accepts_predefined_and_numeric_references_in_scalar_payloads() {
+    fn streaming_accepts_predefined_and_numeric_references_in_scalar_payloads() {
         let xml = worksheet(
             r#"<sheetData><row r="1">
                 <c r="A1" t="str"><v>value &amp; &lt; &gt; &apos; &quot;</v></c>
@@ -4009,7 +4009,7 @@ mod streaming_0366_general_reference_tests {
     }
 
     #[test]
-    fn streaming_0366_bounds_valid_general_reference_tokens() {
+    fn streaming_bounds_valid_general_reference_tokens() {
         let twelve = value_worksheet("prefix&#x00000041;suffix");
         assert_text(eligible(&twelve, "A1"), "prefixAsuffix");
 
@@ -4025,7 +4025,7 @@ mod streaming_0366_general_reference_tests {
     }
 
     #[test]
-    fn streaming_0366_rejects_numeric_inline_references_as_not_eligible() {
+    fn streaming_rejects_numeric_inline_references_as_not_eligible() {
         let xml = worksheet(
             r#"<sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>inline &#65;</t></is></c></row></sheetData>"#,
         );
@@ -4034,7 +4034,7 @@ mod streaming_0366_general_reference_tests {
     }
 
     #[test]
-    fn streaming_0366_keeps_invalid_references_as_typed_errors_without_early_publication() {
+    fn streaming_keeps_invalid_references_as_typed_errors_without_early_publication() {
         assert_mce_xml_error(scan_xml(&value_worksheet("bad &#xZZ;"), "A1"));
         assert_mce_nonconformant(scan_xml(&value_worksheet("bad &custom;"), "A1"));
         assert_mce_xml_error(scan_xml(&value_worksheet("bad &#x110000;"), "A1"));
@@ -4076,7 +4076,7 @@ mod streaming_0366_general_reference_tests {
 }
 
 #[cfg(test)]
-mod streaming_0400_numeric_scratch_tests {
+mod streaming_numeric_scratch_tests {
     use std::fmt::Debug;
     use std::io::Cursor;
 
@@ -4180,7 +4180,7 @@ mod streaming_0400_numeric_scratch_tests {
     }
 
     #[test]
-    fn streaming_0400_numeric_scratch_preserves_long_to_short_and_exponent_lexemes() {
+    fn streaming_numeric_scratch_preserves_long_to_short_and_exponent_lexemes() {
         let long = "1234567890123456789012345678901234567890.123456789";
         let xml = worksheet(&format!(
             r#"<sheetData><row r="1"><c r="A1"><v>{long}</v></c><c r="B1"><v>-0.000</v></c><c r="C1" t="n"><v>6.02E+23</v></c></row></sheetData>"#
@@ -4191,7 +4191,7 @@ mod streaming_0400_numeric_scratch_tests {
     }
 
     #[test]
-    fn streaming_0400_numeric_scratch_handles_scalar_type_transitions() {
+    fn streaming_numeric_scratch_handles_scalar_type_transitions() {
         let xml = worksheet(
             r#"<sheetData><row r="1">
                 <c r="A1"><v>1234567890123456789012345678901234567890.123456789</v></c>
@@ -4242,7 +4242,7 @@ mod streaming_0400_numeric_scratch_tests {
     }
 
     #[test]
-    fn streaming_0400_numeric_scratch_decodes_entity_and_cdata_numeric_fragments() {
+    fn streaming_numeric_scratch_decodes_entity_and_cdata_numeric_fragments() {
         let xml = worksheet(
             r#"<sheetData><row r="1"><c r="A1"><v>&#x31;<![CDATA[.25E+3]]></v></c></row></sheetData>"#,
         );
@@ -4250,7 +4250,7 @@ mod streaming_0400_numeric_scratch_tests {
     }
 
     #[test]
-    fn streaming_0400_numeric_scratch_rejects_oversized_selected_and_unselected_values() {
+    fn streaming_numeric_scratch_rejects_oversized_selected_and_unselected_values() {
         let oversized = "7".repeat(MAX_CELL_CHARACTERS + 1);
         let selected = worksheet(&format!(
             r#"<sheetData><row r="1"><c r="A1"><v>{oversized}</v></c></row></sheetData>"#
@@ -4264,7 +4264,7 @@ mod streaming_0400_numeric_scratch_tests {
     }
 
     #[test]
-    fn streaming_0400_numeric_scratch_does_not_publish_before_malformed_tail() {
+    fn streaming_numeric_scratch_does_not_publish_before_malformed_tail() {
         let xml = format!(
             r#"{}<tail>"#,
             worksheet(
@@ -4275,7 +4275,7 @@ mod streaming_0400_numeric_scratch_tests {
     }
 
     #[test]
-    fn streaming_0401_numeric_elision_preserves_selected_lexemes_and_unselected_validation() {
+    fn streaming_numeric_elision_preserves_selected_lexemes_and_unselected_validation() {
         for (type_attribute, value) in [("", "  -0.000  "), (r#" t="n""#, "6.02E+23")] {
             let xml = worksheet(&format!(
                 r#"<sheetData><row r="1"><c r="A1"><v>7</v></c><c r="B1"{type_attribute}><v>{value}</v></c></row></sheetData>"#
@@ -4303,7 +4303,7 @@ mod streaming_0400_numeric_scratch_tests {
     }
 
     #[test]
-    fn streaming_0401_numeric_elision_defers_malformed_numbers_to_the_repairing_parser() {
+    fn streaming_numeric_elision_defers_malformed_numbers_to_the_repairing_parser() {
         // The materialized parser repairs and records a malformed number;
         // the scanner never repairs, so a selected
         // or unselected malformed lexical defers to it.
@@ -4346,7 +4346,7 @@ mod streaming_0400_numeric_scratch_tests {
     }
 
     #[test]
-    fn streaming_0401_numeric_elision_keeps_formula_cache_ownership_and_parity() {
+    fn streaming_numeric_elision_keeps_formula_cache_ownership_and_parity() {
         let value = "  6.02E+23  ";
         let xml = worksheet(&format!(
             r#"<sheetData><row r="1"><c r="A1"><v>-0.000</v></c><c r="B1"><f>1+1</f><v>{value}</v></c></row></sheetData>"#
@@ -4367,7 +4367,7 @@ mod streaming_0400_numeric_scratch_tests {
     }
 
     #[test]
-    fn streaming_0401_numeric_elision_does_not_skip_unselected_inline_validation() {
+    fn streaming_numeric_elision_does_not_skip_unselected_inline_validation() {
         let valid = worksheet(
             r#"<sheetData><row r="1"><c r="A1"><v>7</v></c><c r="B1"><is><t>unselected inline</t></is></c></row></sheetData>"#,
         );
@@ -4386,7 +4386,7 @@ mod streaming_0400_numeric_scratch_tests {
     }
 
     #[test]
-    fn streaming_0400_dimension_keeps_scalar_and_range_queries_eligible() {
+    fn streaming_dimension_keeps_scalar_and_range_queries_eligible() {
         let empty = worksheet(
             r#"<dimension ref="$B$2:F9"/><sheetData><row r="2"><c r="B2"><v>-0.000</v></c><c r="F2"><v>6.02E+23</v></c></row></sheetData>"#,
         );
@@ -4407,7 +4407,7 @@ mod streaming_0400_numeric_scratch_tests {
     }
 
     #[test]
-    fn streaming_0400_dimension_supports_strict_prefixed_and_ignorable_metadata() {
+    fn streaming_dimension_supports_strict_prefixed_and_ignorable_metadata() {
         let strict = format!(
             r#"<s:worksheet xmlns:s="{STRICT_SPREADSHEETML}"><s:dimension ref="A1:C3"/><s:sheetData><s:row r="1"><s:c r="A1"><s:v>7</s:v></s:c></s:row></s:sheetData></s:worksheet>"#,
         );
@@ -4420,7 +4420,7 @@ mod streaming_0400_numeric_scratch_tests {
     }
 
     #[test]
-    fn streaming_0400_dimension_defers_malformed_duplicate_and_late_metadata() {
+    fn streaming_dimension_defers_malformed_duplicate_and_late_metadata() {
         // The read parse repairs and records each;
         // the scan never repairs, so it defers.
         for xml in [
@@ -4436,7 +4436,7 @@ mod streaming_0400_numeric_scratch_tests {
     }
 
     #[test]
-    fn streaming_0400_dimension_content_and_unknown_attributes_fall_back() {
+    fn streaming_dimension_content_and_unknown_attributes_fall_back() {
         let attribute = worksheet(r#"<dimension ref="A1" future="keep"/><sheetData/>"#);
         assert_not_eligible(&attribute, NotEligibleReason::UnsupportedStructure);
 
@@ -4459,7 +4459,7 @@ mod streaming_0400_numeric_scratch_tests {
 }
 
 #[cfg(test)]
-mod change_0658_ineligibility_gate_tests {
+mod ineligibility_gate_tests {
     use std::io::{self, BufRead, Read};
 
     use litchi_ooxml_common::mce::{Capabilities, StreamLimits};
@@ -4719,11 +4719,11 @@ fn escaped_markup_compatibility_takes_the_rewritten_admission() {
     );
 }
 
-/// M1 L-XLSX-R1: read scans admit the worksheet children the materialized
+/// Read scans admit the worksheet children the materialized
 /// parser does not interpret for cells, so typical generated worksheets stay
 /// on the bounded streaming route.
 #[cfg(test)]
-mod inert_children_m1_tests {
+mod inert_children_tests {
     use std::io::Cursor;
 
     use litchi_ooxml_common::mce::{Capabilities, StreamError, StreamLimits};

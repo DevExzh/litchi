@@ -147,9 +147,9 @@ fn clone_payload(payload: &Payload) -> Payload {
 /// large sheet is quadratic and too slow for an ordinary debug `cargo test`.
 /// The bounded form visits every cell of every worksheet with at most
 /// [`STRIDE_LIMIT`] cells and a fixed stride through the rest; setting
-/// `LITCHI_0622_FULL_ORACLE=1` visits every cell of every worksheet.
+/// `LITCHI_XLSX_FULL_FACTS_ORACLE=1` visits every cell of every worksheet.
 fn exhaustive() -> bool {
-    std::env::var_os("LITCHI_0622_FULL_ORACLE").is_some()
+    std::env::var_os("LITCHI_XLSX_FULL_FACTS_ORACLE").is_some()
 }
 
 const STRIDE_LIMIT: usize = 96;
@@ -450,7 +450,7 @@ fn declined_shapes() -> Vec<(&'static str, String)> {
 
 /// The retained state's size is the whole argument for the design, so pin it.
 #[test]
-fn change_0622_retained_records_stay_compact() {
+fn retained_records_stay_compact() {
     use crate::raw::worksheet::edit::codec_sizes;
 
     let cell_fact = std::hint::black_box(codec_sizes::CELL_FACT);
@@ -466,7 +466,7 @@ fn change_0622_retained_records_stay_compact() {
 }
 
 #[test]
-fn change_0622_admitted_shapes_take_the_fact_route_and_match_the_scan() {
+fn admitted_shapes_take_the_fact_route_and_match_the_scan() {
     for (name, worksheet) in admitted_shapes() {
         let tally = compare(worksheet.as_bytes());
         assert!(
@@ -477,7 +477,7 @@ fn change_0622_admitted_shapes_take_the_fact_route_and_match_the_scan() {
 }
 
 #[test]
-fn change_0622_declined_shapes_keep_the_scan_and_its_answers() {
+fn declined_shapes_keep_the_scan_and_its_answers() {
     for (name, worksheet) in declined_shapes() {
         let tally = compare(worksheet.as_bytes());
         assert_eq!(
@@ -488,7 +488,7 @@ fn change_0622_declined_shapes_keep_the_scan_and_its_answers() {
 }
 
 #[test]
-fn change_0622_dense_grid_matches_the_scan_on_every_cell() {
+fn dense_grid_matches_the_scan_on_every_cell() {
     // The harness `dense-sparse` corpus shape: one dense grid of scalar
     // numeric cells, written the way `litchi-xlsx` itself writes them.
     let (rows, columns) = if exhaustive() {
@@ -520,7 +520,7 @@ fn change_0622_dense_grid_matches_the_scan_on_every_cell() {
 }
 
 #[test]
-fn change_0622_oracle_over_test_data_worksheets() {
+fn oracle_over_test_data_worksheets() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data");
     let Ok(root) = root.canonicalize() else {
         return;

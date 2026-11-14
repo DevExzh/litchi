@@ -157,7 +157,7 @@ fn invalid_links_are_refused() {
 
 #[test]
 fn elements_exobjlist_hyperlink_add_reopens_with_chart_and_content_intact() {
-    let source_bytes = fixture("unified-ops/0294/elements.ppt");
+    let source_bytes = fixture("unified-ops/acceptance-fixtures/elements.ppt");
     let source = Package::from_bytes(&source_bytes).unwrap();
     let source_presentation = source.presentation().unwrap();
     let source_texts = texts(&source);

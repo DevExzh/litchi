@@ -31,28 +31,28 @@ const CONTENT_TYPES_XML: &str = "[Content_Types].xml";
 
 type TestResult<T = ()> = crate::Result<T>;
 
-const CHART_0383_GRAPHIC_URI: &str = "http://schemas.openxmlformats.org/drawingml/2006/chart";
-const CHART_0383_NS: &str = "http://schemas.openxmlformats.org/drawingml/2006/chart";
-const CHART_0383_RELATIONSHIP_TYPE: &str =
+const CHART_GRAPHIC_URI: &str = "http://schemas.openxmlformats.org/drawingml/2006/chart";
+const CHART_NS: &str = "http://schemas.openxmlformats.org/drawingml/2006/chart";
+const CHART_RELATIONSHIP_TYPE: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart";
-const CHART_0383_CONTENT_TYPE: &str =
+const CHART_CONTENT_TYPE: &str =
     "application/vnd.openxmlformats-officedocument.drawingml.chart+xml";
-const CHART_0383_CHARTEX_URI: &str = "http://schemas.microsoft.com/office/drawing/2014/chartex";
+const CHART_CHARTEX_URI: &str = "http://schemas.microsoft.com/office/drawing/2014/chartex";
 
 #[test]
 fn source_backed_cross_copy_supports_one_relationship_free_chart_leaf() -> TestResult {
-    let source = chart_source_fixture_0383(&[("rIdChartOne", "chart-one.xml")])?;
+    let source = chart_source_fixture(&[("rIdChartOne", "chart-one.xml")])?;
     let destination = destination_fixture()?;
     let output = publish(&source, &destination, 0, 1, 1)?;
 
-    let slide_xml = chart_slide_xml_0383(&output)?;
+    let slide_xml = chart_slide_xml(&output)?;
     let (_, _, rels_xml) = copied_slide_parts(&output)?;
-    let slide_bindings = slide_bindings_0383(slide_xml.as_bytes())?;
+    let slide_bindings = parse_slide_bindings(slide_xml.as_bytes())?;
     assert_eq!(slide_bindings.chart_ids.len(), 1);
-    let relationships = relationship_map_0383(rels_xml.as_bytes())?;
+    let relationships = relationship_map(rels_xml.as_bytes())?;
     let chart_relationships: Vec<_> = relationships
         .values()
-        .filter(|record| record.relationship_type == CHART_0383_RELATIONSHIP_TYPE)
+        .filter(|record| record.relationship_type == CHART_RELATIONSHIP_TYPE)
         .collect();
     assert_eq!(chart_relationships.len(), 1);
     let chart_relationship = chart_relationships[0];
@@ -60,9 +60,9 @@ fn source_backed_cross_copy_supports_one_relationship_free_chart_leaf() -> TestR
     assert_eq!(chart_relationship.target, "../charts/chart1.xml");
     assert_eq!(chart_relationship.target_mode, None);
     assert!(slide_xml.contains("Chart 0383 0"));
-    assert!(slide_xml.contains(CHART_0383_GRAPHIC_URI));
+    assert!(slide_xml.contains(CHART_GRAPHIC_URI));
     assert_eq!(
-        chart_members_0383(&output)?,
+        list_chart_members(&output)?,
         vec!["ppt/charts/chart1.xml".to_owned()]
     );
 
@@ -83,12 +83,12 @@ fn source_backed_cross_copy_supports_one_relationship_free_chart_leaf() -> TestR
 
 #[test]
 fn source_backed_cross_copy_preserves_multiple_chart_source_order() -> TestResult {
-    let source = chart_source_fixture_0383(&[
+    let source = chart_source_fixture(&[
         ("rIdChartOne", "chart-one.xml"),
         ("rIdChartTwo", "chart-two.xml"),
     ])?;
     let output = publish(&source, &destination_fixture()?, 0, 1, 1)?;
-    let slide_xml = chart_slide_xml_0383(&output)?;
+    let slide_xml = chart_slide_xml(&output)?;
     let first = slide_xml
         .find("Chart 0383 0")
         .ok_or_else(|| Error::Invalid("first chart frame is missing".into()))?;
@@ -100,7 +100,7 @@ fn source_backed_cross_copy_preserves_multiple_chart_source_order() -> TestResul
         "chart source order changed during publication"
     );
     assert_eq!(
-        chart_members_0383(&output)?,
+        list_chart_members(&output)?,
         vec![
             "ppt/charts/chart1.xml".to_owned(),
             "ppt/charts/chart2.xml".to_owned(),
@@ -111,13 +111,13 @@ fn source_backed_cross_copy_preserves_multiple_chart_source_order() -> TestResul
 
 #[test]
 fn source_backed_cross_copy_deduplicates_shared_chart_physical_members() -> TestResult {
-    let source = chart_source_fixture_0383(&[
+    let source = chart_source_fixture(&[
         ("rIdChartSharedOne", "chart-shared.xml"),
         ("rIdChartSharedTwo", "chart-shared.xml"),
     ])?;
     let output = publish(&source, &destination_fixture()?, 0, 1, 1)?;
-    let slide_xml = chart_slide_xml_0383(&output)?;
-    let slide_bindings = slide_bindings_0383(slide_xml.as_bytes())?;
+    let slide_xml = chart_slide_xml(&output)?;
+    let slide_bindings = parse_slide_bindings(slide_xml.as_bytes())?;
     assert_eq!(slide_bindings.chart_ids.len(), 2);
     assert_eq!(
         slide_bindings
@@ -128,26 +128,24 @@ fn source_backed_cross_copy_deduplicates_shared_chart_physical_members() -> Test
         2
     );
     let (_, _, rels_xml) = copied_slide_parts(&output)?;
-    let relationships = relationship_map_0383(rels_xml.as_bytes())?;
+    let relationships = relationship_map(rels_xml.as_bytes())?;
     for shared_chart_id in &slide_bindings.chart_ids {
         let shared_chart = relationships
             .get(shared_chart_id)
             .ok_or_else(|| Error::Invalid("shared chart relationship is missing".into()))?;
-        assert_eq!(shared_chart.relationship_type, CHART_0383_RELATIONSHIP_TYPE);
+        assert_eq!(shared_chart.relationship_type, CHART_RELATIONSHIP_TYPE);
         assert_eq!(shared_chart.target, "../charts/chart1.xml");
         assert_eq!(shared_chart.target_mode, None);
     }
     assert_eq!(
         relationships
             .values()
-            .filter(|relationship| {
-                relationship.relationship_type == CHART_0383_RELATIONSHIP_TYPE
-            })
+            .filter(|relationship| { relationship.relationship_type == CHART_RELATIONSHIP_TYPE })
             .count(),
         2
     );
     assert_eq!(
-        chart_members_0383(&output)?,
+        list_chart_members(&output)?,
         vec!["ppt/charts/chart1.xml".to_owned()]
     );
     Ok(())
@@ -155,7 +153,7 @@ fn source_backed_cross_copy_deduplicates_shared_chart_physical_members() -> Test
 
 #[test]
 fn source_backed_cross_copy_allocates_chart_uri_and_slide_relationship_collisions() -> TestResult {
-    let destination = destination_fixture_with_chart_collision_0383()?;
+    let destination = destination_fixture_with_chart_collision()?;
     let destination_package = Package::from_reader(io::Cursor::new(destination.clone()))?;
     let anchor_uri = PackURI::new("/ppt/slides/slide2.xml").map_err(Error::Uri)?;
     let anchor = destination_package.opc()?.get_part(&anchor_uri)?;
@@ -167,14 +165,14 @@ fn source_backed_cross_copy_allocates_chart_uri_and_slide_relationship_collision
         .ok_or_else(|| {
             Error::Invalid("destination anchor layout relationship is missing".into())
         })?;
-    let source = chart_source_with_relationship_id_0383(&destination_layout_id)?;
+    let source = chart_source_with_relationship_id(&destination_layout_id)?;
     let before = raw_archive(&destination)?;
     let output = publish(&source, &destination, 0, 1, 1)?;
     let repeated = publish(&source, &destination, 0, 1, 1)?;
-    let slide_xml = chart_slide_xml_0383(&output)?;
+    let slide_xml = chart_slide_xml(&output)?;
     let (_, _, rels_xml) = copied_slide_parts(&output)?;
     let after = raw_archive(&output)?;
-    let chart_members = chart_members_0383(&output)?;
+    let chart_members = list_chart_members(&output)?;
     let new_chart_members = chart_members
         .iter()
         .filter(|name| *name != "ppt/charts/chart1.xml")
@@ -187,20 +185,20 @@ fn source_backed_cross_copy_allocates_chart_uri_and_slide_relationship_collision
         .ok_or_else(|| Error::Invalid("copied chart has an invalid ZIP path".into()))?;
     let new_chart_target = format!("../{new_chart_relative}");
 
-    let relationships = relationship_map_0383(rels_xml.as_bytes())?;
-    let slide_bindings = slide_bindings_0383(slide_xml.as_bytes())?;
+    let relationships = relationship_map(rels_xml.as_bytes())?;
+    let slide_bindings = parse_slide_bindings(slide_xml.as_bytes())?;
     assert_eq!(slide_bindings.chart_ids.len(), 1);
     let copied_chart_id = slide_bindings.chart_ids[0].clone();
     let copied_chart = relationships
         .get(&copied_chart_id)
         .ok_or_else(|| Error::Invalid("copied chart relationship is missing".into()))?;
-    assert_eq!(copied_chart.relationship_type, CHART_0383_RELATIONSHIP_TYPE);
+    assert_eq!(copied_chart.relationship_type, CHART_RELATIONSHIP_TYPE);
     assert_eq!(copied_chart.target, new_chart_target);
     assert_eq!(copied_chart.target_mode, None);
     assert_eq!(copied_chart_id, "rId2");
-    let expected_copied_chart = RelationshipRecord0383 {
+    let expected_copied_chart = RelationshipRecord {
         id: "rId2".to_owned(),
-        relationship_type: CHART_0383_RELATIONSHIP_TYPE.to_owned(),
+        relationship_type: CHART_RELATIONSHIP_TYPE.to_owned(),
         target: new_chart_target.clone(),
         target_mode: None,
     };
@@ -217,7 +215,7 @@ fn source_backed_cross_copy_allocates_chart_uri_and_slide_relationship_collision
     assert_eq!(layout_relationship.target_mode, None);
     let chart_relationships: Vec<_> = relationships
         .values()
-        .filter(|record| record.relationship_type == CHART_0383_RELATIONSHIP_TYPE)
+        .filter(|record| record.relationship_type == CHART_RELATIONSHIP_TYPE)
         .collect();
     assert_eq!(chart_relationships.len(), 1);
     assert_eq!(chart_relationships[0].id, copied_chart_id);
@@ -264,7 +262,7 @@ fn source_backed_cross_copy_allocates_chart_uri_and_slide_relationship_collision
             .ok_or_else(|| Error::Invalid("destination slide relationship is missing".into()))?
             .payload
     );
-    let before_destination_relationships = relationship_map_0383(
+    let before_destination_relationships = relationship_map(
         before
             .members
             .get("ppt/slides/_rels/slide1.xml.rels")
@@ -272,7 +270,7 @@ fn source_backed_cross_copy_allocates_chart_uri_and_slide_relationship_collision
             .payload
             .as_slice(),
     )?;
-    let after_destination_relationships = relationship_map_0383(
+    let after_destination_relationships = relationship_map(
         after
             .members
             .get("ppt/slides/_rels/slide1.xml.rels")
@@ -286,7 +284,7 @@ fn source_backed_cross_copy_allocates_chart_uri_and_slide_relationship_collision
     );
     let preexisting_chart_relationships: Vec<_> = before_destination_relationships
         .values()
-        .filter(|record| record.relationship_type == CHART_0383_RELATIONSHIP_TYPE)
+        .filter(|record| record.relationship_type == CHART_RELATIONSHIP_TYPE)
         .collect();
     assert_eq!(preexisting_chart_relationships.len(), 1);
     assert_eq!(
@@ -298,23 +296,23 @@ fn source_backed_cross_copy_allocates_chart_uri_and_slide_relationship_collision
 
 #[test]
 fn source_backed_cross_copy_copies_charts_alongside_images() -> TestResult {
-    let source = chart_source_fixture_0383(&[("rIdChartOne", "chart-one.xml")])?;
+    let source = chart_source_fixture(&[("rIdChartOne", "chart-one.xml")])?;
     let source = add_media_relationship(&source, "ppt/slides/slide1.xml")?;
     let source = append_direct_picture(&source, "rIdSourceOnlyImage")?;
     let output = publish(&source, &destination_fixture()?, 0, 1, 1)?;
-    let slide_xml = chart_slide_xml_0383(&output)?;
-    let slide_bindings = slide_bindings_0383(slide_xml.as_bytes())?;
+    let slide_xml = chart_slide_xml(&output)?;
+    let slide_bindings = parse_slide_bindings(slide_xml.as_bytes())?;
     assert!(slide_xml.contains("Chart 0383 0"));
     assert_eq!(slide_bindings.chart_ids.len(), 1);
     assert_eq!(slide_bindings.image_ids.len(), 1);
     let (_, _, rels_xml) = copied_slide_parts(&output)?;
-    let relationships = relationship_map_0383(rels_xml.as_bytes())?;
+    let relationships = relationship_map(rels_xml.as_bytes())?;
     let chart_relationship = relationships
         .get(slide_bindings.chart_ids[0].as_str())
         .ok_or_else(|| Error::Invalid("mixed chart relationship is missing".into()))?;
     assert_eq!(
         chart_relationship.relationship_type,
-        CHART_0383_RELATIONSHIP_TYPE
+        CHART_RELATIONSHIP_TYPE
     );
     assert_eq!(chart_relationship.target, "../charts/chart1.xml");
     assert_eq!(chart_relationship.target_mode, None);
@@ -324,7 +322,7 @@ fn source_backed_cross_copy_copies_charts_alongside_images() -> TestResult {
     assert_eq!(image_relationship.relationship_type, rt::IMAGE);
     assert_eq!(image_relationship.target_mode, None);
     assert_eq!(
-        chart_members_0383(&output)?,
+        list_chart_members(&output)?,
         vec!["ppt/charts/chart1.xml".to_owned()]
     );
     let archive = ArchiveReader::new(&output, soapberry_zip::office::ArchiveLimits::default())
@@ -348,7 +346,7 @@ fn source_backed_cross_copy_copies_charts_alongside_images() -> TestResult {
 #[test]
 fn source_backed_cross_copy_chart_publication_is_deterministic_and_source_immutable() -> TestResult
 {
-    let source_bytes = chart_source_fixture_0383(&[("rIdChartOne", "chart-one.xml")])?;
+    let source_bytes = chart_source_fixture(&[("rIdChartOne", "chart-one.xml")])?;
     let destination = destination_fixture()?;
     let source_before = source_bytes.clone();
     let first = publish(&source_bytes, &destination, 0, 1, 1)?;
@@ -363,10 +361,10 @@ fn source_backed_cross_copy_chart_publication_is_deterministic_and_source_immuta
 
 #[test]
 fn source_backed_cross_copy_rejects_chart_relationship_and_leaf_variants() -> TestResult {
-    let valid = chart_source_fixture_0383(&[("rIdChartOne", "chart-one.xml")])?;
+    let valid = chart_source_fixture(&[("rIdChartOne", "chart-one.xml")])?;
     let destination = destination_fixture()?;
     let chart_target = r#"Target="../charts/chart-one.xml""#;
-    let chart_type = format!(r#"Type="{CHART_0383_RELATIONSHIP_TYPE}""#);
+    let chart_type = format!(r#"Type="{CHART_RELATIONSHIP_TYPE}""#);
     let chart_element = r#"<c:chart r:id="rIdChartOne"/>"#;
     let cases = [
         (
@@ -398,7 +396,7 @@ fn source_backed_cross_copy_rejects_chart_relationship_and_leaf_variants() -> Te
         ),
         (
             "wrong chart content type",
-            replace_text_member(&valid, CONTENT_TYPES_XML, CHART_0383_CONTENT_TYPE, ct::PNG)?,
+            replace_text_member(&valid, CONTENT_TYPES_XML, CHART_CONTENT_TYPE, ct::PNG)?,
         ),
         (
             "chart target path",
@@ -450,7 +448,7 @@ fn source_backed_cross_copy_rejects_chart_relationship_and_leaf_variants() -> Te
             replace_text_member(
                 &valid,
                 "ppt/slides/slide1.xml",
-                CHART_0383_GRAPHIC_URI,
+                CHART_GRAPHIC_URI,
                 "http://schemas.openxmlformats.org/drawingml/2006/table",
             )?,
         ),
@@ -459,8 +457,8 @@ fn source_backed_cross_copy_rejects_chart_relationship_and_leaf_variants() -> Te
             replace_text_member(
                 &valid,
                 "ppt/slides/slide1.xml",
-                CHART_0383_GRAPHIC_URI,
-                CHART_0383_CHARTEX_URI,
+                CHART_GRAPHIC_URI,
+                CHART_CHARTEX_URI,
             )?,
         ),
         (
@@ -502,15 +500,15 @@ fn source_backed_cross_copy_rejects_chart_relationship_and_leaf_variants() -> Te
 
 #[test]
 fn source_backed_cross_copy_rejects_chart_outbound_resource_relationships() -> TestResult {
-    let valid = chart_source_fixture_0383(&[("rIdChartOne", "chart-one.xml")])?;
-    let outbound = add_chart_outbound_relationships_0383(&valid)?;
+    let valid = chart_source_fixture(&[("rIdChartOne", "chart-one.xml")])?;
+    let outbound = add_chart_outbound_relationships(&valid)?;
     assert!(plan_refused(&outbound, &destination_fixture()?)?);
     Ok(())
 }
 
 #[test]
 fn source_backed_cross_copy_chart_cancellation_is_fallible() -> TestResult {
-    let source_bytes = chart_source_fixture_0383(&[("rIdChartOne", "chart-one.xml")])?;
+    let source_bytes = chart_source_fixture(&[("rIdChartOne", "chart-one.xml")])?;
     let destination_bytes = destination_fixture()?;
     let budget = Budget::root(
         "pptx-chart-cancel",
@@ -537,7 +535,7 @@ fn source_backed_cross_copy_chart_cancellation_is_fallible() -> TestResult {
 
 #[test]
 fn source_backed_cross_copy_chart_limits_fail_before_materialization() -> TestResult {
-    let source_bytes = chart_source_fixture_0383(&[("rIdChartOne", "chart-one.xml")])?;
+    let source_bytes = chart_source_fixture(&[("rIdChartOne", "chart-one.xml")])?;
     let budget = Budget::root(
         "pptx-chart-limit",
         Limits::new(0, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
@@ -558,9 +556,9 @@ fn source_backed_cross_copy_chart_limits_fail_before_materialization() -> TestRe
 
 #[test]
 fn source_backed_cross_copy_chart_source_version_changes_are_refused() -> TestResult {
-    let source_bytes = chart_source_fixture_0383(&[("rIdChartOne", "chart-one.xml")])?;
+    let source_bytes = chart_source_fixture(&[("rIdChartOne", "chart-one.xml")])?;
     let destination = destination_fixture()?;
-    let stale_source = Arc::new(ChartStaleSource0383::new(source_bytes));
+    let stale_source = Arc::new(ChartStaleSource::new(source_bytes));
     let source = match SourceBackedPresentation::from_read_at(stale_source) {
         Ok(source) => source,
         Err(_) => return Ok(()),
@@ -570,7 +568,7 @@ fn source_backed_cross_copy_chart_source_version_changes_are_refused() -> TestRe
     Ok(())
 }
 
-fn chart_source_fixture_0383(bindings: &[(&str, &str)]) -> TestResult<Vec<u8>> {
+fn chart_source_fixture(bindings: &[(&str, &str)]) -> TestResult<Vec<u8>> {
     let mut package = OpcPackage::from_vec(source_fixture()?, SourceLimits::default())?;
     let slide_uri = PackURI::new("/ppt/slides/slide1.xml").map_err(Error::Uri)?;
     let mut chart_targets = BTreeSet::new();
@@ -579,15 +577,15 @@ fn chart_source_fixture_0383(bindings: &[(&str, &str)]) -> TestResult<Vec<u8>> {
             let chart_uri = PackURI::new(format!("/ppt/charts/{filename}")).map_err(Error::Uri)?;
             package.try_add_part(Box::new(BlobPart::new(
                 chart_uri,
-                CHART_0383_CONTENT_TYPE.to_owned(),
-                chart_payload_0383(filename),
+                CHART_CONTENT_TYPE.to_owned(),
+                chart_payload(filename),
             )))?;
         }
         package
             .get_part_mut(&slide_uri)?
             .rels_mut()
             .try_add_relationship(
-                CHART_0383_RELATIONSHIP_TYPE.to_owned(),
+                CHART_RELATIONSHIP_TYPE.to_owned(),
                 format!("../charts/{filename}"),
                 (*relationship_id).to_owned(),
                 litchi_opc::TargetMode::Internal,
@@ -595,13 +593,13 @@ fn chart_source_fixture_0383(bindings: &[(&str, &str)]) -> TestResult<Vec<u8>> {
     }
     let mut bytes = PackageWriter::to_bytes(&package)?;
     for (index, (relationship_id, _)) in bindings.iter().enumerate() {
-        bytes = append_direct_chart_0383(&bytes, relationship_id, index)?;
+        bytes = append_direct_chart(&bytes, relationship_id, index)?;
     }
     Ok(bytes)
 }
 
-fn chart_source_with_relationship_id_0383(relationship_id: &str) -> TestResult<Vec<u8>> {
-    let bytes = chart_source_fixture_0383(&[("rIdChartSource", "chart-one.xml")])?;
+fn chart_source_with_relationship_id(relationship_id: &str) -> TestResult<Vec<u8>> {
+    let bytes = chart_source_fixture(&[("rIdChartSource", "chart-one.xml")])?;
     let package = OpcPackage::from_vec(bytes.clone(), SourceLimits::default())?;
     let slide_uri = PackURI::new("/ppt/slides/slide1.xml").map_err(Error::Uri)?;
     let source_layout_id = package
@@ -631,19 +629,19 @@ fn chart_source_with_relationship_id_0383(relationship_id: &str) -> TestResult<V
     )
 }
 
-fn destination_fixture_with_chart_collision_0383() -> TestResult<Vec<u8>> {
+fn destination_fixture_with_chart_collision() -> TestResult<Vec<u8>> {
     let mut package = OpcPackage::from_vec(destination_fixture()?, SourceLimits::default())?;
     package.try_add_part(Box::new(BlobPart::new(
         PackURI::new("/ppt/charts/chart1.xml").map_err(Error::Uri)?,
-        CHART_0383_CONTENT_TYPE.to_owned(),
-        chart_payload_0383("destination-chart-one"),
+        CHART_CONTENT_TYPE.to_owned(),
+        chart_payload("destination-chart-one"),
     )))?;
     let slide_uri = PackURI::new("/ppt/slides/slide1.xml").map_err(Error::Uri)?;
     package
         .get_part_mut(&slide_uri)?
         .rels_mut()
         .try_add_relationship(
-            CHART_0383_RELATIONSHIP_TYPE.to_owned(),
+            CHART_RELATIONSHIP_TYPE.to_owned(),
             "../charts/chart1.xml".to_owned(),
             "rIdDestinationChart".to_owned(),
             litchi_opc::TargetMode::Internal,
@@ -651,11 +649,7 @@ fn destination_fixture_with_chart_collision_0383() -> TestResult<Vec<u8>> {
     Ok(PackageWriter::to_bytes(&package)?)
 }
 
-fn append_direct_chart_0383(
-    bytes: &[u8],
-    relationship_id: &str,
-    index: usize,
-) -> TestResult<Vec<u8>> {
+fn append_direct_chart(bytes: &[u8], relationship_id: &str, index: usize) -> TestResult<Vec<u8>> {
     rewrite_member(bytes, "ppt/slides/slide1.xml", |payload| {
         let xml = std::str::from_utf8(payload)
             .map_err(|error| Error::Invalid(format!("slide XML is not UTF-8: {error}")))?;
@@ -667,24 +661,24 @@ fn append_direct_chart_0383(
             r#"<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="{}" name="Chart 0383 {}"/><p:cNvGraphicFramePr/><p:nvPr/></p:nvGraphicFramePr><p:xfrm><a:off x="1" y="2"/><a:ext cx="3" cy="4"/></p:xfrm><a:graphic><a:graphicData uri="{}" xmlns:c="{}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:chart r:id="{}"/></a:graphicData></a:graphic></p:graphicFrame>"#,
             500 + index,
             index,
-            CHART_0383_GRAPHIC_URI,
-            CHART_0383_NS,
+            CHART_GRAPHIC_URI,
+            CHART_NS,
             relationship_id,
         );
         Ok(format!("{}{frame}{}", &xml[..insertion], &xml[insertion..]).into_bytes())
     })
 }
 
-fn chart_payload_0383(label: &str) -> Vec<u8> {
+fn chart_payload(label: &str) -> Vec<u8> {
     let style = if label.contains("two") { "2" } else { "1" };
     format!(
         r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><c:chartSpace xmlns:c="{}" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:chart><c:autoTitleDeleted val="1"/><c:style val="{style}"/></c:chart></c:chartSpace>"#,
-        CHART_0383_NS,
+        CHART_NS,
     )
     .into_bytes()
 }
 
-fn chart_slide_xml_0383(bytes: &[u8]) -> TestResult<String> {
+fn chart_slide_xml(bytes: &[u8]) -> TestResult<String> {
     let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
         .map_err(|error| Error::Invalid(format!("cannot index chart slide output: {error}")))?;
     for name in archive.file_names() {
@@ -703,7 +697,7 @@ fn chart_slide_xml_0383(bytes: &[u8]) -> TestResult<String> {
     Err(Error::Invalid("copied chart slide is missing".into()))
 }
 
-fn chart_members_0383(bytes: &[u8]) -> TestResult<Vec<String>> {
+fn list_chart_members(bytes: &[u8]) -> TestResult<Vec<String>> {
     let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
         .map_err(|error| Error::Invalid(format!("cannot index chart members: {error}")))?;
     let mut members = archive
@@ -715,7 +709,7 @@ fn chart_members_0383(bytes: &[u8]) -> TestResult<Vec<String>> {
     Ok(members)
 }
 
-fn add_chart_outbound_relationships_0383(bytes: &[u8]) -> TestResult<Vec<u8>> {
+fn add_chart_outbound_relationships(bytes: &[u8]) -> TestResult<Vec<u8>> {
     let mut package = OpcPackage::from_vec(bytes.to_vec(), SourceLimits::default())?;
     let workbook_uri = PackURI::new("/ppt/embeddings/workbook.xlsx").map_err(Error::Uri)?;
     let style_uri = PackURI::new("/ppt/charts/style1.xml").map_err(Error::Uri)?;
@@ -767,13 +761,13 @@ fn add_chart_outbound_relationships_0383(bytes: &[u8]) -> TestResult<Vec<u8>> {
     Ok(PackageWriter::to_bytes(&package)?)
 }
 
-struct ChartStaleSource0383 {
+struct ChartStaleSource {
     first: OwnedSource,
     second: OwnedSource,
     changed: std::sync::atomic::AtomicBool,
 }
 
-impl ChartStaleSource0383 {
+impl ChartStaleSource {
     fn new(bytes: Vec<u8>) -> Self {
         let mut alternate = bytes.clone();
         alternate.push(0);
@@ -785,7 +779,7 @@ impl ChartStaleSource0383 {
     }
 }
 
-impl ReadAt for ChartStaleSource0383 {
+impl ReadAt for ChartStaleSource {
     fn len(&self) -> io::Result<u64> {
         self.first.len()
     }
@@ -4935,45 +4929,45 @@ fn physical_media_members(bytes: &[u8]) -> TestResult<BTreeSet<String>> {
         .collect())
 }
 
-const RELATIONSHIP_NAMESPACE_0383: &[u8] =
+const RELATIONSHIP_NAMESPACE: &[u8] =
     b"http://schemas.openxmlformats.org/package/2006/relationships";
-const RELATIONSHIP_ATTRIBUTE_NAMESPACE_0383: &[u8] =
+const RELATIONSHIP_ATTRIBUTE_NAMESPACE: &[u8] =
     b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
-const DRAWINGML_NAMESPACE_0383: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
-const MAX_XML_BYTES_0383: usize = 8 * 1024 * 1024;
-const MAX_XML_EVENTS_0383: usize = 16 * 1024;
-const MAX_BINDINGS_0383: usize = 256;
-const MAX_RELATIONSHIP_VALUE_0383: usize = 4096;
+const DRAWINGML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
+const MAX_XML_BYTES: usize = 8 * 1024 * 1024;
+const MAX_XML_EVENTS: usize = 16 * 1024;
+const MAX_BINDINGS: usize = 256;
+const MAX_RELATIONSHIP_VALUE: usize = 4096;
 
 #[derive(Debug, Default, PartialEq, Eq)]
-struct SlideBindings0383 {
+struct SlideBindings {
     chart_ids: Vec<String>,
     image_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct RelationshipRecord0383 {
+struct RelationshipRecord {
     id: String,
     relationship_type: String,
     target: String,
     target_mode: Option<String>,
 }
 
-fn slide_bindings_0383(xml: &[u8]) -> TestResult<SlideBindings0383> {
-    if xml.len() > MAX_XML_BYTES_0383 {
+fn parse_slide_bindings(xml: &[u8]) -> TestResult<SlideBindings> {
+    if xml.len() > MAX_XML_BYTES {
         return Err(Error::Invalid("slide XML exceeds test scan bound".into()));
     }
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
-    let mut bindings = SlideBindings0383::default();
+    let mut bindings = SlideBindings::default();
     let mut event_count = 0usize;
 
     loop {
         event_count = event_count
             .checked_add(1)
             .ok_or_else(|| Error::Invalid("slide XML event count overflow".into()))?;
-        if event_count > MAX_XML_EVENTS_0383 {
+        if event_count > MAX_XML_EVENTS {
             return Err(Error::Invalid("slide XML exceeds test event bound".into()));
         }
         let event = reader
@@ -4984,10 +4978,8 @@ fn slide_bindings_0383(xml: &[u8]) -> TestResult<SlideBindings0383> {
                 let (is_chart, is_image, unresolved) = {
                     let (namespace, local) = reader.resolver().resolve_element(element.name());
                     (
-                        namespace_is_0383(&namespace, CHART_0383_NS.as_bytes())
-                            && local.as_ref() == b"chart",
-                        namespace_is_0383(&namespace, DRAWINGML_NAMESPACE_0383)
-                            && local.as_ref() == b"blip",
+                        namespace_is(&namespace, CHART_NS.as_bytes()) && local.as_ref() == b"chart",
+                        namespace_is(&namespace, DRAWINGML_NAMESPACE) && local.as_ref() == b"blip",
                         matches!(namespace, ResolveResult::Unknown(_)),
                     )
                 };
@@ -4996,7 +4988,7 @@ fn slide_bindings_0383(xml: &[u8]) -> TestResult<SlideBindings0383> {
                         "slide XML contains an unresolved element prefix".into(),
                     ));
                 }
-                collect_slide_binding_0383(&reader, &element, is_chart, is_image, &mut bindings)?;
+                collect_slide_binding(&reader, &element, is_chart, is_image, &mut bindings)?;
             },
             Event::Eof => break,
             _ => {},
@@ -5006,35 +4998,34 @@ fn slide_bindings_0383(xml: &[u8]) -> TestResult<SlideBindings0383> {
     Ok(bindings)
 }
 
-fn collect_slide_binding_0383(
+fn collect_slide_binding(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     is_chart: bool,
     is_image: bool,
-    bindings: &mut SlideBindings0383,
+    bindings: &mut SlideBindings,
 ) -> TestResult {
     if !is_chart && !is_image {
         return Ok(());
     }
 
-    let binding =
-        relationship_attribute_0383(reader, element, if is_chart { b"id" } else { b"embed" })?
-            .ok_or_else(|| {
-                Error::Invalid(
-                    if is_chart {
-                        "c:chart lacks a namespace-resolved relationship r:id"
-                    } else {
-                        "a:blip lacks a namespace-resolved relationship r:embed"
-                    }
-                    .into(),
-                )
-            })?;
+    let binding = relationship_attribute(reader, element, if is_chart { b"id" } else { b"embed" })?
+        .ok_or_else(|| {
+            Error::Invalid(
+                if is_chart {
+                    "c:chart lacks a namespace-resolved relationship r:id"
+                } else {
+                    "a:blip lacks a namespace-resolved relationship r:embed"
+                }
+                .into(),
+            )
+        })?;
     let target = if is_chart {
         &mut bindings.chart_ids
     } else {
         &mut bindings.image_ids
     };
-    if target.len() >= MAX_BINDINGS_0383 {
+    if target.len() >= MAX_BINDINGS {
         return Err(Error::Invalid(
             "slide binding count exceeds test bound".into(),
         ));
@@ -5046,7 +5037,7 @@ fn collect_slide_binding_0383(
     Ok(())
 }
 
-fn relationship_attribute_0383(
+fn relationship_attribute(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     expected_local: &[u8],
@@ -5062,9 +5053,7 @@ fn relationship_attribute_0383(
             continue;
         }
         match namespace {
-            ResolveResult::Bound(Namespace(value))
-                if value == RELATIONSHIP_ATTRIBUTE_NAMESPACE_0383 =>
-            {
+            ResolveResult::Bound(Namespace(value)) if value == RELATIONSHIP_ATTRIBUTE_NAMESPACE => {
                 if binding.is_some() {
                     return Err(Error::Invalid(
                         "slide element has duplicate relationship bindings".into(),
@@ -5074,7 +5063,7 @@ fn relationship_attribute_0383(
                     .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
                     .map_err(|error| Error::Xml(error.to_string()))?
                     .into_owned();
-                if value.is_empty() || value.len() > MAX_RELATIONSHIP_VALUE_0383 {
+                if value.is_empty() || value.len() > MAX_RELATIONSHIP_VALUE {
                     return Err(Error::Invalid(
                         "slide relationship binding has an invalid length".into(),
                     ));
@@ -5092,8 +5081,8 @@ fn relationship_attribute_0383(
     Ok(binding)
 }
 
-fn relationship_map_0383(xml: &[u8]) -> TestResult<BTreeMap<String, RelationshipRecord0383>> {
-    if xml.len() > MAX_XML_BYTES_0383 {
+fn relationship_map(xml: &[u8]) -> TestResult<BTreeMap<String, RelationshipRecord>> {
+    if xml.len() > MAX_XML_BYTES {
         return Err(Error::Invalid(
             "relationship XML exceeds test scan bound".into(),
         ));
@@ -5111,7 +5100,7 @@ fn relationship_map_0383(xml: &[u8]) -> TestResult<BTreeMap<String, Relationship
         event_count = event_count
             .checked_add(1)
             .ok_or_else(|| Error::Invalid("relationship XML event count overflow".into()))?;
-        if event_count > MAX_XML_EVENTS_0383 {
+        if event_count > MAX_XML_EVENTS {
             return Err(Error::Invalid(
                 "relationship XML exceeds test event bound".into(),
             ));
@@ -5124,9 +5113,9 @@ fn relationship_map_0383(xml: &[u8]) -> TestResult<BTreeMap<String, Relationship
                 let (is_root, is_relationship) = {
                     let (namespace, local) = reader.resolver().resolve_element(element.name());
                     (
-                        namespace_is_0383(&namespace, RELATIONSHIP_NAMESPACE_0383)
+                        namespace_is(&namespace, RELATIONSHIP_NAMESPACE)
                             && local.as_ref() == b"Relationships",
-                        namespace_is_0383(&namespace, RELATIONSHIP_NAMESPACE_0383)
+                        namespace_is(&namespace, RELATIONSHIP_NAMESPACE)
                             && local.as_ref() == b"Relationship",
                     )
                 };
@@ -5156,7 +5145,7 @@ fn relationship_map_0383(xml: &[u8]) -> TestResult<BTreeMap<String, Relationship
             Event::Empty(element) => {
                 let is_relationship = {
                     let (namespace, local) = reader.resolver().resolve_element(element.name());
-                    namespace_is_0383(&namespace, RELATIONSHIP_NAMESPACE_0383)
+                    namespace_is(&namespace, RELATIONSHIP_NAMESPACE)
                         && local.as_ref() == b"Relationship"
                 };
                 if !root_seen || root_closed || depth != 1 {
@@ -5169,12 +5158,12 @@ fn relationship_map_0383(xml: &[u8]) -> TestResult<BTreeMap<String, Relationship
                         "relationship XML contains a non-Relationship child".into(),
                     ));
                 }
-                if records.len() >= MAX_BINDINGS_0383 {
+                if records.len() >= MAX_BINDINGS {
                     return Err(Error::Invalid(
                         "relationship record count exceeds test bound".into(),
                     ));
                 }
-                let record = parse_relationship_record_0383(&reader, &element)?;
+                let record = parse_relationship_record(&reader, &element)?;
                 if records.contains_key(&record.id) {
                     return Err(Error::Invalid(
                         "relationship XML contains duplicate relationship IDs".into(),
@@ -5211,10 +5200,10 @@ fn relationship_map_0383(xml: &[u8]) -> TestResult<BTreeMap<String, Relationship
     Ok(records)
 }
 
-fn parse_relationship_record_0383(
+fn parse_relationship_record(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-) -> TestResult<RelationshipRecord0383> {
+) -> TestResult<RelationshipRecord> {
     let mut id = None;
     let mut relationship_type = None;
     let mut target = None;
@@ -5244,14 +5233,14 @@ fn parse_relationship_record_0383(
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
             .map_err(|error| Error::Xml(error.to_string()))?
             .into_owned();
-        if value.is_empty() || value.len() > MAX_RELATIONSHIP_VALUE_0383 {
+        if value.is_empty() || value.len() > MAX_RELATIONSHIP_VALUE {
             return Err(Error::Invalid(
                 "relationship attribute has an invalid length".into(),
             ));
         }
         *slot = Some(value);
     }
-    Ok(RelationshipRecord0383 {
+    Ok(RelationshipRecord {
         id: id.ok_or_else(|| Error::Invalid("relationship Id is missing".into()))?,
         relationship_type: relationship_type
             .ok_or_else(|| Error::Invalid("relationship Type is missing".into()))?,
@@ -5260,7 +5249,7 @@ fn parse_relationship_record_0383(
     })
 }
 
-fn namespace_is_0383(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
+fn namespace_is(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
     matches!(
         namespace,
         ResolveResult::Bound(Namespace(value)) if *value == expected
@@ -5272,7 +5261,7 @@ fn source_backed_cross_copy_retains_verified_image_and_chart_captures() -> TestR
     for charts in [false, true] {
         let (source_bytes, members) = if charts {
             (
-                chart_source_fixture_0383(&[("rIdChartOne", "chart-one.xml")])?,
+                chart_source_fixture(&[("rIdChartOne", "chart-one.xml")])?,
                 vec!["ppt/charts/chart-one.xml"],
             )
         } else {
@@ -5315,7 +5304,7 @@ fn source_backed_cross_copy_lazily_copies_shared_payload_on_writer_memory_refusa
     for charts in [false, true] {
         let (source_bytes, member) = if charts {
             (
-                chart_source_fixture_0383(&[("rIdChartOne", "chart-one.xml")])?,
+                chart_source_fixture(&[("rIdChartOne", "chart-one.xml")])?,
                 "ppt/charts/chart-one.xml",
             )
         } else {

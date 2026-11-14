@@ -65,12 +65,12 @@ pub(crate) enum Command {
     /// type, unit, values, aliases, constraint and get/set/add flags.
     Schema(Schema),
     /// Import CSV/TSV data into a worksheet.
-    Import(crate::m4::Import),
+    Import(crate::import_eval::Import),
     /// Evaluate one cell: its value, cached formula result or computed
     /// result.
-    Evaluate(crate::m4::Evaluate),
+    Evaluate(crate::import_eval::Evaluate),
     /// Recalculate every formula and compare it with its cached value.
-    Recalculate(crate::m4::Recalculate),
+    Recalculate(crate::import_eval::Recalculate),
     /// Fill a template's `{{key}}` placeholders (DOCX, PPTX, XLSX, XLSB,
     /// DOC, PPT, XLS, RTF and the ODF text, presentation and spreadsheet
     /// formats) and Word merge fields from JSON or CSV data, one output per

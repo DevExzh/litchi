@@ -26,7 +26,7 @@ struct Example {
 }
 
 #[test]
-fn commonmark_0312_complete_normative_release_gate() -> Result<(), Box<dyn std::error::Error>> {
+fn commonmark_0_31_2_complete_normative_release_gate() -> Result<(), Box<dyn std::error::Error>> {
     let examples: Vec<Example> = serde_json::from_str(COMMONMARK_JSON)?;
     assert_eq!(examples.len(), COMMONMARK_EXAMPLE_COUNT);
     for example in &examples {

@@ -58,7 +58,7 @@ fn kind<F: Fixture>(name: &str) -> Kind<F> {
 // ---------------------------------------------------------------- vocabulary
 
 #[test]
-fn the_plans_m1_aliases_are_present() {
+fn the_plans_aliases_are_present() {
     // One row per alias.
     let word: &[(&str, &str)] = &[
         ("paragraph", "p"),

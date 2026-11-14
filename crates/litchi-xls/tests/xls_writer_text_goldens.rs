@@ -1,6 +1,6 @@
 //! Byte-exact goldens for the fresh XLS writer's shared-string path.
 //!
-//! The fixtures of `fresh_xls_writer_shared_strings_match_the_pre_0753_goldens`
+//! The fixtures of `fresh_xls_writer_shared_strings_match_the_pinned_goldens`
 //! were written by the writer at `6d989cad63`, before the shared-string table
 //! was staged by borrowing and hashing each string once, and their SHA-256
 //! recorded here. Each of their worksheets holds at most one distinct string:
@@ -129,7 +129,7 @@ fn empty_worksheet() -> Vec<u8> {
 }
 
 #[test]
-fn fresh_xls_writer_shared_strings_match_the_pre_0753_goldens() {
+fn fresh_xls_writer_shared_strings_match_the_pinned_goldens() {
     let fixtures: [(&str, fn() -> Vec<u8>, &str); 6] = [
         (
             "one_string_per_sheet",

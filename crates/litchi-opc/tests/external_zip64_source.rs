@@ -9,7 +9,7 @@ use litchi_opc::{PackURI, SourceBackedPackage, SourceLimits};
 use soapberry_zip::office::ArchiveLimits;
 use soapberry_zip::{PreservationIndex, ZipArchive};
 
-const ZIP64_SOURCE_ENV: &str = "LITCHI_0415_PYTHON_ZIP";
+const ZIP64_SOURCE_ENV: &str = "LITCHI_PYTHON_ZIP64_CORPUS";
 const DOCUMENT_URI: &str = "/document.xml";
 const LARGE_URI: &str = "/large.bin";
 const LARGE_MEMBER: &[u8] = b"large.bin";
@@ -77,11 +77,11 @@ fn central_without_local_offset(record: &[u8]) -> Vec<u8> {
 }
 
 #[test]
-#[ignore = "requires an independently generated corpus at LITCHI_0415_PYTHON_ZIP"]
+#[ignore = "requires an independently generated corpus at LITCHI_PYTHON_ZIP64_CORPUS"]
 fn independent_zip64_source_metadata_and_small_xml_edit_preserve_large_member() {
     let source_path = std::env::var_os(ZIP64_SOURCE_ENV)
         .map(std::path::PathBuf::from)
-        .expect("set LITCHI_0415_PYTHON_ZIP to the independent Python ZIP64 corpus");
+        .expect("set LITCHI_PYTHON_ZIP64_CORPUS to the independent Python ZIP64 corpus");
     let source_length = std::fs::metadata(&source_path)
         .expect("stat independent ZIP64 corpus")
         .len();

@@ -746,7 +746,7 @@ impl Capabilities {
             }.support();
         }
         if matches!(verb, Verb::Import | Verb::Evaluate) {
-            return self.m4_support(verb);
+            return self.import_eval_support(verb);
         }
         if verb == Verb::Merge {
             return self.merge_support();
@@ -1012,7 +1012,7 @@ impl Capabilities {
             | Verb::Batch => Support::Supported,
             Verb::Save => self.publication_support(),
             Verb::Create => self.creation_support(),
-            Verb::Import | Verb::Evaluate => self.m4_support(verb),
+            Verb::Import | Verb::Evaluate => self.import_eval_support(verb),
             Verb::Merge => self.merge_support(),
             Verb::Replace => self.replace_support(),
             Verb::Refresh => self.refresh_support(),
@@ -2408,48 +2408,48 @@ const _: () = {
 const fn view_gap(adapter: Adapter, mode: Mode) -> Option<&'static GapSpec> {
     match adapter {
         #[cfg(feature = "doc")]
-        Adapter::Doc => m1_view_gap(mode),
+        Adapter::Doc => shared_view_gap(mode),
         #[cfg(feature = "docx")]
-        Adapter::Docx => m1_view_gap(mode),
+        Adapter::Docx => shared_view_gap(mode),
         #[cfg(feature = "xlsx")]
-        Adapter::Xlsx => m1_view_gap(mode),
+        Adapter::Xlsx => shared_view_gap(mode),
         #[cfg(feature = "xlsb")]
-        Adapter::Xlsb => m1_view_gap(mode),
+        Adapter::Xlsb => shared_view_gap(mode),
         #[cfg(feature = "xls")]
-        Adapter::Xls => m1_view_gap(mode),
+        Adapter::Xls => shared_view_gap(mode),
         #[cfg(feature = "pptx")]
-        Adapter::Pptx => m1_view_gap(mode),
+        Adapter::Pptx => shared_view_gap(mode),
         #[cfg(feature = "ppt")]
-        Adapter::Ppt => m1_view_gap(mode),
+        Adapter::Ppt => shared_view_gap(mode),
         #[cfg(feature = "rtf")]
-        Adapter::Rtf => m1_view_gap(mode),
+        Adapter::Rtf => shared_view_gap(mode),
         #[cfg(feature = "ods")]
-        Adapter::Ods => m1_view_gap(mode),
+        Adapter::Ods => shared_view_gap(mode),
         #[cfg(feature = "odt")]
-        Adapter::Odt => m1_view_gap(mode),
+        Adapter::Odt => shared_view_gap(mode),
         #[cfg(feature = "odp")]
-        Adapter::Odp => m1_view_gap(mode),
+        Adapter::Odp => shared_view_gap(mode),
         #[cfg(feature = "odg")]
-        Adapter::Odg => m1_view_gap(mode),
+        Adapter::Odg => shared_view_gap(mode),
         #[cfg(feature = "odc")]
-        Adapter::Odc => m1_view_gap(mode),
+        Adapter::Odc => shared_view_gap(mode),
         #[cfg(feature = "odi")]
-        Adapter::Odi => m1_view_gap(mode),
+        Adapter::Odi => shared_view_gap(mode),
         #[cfg(feature = "odb")]
-        Adapter::Odb => m1_view_gap(mode),
+        Adapter::Odb => shared_view_gap(mode),
         #[cfg(feature = "odf-formula")]
-        Adapter::OdfFormula => m1_view_gap(mode),
+        Adapter::OdfFormula => shared_view_gap(mode),
         #[cfg(feature = "pages")]
-        Adapter::Pages => m1_view_gap(mode),
+        Adapter::Pages => shared_view_gap(mode),
         #[cfg(feature = "keynote")]
-        Adapter::Keynote => m1_view_gap(mode),
+        Adapter::Keynote => shared_view_gap(mode),
         #[cfg(feature = "numbers")]
-        Adapter::Numbers => m1_view_gap(mode),
+        Adapter::Numbers => shared_view_gap(mode),
     }
 }
 
 /// The rule shared by the adapters.
-const fn m1_view_gap(mode: Mode) -> Option<&'static GapSpec> {
+const fn shared_view_gap(mode: Mode) -> Option<&'static GapSpec> {
     match mode {
         Mode::Text | Mode::Annotated | Mode::Outline | Mode::Stats => None,
         Mode::Issues => Some(&ISSUES_GAP),
@@ -4289,7 +4289,7 @@ impl fmt::Display for Support {
 }
 
 mod find;
-mod m4;
+mod import_eval;
 mod merge;
 mod refresh;
 #[cfg(test)]

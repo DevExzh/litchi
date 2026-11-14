@@ -1339,5 +1339,5 @@ pub(crate) enum BodyElement {
 }
 
 #[cfg(test)]
-#[path = "fusion_tests_0722.rs"]
-mod fusion_tests_0722;
+#[path = "fusion_tests.rs"]
+mod fusion_tests;

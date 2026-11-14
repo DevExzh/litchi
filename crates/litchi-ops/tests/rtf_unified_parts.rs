@@ -9,7 +9,7 @@ use litchi_ops::{Code, File, NewNode, open_bytes, props};
 fn fixture() -> Vec<u8> {
     std::fs::read(
         std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../test-data/unified-ops/0294/parts.rtf"),
+            .join("../../test-data/unified-ops/acceptance-fixtures/parts.rtf"),
     )
     .expect("read fixture")
 }

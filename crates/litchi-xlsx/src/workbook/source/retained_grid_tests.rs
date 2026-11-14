@@ -1,6 +1,5 @@
-//! M1 leaf requests L-XLSX-R1, R2 and R6 on the source-backed owner: the
-//! retained parsed grid, its delegates, the blocks outside `sheetData`, and
-//! the early-stop range visitor.
+//! The source-backed owner's retained parsed grid, its delegates, the blocks
+//! outside `sheetData`, and the early-stop range visitor.
 
 use std::fmt::Debug;
 use std::io;

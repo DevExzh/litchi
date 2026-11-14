@@ -149,7 +149,10 @@ mod odt_family {
     #[cfg(all(feature = "oth", feature = "odm"))]
     #[test]
     fn oth_and_odm_paragraph_text_keeps_inline_frames() {
-        for name in ["unified-ops/0294/frames.oth", "unified-ops/0294/frames.odm"] {
+        for name in [
+            "unified-ops/acceptance-fixtures/frames.oth",
+            "unified-ops/acceptance-fixtures/frames.odm",
+        ] {
             let file = open(name);
             assert_eq!(count(&file, "/body/p[1]/frame"), 3, "{name}");
             let changed = reopen(

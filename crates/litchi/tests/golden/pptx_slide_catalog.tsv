@@ -1,5 +1,5 @@
 # Slide catalog and slide size of every test-data/ooxml/pptx fixture the facade's
-# Presentation opens (M0a step S8c). Columns: file name, slide width and height in
+# Presentation opens. Columns: file name, slide width and height in
 # EMU (`-` when absent), then `position:slide id` per slide.
 SmartArt.pptx	12192000	6858000	0:256
 backgrounds.pptx	9144000	6858000	0:256,1:257,2:259,3:258

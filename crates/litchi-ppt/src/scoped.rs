@@ -1305,7 +1305,7 @@ mod tests {
     #[test]
     fn changed_owned_publication_seeds_its_unsigned_signature_result() {
         let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../test-data/unified-ops/0294/video.ppt");
+            .join("../../test-data/unified-ops/acceptance-fixtures/video.ppt");
         let source = Package::from_bytes(&std::fs::read(path).unwrap()).unwrap();
         let mut edit = source.edit_external_media().unwrap();
         edit.set_path(1, Some("seeded-signature-cache.avi".into()))
@@ -1328,7 +1328,7 @@ mod tests {
     #[test]
     fn replay_works_on_an_independent_copy_and_fences_positional_sources() {
         let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../test-data/unified-ops/0294/video.ppt");
+            .join("../../test-data/unified-ops/acceptance-fixtures/video.ppt");
         let bytes = std::fs::read(path).unwrap();
         let source = Package::from_bytes(&bytes).unwrap();
         let mut edit = source.edit_external_media().unwrap();
@@ -1362,7 +1362,7 @@ mod tests {
     #[test]
     fn replay_admits_a_growing_target_under_the_recipient_limit() {
         let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../test-data/unified-ops/0294/video.ppt");
+            .join("../../test-data/unified-ops/acceptance-fixtures/video.ppt");
         let source_bytes = std::fs::read(path).unwrap();
         let source = Package::from_bytes(&source_bytes).unwrap();
         let mut edit = source.edit_external_media().unwrap();
@@ -1552,7 +1552,7 @@ mod tests {
     #[test]
     fn unsigned_publication_does_not_reach_an_orphan_signature_component() {
         let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../test-data/unified-ops/0294/video.ppt");
+            .join("../../test-data/unified-ops/acceptance-fixtures/video.ppt");
         let source = Package::from_bytes(&std::fs::read(path).unwrap()).unwrap();
         let signed = super::signature_package(&source, "_XMLSIGNATURES");
         let mut bytes = signed.to_bytes().unwrap();

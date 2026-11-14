@@ -5,7 +5,7 @@ use litchi_core::Position;
 use litchi_rtf::edit::{Error, SectionValue};
 use litchi_rtf::{Package, PageOrientation, SectionBreakType, TabAlignment, TabLeader, TabStop};
 
-const PARTS: &[u8] = include_bytes!("../../../test-data/unified-ops/0294/parts.rtf");
+const PARTS: &[u8] = include_bytes!("../../../test-data/unified-ops/acceptance-fixtures/parts.rtf");
 
 fn source() -> Package {
     Package::from_bytes(PARTS).unwrap()

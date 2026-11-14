@@ -6,11 +6,11 @@
 //! element. Each fixture here is built with Litchi's own writers: the leaf
 //! builders and edit transactions, and the ODF package writer of
 //! `litchi-odf-common` for content XML written in this file. They are
-//! checked in under `test-data/unified-ops/0294/` so the Rust checklist
+//! checked in under `test-data/unified-ops/acceptance-fixtures/` so the Rust checklist
 //! (`tests/crud_matrix.rs`), the corpus reports and the Python mirror all
 //! open the same bytes, and this test proves they are what the generators
 //! write: rewrite them with `LITCHI_BLESS=1` after an intended change.
-//! `test-data/unified-ops/0294/PROVENANCE.md` lists each file's generator.
+//! `test-data/unified-ops/acceptance-fixtures/PROVENANCE.md` lists each file's generator.
 //!
 //! The fixtures are synthetic: they show that the adapter code of each
 //! element works, not that a third-party producer's variant of it does.
@@ -61,7 +61,7 @@ const PNG: &[u8] = &[
 ];
 
 fn dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/unified-ops/0294")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/unified-ops/acceptance-fixtures")
 }
 
 /// A text body with two sibling frames in one paragraph, one holding a
@@ -865,7 +865,7 @@ fn generated_fixtures_are_current() {
     }
     assert!(
         stale.is_empty(),
-        "generated fixtures differ from test-data/unified-ops/0294 ({stale:?}); \
+        "generated fixtures differ from test-data/unified-ops/acceptance-fixtures ({stale:?}); \
          review and bless with LITCHI_BLESS=1"
     );
 }

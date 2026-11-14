@@ -21,7 +21,7 @@ fn open(path: &str) -> File {
 }
 
 fn parts() -> File {
-    open("unified-ops/0294/parts.odt")
+    open("unified-ops/acceptance-fixtures/parts.odt")
 }
 
 fn prop(file: &File, path: &str, key: &str) -> Option<String> {

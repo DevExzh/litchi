@@ -281,7 +281,6 @@ fn main() {
         .collect();
     let report = json!({
         "schema": "litchi.eval-parity.v1",
-        "record": "0266",
         "tolerance": "relative 1e-9 (|a-b| <= 1e-9 * max(1,|a|,|b|)); text, booleans and errors exact; empty equals empty text",
         "files": files.len(),
         "duplicates_skipped": duplicates,

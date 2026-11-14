@@ -12,5 +12,5 @@
   "steps": "Insert a 2D column chart, tick Caption in Format > Chart, type the caption, save.",
   "sheet": "Sheet 1",
   "caption": "Native caption",
-  "scope": "Native chart-caption structure evidence for record 0433. The full run output stays outside the repository."
+  "scope": "Native chart-caption structure evidence. The full run output stays outside the repository."
 }

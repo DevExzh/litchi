@@ -430,7 +430,7 @@ fn signed_decks_admit_document_noops_and_refuse_changes() {
 /// the working document; the document edits are replayed with them.
 #[test]
 fn document_edits_replay_through_the_structural_rebase() {
-    let source = Package::from_bytes(&read("unified-ops/0294/video.ppt")).unwrap();
+    let source = Package::from_bytes(&read("unified-ops/acceptance-fixtures/video.ppt")).unwrap();
     let flags = |package: &Package| structure(package).slides()[0].flags() & (1 << 2) != 0;
     let before = flags(&source);
     let mut edit = source.edit().unwrap();

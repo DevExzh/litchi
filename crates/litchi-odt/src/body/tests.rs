@@ -324,7 +324,7 @@ fn text_fields_are_listed_and_rewritten() {
 
 fn unified_fixture(name: &str) -> Vec<u8> {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../test-data/unified-ops/0294")
+        .join("../../test-data/unified-ops/acceptance-fixtures")
         .join(name);
     std::fs::read(&path).unwrap_or_else(|error| panic!("{}: {error}", path.display()))
 }

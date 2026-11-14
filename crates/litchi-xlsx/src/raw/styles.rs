@@ -452,10 +452,9 @@ mod tests {
     const S: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
     const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 
-    type Streaming0364Result =
-        std::result::Result<u32, Box<StreamError<crate::Error, crate::Error>>>;
+    type StreamingResult = std::result::Result<u32, Box<StreamError<crate::Error, crate::Error>>>;
 
-    fn streaming_0364_count(xml: &str) -> Streaming0364Result {
+    fn streaming_count(xml: &str) -> StreamingResult {
         let mut input = std::io::Cursor::new(xml.as_bytes());
         stream_count(
             &mut input,
@@ -465,11 +464,11 @@ mod tests {
         .map_err(Box::new)
     }
 
-    fn streaming_0364_count_with(
+    fn streaming_count_with(
         xml: &str,
         capabilities: &Capabilities,
         limits: &StreamLimits,
-    ) -> Streaming0364Result {
+    ) -> StreamingResult {
         let mut input = std::io::Cursor::new(xml.as_bytes());
         stream_count(&mut input, capabilities, limits).map_err(Box::new)
     }
@@ -496,78 +495,78 @@ mod tests {
     }
 
     #[test]
-    fn streaming_0364_counts_direct_cell_xfs() {
+    fn streaming_counts_direct_cell_xfs() {
         let xml = format!(
             r#"<styleSheet xmlns="{S}"><cellXfs count="3"><xf/><xf><alignment/></xf><xf/></cellXfs></styleSheet>"#
         );
-        assert_eq!(streaming_0364_count(&xml).expect("styles"), 3);
+        assert_eq!(streaming_count(&xml).expect("styles"), 3);
     }
 
     #[test]
-    fn streaming_0364_ignores_nested_and_unrelated_xfs() {
+    fn streaming_ignores_nested_and_unrelated_xfs() {
         let xml = format!(
             r#"<styleSheet xmlns="{S}"><unrelated><xf/></unrelated><cellXfs count="2"><xf><nested><xf/></nested></xf><unrelated><xf/></unrelated><xf/></cellXfs></styleSheet>"#
         );
-        assert_eq!(streaming_0364_count(&xml).expect("styles"), 2);
+        assert_eq!(streaming_count(&xml).expect("styles"), 2);
     }
 
     #[test]
-    fn streaming_0364_enforces_declared_count() {
+    fn streaming_enforces_declared_count() {
         let exact = format!(
             r#"<styleSheet xmlns="{S}"><cellXfs count="2"><xf/><xf/></cellXfs></styleSheet>"#
         );
         let mismatch = format!(
             r#"<styleSheet xmlns="{S}"><cellXfs count="1"><xf/><xf/></cellXfs></styleSheet>"#
         );
-        assert_eq!(streaming_0364_count(&exact).expect("styles"), 2);
-        assert!(streaming_0364_count(&mismatch).is_err());
+        assert_eq!(streaming_count(&exact).expect("styles"), 2);
+        assert!(streaming_count(&mismatch).is_err());
     }
 
     #[test]
-    fn streaming_0364_requires_nonempty_cell_xfs() {
+    fn streaming_requires_nonempty_cell_xfs() {
         let missing = format!(r#"<styleSheet xmlns="{S}"/>"#);
         let empty = format!(r#"<styleSheet xmlns="{S}"><cellXfs/></styleSheet>"#);
-        assert!(streaming_0364_count(&missing).is_err());
-        assert!(streaming_0364_count(&empty).is_err());
+        assert!(streaming_count(&missing).is_err());
+        assert!(streaming_count(&empty).is_err());
     }
 
     #[test]
-    fn streaming_0364_selects_mce_choice_or_fallback() {
+    fn streaming_selects_mce_choice_or_fallback() {
         let xml = format!(
             r#"<styleSheet xmlns="{S}" xmlns:mc="{MC}" xmlns:x="urn:future"><mc:AlternateContent><mc:Choice Requires="x"><cellXfs count="1"><xf/></cellXfs></mc:Choice><mc:Fallback><cellXfs count="2"><xf/><xf/></cellXfs></mc:Fallback></mc:AlternateContent></styleSheet>"#
         );
-        assert_eq!(streaming_0364_count(&xml).expect("fallback styles"), 2);
+        assert_eq!(streaming_count(&xml).expect("fallback styles"), 2);
 
         let mut capabilities = Capabilities::default();
         capabilities.understand_namespace("urn:future");
         assert_eq!(
-            streaming_0364_count_with(&xml, &capabilities, &StreamLimits::default())
+            streaming_count_with(&xml, &capabilities, &StreamLimits::default())
                 .expect("choice styles"),
             1
         );
     }
 
     #[test]
-    fn streaming_0364_rejects_malformed_tail_and_endings() {
+    fn streaming_rejects_malformed_tail_and_endings() {
         let cases = [
             format!(r#"<styleSheet xmlns="{S}"><cellXfs><xf/></cellXfs></styleSheet><tail/>"#),
             format!(r#"<styleSheet xmlns="{S}"><cellXfs><xf/></cellXfs></styleSheet>tail"#),
             format!(r#"<styleSheet xmlns="{S}"><cellXfs><xf/></cellXfs></stylesSheet>"#),
         ];
         for xml in cases {
-            assert!(streaming_0364_count(&xml).is_err(), "accepted {xml}");
+            assert!(streaming_count(&xml).is_err(), "accepted {xml}");
         }
     }
 
     #[test]
-    fn streaming_0364_honors_exact_event_limit() {
+    fn streaming_honors_exact_event_limit() {
         let xml = format!(r#"<styleSheet xmlns="{S}"><cellXfs><xf/></cellXfs></styleSheet>"#);
         let exact = StreamLimits {
             max_events: 5,
             ..StreamLimits::default()
         };
         assert_eq!(
-            streaming_0364_count_with(&xml, &Capabilities::default(), &exact).expect("five events"),
+            streaming_count_with(&xml, &Capabilities::default(), &exact).expect("five events"),
             1
         );
 
@@ -575,6 +574,6 @@ mod tests {
             max_events: 4,
             ..exact
         };
-        assert!(streaming_0364_count_with(&xml, &Capabilities::default(), &under).is_err());
+        assert!(streaming_count_with(&xml, &Capabilities::default(), &under).is_err());
     }
 }

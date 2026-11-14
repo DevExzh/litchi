@@ -865,7 +865,7 @@ mod tests {
     }
 
     #[test]
-    fn change_0635_row_number_agrees_with_the_shared_row_parser() {
+    fn row_number_agrees_with_the_shared_row_parser() {
         for value in combinations() {
             let expected = std::str::from_utf8(value.as_bytes())
                 .ok()
@@ -880,7 +880,7 @@ mod tests {
     }
 
     #[test]
-    fn change_0635_cell_column_agrees_with_the_shared_a1_parser() {
+    fn cell_column_agrees_with_the_shared_a1_parser() {
         for value in combinations() {
             // The builder only ever asks about the row it has already
             // accepted, so compare against `parse_a1` followed by that same

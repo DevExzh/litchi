@@ -428,7 +428,7 @@ mod preservation_tests {
 }
 
 #[cfg(test)]
-mod streaming_0410_name_ownership_tests {
+mod streaming_name_ownership_tests {
     use super::super::{
         Capabilities, Error, ExpandedName, LimitKind,
         stream::{
@@ -441,7 +441,7 @@ mod streaming_0410_name_ownership_tests {
     const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 
     #[test]
-    fn streaming_0410_owned_names_survive_raw_and_active_callbacks() {
+    fn streaming_owned_names_survive_raw_and_active_callbacks() {
         let xml = format!(
             r#"<r xmlns:mc="{MC}" xmlns:x="urn:x" xmlns:p="urn:p" mc:Ignorable="x" mc:PreserveAttributes="x:keep" x:keep="root"><p:item x:keep="child" plain="ok">payload</p:item></r>"#
         );
@@ -529,7 +529,7 @@ mod streaming_0410_name_ownership_tests {
     }
 
     #[test]
-    fn streaming_0410_expanded_name_bound_remains_exact() {
+    fn streaming_expanded_name_bound_remains_exact() {
         let namespace = "urn:attribute-namespace-longer-than-xmlns";
         let xml = format!(r#"<r xmlns:p="{namespace}" p:value="ok"/>"#);
         let exact = StreamLimits {
@@ -1151,7 +1151,7 @@ mod fixture_tests {
 }
 
 #[cfg(test)]
-mod streaming_0360_tests {
+mod streaming_event_tests {
     use super::super::{
         Capabilities, Error, ExpandedName, LimitKind, Name,
         stream::{
@@ -1173,7 +1173,7 @@ mod streaming_0360_tests {
             max_events: 0,
             ..StreamLimits::default()
         };
-        let error = streaming_0360_active(b"<root/>", &Capabilities::default(), &limits)
+        let error = streaming_active(b"<root/>", &Capabilities::default(), &limits)
             .expect_err("zero event bounds must be rejected before reading");
         assert!(matches!(
             error,
@@ -1190,7 +1190,7 @@ mod streaming_0360_tests {
 
         let mut limits = StreamLimits::default();
         limits.processing.max_input_bytes = 0;
-        let error = streaming_0360_active(b"<root/>", &Capabilities::default(), &limits)
+        let error = streaming_active(b"<root/>", &Capabilities::default(), &limits)
             .expect_err("zero input bounds must be rejected before reading");
         assert!(matches!(
             error,
@@ -1246,26 +1246,26 @@ mod streaming_0360_tests {
         ));
     }
 
-    fn streaming_0360_expanded(name: &ExpandedName) -> String {
+    fn streaming_expanded(name: &ExpandedName) -> String {
         format!("{}:{}", name.namespace, name.local_name)
     }
 
-    fn streaming_0360_event_signature(event: &SemanticEvent<'_>) -> String {
+    fn streaming_event_signature(event: &SemanticEvent<'_>) -> String {
         match event {
             SemanticEvent::Start(element) => format!(
                 "start:{}:{}",
                 String::from_utf8_lossy(element.name()),
-                streaming_0360_expanded(&element.expanded_name),
+                streaming_expanded(&element.expanded_name),
             ),
             SemanticEvent::Empty(element) => format!(
                 "empty:{}:{}",
                 String::from_utf8_lossy(element.name()),
-                streaming_0360_expanded(&element.expanded_name),
+                streaming_expanded(&element.expanded_name),
             ),
             SemanticEvent::End(element) => format!(
                 "end:{}:{}",
                 String::from_utf8_lossy(element.name()),
-                streaming_0360_expanded(&element.expanded_name),
+                streaming_expanded(&element.expanded_name),
             ),
             SemanticEvent::Text(text) => format!("text:{}", text.text()),
             SemanticEvent::CData(text) => format!("cdata:{}", text.text()),
@@ -1279,7 +1279,7 @@ mod streaming_0360_tests {
         }
     }
 
-    fn streaming_0360_raw_signature(element: &RawElement<'_>) -> String {
+    fn streaming_raw_signature(element: &RawElement<'_>) -> String {
         let kind = match element.kind {
             RawElementKind::Start => "start",
             RawElementKind::Empty => "empty",
@@ -1287,7 +1287,7 @@ mod streaming_0360_tests {
         format!("{kind}:{}", String::from_utf8_lossy(element.name()))
     }
 
-    fn streaming_0360_active(
+    fn streaming_active(
         xml: &[u8],
         capabilities: &Capabilities,
         limits: &StreamLimits,
@@ -1296,13 +1296,13 @@ mod streaming_0360_tests {
         let mut events = Vec::new();
         let report =
             process_markup_compatibility_stream(&mut input, capabilities, limits, |event| {
-                events.push(streaming_0360_event_signature(&event));
+                events.push(streaming_event_signature(&event));
                 Ok::<(), &'static str>(())
             })?;
         Ok((report, events))
     }
 
-    fn streaming_0360_both_observers(
+    fn streaming_both_observers(
         input: &mut dyn BufRead,
         capabilities: &Capabilities,
         limits: &StreamLimits,
@@ -1315,18 +1315,18 @@ mod streaming_0360_tests {
             capabilities,
             limits,
             |element| {
-                raw_events.push(streaming_0360_raw_signature(&element));
+                raw_events.push(streaming_raw_signature(&element));
                 Ok::<(), &'static str>(())
             },
             |event| {
-                active_events.push(streaming_0360_event_signature(&event));
+                active_events.push(streaming_event_signature(&event));
                 Ok::<(), &'static str>(())
             },
         )?;
         Ok((report, raw_events, active_events))
     }
 
-    fn streaming_0360_callback_failure(
+    fn streaming_callback_failure(
         input: &mut dyn BufRead,
         capabilities: &Capabilities,
         limits: &StreamLimits,
@@ -1341,12 +1341,12 @@ mod streaming_0360_tests {
         .unwrap_err()
     }
 
-    struct Streaming0360OneByte {
+    struct StreamingOneByte {
         bytes: Vec<u8>,
         position: usize,
     }
 
-    impl Streaming0360OneByte {
+    impl StreamingOneByte {
         fn new(bytes: &[u8]) -> Self {
             Self {
                 bytes: bytes.to_vec(),
@@ -1355,7 +1355,7 @@ mod streaming_0360_tests {
         }
     }
 
-    impl Read for Streaming0360OneByte {
+    impl Read for StreamingOneByte {
         fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
             if output.is_empty() || self.position == self.bytes.len() {
                 return Ok(0);
@@ -1366,7 +1366,7 @@ mod streaming_0360_tests {
         }
     }
 
-    impl BufRead for Streaming0360OneByte {
+    impl BufRead for StreamingOneByte {
         fn fill_buf(&mut self) -> io::Result<&[u8]> {
             if self.position == self.bytes.len() {
                 Ok(&[])
@@ -1380,12 +1380,12 @@ mod streaming_0360_tests {
         }
     }
 
-    struct Streaming0360FailAfter {
+    struct StreamingFailAfter {
         bytes: Vec<u8>,
         position: usize,
     }
 
-    impl Streaming0360FailAfter {
+    impl StreamingFailAfter {
         fn new(bytes: &[u8]) -> Self {
             Self {
                 bytes: bytes.to_vec(),
@@ -1394,7 +1394,7 @@ mod streaming_0360_tests {
         }
     }
 
-    impl Read for Streaming0360FailAfter {
+    impl Read for StreamingFailAfter {
         fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
             let available = self.fill_buf()?;
             let amount = available.len().min(output.len());
@@ -1404,7 +1404,7 @@ mod streaming_0360_tests {
         }
     }
 
-    impl BufRead for Streaming0360FailAfter {
+    impl BufRead for StreamingFailAfter {
         fn fill_buf(&mut self) -> io::Result<&[u8]> {
             if self.position == self.bytes.len() {
                 Err(io::Error::other("streaming input failure"))
@@ -1419,10 +1419,10 @@ mod streaming_0360_tests {
     }
 
     #[test]
-    fn streaming_0360_projects_namespaced_events_and_counts_them() {
+    fn streaming_projects_namespaced_events_and_counts_them() {
         let xml = br#"<p:r xmlns:p="urn:r"><p:item p:value="&amp;">text</p:item></p:r>"#;
         let (report, events) =
-            streaming_0360_active(xml, &Capabilities::new(), &StreamLimits::default()).unwrap();
+            streaming_active(xml, &Capabilities::new(), &StreamLimits::default()).unwrap();
 
         assert_eq!(
             events,
@@ -1444,7 +1444,7 @@ mod streaming_0360_tests {
     }
 
     #[test]
-    fn streaming_0360_raw_sees_inactive_branches_active_sees_selection() {
+    fn streaming_raw_sees_inactive_branches_active_sees_selection() {
         let xml = format!(
             r#"<r xmlns:mc="{MC}" xmlns:x="urn:x" xmlns:s="urn:s"><mc:AlternateContent><mc:Choice Requires="x"><x:inactive/></mc:Choice><mc:Choice Requires="s"><s:active/></mc:Choice><mc:Fallback><fallback/></mc:Fallback></mc:AlternateContent></r>"#
         );
@@ -1452,8 +1452,7 @@ mod streaming_0360_tests {
         capabilities.understand_namespace("urn:s");
         let mut input = Cursor::new(xml.as_bytes());
         let (report, raw, active) =
-            streaming_0360_both_observers(&mut input, &capabilities, &StreamLimits::default())
-                .unwrap();
+            streaming_both_observers(&mut input, &capabilities, &StreamLimits::default()).unwrap();
 
         assert!(raw.iter().any(|event| event == "start:mc:Choice"));
         assert!(raw.iter().any(|event| event == "empty:x:inactive"));
@@ -1470,7 +1469,7 @@ mod streaming_0360_tests {
     }
 
     #[test]
-    fn streaming_0360_callbacks_disable_independently_and_are_retained() {
+    fn streaming_callbacks_disable_independently_and_are_retained() {
         let xml = b"<r><one/><two/></r>";
         let mut input = Cursor::new(xml);
         let mut raw_calls = 0;
@@ -1505,9 +1504,9 @@ mod streaming_0360_tests {
     }
 
     #[test]
-    fn streaming_0360_later_failures_keep_callback_errors_as_secondary() {
+    fn streaming_later_failures_keep_callback_errors_as_secondary() {
         let mut malformed = Cursor::new(b"<r></q>");
-        let malformed_error = streaming_0360_callback_failure(
+        let malformed_error = streaming_callback_failure(
             &mut malformed,
             &Capabilities::new(),
             &StreamLimits::default(),
@@ -1527,7 +1526,7 @@ mod streaming_0360_tests {
 
         let mce = format!(r#"<r xmlns:mc="{MC}"><mc:AlternateContent/></r>"#);
         let mut mce_input = Cursor::new(mce.as_bytes());
-        let mce_error = streaming_0360_callback_failure(
+        let mce_error = streaming_callback_failure(
             &mut mce_input,
             &Capabilities::new(),
             &StreamLimits::default(),
@@ -1545,8 +1544,8 @@ mod streaming_0360_tests {
             _ => panic!("expected MCE failure to be primary"),
         }
 
-        let mut failed_input = Streaming0360FailAfter::new(b"<r/>");
-        let input_error = streaming_0360_callback_failure(
+        let mut failed_input = StreamingFailAfter::new(b"<r/>");
+        let input_error = streaming_callback_failure(
             &mut failed_input,
             &Capabilities::new(),
             &StreamLimits::default(),
@@ -1565,14 +1564,13 @@ mod streaming_0360_tests {
     }
 
     #[test]
-    fn streaming_0360_event_and_count_limits_are_exact_and_typed() {
+    fn streaming_event_and_count_limits_are_exact_and_typed() {
         let nested = b"<r><leaf/></r>";
         let exact_events = StreamLimits {
             max_events: 3,
             ..StreamLimits::default()
         };
-        let (report, _) =
-            streaming_0360_active(nested, &Capabilities::new(), &exact_events).unwrap();
+        let (report, _) = streaming_active(nested, &Capabilities::new(), &exact_events).unwrap();
         assert_eq!(report.events, 3);
 
         let over_events = StreamLimits {
@@ -1580,7 +1578,7 @@ mod streaming_0360_tests {
             ..exact_events
         };
         assert!(matches!(
-            streaming_0360_active(nested, &Capabilities::new(), &over_events),
+            streaming_active(nested, &Capabilities::new(), &over_events),
             Err(StreamError::Mce {
                 error: Error::LimitExceeded { kind, .. },
                 ..
@@ -1592,13 +1590,13 @@ mod streaming_0360_tests {
             max_event_bytes: attr_xml.len(),
             ..StreamLimits::default()
         };
-        streaming_0360_active(attr_xml.as_bytes(), &Capabilities::new(), &exact_attribute).unwrap();
+        streaming_active(attr_xml.as_bytes(), &Capabilities::new(), &exact_attribute).unwrap();
         let over_attribute = StreamLimits {
             max_event_bytes: attr_xml.len() - 1,
             ..exact_attribute.clone()
         };
         assert!(matches!(
-            streaming_0360_active(attr_xml.as_bytes(), &Capabilities::new(), &over_attribute),
+            streaming_active(attr_xml.as_bytes(), &Capabilities::new(), &over_attribute),
             Err(StreamError::Mce {
                 error: Error::LimitExceeded { kind, .. },
                 ..
@@ -1610,13 +1608,13 @@ mod streaming_0360_tests {
             max_event_bytes: 129,
             ..StreamLimits::default()
         };
-        streaming_0360_active(text_xml.as_bytes(), &Capabilities::new(), &exact_text).unwrap();
+        streaming_active(text_xml.as_bytes(), &Capabilities::new(), &exact_text).unwrap();
         let over_text = StreamLimits {
             max_event_bytes: 128,
             ..exact_text
         };
         assert!(matches!(
-            streaming_0360_active(text_xml.as_bytes(), &Capabilities::new(), &over_text),
+            streaming_active(text_xml.as_bytes(), &Capabilities::new(), &over_text),
             Err(StreamError::Mce {
                 error: Error::LimitExceeded { kind, .. },
                 ..
@@ -1625,15 +1623,15 @@ mod streaming_0360_tests {
     }
 
     #[test]
-    fn streaming_0360_prefix_reader_handles_split_bom_and_replays_prefix() {
-        let mut bom_input = Streaming0360OneByte::new(b"\xef\xbb\xbf<r/>");
+    fn streaming_prefix_reader_handles_split_bom_and_replays_prefix() {
+        let mut bom_input = StreamingOneByte::new(b"\xef\xbb\xbf<r/>");
         let mut bom_events = Vec::new();
         let bom_report = process_markup_compatibility_stream(
             &mut bom_input,
             &Capabilities::new(),
             &StreamLimits::default(),
             |event| {
-                bom_events.push(streaming_0360_event_signature(&event));
+                bom_events.push(streaming_event_signature(&event));
                 Ok::<(), &'static str>(())
             },
         )
@@ -1641,14 +1639,14 @@ mod streaming_0360_tests {
         assert_eq!(bom_report.events, 1);
         assert_eq!(bom_events, vec!["empty:r::r"]);
 
-        let mut prefix_input = Streaming0360OneByte::new(b"<?xml version=\"1.0\"?><r/>");
+        let mut prefix_input = StreamingOneByte::new(b"<?xml version=\"1.0\"?><r/>");
         let mut prefix_events = Vec::new();
         process_markup_compatibility_stream(
             &mut prefix_input,
             &Capabilities::new(),
             &StreamLimits::default(),
             |event| {
-                prefix_events.push(streaming_0360_event_signature(&event));
+                prefix_events.push(streaming_event_signature(&event));
                 Ok::<(), &'static str>(())
             },
         )
@@ -1660,13 +1658,13 @@ mod streaming_0360_tests {
     }
 
     #[test]
-    fn streaming_0360_rejects_direct_alternate_content_data() {
+    fn streaming_rejects_direct_alternate_content_data() {
         for content in ["text", "<![CDATA[ ]]>"] {
             let xml = format!(
                 r#"<r xmlns:mc="{MC}" xmlns:x="urn:x"><mc:AlternateContent>{content}<mc:Choice Requires="x"><yes/></mc:Choice><mc:Fallback><no/></mc:Fallback></mc:AlternateContent></r>"#
             );
             assert!(
-                streaming_0360_active(
+                streaming_active(
                     xml.as_bytes(),
                     &Capabilities::new(),
                     &StreamLimits::default()
@@ -1678,12 +1676,12 @@ mod streaming_0360_tests {
     }
 
     #[test]
-    fn streaming_0360_rejects_custom_references_in_hidden_branches_and_prolog() {
+    fn streaming_rejects_custom_references_in_hidden_branches_and_prolog() {
         let hidden = format!(
             r#"<r xmlns:mc="{MC}" xmlns:x="urn:x"><mc:AlternateContent><mc:Choice Requires="x"><x:payload>&custom;</x:payload></mc:Choice><mc:Fallback><ok/></mc:Fallback></mc:AlternateContent></r>"#
         );
         assert!(
-            streaming_0360_active(
+            streaming_active(
                 hidden.as_bytes(),
                 &Capabilities::new(),
                 &StreamLimits::default()
@@ -1691,7 +1689,7 @@ mod streaming_0360_tests {
             .is_err()
         );
         assert!(
-            streaming_0360_active(
+            streaming_active(
                 b"&custom;<r/>",
                 &Capabilities::new(),
                 &StreamLimits::default()
@@ -1701,10 +1699,10 @@ mod streaming_0360_tests {
     }
 
     #[test]
-    fn streaming_0360_rejects_bad_document_boundaries() {
+    fn streaming_rejects_bad_document_boundaries() {
         for xml in [&b"<r></q>"[..], &b""[..], &b"<r/>tail"[..]] {
             assert!(
-                streaming_0360_active(xml, &Capabilities::new(), &StreamLimits::default()).is_err(),
+                streaming_active(xml, &Capabilities::new(), &StreamLimits::default()).is_err(),
                 "accepted malformed document: {:?}",
                 xml
             );
@@ -1712,7 +1710,7 @@ mod streaming_0360_tests {
     }
 
     #[test]
-    fn streaming_0360_expands_rebound_and_unqualified_attributes() {
+    fn streaming_expands_rebound_and_unqualified_attributes() {
         let xml =
             br#"<r xmlns:p="urn:one"><p:item xmlns:p="urn:two" p:qualified="yes" plain="ok"/></r>"#;
         let mut item = None;
@@ -1763,7 +1761,7 @@ mod streaming_0360_tests {
     }
 
     #[test]
-    fn streaming_0360_processes_preserves_and_keeps_opaque_content() {
+    fn streaming_processes_preserves_and_keeps_opaque_content() {
         let mut capabilities = Capabilities::new();
         capabilities.preserve_extension_element(Name {
             namespace: "urn:ext".to_owned(),
@@ -1773,7 +1771,7 @@ mod streaming_0360_tests {
             r#"<r xmlns:mc="{MC}" xmlns:x="urn:x" xmlns:ext="urn:ext" mc:Ignorable="x ext" mc:ProcessContent="x:unwrap" mc:PreserveElements="x:keep" mc:PreserveAttributes="x:flag"><x:unwrap><known/></x:unwrap><x:keep x:flag="yes"><x:drop/><known2/></x:keep><ext:opaque><ext:child>opaque</ext:child></ext:opaque><x:drop/></r>"#
         );
         let (report, events) =
-            streaming_0360_active(xml.as_bytes(), &capabilities, &StreamLimits::default()).unwrap();
+            streaming_active(xml.as_bytes(), &capabilities, &StreamLimits::default()).unwrap();
 
         assert!(events.iter().any(|event| event.starts_with("empty:known:")));
         assert!(
@@ -1805,7 +1803,7 @@ mod streaming_0360_tests {
     }
 }
 #[cfg(test)]
-mod streaming_0361_raw_attribute_tests {
+mod streaming_raw_attribute_tests {
     use super::super::{
         Capabilities, Error,
         stream::{
@@ -1817,7 +1815,7 @@ mod streaming_0361_raw_attribute_tests {
 
     type AttributeSnapshot = (String, Vec<u8>, String, String);
 
-    fn streaming_0361_raw_attributes(
+    fn streaming_raw_attributes(
         input: &mut dyn BufRead,
         limits: &StreamLimits,
     ) -> (
@@ -1846,10 +1844,9 @@ mod streaming_0361_raw_attribute_tests {
     }
 
     #[test]
-    fn streaming_0361_duplicate_ordinary_attributes_are_raw_before_primary_error() {
+    fn streaming_duplicate_ordinary_attributes_are_raw_before_primary_error() {
         let mut input = Cursor::new(br#"<r value="one" value="two"/>"#);
-        let (attributes, result) =
-            streaming_0361_raw_attributes(&mut input, &StreamLimits::default());
+        let (attributes, result) = streaming_raw_attributes(&mut input, &StreamLimits::default());
 
         assert_eq!(
             attributes,
@@ -1880,12 +1877,11 @@ mod streaming_0361_raw_attribute_tests {
     }
 
     #[test]
-    fn streaming_0361_alias_attributes_are_raw_before_expanded_duplicate_error() {
+    fn streaming_alias_attributes_are_raw_before_expanded_duplicate_error() {
         let mut input = Cursor::new(
             br#"<r xmlns:a="urn:shared" xmlns:b="urn:shared" a:value="one" b:value="two"/>"#,
         );
-        let (attributes, result) =
-            streaming_0361_raw_attributes(&mut input, &StreamLimits::default());
+        let (attributes, result) = streaming_raw_attributes(&mut input, &StreamLimits::default());
         let aliases: Vec<_> = attributes
             .iter()
             .filter(|(name, _, _, _)| name == "a:value" || name == "b:value")
@@ -1912,7 +1908,7 @@ mod streaming_0361_raw_attribute_tests {
     }
 
     #[test]
-    fn streaming_0361_raw_callback_error_is_secondary_to_duplicate_error() {
+    fn streaming_raw_callback_error_is_secondary_to_duplicate_error() {
         let mut input = Cursor::new(br#"<r value="one" value="two"/>"#);
         let result = process_markup_compatibility_stream_with_observers(
             &mut input,
@@ -1933,9 +1929,9 @@ mod streaming_0361_raw_attribute_tests {
         ));
     }
 
-    fn streaming_0361_assert_no_raw_delivery(xml: &[u8], limits: StreamLimits) {
+    fn streaming_assert_no_raw_delivery(xml: &[u8], limits: StreamLimits) {
         let mut input = Cursor::new(xml);
-        let (attributes, result) = streaming_0361_raw_attributes(&mut input, &limits);
+        let (attributes, result) = streaming_raw_attributes(&mut input, &limits);
         assert!(
             attributes.is_empty(),
             "raw callback observed: {attributes:?}"
@@ -1944,31 +1940,31 @@ mod streaming_0361_raw_attribute_tests {
     }
 
     #[test]
-    fn streaming_0361_namespace_syntax_and_limits_fail_before_raw_delivery() {
-        streaming_0361_assert_no_raw_delivery(
+    fn streaming_namespace_syntax_and_limits_fail_before_raw_delivery() {
+        streaming_assert_no_raw_delivery(
             br#"<r xmlns:a="urn:one" xmlns:a="urn:two"/>"#,
             StreamLimits::default(),
         );
-        streaming_0361_assert_no_raw_delivery(
+        streaming_assert_no_raw_delivery(
             br#"<r value="one" value="two/>"#,
             StreamLimits::default(),
         );
 
-        streaming_0361_assert_no_raw_delivery(
+        streaming_assert_no_raw_delivery(
             br#"<r first="1" second="2"/>"#,
             StreamLimits {
                 max_attributes_per_event: 1,
                 ..StreamLimits::default()
             },
         );
-        streaming_0361_assert_no_raw_delivery(
+        streaming_assert_no_raw_delivery(
             br#"<root/>"#,
             StreamLimits {
                 max_name_bytes: 3,
                 ..StreamLimits::default()
             },
         );
-        streaming_0361_assert_no_raw_delivery(
+        streaming_assert_no_raw_delivery(
             br#"<r value="123"/>"#,
             StreamLimits {
                 max_attribute_bytes_per_event: 3,
@@ -1977,8 +1973,7 @@ mod streaming_0361_raw_attribute_tests {
         );
 
         let mut input = Cursor::new(br#"<r xmlns:a="urn:one" xmlns:a="urn:two"/>"#);
-        let (attributes, result) =
-            streaming_0361_raw_attributes(&mut input, &StreamLimits::default());
+        let (attributes, result) = streaming_raw_attributes(&mut input, &StreamLimits::default());
         assert!(attributes.is_empty());
         assert!(matches!(
             result,
@@ -1991,7 +1986,7 @@ mod streaming_0361_raw_attribute_tests {
 }
 
 #[cfg(test)]
-mod streaming_0361_raw_recovery_tests {
+mod streaming_raw_recovery_tests {
     use super::super::{
         Capabilities, Error, LimitKind, Name,
         stream::{
@@ -2006,28 +2001,28 @@ mod streaming_0361_raw_recovery_tests {
 
     const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 
-    fn streaming_0361_recovery_raw_name(element: &RawElement<'_>) -> String {
+    fn streaming_recovery_raw_name(element: &RawElement<'_>) -> String {
         String::from_utf8_lossy(element.name()).into_owned()
     }
 
-    fn streaming_0361_recovery_source() -> String {
+    fn streaming_recovery_source() -> String {
         format!(
             r#"<r xmlns:mc="{MC}"><mc:AlternateContent><mc:Choice Requires="missing"><bad/></mc:Choice></mc:AlternateContent><later></wrong></r>"#
         )
     }
 
-    fn streaming_0361_recovery_input_source() -> String {
+    fn streaming_recovery_input_source() -> String {
         format!(
             r#"<r xmlns:mc="{MC}"><mc:AlternateContent><mc:Choice Requires="missing"><bad/></mc:Choice></mc:AlternateContent><later/><sentinel/></r>"#
         )
     }
 
-    struct Streaming0361RecoveryOneByte {
+    struct StreamingRecoveryOneByte {
         bytes: Vec<u8>,
         position: usize,
     }
 
-    impl Streaming0361RecoveryOneByte {
+    impl StreamingRecoveryOneByte {
         fn new(bytes: &[u8]) -> Self {
             Self {
                 bytes: bytes.to_vec(),
@@ -2036,7 +2031,7 @@ mod streaming_0361_raw_recovery_tests {
         }
     }
 
-    impl Read for Streaming0361RecoveryOneByte {
+    impl Read for StreamingRecoveryOneByte {
         fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
             if output.is_empty() || self.position == self.bytes.len() {
                 return Ok(0);
@@ -2047,7 +2042,7 @@ mod streaming_0361_raw_recovery_tests {
         }
     }
 
-    impl BufRead for Streaming0361RecoveryOneByte {
+    impl BufRead for StreamingRecoveryOneByte {
         fn fill_buf(&mut self) -> io::Result<&[u8]> {
             if self.position == self.bytes.len() {
                 Ok(&[])
@@ -2061,13 +2056,13 @@ mod streaming_0361_raw_recovery_tests {
         }
     }
 
-    struct Streaming0361RecoveryInterruptedInput {
+    struct StreamingRecoveryInterruptedInput {
         bytes: Vec<u8>,
         position: usize,
         interrupted: usize,
     }
 
-    impl Streaming0361RecoveryInterruptedInput {
+    impl StreamingRecoveryInterruptedInput {
         fn new(bytes: &[u8]) -> Self {
             Self {
                 bytes: bytes.to_vec(),
@@ -2077,7 +2072,7 @@ mod streaming_0361_raw_recovery_tests {
         }
     }
 
-    impl Read for Streaming0361RecoveryInterruptedInput {
+    impl Read for StreamingRecoveryInterruptedInput {
         fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
             let available = self.fill_buf()?;
             let amount = available.len().min(output.len());
@@ -2087,7 +2082,7 @@ mod streaming_0361_raw_recovery_tests {
         }
     }
 
-    impl BufRead for Streaming0361RecoveryInterruptedInput {
+    impl BufRead for StreamingRecoveryInterruptedInput {
         fn fill_buf(&mut self) -> io::Result<&[u8]> {
             if self.position < self.bytes.len() {
                 return Ok(&self.bytes[self.position..]);
@@ -2105,8 +2100,8 @@ mod streaming_0361_raw_recovery_tests {
     }
 
     #[test]
-    fn streaming_0361_raw_recovers_after_semantic_failure_and_wins_secondary() {
-        let xml = streaming_0361_recovery_source();
+    fn streaming_raw_recovers_after_semantic_failure_and_wins_secondary() {
+        let xml = streaming_recovery_source();
         let semantic_failed = Cell::new(false);
         let mut raw_names = Vec::new();
         let mut active_names = Vec::new();
@@ -2118,7 +2113,7 @@ mod streaming_0361_raw_recovery_tests {
             &Capabilities::new(),
             &StreamLimits::default(),
             |element| {
-                let name = streaming_0361_recovery_raw_name(&element);
+                let name = streaming_recovery_raw_name(&element);
                 if name == "mc:Choice" {
                     semantic_failed.set(true);
                 }
@@ -2168,20 +2163,20 @@ mod streaming_0361_raw_recovery_tests {
     }
 
     #[test]
-    fn streaming_0361_one_byte_recovery_resolves_nested_namespaces_and_pops_scopes() {
+    fn streaming_one_byte_recovery_resolves_nested_namespaces_and_pops_scopes() {
         let xml = format!(
             r#"<r xmlns:mc="{MC}" xmlns:p="urn:outer"><mc:AlternateContent><mc:Choice Requires="missing"><bad/></mc:Choice></mc:AlternateContent><scope xmlns:p="urn:inner"><p:inside/></scope><p:outside/><later></wrong></r>"#
         );
         let semantic_failed = Cell::new(false);
         let mut expanded = Vec::new();
         let mut active_after_failure = 0;
-        let mut input = Streaming0361RecoveryOneByte::new(xml.as_bytes());
+        let mut input = StreamingRecoveryOneByte::new(xml.as_bytes());
         let result = process_markup_compatibility_stream_with_observers(
             &mut input,
             &Capabilities::new(),
             &StreamLimits::default(),
             |element| {
-                let name = streaming_0361_recovery_raw_name(&element);
+                let name = streaming_recovery_raw_name(&element);
                 if name == "mc:Choice" {
                     semantic_failed.set(true);
                 }
@@ -2244,19 +2239,19 @@ mod streaming_0361_raw_recovery_tests {
     }
 
     #[test]
-    fn streaming_0361_input_failure_after_recovery_retains_raw_error() {
-        let xml = streaming_0361_recovery_input_source();
+    fn streaming_input_failure_after_recovery_retains_raw_error() {
+        let xml = streaming_recovery_input_source();
         let semantic_failed = Cell::new(false);
-        let mut input = Streaming0361RecoveryInterruptedInput::new(xml.as_bytes());
+        let mut input = StreamingRecoveryInterruptedInput::new(xml.as_bytes());
         let result = process_markup_compatibility_stream_with_observers(
             &mut input,
             &Capabilities::new(),
             &StreamLimits::default(),
             |element| {
-                if streaming_0361_recovery_raw_name(&element) == "mc:Choice" {
+                if streaming_recovery_raw_name(&element) == "mc:Choice" {
                     semantic_failed.set(true);
                 }
-                if streaming_0361_recovery_raw_name(&element) == "sentinel" {
+                if streaming_recovery_raw_name(&element) == "sentinel" {
                     Err::<(), &'static str>("raw sentinel")
                 } else {
                     Ok::<(), &'static str>(())
@@ -2291,7 +2286,7 @@ mod streaming_0361_raw_recovery_tests {
     }
 
     #[test]
-    fn streaming_0361_semantic_failure_without_later_errors_is_not_a_report() {
+    fn streaming_semantic_failure_without_later_errors_is_not_a_report() {
         let xml = format!(
             r#"<r xmlns:mc="{MC}"><mc:AlternateContent><mc:Choice Requires="missing"/></mc:AlternateContent></r>"#
         );
@@ -2319,7 +2314,7 @@ mod streaming_0361_raw_recovery_tests {
     }
 
     #[test]
-    fn streaming_0361_opaque_extension_emits_lexical_mce_content() {
+    fn streaming_opaque_extension_emits_lexical_mce_content() {
         let mut capabilities = Capabilities::new();
         capabilities.preserve_extension_element(Name {
             namespace: "urn:ext".to_owned(),
@@ -2375,7 +2370,7 @@ mod streaming_0361_raw_recovery_tests {
     }
 
     #[test]
-    fn streaming_0361_opaque_extension_survives_recovery_state() {
+    fn streaming_opaque_extension_survives_recovery_state() {
         let mut capabilities = Capabilities::new();
         capabilities.preserve_extension_element(Name {
             namespace: "urn:ext".to_owned(),
@@ -2393,7 +2388,7 @@ mod streaming_0361_raw_recovery_tests {
             &capabilities,
             &StreamLimits::default(),
             |element| {
-                let name = streaming_0361_recovery_raw_name(&element);
+                let name = streaming_recovery_raw_name(&element);
                 if name == "mc:Choice" {
                     semantic_failed.set(true);
                 }
@@ -2424,7 +2419,7 @@ mod streaming_0361_raw_recovery_tests {
     }
 
     #[test]
-    fn streaming_0361_deep_expanded_names_have_exact_context_bound() {
+    fn streaming_deep_expanded_names_have_exact_context_bound() {
         let depth = 3;
         let mut xml = String::from("<root>");
         let mut expected_context_bytes = "root".len() * 2;
@@ -2997,7 +2992,7 @@ mod namespace_emission_contract_tests {
 }
 
 #[cfg(test)]
-mod streaming_0658_active_stop_tests {
+mod streaming_active_stop_tests {
     use super::super::{
         Capabilities,
         stream::{

@@ -23,5 +23,5 @@
   },
   "observed": "Only the today cell was highlighted, before and after close and reopen.",
   "note": "The queue row asked for B2 and a second file with C3 is tomorrow; this file holds the rule on A2:A4 and no second file was delivered.",
-  "scope": "Native volatile-highlight evidence for record 0432. Screenshots, accessibility dumps and the full receipt are kept outside the repository."
+  "scope": "Native volatile-highlight evidence. Screenshots, accessibility dumps and the full receipt are kept outside the repository."
 }

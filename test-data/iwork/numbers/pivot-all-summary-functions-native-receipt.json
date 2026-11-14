@@ -95,5 +95,5 @@
     "Each value column's function was verified in the Summarize by menu; the menu was cancelled without a change.",
     "Closed and reopened; all value columns intact. File hash unchanged by the verification."
   ],
-  "scope": "Native pivot evidence for record 0432. Screenshots, accessibility dumps and the full receipt are kept outside the repository."
+  "scope": "Native pivot evidence. Screenshots, accessibility dumps and the full receipt are kept outside the repository."
 }

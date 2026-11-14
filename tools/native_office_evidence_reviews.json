@@ -1455,7 +1455,7 @@
         "crates/litchi-docx/docs/FEATURE_MATRIX.md",
         "crates/litchi-ops/src/capabilities.rs",
         "crates/litchi-ops/src/read.rs",
-        "crates/litchi-ops/src/capabilities/m4.rs"
+        "crates/litchi-ops/src/capabilities/import_eval.rs"
       ],
       "scope_limit": "Explicit application-runtime boundary, not a missing native specimen or positive semantic credit for this row. The cited owner tests qualify their bounded data behavior only. Historical authoring statuses and fixture bytes stay unchanged; no native-app rendering, layout, playback, field evaluation, merge generation or external activation is claimed."
     },
@@ -1521,7 +1521,7 @@
         "crates/litchi-docx/docs/FEATURE_MATRIX.md",
         "crates/litchi-ops/src/capabilities.rs",
         "crates/litchi-ops/src/read.rs",
-        "crates/litchi-ops/src/capabilities/m4.rs"
+        "crates/litchi-ops/src/capabilities/import_eval.rs"
       ],
       "scope_limit": "Explicit application-runtime boundary, not a missing native specimen or positive semantic credit for this row. The cited owner tests qualify their bounded data behavior only. Historical authoring statuses and fixture bytes stay unchanged; no native-app rendering, layout, playback, field evaluation, merge generation or external activation is claimed."
     },
@@ -2060,7 +2060,7 @@
         "crates/litchi-rtf/docs/FEATURE_MATRIX.md",
         "crates/litchi-ops/src/capabilities.rs",
         "crates/litchi-ops/src/read.rs",
-        "crates/litchi-ops/src/capabilities/m4.rs"
+        "crates/litchi-ops/src/capabilities/import_eval.rs"
       ],
       "scope_limit": "Explicit application-runtime boundary, not a missing native specimen or positive semantic credit for this row. The cited owner tests qualify their bounded data behavior only. Historical authoring statuses and fixture bytes stay unchanged; no native-app rendering, layout, playback, field evaluation, merge generation or external activation is claimed."
     },

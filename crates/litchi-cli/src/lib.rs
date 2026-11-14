@@ -103,7 +103,7 @@
 mod cli;
 mod exit;
 mod formats;
-mod m4;
+mod import_eval;
 mod merge;
 mod raw;
 mod refresh;

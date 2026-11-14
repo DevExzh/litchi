@@ -165,7 +165,8 @@ fn movie_path(package: &Package, id: u32) -> Option<String> {
 
 #[test]
 fn external_media_edits_publish_replay_and_invert_exactly() {
-    let source = Package::from_bytes(&fixture("unified-ops/0294/video.ppt")).unwrap();
+    let source =
+        Package::from_bytes(&fixture("unified-ops/acceptance-fixtures/video.ppt")).unwrap();
     let source_bytes = source.to_bytes().unwrap();
     let id = 1;
     let original = movie_path(&source, id);
@@ -1005,7 +1006,9 @@ fn object_storage(data: &[u8]) -> litchi_ppt::embedded::storage::Storage {
 
 #[test]
 fn a_signed_deck_admits_external_media_edits_and_refuses_only_a_changed_commit() {
-    let source = signed(&Package::from_bytes(&fixture("unified-ops/0294/video.ppt")).unwrap());
+    let source = signed(
+        &Package::from_bytes(&fixture("unified-ops/acceptance-fixtures/video.ppt")).unwrap(),
+    );
     assert_signed_rule!(
         &source,
         |package: &Package| package.edit_external_media().unwrap(),

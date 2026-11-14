@@ -1,5 +1,5 @@
-# Tolerance reports of the facade's Document, Presentation and Workbook types (M0a
-# step S8c), as unified_open_facade.rs's S7 parity tests read them. Columns: family,
+# Tolerance reports of the facade's Document, Presentation and Workbook types,
+# as unified_open_facade.rs's parity tests read them. Columns: family,
 # route, fixture, the report's debug form.
 document	path	ole/doc/watermark.doc	Doc(ToleranceReport { defects: [ToleratedDefect { defect: Bookmark(EndIndex), context: 3 }], unrecorded: 0 })
 document	bytes	ole/doc/watermark.doc	Doc(ToleranceReport { defects: [ToleratedDefect { defect: Bookmark(EndIndex), context: 3 }], unrecorded: 0 })

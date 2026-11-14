@@ -110,7 +110,7 @@ fn an_empty_first_paragraph_moves_and_moves_back() {
 
 /// A formatting group that holds several paragraphs, paragraphs that inherit
 /// root-level state, insertion, removal of anchored content and table rows.
-mod record_0308 {
+mod grouped_paragraph_moves {
     use super::*;
 
     fn moved(source: &Package, from: usize, to: usize) -> Package {

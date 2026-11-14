@@ -291,7 +291,7 @@ fn attached_glossary_template() -> Vec<u8> {
 }
 
 #[test]
-fn fresh_doc_writer_text_paths_match_the_pre_0753_goldens() {
+fn fresh_doc_writer_text_paths_match_the_pinned_goldens() {
     let fixtures: [(&str, fn() -> Vec<u8>, &str); 9] = [
         (
             "ascii_paragraphs",

@@ -193,7 +193,7 @@ fn count(haystack: &[u8], needle: &[u8]) -> usize {
 }
 
 #[test]
-fn every_word_fixture_falls_into_the_stage_record_0008_names() {
+fn every_word_fixture_falls_into_an_admission_stage() {
     let mut declared = Vec::new();
     let mut ignorable = Vec::new();
     for name in all_fixtures() {

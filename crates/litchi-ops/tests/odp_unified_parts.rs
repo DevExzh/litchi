@@ -17,7 +17,7 @@ fn fixture(path: &str) -> Vec<u8> {
 }
 
 fn parts() -> File {
-    open_bytes(fixture("unified-ops/0294/parts.odp")).expect("open ODP")
+    open_bytes(fixture("unified-ops/acceptance-fixtures/parts.odp")).expect("open ODP")
 }
 
 fn reopen(file: &File) -> File {

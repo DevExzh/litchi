@@ -1125,7 +1125,7 @@ mod tests {
     use crate::pinned_rows::assert_rows;
 
     #[allow(clippy::result_large_err)]
-    fn streaming_0364_run(
+    fn streaming_run(
         content: &[u8],
         capabilities: &Capabilities,
         limits: &StreamLimits,
@@ -1136,11 +1136,11 @@ mod tests {
     }
 
     #[allow(clippy::result_large_err)]
-    fn streaming_0364_default(
+    fn streaming_default(
         content: &[u8],
         requested: &[usize],
     ) -> std::result::Result<Selected, StreamError<crate::Error, crate::Error>> {
-        streaming_0364_run(
+        streaming_run(
             content,
             &Capabilities::default(),
             &StreamLimits::default(),
@@ -1149,14 +1149,14 @@ mod tests {
     }
 
     #[test]
-    fn streaming_0364_selects_plain_requested_indexes() {
+    fn streaming_selects_plain_requested_indexes() {
         let xml = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
             <si><t>first</t></si>
             <si><t>middle</t></si>
             <si><t>last</t></si>
         </sst>"#;
 
-        let first = streaming_0364_default(xml, &[0]).expect("first shared string");
+        let first = streaming_default(xml, &[0]).expect("first shared string");
         assert_eq!(first.count, 3);
         assert_eq!(
             first.requested.first().map(|(_, text)| text.as_str()),
@@ -1164,32 +1164,32 @@ mod tests {
         );
         assert!(!first.unsupported_rich);
 
-        let last = streaming_0364_default(xml, &[2]).expect("last shared string");
+        let last = streaming_default(xml, &[2]).expect("last shared string");
         assert_eq!(last.count, 3);
         assert_eq!(
             last.requested.first().map(|(_, text)| text.as_str()),
             Some("last")
         );
 
-        let missing = streaming_0364_default(xml, &[3]).expect("missing shared string");
+        let missing = streaming_default(xml, &[3]).expect("missing shared string");
         assert_eq!(missing.count, 3);
         assert!(missing.requested.is_empty());
     }
 
     #[test]
-    fn streaming_0364_decodes_split_reference_escapes() {
+    fn streaming_decodes_split_reference_escapes() {
         let xml = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
             <si><t>_xD83D&#x5f;_xDE00_</t></si>
             <si><t>A&amp;B&#x21;</t></si>
         </sst>"#;
 
-        let split = streaming_0364_default(xml, &[0]).expect("split SpreadsheetML escape");
+        let split = streaming_default(xml, &[0]).expect("split SpreadsheetML escape");
         assert_eq!(
             split.requested.first().map(|(_, text)| text.as_str()),
             Some("😀")
         );
 
-        let references = streaming_0364_default(xml, &[1]).expect("XML references");
+        let references = streaming_default(xml, &[1]).expect("XML references");
         assert_eq!(
             references.requested.first().map(|(_, text)| text.as_str()),
             Some("A&B!")
@@ -1197,7 +1197,7 @@ mod tests {
     }
 
     #[test]
-    fn streaming_0364_marks_unsupported_constructs_without_approximation() {
+    fn streaming_marks_unsupported_constructs_without_approximation() {
         let xml = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:x="urn:foreign">
             <si><t>safe</t></si>
             <si><r><t>rich</t></r></si>
@@ -1207,12 +1207,12 @@ mod tests {
         </sst>"#;
 
         for index in 1..5 {
-            let selected = streaming_0364_default(xml, &[index]).expect("unsupported item");
+            let selected = streaming_default(xml, &[index]).expect("unsupported item");
             assert_eq!(selected.count, 5);
             assert!(selected.requested.is_empty(), "requested index {index}");
             assert!(selected.unsupported_rich);
         }
-        let safe = streaming_0364_default(xml, &[0]).expect("plain item");
+        let safe = streaming_default(xml, &[0]).expect("plain item");
         assert_eq!(
             safe.requested.first().map(|(_, text)| text.as_str()),
             Some("safe")
@@ -1221,7 +1221,7 @@ mod tests {
     }
 
     #[test]
-    fn streaming_0364_selects_mce_choice_or_fallback() {
+    fn streaming_selects_mce_choice_or_fallback() {
         let xml = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
             xmlns:x="urn:choice">
@@ -1231,7 +1231,7 @@ mod tests {
             </mc:AlternateContent>
         </sst>"#;
 
-        let fallback = streaming_0364_default(xml, &[0]).expect("fallback branch");
+        let fallback = streaming_default(xml, &[0]).expect("fallback branch");
         assert_eq!(fallback.count, 1);
         assert_eq!(
             fallback.requested.first().map(|(_, text)| text.as_str()),
@@ -1241,7 +1241,7 @@ mod tests {
 
         let mut capabilities = Capabilities::default();
         capabilities.understand_namespace("urn:choice");
-        let choice = streaming_0364_run(xml, &capabilities, &StreamLimits::default(), &[0])
+        let choice = streaming_run(xml, &capabilities, &StreamLimits::default(), &[0])
             .expect("choice branch");
         assert_eq!(choice.count, 1);
         assert_eq!(
@@ -1252,65 +1252,65 @@ mod tests {
     }
 
     #[test]
-    fn streaming_0364_drains_malformed_tail_and_rejects_roots() {
+    fn streaming_drains_malformed_tail_and_rejects_roots() {
         let malformed_tail =
             br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
             <si><t>requested</t></si><si><t>broken</si></sst>"#;
-        assert!(streaming_0364_default(malformed_tail, &[0]).is_err());
+        assert!(streaming_default(malformed_tail, &[0]).is_err());
 
         let wrong_root =
             br#"<notSst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#;
-        assert!(streaming_0364_default(wrong_root, &[0]).is_err());
+        assert!(streaming_default(wrong_root, &[0]).is_err());
 
         let trailing_root =
             br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/><tail/>"#;
-        assert!(streaming_0364_default(trailing_root, &[]).is_err());
+        assert!(streaming_default(trailing_root, &[]).is_err());
     }
 
     #[test]
-    fn streaming_0364_enforces_exact_stream_and_text_limits() {
+    fn streaming_enforces_exact_stream_and_text_limits() {
         let empty = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#;
 
         let mut input_exact = StreamLimits::default();
         input_exact.processing.max_input_bytes = empty.len();
-        assert!(streaming_0364_run(empty, &Capabilities::default(), &input_exact, &[]).is_ok());
+        assert!(streaming_run(empty, &Capabilities::default(), &input_exact, &[]).is_ok());
         input_exact.processing.max_input_bytes = empty.len() - 1;
-        assert!(streaming_0364_run(empty, &Capabilities::default(), &input_exact, &[]).is_err());
+        assert!(streaming_run(empty, &Capabilities::default(), &input_exact, &[]).is_err());
 
         let event_exact = StreamLimits {
             max_event_bytes: empty.len(),
             ..StreamLimits::default()
         };
-        assert!(streaming_0364_run(empty, &Capabilities::default(), &event_exact, &[]).is_ok());
+        assert!(streaming_run(empty, &Capabilities::default(), &event_exact, &[]).is_ok());
         let event_under = StreamLimits {
             max_event_bytes: empty.len() - 1,
             ..event_exact
         };
-        assert!(streaming_0364_run(empty, &Capabilities::default(), &event_under, &[]).is_err());
+        assert!(streaming_run(empty, &Capabilities::default(), &event_under, &[]).is_err());
 
         let exact_text = "_xD83D__xDE00_".repeat(MAX_CELL_CHARACTERS);
         let exact_xml = format!(
             r#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>{exact_text}</t></si></sst>"#
         );
-        assert!(streaming_0364_default(exact_xml.as_bytes(), &[]).is_ok());
+        assert!(streaming_default(exact_xml.as_bytes(), &[]).is_ok());
 
         let too_many_chars = "a".repeat(MAX_CELL_CHARACTERS + 1);
         let too_many_xml = format!(
             r#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>{too_many_chars}</t></si></sst>"#
         );
-        assert!(streaming_0364_default(too_many_xml.as_bytes(), &[]).is_err());
+        assert!(streaming_default(too_many_xml.as_bytes(), &[]).is_err());
 
         let over_encoded = format!("{exact_text}_xD83D__xDE00_");
         let over_encoded_xml = format!(
             r#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>{over_encoded}</t></si></sst>"#
         );
-        assert!(streaming_0364_default(over_encoded_xml.as_bytes(), &[]).is_err());
+        assert!(streaming_default(over_encoded_xml.as_bytes(), &[]).is_err());
     }
 
     #[test]
-    fn streaming_0364_accepts_advisory_count_mismatches_and_rejects_bad_hints() {
+    fn streaming_accepts_advisory_count_mismatches_and_rejects_bad_hints() {
         let mismatch = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="0" uniqueCount="2"><si><t>x</t></si></sst>"#;
-        let selected = streaming_0364_default(mismatch, &[]).expect("advisory mismatch");
+        let selected = streaming_default(mismatch, &[]).expect("advisory mismatch");
         assert_eq!(selected.count, 1);
 
         assert!(!selected.irregular);
@@ -1318,21 +1318,17 @@ mod tests {
         // A malformed hint is repaired by the materializing parse; the
         // dependency scan reports the table as irregular instead.
         let invalid = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" uniqueCount="NaN"/>"#;
-        assert!(
-            streaming_0364_default(invalid, &[])
-                .expect("scanned")
-                .irregular
-        );
+        assert!(streaming_default(invalid, &[]).expect("scanned").irregular);
 
         let excessive = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="2147483648"/>"#;
         assert!(
-            streaming_0364_default(excessive, &[])
+            streaming_default(excessive, &[])
                 .expect("scanned")
                 .irregular
         );
     }
 
-    fn streaming_0365_entries(selected: &Selected) -> Vec<(usize, &str)> {
+    fn streaming_entries(selected: &Selected) -> Vec<(usize, &str)> {
         selected
             .requested
             .iter()
@@ -1341,68 +1337,67 @@ mod tests {
     }
 
     #[test]
-    fn streaming_0365_accepts_empty_request_without_retaining_items() {
+    fn streaming_accepts_empty_request_without_retaining_items() {
         let xml = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>first</t></si><si><t>middle</t></si></sst>"#;
 
-        let selected = streaming_0364_default(xml, &[]).expect("empty request");
+        let selected = streaming_default(xml, &[]).expect("empty request");
         assert_eq!(selected.count, 2);
         assert!(selected.requested.is_empty());
         assert!(!selected.unsupported_rich);
     }
 
     #[test]
-    fn streaming_0365_returns_first_middle_last_in_request_order() {
+    fn streaming_returns_first_middle_last_in_request_order() {
         let xml = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>first</t></si><si><t>ignored</t></si><si><t>middle</t></si><si><t>ignored too</t></si><si><t>last</t></si></sst>"#;
 
-        let selected = streaming_0364_default(xml, &[0, 2, 4]).expect("ordered selection");
+        let selected = streaming_default(xml, &[0, 2, 4]).expect("ordered selection");
         assert_eq!(selected.count, 5);
         assert_eq!(
-            streaming_0365_entries(&selected),
+            streaming_entries(&selected),
             vec![(0, "first"), (2, "middle"), (4, "last")]
         );
     }
 
     #[test]
-    fn streaming_0365_omits_missing_and_out_of_range_indexes() {
+    fn streaming_omits_missing_and_out_of_range_indexes() {
         let xml = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>first</t></si><si><t>middle</t></si><si><t>last</t></si></sst>"#;
 
-        let selected =
-            streaming_0364_default(xml, &[0, 3, usize::MAX]).expect("out-of-range selection");
+        let selected = streaming_default(xml, &[0, 3, usize::MAX]).expect("out-of-range selection");
         assert_eq!(selected.count, 3);
-        assert_eq!(streaming_0365_entries(&selected), vec![(0, "first")]);
+        assert_eq!(streaming_entries(&selected), vec![(0, "first")]);
     }
 
     #[test]
-    fn streaming_0365_rejects_unsorted_and_duplicate_requests() {
+    fn streaming_rejects_unsorted_and_duplicate_requests() {
         let xml = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#;
 
-        assert!(streaming_0364_default(xml, &[1, 0]).is_err());
-        assert!(streaming_0364_default(xml, &[1, 1]).is_err());
+        assert!(streaming_default(xml, &[1, 0]).is_err());
+        assert!(streaming_default(xml, &[1, 1]).is_err());
     }
 
     #[test]
-    fn streaming_0365_reports_rich_items_for_requested_and_unrequested_indexes() {
+    fn streaming_reports_rich_items_for_requested_and_unrequested_indexes() {
         let xml = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>safe</t></si><si><r><t>rich</t></r></si></sst>"#;
 
-        let requested_rich = streaming_0364_default(xml, &[1]).expect("requested rich item");
+        let requested_rich = streaming_default(xml, &[1]).expect("requested rich item");
         assert_eq!(requested_rich.count, 2);
         assert!(requested_rich.requested.is_empty());
         assert!(requested_rich.unsupported_rich);
 
-        let unrequested_rich = streaming_0364_default(xml, &[0]).expect("unrequested rich item");
-        assert_eq!(streaming_0365_entries(&unrequested_rich), vec![(0, "safe")]);
+        let unrequested_rich = streaming_default(xml, &[0]).expect("unrequested rich item");
+        assert_eq!(streaming_entries(&unrequested_rich), vec![(0, "safe")]);
         assert!(unrequested_rich.unsupported_rich);
     }
 
     #[test]
-    fn streaming_0365_drains_malformed_tail_after_selected_items() {
+    fn streaming_drains_malformed_tail_after_selected_items() {
         let malformed_tail = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>first</t></si><si><t>middle</t></si><si><t>broken</si></sst>"#;
 
-        assert!(streaming_0364_default(malformed_tail, &[0, 1]).is_err());
+        assert!(streaming_default(malformed_tail, &[0, 1]).is_err());
     }
 
     #[test]
-    fn streaming_0365_accepts_exact_input_event_and_request_bounds() {
+    fn streaming_accepts_exact_input_event_and_request_bounds() {
         let xml = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si/><si/></sst>"#;
         let limits = StreamLimits {
             processing: litchi_ooxml_common::mce::Limits {
@@ -1413,11 +1408,11 @@ mod tests {
             ..StreamLimits::default()
         };
 
-        let selected = streaming_0364_run(xml, &Capabilities::default(), &limits, &[0, 1])
+        let selected = streaming_run(xml, &Capabilities::default(), &limits, &[0, 1])
             .expect("exact bounded selection");
         assert_eq!(selected.count, 2);
         assert_eq!(selected.requested.len(), 2);
-        assert_eq!(streaming_0365_entries(&selected), vec![(0, ""), (1, "")]);
+        assert_eq!(streaming_entries(&selected), vec![(0, ""), (1, "")]);
     }
 
     #[test]
@@ -1507,7 +1502,7 @@ mod tests {
                 parse(xml.as_bytes()).is_err(),
                 "strict parse accepted {items}"
             );
-            let selected = streaming_0364_default(xml.as_bytes(), &[0, 1]).expect("scanned");
+            let selected = streaming_default(xml.as_bytes(), &[0, 1]).expect("scanned");
             assert!(selected.irregular, "{items}");
         }
 
@@ -1518,7 +1513,7 @@ mod tests {
         assert_eq!(strings[1].as_str(), "a😀");
         assert!(report.is_clean());
         assert!(
-            !streaming_0364_default(xml.as_bytes(), &[1])
+            !streaming_default(xml.as_bytes(), &[1])
                 .expect("scanned")
                 .irregular
         );
@@ -1882,7 +1877,7 @@ mod tests {
             ),
         ];
         assert_rows(EXPECTED, |body| {
-            match streaming_0364_default(item_table(body).as_bytes(), &[0]) {
+            match streaming_default(item_table(body).as_bytes(), &[0]) {
                 Ok(selected) => format!(
                     "irregular={} unsupported_rich={} requested={:?}",
                     selected.irregular,
