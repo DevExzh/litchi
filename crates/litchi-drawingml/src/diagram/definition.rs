@@ -403,3 +403,166 @@ mod tests {
         assert!(matches!(parse_layout(nested), Err(Error::Invalid(_))));
     }
 }
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the diagram definition reader accepts before, around and after its root, and the exact error reported otherwise. Each
+    //! expected line is the row label followed by the result.
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+            ("reference before root", format!("&amp;{d}")),
+            ("reference after root", format!("{d}&amp;")),
+            ("CDATA after root", format!("{d}<![CDATA[x]]>")),
+            ("end tag before root", format!("</foreign>{d}")),
+            (
+                "declaration inside root",
+                format!("{open}{DECLARATION}{body}{close}"),
+            ),
+            (
+                "text, CDATA and reference inside root",
+                format!("{open}{body}text<![CDATA[x]]>&amp;{close}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&str) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(&xml)))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    /// The definition header reader, through the colors part.
+    #[test]
+    fn colors_definition_envelope() {
+        let root = Root {
+            open: r#"<dgm:colorsDef xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram" uniqueId="urn:test/colors">"#,
+            body: r#"<dgm:title val="T"/><dgm:catLst><dgm:cat type="accent1" pri="1"/></dgm:catLst>"#,
+            close: r"</dgm:colorsDef>",
+            empty: r#"<dgm:colorsDef xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram" uniqueId="urn:test/colors"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"missing or unterminated definition root\")",
+                "whitespace only: Invalid(\"missing or unterminated definition root\")",
+                "declaration only: Invalid(\"missing or unterminated definition root\")",
+                "empty-element root: Ok(Some(\"urn:test/colors\") None 0)",
+                "start and end root: Ok(Some(\"urn:test/colors\") None 0)",
+                "root then whitespace: Ok(Some(\"urn:test/colors\") Some(\"T\") 1)",
+                "root then comment: Ok(Some(\"urn:test/colors\") Some(\"T\") 1)",
+                "root then PI: Ok(Some(\"urn:test/colors\") Some(\"T\") 1)",
+                "root then text: Invalid(\"non-whitespace text is outside the diagram definition\")",
+                "root then second root: Invalid(\"trailing markup follows the diagram definition\")",
+                "root then foreign start: Invalid(\"trailing markup follows the diagram definition\")",
+                "root then foreign empty: Invalid(\"trailing markup follows the diagram definition\")",
+                "declaration after root: Ok(Some(\"urn:test/colors\") Some(\"T\") 1)",
+                "two declarations: Ok(Some(\"urn:test/colors\") Some(\"T\") 1)",
+                "comment before declaration: Ok(Some(\"urn:test/colors\") Some(\"T\") 1)",
+                "text before root: Invalid(\"non-whitespace text is outside the diagram definition\")",
+                "unterminated root: Invalid(\"missing or unterminated definition root\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"DTDs are rejected\")",
+                "top-level CDATA: Invalid(\"CDATA is rejected\")",
+                "declaration then root: Ok(Some(\"urn:test/colors\") Some(\"T\") 1)",
+                "whitespace before declaration: Ok(Some(\"urn:test/colors\") Some(\"T\") 1)",
+                "PI before declaration: Ok(Some(\"urn:test/colors\") Some(\"T\") 1)",
+                "comment then root: Ok(Some(\"urn:test/colors\") Some(\"T\") 1)",
+                "PI then root: Ok(Some(\"urn:test/colors\") Some(\"T\") 1)",
+                "root then text then second root: Invalid(\"non-whitespace text is outside the diagram definition\")",
+                "empty-element root then root: Invalid(\"trailing markup follows the diagram definition\")",
+                "declaration after empty-element root: Ok(Some(\"urn:test/colors\") None 0)",
+                "reference before root: Invalid(\"entity reference is outside the diagram definition\")",
+                "reference after root: Invalid(\"entity reference is outside the diagram definition\")",
+                "CDATA after root: Invalid(\"CDATA is rejected\")",
+                "end tag before root: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "declaration inside root: Ok(Some(\"urn:test/colors\") Some(\"T\") 1)",
+                "text, CDATA and reference inside root: Invalid(\"CDATA is rejected\")",
+            ],
+            |xml| {
+                outcome(
+                    super::DiagramDefinition::parse_colors(xml, &super::Limits::default()),
+                    |value| {
+                        format!(
+                            "{:?} {:?} {}",
+                            value.unique_id,
+                            value.title,
+                            value.categories.len()
+                        )
+                    },
+                )
+            },
+        );
+    }
+}

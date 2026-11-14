@@ -2546,3 +2546,250 @@ mod tests {
         assert_eq!(snapshot.inventory().sheet_table_indices, [0, 1]);
     }
 }
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the DDE reader accepts before, around and after its document root, and the exact error reported otherwise. Each
+    //! expected line is the row label followed by the result.
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+            ("reference before root", format!("&amp;{d}")),
+            ("reference after root", format!("{d}&amp;")),
+            ("CDATA after root", format!("{d}<![CDATA[x]]>")),
+            ("end tag before root", format!("</foreign>{d}")),
+            (
+                "declaration inside root",
+                format!("{open}{DECLARATION}{body}{close}"),
+            ),
+            (
+                "text, CDATA and reference inside root",
+                format!("{open}{body}text<![CDATA[x]]>&amp;{close}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&str) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(&xml)))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    fn parse(xml: &str) -> String {
+        outcome(super::Snapshot::parse(xml), |value| {
+            format!("{} links", value.links().len())
+        })
+    }
+
+    const CONTENT_OPEN: &str = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0">"#;
+    const CONTENT_BODY: &str = r"<office:body><office:spreadsheet/></office:body>";
+    const CONTENT_CLOSE: &str = r"</office:document-content>";
+
+    /// The DDE reader over an unpackaged `office:document-content` root.
+    #[test]
+    fn dde_content_envelope() {
+        let root = Root {
+            open: CONTENT_OPEN,
+            body: CONTENT_BODY,
+            close: CONTENT_CLOSE,
+            empty: r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: InvalidStructure(\"DDE XML lacks a complete document-content envelope\")",
+                "whitespace only: InvalidStructure(\"DDE XML lacks a complete document-content envelope\")",
+                "declaration only: InvalidStructure(\"DDE XML lacks a complete document-content envelope\")",
+                "empty-element root: InvalidStructure(\"DDE document root must contain office:body and office:spreadsheet\")",
+                "start and end root: InvalidStructure(\"DDE XML lacks a complete document-content envelope\")",
+                "root then whitespace: Ok(0 links)",
+                "root then comment: Ok(0 links)",
+                "root then PI: Ok(0 links)",
+                "root then text: InvalidStructure(\"DDE XML has text outside its root\")",
+                "root then second root: InvalidStructure(\"DDE XML has multiple document roots\")",
+                "root then foreign start: InvalidStructure(\"DDE XML has multiple document roots\")",
+                "root then foreign empty: InvalidStructure(\"DDE document root must contain office:body and office:spreadsheet\")",
+                "declaration after root: InvalidStructure(\"DDE XML declaration must be the first document markup\")",
+                "two declarations: InvalidStructure(\"DDE XML declaration must be the first document markup\")",
+                "comment before declaration: InvalidStructure(\"DDE XML declaration must be the first document markup\")",
+                "text before root: InvalidStructure(\"DDE XML has text outside its root\")",
+                "unterminated root: InvalidStructure(\"DDE XML lacks a complete document-content envelope\")",
+                "stray end tag: InvalidStructure(\"DDE namespace scope stack underflow\")",
+                "DOCTYPE: InvalidStructure(\"DTD content is not accepted\")",
+                "top-level CDATA: InvalidStructure(\"DDE XML has CDATA outside its root\")",
+                "declaration then root: Ok(0 links)",
+                "whitespace before declaration: Ok(0 links)",
+                "PI before declaration: InvalidStructure(\"DDE XML declaration must be the first document markup\")",
+                "comment then root: Ok(0 links)",
+                "PI then root: Ok(0 links)",
+                "root then text then second root: InvalidStructure(\"DDE XML has text outside its root\")",
+                "empty-element root then root: InvalidStructure(\"DDE document root must contain office:body and office:spreadsheet\")",
+                "declaration after empty-element root: InvalidStructure(\"DDE document root must contain office:body and office:spreadsheet\")",
+                "reference before root: InvalidStructure(\"DDE XML contains an unsupported entity reference\")",
+                "reference after root: InvalidStructure(\"DDE XML contains an unsupported entity reference\")",
+                "CDATA after root: InvalidStructure(\"DDE XML has CDATA outside its root\")",
+                "end tag before root: InvalidStructure(\"DDE namespace scope stack underflow\")",
+                "declaration inside root: InvalidStructure(\"DDE XML declaration must be the first document markup\")",
+                "text, CDATA and reference inside root: Ok(0 links)",
+            ],
+            parse,
+        );
+    }
+
+    /// The DDE reader over a flat `office:document` root.
+    #[test]
+    fn dde_flat_envelope() {
+        let root = Root {
+            open: r#"<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" office:mimetype="application/vnd.oasis.opendocument.spreadsheet">"#,
+            body: CONTENT_BODY,
+            close: r"</office:document>",
+            empty: r#"<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" office:mimetype="application/vnd.oasis.opendocument.spreadsheet"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: InvalidStructure(\"DDE XML lacks a complete document-content envelope\")",
+                "whitespace only: InvalidStructure(\"DDE XML lacks a complete document-content envelope\")",
+                "declaration only: InvalidStructure(\"DDE XML lacks a complete document-content envelope\")",
+                "empty-element root: InvalidStructure(\"DDE document root must contain office:body and office:spreadsheet\")",
+                "start and end root: InvalidStructure(\"DDE XML lacks a complete document-content envelope\")",
+                "root then whitespace: Ok(0 links)",
+                "root then comment: Ok(0 links)",
+                "root then PI: Ok(0 links)",
+                "root then text: InvalidStructure(\"DDE XML has text outside its root\")",
+                "root then second root: InvalidStructure(\"DDE XML has multiple document roots\")",
+                "root then foreign start: InvalidStructure(\"DDE XML has multiple document roots\")",
+                "root then foreign empty: InvalidStructure(\"DDE document root must contain office:body and office:spreadsheet\")",
+                "declaration after root: InvalidStructure(\"DDE XML declaration must be the first document markup\")",
+                "two declarations: InvalidStructure(\"DDE XML declaration must be the first document markup\")",
+                "comment before declaration: InvalidStructure(\"DDE XML declaration must be the first document markup\")",
+                "text before root: InvalidStructure(\"DDE XML has text outside its root\")",
+                "unterminated root: InvalidStructure(\"DDE XML lacks a complete document-content envelope\")",
+                "stray end tag: InvalidStructure(\"DDE namespace scope stack underflow\")",
+                "DOCTYPE: InvalidStructure(\"DTD content is not accepted\")",
+                "top-level CDATA: InvalidStructure(\"DDE XML has CDATA outside its root\")",
+                "declaration then root: Ok(0 links)",
+                "whitespace before declaration: Ok(0 links)",
+                "PI before declaration: InvalidStructure(\"DDE XML declaration must be the first document markup\")",
+                "comment then root: Ok(0 links)",
+                "PI then root: Ok(0 links)",
+                "root then text then second root: InvalidStructure(\"DDE XML has text outside its root\")",
+                "empty-element root then root: InvalidStructure(\"DDE document root must contain office:body and office:spreadsheet\")",
+                "declaration after empty-element root: InvalidStructure(\"DDE document root must contain office:body and office:spreadsheet\")",
+                "reference before root: InvalidStructure(\"DDE XML contains an unsupported entity reference\")",
+                "reference after root: InvalidStructure(\"DDE XML contains an unsupported entity reference\")",
+                "CDATA after root: InvalidStructure(\"DDE XML has CDATA outside its root\")",
+                "end tag before root: InvalidStructure(\"DDE namespace scope stack underflow\")",
+                "declaration inside root: InvalidStructure(\"DDE XML declaration must be the first document markup\")",
+                "text, CDATA and reference inside root: Ok(0 links)",
+            ],
+            parse,
+        );
+    }
+
+    /// Prolog orderings the shared rows do not build: a comment or processing
+    /// instruction after the declaration, markup before the declaration, and
+    /// an end tag of the other root kind.
+    #[test]
+    fn dde_prolog_orderings() {
+        let document = format!("{CONTENT_OPEN}{CONTENT_BODY}{CONTENT_CLOSE}");
+        let d = document.as_str();
+        let actual = [
+            format!("{DECLARATION}<!--c-->{d}"),
+            format!("{DECLARATION}<?pi x?>{d}"),
+            format!("{DECLARATION}<!--c--><?pi x?>{d}"),
+            format!("{DECLARATION}<!--c-->{DECLARATION}{d}"),
+            format!("<!--c--><?pi x?>{d}"),
+            format!("<?pi x?>{DECLARATION}{d}"),
+            format!("{DECLARATION} \n{d}"),
+            format!("{CONTENT_OPEN}{CONTENT_BODY}</office:document>"),
+            format!("{d}<!--c-->{DECLARATION}"),
+        ]
+        .iter()
+        .map(|xml| parse(xml))
+        .collect::<Vec<_>>();
+        let expected: &[&str] = &[
+            "Ok(0 links)",
+            "Ok(0 links)",
+            "Ok(0 links)",
+            "InvalidStructure(\"DDE XML declaration must be the first document markup\")",
+            "Ok(0 links)",
+            "InvalidStructure(\"DDE XML declaration must be the first document markup\")",
+            "Ok(0 links)",
+            "InvalidXml(\"ill-formed document: expected `</office:document-content>`, but `</office:document>` was found\")",
+            "InvalidStructure(\"DDE XML declaration must be the first document markup\")",
+        ];
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+}

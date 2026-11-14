@@ -508,3 +508,158 @@ pub(crate) fn validate_inert_fragment(value: &Inert) -> Result<(), Error> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the opaque-fragment check accepts before, around and after the one element, and the exact error reported otherwise. Each
+    //! expected line is the row label followed by the result.
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+            ("reference before root", format!("&amp;{d}")),
+            ("reference after root", format!("{d}&amp;")),
+            ("CDATA after root", format!("{d}<![CDATA[x]]>")),
+            ("end tag before root", format!("</foreign>{d}")),
+            (
+                "declaration inside root",
+                format!("{open}{DECLARATION}{body}{close}"),
+            ),
+            (
+                "text, CDATA and reference inside root",
+                format!("{open}{body}text<![CDATA[x]]>&amp;{close}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&str) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(&xml)))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    /// The check that an opaque child is one complete element.
+    #[test]
+    fn inert_fragment_envelope() {
+        let root = Root {
+            open: r#"<x:ext xmlns:x="urn:example:x">"#,
+            body: r"<x:a/>",
+            close: r"</x:ext>",
+            empty: r#"<x:ext xmlns:x="urn:example:x"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Limit { kind: InertFragmentBytes, observed: 0, maximum: 8388608 }",
+                "whitespace only: Inert(\"fragment is not one complete element\")",
+                "declaration only: Inert(\"document-level markup is forbidden\")",
+                "empty-element root: Ok()",
+                "start and end root: Ok()",
+                "root then whitespace: Ok()",
+                "root then comment: Ok()",
+                "root then PI: Ok()",
+                "root then text: Inert(\"text outside root\")",
+                "root then second root: Inert(\"multiple roots\")",
+                "root then foreign start: Inert(\"multiple roots\")",
+                "root then foreign empty: Inert(\"multiple roots\")",
+                "declaration after root: Inert(\"document-level markup is forbidden\")",
+                "two declarations: Inert(\"document-level markup is forbidden\")",
+                "comment before declaration: Inert(\"document-level markup is forbidden\")",
+                "text before root: Inert(\"text outside root\")",
+                "unterminated root: Inert(\"fragment is not one complete element\")",
+                "stray end tag: Inert(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Inert(\"document-level markup is forbidden\")",
+                "top-level CDATA: Inert(\"CDATA outside root\")",
+                "declaration then root: Inert(\"document-level markup is forbidden\")",
+                "whitespace before declaration: Inert(\"document-level markup is forbidden\")",
+                "PI before declaration: Inert(\"document-level markup is forbidden\")",
+                "comment then root: Ok()",
+                "PI then root: Ok()",
+                "root then text then second root: Inert(\"text outside root\")",
+                "empty-element root then root: Inert(\"multiple roots\")",
+                "declaration after empty-element root: Inert(\"document-level markup is forbidden\")",
+                "reference before root: Ok()",
+                "reference after root: Ok()",
+                "CDATA after root: Inert(\"CDATA outside root\")",
+                "end tag before root: Inert(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "declaration inside root: Inert(\"document-level markup is forbidden\")",
+                "text, CDATA and reference inside root: Ok()",
+            ],
+            |xml| {
+                let value =
+                    super::Inert::from_wire(xml.as_bytes().to_vec(), "ext", "urn:example:x");
+                outcome(super::validate_inert_fragment(&value), |()| String::new())
+            },
+        );
+    }
+}

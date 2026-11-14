@@ -2492,3 +2492,175 @@ mod tests {
         assert_eq!(catalog.cells[1].direct_owner_count, 0);
     }
 }
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the sheet metadata index accepts before, around and after its document root, and the exact error reported otherwise. Each
+    //! expected line is the row label followed by the result.
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+            ("reference before root", format!("&amp;{d}")),
+            ("reference after root", format!("{d}&amp;")),
+            ("CDATA after root", format!("{d}<![CDATA[x]]>")),
+            ("end tag before root", format!("</foreign>{d}")),
+            (
+                "declaration inside root",
+                format!("{open}{DECLARATION}{body}{close}"),
+            ),
+            (
+                "text, CDATA and reference inside root",
+                format!("{open}{body}text<![CDATA[x]]>&amp;{close}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&str) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(&xml)))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    /// The sheet metadata index scan.
+    #[test]
+    fn metadata_index_envelope() {
+        let root = Root {
+            open: r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0">"#,
+            body: r#"<office:body><office:spreadsheet><table:table table:name="Data"><table:table-row><table:table-cell/></table:table-row></table:table></office:spreadsheet></office:body>"#,
+            close: r"</office:document-content>",
+            empty: r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: InvalidFormat(\"ODS metadata XML has no root element\")",
+                "whitespace only: InvalidFormat(\"ODS metadata XML has no root element\")",
+                "declaration only: InvalidFormat(\"ODS metadata XML has no root element\")",
+                "empty-element root: InvalidFormat(\"ODS metadata has no direct office:body element\")",
+                "start and end root: InvalidFormat(\"ODS metadata has no direct office:body element\")",
+                "root then whitespace: Ok()",
+                "root then comment: Ok()",
+                "root then PI: Ok()",
+                "root then text: InvalidFormat(\"ODS metadata XML has text outside its root\")",
+                "root then second root: InvalidFormat(\"ODS metadata XML contains multiple roots\")",
+                "root then foreign start: InvalidFormat(\"ODS metadata XML contains multiple roots\")",
+                "root then foreign empty: InvalidFormat(\"ODS metadata XML contains multiple roots\")",
+                "declaration after root: Ok()",
+                "two declarations: Ok()",
+                "comment before declaration: Ok()",
+                "text before root: InvalidFormat(\"ODS metadata XML has text outside its root\")",
+                "unterminated root: InvalidFormat(\"ODS metadata XML has an unfinished element\")",
+                "stray end tag: InvalidFormat(\"invalid ODS metadata XML: ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Ok()",
+                "top-level CDATA: InvalidFormat(\"ODS metadata XML has text outside its root\")",
+                "declaration then root: Ok()",
+                "whitespace before declaration: Ok()",
+                "PI before declaration: Ok()",
+                "comment then root: Ok()",
+                "PI then root: Ok()",
+                "root then text then second root: InvalidFormat(\"ODS metadata XML has text outside its root\")",
+                "empty-element root then root: InvalidFormat(\"ODS metadata XML contains multiple roots\")",
+                "declaration after empty-element root: InvalidFormat(\"ODS metadata has no direct office:body element\")",
+                "reference before root: InvalidFormat(\"ODS metadata XML has a reference outside its root\")",
+                "reference after root: InvalidFormat(\"ODS metadata XML has a reference outside its root\")",
+                "CDATA after root: InvalidFormat(\"ODS metadata XML has text outside its root\")",
+                "end tag before root: InvalidFormat(\"invalid ODS metadata XML: ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "declaration inside root: Ok()",
+                "text, CDATA and reference inside root: InvalidFormat(\"ODS metadata structural element contains non-whitespace text\")",
+            ],
+            |xml| {
+                let budget = litchi_core::Budget::root(
+                    "ods-metadata-envelope-tests",
+                    litchi_core::Limits::for_profile(litchi_core::Profile::TrustedBatch),
+                );
+                let (_source, token) = litchi_core::CancellationSource::pair();
+                let context = super::ExecutionContext::new(
+                    budget,
+                    token,
+                    litchi_core::ExecutionLimits::new(
+                        std::num::NonZeroUsize::MIN,
+                        std::num::NonZeroUsize::MIN,
+                        std::num::NonZeroU64::new(1024 * 1024).expect("in-flight bytes"),
+                        0,
+                    )
+                    .expect("execution limits"),
+                );
+                outcome(
+                    super::scan(xml, crate::sheet_metadata::Limits::default(), &context),
+                    |_catalog| String::new(),
+                )
+            },
+        );
+    }
+}

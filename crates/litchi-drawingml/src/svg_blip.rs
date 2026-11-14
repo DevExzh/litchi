@@ -3125,6 +3125,120 @@ pub(crate) mod codec {
                 },
             );
         }
+
+        /// The `svgBlip` root both fragment readers are given.
+        fn svg_blip_root() -> Root<'static> {
+            Root {
+                open: r#"<asvg:svgBlip xmlns:asvg="http://schemas.microsoft.com/office/drawing/2016/SVG/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:future="urn:example:future" r:embed="rIdSvg">"#,
+                body: r#"<future:payload data="x"/>"#,
+                close: r"</asvg:svgBlip>",
+                empty: r#"<asvg:svgBlip xmlns:asvg="http://schemas.microsoft.com/office/drawing/2016/SVG/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rIdSvg"/>"#,
+            }
+        }
+
+        /// The standalone fragment reader.
+        #[test]
+        fn standalone_read_envelope() {
+            assert_matrix(
+                &svg_blip_root(),
+                &[
+                    "empty input: Invalid(\"SVG blip fragment has no root element\")",
+                    "whitespace only: Invalid(\"SVG blip fragment has no root element\")",
+                    "declaration only: Invalid(\"SVG blip fragment has no root element\")",
+                    "empty-element root: Ok(0)",
+                    "start and end root: Ok(0)",
+                    "root then whitespace: Ok(1)",
+                    "root then comment: Ok(1)",
+                    "root then PI: Invalid(\"SVG blip fragment contains forbidden document markup\")",
+                    "root then text: Invalid(\"SVG blip fragment has text outside its root\")",
+                    "root then second root: Invalid(\"SVG blip fragment has more than one root element\")",
+                    "root then foreign start: Invalid(\"SVG blip fragment has more than one root element\")",
+                    "root then foreign empty: Invalid(\"SVG blip fragment has more than one root element\")",
+                    "declaration after root: Invalid(\"SVG blip fragment has markup outside its root\")",
+                    "two declarations: Ok(1)",
+                    "comment before declaration: Ok(1)",
+                    "text before root: Invalid(\"SVG blip fragment has text outside its root\")",
+                    "unterminated root: Invalid(\"SVG blip root is unterminated\")",
+                    "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                    "DOCTYPE: Invalid(\"SVG blip fragment contains forbidden document markup\")",
+                    "top-level CDATA: Invalid(\"SVG blip fragment has markup outside its root\")",
+                    "declaration then root: Ok(1)",
+                    "whitespace before declaration: Ok(1)",
+                    "PI before declaration: Invalid(\"SVG blip fragment contains forbidden document markup\")",
+                    "comment then root: Ok(1)",
+                    "PI then root: Invalid(\"SVG blip fragment contains forbidden document markup\")",
+                    "root then text then second root: Invalid(\"SVG blip fragment has text outside its root\")",
+                    "empty-element root then root: Invalid(\"SVG blip fragment has more than one root element\")",
+                    "declaration after empty-element root: Invalid(\"SVG blip fragment has markup outside its root\")",
+                    "reference before root: Invalid(\"SVG blip fragment has markup outside its root\")",
+                    "reference after root: Invalid(\"SVG blip fragment has markup outside its root\")",
+                    "CDATA after root: Invalid(\"SVG blip fragment has markup outside its root\")",
+                    "end tag before root: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                    "declaration inside root: Invalid(\"SVG blip contains forbidden child markup\")",
+                    "text, CDATA and reference inside root: Ok(4)",
+                ],
+                |xml| {
+                    outcome(
+                        super::read(xml.as_bytes(), super::Limits::DEFAULT),
+                        |value| value.children().len().to_string(),
+                    )
+                },
+            );
+        }
+
+        /// The fragment reader that resolves names against a host context.
+        #[test]
+        fn contextual_read_envelope() {
+            assert_matrix(
+                &svg_blip_root(),
+                &[
+                    "empty input: Invalid(\"SVG blip fragment has no root element\")",
+                    "whitespace only: Invalid(\"SVG blip fragment has no root element\")",
+                    "declaration only: Invalid(\"SVG blip fragment has no root element\")",
+                    "empty-element root: Ok(0)",
+                    "start and end root: Ok(0)",
+                    "root then whitespace: Ok(1)",
+                    "root then comment: Ok(1)",
+                    "root then PI: Invalid(\"SVG blip fragment contains forbidden document markup\")",
+                    "root then text: Invalid(\"SVG blip fragment has text outside its root\")",
+                    "root then second root: Invalid(\"SVG blip fragment has more than one root element\")",
+                    "root then foreign start: Invalid(\"SVG blip fragment has more than one root element\")",
+                    "root then foreign empty: Invalid(\"SVG blip fragment has more than one root element\")",
+                    "declaration after root: Invalid(\"SVG blip fragment has markup outside its root\")",
+                    "two declarations: Ok(1)",
+                    "comment before declaration: Ok(1)",
+                    "text before root: Invalid(\"SVG blip fragment has text outside its root\")",
+                    "unterminated root: Invalid(\"SVG blip child is unterminated\")",
+                    "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                    "DOCTYPE: Invalid(\"SVG blip fragment contains forbidden document markup\")",
+                    "top-level CDATA: Invalid(\"SVG blip fragment has markup outside its root\")",
+                    "declaration then root: Ok(1)",
+                    "whitespace before declaration: Ok(1)",
+                    "PI before declaration: Invalid(\"SVG blip fragment contains forbidden document markup\")",
+                    "comment then root: Ok(1)",
+                    "PI then root: Invalid(\"SVG blip fragment contains forbidden document markup\")",
+                    "root then text then second root: Invalid(\"SVG blip fragment has text outside its root\")",
+                    "empty-element root then root: Invalid(\"SVG blip fragment has more than one root element\")",
+                    "declaration after empty-element root: Invalid(\"SVG blip fragment has markup outside its root\")",
+                    "reference before root: Invalid(\"SVG blip fragment has markup outside its root\")",
+                    "reference after root: Invalid(\"SVG blip fragment has markup outside its root\")",
+                    "CDATA after root: Invalid(\"SVG blip fragment has markup outside its root\")",
+                    "end tag before root: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                    "declaration inside root: Invalid(\"SVG contextual child contains forbidden markup\")",
+                    "text, CDATA and reference inside root: Ok(4)",
+                ],
+                |xml| {
+                    outcome(
+                        super::read_contextual(
+                            xml.as_bytes(),
+                            &super::NamespaceContext::empty(),
+                            super::Limits::DEFAULT,
+                        ),
+                        |value| value.children().len().to_string(),
+                    )
+                },
+            );
+        }
     }
 }
 
