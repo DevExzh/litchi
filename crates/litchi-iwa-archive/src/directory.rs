@@ -4,6 +4,15 @@
     clippy::arbitrary_source_item_ordering,
     reason = "filesystem acquisition helpers stay beside the state they validate"
 )]
+#![cfg_attr(
+    windows,
+    allow(
+        dead_code,
+        unused_imports,
+        unused_mut,
+        reason = "directory-backed bundles are refused on Windows, so their capture code is reached only on other targets"
+    )
+)]
 
 use std::{fmt, fs, io::Read, path::Path, sync::Arc};
 

@@ -194,7 +194,14 @@ pub(crate) enum TempFileIdentity {
 }
 
 fn file_identity(file: &File) -> io::Result<TempFileIdentity> {
-    identity_from_metadata(&file.metadata()?)
+    #[cfg(windows)]
+    {
+        windows_file_identity(file)
+    }
+    #[cfg(not(windows))]
+    {
+        identity_from_metadata(&file.metadata()?)
+    }
 }
 
 pub(crate) fn path_identity(path: &Path) -> io::Result<TempFileIdentity> {
@@ -205,45 +212,73 @@ pub(crate) fn path_identity(path: &Path) -> io::Result<TempFileIdentity> {
             "CFB temporary path is not a regular file",
         ));
     }
-    identity_from_metadata(&metadata)
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        use windows_sys::Win32::Storage::FileSystem::{
+            FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT,
+        };
+
+        // Opening with no access right reads the identity without
+        // conflicting with the staged writer's handle, and the reparse-point
+        // flag reads the path itself rather than what it may point to.
+        let file = fs::OpenOptions::new()
+            .access_mode(0)
+            .custom_flags(FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT)
+            .open(path)?;
+        windows_file_identity(&file)
+    }
+    #[cfg(not(windows))]
+    {
+        identity_from_metadata(&metadata)
+    }
 }
 
+#[cfg(not(windows))]
 fn identity_from_metadata(metadata: &fs::Metadata) -> io::Result<TempFileIdentity> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt;
 
-        return Ok(TempFileIdentity::Unix {
+        Ok(TempFileIdentity::Unix {
             device: metadata.dev(),
             inode: metadata.ino(),
-        });
+        })
     }
 
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::MetadataExt;
-
-        let volume = metadata.volume_serial_number().ok_or_else(|| {
-            io::Error::new(
-                ErrorKind::Unsupported,
-                "CFB temporary file has no volume identity",
-            )
-        })?;
-        let index = metadata.file_index().ok_or_else(|| {
-            io::Error::new(
-                ErrorKind::Unsupported,
-                "CFB temporary file has no file identity",
-            )
-        })?;
-        return Ok(TempFileIdentity::Windows { volume, index });
-    }
-
-    #[cfg(not(any(unix, windows)))]
+    #[cfg(not(unix))]
     {
         Ok(TempFileIdentity::Fallback {
             length: metadata.len(),
         })
     }
+}
+
+/// The volume serial number and file index of an open file.
+///
+/// `std`'s `MetadataExt::volume_serial_number` and `file_index` are unstable,
+/// so the identity comes from `GetFileInformationByHandle` directly.
+#[cfg(windows)]
+fn windows_file_identity(file: &File) -> io::Result<TempFileIdentity> {
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::Storage::FileSystem::{
+        BY_HANDLE_FILE_INFORMATION, GetFileInformationByHandle,
+    };
+
+    let mut information = std::mem::MaybeUninit::<BY_HANDLE_FILE_INFORMATION>::uninit();
+    // SAFETY: the handle belongs to `file`, which stays open for the call,
+    // and `information` is a writable buffer of the type the call fills.
+    let succeeded =
+        unsafe { GetFileInformationByHandle(file.as_raw_handle(), information.as_mut_ptr()) };
+    if succeeded == 0 {
+        return Err(io::Error::last_os_error());
+    }
+    // SAFETY: a successful call initialized every field.
+    let information = unsafe { information.assume_init() };
+    Ok(TempFileIdentity::Windows {
+        volume: information.dwVolumeSerialNumber,
+        index: (u64::from(information.nFileIndexHigh) << 32) | u64::from(information.nFileIndexLow),
+    })
 }
 
 fn ensure_temp_identity(temporary_path: &Path, expected: TempFileIdentity) -> io::Result<()> {

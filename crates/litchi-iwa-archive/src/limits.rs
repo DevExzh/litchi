@@ -79,6 +79,13 @@ impl Limits {
 
     /// Set a derived subordinate metadata ceiling without weakening the outer
     /// checked profile.
+    #[cfg_attr(
+        windows,
+        allow(
+            dead_code,
+            reason = "directory-backed bundles are refused on Windows, so this is reached only on other targets"
+        )
+    )]
     pub(crate) fn with_derived_metadata_bytes(mut self, maximum: u64) -> Result<Self> {
         if maximum > self.max_input_bytes.min(Self::MAX_METADATA_BYTES) {
             return Err(Error::Limit {

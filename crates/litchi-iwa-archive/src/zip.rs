@@ -723,6 +723,13 @@ pub(crate) fn parse_iwa_components(
 /// a directory bundle is already the index container. Accepting another
 /// nested `Index.zip` here would erase one physical provenance boundary and
 /// could make the nested bytes look like the complete directory artifact.
+#[cfg_attr(
+    windows,
+    allow(
+        dead_code,
+        reason = "directory-backed bundles are refused on Windows, so this is reached only on other targets"
+    )
+)]
 pub(crate) fn parse_directory_index_components(
     archive: &ZipArchive<'_>,
     limits: Limits,

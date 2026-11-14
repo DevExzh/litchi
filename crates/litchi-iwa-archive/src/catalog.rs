@@ -168,6 +168,13 @@ impl ComponentCatalog {
         Ok(Self { components })
     }
 
+    #[cfg_attr(
+        windows,
+        allow(
+            dead_code,
+            reason = "directory-backed bundles are refused on Windows, so this is reached only on other targets"
+        )
+    )]
     pub(crate) fn from_directory_index_zip_with_report(
         bytes: &[u8],
         index_limits: Limits,
@@ -193,6 +200,13 @@ impl ComponentCatalog {
     ///
     /// Only exact raw `Index/<name>.iwa` authorities are read. Selected
     /// headers are preflighted as one batch before any payload is inflated.
+    #[cfg_attr(
+        windows,
+        allow(
+            dead_code,
+            reason = "directory-backed bundles are refused on Windows, so this is reached only on other targets"
+        )
+    )]
     pub(crate) fn from_directory_index_zip_with_report_semantic(
         bytes: &[u8],
         index_limits: Limits,
@@ -221,6 +235,13 @@ impl ComponentCatalog {
     /// It exists solely to let a format-pinned directory ingress decide
     /// whether the strict semantic profile belongs to this package before
     /// applying that profile to the rest of the index.
+    #[cfg_attr(
+        windows,
+        allow(
+            dead_code,
+            reason = "directory-backed bundles are refused on Windows, so this is reached only on other targets"
+        )
+    )]
     pub(crate) fn from_directory_index_zip_root_with_report(
         bytes: &[u8],
         index_limits: Limits,
@@ -240,6 +261,13 @@ impl ComponentCatalog {
         Ok((Self { components }, report))
     }
 
+    #[cfg_attr(
+        windows,
+        allow(
+            dead_code,
+            reason = "directory-backed bundles are refused on Windows, so this is reached only on other targets"
+        )
+    )]
     pub(crate) fn from_logical_entries<'a>(
         entries: impl IntoIterator<Item = (&'a str, &'a [u8])>,
         limits: Limits,
@@ -250,6 +278,13 @@ impl ComponentCatalog {
     /// Parse frozen loose `Index/` entries under the semantic authority
     /// profile. The directory traversal pins these names, while this parser
     /// still refuses a non-canonical logical IWA authority before decoding it.
+    #[cfg_attr(
+        windows,
+        allow(
+            dead_code,
+            reason = "directory-backed bundles are refused on Windows, so this is reached only on other targets"
+        )
+    )]
     pub(crate) fn from_semantic_logical_entries<'a>(
         entries: impl IntoIterator<Item = (&'a str, &'a [u8])>,
         limits: Limits,
@@ -503,6 +538,13 @@ impl ComponentCatalog {
     }
 }
 
+#[cfg_attr(
+    windows,
+    allow(
+        dead_code,
+        reason = "directory-backed bundles are refused on Windows, so this is reached only on other targets"
+    )
+)]
 fn parse_semantic_directory_index_components(
     archive: &ZipArchive<'_>,
     limits: Limits,
@@ -565,6 +607,13 @@ fn parse_semantic_directory_index_components(
     Ok(components)
 }
 
+#[cfg_attr(
+    windows,
+    allow(
+        dead_code,
+        reason = "directory-backed bundles are refused on Windows, so this is reached only on other targets"
+    )
+)]
 fn parse_directory_index_root(
     archive: &ZipArchive<'_>,
     limits: Limits,
