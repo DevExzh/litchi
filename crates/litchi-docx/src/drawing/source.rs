@@ -1084,6 +1084,36 @@ enum Kind {
     SvgBlip,
 }
 
+/// Where [`Scanner`] is relative to the `w:document` root.
+///
+/// ```text
+/// Start --XML declaration--> Declared
+/// Declared | Open | Closed --XML declaration--> refused
+/// Start | Declared --comment, processing instruction or whitespace--> unchanged
+/// Start | Declared --root start tag--> Open
+/// Start | Declared --root empty element--> Closed
+/// Start | Declared --any other element--> refused
+/// Open  --root end tag--> Closed
+/// Open  --another root element--> refused
+/// Closed --any element--> refused
+/// Start | Declared | Closed --text other than whitespace at depth 0--> refused
+/// any   --character data or a reference at depth 0, or a DOCTYPE--> refused
+/// end of input--> accepted in Closed only
+/// ```
+///
+/// A comment or whitespace before the declaration does not refuse it.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// Nothing but comments, processing instructions or whitespace yet.
+    Start,
+    /// The XML declaration was read; no root yet.
+    Declared,
+    /// Inside the root element.
+    Open,
+    /// The root element has ended.
+    Closed,
+}
+
 struct Scanner<'a> {
     source: &'a [u8],
     drawing_ordinal: usize,
@@ -1094,10 +1124,7 @@ struct Scanner<'a> {
     relationship_references: Vec<RelationshipReference<'a>>,
     active_namespace_bindings: usize,
     namespace_scope_bytes: usize,
-    root_seen: bool,
-    root_closed: bool,
-    declaration_seen: bool,
-    prolog: bool,
+    root_phase: RootPhase,
     nodes: usize,
     dialect: Option<DrawingDialect>,
     relationship_dialect: Option<RelationshipDialect>,
@@ -1136,10 +1163,7 @@ impl<'a> Scanner<'a> {
             relationship_references,
             active_namespace_bindings: 0,
             namespace_scope_bytes: 0,
-            root_seen: false,
-            root_closed: false,
-            declaration_seen: false,
-            prolog: true,
+            root_phase: RootPhase::Start,
             nodes: 0,
             dialect: None,
             relationship_dialect: None,
@@ -1309,7 +1333,6 @@ impl<'a> Scanner<'a> {
                         .try_reserve(1)
                         .map_err(|source| allocation("DOCX drawing XML stack", source))?;
                     self.frames.push(frame);
-                    self.prolog = false;
                 },
                 Event::Empty(element) => {
                     let frame = self.start_element(
@@ -1329,9 +1352,8 @@ impl<'a> Scanner<'a> {
                         .ok_or_else(|| invalid("DOCX namespace scope underflow"))?;
                     self.namespace_context = parent_namespace_context;
                     if root {
-                        self.root_closed = true;
+                        self.root_phase = RootPhase::Closed;
                     }
-                    self.prolog = false;
                 },
                 Event::End(element) => {
                     validate_qname(element.name().as_ref(), "end element")?;
@@ -1347,7 +1369,7 @@ impl<'a> Scanner<'a> {
                         .ok_or_else(|| invalid("DOCX namespace scope underflow"))?;
                     self.namespace_context = parent_namespace_context;
                     if frame.kind == Kind::Root {
-                        self.root_closed = true;
+                        self.root_phase = RootPhase::Closed;
                     }
                 },
                 Event::Text(text) => {
@@ -1358,7 +1380,7 @@ impl<'a> Scanner<'a> {
                         ));
                     }
                     if self.frames.is_empty()
-                        && (!self.root_seen || self.root_closed)
+                        && self.root_phase != RootPhase::Open
                         && !is_xml_whitespace(text.as_ref())
                     {
                         return Err(invalid("non-whitespace DOCX text appears outside the root"));
@@ -1394,13 +1416,16 @@ impl<'a> Scanner<'a> {
                     return Err(invalid("DOCTYPE is forbidden in DOCX drawing scan"));
                 },
                 Event::Decl(declaration) => {
-                    if self.declaration_seen || !self.prolog || self.root_seen {
-                        return Err(invalid(
-                            "DOCX XML declaration is not at the beginning of the main story",
-                        ));
+                    match self.root_phase {
+                        RootPhase::Start => {},
+                        RootPhase::Declared | RootPhase::Open | RootPhase::Closed => {
+                            return Err(invalid(
+                                "DOCX XML declaration is not at the beginning of the main story",
+                            ));
+                        },
                     }
                     validate_declaration(&declaration)?;
-                    self.declaration_seen = true;
+                    self.root_phase = RootPhase::Declared;
                 },
                 Event::Comment(comment) => validate_xml_characters(comment.as_ref())?,
                 Event::PI(instruction) => validate_processing_instruction(instruction.as_ref())?,
@@ -1409,7 +1434,11 @@ impl<'a> Scanner<'a> {
             buffer.clear();
         }
 
-        if !self.root_seen || !self.root_closed || !self.frames.is_empty() {
+        let closed = match self.root_phase {
+            RootPhase::Start | RootPhase::Declared | RootPhase::Open => false,
+            RootPhase::Closed => self.frames.is_empty(),
+        };
+        if !closed {
             return Err(invalid("DOCX main story XML has an incomplete root"));
         }
         let dialect = self
@@ -1489,7 +1518,7 @@ impl<'a> Scanner<'a> {
                 self.limits.max_depth,
             ));
         }
-        if self.root_closed {
+        if self.root_phase == RootPhase::Closed {
             return Err(invalid("DOCX main story has content after its root"));
         }
         validate_qname(element.name().as_ref(), "element")?;
@@ -1545,14 +1574,14 @@ impl<'a> Scanner<'a> {
             &resolved,
             element.name(),
             parent,
-            !self.root_seen,
+            matches!(self.root_phase, RootPhase::Start | RootPhase::Declared),
             element,
             reader.decoder(),
         )?;
         if kind == Kind::Root && !self.frames.is_empty() {
             return Err(invalid("DOCX main story has a nested w:document root"));
         }
-        if !self.root_seen && kind != Kind::Root {
+        if matches!(self.root_phase, RootPhase::Start | RootPhase::Declared) && kind != Kind::Root {
             return Err(invalid(
                 "DOCX main story has a non-root element before w:document",
             ));
@@ -1604,10 +1633,12 @@ impl<'a> Scanner<'a> {
 
         match kind {
             Kind::Root => {
-                if self.root_seen {
-                    return Err(invalid("DOCX main story has more than one root"));
+                match self.root_phase {
+                    RootPhase::Start | RootPhase::Declared => self.root_phase = RootPhase::Open,
+                    RootPhase::Open | RootPhase::Closed => {
+                        return Err(invalid("DOCX main story has more than one root"));
+                    },
                 }
-                self.root_seen = true;
                 self.dialect = Some(
                     if resolved == Resolved::Known(STRICT_WORDPROCESSINGML_NAMESPACE) {
                         DrawingDialect::Strict

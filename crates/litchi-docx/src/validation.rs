@@ -1154,6 +1154,34 @@ fn is_legal_xml_character(character: char) -> bool {
     )
 }
 
+/// Where [`inspect_visible_xml`] is relative to the `w:document` root.
+///
+/// ```text
+/// Prolog --root start tag--> Open
+/// Prolog --root empty element--> Closed
+/// Open   --root end tag--> Closed
+/// Open | Closed --another top-level element--> refused
+/// Closed --any element--> refused
+/// any    --XML declaration that is not the first event--> refused
+/// any    --text other than whitespace, character data or a reference
+///          at depth 0--> refused
+/// any    --comment--> unchanged
+/// any    --DOCTYPE or processing instruction--> refused
+/// end of input--> accepted in Closed only
+/// ```
+///
+/// A declaration is accepted only as the very first event, so a second one,
+/// or one after a comment or whitespace, is refused without a separate flag.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum MainDocumentRootPhase {
+    /// No root element yet.
+    Prolog,
+    /// Inside the root element.
+    Open,
+    /// The root element has ended.
+    Closed,
+}
+
 fn inspect_visible_xml(
     xml: &[u8],
     path: &str,
@@ -1169,9 +1197,7 @@ fn inspect_visible_xml(
     reader.config_mut().check_end_names = true;
     let mut events = 0usize;
     let mut depth = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
-    let mut declaration_seen = false;
+    let mut phase = MainDocumentRootPhase::Prolog;
     let mut body_depth = None;
     let mut body_seen = false;
     let mut unsupported_body_children = 0_u64;
@@ -1203,7 +1229,7 @@ fn inspect_visible_xml(
         }
         match event {
             Event::Start(element) => {
-                if root_closed {
+                if phase == MainDocumentRootPhase::Closed {
                     return Err(malformed_xml_failure(path, report_limits));
                 }
                 if !is_valid_element_attributes(&element)
@@ -1219,10 +1245,12 @@ fn inspect_visible_xml(
                 }
                 let local = element.local_name();
                 if depth == 1 {
-                    if root_seen {
-                        return Err(malformed_xml_failure(path, report_limits));
+                    match phase {
+                        MainDocumentRootPhase::Prolog => phase = MainDocumentRootPhase::Open,
+                        MainDocumentRootPhase::Open | MainDocumentRootPhase::Closed => {
+                            return Err(malformed_xml_failure(path, report_limits));
+                        },
                     }
-                    root_seen = true;
                     if !is_word_namespace || local.as_ref() != b"document" {
                         return Err(InspectionFailure::Issue(Box::new(simple_issue(
                             SEMANTICS,
@@ -1234,7 +1262,10 @@ fn inspect_visible_xml(
                             report_limits,
                         ).map_err(InspectionFailure::Report)?)));
                     }
-                } else if depth == 2 && root_seen && is_word_namespace && local.as_ref() == b"body"
+                } else if depth == 2
+                    && phase != MainDocumentRootPhase::Prolog
+                    && is_word_namespace
+                    && local.as_ref() == b"body"
                 {
                     if body_seen {
                         return Err(malformed_xml_failure(path, report_limits));
@@ -1252,7 +1283,7 @@ fn inspect_visible_xml(
                 }
             },
             Event::Empty(element) => {
-                if root_closed {
+                if phase == MainDocumentRootPhase::Closed {
                     return Err(malformed_xml_failure(path, report_limits));
                 }
                 if !is_valid_element_attributes(&element)
@@ -1268,11 +1299,12 @@ fn inspect_visible_xml(
                 }
                 let local = element.local_name();
                 if child_depth == 1 {
-                    if root_seen {
-                        return Err(malformed_xml_failure(path, report_limits));
+                    match phase {
+                        MainDocumentRootPhase::Prolog => phase = MainDocumentRootPhase::Closed,
+                        MainDocumentRootPhase::Open | MainDocumentRootPhase::Closed => {
+                            return Err(malformed_xml_failure(path, report_limits));
+                        },
                     }
-                    root_seen = true;
-                    root_closed = true;
                     if !is_word_namespace || local.as_ref() != b"document" {
                         return Err(InspectionFailure::Issue(Box::new(simple_issue(
                             SEMANTICS,
@@ -1285,7 +1317,11 @@ fn inspect_visible_xml(
                         ).map_err(InspectionFailure::Report)?)));
                     }
                 }
-                if child_depth == 2 && root_seen && is_word_namespace && local.as_ref() == b"body" {
+                if child_depth == 2
+                    && phase != MainDocumentRootPhase::Prolog
+                    && is_word_namespace
+                    && local.as_ref() == b"body"
+                {
                     if body_seen {
                         return Err(malformed_xml_failure(path, report_limits));
                     }
@@ -1313,7 +1349,7 @@ fn inspect_visible_xml(
                     body_depth = None;
                 }
                 if depth == 1 {
-                    root_closed = true;
+                    phase = MainDocumentRootPhase::Closed;
                 }
                 depth = depth
                     .checked_sub(1)
@@ -1347,8 +1383,7 @@ fn inspect_visible_xml(
                 let standalone_invalid = declaration.standalone().is_some_and(|value| {
                     value.map_or(true, |value| !matches!(value.as_ref(), b"yes" | b"no"))
                 });
-                if declaration_seen
-                    || root_seen
+                if phase != MainDocumentRootPhase::Prolog
                     || events != 1
                     || declaration.xml_version().is_err()
                     || declaration.encoding().is_some_and(|value| value.is_err())
@@ -1356,7 +1391,6 @@ fn inspect_visible_xml(
                 {
                     return Err(malformed_xml_failure(path, report_limits));
                 }
-                declaration_seen = true;
             },
             Event::PI(_) | Event::DocType(_) => {
                 return Err(malformed_xml_failure(path, report_limits));
@@ -1368,7 +1402,11 @@ fn inspect_visible_xml(
             },
         }
     }
-    if !root_seen || !root_closed || depth != 0 {
+    let closed = match phase {
+        MainDocumentRootPhase::Prolog | MainDocumentRootPhase::Open => false,
+        MainDocumentRootPhase::Closed => depth == 0,
+    };
+    if !closed {
         return Err(InspectionFailure::Issue(Box::new(
             simple_issue(
                 SEMANTICS,

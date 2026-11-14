@@ -451,10 +451,7 @@ pub(crate) fn retarget_fallbacks(
         })?;
     let mut target_index = 0usize;
     let mut nodes = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
-    let mut declaration_seen = false;
-    let mut prolog_started = false;
+    let mut root_phase = RootPhase::Start;
     let mut edits = Vec::new();
     edits
         .try_reserve_exact(targets.len())
@@ -480,9 +477,7 @@ pub(crate) fn retarget_fallbacks(
                     &mut stack,
                     &mut nodes,
                     limits,
-                    &mut root_seen,
-                    root_closed,
-                    &mut prolog_started,
+                    &mut root_phase,
                 )?;
                 let (start, _start_end) = opening_span(event_end, &element, false, bytes)?;
                 let kind = classify_fallback_node(&namespace, &element);
@@ -602,9 +597,7 @@ pub(crate) fn retarget_fallbacks(
                     &mut stack,
                     &mut nodes,
                     limits,
-                    &mut root_seen,
-                    &mut root_closed,
-                    &mut prolog_started,
+                    &mut root_phase,
                 )?;
                 let (start, _end) = opening_span(event_end, &element, true, bytes)?;
                 let kind = classify_fallback_node(&namespace, &element);
@@ -703,13 +696,13 @@ pub(crate) fn retarget_fallbacks(
                     )?;
                 }
                 if stack.is_empty() {
-                    root_closed = true;
+                    root_phase = RootPhase::Closed;
                 }
             },
             Event::Text(text) => {
                 xml::text(text.as_ref())?;
                 if stack.is_empty() {
-                    if (!root_seen || root_closed)
+                    if root_phase != RootPhase::Open
                         && !text.as_ref().iter().all(u8::is_ascii_whitespace)
                     {
                         return Err(invalid(
@@ -728,36 +721,40 @@ pub(crate) fn retarget_fallbacks(
                         }
                     }
                 }
-                if !root_seen {
-                    prolog_started = true;
+                match root_phase {
+                    RootPhase::Start | RootPhase::Prolog => root_phase = RootPhase::Prolog,
+                    RootPhase::Open | RootPhase::Closed => {},
                 }
             },
             Event::CData(data) => {
                 xml::text(data.as_ref())?;
-                if stack.is_empty() || !root_seen || root_closed {
+                if stack.is_empty() || root_phase != RootPhase::Open {
                     return Err(invalid("DOCX source has CDATA outside its root"));
                 }
             },
             Event::Comment(comment) => {
                 xml::text(comment.as_ref())?;
-                if !root_seen {
-                    prolog_started = true;
+                match root_phase {
+                    RootPhase::Start | RootPhase::Prolog => root_phase = RootPhase::Prolog,
+                    RootPhase::Open | RootPhase::Closed => {},
                 }
             },
             Event::GeneralRef(reference) => {
                 xml::reference(reference.as_ref())?;
-                if stack.is_empty() || !root_seen || root_closed {
+                if stack.is_empty() || root_phase != RootPhase::Open {
                     return Err(invalid("DOCX source has a reference outside its root"));
                 }
             },
             Event::Decl(declaration) => {
                 xml::declaration(&declaration)?;
-                if declaration_seen || prolog_started || root_seen {
-                    return Err(invalid(
-                        "DOCX source has an XML declaration outside its prolog",
-                    ));
+                match root_phase {
+                    RootPhase::Start => root_phase = RootPhase::Prolog,
+                    RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+                        return Err(invalid(
+                            "DOCX source has an XML declaration outside its prolog",
+                        ));
+                    },
                 }
-                declaration_seen = true;
             },
             Event::DocType(_) | Event::PI(_) => {
                 return Err(invalid(
@@ -765,8 +762,11 @@ pub(crate) fn retarget_fallbacks(
                 ));
             },
             Event::Eof => {
-                if !root_seen || !root_closed || !stack.is_empty() || target_index != targets.len()
-                {
+                let complete = match root_phase {
+                    RootPhase::Start | RootPhase::Prolog | RootPhase::Open => false,
+                    RootPhase::Closed => stack.is_empty(),
+                };
+                if !complete || target_index != targets.len() {
                     return Err(invalid("DOCX Ink fallback target inventory is incomplete"));
                 }
                 break;
@@ -830,10 +830,7 @@ pub(crate) fn fallback_start(
     let origin = ReaderOrigin::of(source);
     let mut stack: Vec<HostFrame> = Vec::new();
     let mut nodes = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
-    let mut declaration_seen = false;
-    let mut prolog_started = false;
+    let mut root_phase = RootPhase::Start;
     let mut found = None;
     loop {
         let event = reader
@@ -851,9 +848,7 @@ pub(crate) fn fallback_start(
                     &mut stack,
                     &mut nodes,
                     limits,
-                    &mut root_seen,
-                    root_closed,
-                    &mut prolog_started,
+                    &mut root_phase,
                 )?;
                 let (start, start_end) = opening_span(event_end, &element, false, source)?;
                 let kind = classify_host_kind(&namespace, &element);
@@ -884,9 +879,7 @@ pub(crate) fn fallback_start(
                     &mut stack,
                     &mut nodes,
                     limits,
-                    &mut root_seen,
-                    &mut root_closed,
-                    &mut prolog_started,
+                    &mut root_phase,
                 )?;
                 let (start, _end) = opening_span(event_end, &element, true, source)?;
                 let kind = classify_host_kind(&namespace, &element);
@@ -945,13 +938,13 @@ pub(crate) fn fallback_start(
                     parent.observe_child(frame.kind);
                 }
                 if stack.is_empty() {
-                    root_closed = true;
+                    root_phase = RootPhase::Closed;
                 }
             },
             Event::Text(text) => {
                 xml::text(text.as_ref())?;
                 if stack.is_empty() {
-                    if !root_seen || root_closed {
+                    if root_phase != RootPhase::Open {
                         if !text.as_ref().iter().all(u8::is_ascii_whitespace) {
                             return Err(invalid(
                                 "DOCX source has non-whitespace text outside its root",
@@ -963,13 +956,14 @@ pub(crate) fn fallback_start(
                         frame.non_whitespace_text = true;
                     }
                 }
-                if !root_seen {
-                    prolog_started = true;
+                match root_phase {
+                    RootPhase::Start | RootPhase::Prolog => root_phase = RootPhase::Prolog,
+                    RootPhase::Open | RootPhase::Closed => {},
                 }
             },
             Event::CData(data) => {
                 xml::text(data.as_ref())?;
-                if stack.is_empty() || !root_seen || root_closed {
+                if stack.is_empty() || root_phase != RootPhase::Open {
                     return Err(invalid("DOCX source has CDATA outside its root"));
                 }
                 if let Some(frame) = stack.last_mut() {
@@ -978,13 +972,14 @@ pub(crate) fn fallback_start(
             },
             Event::Comment(comment) => {
                 xml::text(comment.as_ref())?;
-                if !root_seen {
-                    prolog_started = true;
+                match root_phase {
+                    RootPhase::Start | RootPhase::Prolog => root_phase = RootPhase::Prolog,
+                    RootPhase::Open | RootPhase::Closed => {},
                 }
             },
             Event::GeneralRef(reference) => {
                 xml::reference(reference.as_ref())?;
-                if stack.is_empty() || !root_seen || root_closed {
+                if stack.is_empty() || root_phase != RootPhase::Open {
                     return Err(invalid("DOCX source has a reference outside its root"));
                 }
                 if let Some(frame) = stack.last_mut() {
@@ -993,12 +988,14 @@ pub(crate) fn fallback_start(
             },
             Event::Decl(declaration) => {
                 xml::declaration(&declaration)?;
-                if declaration_seen || prolog_started || root_seen {
-                    return Err(invalid(
-                        "DOCX source has an XML declaration outside its prolog",
-                    ));
+                match root_phase {
+                    RootPhase::Start => root_phase = RootPhase::Prolog,
+                    RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+                        return Err(invalid(
+                            "DOCX source has an XML declaration outside its prolog",
+                        ));
+                    },
                 }
-                declaration_seen = true;
             },
             Event::DocType(_) | Event::PI(_) => {
                 return Err(invalid(
@@ -1006,7 +1003,11 @@ pub(crate) fn fallback_start(
                 ));
             },
             Event::Eof => {
-                if !root_seen || !root_closed || !stack.is_empty() {
+                let complete = match root_phase {
+                    RootPhase::Start | RootPhase::Prolog | RootPhase::Open => false,
+                    RootPhase::Closed => stack.is_empty(),
+                };
+                if !complete {
                     return Err(invalid("DOCX source has an unterminated XML root"));
                 }
                 break;
@@ -1049,10 +1050,7 @@ fn scan_paragraph_candidates(
             source,
         })?;
     let mut nodes = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
-    let mut declaration_seen = false;
-    let mut prolog_started = false;
+    let mut root_phase = RootPhase::Start;
 
     loop {
         let event = reader
@@ -1070,9 +1068,7 @@ fn scan_paragraph_candidates(
                     &mut stack,
                     &mut nodes,
                     limits,
-                    &mut root_seen,
-                    root_closed,
-                    &mut prolog_started,
+                    &mut root_phase,
                 )?;
                 let (start, end) = opening_span(event_position, &element, false, source)?;
                 let kind = classify_mce(&namespace, &element);
@@ -1098,9 +1094,7 @@ fn scan_paragraph_candidates(
                     &mut stack,
                     &mut nodes,
                     limits,
-                    &mut root_seen,
-                    &mut root_closed,
-                    &mut prolog_started,
+                    &mut root_phase,
                 )?;
                 let (start, end) = opening_span(event_position, &element, true, source)?;
                 if is_paragraph(&namespace, &element, dialect) {
@@ -1118,45 +1112,42 @@ fn scan_paragraph_candidates(
                 }
                 xml::text(element.name().as_ref())?;
                 if stack.is_empty() {
-                    root_closed = true;
+                    root_phase = RootPhase::Closed;
                 }
             },
             Event::Text(text) => {
                 xml::text(text.as_ref())?;
-                observe_outside_text(
-                    &stack,
-                    &mut root_seen,
-                    root_closed,
-                    &mut prolog_started,
-                    text.as_ref(),
-                )?;
+                observe_outside_text(&stack, &mut root_phase, text.as_ref())?;
             },
             Event::CData(data) => {
                 xml::text(data.as_ref())?;
-                if stack.is_empty() || !root_seen || root_closed {
+                if stack.is_empty() || root_phase != RootPhase::Open {
                     return Err(invalid("DOCX source has CDATA outside its root"));
                 }
             },
             Event::Comment(comment) => {
                 xml::text(comment.as_ref())?;
-                if !root_seen {
-                    prolog_started = true;
+                match root_phase {
+                    RootPhase::Start | RootPhase::Prolog => root_phase = RootPhase::Prolog,
+                    RootPhase::Open | RootPhase::Closed => {},
                 }
             },
             Event::GeneralRef(reference) => {
                 xml::reference(reference.as_ref())?;
-                if stack.is_empty() || !root_seen || root_closed {
+                if stack.is_empty() || root_phase != RootPhase::Open {
                     return Err(invalid("DOCX source has a reference outside its root"));
                 }
             },
             Event::Decl(declaration) => {
                 xml::declaration(&declaration)?;
-                if declaration_seen || prolog_started || root_seen {
-                    return Err(invalid(
-                        "DOCX source has an XML declaration outside its prolog",
-                    ));
+                match root_phase {
+                    RootPhase::Start => root_phase = RootPhase::Prolog,
+                    RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+                        return Err(invalid(
+                            "DOCX source has an XML declaration outside its prolog",
+                        ));
+                    },
                 }
-                declaration_seen = true;
             },
             Event::DocType(_) | Event::PI(_) => {
                 return Err(invalid(
@@ -1164,7 +1155,11 @@ fn scan_paragraph_candidates(
                 ));
             },
             Event::Eof => {
-                if !root_seen || !root_closed || !stack.is_empty() {
+                let complete = match root_phase {
+                    RootPhase::Start | RootPhase::Prolog | RootPhase::Open => false,
+                    RootPhase::Closed => stack.is_empty(),
+                };
+                if !complete {
                     return Err(invalid("DOCX source has an unterminated XML root"));
                 }
                 break;
@@ -1588,6 +1583,35 @@ fn escape_attribute_value(value: &str) -> Result<Vec<u8>> {
     Ok(output)
 }
 
+/// Where the scanners of this file are relative to the story's single root
+/// element.
+///
+/// ```text
+/// Start  --XML declaration--> Prolog
+/// Start | Prolog --comment or whitespace text--> Prolog
+/// Prolog | Open | Closed --XML declaration--> refused
+/// Start | Prolog --root start tag--> Open
+/// Start | Prolog --root empty element--> Closed
+/// Open   --root end tag--> Closed
+/// Open | Closed --another top-level element--> refused
+/// Start | Prolog | Closed --text other than whitespace, character data
+///          or reference--> refused
+/// Open | Closed --comment--> unchanged
+/// any    --DOCTYPE or processing instruction--> refused
+/// end of input--> accepted in Closed only
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// Nothing has been read; an XML declaration is still allowed.
+    Start,
+    /// A declaration, comment or whitespace was read; no root yet.
+    Prolog,
+    /// Inside the root element.
+    Open,
+    /// The root element has ended.
+    Closed,
+}
+
 fn observe_envelope_start<T>(
     element: &BytesStart<'_>,
     namespace: &ResolveResult<'_>,
@@ -1595,9 +1619,7 @@ fn observe_envelope_start<T>(
     stack: &mut [T],
     nodes: &mut usize,
     limits: Limits,
-    root_seen: &mut bool,
-    root_closed: bool,
-    prolog_started: &mut bool,
+    root_phase: &mut RootPhase,
 ) -> Result<()> {
     xml::element(element, resolver)?;
     if matches!(namespace, ResolveResult::Unknown(_)) {
@@ -1613,16 +1635,15 @@ fn observe_envelope_start<T>(
     if depth > limits.max_xml_depth {
         return Err(limit(LimitKind::XmlDepth, depth, limits.max_xml_depth));
     }
-    if *root_seen && root_closed {
+    if *root_phase == RootPhase::Closed {
         return Err(invalid("DOCX source has more than one XML root"));
     }
     if stack.is_empty() {
-        if *root_seen {
+        if matches!(*root_phase, RootPhase::Open | RootPhase::Closed) {
             return Err(invalid("DOCX source has more than one XML root"));
         }
-        *root_seen = true;
+        *root_phase = RootPhase::Open;
     }
-    *prolog_started = true;
     Ok(())
 }
 
@@ -1633,9 +1654,7 @@ fn observe_envelope_empty<T>(
     stack: &mut [T],
     nodes: &mut usize,
     limits: Limits,
-    root_seen: &mut bool,
-    root_closed: &mut bool,
-    prolog_started: &mut bool,
+    root_phase: &mut RootPhase,
 ) -> Result<()> {
     xml::element(element, resolver)?;
     if matches!(namespace, ResolveResult::Unknown(_)) {
@@ -1652,33 +1671,32 @@ fn observe_envelope_empty<T>(
         return Err(limit(LimitKind::XmlDepth, depth, limits.max_xml_depth));
     }
     if stack.is_empty() {
-        if *root_seen {
+        if matches!(*root_phase, RootPhase::Open | RootPhase::Closed) {
             return Err(invalid("DOCX source has more than one XML root"));
         }
-        *root_seen = true;
-        *root_closed = true;
-    } else if *root_closed {
+        *root_phase = RootPhase::Closed;
+    } else if *root_phase == RootPhase::Closed {
         return Err(invalid("DOCX source has markup after its XML root"));
     }
-    *prolog_started = true;
     Ok(())
 }
 
 fn observe_outside_text(
     stack: &[ScanFrame],
-    root_seen: &mut bool,
-    root_closed: bool,
-    prolog_started: &mut bool,
+    root_phase: &mut RootPhase,
     text: &[u8],
 ) -> Result<()> {
-    if stack.is_empty() && (!*root_seen || root_closed) && !text.iter().all(u8::is_ascii_whitespace)
+    if stack.is_empty()
+        && *root_phase != RootPhase::Open
+        && !text.iter().all(u8::is_ascii_whitespace)
     {
         return Err(invalid(
             "DOCX source has non-whitespace text outside its root",
         ));
     }
-    if !*root_seen {
-        *prolog_started = true;
+    match *root_phase {
+        RootPhase::Start | RootPhase::Prolog => *root_phase = RootPhase::Prolog,
+        RootPhase::Open | RootPhase::Closed => {},
     }
     Ok(())
 }

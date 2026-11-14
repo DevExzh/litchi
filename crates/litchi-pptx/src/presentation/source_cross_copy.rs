@@ -5042,6 +5042,57 @@ fn relationship_list(
     Ok(values)
 }
 
+/// Where [`validate_xml_with_policy`] is relative to the part's root element.
+///
+/// `declaration_allowed` stays true until a declaration, a comment or
+/// non-empty whitespace text is read outside a root.
+///
+/// ```text
+/// Prolog | ClosedWithoutRoot --XML declaration, when allowed--> same, declaration no longer allowed
+/// any other phase --XML declaration--> refused
+/// Prolog | ClosedWithoutRoot --comment, or non-empty whitespace text at depth 0--> same, declaration no longer allowed
+/// Prolog --element in a resolved namespace, start tag--> Open
+/// Prolog --element in a resolved namespace, empty element--> Closed
+/// Prolog | Open --element with an undeclared prefix, unknown namespaces allowed--> unchanged (skipped)
+/// Prolog --end tag back to depth 0--> ClosedWithoutRoot
+/// Open --end tag back to depth 0--> Closed
+/// Closed | ClosedWithoutRoot --any element--> refused as a second root
+/// end of input --> accepted in Closed at depth 0 only
+/// ```
+///
+/// The root may sit inside skipped elements: `<x:a><p:sld/></x:a>` is
+/// accepted.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum XmlRootPhase {
+    /// No root yet.
+    Prolog { declaration_allowed: bool },
+    /// Inside the root element.
+    Open,
+    /// The root element has ended.
+    Closed,
+    /// No root was seen, but an element skipped for its undeclared prefix
+    /// ended at depth 0 (only when unknown namespaces are allowed). This is
+    /// how the validator behaves today: every later element is refused as a
+    /// second root, and end of input reports "not one closed root".
+    ClosedWithoutRoot { declaration_allowed: bool },
+}
+
+impl XmlRootPhase {
+    /// A declaration, comment or whitespace was read outside a root: a later
+    /// declaration is misplaced. A root, once seen, refuses one anyway.
+    fn forbid_declaration(&mut self) {
+        match self {
+            Self::Prolog {
+                declaration_allowed,
+            }
+            | Self::ClosedWithoutRoot {
+                declaration_allowed,
+            } => *declaration_allowed = false,
+            Self::Open | Self::Closed => {},
+        }
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum XmlValidationPolicy {
     SourceClosure,
@@ -5134,10 +5185,9 @@ fn validate_xml_with_policy(
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
     let mut nodes = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
-    let mut declaration_seen = false;
-    let mut prolog_content_seen = false;
+    let mut phase = XmlRootPhase::Prolog {
+        declaration_allowed: true,
+    };
     let mut xml_version = XmlVersion::Implicit1_0;
     let mut transitional = false;
     let mut strict = false;
@@ -5157,7 +5207,10 @@ fn validate_xml_with_policy(
         let is_start = matches!(&event, Event::Start(_));
         match event {
             Event::Start(element) | Event::Empty(element) => {
-                if root_closed {
+                if matches!(
+                    phase,
+                    XmlRootPhase::Closed | XmlRootPhase::ClosedWithoutRoot { .. }
+                ) {
                     return Err(Error::Xml(format!(
                         "{context} contains more than one root element"
                     )));
@@ -5298,29 +5351,37 @@ fn validate_xml_with_policy(
                         );
                     }
                 }
-                if !root_seen {
-                    root_seen = true;
-                    if element.local_name().as_ref() != root
-                        || !root_namespace.matches(pml, dml, chart)
-                    {
-                        return refusal(
-                            SlideCopyRefusal::UnknownSemanticSurface,
-                            format!("{context} has an unexpected root"),
-                        );
-                    }
-                    if !is_start {
-                        root_closed = true;
-                    }
-                } else if reject_dependency_surfaces
-                    && !passive
-                    && unsupported_surface(element.local_name().as_ref())
-                    && !(matches!(validation_policy, XmlValidationPolicy::SourceSlideCharts)
-                        && element.local_name().as_ref() == b"graphicFrame")
-                {
-                    return refusal(
-                        SlideCopyRefusal::UnknownSemanticSurface,
-                        format!("{context} contains an unsupported dependency surface"),
-                    );
+                match phase {
+                    XmlRootPhase::Prolog { .. } | XmlRootPhase::ClosedWithoutRoot { .. } => {
+                        if element.local_name().as_ref() != root
+                            || !root_namespace.matches(pml, dml, chart)
+                        {
+                            return refusal(
+                                SlideCopyRefusal::UnknownSemanticSurface,
+                                format!("{context} has an unexpected root"),
+                            );
+                        }
+                        phase = if is_start {
+                            XmlRootPhase::Open
+                        } else {
+                            XmlRootPhase::Closed
+                        };
+                    },
+                    XmlRootPhase::Open | XmlRootPhase::Closed => {
+                        if reject_dependency_surfaces
+                            && !passive
+                            && unsupported_surface(element.local_name().as_ref())
+                            && !(matches!(
+                                validation_policy,
+                                XmlValidationPolicy::SourceSlideCharts
+                            ) && element.local_name().as_ref() == b"graphicFrame")
+                        {
+                            return refusal(
+                                SlideCopyRefusal::UnknownSemanticSurface,
+                                format!("{context} contains an unsupported dependency surface"),
+                            );
+                        }
+                    },
                 }
                 let allow_source_slide_image_relationship_attributes =
                     matches!(context, "source slide" | "staged source slide")
@@ -5441,7 +5502,15 @@ fn validate_xml_with_policy(
                     .checked_sub(1)
                     .ok_or_else(|| invalid("XML depth underflow"))?;
                 if depth == 0 {
-                    root_closed = true;
+                    phase = match phase {
+                        XmlRootPhase::Prolog {
+                            declaration_allowed,
+                        } => XmlRootPhase::ClosedWithoutRoot {
+                            declaration_allowed,
+                        },
+                        XmlRootPhase::Open | XmlRootPhase::Closed => XmlRootPhase::Closed,
+                        XmlRootPhase::ClosedWithoutRoot { .. } => phase,
+                    };
                 }
             },
             Event::DocType(_) | Event::PI(_) => {
@@ -5450,7 +5519,16 @@ fn validate_xml_with_policy(
                     format!("{context} contains DTD or PI"),
                 );
             },
-            Event::Decl(_) if root_seen || declaration_seen || prolog_content_seen => {
+            Event::Decl(_)
+                if !matches!(
+                    phase,
+                    XmlRootPhase::Prolog {
+                        declaration_allowed: true
+                    } | XmlRootPhase::ClosedWithoutRoot {
+                        declaration_allowed: true
+                    }
+                ) =>
+            {
                 return Err(Error::Xml(format!(
                     "{context} contains a misplaced or repeated XML declaration"
                 )));
@@ -5464,7 +5542,7 @@ fn validate_xml_with_policy(
                     b"1.1" => XmlVersion::Explicit1_1,
                     _ => return Err(Error::Xml(format!("{context} has an invalid XML version"))),
                 };
-                declaration_seen = true;
+                phase.forbid_declaration();
             },
             Event::Text(text) if depth == 0 => {
                 if !text.as_ref().iter().all(u8::is_ascii_whitespace) {
@@ -5472,11 +5550,18 @@ fn validate_xml_with_policy(
                         "{context} contains text outside its root"
                     )));
                 }
-                if !root_seen && !text.as_ref().is_empty() {
-                    prolog_content_seen = true;
+                if !text.as_ref().is_empty() {
+                    phase.forbid_declaration();
                 }
             },
-            Event::Comment(_) if !root_seen => prolog_content_seen = true,
+            Event::Comment(_)
+                if matches!(
+                    phase,
+                    XmlRootPhase::Prolog { .. } | XmlRootPhase::ClosedWithoutRoot { .. }
+                ) =>
+            {
+                phase.forbid_declaration();
+            },
             Event::CData(_) | Event::GeneralRef(_) if depth == 0 => {
                 return Err(Error::Xml(format!(
                     "{context} contains character data outside its root"
@@ -5498,7 +5583,13 @@ fn validate_xml_with_policy(
             _ => {},
         }
     }
-    if !root_seen || !root_closed || depth != 0 {
+    let closed = match phase {
+        XmlRootPhase::Closed => depth == 0,
+        XmlRootPhase::Prolog { .. }
+        | XmlRootPhase::Open
+        | XmlRootPhase::ClosedWithoutRoot { .. } => false,
+    };
+    if !closed {
         return Err(Error::Xml(format!("{context} is not one closed root")));
     }
     match (transitional, strict) {

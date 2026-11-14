@@ -9560,6 +9560,30 @@ fn rewrite_revision_fragment(
     replace_ranges(&inner, &replacements).map_err(|_error| Refusal::RevisionDependency)
 }
 
+/// Where [`scan_revision_fragment`] is relative to the revision element that
+/// roots the fragment, with the byte offsets the result reports.
+///
+/// ```text
+/// Prolog --revision start tag at depth 1--> Open
+/// Prolog --revision empty element--> Closed (both offsets at its end)
+/// Prolog --any other element--> refused as not found
+/// Open   --root end tag--> Closed
+/// Closed --any element or end tag--> refused
+/// any    --XML declaration or DOCTYPE--> refused
+/// any    --comment or processing instruction--> unchanged
+/// end of input--> accepted in Closed only
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RevisionFragmentPhase {
+    /// No element yet.
+    Prolog,
+    /// Inside the root; `open_end` is the end offset of its start tag.
+    Open { open_end: usize },
+    /// The root has ended; `close_start` is where its end tag starts, or
+    /// the end of an empty-element root.
+    Closed { open_end: usize, close_start: usize },
+}
+
 fn scan_revision_fragment(
     xml: &[u8],
     kind: RevisionKind,
@@ -9576,10 +9600,7 @@ fn scan_revision_fragment(
             .add(prefix, Namespace(namespace))
             .map_err(|_error| Refusal::RevisionDependency)?;
     }
-    let mut root_started = false;
-    let mut root_closed = false;
-    let mut root_open_end = None;
-    let mut root_close_start = None;
+    let mut phase = RevisionFragmentPhase::Prolog;
     let mut child_ranges = Vec::new();
     let mut namespace_declarations = Vec::new();
     let mut scope_attributes = Vec::new();
@@ -9617,15 +9638,16 @@ fn scan_revision_fragment(
                 if depth > MAX_DOCUMENT_DEPTH {
                     return Err(Refusal::RevisionDependency);
                 }
-                if !root_started {
+                if phase == RevisionFragmentPhase::Prolog {
                     if depth != 1
                         || !is_wordprocessing_namespace(&namespace)
                         || element.local_name().as_ref() != kind.local_name()
                     {
                         return Err(Refusal::RevisionNotFound);
                     }
-                    root_started = true;
-                    root_open_end = Some(event_end);
+                    phase = RevisionFragmentPhase::Open {
+                        open_end: event_end,
+                    };
                     namespace_declarations = raw_namespace_declarations(
                         xml.get(event_start..event_end)
                             .ok_or(Refusal::RevisionDependency)?,
@@ -9639,7 +9661,7 @@ fn scan_revision_fragment(
                     )?;
                     continue;
                 }
-                if root_closed || depth == 1 {
+                if matches!(phase, RevisionFragmentPhase::Closed { .. }) || depth == 1 {
                     return Err(Refusal::RevisionDependency);
                 }
                 if depth == 2 {
@@ -9680,17 +9702,17 @@ fn scan_revision_fragment(
             },
             Event::Empty(element) => {
                 let child_depth = depth.checked_add(1).ok_or(Refusal::RevisionDependency)?;
-                if !root_started {
+                if phase == RevisionFragmentPhase::Prolog {
                     if depth != 0
                         || !is_wordprocessing_namespace(&namespace)
                         || element.local_name().as_ref() != kind.local_name()
                     {
                         return Err(Refusal::RevisionNotFound);
                     }
-                    root_started = true;
-                    root_closed = true;
-                    root_open_end = Some(event_end);
-                    root_close_start = Some(event_end);
+                    phase = RevisionFragmentPhase::Closed {
+                        open_end: event_end,
+                        close_start: event_end,
+                    };
                     namespace_declarations = raw_namespace_declarations(
                         xml.get(event_start..event_end)
                             .ok_or(Refusal::RevisionDependency)?,
@@ -9702,7 +9724,7 @@ fn scan_revision_fragment(
                         reader.resolver(),
                         reader.decoder(),
                     )?;
-                } else if root_closed {
+                } else if matches!(phase, RevisionFragmentPhase::Closed { .. }) {
                     return Err(Refusal::RevisionDependency);
                 } else if child_depth == 2 {
                     if !is_word_local(&namespace, element.name(), b"r") {
@@ -9737,15 +9759,22 @@ fn scan_revision_fragment(
                 }
             },
             Event::End(element) => {
-                if !root_started || root_closed || depth == 0 {
-                    return Err(Refusal::RevisionDependency);
-                }
+                let open_end = match phase {
+                    RevisionFragmentPhase::Open { open_end } if depth != 0 => open_end,
+                    RevisionFragmentPhase::Prolog
+                    | RevisionFragmentPhase::Open { .. }
+                    | RevisionFragmentPhase::Closed { .. } => {
+                        return Err(Refusal::RevisionDependency);
+                    },
+                };
                 if depth == 1 {
                     if !is_word_local(&namespace, element.name(), kind.local_name()) {
                         return Err(Refusal::RevisionDependency);
                     }
-                    root_close_start = Some(event_start);
-                    root_closed = true;
+                    phase = RevisionFragmentPhase::Closed {
+                        open_end,
+                        close_start: event_start,
+                    };
                     depth = 0;
                 } else {
                     if let Some(text_depth_value) = text_depth {
@@ -9800,19 +9829,21 @@ fn scan_revision_fragment(
             Event::Comment(_) | Event::PI(_) => {},
         }
     }
-    if !root_started
-        || !root_closed
-        || depth != 0
-        || text_depth.is_some()
-        || opaque_depth.is_some()
-        || run_depth.is_some()
-    {
+    let (root_open_end, root_close_start) = match phase {
+        RevisionFragmentPhase::Closed {
+            open_end,
+            close_start,
+        } => (open_end, close_start),
+        RevisionFragmentPhase::Prolog | RevisionFragmentPhase::Open { .. } => {
+            return Err(Refusal::RevisionDependency);
+        },
+    };
+    if depth != 0 || text_depth.is_some() || opaque_depth.is_some() || run_depth.is_some() {
         return Err(Refusal::RevisionDependency);
     }
-    let root_open_end = root_open_end.ok_or(Refusal::RevisionDependency)?;
     Ok(RevisionFragmentInfo {
         root_open_end,
-        root_close_start: root_close_start.unwrap_or(root_open_end),
+        root_close_start,
         child_ranges,
         namespace_declarations,
         scope_attributes,

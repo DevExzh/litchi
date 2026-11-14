@@ -3058,6 +3058,31 @@ fn scan_glossary(
     })
 }
 
+/// Where [`scan_glossary_many`] is relative to the `w:glossaryDocument` root.
+///
+/// ```text
+/// Prolog --XML declaration, comment or whitespace--> Prolog (repeated
+///          declarations are accepted)
+/// Prolog --root start tag--> Open
+/// Prolog --root empty element--> Closed
+/// Open   --root end tag--> Closed
+/// Open | Closed --another top-level element--> refused
+/// Closed --element below the top level--> refused
+/// Open | Closed --XML declaration--> refused
+/// any    --text other than whitespace at depth 0, character data, DOCTYPE
+///          or processing instruction--> refused
+/// end of input--> accepted in Closed only
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum GlossaryRootPhase {
+    /// No root yet.
+    Prolog,
+    /// Inside the root element.
+    Open,
+    /// The root element has ended.
+    Closed,
+}
+
 fn scan_glossary_many(
     xml: &[u8],
     selectors: &[GlossarySelector],
@@ -3102,8 +3127,7 @@ fn scan_glossary_many(
     reader.config_mut().check_end_names = true;
     let mut event_count = 0usize;
     let mut depth = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = GlossaryRootPhase::Prolog;
     let mut word_namespace = Vec::new();
     let mut word_namespace_shared: Option<Arc<[u8]>> = None;
     let mut namespace_stack = Vec::new();
@@ -3184,7 +3208,7 @@ fn scan_glossary_many(
                     expected_word_namespace,
                 )?;
                 if parent_depth == 0 {
-                    if root_seen || root_closed {
+                    if phase != GlossaryRootPhase::Prolog {
                         return Err(unsupported_xml("multiple glossary roots"));
                     }
                     let info = inspect_root(
@@ -3202,8 +3226,8 @@ fn scan_glossary_many(
                     }
                     word_namespace = info.word_namespace;
                     word_namespace_shared = Some(word_namespace.clone().into());
-                    root_seen = true;
-                } else if !root_seen || root_closed {
+                    phase = GlossaryRootPhase::Open;
+                } else if phase != GlossaryRootPhase::Open {
                     return Err(unsupported_xml("glossary content occurs outside its root"));
                 }
                 reject_wrong_word_namespace(start.name(), &context, &word_namespace)?;
@@ -3377,7 +3401,7 @@ fn scan_glossary_many(
                     expected_word_namespace,
                 )?;
                 if parent_depth == 0 {
-                    if root_seen || root_closed {
+                    if phase != GlossaryRootPhase::Prolog {
                         return Err(unsupported_xml("multiple glossary roots"));
                     }
                     let info = inspect_root(
@@ -3395,9 +3419,8 @@ fn scan_glossary_many(
                     }
                     word_namespace = info.word_namespace;
                     word_namespace_shared = Some(word_namespace.clone().into());
-                    root_seen = true;
-                    root_closed = true;
-                } else if !root_seen || root_closed {
+                    phase = GlossaryRootPhase::Closed;
+                } else if phase != GlossaryRootPhase::Open {
                     return Err(unsupported_xml("glossary content occurs outside its root"));
                 } else {
                     reject_wrong_word_namespace(start.name(), &context, &word_namespace)?;
@@ -3662,10 +3685,14 @@ fn scan_glossary_many(
                     doc_parts_depth = None;
                 }
                 if depth == 1 {
-                    if root_closed {
-                        return Err(unsupported_xml("glossary root closes more than once"));
+                    match phase {
+                        GlossaryRootPhase::Prolog | GlossaryRootPhase::Open => {
+                            phase = GlossaryRootPhase::Closed;
+                        },
+                        GlossaryRootPhase::Closed => {
+                            return Err(unsupported_xml("glossary root closes more than once"));
+                        },
                     }
-                    root_closed = true;
                 }
                 namespace_stack.pop();
                 depth -= 1;
@@ -3682,7 +3709,7 @@ fn scan_glossary_many(
             Event::GeneralRef(reference) => {
                 validate_story_general_reference(&reference)?;
             },
-            Event::Decl(_) if root_seen => {
+            Event::Decl(_) if phase != GlossaryRootPhase::Prolog => {
                 return Err(unsupported_xml(
                     "XML declarations are only accepted before the glossary root",
                 ));
@@ -3699,7 +3726,11 @@ fn scan_glossary_many(
         }
     }
 
-    if !root_seen || !root_closed || depth != 0 || !namespace_stack.is_empty() {
+    let closed = match phase {
+        GlossaryRootPhase::Prolog | GlossaryRootPhase::Open => false,
+        GlossaryRootPhase::Closed => depth == 0 && namespace_stack.is_empty(),
+    };
+    if !closed {
         return Err(unsupported_xml("glossary XML root is incomplete"));
     }
     if !root_has_doc_parts {
@@ -3804,6 +3835,31 @@ fn validate_glossary_batch_selector_limits(
     Ok(())
 }
 
+/// Where [`scan_story`] is relative to the story's root element.
+///
+/// ```text
+/// Prolog --XML declaration, comment or whitespace--> Prolog (repeated
+///          declarations are accepted)
+/// Prolog --root start tag--> Open
+/// Prolog --root empty element--> Closed
+/// Open   --root end tag--> Closed
+/// Open | Closed --another top-level element--> refused
+/// Closed --element below the top level--> refused
+/// Open | Closed --XML declaration--> refused
+/// any    --text other than whitespace at depth 0, character data, DOCTYPE
+///          or processing instruction--> refused
+/// end of input--> accepted in Closed only
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum StoryRootPhase {
+    /// No root yet.
+    Prolog,
+    /// Inside the root element.
+    Open,
+    /// The root element has ended.
+    Closed,
+}
+
 fn scan_story(
     xml: &[u8],
     selector: &Selector,
@@ -3837,8 +3893,7 @@ fn scan_story(
     reader.config_mut().check_end_names = true;
     let mut event_count = 0usize;
     let mut depth = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = StoryRootPhase::Prolog;
     let mut root_start_end = 0usize;
     let mut root_end_start = 0usize;
     let mut root_kind = expected_kind;
@@ -3896,7 +3951,7 @@ fn scan_story(
                     expected_word_namespace,
                 )?;
                 if parent_depth == 0 {
-                    if root_seen || root_closed {
+                    if phase != StoryRootPhase::Prolog {
                         return Err(unsupported_xml("multiple story roots"));
                     }
                     let info = inspect_root(
@@ -3917,8 +3972,8 @@ fn scan_story(
                     word_namespace = info.word_namespace;
                     has_w_namespace = info.has_w_namespace;
                     root_start_end = after;
-                    root_seen = true;
-                } else if !root_seen || root_closed {
+                    phase = StoryRootPhase::Open;
+                } else if phase != StoryRootPhase::Open {
                     return Err(unsupported_xml("story content occurs outside its root"));
                 }
                 reject_wrong_word_namespace(start.name(), &context, &word_namespace)?;
@@ -4043,7 +4098,7 @@ fn scan_story(
                     expected_word_namespace,
                 )?;
                 if parent_depth == 0 {
-                    if root_seen || root_closed {
+                    if phase != StoryRootPhase::Prolog {
                         return Err(unsupported_xml("multiple story roots"));
                     }
                     let info = inspect_root(
@@ -4065,10 +4120,9 @@ fn scan_story(
                     has_w_namespace = info.has_w_namespace;
                     root_start_end = after;
                     root_end_start = after;
-                    root_seen = true;
-                    root_closed = true;
+                    phase = StoryRootPhase::Closed;
                 } else {
-                    if !root_seen || root_closed {
+                    if phase != StoryRootPhase::Open {
                         return Err(unsupported_xml("story content occurs outside its root"));
                     }
                     reject_wrong_word_namespace(start.name(), &context, &word_namespace)?;
@@ -4198,11 +4252,15 @@ fn scan_story(
                     selected_entry_depth = None;
                 }
                 if depth == 1 {
-                    if root_closed {
-                        return Err(unsupported_xml("story root closes more than once"));
+                    match phase {
+                        StoryRootPhase::Prolog | StoryRootPhase::Open => {
+                            root_end_start = event_start;
+                            phase = StoryRootPhase::Closed;
+                        },
+                        StoryRootPhase::Closed => {
+                            return Err(unsupported_xml("story root closes more than once"));
+                        },
                     }
-                    root_end_start = event_start;
-                    root_closed = true;
                 }
                 if body_depth == Some(depth) {
                     body_depth = None;
@@ -4222,7 +4280,7 @@ fn scan_story(
             Event::GeneralRef(reference) => {
                 validate_story_general_reference(&reference)?;
             },
-            Event::Decl(_) if root_seen => {
+            Event::Decl(_) if phase != StoryRootPhase::Prolog => {
                 return Err(unsupported_xml(
                     "XML declarations are only accepted before the story root",
                 ));
@@ -4239,7 +4297,11 @@ fn scan_story(
         }
     }
 
-    if !root_seen || !root_closed || depth != 0 || !paragraph_stack.is_empty() {
+    let closed = match phase {
+        StoryRootPhase::Prolog | StoryRootPhase::Open => false,
+        StoryRootPhase::Closed => depth == 0 && paragraph_stack.is_empty(),
+    };
+    if !closed {
         return Err(unsupported_xml("story XML root is incomplete"));
     }
     if root_kind == RootKind::Main && body_count != 1 {

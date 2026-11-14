@@ -553,6 +553,33 @@ pub(crate) fn parse_revisions_with_limits(
     )
 }
 
+/// Where [`parse_revisions_tolerant`] is relative to the fragment's root
+/// element.
+///
+/// ```text
+/// Prolog --start or empty element--> Open
+/// Open   --start or empty element--> Open
+/// Open   --end tag or empty element back to depth 0--> Closed
+/// Closed --any element--> refused
+/// Prolog | Closed --text other than whitespace, character data or a
+///          reference--> refused
+/// any    --XML declaration that is not the first event--> refused
+/// end of input in Prolog--> refused (no root); otherwise the depth and
+///          open-scope checks decide
+/// ```
+///
+/// A declaration is accepted only as the very first event, so a second one
+/// is refused without a separate flag.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RevisionRootPhase {
+    /// No element yet.
+    Prolog,
+    /// The root element has started and not yet ended.
+    Open,
+    /// The root element has ended.
+    Closed,
+}
+
 /// Parse revisions, recording each [`RevisionDefect`] repair in `tolerance`
 /// with the byte offset of the revision element within `xml_bytes`.
 pub(crate) fn parse_revisions_tolerant(
@@ -901,9 +928,7 @@ pub(crate) fn parse_revisions_tolerant(
     }
 
     let mut first_element = true;
-    let mut root_seen = false;
-    let mut root_closed = false;
-    let mut declaration_seen = false;
+    let mut phase = RevisionRootPhase::Prolog;
     loop {
         // Text and comments are separate events, so the position before an
         // element event is its `<` — the context for revision repairs.
@@ -935,13 +960,15 @@ pub(crate) fn parse_revisions_tolerant(
         };
         match event {
             Event::Start(e) => {
-                if root_closed {
-                    return Err(Error::InvalidFormat(
-                        "revision XML has multiple root elements".into(),
-                    ));
-                }
-                if !root_seen {
-                    root_seen = true;
+                match phase {
+                    RevisionRootPhase::Closed => {
+                        return Err(Error::InvalidFormat(
+                            "revision XML has multiple root elements".into(),
+                        ));
+                    },
+                    RevisionRootPhase::Prolog | RevisionRootPhase::Open => {
+                        phase = RevisionRootPhase::Open;
+                    },
                 }
                 if text_element_depth.is_some() {
                     return Err(Error::InvalidFormat(
@@ -1023,13 +1050,15 @@ pub(crate) fn parse_revisions_tolerant(
                 }
             },
             Event::Empty(e) => {
-                if root_closed {
-                    return Err(Error::InvalidFormat(
-                        "revision XML has multiple root elements".into(),
-                    ));
-                }
-                if !root_seen {
-                    root_seen = true;
+                match phase {
+                    RevisionRootPhase::Closed => {
+                        return Err(Error::InvalidFormat(
+                            "revision XML has multiple root elements".into(),
+                        ));
+                    },
+                    RevisionRootPhase::Prolog | RevisionRootPhase::Open => {
+                        phase = RevisionRootPhase::Open;
+                    },
                 }
                 if text_element_depth.is_some() {
                     return Err(Error::InvalidFormat(
@@ -1104,10 +1133,10 @@ pub(crate) fn parse_revisions_tolerant(
                     )?;
                 }
                 if element_depth == 0 {
-                    root_closed = true;
+                    phase = RevisionRootPhase::Closed;
                 }
             },
-            Event::Text(e) if !root_seen || root_closed => {
+            Event::Text(e) if phase != RevisionRootPhase::Open => {
                 let text = e
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|error| Error::Xml(error.to_string()))?;
@@ -1120,7 +1149,7 @@ pub(crate) fn parse_revisions_tolerant(
                     ));
                 }
             },
-            Event::CData(_) if !root_seen || root_closed => {
+            Event::CData(_) if phase != RevisionRootPhase::Open => {
                 return Err(Error::InvalidFormat(
                     "revision XML has CDATA outside its root element".into(),
                 ));
@@ -1179,7 +1208,7 @@ pub(crate) fn parse_revisions_tolerant(
                 )?;
                 let text = decode_xml_reference(&reference)?;
                 validate_xml_characters(&text)?;
-                if !root_seen || root_closed {
+                if phase != RevisionRootPhase::Open {
                     return Err(Error::InvalidFormat(
                         "revision XML has a reference outside its root element".into(),
                     ));
@@ -1200,12 +1229,11 @@ pub(crate) fn parse_revisions_tolerant(
                 }
             },
             Event::Decl(_) => {
-                if declaration_seen || events != 1 || root_seen {
+                if events != 1 || phase != RevisionRootPhase::Prolog {
                     return Err(Error::InvalidFormat(
                         "revision XML declaration must appear once at the beginning".into(),
                     ));
                 }
-                declaration_seen = true;
             },
             Event::DocType(_) => {
                 return Err(Error::InvalidFormat(
@@ -1230,16 +1258,16 @@ pub(crate) fn parse_revisions_tolerant(
                     .checked_sub(1)
                     .ok_or_else(|| Error::InvalidFormat("invalid revision XML nesting".into()))?;
                 if element_depth == 0 {
-                    root_closed = true;
+                    phase = RevisionRootPhase::Closed;
                 }
             },
-            Event::Eof => {
-                if !root_seen {
+            Event::Eof => match phase {
+                RevisionRootPhase::Prolog => {
                     return Err(Error::InvalidFormat(
                         "revision XML has no root element".into(),
                     ));
-                }
-                break;
+                },
+                RevisionRootPhase::Open | RevisionRootPhase::Closed => break,
             },
             _ => {},
         }
