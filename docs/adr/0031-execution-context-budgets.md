@@ -5,17 +5,17 @@
 - Supersedes: nothing. Amends: the execution paragraph of
   [ADR 0005](0005-io-memory-and-performance.md) only. Every other paragraph of
   that record, and every other accepted record, is untouched.
-- Raised by: a capability matrix against `docs/GOAL.md` Workstream F,
+- Raised by: a capability matrix against the parallelism requirements below,
   retained scaling evidence, and the coexistence probe whose counts are quoted
   below. This
   is a prerequisite rather than a speedup.
 
 ## Context
 
-`docs/GOAL.md` rule 9 requires that "CPU parallelism must be opt-in and
+The performance program requires that CPU parallelism be opt-in and
 controlled by an explicit execution context with thread, memory, I/O,
-cancellation, and task-granularity budgets", and Workstream F lists the
-capabilities such a context must control: maximum worker count, CPU task
+cancellation, and task-granularity budgets, and lists the capabilities such
+a context must control (the parallelism list below): maximum worker count, CPU task
 budget, memory and decompression-in-flight budget, I/O concurrency,
 cancellation, task size thresholds, and an optional caller-provided executor or
 scoped worker facility.
@@ -25,9 +25,9 @@ context controlling scheduling, affinity, cancellation, thread and memory
 budgets. There is no hidden global Rayon pool."
 
 `litchi_core::ExecutionLimits` (`crates/litchi-core/src/execution.rs:38`)
-implements the ADR 0005 list and part of the Workstream F list:
+implements the ADR 0005 list and part of the parallelism list:
 
-| Workstream F capability | Present today | Where |
+| Parallelism-list capability | Present today | Where |
 | --- | --- | --- |
 | maximum worker count | yes | `ExecutionLimits::workers` |
 | memory and decompression-in-flight budget | yes | `max_in_flight_bytes`, `Resource::Memory` |
@@ -105,8 +105,8 @@ individual policies say.
 
 `Budget::reserve` refuses; it does not block. A worker that discovered mid-read
 that it had no permit would have to abandon work already started, which
-`docs/GOAL.md` rule 3 forbids ("never trade a typed refusal for a partial or
-guessed edit").
+the library's editing rule forbids: never trade a typed refusal for a partial
+or guessed edit.
 
 The consumption rule is therefore **admission-time**, matching how
 `SchedulerAdmission` already reserves worker stacks and channel state before a
@@ -214,7 +214,7 @@ impl ExecutionContext {
 - Rayon remains a private implementation detail of `litchi-cfb` and
   `soapberry-zip`. No Rayon or Tokio type appears in any public signature. There
   is still no global pool.
-- `docs/GOAL.md` rule 7 forbids exposing "executors, runtime handles" through
+- The library does not expose executors or runtime handles through
   **ordinary public CRUD APIs**. `ScopedWorkers` is a caller-implemented trait
   that appears only on `ExecutionContext`, which is already an advanced-ingress
   type that no `Document`, `Workbook`, `Presentation`, worksheet, slide or
@@ -248,7 +248,7 @@ against `max_in_flight_bytes` in the same way `min_parallel_bytes` already is.
 A batch whose individual tasks are below the floor stays serial even when the
 aggregate clears `min_parallel_bytes`.
 
-This field is not named by Workstream F's list; it is
+This field is not named by the parallelism list; it is
 proposed because the measured evidence points at it more
 directly than at anything else in this record. A reviewer who wants the record
 narrowed should strike §7 first.
@@ -296,7 +296,8 @@ path faster; it makes an existing path bounded.
   the same table at a higher field count.
 - *A process-global registry of live sessions.* Rejected on ADR 0005 grounds
   ("no hidden global Rayon pool" is a specific case of a general refusal of
-  ambient process state) and on `docs/GOAL.md` rule 8.
+  ambient process state) and because ambient Rayon or Tokio behavior is not
+  added where an explicit execution context is required.
 - *A blocking semaphore instead of a fail-fast reservation.* Rejected: a
   blocking acquire inside a worker that already holds a `Workers` permit is a
   deadlock the type system cannot rule out, and a mid-operation stall is not a
@@ -322,7 +323,7 @@ Acceptance should require, at minimum:
    facility never changes an error identity, an ordinal selection, or a
    cancellation outcome.
 5. An API audit proving no ordinary CRUD signature names `ScopedWorkers`,
-   satisfying `docs/GOAL.md` rule 7.
+   so ordinary CRUD APIs expose no executor or runtime handle.
 6. A crate-boundary check proving `soapberry-zip` still does not depend on
    `litchi-core`.
 7. Re-running the scaling captures with the new

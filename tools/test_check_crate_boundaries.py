@@ -4352,8 +4352,8 @@ class BoundaryPolicyTests(unittest.TestCase):
         archive_edge = boundaries.Edge("litchi-iwa-archive", "litchi-iwa-package")
         all_policy_edges = self.policy.canonical_edges | self.policy.migration_edges
         # Derive the expected inventory from the reviewed JSON rather than a
-        # hard-coded count, so a registered edge (each one carries its ADR
-        # 0024 amendment) does not break this test while a parser that drops,
+        # hard-coded count, so a registered edge does not break this test
+        # while a parser that drops,
         # invents or merges an edge still does.
         registered_edges = {
             boundaries.Edge(dependent, dependency)

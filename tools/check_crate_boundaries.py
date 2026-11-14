@@ -4204,8 +4204,6 @@ KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_FUZZ_CODEC_ALTERNATES = (
     ),
 )
 KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_DOC_SOURCES = (
-    Path("docs/adr/0008-migration-and-verification.md"),
-    Path("docs/adr/0028-iwa-monolith-exit.md"),
     Path("crates/litchi-keynote/docs/FEATURE_MATRIX.md"),
 )
 KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_DOC_MARKERS = (

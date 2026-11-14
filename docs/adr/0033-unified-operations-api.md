@@ -9,9 +9,8 @@
   [ADR 0024](0024-current-topology.md) inventory.
 - Raised by: the design consensus
   [`docs/UNIFIED_OPS_API_DESIGN.md`](../UNIFIED_OPS_API_DESIGN.md) (agreed
-  2026-09-20, revised 2026-10-01, migration assessment 2026-10-04), the
-  execution goal [`docs/UNIFIED_OPS_GOAL.md`](../UNIFIED_OPS_GOAL.md) including
-  its owner override of 2026-10-04.
+  2026-09-20, revised 2026-10-01, migration assessment 2026-10-04), and the
+  owner override of 2026-10-04 described under Decision.
 
 ## Context
 
@@ -140,8 +139,7 @@ Topology (ADR 0002, ADR 0024):
   as a bulk root. That reclassification is part of the change that adds the
   first iWork edge.
   *Done (2026-10-15): `litchi-ops` and
-  `litchi-cli` left the bulk slice as the iWork-capable unified layer; see
-  the ADR 0024 amendment of that date.*
+  `litchi-cli` left the bulk slice as the iWork-capable unified layer.*
 
 Format features of `litchi-ops` mirror the facade's per-format features; they
 are inert until the corresponding leaf edge exists.

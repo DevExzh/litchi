@@ -11,8 +11,8 @@
 #   GATE_OUT       result directory (default: $GATE_DIR/target/gate-results/<name>).
 #   GATE_EXTRA     extra clippy `-p` arguments for row 1.
 #   GATE_OFFLINE   set to 1 to forbid network access (CARGO_NET_OFFLINE).
-#   GATE_LOCK_SEED Cargo.lock to copy into a checkout that has none (the root
-#                  lock is untracked by policy, ADR 0028).
+#   GATE_LOCK_SEED Cargo.lock to copy into a checkout that has none (this
+#                  library workspace does not track its root lock).
 #   CARGO_HOME, RUSTUP_HOME, HOME  toolchain location (defaults derived from
 #                  the passwd entry, so a systemd scope with an empty
 #                  environment works the same as a login shell).
@@ -120,7 +120,7 @@ if ! rustc -V >/dev/null 2>&1 || ! cargo -V >/dev/null 2>&1; then
     exit 2
 fi
 
-# Root Cargo.lock: this library workspace does not track it (ADR 0028), but
+# Root Cargo.lock: this library workspace does not track it, but
 # several rows (feature matrix, --locked legs) need one. A checkout without a
 # lock gets GATE_LOCK_SEED (e.g. the trunk worktree's lock) or, without a
 # seed, a freshly resolved one; either way `cargo metadata` then reconciles it
