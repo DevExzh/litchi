@@ -14,13 +14,16 @@ returns `SourceChanged`.
 Opening performs container, relationship/catalog, security, and mandatory
 structural validation. Semantic payloads load lazily into thread-safe weighted
 caches. Clean parsed values are evictable; active handles pin them; dirty edit
-state is never silently evicted. Cache behavior is semantically invisible.
+state is never silently evicted. Cache behavior is semantically invisible; see
+[Caches and retained state](#caches-and-retained-state) for the two kinds of
+retained state that are not evictable caches.
 
 Every operation charges a hierarchical resource budget supplied by an execution
 context. Production-safe desktop, server, and trusted-batch profiles are finite.
 Callers may raise specific configurable limits but cannot bypass integer,
 nesting, decompression, or structural safety ceilings. Limit errors identify the
-resource, observed value, limit, and object path.
+resource, observed value, limit, and object path. A budget may be charged in
+chunks through a lease; see [Budget leases](#budget-leases).
 
 Scratch storage is an explicit capability. Litchi never spills decrypted or
 sensitive content to plaintext temporary files automatically. Supported scratch
@@ -34,12 +37,9 @@ temporary artifact, validation/finalization, flush/fsync as supported, and atomi
 replacement. Cancellation leaves the destination untouched and performs
 best-effort identity-aware cleanup of the temporary artifact. Caller-owned
 non-atomic sinks report incomplete output and
-bytes written.
-
-> **Amended 2026-09-24** (section "2026-09-24 amendment: caller-selected save
-> durability" below): "flush/fsync as supported" is the default `Full`
-> durability of every ordinary save; a caller may explicitly select a weaker
-> level for one save.
+bytes written. "Flush/fsync as supported" is the default `Full` durability of
+every ordinary save; a caller may select a weaker level for one save (see
+[Save durability levels](#save-durability-levels)).
 
 Every finalized document supports a sequential non-seekable sink by planning
 sizes and layout first or using explicit scratch storage. Preserve-mode save
@@ -56,2300 +56,153 @@ future hot path; runtime adapters are optional. CPU parallelism is opt-in throug
 an execution context controlling scheduling, affinity, cancellation, thread and
 memory budgets. There is no hidden global Rayon pool.
 
-## Measurement contract
-
-Representative small, large, sparse, media-heavy, encrypted, and malformed
-corpora gate open latency, lazy lookup, concurrent reads, disjoint writes,
-patching, and save. Track peak resident memory, allocations, copied bytes,
-decompression, cache misses, lock/contention time, CPU utilization, and scaling.
-Optimization decisions require profiles, flame graphs, and statistical evidence;
-intuition alone is not accepted.
-
-Generated IWA protobuf bindings are also kept minimal. Prost runtime type-name
-metadata remains disabled because no production path consumes it, while the
-first production archive-header seam uses exact-version Buffa 0.9.1 lazy views
-behind a private codec. This is a staged runtime migration, not permission to
-generate the complete schema corpus eagerly for every format.
-
-Physical iWork ingress bounds the two ZIP name spellings independently before
-copying either one. Local and central names, extras, and comments are charged
-cumulatively; compressed sizes are rejected before payload materialization.
-For legacy packages, catalog, component-catalog, and detection paths reject a
-nested `Index.zip` from its declared uncompressed size before decompression.
-Limit failures retain the resource kind and exact observed and maximum values.
-This layer does not yet promise a semantic object path in every physical ZIP
-diagnostic.
-
-Buffa lazy decoding of untrusted IWA bytes in focused format-owned and
-`litchi-iwa-core` ingress paths is preceded by a schema-directed common
-wire-tree preflight. Legacy host compatibility decoders remain migration debt:
-the `litchi-iwa` registry calls `archive_codec::decode_archive_info` and
-`decode_message_info` directly with bounded options, without this common
-preflight. One aggregate policy bounds scanned bytes, fields, nesting, repeated
-metadata items, deferred-message occurrences, and a conservative decoded-memory
-envelope before a lazy view is constructed.
-The adapter then visits every deferred archive-header child exactly once,
-checks proto2 required presence, and projects directly into the existing
-physical metadata with fallible destination reservations; generated
-`to_owned_message` is not a production ingress path. Buffa 0.9.1 still uses
-ordinary infallible `Vec` growth for some internal lazy metadata, so the
-preflight bounds hostile amplification but does not claim typed recovery from
-global allocator exhaustion or a language-level exact resident-memory bound.
-Strict contracts requiring either property must use a streaming handwritten
-cursor or a corrected Buffa runtime.
-
-The next production Buffa projection is deliberately smaller than a canonical
-format schema root. A derived five-file projection reads only repeated field 3
-of `TSWP.StorageArchive`, is hard-capped at 32 KiB of generated Rust, disables
-unknown retention, and exposes only borrowed text fragments through a private
-wrapper. Common-wire preflight bounds root bytes, fields, field type,
-fragment count, UTF-8 bytes, and the conservative repeated-view allocation
-before stock Buffa 0.9.1 runs. Other length-delimited fields remain opaque by
-design, so this projection is suitable only for call sites whose policy needs
-semantic text rather than eager validation of every unrelated known child.
-The caller-owned source remains authoritative, and no owned Buffa projection
-or lazy re-encoding participates in preservation.
-
-Keynote is the first concrete format owner to consume that projection in a
-production package path. Ingress counts all parsed IWA objects before one
-fallible exact reservation, stores only `(identifier, component, object)`
-locators, sorts them once, rejects duplicate identities, and performs later
-lookups by binary search. Slide records, semantic slides, builds, and text
-storages reserve fallibly from validated source counts. The text adapter is
-invoked only for graph-reachable typed storage payloads and receives the
-smaller of the physical message ceiling, the wire hard ceiling, and the
-remaining package-wide semantic text and fragment budgets. Streaming wire
-preflights count slides and used build/drawable references before generated
-Prost vectors are materialized; they also charge retained slide names and
-build/transition identifiers before semantic ownership conversion. Aggregate
-storage, fragment-range, reference, and UTF-8 counters include a content-free
-semantic path in every limit failure. Common-wire byte, field, nesting, and
-work ceilings are translated into the same format-owned counted diagnostic.
-Text extraction performs a checked sizing pass and one fallible destination
-reservation instead of building a temporary vector of cloned strings. These
-are bounded allocation and lookup-shape guarantees for the migrated fields;
-ignored nested fields still materialized by the generated Prost graph remain
-bounded only by the physical message profile and require a later focused
-projection. No throughput or RSS improvement is claimed without a
-representative benchmark.
-
-The concrete Numbers package uses the same bounded lookup shape without
-sharing Keynote's format graph. It counts all component objects before exact
-fallible reservation, stores one compact `(identifier, component, object)`
-locator and at most one primary-message classification per object, rejects
-duplicate global identities, sorts both arrays once, and resolves later
-references by binary search. This replaces package-wide linear object lookup
-and the previous one-index-entry-per-message amplification. Checked read
-options combine physical archive limits with non-zero hard-bounded ceilings for
-objects, rooted sheets, semantic tables, and rooted reference occurrences.
-Sheet/reference/table counts are charged before their semantic result vectors
-grow; structured table output is fallibly reserved one item at a time under
-the same table ceiling. Legacy type-6000 model discrimination still requires a
-complete bounded parse because genuine type-6000 table-info payloads are valid
-false positives; the object and physical message ceilings bound that fallback
-until its schema family receives a lazy Buffa projection.
-
-Core archive metadata is projected into core-owned `FieldPath`, `FieldInfo`,
-and closed-enum wrappers. Optional presence and unknown signed enum values are
-retained exactly. Preflight charges both the transient Buffa representation and
-the neutral destination vectors, including unknown closed-enum records, before
-publication.
-
-Lazy re-encoding is not the preservation boundary. Original source-backed
-header bytes and common raw spans remain authoritative for exact no-ops,
-unknown fields, duplicate occurrences, and non-canonical encodings. Buffa
-encoding is used only for the canonical header created after a semantic change.
-
-Borrowed IWA wire readers use the common source-bound `WireView<'a>` and
-`WireFieldView<'a>` when interpreting recognized fields: one borrowed source
-and compact spans avoid per-field slice metadata, payload ranges are sliced
-through validated spans, and schema-owned key/length framing can be required
-without changing the permissive unknown-field parser. Singular wire overlays
-index base and overlay field numbers once and emit one exact-capacity output,
-so sparse updates do not repeatedly reparse a growing message. Source-built
-Pages, Numbers, and Keynote chart updates also locate their single chart
-payload with one linear scan and
-no temporary index allocation before decoding or invoking a mutation callback.
-These are allocation-shape and safety improvements; representative allocation,
-latency, and throughput measurements remain governed by the measurement
-contract above and are not claimed by this slice.
-
-Reference-line graph updates likewise avoid a full generated-Prost round-trip:
-bounded raw fields are merged by repeated-field occurrence and only recognized
-values are replaced, so unknown graph bytes are copied once at their original
-nesting positions. The candidate field collection is validated before
-publication. This reduces avoidable graph allocations while remaining a
-structural optimization rather than a measured throughput claim.
-
-Instrumentation is an opt-in runtime-neutral observer with optional tracing and
-profiling adapters. It never records document content, credentials, or sensitive
-paths by default.
-
-## 2026-08-08 amendment: direct Keynote settings projection
-
-The focused Keynote settings reader uses the existing schema-directed Show and
-SlideTree preflight, including the caller's slide-reference ceiling, before a
-private Buffa settings projection is forced. Unlike the full Show projection,
-it does not allocate or retain the slide-node identifier collection and does
-not initialize the package's full semantic slide cache. This is a bounded
-allocation-shape statement only. The format and codec validation layers may
-both scan the payload, and no O(1), single-pass, latency, RSS, allocation-count,
-or throughput result is inferred without measurement.
-
-## 2026-08-08 amendment: bounded Pages section-name rewriting
-
-The Pages section-name transaction retains the package's original limits and
-checks input/output package bytes, entry and aggregate bytes, IWA object and
-message counts, retained name bytes, protobuf bytes, fields, nesting, and
-rewrite work. Fallible reservations precede owned copies, size arithmetic is
-checked, and the complete candidate is reopened under the same limits before
-publication. A no-op shares the existing `Arc` and avoids package reassembly
-and reparsing.
-
-For a changed exact package, the implementation locates the selected native
-section privately, performs a bounded canonical-wire preflight, replaces only
-length-delimited field 26, preserves the complete IWA object header with
-`replace_message_preserving_header_with_limits`, recompresses one component,
-and reassembles the source catalog. Untouched ZIP members and their raw local
-and central records remain exact except for central-directory offsets that
-must move when the changed member length changes.
-
-No generated Buffa or Prost message is materialized for this preservation
-rewrite. That is deliberate: raw validated field records are the authority for
-unknown fields, duplicate ordering, encoded keys, and length headers. This is
-an allocation-shape and boundedness statement only; it makes no O(1),
-single-pass, latency, RSS, allocation-count, or throughput claim without the
-measurement protocol above.
-
-## 2026-08-08 amendment: retained semantic text accounting
-
-The neutral iWork aggregate now measures the UTF-8 bytes of every owned string
-that survives in the archive-free result. Keynote accounting includes the show
-title and owned unknown animation/transition identifiers; known static effect
-labels consume no owned-text budget. Its failure observation follows the same
-title, slide content, additional storage, and speaker-notes order exposed by
-the public semantic model.
-
-Pages now separates rendered text length from retained text. Section names,
-headings, paragraphs, and storage text are charged once, while synthesized
-rendering separators and temporary `Option<Box<str>>` slots are not charged as
-UTF-8. A rejection reports the checked observed byte count (or `usize::MAX` on
-arithmetic overflow) through the focused crate and root facade rather than
-fabricating `limit + 1`. Exact-limit and one-under regressions lock these
-rules. This is a correctness and boundedness result; it makes no latency,
-allocation-count, throughput, or peak-RSS claim.
-
-## 2026-08-16 amendment: bounded Numbers root, sheet, and storage views
-
-The focused Numbers package removes four eager application-payload decodes from
-its production package reader. The type-1 document root is projected through
-the existing strict `numbers_sheet_order_codec` view; standard and form-based
-type-2/3 sheets use the bounded name/drawable preflight; and compatibility
-storage text uses the shared bounded `ValidatedStorage` path from
-`litchi-iwa-text-wire`. The semantic reader therefore retains only the root
-sheet references, borrowed sheet name and drawable spans, and the text needed
-by its public diagnostic. It does not construct a generated document, sheet,
-form-sheet, or storage object for these paths.
-
-Each selected payload is bounded before publication by input bytes, traversed
-fields, nesting, aggregate wire work, and the caller's remaining semantic
-references or text output. Sheet names, drawable references, and joined storage
-text are checked before owned allocation; malformed storage candidates retain
-the established compatibility skip behavior, while malformed rooted document
-and sheet ownership fails atomically. Standard/form sheet parity, duplicate
-references, missing objects, and strict-versus-Buffa disagreement remain
-failure cases. Raw component bytes remain the preservation authority, so the
-private Buffa views neither retain unknown fields nor encode replacement data.
-
-This is an allocation-shape and boundedness improvement, not a measured
-latency, RSS, or complete Numbers Buffa-laziness claim. Table, tile, formula,
-sidecar, and other native graph paths remain separate migration work and may
-still use generated Prost values behind their own limits.
-
-## 2026-08-16 amendment: bounded Numbers names dependency and pivot guards
-
-The focused Numbers names transaction removes its remaining production
-generated-message reads from the changed-only dependency guards. The rooted
-calculation-engine route is inspected through the existing strict
-`numbers_table_cell_dependency_codec`: its calculation-engine envelope,
-dependency tracker, and formula-owner dependency records are borrowed
-Buffa-checked snapshots. The raw field-3 root reference and the repeated
-tracker field-6 records are still cross-checked against object metadata,
-local-reference framing, and declared paths. The volatile name-dependency
-field that is intentionally opaque in the sidecar is checked with a narrow
-raw-wire presence scan; an empty coordinate set does not count as a
-dependency.
-
-The pivot guard is intentionally narrower than a table-cell read. It scans
-only `TST.TableModelArchive` field 85, requires one canonical local
-`TSP.Reference` when present, and does not force or recursively walk the table
-data-store graph merely to decide whether a rename is supported. This keeps
-the conservative native `O(T²)` rooted-table traversal, while the transaction
-charges the complete over-approximation (`selected changes × rooted topology`
-plus the quadratic table term and object term) against `WireWork` before any
-changed component is scanned or rewritten.
-
-Every selected dependency/pivot payload receives bounded input bytes, fields,
-work, references, text, and nesting options. The format maps codec resource
-errors into content-free `names::LimitKind` values, preserves fallible
-collection growth, and rejects malformed, duplicate, wrong-wire, non-local,
-or metadata-inconsistent routes before publication. The raw component remains
-the preservation authority; private Buffa views retain no unknown fields and
-never encode replacement bytes. The package-wide hard ceilings remain 512 MiB
-input/output, 1,000,000 fields, depth 64, and 16,000,000 rewrite-work units.
-
-This is a bounded allocation-shape and production-boundary result. It does not
-claim a measured latency, RSS, allocator-count, or throughput improvement,
-and it does not make the complete Numbers table/formula/sidecar graph
-generated-message-free. The ordinary Numbers manifest still retains its
-compatibility Prost paths where unrelated table extraction and editing code
-requires them.
-
-## 2026-08-17 amendment: bounded Numbers rich-text payload envelope
-
-The Numbers table extractor now treats its bounded raw-wire preflight as the
-authoritative projection of the small type-6218
-`TST.RichTextPayloadArchive` envelope. The preflight scans the complete
-message, requires one canonical length-delimited local storage reference in
-field 1 and one cell-owner value in field 3, and validates the nested local
-reference framing before returning the storage identifier. The extractor
-forwards that identifier directly to the existing bounded
-`litchi-iwa-text-wire` storage path. It no longer constructs a generated
-`RichTextPayloadArchive` with Prost merely to read the same reference and
-compare it with the already-validated projection.
-
-This removes one redundant generated allocation and one duplicate parse from
-the rich-text path without changing its source authority. Unknown envelope
-bytes remain owned by the original component and are neither retained in the
-private projection nor re-encoded. Storage validation and materialization still
-charge physical bytes, fields, nesting, references, wire work, UTF-8 text, and
-the caller's remaining aggregate semantic text budget before owned output is
-published; document projection retains the existing strict validation/text
-length parity check. The focused ratchet excludes only test fixtures and
-rejects a production `RichTextPayloadArchive::decode`; it intentionally does
-not claim that the broader Numbers extractor or crate is Prost-free.
-
-The 2026-08-17 gate recorded 298 passing and four ignored tests in the
-all-feature Numbers library suite, including nine focused rich-text projection
-tests,
-16/16 document-reader integration tests, and 267/267 boundary-policy tests.
-The live boundary graph remains 64 workspace packages,
-240 internal declarations, and the unchanged 14 ordered `litchi-iwa`
-migration debts. Existing formula/rich-text and basic Numbers application
-fixtures remain the native semantic oracles; this read-path-only change does
-not alter their bytes or require a new native mutation claim. This is a bounded
-allocation-shape improvement, not a measured latency/RSS result or a complete
-table, tile, formula, comment, or host-editor migration.
-
-## 2026-08-21 amendment: OPC exact-source authorization
-
-For OPC, direct byte-identical no-op publication has one authority: the owning
-package or source-backed object must retain its exact source artifact and an
-unrevoked exact-source authorization. Preservation provenance, ZIP indexes,
-and reconstructed graph equality are planning evidence only; none of them can
-authorize exact passthrough or a normalizing full-writer fallback. Any mutable
-OPC seam revokes that authorization. A changed owned source is publishable only
-through a proven preservation plan; if physical framing or opaque members cannot
-be preserved, publication returns a typed capability refusal before output.
-
-## 2026-08-20 amendment: focused Numbers type-6002 Tile production-decode exit
-
-The focused Numbers extractor now routes native type-6002 `TST.Tile` payloads
-through the no-`Vec` transactional
-`numbers_table_cell_storage_codec::decode_tile_with_visitor` path. A strict
-handwritten canonical router owns root and row framing, required and duplicate
-field checks, canonical scalar and Boolean validation, unknown/group handling,
-and aggregate resource accounting. Private Buffa lazy views are forced only
-for parity after the strict route; no generated Tile value is published by
-production. Row callbacks expose payload slices borrowed from the caller-owned
-component source. The production ratchet rejects both generated
-`Tile::decode` and `TileRowInfo::decode` (including `tst::Tile::decode` and
-`tst::TileRowInfo::decode`); Prost remains a test-only oracle and fixture
-builder.
-
-The row visitor applies a prefix materialized-cell guard before attempting cell
-materialization. After a semantic cell error is retained, later rows continue
-through strict wire validation so the decoder can return its full
-`DecodeReport`, without growing the semantic table. The extractor then charges
-that complete report, charges the aggregate materialized-cell count, and only
-then surfaces the retained semantic error. A later malformed wire error
-therefore overrides an earlier semantic cell error, while an aggregate
-materialized-cell limit takes precedence over a retained semantic error. Each
-table candidate owns a local table and candidate budget; rejected candidates
-publish neither cells nor retained output, although bounded decode work remains
-an aggregate admission cost.
-
-This turn also hardens legacy type-6000 admission: strict shape classification
-still ignores TableInfo false positives, while schema-shaped legacy models hit
-the table budget before Prost decode/materialization and cannot commit rejected
-candidate budgets.
-
-This removes the duplicate Tile parse and row-buffer copies from the production
-path. The decoder's row payloads are source-borrowed, but the change is not an
-end-to-end zero-copy claim. The 2026-08-20 evidence records 221
-`litchi-iwa-protos` tests, 311 passed and four ignored Numbers unit tests, and
-all 14 integration binaries passed (120 tests total), including
-`document_reader` 16/16 and `tile_reader_integration` 2/2. Boundary is 271;
-the live audit is 64 workspace packages, 240 internal declarations, and 14
-unchanged ordered debts. The final temp-corpus nightly ASan smoke ran 100
-runs with eight seeds. A read-only native Numbers ZIP and directory hash/UI
-gate also passed against its known hashes.
-
-No measured performance, latency, RSS, native save, or native mutation claim
-follows. This is not a complete extractor, Numbers, or monolith exit: eight
-production generated decodes remain in the extractor, the older `litchi-iwa`
-Tile paths remain, and debt 015 plus all 14 ordered migration debts are
-unchanged.
-
-## 2026-08-21 amendment: bounded Numbers TableDataList and Segment ingress
-
-The focused Numbers extractor now routes native `TST.TableDataList` and
-`TST.TableDataListSegment` payloads through a strict handwritten wire router
-and the private Buffa lazy-view projection. The same strict ingress is used by
-both Package and Document extraction. Document intentionally skips comment
-resolution, as required by its projection contract; Package retains strict
-comment validation. Production retains only the final semantic table values
-needed by a candidate, plus bounded segment-id/key tracking where required,
-with fallible reserves. It does not claim zero-copy operation or the absence
-of all `Vec`/`HashSet` storage.
-
-The route preserves required-field, duplicate, canonical-wire, UTF-8,
-reference, segment-range, ownership, and candidate-publication checks. Input,
-output, field, nesting, and aggregate work remain bounded by the package
-ceilings of 512 MiB, 512 MiB, 1,000,000 fields, depth 64, and 16,000,000 work
-units, with tighter per-payload and semantic text budgets applied before
-fallible allocation. Unknown bytes remain owned by the raw component and are
-not re-encoded by the private view. FormulaArchive and the legacy `litchi-iwa`
-comment path remain explicit migration debt; five generated extractor decodes
-remain (four table-model decodes and one FormulaArchive decode). The former
-generated comment decode is no longer part of this extractor path.
-
-The 2026-08-21 evidence records 237 `litchi-iwa-protos` tests, 49 focused
-extractor tests, 14 TDL integration tests, and 281 boundary tests. The live
-boundary graph remains 64 packages, 240 declarations, and 14 ordered debts.
-The TDL fuzz corpus has 11 seeds and completed 100 nightly ASan runs without
-an artifact. A disposable native Numbers 1,200-by-8 artifact was created,
-saved, closed, and reopened through the application; strings, formula
-results, an intentional formula error, rich text, and a persisted comment were
-observed without a repair dialog. Its archive listing contains DataList
-members, but no parsed type-6011 Segment was established. This is correctness
-and boundedness evidence only: it makes no native segment, native
-save-mutation, performance, host-exit, or complete-monolith-retirement claim.
-
-## 2026-08-21 amendment: bounded Numbers CommentStorage migration
-
-The focused Numbers extractor now routes `TSD.CommentStorageArchive` payloads
-through a strict handwritten CommentStorage codec and a private Buffa lazy
-projection. Package keeps strict comment validation and resolution;
-Document deliberately skips comment resolution. Per-cell comment values are
-materialized only after strict validation, with bounded, fallible reserves and
-candidate-local publication. The private projection is a parity view, while
-the caller-owned raw bytes remain the preservation authority.
-
-FormulaArchive and the legacy `litchi-iwa` comment path remain explicit
-migration debt. Five generated extractor decodes remain (four table-model
-decodes and one FormulaArchive decode); the former generated CommentStorage
-decode is no longer part of the production extractor path. Legacy monolith and
-dependency edges, plus all 14 ordered migration debts, remain unchanged.
-
-Evidence on 2026-08-21 records 237 `litchi-iwa-protos` tests, 324 passing
-Numbers library tests with four ignored (including 53 focused extractor
-tests), 14 integration tests, and 281 boundary tests. The CommentStorage fuzz
-corpus has 20 seeds, and its nightly ASan smoke completed 100 runs cleanly
-without an artifact. A disposable native Numbers 1,200-by-8 document with
-comment, formula, and rich-text content was saved, closed, and reopened
-without a repair dialog. Its archive listed DataList members, but no parsed
-type-6011 Segment proof was established. This is bounded correctness evidence
-only: it makes no native segment or save-mutation, performance, host-exit, or
-complete-monolith-retirement claim.
-
-## 2026-08-23 amendment: Keynote plain-text allocation shape
-
-`Slide::plain_text` now computes a checked aggregate UTF-8 length for its
-semantic text values, reserves one output `String` when representable, and
-appends directly in source order without first constructing the intermediate
-`Vec<String>` used by `all_text()`. Empty text storages remain filtered, while
-empty modeled values retain their separators. This is structural allocation
-shape and ordering evidence only; it makes no allocation-count, latency, RSS,
-throughput, or peak-memory claim and is not a measured performance result.
-
-## Current present status
-
-The recorded detached baseline reports 64 workspace packages, 239 internal
-dependency declarations, and 13 ordered migration debts; its commit/tree
-provenance is unavailable in this checkout. Its focused protocol codec check
-records 33 passed tests; the full `litchi-iwa-protos` suite records 267 passed
-and 0 failed. The baseline Numbers library gate records 356 passed tests with
-four ignored. The baseline `litchi-iwa` library gate records 1,442 passed
-tests; the Pages all-target gate records 149 passed tests, and the Keynote
-all-target gate passes. These detached-baseline metrics are historical
-evidence, not current-wave gate results. The prior XLS certification gate
-remains at 2,146 passed across BIFF15/CFB254/XLSB603/XLS1274.
-
-Native no-repair reopen evidence covers Keynote transition/title and Pages
-body/background paths. A native Numbers rich/formula/comment reopen retained
-the exact `Persistent TDL comment`; its archive inspection recorded 24
-type-6005 entries and 0 type-6011 entries. This does not establish the
-type-6011/Segment path, whose proof remains withheld.
-
-FormulaArchive and the legacy `litchi-iwa` comment path remain explicit
-migration debt; legacy monolith/dependency edges and all 13 ordered debts
-remain open. These checks provide focused correctness/boundedness and native
-no-repair evidence only: no native segment/save-mutation, performance,
-host-exit, or complete-monolith-retirement claim follows. The dated gate
-counts above remain historical evidence.
-
-## 2026-08-23 boundary-audit disposition
-
-At committed HEAD `4e84abdf`, the Cargo metadata snapshot contains 64 workspace
-packages, 239 internal dependency declarations, and 13 ordered policy debts.
-Those figures are inventory evidence only: the complete
-`tools/check_crate_boundaries.py` run is not green and reports 20 focused
-Pages table-lock flat-alias findings: 18 findings for the six compatibility
-aliases introduced by `093b82f40` (three public sites each), plus two
-pre-existing findings for `TableLockState` and the shared `TableSelector`
-export. This disposition changes no policy edge, debt item, ownership
-assignment, or verification gate.
-
-## 2026-08-23 follow-up: aggregate comment-scan scope
-
-Committed HEAD `22e8c58ca` only changes where the bounded Numbers comment-cell
-scan-work counter is accumulated: the counter now spans the model/cell scan
-instead of resetting for each table. The change does not alter Cargo metadata
-or the boundary-checker topology, and it does not turn the historical
-`4e84abdf` 20-finding audit above into a current-wave gate. No policy edge,
-debt item, ownership assignment, or verification result changes here.
-
-## 2026-08-23 amendment: typed Pages footnote limit preservation
-
-The committed `33656a7f0` change keeps the Pages footnote rewrite seam's
-resource failures typed. `rewrite_custom_mark_wire` now checks the
-selected/after field arithmetic instead of saturating; overflow is reported
-as `WireFields`. Candidate verification runs `native_footnotes` before
-semantic readback so aggregate text and entry ceilings can surface as
-`TextBytes` and `Entries`; `map_package_error_with_kind` maps `TextTooLarge`
-and `TooManyBodyStorages` into those categories. The focused source test
-`semantic_package_limits_keep_typed_footnote_error_categories` covers
-`TextTooLarge { observed: 9, limit: 8 }` to `TextBytes` and
-`TooManyBodyStorages { actual: 5, limit: 4 }` to `Entries`; no test execution
-result is claimed here.
-
-This is bounded error classification and checked-arithmetic evidence only.
-It does not claim package-wide accounting, allocation or performance
-measurements, native round-trip behavior, migration-debt retirement, host
-exit, or `litchi-iwa` monolith deletion.
-
-## 2026-08-23 amendment: current HEAD bounded follow-up
-
-The prior dated evidence and scope notes remain historical as written. At
-committed HEAD `4f2c14484` (parent `609d44049`), the post-`b208dbd77` changes
-are bounded source, test, deprecation, and fuzz-harness hardening:
-
-- `d131176b4`, `94b07ffc5`, `03cee9a79`, and `7a497d1ef` retain and ratchet the archive
-  production Buffa lazy-view boundary by rejecting generated eager helpers;
-- `6b705d39b`, `f8060a43f`, and `447cb3ec3` keep duplicate unselected/shared
-  Keynote slide owners rejected before read or staging and add focused
-  coverage;
-- `33656a7f0` and `8254df4e9` preserve typed Pages footnote wire and
-  semantic/rewrite limit categories;
-- `cd2dc0ca5` deprecates only the legacy raw-ID Pages section-clear API;
-- `d3b1bd571` and `5abf10bb4` add mixed reorder/replacement cache-publication
-  coverage;
-- `95356f2a8` rejects case-insensitive worksheet-name duplicates;
-- `543f74a37` makes Numbers table-header growth fallible per iterator item;
-- `cca10f240` redacts native reference identifiers from diagnostic formatting;
-- `7effedb57` adds a deprecation boundary to legacy raw-ID Numbers
-  cell-comment APIs while retaining compatibility and migration-host paths;
-- `609d44049` fixes BIFF8 supplementary-character length accounting and adds
-  validation-string round-trip coverage;
-- `4f2c14484` charges nested table-lock references before declaration-map
-  reservation and adds a low-ceiling budget case;
-- `b5a9d5994` bounds CFB fuzz input to 4 MiB, while `1446dc8e7` bounds RTF
-  fuzz inputs to 1 MiB and parser/opaque work; both supply campaign recipes
-  only.
-
-No test/build/Cargo execution, sanitizer campaign, native application
-result, performance/allocation measurement, dependency-edge or ordered-debt
-change, host-exit, or monolith-deletion result is admitted by this amendment.
-
-## 2026-08-23 amendment: current HEAD truth audit
-
-The preceding `4f2c14484` note is historical. At committed HEAD
-`51ca8eae7` (parent `9366d0a00`), the intervening source changes remain narrow:
-
-- `b316320c9` marks the `litchi-iwa::raw` compatibility facade deprecated and
-  makes the boundary checker require that marker. Its policy update only
-  clarifies ordered debt 9's reason and exit condition; it removes no edge or
-  debt item.
-- `e4533c17d` lets focused and migration-host Keynote chart-title setters take
-  `AsRef<str>`. `ChartTitleEdit::set` still copies through the existing
-  64-MiB visible-title ceiling before staging. The owned-input cases are
-  source-level tests, not an executed test gate.
-- `9366d0a00` only removes needless `&Cell` borrows in XLS test calls.
-- `51ca8eae7` changes Pages footnote edit publication to use fallible exact
-  reservations for staged text and custom-mark copies and adds typed mapping
-  cases. This is edit-local allocation hardening, not package-wide accounting
-  or a peak-memory bound.
-
-The archived HEAD metadata still contains 64 workspace packages, 239 internal
-dependency declarations, and 13 ordered debts. The complete boundary checker
-is not green at this HEAD: it reports 22 findings (two Keynote
-slide-transition validator exports, 18 Pages table-lock alias sites, and the
-two existing `TableLockState`/`TableSelector` aliases). These are inventory
-and source-audit observations only. No test/build/Cargo execution, native
-application result, performance measurement, Buffa/Prost or generated-schema
-boundary change, dependency-edge/debt retirement, host exit, or monolith
-deletion follows from these commits.
-
-## 2026-08-23 amendment: current HEAD extension after the truth audit
-
-The preceding `51ca8eae7` audit is historical. At current committed HEAD
-`ff782f2f5` (parent `dab07a09f`), `dab07a09f` extends the existing bounded
-Keynote chart-graph ownership scan to count both non-style owners and title
-stand-ins, rejecting a shared title stand-in before read or edit and adding a
-focused malformed-graph case. It changes no chart-title wire authority or
-package-wide limit profile. `ff782f2f5` marks the three legacy
-`KeynoteSlideInfo` native text-storage ID fields deprecated and adds a source
-ratchet; the migration-host compatibility value remains available.
-
-These are source-level ownership/deprecation changes. No test command, native
-application result, performance measurement, Buffa/Prost projection change,
-dependency-edge/debt retirement, host exit, or monolith deletion is admitted.
-
-## 2026-08-23 amendment: current HEAD extension after cache and stale-metadata fixes
-
-The preceding `ff782f2f5` note is historical. At current committed HEAD
-`8cddd44af`, `09286432e` charges the empty body-table metadata inventory
-before declaration reservation and rejects stale field-9 table declarations
-as invalid source rather than treating them as an ordinary selector miss.
-The focused and integration cases are source-level coverage only.
-`8cddd44af` adds a test-only moved/replaced-entry cache invalidation case; it
-does not change production cache behavior. These changes do not establish a
-package-wide memory, latency, or performance result.
-
-The current Cargo inventory remains 64 workspace packages, 239 internal
-declarations, and 13 ordered debts. The complete boundary checker remains
-non-green with 22 findings (two Keynote slide-transition validator exports,
-18 Pages table-lock alias sites, and the two existing
-`TableLockState`/`TableSelector` aliases). No test execution, native result,
-Buffa/Prost or generated-schema change, dependency-edge/debt retirement, host
-exit, or monolith deletion follows.
-
-## 2026-08-23 amendment: current HEAD extension after deprecation and alias guards
-
-The preceding `8cddd44af` note is historical. At the then-current committed
-HEAD `546df8f04`, `406cff111` adds source ratchets requiring the retained
-Numbers cell-comment and Pages section-text compatibility methods to stay
-deprecated;
-it adds boundary unit cases but changes no runtime format path. `546df8f04`
-rejects aliased Keynote slide/show/node identities before transition reads or
-staging and adds malformed-topology coverage. The existing bounded owner-work
-profile is retained; no package-wide or performance result is implied.
-
-No test command, native application result, Buffa/Prost or generated-schema
-change, dependency-edge/debt retirement, host exit, or monolith deletion is
-admitted by these source and boundary-ratchet changes.
-
-## 2026-08-23 amendment: Wave45 source-only follow-up at HEAD 97972ce74
-
-The preceding `546df8f04` note is historical. At committed HEAD
-`97972ce74` (parent `875fe2a48`), the intervening Wave45 changes remain
-bounded source hardening and staged budget work:
-
-- `6d7f1a701` repairs the Pages native-message provenance guard markers and
-  adds a direct guard check. The supplied direct Pages guard evidence is
-  `16/16`; this is scoped guard evidence, not a full workspace gate.
-- `1bad9156e` tightens the strict Numbers TableDataList/Segment route probe:
-  known repeated entry/segment fields must carry length-delimited wire shape
-  before a candidate is admitted to full decode. This is source-level wire
-  hardening; no test execution is recorded here.
-- `875fe2a48` stages private `BundleExtractionLimits`,
-  `BundleExtractionBudget`, `BundleExtractionContext`, and
-  `BundleExtractionTransaction` for cumulative fields/work/text/output
-  charging and atomic publication. The seam is explicitly `dead_code`-allowed
-  pending neutral-decoder cutover and does not widen the 6005/6201/6011
-  compatibility routes. Review was limited to rustfmt/diff; Cargo was blocked
-  before this repair, so no Cargo or test result is claimed.
-- `97972ce74` repairs the Keynote soundtrack projection digest and adds a
-  scalar provenance guard. The supplied soundtrack-focused `cargo check`
-  passes; the full `litchi-iwa-protos` test remains blocked by the
-  `table_info` compile failure.
-
-These changes establish no native or type-6011 result, full-workspace
-verification, Buffa/Prost exit, generated-schema retirement, dependency/debt
-change, host exit, monolith deletion, or performance measurement.
-
-## 2026-08-24 amendment: accepted bounded follow-up at `2bbf3c64`
-
-The historical tails above are retained. The accepted chain from `7468fdfc4`
-through `2bbf3c64` remains narrowly scoped:
-
-- `7468fdfc4` makes an exact-byte `EntryStore::replace_data` replacement a
-  copy-on-write no-op and its focused case asserts shared state and payload
-  `Arc` identity (`Arc::ptr_eq`); it adds no wire or package-wide memory
-  measurement.
-- `322032c10` deprecates the three legacy raw-ID Keynote chart-title methods
-  and adds boundary source ratchets requiring the typed selector methods;
-  the compatibility methods remain available.
-- `031678a31` covers the strict alternate type-`6201` TableDataList route,
-  rejects a non-canonical duplicate scalar before public projection, and
-  explicitly uses only synthetic type-`6011` segment fixtures; it is not
-  native Segment evidence.
-- `2bbf3c64` shares one `FootnoteSemanticBudget` across source and candidate
-  projections, with the exact-cap case rejecting observed `19` at limit `14`;
-  fallible reservations remain local and this is not package-wide accounting.
-
-The current lightweight checks are `git diff --check` and the boundary-policy
-Python suite (`python3 -m unittest tools.test_check_crate_boundaries`, 314
-tests). No full-workspace Cargo gate is claimed: the surrounding checkout has
-a dirty/staged snapshot and `Cargo.lock` is not tracked by this parent. The
-clean archived Buffa/protos reports remain historical only (33 focused
-protocol tests and a full `litchi-iwa-protos` run at 267 passed/0 failed; a
-later strict Numbers/Buffa report recorded 237 passing protos tests). None of
-these four commits changes generated schema ownership or removes Prost.
-
-Prior reports supply only historical native no-repair and fuzz-smoke evidence:
-the Numbers comment/formula/rich-text reopen recorded 24 type-6005 and zero
-type-6011 entries, and the TableDataList/CommentStorage smokes recorded 100
-ASan runs with 11/20 seeds. They do not establish native type-6011 support or
-a current campaign. No performance/allocation result, Prost removal,
-host-edge or ordered-debt retirement, migration-host exit, or monolith
-deletion follows from this amendment.
-
-## 2026-08-23 amendment: Wave52 Numbers formula projection (bounded resource record)
-
-The preceding dated evidence and scope notes remain historical. The current
-Numbers formula slice moves the production fallback away from the per-cell
-generated `FormulaArchive` graph. A bounded owned copy of the admitted formula
-source (`FormulaArchiveBytes`) remains the exact-byte preservation authority;
-the production path does not re-encode that source. Strict schema-directed
-preflight charges the bounded bytes, fields, nesting, work, and
-repeated-entry/node counts before a private Buffa lazy per-node/event stream
-is admitted. The stream is forced for every selected node or event used by
-rendering. It does not materialize generated repeated fields or a generated
-`LazyRepeatedView`, and it does not call `to_owned_message`.
-
-Within the `litchi-numbers` formula path, the canonical Prost-generated
-builders and decoder remain a `cfg(test)`-gated oracle for differential
-fixture construction and parity checks. Commit `2c538d496` moves the direct
-`litchi-numbers` `prost` dependency from normal dependencies to
-dev-dependencies; it does not remove Prost from the workspace or from other
-owners.
-
-The exact isolated resource record used a detached snapshot plus a temporary,
-uncommitted bypass of the unrelated Pages provenance guard. The formula codec
-suite passed 36/36, the direct compatibility-renderer suite 7/7, the raw
-formula-envelope suite 9/9, and the scalar/fallback suite 9/9.
-`cargo check -p litchi-iwa-protos -p litchi-numbers --all-targets` passed.
-Strict `litchi-iwa-protos` library Clippy passed; strict `litchi-numbers`
-library Clippy stopped only at two untouched deprecated `object_count` calls
-and one untouched `manual_contains` finding. The boundary-policy suite passed
-319/319, with the tracked audit retaining 20 Pages findings and zero Numbers
-findings.
-
-Numbers 14.4 opened the read-only native fixture
-`/private/tmp/litchi-wave52-formula-native.2dgQQv/source.numbers` without a
-repair warning. The 1,200 by 8 table exposed 2,398 formulas, result `5` at E2,
-and the intentional division-by-zero at F2; inspecting and cancelling the
-formula editor left SHA-256
-`e0fb395b0e819583f14d72f1d4916ce482ff35dce9de895d3dfd26869888bbc9`
-unchanged. The Rust `read_numbers` example also reported one rooted sheet, one
-1,200 by 8 table with 9,600 materialized cells, and one compatibility table,
-with the same post-read hash. This is bounded reader and application-acceptance
-evidence only: no exact RSS, allocation, latency, performance, Rust/native
-formula parity, native save/reopen mutation, publication change, host exit,
-debt retirement, or monolith deletion is claimed.
-
-## 2026-08-24 amendment: Wave53 Keynote slide-background resource record
-
-Commit `0b12df5e1` applies the resource contract to the focused Keynote
-slide-background seam. The borrowed codec charges aggregate source scanning,
-selected fields, nesting, projection/iterator work, typed rewrite work,
-readback, and exact output size before the corresponding allocation. Fallible
-reservations cover handwritten output buffers and metadata/style rewrites;
-failed limit checks publish no partial package. Unknown source bytes are
-retained only when the selected typed rewrite can prove that its framing and
-nested fields remain safe. This is bounded operation-local accounting, not a
-package-wide peak-memory, allocation, latency, or throughput measurement.
-
-The focused manifest topology is unchanged. `litchi-keynote` keeps its direct
-`prost` edge in `dev-dependencies` for test-only compatibility oracles;
-`litchi-iwa-protos` retains normal `prost` because other generated owners still
-use it; and the earlier `litchi-numbers` formula migration retains its direct
-`prost` edge only in `dev-dependencies`. Wave53 introduces no normal
-dependency edge and does not claim workspace-wide Prost freedom or generated
-schema retirement.
-
-The frozen focused resource evidence is recorded in ADR 0008: 25/25 focused
-Keynote package cases, 19/19 background-codec cases, 13/13 package-metadata
-codec cases, and 9/9 migration-host background cases. Strict Keynote and
-protos Clippy passed; the three-crate all-target check passed with the
-checkout's existing warnings. These results establish bounded correctness and
-limit behavior for this seam, not a general performance result.
-
-## 2026-08-24 amendment: Wave54 Numbers table-cell storage reader resource record
-
-Commit `b7f720872` moves the three read-only Numbers table-cell storage
-helpers `resolve_table_string_values`, `table_data_list_has_entries`, and
-`rich_text_payload_entry_count` off owned generated `TableDataList` and
-`TableDataListSegment` graphs. The doc-hidden
-`litchi_iwa_protos::numbers_table_cell_storage_codec` now supplies borrowed
-root/segment snapshots and strict streaming visitors. Its private Buffa lazy
-views are forced only as parity checks; generated repeated storage does not
-escape. Generated messages remain in the unchanged mutation/writer paths and
-test oracles.
-
-Each admitted payload has explicit source-byte, field, work, nesting,
-reference, and selected-text limits. The host merges successful reports into
-one operation-local field/work/reference/text budget across root candidates,
-ordered segments, and rich-text package scans. Failed resource checks stop the
-operation; ordinary malformed candidates conservatively charge their complete
-source length before compatibility selection continues. Visitor output is
-staged with fallible reservations, and no partial strings, counts, or package
-mutation are published after a later segment failure.
-
-This is a finite reader-resource contract, not a measurement of peak memory,
-allocation count, latency, throughput, or package-wide performance. No
-manifest edge changes, generated-schema retirement, or workspace-wide Prost
-claim follow from this reader cutover.
-
-## 2026-08-24 amendment: Wave55 PackageMetadata registry reader resource record
-
-Commit `02eeb3acc29801838e3981236fd1e41ecbc44fee` moves only the three private
-`litchi-iwa` PackageMetadata registry queries
-`component_identifier_for_entry` (157 non-definition callers),
-`component_identifier_for_object_uuid` (14), and `component_uuid_identifiers`
-(41), 209 callers in total, through the doc-hidden
-`litchi_iwa_protos::package_metadata_codec` borrowed visitor. Mutation, writer,
-allocator, save-token, and data-reference routes remain on generated Prost
-messages.
-
-The reader derives package/effective-message limits and `WireLimits` for input,
-output, fields, work, nesting, components, and references. A strict two-pass
-preflight/visitor charges those finite resources before observations are
-accepted. Visitor results stay borrowed; the UUID query uses fallible
-`HashSet` staging, and byte, field, work, nesting, and allocation failures are
-typed and mapped without publishing partial observations. This is a bounded
-resource contract, not a performance, peak-RSS, or allocation measurement.
-
-Admission is intentionally narrower than permissive Prost decoding for the
-selected projection: selected fields require canonical singular required and
-nonzero values, valid UTF-8, canonical booleans, complete UUIDs, and valid
-nested references. Malformed versioned records therefore fail even when the
-three query results would otherwise ignore them. The codec validates only this
-projection, not the complete `PackageMetadata` schema; unknown noncanonical
-keys or lengths are rejected, while unknown noncanonical varint values and
-balanced unknown groups are accepted. No manifest/public-API, package-owner,
-workspace Prost-retirement, host, or monolith claim follows from this reader
-cutover.
-
-## 2026-08-24 amendment: Wave56 Numbers exact-alias resource record
-
-Commit `e4952f7eeaa196263a28fac6cf86510c3e11a2f6` admits only
-source-authoritatively exact copies of one Numbers object identifier in
-distinct physical components. `Index::from_components` counts every physical
-object before checking `max_objects` and before reserving locator/type storage.
-It then sorts the physical locators deterministically, rejects duplicate
-identifiers within one component, compares cross-component candidates, and
-coalesces an admitted alias group to one logical locator and one primary-type
-entry. `Package::object_count` continues to report the physical count.
-
-`ArchiveObject::same_content_ignoring_offsets` performs the alias comparison
-without allocation. It compares decoded `ArchiveInfo`, exact raw messages,
-header and payload lengths, and retained original and original-canonical
-header bytes; only component-relative header and payload offsets are ignored.
-Consequently, payload, metadata, raw-header, or framing divergence fails
-closed even when a neutral decoded projection would otherwise compare equal.
-
-Lookup comparison work is based on the deduplicated logical locator set,
-while index allocation, population, sorting, and comparison topology are
-charged from the physical count. The already-admitted component/message bytes
-remain part of package ingress and candidate-reopen accounting. This is a
-finite operation-local accounting contract, not a measurement or claim for
-package-wide peak RSS, allocation count, latency, or throughput. The slice
-changes no manifest edge and retires no Prost-generated schema or workspace
-dependency.
-
-## 2026-08-24 amendment: Wave57 Numbers name-publication resource record
-
-Commit `35c2ae281d40bc16c659c30dd3690a702a750ea0` extends the bounded Numbers
-name-publication operation through the PackageMetadata save-token sidecar.
-Follow-up accounting hardening is commit
-`ba57356166e82ff37ee1cd5223b68acd484aac42`. It removes detached, unmetered
-candidate-size `Budget` work: candidate sizing and selector comparisons now
-share the reported `Budget`, a test-only aggregate proves every successful
-`Budget` charge equals `RewriteReport.work_bytes`, and max-minus-one fails
-before candidate allocation.
-Source scanning charges physical package entries, the metadata member,
-identifier/effective-locator matching, fields, nesting depth, work, selected
-component count, and output bytes. The operation charges native rewrite and
-metadata rewrite work together and performs exact output sizing, fallible
-reservation, and candidate verification before publication. A candidate
-allocation is made only after the relevant preflight checks succeed.
-
-The save-token selector count is bounded by `RewriteOptions.max_components`;
-the report keeps `additions = 0` because token updates are not registry-object
-additions. Root token advancement and selected current-component updates are
-therefore accounted as operation-local rewrite work without overloading the
-registry-addition counter. Unknown root/component fields are copied from the
-source, while selected known fields are replaced or canonically appended only
-after the full source and selector checks pass. This is a finite resource
-contract for this operation, not a package-wide memory, allocation, RSS,
-latency, throughput, or performance claim. Before native rewrite/allocation,
-the Names caller also precharges decompressed type-11006 payload bytes times
-the changed semantic-operation upper bound for visitor locator matching;
-compressed Snappy bytes are separate publication accounting.
-
-No manifest edge changed. This amendment does not retire generated schemas or
-Prost ownership: the hidden codec uses the existing Buffa projection as a
-parity boundary, while unrelated generated mutation/writer paths and normal
-workspace Prost owners remain. It makes no workspace-wide dependency-removal
-claim.
-
-## 2026-08-24 amendment: Wave60 Numbers root comment-clear resource record
-
-The Wave60 implementation series culminates in commit
-`895ef17848516cf201e717239c44c119eae5da87`. The changed-clear transaction
-keeps the existing package, archive, semantic-reference, wire-byte, field,
-nesting, work, materialized-cell, text, and output ceilings. Selected tile,
-root-list, comment-storage, PackageMetadata, and archive-header operations use
-their explicit finite codec profiles; fallible reservations precede retained
-census collections and publication artifacts.
-
-The global ownership pass charges complete BNC cell payload bytes before the
-handwritten cell parser runs. Archive-owner inspection accumulates header work
-and reference occurrences across every physical component instead of resetting
-the effective budget at each object. The comment graph census applies one
-aggregate semantic-reference ceiling before allocating its lookup sets, and
-source identity, reply, list, storage, cell-key, and UUID checks use bounded
-`HashSet` membership rather than repeated quadratic scans. Candidate archive
-mutation validates canonical object framing, rejects multi-message storage
-objects, preserves supported raw headers/unknown fields, and refuses opaque
-future owners before deletion.
-
-The PackageMetadata codecs preflight source scanning, exact output sizing,
-selected-field work, candidate verification, and root-map/combined-removal
-support before their output allocation. The current comment-clear route uses
-the dedicated ownership visitor and save-token rewrite because an admitted
-storage object must have no metadata ownership; it does not claim to delete an
-arbitrary registered resource graph. Native component compression, Metadata
-rewriting, ZIP reassembly, and candidate reopen remain separately staged
-fallible buffers under their existing package/archive ceilings. This amendment
-therefore records bounded operation-local work, not a single-allocation design
-or a measurement of peak memory, allocation count, latency, throughput, or
-RSS.
-
-No manifest edge changed. Generated schemas and normal Prost owners elsewhere
-remain, and this resource record makes no package-wide performance,
-workspace-wide dependency-removal, or publication-completeness claim.
-
-## 2026-08-24 amendment: Wave61 Pages body-table lock resource record
-
-Commit `ca3fbd21a24f7195ef9b2d8d169e286339fc274e` strengthens the finite
-resource contract for the selector-first Pages body-table lock transaction.
-Before Snappy decompression or `Archive::parse` can allocate the selected
-component, the owner derives the complete decoded archive extent and physical
-object/message inventory from the already parsed source catalog, charges that
-inventory to the shared operation budget, and then cross-checks the actual
-decompressed length. Canonical archive-object framing is still validated
-after parse.
-
-Name selection charges the compared source and selector bytes for every
-candidate table; position selection charges the inspected prefix. Exact
-source/patch and no-op artifact comparisons now charge equal-length byte
-scans instead of performing unreported linear work. These charges join the
-existing finite source, package-entry, payload, field, nesting, reference,
-object/message, output, compression, ZIP reassembly, and candidate-reopen
-ceilings. Overflow and limit failures remain typed and occur before the
-selected mutation is published.
-
-This is an operation-local preflight improvement, not a measurement of peak
-RSS, allocation count, latency, or throughput. It does not establish a
-package-wide allocation census or claim that every generic ZIP/catalog
-candidate allocation has moved behind one common reservation. No manifest,
-generated-schema, Buffa, or Prost ownership changed, and no workspace-wide
-performance or dependency-removal claim follows.
-
-## 2026-08-24 amendment: Wave62 Pages body-table title resource record
-
-The Wave62 ownership and hardening series is commits
-`48f203aae56e43133fd931accfa6558661594ba0`,
-`a92f8f11a50c709877b8d1f0a158da72114dc4ab`,
-`a7088be4dd9fde9b2e843473b093839e7b7629b3`, and
-`a1c1e83a3edad808bacefa648fe0c1bdd53308f5`. The title transaction reuses the
-body-table lock `WireBudget` for one operation-local accounting envelope.
-Before the editable selected archive is allocated, it charges the source
-catalog, selected compressed member, decoded archive extent, and physical
-object/message inventory. Name and position selection, rooted graph
-inspection, reference metadata, and cross-component title-style scans are
-charged through the same budget; the final style scans are allocation-free.
-
-The strict title codec reports and charges selected wire bytes, fields,
-nesting, work, and references. The package precharges rewritten payload,
-compression, ZIP-entry, complete package, and candidate verification bounds.
-Candidate bytes are charged before reopening the candidate `SourceCatalog`,
-and verification continues with the same transaction budget. Exact output
-sizing and fallible reservations remain the allocation boundary for the
-focused codec and publication artifacts; overflow and limit failures are
-typed and occur before publication.
-
-This is a finite operation-local resource contract, not a measurement or
-claim about package-wide peak memory, allocation count, RSS, latency,
-throughput, or performance. Generic ZIP/catalog construction still has its
-own bounded internal allocations; this amendment does not claim one global
-allocation for every candidate stage. No manifest edge, generated schema,
-Buffa owner, or Prost owner changed, and no workspace-wide dependency-removal
-claim follows.
-
-## 2026-08-24 amendment: Wave63 Pages body-table header resource record
-
-The Wave63 resource owner culminates in `7bc68903e`, following the shared
-semantics, strict codec, focused package, host cutover, boundary, and
-dependency-neutral edits `6f35a3d88`, `dd9e7f25c`, `58f04cd90`, `2bf7598d7`,
-`c93598d22`, `7261dd1c4`, and `30207fa47`.
-
-The hidden neutral `table_header_settings_codec` derives finite source-byte,
-field, work, nesting, and candidate-output ceilings. Strict preflight validates
-the selected scalar projection, measures exact rewritten payload size before
-output allocation, performs one fallible output reservation, preserves unknown
-source spans, and verifies candidate readback. Package reference/dependency
-scans charge aggregate and optional field-local references before ownership
-decisions; non-local, external, data-reference, duplicate, malformed, and
-unsupported group/dependency cases are rejected rather than normalized.
-
-The Pages package joins those charges to source-catalog/member bytes, decoded
-archive extent, physical object/message inventory, selection, compression,
-root-preview deletion, ZIP reassembly, and candidate-reopen ceilings.
-Candidate reservation and verification remain operation-local and fallible;
-generic ZIP/catalog staging retains its own bounded allocations. This is a
-finite resource contract, not a package-wide peak-memory, allocation-count,
-RSS, latency, throughput, or performance claim. No manifest edge, generated
-schema, Buffa owner, or normal Prost owner changed.
-
-## 2026-08-24 amendment: Wave64 Keynote chart-caption resource record
-
-Commit `514b82bdf658d78ea0154f4fc075b1b85488f31c` reuses the finite
-Keynote package, semantic, archive, ZIP, and wire ceilings for existing-caption
-replacement. Caption input is capped at 64 MiB and copied only after a
-fallible exact `String` reservation. Chart-caption and caption-info projections
-receive payload-sized `DecodeOptions` bounded by the package field, nesting,
-and rewrite-work limits. The selected text storage uses the existing strict
-text-wire rewrite limits, exact output sizing, fallible reservations, archive
-framing checks, Snappy compression limits, package-output ceiling, and complete
-candidate reopen.
-
-The ownership census visits the already prepared finite package object,
-message, and reference inventory and retains no unbounded caller-controlled
-graph collection. Exact patch artifacts remain bounded by the package input
-and output limits; unchanged commits reuse the exact source artifact. Preview
-deletion and storage/node component rewrites are counted in transaction
-diagnostics, but the public diagnostics do not expose native identifiers.
-
-These are operation-local bounds inherited from the focused package and codec
-seams, not a claim that every comparison is represented by one aggregate
-counter or that every candidate stage uses a single allocation. No latency,
-throughput, peak-memory, RSS, or package-wide allocation measurement was made.
-No manifest edge, generated schema, Buffa owner, normal Prost owner, or
-workspace-wide dependency changed.
-
-## 2026-08-24 amendment: Wave65 Keynote chart-caption graph resource record
-
-Commit `f0bbe079b094b3652751f6ab7c89b2dc64fac6a9` extends the focused
-chart-caption resource contract from text replacement to the canonical graph
-lifecycle. The graph codec, Metadata codec, archive parser, Snappy path, and
-package owner retain finite source, payload, field, nesting, work, reference,
-object, text, output, and candidate-reopen ceilings. Creation and stand-in
-removal account for graph-object additions, UUID/Metadata registration,
-selected-component save-token work, archive edits, preview invalidation,
-compression, ZIP reassembly, and candidate verification.
-
-The graph and metadata codecs perform bounded preflight, exact selected
-payload sizing, and fallible reservations for their own outputs. The package
-also bounds physical package members, decoded archive objects/messages, graph
-ownership census, and Metadata scans; unknown source spans are retained and
-ambiguous or unsupported ownership is rejected. Exact artifacts are reused
-for no-ops and retained for inverse application.
-
-This implementation does not claim one aggregate transaction budget across
-graph encoding, Metadata rewriting, archive serialization, Snappy
-compression, ZIP reassembly, candidate reopening, and `ExactArtifacts`.
-Those stages remain separately bounded and fallible. Consequently this is an
-operation-local resource record, not a package-wide allocation, peak-memory,
-RSS, latency, throughput, or performance measurement. No manifest edge,
-generated schema, Buffa owner, or normal Prost owner changed.
-
-## 2026-08-24 amendment: Wave66 Keynote chart-caption hardening resource record
-
-Commit `cd76c394e2cd6e360cd01e8bd61cb7594d837701` keeps the Wave65
-chart-caption lifecycle while adding strict source-authority work at its
-selected boundaries. Canonical IWA framing checks, chart/reference/theme
-wire scans, physical dependency attribution, Metadata component and external-
-reference inspection, save-token rewriting, MessageInfo reference transition,
-candidate reassembly, and complete reopen all remain under the existing
-finite package, archive, wire, object, field, nesting, reference, work, and
-output ceilings.
-
-The strict Metadata and chart-caption codecs measure their selected outputs
-before fallible allocation and verify candidate readback. The package scans a
-finite physical catalog, rejects ambiguous owners instead of retaining an
-unbounded graph, and preserves exact source/target artifacts for inverse
-application. Some-to-some replacement adds the Metadata sidecar as one
-authorized changed component; graph transitions authorize aggregate and
-field-local reference lists without exposing raw identifiers publicly.
-
-Wave66 still does not provide one aggregate transaction counter or a single
-candidate allocation across archive parsing, dependency census, Metadata
-inspection/rewrite, Snappy compression, ZIP reassembly, candidate reopen, and
-exact artifacts. Each stage remains bounded and fallible, but this is not a
-package-wide allocation, peak-memory, RSS, latency, throughput, or performance
-claim. No manifest edge, generated schema, Buffa owner, normal Prost owner, or
-workspace dependency changed.
-
-## 2026-08-24 amendment: Wave67 Keynote chart-caption aggregate transaction-budget resource record
-
-Commit `688ddbb0bd6ca4e7addc15ac8fbd12b0032fc5a9` replaces the
-Wave66 collection of independently bounded chart-caption stages with one
-private aggregate `CaptionBudget` for the focused transaction. The budget
-charges the finite package catalog and ownership census, strict graph and
-Metadata codec reports, archive serialization, Snappy input and maximum
-compressed extent, ZIP reassembly planning and execution, complete candidate
-reopens, and exact source/target artifacts. Checked counters cover input,
-intermediate and final output, fields, work, nesting, components, references,
-objects, messages, additions, allocations, retained bytes, and scratch bytes;
-overflow fails closed.
-
-The supporting seams are output-free where publication needs a global plan.
-`Archive::encoded_len_with_limits` measures exact source-authoritative IWA
-serialization, `SnappyStream::maximum_compressed_len` provides a bounded
-compression ceiling, and `PreparedReassembly` exposes exact ZIP execution
-requirements before final allocation. The strict PackageMetadata save-token
-and addition-plus-save-token routes now expose prepare reports and execution
-requirements; prepare performs source scan, sizing, precharge, and semantic
-validation without allocating the candidate output, while execute enforces
-the residual limits and performs the single codec output reservation.
-
-Existing-caption replacement still uses two private staged candidates: the
-native text candidate followed by the Metadata save-token candidate. Both
-stages and both allocations are charged before publication, and a later
-failure leaves the package source unchanged, but Wave67 does not claim one
-candidate allocation for the whole transaction. The aggregate intermediate-
-output ceiling is transaction-local and intentionally larger than the final
-physical package ceiling; member and final artifact limits are enforced again
-by reassembly and complete reopen.
-
-This is a focused chart-caption transaction contract, not a package-wide
-peak-memory, allocation-count, RSS, latency, throughput, or performance
-measurement. No manifest edge, generated schema, Buffa owner, normal Prost
-owner, or workspace dependency changed.
-
-## 2026-08-24 amendment: Wave69 shared chart-caption edge resource record
-
-Commit `cd382f95dad52fecdfdb17a7fbb1565c489e6de1` gives the shared
-chart-caption edge finite input, output, field, work, and nesting ceilings.
-The host helper derives those ceilings from the owning package's finite IWA
-stream and archive-message limits and maps codec byte, output, field, work,
-nesting, and allocation failures back to the existing typed host error
-surface.
-
-The strict codec meters source projection, selected-field validation, exact
-output sizing, raw emission, and candidate readback. Rewrite preflight covers
-the complete emission and verification passes before the single exact output
-reservation. Its reports expose measured input/output bytes, fields, work,
-maximum depth, allocation, retained/scratch, and changed-state facts; direct
-tests prove exact ceilings and max-minus-one output, field, work, and depth
-failure before output allocation.
-
-These are operation-local codec and helper bounds. Wave69 does not establish
-one aggregate transaction budget across chart graph ownership, archive
-serialization, Snappy compression, ZIP reassembly, Metadata, or package
-publication, and it makes no peak-memory, RSS, latency, throughput, or
-zero-copy claim. No manifest dependency, generated schema, Buffa owner,
-normal Prost owner, or workspace dependency changed.
-
-## 2026-08-24 amendment: Wave70 Pages drawable-order resource record
-
-Commit `9b44e20ac0d3696aeb28f94d923612157446a83c` gives the hidden
-`pages_drawable_order_codec` a bounded source projection and rewrite for the
-complete `TP.DrawablesZOrderArchive` repeated `TSP.Reference` field. Strict
-preflight charges input and exact output bytes, fields, work, nesting, and
-references, including the full source scan and identifier lookup work. The
-rewrite performs one output allocation only after exact sizing and all
-limits have passed; the host then charges its transactional archive
-candidate/readback/reopen path separately under its existing package limits.
-
-The codec keeps complete raw reference records and interleaved root fields as
-the preservation authority, including unknown balanced groups and overlong
-unknown scalar framing. It rejects noncanonical known keys, lengths, and
-values, missing or zero identifiers, duplicates, and non-permutation edits.
-The outer IWA object-length prefix may be canonicalized by the existing host
-serializer policy; this record does not promise raw outer-prefix preservation.
-
-These are operation-local resource bounds. They are not a package-wide
-allocation, peak-memory, RSS, latency, throughput, or zero-copy measurement,
-and no aggregate budget across archive serialization, compression, ZIP
-reassembly, or native application save is claimed. No manifest, generated
-schema, Buffa owner, normal Prost owner, or workspace dependency changed.
-
-## 2026-08-25 amendment: Wave74 Keynote movie-caption resource record
-
-Implementation commit `40c3d0b217e4b17304efca24c6a81b9d1240246b`
-threads one private `CaptionBudget` through the canonical movie-caption graph
-transition. It charges graph projection and rewrite reports, selected native
-archive scans, exact output sizing, metadata inspection and the prepared
-UUID/watermark/save-token rewrite, Snappy member work, ZIP reassembly,
-candidate reopen and locality verification, and retained source/target patch
-artifacts. Fields and work are summed, nesting uses the observed maximum, and
-allocation/scratch/output requirements remain fallible and bounded.
-
-Creation and removal use staged private native and Metadata candidates. No
-package publication occurs until every stage and the final reopened candidate
-verify, so a later failure leaves the source exact. This is publication
-atomicity, not a claim that the transaction has one global candidate allocation
-or one output-free preflight covering every stage. The resource evidence is
-operation-local; it establishes no package-wide peak-RSS, latency, throughput,
-zero-copy, or performance result.
-
-No manifest dependency changed. `litchi-iwa-protos` retains its generated
-schema, Buffa, and normal Prost owners, and the broader workspace retains its
-existing Prost edges. This slice therefore records bounded accounting for one
-semantic owner, not generated-code or dependency retirement.
-
-## 2026-08-25 amendment: Wave73 Keynote movie-caption resource record
-
-Commit `6ed7ee4e277c78a99f1b779a2b5530d7267beddf` gives the hidden movie-caption
-edge codec finite input, exact output, field, work, and nesting ceilings. The
-codec charges strict projection, selected-field validation, exact sizing, raw
-emission, and candidate readback before its single exact output reservation;
-its report includes input/output bytes, fields, work, maximum depth,
-allocation, retained/scratch, and change facts.
-
-The admitted `Some -> Some` package mutation reuses the private chart-caption
-physical transaction: bounded catalog and storage work, prepared Metadata
-save-token execution for every changed current component, archive sizing,
-Snappy compression, ZIP reassembly, preview deletion, complete candidate
-reopen, and exact locality verification. Split slide/storage and slide-node
-components are not undercounted as one semantic target: each changed current
-component receives the same new root save token and diagnostics include the
-Metadata member.
-
-Selection and the global ownership census remain separately governed by the
-package's finite semantic and wire limits rather than one newly claimed
-end-to-end allocation counter. This record therefore makes no package-wide
-single-allocation, peak-memory, RSS, latency, throughput, zero-copy, or
-performance claim. No manifest dependency, generated source schema owner,
-normal Prost owner, or workspace dependency edge was removed; the private
-Buffa projection remains an implementation detail of `litchi-iwa-protos`.
-
-## 2026-08-25 amendment: Wave71 Pages exact-output resource record
-
-Commit `580a5343a2c75a1c1b185a5cc8aff4a87e2a5c11` makes
-`litchi_pages::Package::write_to` the public exact-output seam. The writer
-streams the retained ZIP artifact to a caller-owned `Write` sink without
-allocating another package-sized output buffer. It tolerates `Interrupted`,
-tracks the offset reached by conforming partial writes, and reports zero-write,
-over-report, and ordinary sink failures through typed redacted `WriteError`
-values carrying `bytes_written`.
-
-The Pages-to-host section bridge now uses one-pass `FocusedCandidateWriter`.
-It charges each emitted chunk before retaining it and preserves the existing
-`3S+2T` work accounting, so a limit failure does not leave a package-sized
-candidate allocation behind. This is an operation-local bridge accounting
-record, not a package-wide allocation or peak-memory proof.
-
-`write_to` does not flush or sync its sink and does not rename, atomically
-replace, or durably publish a filesystem path. No package-wide output-buffer,
-allocation, zero-copy, RSS, latency, throughput, or performance claim follows;
-those policies remain with the caller and later publication work. No manifest
-edge, generated schema, Buffa owner, normal Prost owner, or workspace
-dependency changed.
-
-## 2026-08-25 amendment: Wave72 shared chart-caption resource record
-
-Commit `997e0bf55e8a1381296a4d446f83dd5217a15385` makes every internal
-chart-caption codec traversal charge its source scan, sizing, raw emission, and
-candidate-verification work. Unknown overlong scalar values and complete
-unknown source groups are retained byte-for-byte; their keys and length
-framing, selected known fields, and exact nesting depth remain bounded and
-strict. Pages and Numbers retarget paths preserve raw `ArchiveInfo` headers and
-the exact aggregate/`FieldInfo` reference sets, rejecting shared or
-misattributed `CaptionInfo`/storage owners before publication. Keynote merges
-the residual codec report into `CaptionBudget` and precharges candidate reopen
-work; output and allocation failures retain typed limit/error mapping.
-
-These are operation-local source, work, nesting, output, allocation, and
-candidate-accounting facts. They do not establish a package-wide memory,
-peak-RSS, latency, throughput, zero-copy, or performance measurement, nor a
-single allocation for every format transaction. No manifest edge, generated
-schema, Buffa owner, normal Prost owner, or workspace dependency changed.
-
-## 2026-08-25 amendment: Wave75 Keynote movie-title resource record
-
-Implementation commit `ad7fc362036fa81c70c3e8ac373d7901e7689179` extends the
-private aggregate `CaptionBudget` through the selector, graph, archive, and
-metadata phases of the movie-title lifecycle. It charges the shared movie-edge
-codec Title slot, typed inline title-graph scans and allocations, native
-archive scans and exact sizing, UUID/watermark/save-token metadata work,
-Snappy compression, ZIP reassembly, preview invalidation, candidate reopen and
-locality verification, and retained exact source/target patch artifacts.
-
-The four-object stand-in-to-title creation and active-to-fresh-stand-in
-removal use fallible, collision-checked identifier work and retain old removal
-graphs for inverse/history semantics. Aggregate fields and work are charged
-across the private stages, observed nesting uses the maximum, and all output,
-scratch, retained, and candidate allocations remain bounded before publication.
-This records publication atomicity for private staged candidates; it does not
-claim one allocation or one output-free preflight for the entire transaction.
-
-These are operation-local resource facts. They establish no package-wide
-peak-memory, RSS, latency, throughput, zero-copy, or performance result. No
-manifest dependency, generated schema, Buffa owner, normal Prost owner, or
-workspace dependency edge changed; the hidden codec and generated projection
-remain private implementation details.
-
-## 2026-08-25 amendment: Wave76 Pages body-table dimension resource record
-
-Implementation commit `e624ebab09a891eb9d5921f6ebf8c0e601bf5dff` carries one
-aggregate transaction budget through body-table selector and model selection,
-the selected header bucket and member, decompressed archive data, strict
-codec fields/work/depth/references, output sizing, Snappy and Deflate
-compression, ZIP reassembly, and candidate reopen. Residual codec options are
-derived from that budget rather than resetting full limits for each phase.
-`preflight_dimension_rewrite` runs before codec planning or archive allocation;
-conservative message, archive, compression, and package bounds are charged
-before publication, and candidate-reopen work is precharged. Prepared ZIP
-exact requirements and execution limits cover scratch and output allocations,
-while the final execution report is checked without double-charging work or
-fields already accounted for by the aggregate budget.
-
-Exact selected-header sizing and fallible reservations remain the allocation
-boundary. The transaction retains source/target artifacts for exact inverse
-semantics and publishes only after the candidate, locality, and reopen checks
-pass. These are operation-local source, model, archive, codec, compression,
-ZIP, output, scratch, and candidate-accounting facts. They establish no
-package-wide peak-memory, RSS, latency, throughput, zero-copy, or performance
-result, and make no claim that every transaction has one allocation or one
-output-free preflight. No manifest dependency, generated schema, Buffa owner,
-normal Prost owner, or workspace dependency changed.
-
-## 2026-08-25 amendment: Wave77 Pages body-footnote insertion/removal resource record
-
-Implementation commit `5dc2ab5337cb61b72f83e369d818829c355d7141`
-carries one aggregate body-footnote transaction budget across the source
-catalog, rooted body and graph census, strict graph codec, Metadata inspection
-and prepared rewrite, archive parsing and exact sizing, Snappy compression,
-ZIP reassembly, preview deletion, complete candidate reopen, locality checks,
-and retained exact source/target patch artifacts. Distinct scans and private
-candidates are summed, maximum nesting is merged by maximum, and already
-charged borrowed payloads are not charged a second time.
-
-The graph codec and PackageMetadata insertion/removal-plus-save-token routes
-perform strict source validation, exact output sizing, semantic precharge, and
-candidate verification. Prepared metadata execution requirements cover
-output, fields, work, components, references, allocations, retained bytes, and
-scratch before their candidate allocation. The package derives residual
-limits from the transaction rather than resetting full limits for each phase;
-identifier collision work, native graph output, compression bounds, prepared
-ZIP execution, and candidate reread are charged before publication. Fallible
-reservations and typed input/output/field/work/depth/reference/component/
-addition/allocation failures leave the immutable source artifact unchanged.
-
-These are operation-local accounting and atomic-publication facts. They do not
-establish package-wide peak memory, RSS, latency, throughput, zero-copy, or
-performance, and they do not claim a single allocation or one output-free
-preflight for every private stage. No production manifest dependency,
-generated schema, normal Prost owner, Buffa owner, or workspace dependency
-edge changed; fuzz manifests and inventories changed only to register the new
-bounded targets.
-
-## 2026-08-25 amendment: Wave78 Pages header/footer text resource record
-
-Implementation commit `1596d5106ee42fe9238e8d63cc55d39c494d59c3` carries one
-aggregate `TransactionBudget` through physical source and catalog scans,
-root body/section/template/text/metadata selection, strict header/footer and
-text-wire scans, archive and Snappy bounds, exact output sizing, ZIP
-reassembly, private prepared metadata/text candidates, candidate catalog
-reopen, locality verification, and retained exact source/target patch
-artifacts. Distinct scans and private candidates are charged as distinct
-operation work; nesting is merged by maximum, and borrowed payloads already
-charged by an earlier phase are not charged again.
-
-The text and metadata paths perform strict source validation, exact sizing,
-semantic precharge, and candidate verification. Prepared ZIP execution
-requirements cover output, scratch, retained bytes, and fallible allocation
-before execution. Residual limits are passed between phases instead of
-resetting full limits. Staged private candidates are permitted, but
-publication remains atomic and archive, compression, ZIP, candidate-reopen,
-and locality bounds are charged before publication. Metadata root and
-selected-token work, including preservation of root field 1 and
-unknown/unselected/versioned bytes, is included in the same transaction
-budget.
-
-These are operation-local input, output, archive, codec, compression, ZIP,
-candidate, scratch, and allocation facts. They establish no package-wide
-peak-memory, RSS, latency, throughput, zero-copy, or performance result, and
-do not claim one global allocation or a universally output-free preflight.
-No production manifest dependency, generated schema, normal Prost owner,
-Buffa owner, or workspace dependency edge changed.
-
-## 2026-08-25 amendment: Wave79 Pages section-text host-retirement resource record
-
-Implementation commit `507193d3c2ea7c6f6939f47189be5a7b425661c0`
-carries one operation-local `TransactionBudget` through the exact source and
-catalog inventory, rooted body/section and ownership scans, strict text-wire
-prepare report, rewrite execution requirements, archive sizing, Snappy bounds,
-prepared ZIP reassembly, complete candidate reopen, semantic/topology and
-locality verification, and retained exact source/target patch artifacts.
-Distinct scans and candidates are charged as distinct work; nesting is merged
-by maximum, and already charged borrowed payloads are not charged again.
-
-The text-wire prepare phase validates fields, work, references, text bytes and
-UTF-16 units, table entries, fragments, and nesting without allocating the
-rewritten output. Its exact execution requirements bound output, retained
-elements/bytes, scratch, allocations, and work. Before final ZIP allocation,
-the package charges conservative message/archive/compression bounds, prepares
-exact reassembly requirements, and precharges the candidate catalog, object,
-message, reference, and locality walks. Typed input/output/member/archive/
-field/work/nesting/reference/allocation failures leave the immutable source
-and public package state unchanged.
-
-These are operation-local accounting and atomic-publication facts only. They
-do not establish package-wide peak memory, RSS, latency, throughput, zero-copy,
-or performance, and do not claim one global allocation or a universally
-output-free preflight. No production manifest dependency, generated schema,
-normal Prost owner, Buffa owner, or workspace dependency edge changed; fuzz
-manifest changes only register the bounded section codec and lifecycle targets.
-
-## 2026-08-25 amendment: Wave80 Numbers table-appearance resource record
-
-Implementation commit `bf01576c090cb508ac0596a5faac01951ef502d0`
-carries one operation-local transaction budget through source catalog and
-rooted selector resolution, model/style/stylesheet and metadata ownership
-scans, strict codec preparation and execution, UUID/external-reference and
-save-token preparation, archive and Snappy sizing, prepared ZIP reassembly,
-candidate reopen, semantic readback, locality verification, and retained
-source/target patch artifacts. Residual input, output, fields, work, nesting,
-components, references, additions, allocations, retained bytes, and scratch
-limits are passed between distinct phases instead of resetting full limits.
-
-Native and metadata codec plans expose checked execution requirements and use
-fallible scratch/output reservations. Conservative component archive,
-compression, candidate, and package-output bounds are charged before their
-respective private candidates; exact prepared reassembly requirements are
-checked before the final ZIP allocation. Typed archive/core/codec limit and
-allocation failures leave the immutable source and published package state
-unchanged. Independent source and candidate scans are charged independently,
-while already-accounted borrowed bytes are not charged twice and nesting is
-merged by maximum.
-
-The native rewrite and metadata rewrite are staged private candidates because
-the metadata UUID transition consumes the newly generated style identifier.
-Publication is atomic after all verification, but this record does not claim
-one global output-free preflight or one allocation. These are operation-local
-accounting facts only: they establish no package-wide peak memory, RSS,
-latency, throughput, zero-copy, or performance result. No production manifest
-dependency, generated schema, normal Prost owner, Buffa owner, or workspace
-dependency edge changed; fuzz manifests only register the bounded codec and
-package targets.
-
-## 2026-08-25 amendment: Wave81 Numbers table-cell Pop-Up Menu resource record
-
-Implementation commit `4ea040b4f9cf97f61ae9a690c6ae592b1b7ac567`
-carries one operation-local transaction budget through physical source and
-catalog inventory, rooted sheet/table/cell resolution, model/store/tile/list/
-cell-spec/model scans, exhaustive BNC key/refcount census, strict Pop-Up Menu
-and storage-wire reports, metadata ownership and identifier scans, native and
-metadata rewrites, archive and Snappy bounds, prepared ZIP reassembly,
-candidate reopen, semantic readback, locality, and retained exact source/target
-patch artifacts. Independent source and candidate traversals are charged as
-independent work; nesting is merged by maximum, while a borrowed payload
-already charged by the enclosing phase is not charged twice.
-
-Residual physical input/output, entry, payload, fields, work, nesting,
-references, items, text, components, additions, allocations, retained bytes,
-and scratch limits are passed to the strict codec/storage phases. Prepared
-model and cell-spec writes, package-metadata transitions, native archive and
-compression bounds, and exact reassembly execution requirements are checked
-before their corresponding output allocation. Fallible reservations and typed
-archive/core/codec limit mappings leave the immutable source and published
-package unchanged on failure. Candidate reopen and object/member locality are
-charged before publication.
-
-Native, metadata, and final ZIP values are staged private candidates; the
-later stages consume identifiers and bytes produced by earlier stages.
-Publication is atomic, but this record does not claim one global output-free
-preflight, one allocation, or support for cross-component control graphs.
-These are operation-local accounting facts only and establish no package-wide
-peak memory, RSS, latency, throughput, zero-copy, or performance result. No
-production dependency edge or normal generated-schema/Prost/Buffa owner
-changed; fuzz manifests only register the bounded codec and package targets.
-
-## 2026-08-25 amendment: Wave82 Keynote movie-playback resource record
-
-Implementation commit `666ee3ec3be5d7574ebb9324154b550fde83a5f1`
-carries one conservative operation-local `PlaybackBudget` through source and
-component inventory, rooted slide/movie selection, strict owner/reference and
-movie-data scans, codec reports and execution requirements, native archive and
-Snappy bounds, prepared ZIP reassembly, candidate reopen/validation, semantic
-readback, and member/object locality. Independent source and candidate scans
-are charged independently, while nesting is merged by maximum.
-
-Residual input/output, wire fields/work/nesting, references, components,
-allocations, retained bytes, and scratch limits are passed to the strict codec
-and physical phases. The prepared playback rewrite exposes exact execution
-requirements and checks every execution axis before emission. Archive,
-compression, and package-output bounds are precharged before codec execution;
-prepared ZIP reassembly uses its exact requirements and execution limits
-before producing the final package. Fallible reservations and typed codec,
-archive, and core limit mappings leave the immutable source and published
-package unchanged on failure.
-
-The codec payload, physical archive, compression buffer, and final package are
-staged private candidates before semantic verification and publication. This
-record therefore makes no one-global-preflight, single-allocation, zero-copy,
-package-wide peak-memory/RSS, latency, throughput, or performance claim.
-Metadata and preview bytes are outside the mutation set and remain exact. No
-production dependency edge or normal generated-schema/Prost owner changed;
-the private Buffa projection and fuzz manifests register only this bounded
-codec and package route.
-
-## 2026-08-25 amendment: Wave83 Numbers table-sort resource record
-
-Implementation commit `20aca0ede7817e7fbb630338dbb4bcc852d7d500`
-carries one operation-local transaction budget through source/catalog and
-rooted table inventory, archive/object/message/reference scans, strict
-sort-order codec reports and execution requirements, model replacement,
-preview and member locality, physical archive/compression bounds, prepared ZIP
-reassembly, candidate reopen, semantic readback, and retained exact
-source/target patch artifacts. Independent source and candidate traversals are
-charged independently, while nesting is merged by maximum and already-charged
-borrowed payload bytes are not charged twice.
-
-Residual input/output, entry, payload, object, message, item, reference,
-field, work, nesting, rule, column, allocation, retained-byte, and scratch
-ceilings are passed between phases. Codec prepare/execute reports are checked
-against their requirements; archive, compression, preview staging, candidate,
-and package-output bounds use checked arithmetic and fallible reservations.
-Typed codec/archive/core limit and allocation failures leave the immutable
-source and published package unchanged.
-
-Codec output, native archive, compression, and final ZIP values are staged
-private candidates before semantic verification and publication. This record
-therefore makes no one-global-output-free-preflight, single-allocation,
-zero-copy, package-wide peak-memory/RSS, latency, throughput, or performance
-claim. Metadata and preview bytes are preserved rather than rewritten. No
-production dependency edge or normal generated-schema/Prost owner changed;
-the private Buffa projection and fuzz manifests register only this bounded
-codec and package route.
-
-## 2026-08-26 amendment: Wave84 Pages body-table sort resource record
-
-Implementation commit `31d5081ca6cd56256e463bee0019e4c7241d6df1` carries one
-aggregate operation-local resource budget through source/catalog and rooted
-body-table selection, lock/dependency checks, strict persisted-sort codec
-projection and rewrite, model/archive scans, candidate verification and
-semantic reread, object/member locality, physical archive and compression
-bounds, and prepared ZIP reassembly. Independent source and candidate walks
-are charged independently; nesting is merged by maximum, and already-charged
-borrowed payload bytes are not charged twice.
-
-Residual input/output, entry, payload, object, message, reference, field,
-work, nesting, rule, row-range, allocation, retained-byte, scratch,
-compression, and reassembly ceilings are propagated across the operation.
-Prepared codec and reassembly requirements are checked with fallible
-reservations and typed limit mappings before their corresponding publication
-steps. Failures leave the immutable source and published package unchanged.
-
-Native archive, codec, compression, and final ZIP values are staged as private
-candidates before semantic verification and publication. This is an
-operation-local accounting record with prepared reassembly; it makes no claim
-of a single allocation, zero-allocation preflight, zero-copy behavior,
-package-wide peak memory or RSS, latency, throughput, or performance. The
-owner does not mutate Metadata, UUIDs, save tokens, or previews. No production
-dependency edge or normal generated-schema/Prost/Buffa owner changed.
-
-## 2026-08-26 amendment: Wave85 Numbers unified cell-control resource record
-
-Implementation commit `8f804fdc65f5d99a61d8b73503353901edf87488` carries one
-operation-local transaction budget through source/catalog inventory, rooted
-table/model/tile selection, BNC cell and mixed format/control-list scans,
-strict control and storage codec reports, exact refcount/ownership census,
-metadata UUID/save-token transitions, native archive and Snappy bounds,
-prepared ZIP reassembly, candidate reopen, semantic readback, exact patch
-artifacts, and object/member locality. Distinct source and candidate scans are
-charged independently, while nesting is merged by maximum.
-
-Residual input/output, package-entry, payload, object, message, item,
-reference, field, work, nesting, component, allocation, retained-byte, and
-scratch ceilings are propagated across the admitted route. Prepared
-CellSpec/display-format/list rewrites validate their reports against execution
-requirements. Archive, compression, metadata, package-output, and reassembly
-bounds use checked arithmetic, fallible reservations, and typed codec/archive/
-core mappings. Failures leave the immutable source and published package
-unchanged.
-
-Codec payloads, list/archive rewrites, metadata, compression output, and the
-final ZIP are staged as private candidates before semantic verification and
-publication. The popup metadata stage depends on the native stage's selected
-result, so this is not one global allocation-free preflight. No single-
-allocation, zero-copy, package-wide peak-memory/RSS, latency, throughput, or
-performance claim follows. Cross-component control graphs are outside the
-admitted resource contract. No production dependency edge or normal
-generated-schema/Prost/Buffa owner changed; fuzz manifests register only the
-bounded codec and package routes.
-
-## 2026-08-26 amendment: Wave86 Numbers unified cell-control split-read resource boundary
-
-Implementation commit `3dfe506f4febe7f389db4f60b2988430bbd6038e` limits the
-Wave86 resource statement to package-ingress limits for strict split-component
-control reads and byte-exact no-ops. The logical read reuses one cached
-`RegistryFacts`/physical census, and selected sidecar aggregate/explicit
-`FieldInfo` checks are source-authority checks; producer-omitted `FieldInfo`
-remains admitted. Changed split-component routes, including popup-only routes,
-are refused before native/ZIP candidate publication and leave the source
-unchanged.
-
-This record makes no aggregate storage/codec read claim for fields, work,
-references, nesting, scratch, allocations, or max-minus-one limits. It makes
-no peak-memory/RSS, latency, throughput, performance, zero-copy, or
-zero-allocation-before-refusal claim. No cross-component COW, UUID/save-token
-batch, candidate/locality, inverse, or successful split-write resource route
-is owned. Package ingress limits are the only resource ceiling claimed for
-this bounded read/no-op boundary; same-component resource claims remain those
-of the preceding Wave85 slice.
-
-## 2026-08-26 amendment: Wave87 Keynote movie-geometry resource record
-
-Implementation commit `e11a4cc993cf29e5524745f2fa51dd3dd7d20b3e` carries one
-operation-local geometry budget through source/catalog inventory, rooted
-slide/movie selection, file-movie and same-component ownership checks, strict
-geometry codec reports and execution requirements, archive and Snappy
-rewriting, root-preview deletion, prepared ZIP reassembly, candidate reopen,
-semantic reread, and object/member locality. Independent source and candidate
-walks are charged independently; nesting is merged by maximum and borrowed
-payloads are not silently charged as a second physical scan.
-
-Residual input/output, entry, total, wire-byte, field, work, nesting,
-reference, geometry-byte, component, allocation, retained-byte, and scratch
-ceilings are propagated through the admitted route. Prepared codec and ZIP
-reassembly requirements are checked with checked arithmetic, fallible
-reservations, and typed codec/archive/core mappings before their corresponding
-output stages. Any rejected limit or verification failure leaves the
-immutable source and published package unchanged.
-
-Native archive, compression, preview, and final ZIP values are staged as
-private candidates before semantic verification and publication. This is an
-operation-local accounting record only: it makes no claim of a single global
-allocation-free preflight, a single allocation, zero-copy behavior,
-package-wide peak memory or RSS, latency, throughput, or performance. The
-geometry owner does not allocate objects or mutate Metadata/UUIDs/save tokens;
-legacy angle/flags/flip/original-size-restore compatibility remains outside
-this resource slice. No production dependency edge or normal generated-
-schema/Prost/Buffa owner changes by this record.
-
-## 2026-08-26 amendment: Wave88 Numbers split cell-control write resource record
-
-Implementation commit `d1e11c7f218583becc85be7fa426650aa0113de4`
-carries one operation-local transaction budget through source/catalog and
-component inventory, rooted model/tile/list selection, strict storage/control
-codec reports, BNC and list refcount census, metadata UUID/external-edge and
-save-token transitions, native archive/Snappy output bounds, prepared ZIP
-reassembly, candidate reopen, semantic readback, exact patch artifacts, and
-object/member locality. Distinct source and candidate walks are charged
-independently; nesting is merged by maximum and repeated borrowed payloads are
-not silently charged as new physical input.
-
-Residual input/output, entry, payload, object, message, item, reference,
-field, work, nesting, component, allocation, retained-byte, and scratch
-ceilings are propagated through the admitted split route. Checked arithmetic,
-fallible reservations, residual codec limits, prepared reassembly
-requirements, and typed codec/archive/core mappings reject oversized work
-before publication. Refcount and metadata censuses are repeated against the
-private candidate, and any rejected limit or verification leaves the source
-and published package unchanged.
-
-Codec payloads, native archives, metadata, compression output, and the final
-ZIP are staged as private candidates. This is not one global allocation-free
-preflight and makes no single-allocation, zero-copy, package-wide peak-memory
-or RSS, latency, throughput, or performance claim. Cross-component popup
-mutation is outside this resource contract. No production dependency edge or
-normal generated-schema/Prost/Buffa owner changes by this record.
-
-## 2026-08-26 amendment: Wave90 Numbers split Pop-Up Menu resource record
-
-Implementation base `e867003d80fb9cc9373f2f659e2b51c3264de06b` carries one
-operation-local transaction budget through the complete admitted split popup
-route: current-member and ownership census, aggregate merge scratch and
-object slots, popup/control codecs, BNC/list references, metadata UUID,
-external-edge and combined save-token transitions, per-member archive and
-Snappy output, prepared ZIP reassembly, candidate reopen/readback/locality,
-and patch/inverse artifacts. Source and candidate walks are staged and
-charged independently; checked arithmetic, fallible reservations, and
-residual codec ceilings gate each output stage.
-
-The split implementation's exact-byte filter can serialize the source
-`Archive` once for every structurally changed source member
-(`Archive::to_bytes_with_limits`) before deciding whether that member edit
-is a no-op. That per-member source serialization and its comparison bytes are
-part of the staged operation-local allocation/resource record; they are not
-free and do not establish an allocation-free preflight. Merge scratch,
-candidate archives, metadata, compression output, and final ZIP storage are
-likewise private staged allocations.
-
-The same output-free `encoded_len_with_limits` preflight, checked aggregate
-source/candidate arithmetic, and immediate actual-length replay now cover the
-earlier split scalar-control serializer. This closes a shared serialization
-accounting seam without widening the Wave88 semantic transition set.
-
-This amendment records bounded resource accounting only. It makes no claim of
-a single global allocation-free pass, a single allocation, zero-copy
-behavior, package-wide peak memory or RSS, latency, throughput, or
-performance. Native semantic persistence does not alter that resource scope,
-and no production dependency edge or normal generated-schema/Prost/Buffa
-owner changes by this record.
-
-## 2026-08-26 amendment: Wave91 Numbers comment-reply read resource record
-
-The Wave91 facade is source-immutable and publishes no partial result. Package
-ingress retains the existing physical archive and semantic object/reference/
-text ceilings; each strict comment-storage decode retains typed byte, field,
-work, nesting, reference, and text ceilings. Census and output vectors use
-fallible reservations. Storage duplicate detection and selected reply lookup
-use hash indices, so the admitted census/projection path is linear rather than
-quadratic in recognized storage and reply counts.
-
-This amendment deliberately does not claim one aggregate operation-local
-ledger across selection, package-wide recognized-graph census, cycle checks,
-and reply projection. Root selection and the census can inspect the same
-payload in separate bounded passes, and allocation/scratch/retained/work
-counters are not exposed as a new reply-read limit profile. The read path has
-no candidate archive, metadata rewrite, compression, ZIP reassembly, reopen,
-locality, patch, inverse, or publication cost.
-
-Accordingly there is no single-allocation, allocation-free preflight,
-zero-copy, peak-memory/RSS, latency, throughput, or performance claim. The
-record is limited to existing package/per-decode ceilings, fallible local
-allocation, linear indexing, typed refusal where surfaced, and immutable
-source bytes.
-
-## 2026-08-26 amendment: Wave92 comment-reply rewrite codec resource record
-
-Implementation commit `65bdac3ece028a997c73dc82c4d49ef7839ff002`
-adds a codec-local prepare/execute split. Preparation validates the source and
-selected ordinal, checks the Buffa hard message ceiling, computes the exact
-logical candidate length, validates candidate field/work/depth/reference
-bounds, and returns aggregate source-plus-candidate requirements before the
-candidate output vector is allocated. Execution replays input, output, field,
-work, depth, reference, reply, reference-byte, logical-allocation,
-scratch-request, and retained-length ceilings, emits with a fallible reserve,
-and strictly scans the candidate before returning it.
-
-The allocation, scratch, and retained counters are explicitly codec-local
-logical/requested bounds: they are not allocator-call telemetry or capacity
-measurements. Preparation itself retains bounded reply-ID and group-stack
-scratch, and the eventual package owner must separately charge rooted graph
-selection, list/BNC/refcount and metadata scans, archive decompression and
-serialization, Snappy and ZIP output, reassembly, candidate reopen/locality,
-patch artifacts, and publication. There is no one-global-pass,
-allocation-free, single-allocation, zero-copy, package peak-memory/RSS,
-latency, throughput, or performance claim.
-
-## 2026-08-26 amendment: Wave93 Numbers comment-reply lifecycle resource record
-
-Implementation commit `21004a78ec4c6c7d8436424de270ad6ed6051eb0`
-carries one operation-local `TransactionBudget` through exact source/catalog
-inventory, comment list/storage/tile/reference censuses, strict Metadata and
-ArchiveInfo inspection, native root/list/tile COW, prepared reply-reference
-rewrite, archive/Snappy output envelopes, prepared ZIP reassembly, candidate
-reopen, semantic reread, and exact patch artifacts. Checked arithmetic,
-fallible reservations, typed semantic/physical ceilings, encoded-length
-precharges, and source-atomic failure tests cover the admitted same-member
-route.
-
-The native archive, metadata payload, compression output, and final ZIP are
-staged as private candidates before verified publication. Comment-storage and
-metadata codecs still receive conservative source-sized/full option profiles
-where the shared budget exposes no residual adapter; preparation can allocate
-private plan storage before execution requirements are returned. This record
-therefore does not claim a single global allocation-free preflight, a single
-allocation, exact allocator telemetry, zero-copy behavior, package-wide peak
-memory or RSS, latency, throughput, or general performance.
-
-Cross-member graphs, segmented lists, shared reply leaves, author creation,
-and graph repair are refused before publication and have no successful-route
-resource claim. The record is scoped to the tested direct-leaf lifecycle and
-does not change production dependency ownership or normal generated-schema,
-Prost, or Buffa responsibilities.
-
-## 2026-08-31 amendment: Wave117 Keynote chart-legend visibility resource record
-
-The focused Keynote chart-legend visibility route reuses finite package,
-archive, and source-catalog limits while the private codec applies its own
-bounded message, field, work, nesting, output, retained-byte, allocation, and
-scratch ceilings. Strict preflight and the prepared plan check the selected
-field before the rewrite output is reserved; execution emits one
-source-preserving candidate and validates its semantic readback before
-publication. Exact no-ops reuse the source snapshot and do not reassemble a
-candidate. Failed selection, validation, limit, allocation, conflict, or
-candidate checks leave the immutable source unpublished.
-
-This is a bounded focused operation, not a claim that all package, archive,
-ZIP, Snappy, candidate, and patch allocations share one aggregate counter.
-Package caches, decompressed archives, the process allocator, RSS, and
-codec-internal allocator behavior are not measured. No single-allocation,
-zero-copy, package-wide peak-memory, latency, throughput, or general
-performance claim follows. The focused 156,278-byte native source produced a
-46,022-byte candidate after three stale root previews were removed; Keynote
-then saved a 154,754-byte native copy. Those observed sizes are acceptance
-evidence, not peak-memory or compression-performance measurements. No
-production dependency edge or normal Prost owner changes by this record.
-Wave117 adds only a private Buffa projection schema/module under the existing
-`litchi-iwa-protos` owner; generated values remain private to the package
-implementation.
-
-## 2026-08-31 amendment: Wave118 archive-owned durable publication resource record
-
-Wave118 makes `litchi-iwa-archive` the owner of the reusable durable
-filesystem-publication boundary. The helper validates the destination before
-invoking its one-shot writer callback, rejects symbolic-link and non-regular
-destinations, captures permissions from an existing regular file, and creates
-the staging file as a private sibling in the destination directory. The
-callback writes only to that staging file. A callback, stream, validation, or
-allocation error before replacement is returned through the typed save error;
-the helper does not replace the destination. Best-effort cleanup is
-identity-aware: it removes the private temporary only while its pathname is
-still proved to name this operation's staging file, and otherwise disarms
-cleanup rather than unlinking an entry whose identity is uncertain. The same
-rule applies to pre-replacement permission hardening, flush, file-sync,
-revalidation, and replacement failures.
-
-Each immutable focused `Package::save` invokes `Package::write_to` once with
-the staging `File`; it does not first materialize `to_bytes` or add a second
-complete package-sized buffer/copy. The publication sequence is callback/write,
-restoration of private Unix staging mode `0600`, `File::flush`, staging-file
-`sync_all`, final destination and staging-path identity revalidation, and
-`persist` for same-directory atomic replacement. Only after replacement does
-the helper apply the existing destination's current ordinary permissions
-through the still-open published file descriptor, synchronize that published
+### Save durability levels
+
+Full durability is the default and is what every ordinary `save` does, with
+unchanged bytes, and with unchanged system calls on success and on every
+failure before the replacement: the staged temporary artifact is flushed and
+synchronized before the atomic replacement, and the destination's parent
+directory is synchronized after it where the platform supports that. A caller
+may select a weaker level for one save, and only by passing an explicit
+`litchi_core::Durability` to a `*_with_durability` method: `FileOnly` skips the
+parent-directory synchronization, and `NoSync` also skips the temporary
+artifact's synchronization. The level is a per-call argument. It is never read
+from the environment, a global or thread-local value, or a package's stored
+save preferences, so selecting one changes no preference and revokes no
+exact-source authorization.
+
+Every level keeps the rest of this section: the sibling temporary artifact,
+every check the route makes before publishing, validation and finalization
+before replacement, the one atomic replacement, a destination left untouched
+by any failure or cancellation before that replacement, best-effort
+identity-aware cleanup of the temporary artifact, and typed errors. A level
+never attempts a step it skips, so it cannot fail at one; only `Full` can
+report that the destination was replaced before its directory synchronization
+failed. What a weaker level gives up is durability across an operating-system
+crash or power loss after the save has returned: after `FileOnly` the
+destination names what it named before the save or the complete new artifact,
+and the replacement itself may be lost; after `NoSync` nothing is promised,
+and on a filesystem that does not write file data before the rename that
+exposes it the destination may be truncated. A process crash needs no
+synchronization at any level. The `litchi_core::Durability` documentation
+states each level's guarantees and is the normative list.
+
+### Exact-output streaming of iWork packages
+
+`Package::write_to` on the focused Pages, Numbers, and Keynote packages is the
+exact-output seam. It streams the retained ZIP artifact to a caller-owned
+`Write` sink without allocating another package-sized output buffer. It
+tolerates `Interrupted`, tracks the offset reached by conforming partial
+writes, and reports zero-write, over-report, and ordinary sink failures through
+typed, redacted `WriteError` values carrying `bytes_written`. `write_to` does
+not flush or sync its sink and does not rename, atomically replace, or durably
+publish a filesystem path; that is `save`'s job.
+
+### Durable filesystem publication of iWork packages
+
+`litchi-iwa-archive` owns the one reusable durable filesystem-publication
+operation for iWork packages. `litchi_pages::Package::save`,
+`litchi_numbers::Package::save`, and `litchi_keynote::Package::save` each
+delegate to it; no format keeps a parallel temporary/rename implementation.
+These methods publish the already validated exact artifact and add no semantic
+selection, mutation, candidate construction, reopen/readback, or locality
+work. The read-only `litchi` iWork facade adds no save API of its own.
+
+The helper validates the destination before invoking its one-shot writer
+callback, rejects symbolic-link and non-regular destinations, captures
+permissions from an existing regular file, and creates the staging file as a
+private sibling in the destination directory. The callback writes only to that
+staging file; each `Package::save` invokes `Package::write_to` once with the
+staging `File` and never first materializes `to_bytes` or a second
+package-sized buffer. A callback, stream, validation, or allocation error
+before replacement is returned through the typed save error, and the
+destination is not replaced. Cleanup is identity-aware: the private temporary
+is removed only while its pathname is still proved to name this operation's
+staging file; otherwise cleanup is disarmed rather than unlinking an entry
+whose identity is uncertain. The same rule applies to pre-replacement
+permission hardening, flush, file-sync, revalidation, and replacement failures.
+
+The publication sequence is callback/write, private Unix staging mode `0600`,
+`File::flush`, staging-file `sync_all`, final destination and staging-path
+identity revalidation, and same-directory atomic replacement. Only after
+replacement does the helper apply the existing destination's ordinary
+permissions through the still-open published file descriptor, synchronize that
 file when permissions were applied, and synchronize the parent directory where
 supported. New Unix destinations remain mode `0600`; inherited Unix
-set-user-ID and set-group-ID bits are cleared. Replacement is the publication
-commit point. A post-replacement permission or published-file synchronization
-failure, or a parent-sync failure other than Unix `InvalidInput`/`Unsupported`,
-is represented by the opaque archive publication `Error` as an explicit
-committed error; those two parent-sync kinds mean the capability is unavailable
-and return success. Callers use
-`was_committed()`/`is_committed()` and the typed stage and I/O accessors to
-learn that replacement already committed, so blind retry is unsafe. This is an
-exact streaming and allocation-shape contract, not a zero-copy, package-wide
-peak-memory, RSS, latency, throughput, or broad performance result.
+set-user-ID and set-group-ID bits are cleared.
 
-The focused durable entry points are
-`litchi-pages::Package::save`, `litchi-numbers::Package::save`, and
-`litchi-keynote::Package::save`. Each delegates to the single archive-owned
-publication operation. `litchi-iwa::IWorkPackage::save` and
-`litchi-iwa::Snapshot::save` remain compatibility host routes through that
-same operation and must not retain a parallel temporary/rename
-implementation. These save methods publish the already validated exact
-artifact; they add no semantic selection, mutation, candidate construction,
-reopen/readback, or locality work. The archive owns the filesystem sink,
-permission transfer, synchronization, and replacement.
-`Package::write_to` remains an exact caller-owned streaming sink and is not by
-itself a durable-save claim. The read-only umbrella `litchi` iWork facade does
-not introduce a fourth save API.
+Replacement is the commit point. A post-replacement permission or
+published-file synchronization failure, or a parent-sync failure other than
+Unix `InvalidInput`/`Unsupported`, is an explicit committed error; those two
+parent-sync kinds mean the capability is unavailable and return success.
+Callers use `was_committed()`/`is_committed()` and the typed stage and I/O
+accessors to learn that replacement already committed, so blind retry is
+unsafe. The save errors distinguish staging/write failure from publication
+failure. Their `Display`/`Debug` forms redact destination and temporary paths,
+package bytes, and lower-layer diagnostic text; `Error::source()` and
+`Error::io_error()` intentionally still expose the original operating-system
+error to a caller that asks for it.
 
-The public save wrappers distinguish staging/write failure from filesystem
-publication failure and expose typed accessors, including whether replacement
-committed. Their default `Display`/`Debug` forms are content-free and redact
-destination and temporary paths, package bytes, and lower-layer diagnostic
-text. The publication `Error::source()` and `Error::io_error()` accessors can
-still expose the original operating-system error and its text to a caller
-that requests it; that diagnostic escape hatch is intentional. The existing
-typed streaming error still reports only the conforming byte offset and I/O
-kind. Windows receives the best-supported same-directory atomic replacement
-and file synchronization, but no stronger parent-durability or POSIX-rename
-guarantee is claimed. Other targets fail before the writer runs.
-Existing/current permission transfer is also platform-specific: Unix mode
-bits with set-user-ID/set-group-ID clearing are the narrow contract, while
-Windows reparse points are rejected and broader Windows metadata/ACL behavior
-is not portable. Unix `InvalidInput` and `Unsupported` parent-sync results are
-accepted as an unavailable capability; other post-replacement permission,
-file-sync, or parent-sync failures remain typed committed errors. The contract
-assumes a trusted, caller-controlled parent and
-ordinary local-filesystem rename/sync semantics; network and userspace
-filesystems, concurrent same-identity pathname replacement, and platform
-metadata can weaken identity, atomicity, cleanup, or crash-durability
-guarantees. Platform-specific refusal and post-replace durability failures
-remain typed rather than being presented as an ordinary pre-publication error.
+Windows receives the best-supported same-directory atomic replacement and file
+synchronization, but no stronger parent-durability or POSIX-rename guarantee;
+reparse points are rejected and broader Windows metadata/ACL transfer is not
+portable. Other targets fail before the writer runs. The contract assumes a
+trusted, caller-controlled parent and ordinary local-filesystem rename/sync
+semantics; network and userspace filesystems, concurrent same-identity
+pathname replacement, and platform metadata can weaken identity, atomicity,
+cleanup, or crash-durability guarantees.
 
-The Wave118 playback side keeps the existing private Keynote
-`movie_playback_codec` Buffa build ratchet: strict raw-wire validation runs
-before the borrowed private Buffa projection, generated owned views and
-production Prost/generated decode or encode paths remain excluded, and raw
-source bytes remain the preservation authority. The selector-first playback
-surface stays archive-free; this ratchet is a scoped codec/build boundary and
-does not claim native playback behavior or a format-owner exit.
+## Caches and retained state
 
-Scoped verification records 18/18 archive publication tests; 7/7 focused save
-tests in each of Pages, Numbers, and Keynote; the four legacy-host save tests;
-the 17-case production-codec guard; and the 7 movie-codec, 3 provenance,
-1 focused-codec, 10 generated-output, and 2 encoder ratchets. Strict focused
-Clippy and rustdoc gates passed, as did the 705-case boundary-policy suite; the
-live checker still reports only the three pre-existing untracked Pages
-table-lock findings.
+"Cache behavior is semantically invisible" describes evictable parsed values
+behind a handle. Two other shapes of retained state are admitted, each under
+its own rules.
 
-Computer Use opened the Rust-produced artifacts without repair, observed their
-markers, saved, closed, and reopened them with the markers intact. Pages moved
-from 96,417 bytes/SHA-256
-`21107bc9323fba6f1589152454c0b0b0cc8e239313c6a369bc4a891116601b42`
-to the native-normalized 96,413 bytes/SHA-256
-`93b904b95251c8160c71fb3e34cb169f66aff91ac85a70274c07b7942567273c`;
-Numbers moved from 136,357 bytes/
-`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`
-to 136,023 bytes/
-`8072f6c00c2e530867581104510e2f0eb08821a8a11b2a1158b540182bedfba1`;
-Keynote moved from 500,058 bytes/
-`3a3d07476b45b6e543bcfba75fe38a245434176dcb3565e34570b817708b9f42`
-to 500,021 bytes/
-`9c8dd8e80ce843d8376ffa90a9904a15f041f71fe436752700a0a7fd3b76c99f`.
-Each focused API then reopened and republished its native-normalized artifact
-byte-for-byte. These are disposable correctness/interop artifacts, not CI
-fixtures, and no latency, throughput, allocation, RSS, or broader performance
-claim follows.
-
-## 2026-08-31 amendment: Wave119 debt-005 archive routing
-
-Wave119 retires ordered migration debt 005. The archive owns a doc-hidden,
-explicit, exact-type `iwa` route for the compatibility host. The route exposes
-the core boundary by exact type identity; it introduces no wrapper, conversion,
-copied value, compatibility implementation, or second owner. `litchi-iwa` no
-longer declares or imports `litchi-iwa-core` directly; its existing host paths
-consume that archive-owned route.
-
-This is dependency routing only, not an object-level semantic migration. It
-does not establish a memory, allocation, latency, throughput, or other
-performance result. Host/edge debt 002 and the migration host remain, as do
-the remaining host editor/compatibility logic and the other ordered debts. No
-Buffa or generated-schema implementation, projection, or budget changes are
-included. Computer Use opened the canonical Pages, Numbers, and Keynote
-fixtures, created native copies, closed them, and reopened the copies without
-repair or recovery UI while retaining their text/date markers and Numbers
-value `42`. The format-owned `Package::save` APIs then republished the
-native-normalized copies byte-for-byte: Pages 96,407 bytes/
-`d321bde90824664eb6122690eacd30441aa5d4d329c655b808e1b420a78e6bb5`,
-Numbers 135,985 bytes/
-`1e23a5b36e3f11bc0de2b11de37488c4c981f13f7335ef415e63eccb2adedc18`,
-and Keynote 499,981 bytes/
-`a720f3a1dbe32070a1c72bc710621747b9c305261b86c4ade1879b6a3eadaf02`.
-These disposable artifacts establish preservation only; they do not establish
-memory, allocation, latency, throughput, or other performance results.
-
-The authoritative post-Wave119 inventory is 64 workspace packages, 237
-internal dependency declarations, 226 canonical edges, and 11 ordered
-migration debts with orders `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, with
-one migration host. Debt 005 is removed; debt 002, the relevant host/edge, and
-the remaining host logic stay open.
-
-## 2026-08-31 amendment: Wave120 bounded TableDataList text projection
-
-Wave120 removes the generic text registry's eager generated-Prost construction
-for root and segmented Numbers `TableDataList` payloads (message types 6005,
-6201, and 6011). The adapter now uses the existing strict
-`numbers_table_cell_storage_codec`: a handwritten bounded traversal validates
-the source and forces the private Buffa lazy projection for parity while the
-original archive bytes remain authoritative.
-
-The adapter stages only non-empty borrowed strings, copies them with fallible
-reservations, and publishes the owned vector only after the complete decode
-succeeds. Decode options impose finite input-byte, field, work, nesting,
-reference, and aggregate-text ceilings; resource failures cross the adapter as
-typed common limits where that vocabulary exists. Focused tests cover root and
-segment parity, ownership after source mutation, malformed/truncated input,
-duplicate and wrong-wire fields, invalid UTF-8, budget refusal, and private
-prefix non-publication.
-
-This removes two eager production decoder calls from one private extraction
-path. It is not a latency, throughput, allocation-count, or whole-graph memory
-claim. Other host editor paths still use generated Prost values, and no public
-API, dependency edge, ordered migration debt, or monolith-deletion gate changes.
-
-## 2026-09-01 amendment: Keynote chart Arrange bounded resource record
-
-The existing-chart Arrange transaction is a bounded source-preserving rewrite
-of the native chart's `locked` and `constrain_proportions` fields. Its private
-strict codec validates wire types, duplicate fields, nesting, work, and
-payload bounds before any changed candidate is staged. The codec uses a
-private Buffa lazy view for the admitted fields; generated Prost values,
-archive containers, and native identifiers do not cross the semantic API.
-Source bytes remain authoritative for unselected fields and members.
-
-The operation resolves `SlideSelector` and `ChartSelector` first, charges its
-finite package, wire, field, work, nesting, reference, output, retained-byte,
-and allocation ceilings with checked arithmetic, and uses fallible staging.
-An exact no-op shares the source snapshot. A changed candidate is assembled
-once, reopened, and semantically reread before atomic publication. Since the
-flags are non-rendering Arrange metadata, preview invalidation/removal is not
-part of this transaction; verification must prove previews remain preserved.
-
-This record makes no zero-copy, single-allocation, package-wide peak-memory,
-RSS, latency, throughput, or general performance claim. It also does not
-claim Buffa ownership of chart data or other chart graphs. Legend visibility,
-persisted sort configuration, and physical `Sort Now` remain separate slices.
-No normal dependency edge or migration-host ownership changes in this record.
-
-## 2026-09-01 amendment: Numbers existing-cell Number-format resource record
-
-The existing-cell Number-format transaction is a bounded source-preserving
-operation over the selected table cell, its BNC cell record, and the admitted
-shared Number-format registry/refcount closure. The strict ingress validates
-wire keys, length-delimited payloads, duplicate/cardinality rules, numeric
-domains, nesting, and known field framing before forcing a private borrowed
-Buffa view. Buffa is a lazy inspection/parity layer only; generated owned
-messages and Prost-style whole-message re-encoding are not the preservation
-authority. Unselected field bytes and unrelated package members remain
-borrowed from the exact source until the commit's fallible staging boundary.
-
-One operation-local budget charges the selected graph's input bytes, decoded
-fields and references, bounded wire work/nesting, semantic output bytes,
-retained and scratch bytes, and fallible staging allocations. Codec size,
-field, identifier, and dense-list cursor arithmetic is checked. Conservative
-owner aggregate charges saturate to the applicable ceiling before
-authorization, and output reservation occurs only after the relevant prepared
-plan limits and package reassembly preflight succeed. Dense format-list append
-updates the entry and `next_list_id` cursor in one prepared rewrite. A limit
-failure, malformed or ambiguous ownership, invalid format value, allocation
-refusal, candidate reopen disagreement, or locality mismatch leaves the source
-unchanged. An exact no-op shares the source and does not allocate a candidate;
-a changed operation performs one admitted rewrite, one bounded reopen/readback,
-and atomic publication.
-
-The locality proof is semantic rather than a package-wide rewrite promise:
-only the selected cell's admitted storage and the format-table/refcount
-records required by that cell may change, while unselected cells, unknown
-fields, controls, values, formulas, metadata, previews, and unrelated archive
-members remain byte-preserved. The exact member set and measured resource
-counts for the root verification run are intentionally recorded in ADR 0008,
-not inferred here. This amendment therefore makes no zero-copy, allocation
-count, peak-RSS, latency, throughput, or whole-package memory claim, and it
-does not transfer Buffa ownership of the remaining Numbers data-format
-families or table graph.
-
-## 2026-09-01 amendment: Numbers existing-cell Percentage-format resource record
-
-Percentage reuses the single focused decimal graph owner rather than copying
-the Number registry, tile, metadata, census, or locality implementation. Its
-strict type-258 codec performs bounded raw-wire validation before a private
-borrowed Buffa lazy-view parity check. Public Percentage snapshots, writes,
-and prepared plans are nominal wrappers, so compile-time family separation is
-preserved without duplicating the scanner or emitter. Candidate readback keeps
-the caller's original message ceiling; it does not raise that ceiling to the
-candidate size.
-
-The transaction threads finite package, graph, wire, output, retained, scratch,
-work, and allocation ceilings through native planning, reassembly, candidate
-reopen, and semantic readback. Checked size/cursor arithmetic and fallible
-output reservation protect publication. Shared entries use copy-on-write;
-exact semantic reuse avoids duplicate entries; zero-refcount entries are
-culled; stale or zero `next_list_id` values fail closed. The BNC wire crate
-exposes one narrowly named metadata-only decimal operation so the package owner
-does not duplicate BNC layout constants or invoke scalar conversion policy.
-
-Locality verification compares complete physical ZIP member records for every
-untouched member, requires each authorized native and metadata member exactly
-once, permits only deletion of invalidated previews, and validates the selected
-members' preserved headers. Tests cover all 256 valid decimal/negative/
-separator combinations, COW/refcounts, unknown extensions, malformed input,
-operation limits, exact no-op/inverse behavior, concurrency, and native
-selector equivalence. These are bounded correctness claims only: this record
-makes no peak-RSS, allocation-count, latency, throughput, zero-copy, or
-package-wide performance claim and does not extend ownership to other data
-format families.
-
-## 2026-09-01 amendment: Numbers existing-cell Currency-format resource record
-
-Currency uses the shared bounded decimal graph owner with a nominal strict
-type-257 codec. The operation validates the alternate-number BNC shape, the
-optional secondary generic Number reference, format-list identity, refcounts,
-wire field domains, duplicate/cardinality rules, UTF-8/code constraints,
-length-delimited framing, nesting, and work before constructing its borrowed
-Buffa lazy parity view. Buffa is inspection/parity only; a generated owned
-message or normal-Prost whole-message re-encoding is never the preservation
-authority.
-
-The operation-local budget covers package input/output, physical entries,
-decoded payload objects/messages/references, wire bytes/fields/nesting/work,
-retained and scratch bytes, compressed output, staging allocations, and total
-transaction work. Checked cursor/size arithmetic and fallible reservation
-guard publication. Exact no-ops do not construct a candidate; changed edits
-use copy-on-write, preserve unknown/unselected bytes, strictly reopen and read
-back the selected semantic value, and compare complete physical locality for
-unselected members. Limit, malformed, allocation, lock, dependency,
-candidate-verification, or locality failures leave the source unchanged.
-
-These are bounded correctness and refusal claims, not a peak-RSS,
-allocation-count, latency, throughput, zero-copy, or whole-package memory
-claim. The focused Currency owner does not transfer Buffa or package-resource
-ownership for other display/control families, cell values/formulas, styles, or
-table topology; its operation-specific native E3/E4 evidence is recorded in
-ADR 0008 and does not establish a package-wide performance claim.
-
-## 2026-09-01 amendment: Numbers existing-cell Scientific-format resource record
-
-The Scientific transaction is a bounded source-preserving operation over one
-selected cell, its BNC format reference, and the admitted shared
-format-list/refcount closure. The strict type-259 codec validates required
-fields, canonical varints, fixed precision, the native minus-sign style, hidden
-thousands-separator state, duplicate/cardinality rules, length-delimited and
-group framing, nesting, and work before constructing its private borrowed
-Buffa view. Buffa is an inspection/parity layer only; generated owned messages
-and normal-Prost whole-message re-encoding are not the source of preservation.
-
-The operation-local budget charges package input/output, physical entries and
-payloads, decoded objects/messages/references, wire bytes/fields/nesting/work,
-retained and scratch bytes, compressed output, staging allocations, and total
-transaction work. Checked cursor/size arithmetic and fallible reservations
-guard every publication boundary. Exact no-ops do not construct a candidate;
-changed edits use copy-on-write, retain unknown and unselected bytes, reopen
-and read back the selected Scientific value, and compare complete physical
-locality for untouched members. Malformed, wrong-family, unsupported,
-over-budget, allocation, lock, candidate-verification, or locality failures
-leave the source unchanged.
-
-This is a bounded correctness/refusal contract only. It makes no zero-copy,
-allocation-count, peak-RSS, latency, throughput, or whole-package memory claim,
-and it does not transfer wire or package-resource ownership for other display
-families, values/formulas, styles, or table topology. Scientific focused
-test/fuzz and native-app evidence is recorded in ADR 0008; this resource record
-still makes no package-wide performance/RSS or certification claim.
-
-## 2026-09-02 amendment: Numbers existing-cell Fraction-format resource record
-
-The Fraction transaction is a bounded source-preserving operation over one
-selected cell, its BNC format reference, and the admitted type-262
-format-list/refcount closure. The strict codec validates required fields,
-canonical varints, all nine `FractionAccuracy` strategies, duplicate/cardinality
-rules, length-delimited and group framing, nesting, and work before constructing
-its private borrowed lazy Buffa view. Buffa is an inspection/parity layer only;
-owned generated messages and normal-Prost whole-message re-encoding are not the
-source of preservation. Field 20 (`requires_fraction_replacement`) is preserved
-when absent or canonically encoded as `false` (absence remains absent); a
-canonical `true` is rejected because replacement semantics are unsupported.
-
-The operation-local budget charges package input/output, physical entries and
-payloads, decoded objects/messages/references, wire bytes/fields/nesting/work,
-retained and scratch bytes, compressed output, staging allocations, and total
-transaction work. Checked cursor/size arithmetic and fallible reservations
-guard every publication boundary. Exact no-ops do not construct a candidate;
-changed selector-first exact-source edits use copy-on-write, preserve unknown and
-unselected bytes, reopen and read back the selected Fraction value, and compare
-complete physical locality for untouched members. Malformed, wrong-family,
-noncanonical field-20, over-budget, allocation, lock, candidate-verification,
-or locality failures leave the source unchanged. The legacy host delegate is
-fail-closed after an exact-source owner rejection.
-
-The focused evidence records 22/22 package integration tests, 4/4 library codec
-tests, 3/3 direct codec tests, and 36/36 wire tests, with 44 proto fuzz corpus
-seeds and 18 package fuzz corpus seeds; both targets completed 100-run
-AddressSanitizer smokes. These are bounded correctness and refusal claims only:
-no zero-copy, allocation-count, peak-RSS, latency, throughput, or whole-package
-memory claim is made. The owner does not transfer wire or package-resource
-ownership for other display families, values/formulas, styles, or table
-topology. ADR 0008 separately records representative operation-specific native
-E3/E4 and artifact/hash evidence; neither record closes a topology, debt, host,
-or ADR 0028 gate. The topology
-remains 64 workspace packages, 237 internal dependency declarations, 226
-canonical edges, 11 ordered migration debts with IDs `[1, 2, 4, 8, 10, 12, 13,
-14, 15, 16, 17]`, and one migration host.
-
-## 2026-09-02 amendment: Keynote physical table-sort resource record
-
-The focused physical `Sort Now` operation is bounded by source/candidate
-package, entry/payload/object/message/reference, wire bytes/fields/nesting/work,
-row/column/key-cell, BNC-offset, retained/scratch, allocation, component, and
-reassembly ceilings. Checked arithmetic and fallible staging occur before
-publication. Tile/header/UID codecs borrow source records and expose prepared
-requirements; strict preflight runs before a private lazy Buffa view, while raw
-source bytes remain preservation authority. The operation plans a stable
-permutation without cloning each BNC payload and rewrites only admitted
-row envelopes, sparse header records, and UID arrays plus root preview
-invalidation.
-
-Exact no-ops do not construct candidates. Changed candidates are staged once,
-reopened under retained limits, semantically reread, and locality-verified
-before publication; failures leave the immutable source unchanged. These are
-bounded correctness/refusal contracts, not zero-copy, allocation-count,
-peak-RSS, latency, throughput, or package-wide performance claims. Cross-tile/
-bucket moves and formula/error/rich/comment/merge/filter/group/category/pivot/
-spill/conditional/hidden/imported/provenance/stroke or other unproven row-affine
-dependencies fail closed. There is no public row/value reader. A disposable
-Computer Use probe opened a pre-hardening candidate, but the current strict
-owner rejects the app-authored source because model field 39 identifies an
-unowned conditional-style CalculationEngine dependency graph; that run is
-exploratory evidence only. Native Keynote
-acceptance and hashes for the current owner are pending, and the added
-canonical BNC edge does not close any migration debt or monolith gate. Current
-topology remains 64 packages, 238 declarations, 227 canonical edges, 11
-development-only edges, 11 debts with IDs
-`[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.
-
-## 2026-09-03 amendment: package-scale indexing and fallible staging
-
-This wave hardens package-scale paths without changing their semantic owners.
-The migration host now checks borrowed package input length before allocating
-or copying it and uses fallible reservation; allocation failure maps to the
-existing typed allocation error. Its object index preflights cardinality,
-builds duplicate/archive/name catalogs once, and batches resolution without
-repeated map reconstruction. Pages host graph deletion uses one fallibly
-reserved object-location/inbound-reference index, and host media reachability
-uses bounded maps/sets plus sorted linear deduplication instead of quadratic
-`Vec::contains` scans. Existing traversal order and failure behavior remain
-authoritative.
-
-Focused owners receive the same locality treatment. Numbers comment metadata
-and reply validation use reserved ID/UUID/location indexes and one inbound
-census; the six scalar display-format owners and persisted sort share a
-duplicate-rejecting physical-entry index. Pages footnote validation borrows
-metadata until preflight, uses fallible visitor growth, and reuses one sorted
-package graph census. Keynote chart-caption, movie-playback, table-title,
-table-header, and table-appearance verification replace nested scans with
-fallible catalogs and reference-frequency maps. These changes improve admitted
-paths from repeated quadratic scans to expected linear or indexed lookup while
-charging retained memory/work to existing transaction budgets; they do not
-establish package-wide peak-RSS, latency, or zero-copy claims.
-
-The focused Keynote build-order owner added in the same wave performs fallible
-preflight before retaining build/chunk references, preserves complete nested
-reference bytes, reserves chunk groups before publication, and uses checked
-global chunk offsets after a permutation. Exact no-op classification requires
-both semantic identity and exact artifact equality. Prost/Buffa differential
-tests now cover every projected drawable-parent `Reference` field, absent
-parents, unknown wire kinds/groups, malformed groups, and exact limits; the
-text-storage codec gains Unicode/empty repeated parity, source borrowing,
-UTF-8, group-policy, and boundary tests. This test expansion changes no
-production wire ownership.
-
-Focused verification passed 694 `litchi-iwa-protos` library tests, 425 Numbers
-library tests (421 passed, four external-oracle tests ignored), 131 Pages
-library tests, and 189 Keynote library tests, plus focused clippy gates. The
-topology remains 64 workspace packages, 238 internal declarations, 227
-canonical edges, 11 development-only edges, debts
-`[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host. No
-dependency, debt, host, or ADR 0028 deletion gate closes.
-
-## 2026-09-03 amendment: iWork staging and compatibility resource status
-
-The Number and Percentage existing-cell rewrites now preflight the bounded
-member count, maximum compressed bytes, compression-frame allocations, and
-checked work totals. They charge compressed, scratch, retained, allocation,
-and transaction-work budgets before reassembly; compressed members, edit lists,
-and changed-name lists use fallible reservations, and changed names borrow the
-immutable package catalogs. A refusal therefore occurs before publication and
-maps to the existing typed allocation/limit errors. This is allocation and
-budget safety only, not a measured allocation, RSS, latency, throughput, or
-zero-copy result.
-
-The related iWork ownership status is also current: focused Keynote owns
-soundtrack-item CRUD while host soundtrack creation and broad media remain;
-public `NumbersEditor::move_table` and the dedicated raw-ID Number, Percentage,
-Currency, Scientific, and Fraction routes are retired, with only the
-crate-private duplication bridge and generic `DataFormat` compatibility left.
-Host build-order reorder/move and its wire helper are removed, and
-nested-effect projection is an E1 semantic correction without native
-build-order proof. The current topology is 64 workspace packages, 238 internal
-declarations, 227 canonical
-edges, 11 development-only edges, 11 ordered debts `[1, 2, 4, 8, 10, 12, 13,
-14, 15, 16, 17]`, and one migration host.
-
-## 2026-09-04 amendment: Numbers existing-cell Text-format resource record
-
-The focused Numbers Text-format transaction is a bounded, exact-source
-operation over one selected existing cell and its admitted format-list/refcount
-closure. Its archive-free value is a content-free `Text` marker; the private
-type-260 codec validates the native format envelope and constructs a borrowed
-lazy Buffa view only after strict preflight. Native IDs, generated messages,
-archive members, and raw wire values remain below the public boundary.
-
-The transaction charges package, entry, payload, wire, retained, scratch,
-allocation, compression, and work requirements before publication. Exact
-no-ops avoid candidate construction; changed edits use copy-on-write, preserve
-unknown and unselected bytes, reopen and reread the selected semantic value,
-and compare physical locality. Canonical explicit Text uses marker `0x80`;
-an unchanged admitted converted-Text marker `0x81` with retained Number
-provenance remains source-authoritative. Malformed, wrong-family, unsupported,
-over-budget, allocation, lock, candidate-verification, and locality failures
-leave the source unchanged.
-
-Focused tests provide E1 evidence and the checked-in Apple fixture provides
-E2 read/no-op evidence only. No native E3/E4 acceptance, numeric-to-Text
-conversion, package-wide performance/RSS, or general display-format ownership
-claim follows from this record. The existing topology and host/debt gate are
-unchanged.
-
-## 2026-09-04 amendment: current scalar-owner count
-
-The six-owner count in the preceding 2026-09-03 resource snapshot is
-historical. The current focused Numbers scalar display-format set has seven
-owners: Number, Percentage, Currency, Scientific, Fraction, Text, and Date &
-Time. This amendment updates the current count without rewriting that prior
-resource record; the shared physical-entry index and its bounded resource
-claims remain unchanged.
-
-## 2026-09-16 amendment: retained per-part digest memos on an opened-presentation snapshot and its facade
-
-Authorized by the owner's decision. It refines the
-"cache behaviour is semantically invisible" rule above for one shape of
-retained state this ADR did not previously describe: a memo that is not an
-evictable weighted cache of parsed values, but a bounded table of digests over
-bytes the owner already holds.
+### Retained digest memos
 
 An immutable snapshot, and a package facade that publishes snapshots, may
-retain such a memo across operations under all of the following, each of which
-the implementing record proves rather than asserts. The memo is keyed on the
-identity of an allocation the owner already holds and retains a strong
-reference to it, so a key cannot be recycled by a different payload and a hit
-proves byte identity. Every entry names an allocation the owning snapshot's own
-package holds; the process retains no payload solely because a memo names it,
-and a memo carried onto another package is re-projected onto that package's own
-allocations rather than inherited. A facade that retains such a memo across
-operations adopts the memo of the snapshot each publication produces and
-releases it at every mutation that produces no snapshot to adopt, so the memo
-never outlives the graph it describes. A miss is an ordinary recomputation, so no
-value, refusal, limit or published byte depends on which entries a memo holds.
-The memo is rebuilt or projected, never mutated in place, and it holds no limit
-and raises no error the unmemoized path would not raise. Its resident cost is
-bounded by the part count, is stated in the implementing record, and is charged
-through fallible reservation, so exhaustion is a typed resource error and not
-an abort. A reused value is re-derived by a `debug_assert!` in test and debug
-builds, so the owning crate's suite proves value identity rather than only
-compilation.
+retain a memo that is not an evictable weighted cache of parsed values but a
+bounded table of digests over bytes the owner already holds. [ADR
+0032](0032-snapshot-derived-value-memos.md) widens the values such a memo may
+hold. Every one of the following holds, and the implementation proves rather
+than asserts it:
 
-This amendment does not weaken the eviction rules for semantic payload caches,
-does not permit ambient process-wide state, and changes no other sentence of
-this ADR.
+- The memo is keyed on the identity of an allocation the owner already holds
+  and retains a strong reference to it, so a key cannot be recycled by a
+  different payload and a hit proves byte identity.
+- Every entry names an allocation the owning snapshot's own package holds; the
+  process retains no payload solely because a memo names it, and a memo
+  carried onto another package is re-projected onto that package's own
+  allocations rather than inherited.
+- Adoption: a facade that retains such a memo across operations adopts the
+  memo of the snapshot each publication produces and releases it at every
+  mutation that produces no snapshot to adopt, so the memo never outlives the
+  graph it describes. This names when a facade must refresh its memo, not the
+  only point at which it may take one: a facade holding no memo may fill the
+  slot from a capture of its current, unmutated graph, provided every kept
+  entry is re-projected onto the facade's own allocations (entries naming
+  allocations the facade's package does not hold are dropped).
+- A miss is an ordinary recomputation, so no value, refusal, limit or
+  published byte depends on which entries a memo holds. The memo is rebuilt or
+  projected, never mutated in place, and it holds no limit and raises no error
+  the unmemoized path would not raise.
+- Its resident cost is bounded by the part count, is stated where the memo is
+  implemented, and is charged through fallible reservation, so exhaustion is a
+  typed resource error and not an abort.
+- A reused value is re-derived by a `debug_assert!` in test and debug builds,
+  so the owning crate's suite proves value identity rather than only
+  compilation.
 
-> **Clarified 2026-09-24** by the owner's decision: the
-> adoption sentence above names when a facade must refresh its memo, not the only
-> point at which it may take one. A facade holding no memo may fill the slot
-> from a capture of its current, unmutated graph, provided every kept entry is
-> re-projected onto the facade's own allocations (entries naming allocations
-> the facade's package does not hold are dropped). Every other condition of
-> this amendment applies unchanged. [ADR 0032](0032-snapshot-derived-value-memos.md)
-> widens the values such a memo may hold.
+This does not weaken the eviction rules for semantic payload caches and does
+not permit ambient process-wide state.
 
-## 2026-09-16 amendment: retained state that is not a cache, and its ceiling
+### Retained state that is not a cache
 
-Authorized by the owner's decision ("Cross-package copy: add a budget for
-that") for the
-first construct to hold a whole serialized document inside a public value for a
-caller-controlled lifetime.
-
-This amendment changes two sentences of this ADR's reading and nothing else.
-
-"Cache behavior is semantically invisible" continues to describe evictable
-parsed values behind a handle. It does **not** license retained state whose
-size is the point. State that a public value owns after the operation that
-produced it has returned, whose bytes a caller therefore holds for as long as
-it keeps that value, is a retention policy rather than a cache, and it is
-declared, bounded and observable:
+State that a public value owns after the operation that produced it has
+returned, whose bytes a caller therefore holds for as long as it keeps that
+value (for example a whole serialized document held inside a public value), is
+a retention policy rather than a cache. It is declared, bounded and
+observable:
 
 - its ceiling is a member of the operation's own finite limit policy, of the
   same kind as the already-enforced live-memory ceilings there, intersected
@@ -2359,43 +212,37 @@ declared, bounded and observable:
 - the retained allocation is one an operation already made, not a new copy of
   it; retention is a decision not to free.
 
-"Every operation charges a hierarchical resource budget supplied by an
-execution context" remains the target, and where a path has such a context that
-context is still the authority. Where a path has **no** execution context, as
-the PPTX opened-presentation path does not, the operation's finite limit policy
-carries the ceiling. That is an interim location, not a second budget system:
-when a path gains an execution context under
+Where a path has an execution context, that context is the authority for the
+ceiling. Where a path has **no** execution context, as the PPTX
+opened-presentation path does not, the operation's finite limit policy carries
+the ceiling. That is an interim location, not a second budget system: when a
+path gains an execution context under
 [ADR 0031](0031-execution-context-budgets.md), its retention ceilings move
 there.
 
 Exceeding such a ceiling is **not** a refusal when the work the retention
-avoids is always available by recomputation. The typed limit error of this ADR
-protects a caller from work or memory it did not ask for; there is nothing to
-protect it from when the alternative is the path the library takes anyway. A
-retention ceiling that is exceeded therefore falls back to recomputation
-silently and observably — the value reports that it is holding nothing — and
-the ceiling never changes any result, refusal or published byte. Ceilings whose
-alternative is *not* recomputation keep the typed `Limit` refusal they have
-today; this reading applies only to retention that is a pure optimization.
+avoids is always available by recomputation. The typed limit error protects a
+caller from work or memory it did not ask for; there is nothing to protect it
+from when the alternative is the path the library takes anyway. A retention
+ceiling that is exceeded therefore falls back to recomputation silently and
+observably (the value reports that it is holding nothing), and the ceiling
+never changes any result, refusal or published byte. Ceilings whose
+alternative is *not* recomputation keep their typed `Limit` refusal; this
+reading applies only to retention that is a pure optimization.
 
-The scratch-storage clause is untouched and is the reason the fallback is
-recomputation rather than a spill: a retained document archive is document
-content, and litchi never writes it anywhere automatically.
+The scratch-storage rule is the reason the fallback is recomputation rather
+than a spill: a retained document archive is document content, and litchi
+never writes it anywhere automatically.
 
-## 2026-09-24 clarification: chunked charging through a budget lease
-
-Authorized by the owner's decision ("Accept a
-rough budget lease rather than a precise one"). This is a reading of
-"Every operation charges a hierarchical resource budget supplied by an
-execution context", not a new budget system.
+## Budget leases
 
 An operation may charge a budget through a `Lease` (`Budget::lease`,
 `ExecutionContext::lease`): it claims up to a stated chunk of one resource at
 a time, with the same atomic check-and-add per hierarchy level as any other
-charge, and hands the units out locally. That is charging the budget. A lease
-never holds more than one chunk: a claim near a limit shrinks to the room
-left, and units a refund takes back beyond one chunk return to the budget at
-once.
+charge, and hands the units out locally. That is charging the budget, not a
+second budget system. A lease never holds more than one chunk: a claim near a
+limit shrinks to the room left, and units a refund takes back beyond one chunk
+return to the budget at once.
 
 What stays exact: no level is ever above its limit, even transiently; when
 every charge a holder makes of a resource goes through one lease, that holder
@@ -2410,43 +257,488 @@ settles at exactly what was handed out.
 What becomes rough, and only for other holders of the same budget: the
 pre-claimed units count as used, so another holder can be refused earlier than
 exact accounting would refuse it, by up to one chunk per other open lease, and
-a refusal it receives reports usage that includes the pre-claims. Each lease's chunk size is stated
-with its reason by the code that opens it. Reservations, `consume` and every
-charge made outside a lease are unchanged. ADR 0031's reservation dimensions
-(`Workers`, `IoConcurrency`) are admission-time reservations, not charges, and
-are not leased.
+a refusal it receives reports usage that includes the pre-claims. Each lease's
+chunk size is stated with its reason by the code that opens it. Reservations,
+`consume` and every charge made outside a lease are unchanged. ADR 0031's
+reservation dimensions (`Workers`, `IoConcurrency`) are admission-time
+reservations, not charges, and are not leased.
 
-## 2026-09-24 amendment: caller-selected save durability
+## Measurement contract
 
-Authorized by the owner's decision
-("Accept the opt-in save policy"). It amends one phrase of
-§Output above, "flush/fsync as supported", and nothing else.
+Representative small, large, sparse, media-heavy, encrypted, and malformed
+corpora gate open latency, lazy lookup, concurrent reads, disjoint writes,
+patching, and save. Track peak resident memory, allocations, copied bytes,
+decompression, cache misses, lock/contention time, CPU utilization, and scaling.
+Optimization decisions require profiles, flame graphs, and statistical evidence;
+intuition alone is not accepted.
 
-Full durability remains the default and is what every ordinary `save` does,
-with unchanged bytes, and with unchanged system calls on success and on every
-failure before the replacement: the staged temporary artifact is flushed and
-synchronized before the atomic replacement, and the destination's parent
-directory is synchronized after it where the platform supports that. A caller
-may select a weaker level for one save, and only by passing an explicit
-`litchi_core::Durability` to a `*_with_durability` method: `FileOnly` skips the
-parent-directory synchronization, and `NoSync` also skips the temporary
-artifact's synchronization. The level is a per-call argument. It is never read
-from the environment, a global or thread-local value, or a package's stored
-save preferences, so selecting one changes no preference and revokes no
-exact-source authorization.
+The allocation-shape, bounded-accounting, and indexing rules in the rest of
+this ADR are correctness and boundedness properties. They are not latency,
+throughput, allocation-count, zero-copy, or peak-memory results; any such claim
+needs the measurement above.
 
-Every level keeps the rest of §Output: the sibling temporary artifact, every
-check the route makes before publishing, validation and finalization before
-replacement, the one
-atomic replacement, a destination left untouched by any failure or
-cancellation before that replacement, best-effort identity-aware cleanup of the
-temporary artifact, and typed errors. A level never attempts a step it skips,
-so it cannot fail at one; only `Full` can report that the destination was
-replaced before its directory synchronization failed. What a weaker level gives
-up is durability across an operating-system crash or power loss after the save
-has returned: after `FileOnly` the destination names what it named before the
-save or the complete new artifact, and the replacement itself may be lost;
-after `NoSync` nothing is promised, and on a filesystem that does not write
-file data before the rename that exposes it the destination may be truncated. A process crash
-needs no synchronization at any level. The `litchi_core::Durability`
-documentation states each level's guarantees and is the normative list.
+Instrumentation is an opt-in runtime-neutral observer with optional tracing and
+profiling adapters. It never records document content, credentials, or sensitive
+paths by default.
+
+## IWA decoding and preservation
+
+### Generated bindings and lazy views
+
+Generated IWA protobuf bindings are kept minimal. Prost runtime type-name
+metadata stays disabled because no production path consumes it. Production
+archive-header and focused projections use exact-version Buffa 0.9.1 lazy views
+behind private codecs in `litchi-iwa-protos`. The complete schema corpus is not
+generated eagerly for every format, and generated Buffa types, decode contexts,
+and codec errors never cross a crate's public boundary. `litchi-iwa-protos`
+keeps its normal `prost` dependency for the generated owners that still use it;
+`litchi-keynote`, `litchi-numbers`, and `litchi-pages` use Prost only as a
+dev-dependency for test oracles and fixture builders.
+
+Buffa lazy decoding of untrusted IWA bytes is preceded by a schema-directed
+common wire-tree preflight. One aggregate policy bounds scanned bytes, fields,
+nesting, repeated metadata items, deferred-message occurrences, and a
+conservative decoded-memory envelope before a lazy view is constructed. The
+archive-header adapter then visits every deferred child exactly once, checks
+proto2 required presence, and projects directly into physical metadata with
+fallible destination reservations; generated `to_owned_message` is not a
+production ingress path. Buffa 0.9.1 still uses ordinary infallible `Vec`
+growth for some internal lazy metadata, so the preflight bounds hostile
+amplification but does not give typed recovery from global allocator
+exhaustion or a language-level exact resident-memory bound. A contract that
+needs either property must use a streaming handwritten cursor or a corrected
+Buffa runtime.
+
+Core archive metadata is projected into core-owned `FieldPath`, `FieldInfo`,
+and closed-enum wrappers. Optional presence and unknown signed enum values are
+retained exactly. Preflight charges both the transient Buffa representation and
+the neutral destination vectors, including unknown closed-enum records, before
+publication.
+
+The recurring codec pattern is: a strict handwritten router owns framing,
+required and duplicate field checks, canonical scalar and Boolean validation,
+and unknown/group handling, and charges every resource; the private Buffa view
+is forced afterwards only for parity. The view retains no unknown fields and
+never encodes replacement bytes.
+
+### Preservation authority
+
+Lazy re-encoding is not the preservation boundary. Original source-backed
+header bytes and raw spans remain authoritative for exact no-ops, unknown
+fields, duplicate occurrences, and non-canonical encodings. Buffa encoding is
+used only for a canonical header created after a semantic change. A rewrite
+replaces only the selected fields of a validated raw record and copies
+everything else from the source; no generated Buffa or Prost message is
+materialized for a preservation rewrite, because raw validated field records
+are the authority for unknown fields, duplicate ordering, encoded keys, and
+length headers.
+
+### Physical ZIP ingress
+
+Physical iWork ingress bounds the two ZIP name spellings independently before
+copying either one. Local and central names, extras, and comments are charged
+cumulatively; compressed sizes are rejected before payload materialization.
+For legacy packages, catalog, component-catalog, and detection paths reject a
+nested `Index.zip` from its declared uncompressed size before decompression.
+Limit failures retain the resource kind and exact observed and maximum values.
+This layer does not promise a semantic object path in every physical ZIP
+diagnostic.
+
+### Borrowed wire readers
+
+Borrowed IWA wire readers use the common source-bound `WireView<'a>` and
+`WireFieldView<'a>` when interpreting recognized fields: one borrowed source
+and compact spans avoid per-field slice metadata, payload ranges are sliced
+through validated spans, and schema-owned key/length framing can be required
+without changing the permissive unknown-field parser. Singular wire overlays
+index base and overlay field numbers once and emit one exact-capacity output,
+so sparse updates do not repeatedly reparse a growing message. Source-built
+Pages, Numbers, and Keynote chart updates locate their single chart payload
+with one linear scan and no temporary index allocation before decoding or
+invoking a mutation callback.
+
+Reference-line graph updates avoid a full generated-Prost round-trip: bounded
+raw fields are merged by repeated-field occurrence and only recognized values
+are replaced, so unknown graph bytes are copied once at their original nesting
+positions. The candidate field collection is validated before publication.
+
+### Focused text projection
+
+The storage-text Buffa projection is deliberately smaller than a canonical
+format schema root. A derived five-file projection reads only repeated field 3
+of `TSWP.StorageArchive`, is hard-capped at 32 KiB of generated Rust, disables
+unknown retention, and exposes only borrowed text fragments through a private
+wrapper. Common-wire preflight bounds root bytes, fields, field type, fragment
+count, UTF-8 bytes, and the conservative repeated-view allocation before stock
+Buffa 0.9.1 runs. Other length-delimited fields remain opaque by design, so
+this projection suits only call sites whose policy needs semantic text rather
+than eager validation of every unrelated known child. The caller-owned source
+remains authoritative.
+
+### Retained semantic text accounting
+
+The neutral iWork aggregate measures the UTF-8 bytes of every owned string that
+survives in the archive-free result. Keynote accounting includes the show title
+and owned unknown animation/transition identifiers; known static effect labels
+consume no owned-text budget. Its failure observation follows the same title,
+slide content, additional storage, and speaker-notes order exposed by the
+public semantic model.
+
+Pages separates rendered text length from retained text. Section names,
+headings, paragraphs, and storage text are charged once, while synthesized
+rendering separators and temporary `Option<Box<str>>` slots are not charged as
+UTF-8. A rejection reports the checked observed byte count (or `usize::MAX` on
+arithmetic overflow) through the focused crate and root facade rather than
+fabricating `limit + 1`.
+
+## Keynote reads
+
+Keynote package ingress counts all parsed IWA objects before one fallible exact
+reservation, stores only `(identifier, component, object)` locators, sorts them
+once, rejects duplicate identities, and performs later lookups by binary
+search. Slide records, semantic slides, builds, and text storages reserve
+fallibly from validated source counts. The text adapter runs only for
+graph-reachable typed storage payloads and receives the smaller of the physical
+message ceiling, the wire hard ceiling, and the remaining package-wide semantic
+text and fragment budgets. Streaming wire preflights count slides and used
+build/drawable references before generated Prost vectors are materialized, and
+charge retained slide names and build/transition identifiers before semantic
+ownership conversion. Aggregate storage, fragment-range, reference, and UTF-8
+counters include a content-free semantic path in every limit failure.
+Common-wire byte, field, nesting, and work ceilings are translated into the
+same format-owned counted diagnostic. Text extraction performs a checked sizing
+pass and one fallible destination reservation instead of building a temporary
+vector of cloned strings. Ignored nested fields still materialized by the
+generated Prost graph are bounded only by the physical message profile.
+
+The focused settings reader uses the schema-directed Show and SlideTree
+preflight, including the caller's slide-reference ceiling, before a private
+Buffa settings projection is forced. Unlike the full Show projection, it does
+not allocate or retain the slide-node identifier collection and does not
+initialize the package's full semantic slide cache.
+
+`Slide::plain_text` computes a checked aggregate UTF-8 length for its semantic
+text values, reserves one output `String` when representable, and appends
+directly in source order without the intermediate `Vec<String>` used by
+`all_text()`. Empty text storages are filtered, while empty modeled values keep
+their separators.
+
+## Numbers reads
+
+### Object index
+
+The Numbers package uses the same bounded lookup shape without sharing
+Keynote's format graph. `Index::from_components` counts every physical object
+before checking `max_objects` and before reserving locator/type storage. It
+stores one compact `(identifier, component, object)` locator and at most one
+primary-message classification per object, sorts both arrays once, and
+resolves later references by binary search. Checked read options combine
+physical archive limits with non-zero hard-bounded ceilings for objects, rooted
+sheets, semantic tables, and rooted reference occurrences. Sheet/reference/
+table counts are charged before their semantic result vectors grow; structured
+table output is fallibly reserved one item at a time under the same table
+ceiling.
+
+Duplicate identifiers within one component are rejected. Across distinct
+physical components, only source-authoritatively exact copies of one object
+identifier are admitted, and an admitted alias group coalesces to one logical
+locator and one primary-type entry; `Package::object_count` still reports the
+physical count. `ArchiveObject::same_content_ignoring_offsets` compares decoded
+`ArchiveInfo`, exact raw messages, header and payload lengths, and retained
+original and original-canonical header bytes without allocation; only
+component-relative header and payload offsets are ignored, so payload,
+metadata, raw-header, or framing divergence fails closed. Lookup comparison
+work is based on the deduplicated logical locator set, while index allocation,
+population, sorting, and comparison topology are charged from the physical
+count.
+
+Legacy type-6000 model discrimination requires a complete bounded parse
+because genuine type-6000 table-info payloads are valid false positives; the
+object and physical message ceilings bound that fallback. Strict shape
+classification ignores TableInfo false positives, while schema-shaped legacy
+models hit the table budget before Prost decode/materialization and cannot
+commit rejected candidate budgets.
+
+### Root, sheet, and storage views
+
+The type-1 document root is projected through the strict
+`numbers_sheet_order_codec` view; standard and form-based type-2/3 sheets use
+the bounded name/drawable preflight; and compatibility storage text uses the
+shared bounded `ValidatedStorage` path from `litchi-iwa-text-wire`. The reader
+retains only the root sheet references, borrowed sheet name and drawable spans,
+and the text needed by its public diagnostic, and constructs no generated
+document, sheet, form-sheet, or storage object for these paths. Each selected
+payload is bounded before publication by input bytes, traversed fields,
+nesting, aggregate wire work, and the caller's remaining semantic references or
+text output. Malformed storage candidates keep the compatibility skip
+behavior, while malformed rooted document and sheet ownership fails
+atomically. Standard/form sheet parity, duplicate references, missing objects,
+and strict-versus-Buffa disagreement are failures.
+
+### Table extraction
+
+The table extractor treats its bounded raw-wire preflight as the authoritative
+projection of the type-6218 `TST.RichTextPayloadArchive` envelope: it scans
+the complete message, requires one canonical length-delimited local storage
+reference in field 1 and one cell-owner value in field 3, validates the nested
+reference framing, and forwards the storage identifier to the bounded
+`litchi-iwa-text-wire` storage path. Production never calls
+`RichTextPayloadArchive::decode`. Storage validation and materialization charge
+physical bytes, fields, nesting, references, wire work, UTF-8 text, and the
+caller's remaining aggregate semantic text budget before owned output is
+published; document projection keeps the strict validation/text length parity
+check.
+
+Native type-6002 `TST.Tile` payloads go through the no-`Vec` transactional
+`numbers_table_cell_storage_codec::decode_tile_with_visitor` path; production
+never calls generated `Tile::decode` or `TileRowInfo::decode`. Row callbacks
+expose payload slices borrowed from the caller-owned component source. The row
+visitor applies a prefix materialized-cell guard before materializing a cell.
+After a semantic cell error is retained, later rows continue through strict
+wire validation so the decoder can return its full `DecodeReport` without
+growing the semantic table. The extractor then charges that complete report,
+charges the aggregate materialized-cell count, and only then surfaces the
+retained semantic error. A later malformed wire error therefore overrides an
+earlier semantic cell error, while an aggregate materialized-cell limit takes
+precedence over a retained semantic error. Each table candidate owns a local
+table and candidate budget; rejected candidates publish neither cells nor
+retained output, although bounded decode work remains an aggregate admission
+cost.
+
+`TST.TableDataList` and `TST.TableDataListSegment` payloads (types 6005, 6201,
+and 6011) go through a strict handwritten router and the private Buffa
+projection, for both `Package` and `Document` extraction and for the generic
+text registry. Known repeated entry/segment fields must carry
+length-delimited wire shape before a candidate is admitted to full decode.
+Production retains only the final semantic table values needed by a candidate,
+plus bounded segment-id/key tracking where required, with fallible reserves.
+The text adapter stages only non-empty borrowed strings, copies them with
+fallible reservations, and publishes the owned vector only after the complete
+decode succeeds. Required-field, duplicate, canonical-wire, UTF-8, reference,
+segment-range, ownership, and candidate-publication checks apply. Input,
+output, field, nesting, and aggregate work are bounded by the `WireLimits`
+hard ceilings (512 MiB input, 512 MiB output, 1,000,000 fields, depth 64,
+16,000,000 work units), with tighter per-payload and semantic text budgets
+applied before fallible allocation.
+
+Read-only table-cell storage queries (string-value resolution, entry
+presence, and rich-text entry counts) use the borrowed root/segment snapshots and strict streaming visitors of the
+doc-hidden `litchi_iwa_protos::numbers_table_cell_storage_codec`. Each admitted
+payload has explicit source-byte, field, work, nesting, reference, and
+selected-text limits, and successful reports merge into one operation-local
+field/work/reference/text budget across root candidates, ordered segments, and
+rich-text package scans. Failed resource checks stop the operation; ordinary
+malformed candidates conservatively charge their complete source length before
+compatibility selection continues. No partial strings, counts, or package
+mutation are published after a later segment failure.
+
+### Comments
+
+`TSD.CommentStorageArchive` payloads go through a strict handwritten codec and
+a private Buffa parity projection. `Package` keeps strict comment validation
+and resolution; `Document` deliberately skips comment resolution. Per-cell
+comment values are materialized only after strict validation, with bounded,
+fallible reserves and candidate-local publication. The bounded comment-cell
+scan-work counter spans the whole model/cell scan rather than resetting for
+each table.
+
+The comment-reply read is source-immutable and publishes no partial result.
+Package ingress keeps the physical archive and semantic object/reference/text
+ceilings; each strict comment-storage decode keeps typed byte, field, work,
+nesting, reference, and text ceilings. Census and output vectors use fallible
+reservations, and storage duplicate detection and selected reply lookup use
+hash indices, so the census/projection path is linear in recognized storage
+and reply counts. Root selection and the census may inspect the same payload in
+separate bounded passes; there is no single aggregate ledger across them.
+
+### Formulas
+
+A bounded owned copy of the admitted formula source (`FormulaArchiveBytes`) is
+the exact-byte preservation authority and is never re-encoded. Strict
+schema-directed preflight charges bytes, fields, nesting, work, and
+repeated-entry/node counts before a private Buffa lazy per-node/event stream is
+admitted. The stream is forced for every selected node or event used by
+rendering; it materializes no generated repeated field or `LazyRepeatedView`
+and never calls `to_owned_message`. The canonical Prost builders and decoder
+are a test-only oracle for differential fixtures and parity checks.
+
+### PackageMetadata inspection
+
+The PackageMetadata visitor (`inspect_package_metadata_with_visitor`) derives
+package/effective-message limits and `WireLimits` for input, output, fields,
+work, nesting, components, and references, and a strict two-pass
+preflight/visitor charges them before observations are accepted. Visitor
+results stay borrowed; byte, field, work, nesting, and allocation failures are
+typed and publish no partial observation. Admission is narrower than permissive
+Prost decoding for the selected projection: selected fields require canonical
+singular required and nonzero values, valid UTF-8, canonical Booleans, complete
+UUIDs, and valid nested references, so malformed versioned records fail even
+when a query would otherwise ignore them. The codec validates only this
+projection, not the complete `PackageMetadata` schema; unknown noncanonical
+keys or lengths are rejected, while unknown noncanonical varint values and
+balanced unknown groups are accepted.
+
+## OPC exact-source authorization
+
+For OPC, direct byte-identical no-op publication has one authority: the owning
+package or source-backed object must retain its exact source artifact and an
+unrevoked exact-source authorization. Preservation provenance, ZIP indexes,
+and reconstructed graph equality are planning evidence only; none of them can
+authorize exact passthrough or a normalizing full-writer fallback. Any mutable
+OPC seam revokes that authorization. A changed owned source is publishable only
+through a proven preservation plan; if physical framing or opaque members cannot
+be preserved, publication returns a typed capability refusal before output.
+
+## iWork edit transactions
+
+### Common resource contract
+
+Every focused iWork edit transaction (Pages, Numbers, and Keynote) follows one
+resource contract:
+
+- **One operation-local budget.** A private transaction budget (for example
+  `TransactionBudget`, `CaptionBudget`, `PlaybackBudget`, `GeometryBudget`)
+  carries every phase: physical source and catalog inventory, rooted selection
+  and ownership census, strict codec prepare/execute reports, Metadata
+  UUID/external-reference/save-token transitions, archive serialization and
+  exact sizing, Snappy and Deflate compression, ZIP reassembly, candidate
+  reopen, semantic readback, locality verification, and retained exact
+  source/target patch artifacts. Residual limits pass from phase to phase;
+  no phase resets to full limits. Independent source and candidate scans are
+  charged independently, nesting is merged by maximum, and a borrowed payload
+  already charged by an enclosing phase is not charged again. Counters cover
+  input, intermediate and final output, package entries, payloads, objects,
+  messages, items, fields, work, nesting, references, components, additions,
+  allocations, retained bytes, and scratch bytes, with checked arithmetic;
+  overflow fails closed.
+- **Preflight before allocation.** Before Snappy decompression or
+  `Archive::parse` allocates a selected component, the owner derives the
+  decoded archive extent and physical object/message inventory from the parsed
+  source catalog, charges it, and then cross-checks the actual decompressed
+  length. Name selection charges the compared source and selector bytes for
+  every candidate; position selection charges the inspected prefix. Exact
+  source/patch and no-op artifact comparisons charge equal-length byte scans.
+- **Prepare, then execute.** Codecs expose a prepare step that validates the
+  source, sizes the exact output, and returns execution requirements without
+  allocating the candidate, and an execute step that replays the residual
+  limits and performs one fallible output reservation, then strictly scans the
+  candidate. `Archive::encoded_len` measures exact source-authoritative IWA
+  serialization, `SnappyStream::maximum_compressed_len` gives a bounded
+  compression ceiling, and `PreparedReassembly` exposes exact ZIP execution
+  requirements before the final allocation. A codec's allocation, scratch, and
+  retained counters are logical/requested bounds, not allocator telemetry.
+- **Staged private candidates, atomic publication.** Native archive, Metadata,
+  compression output, and final ZIP values may be staged as separate private
+  candidates (later stages can consume identifiers produced by earlier ones),
+  each charged before allocation. Nothing is published until every stage, the
+  complete candidate reopen, semantic readback, and locality verification
+  succeed; any limit, allocation, or verification failure leaves the immutable
+  source and the published package unchanged. There is no single global
+  output-free preflight or single allocation per transaction, and the
+  aggregate intermediate-output ceiling may exceed the final physical package
+  ceiling because member and final artifact limits are enforced again by
+  reassembly and reopen.
+- **No-ops share the source.** An exact no-op shares the source snapshot and
+  constructs no candidate. Exact patch artifacts are bounded by the package
+  input and output limits.
+- **Typed failures.** Output, allocation, and limit failures keep typed
+  limit/error mapping into the format's content-free `LimitKind` vocabulary.
+
+### Per-operation rules
+
+These add to or narrow the common contract:
+
+- **Pages section names.** The package's original limits cover input/output
+  package bytes, entry and aggregate bytes, IWA object and message counts,
+  retained name bytes, protobuf bytes, fields, nesting, and rewrite work. A
+  changed name replaces only length-delimited field 26 of the selected
+  section, recompresses one component, and reassembles the source catalog;
+  untouched ZIP members and their raw local and central records stay exact
+  except for central-directory offsets that must move.
+- **Pages footnotes.** `rewrite_custom_mark_wire` checks the selected/after
+  field arithmetic instead of saturating, and overflow is `WireFields`.
+  Candidate verification runs `native_footnotes` before semantic readback, so
+  aggregate text and entry ceilings surface as `TextBytes` and `Entries`
+  (`TextTooLarge` and `TooManyBodyStorages` map to those categories). One
+  `FootnoteSemanticBudget` is shared across source and candidate projections,
+  and staged text and custom-mark copies use fallible exact reservations.
+- **Pages drawable order.** `pages_drawable_order_codec` keeps complete raw
+  reference records and interleaved root fields as the preservation authority,
+  including unknown balanced groups and overlong unknown scalar framing. It
+  rejects noncanonical known keys, lengths, and values, missing or zero
+  identifiers, duplicates, and non-permutation edits. The outer IWA
+  object-length prefix may be canonicalized by the archive serializer.
+- **Numbers names.** The calculation-engine dependency route is inspected
+  through the strict `numbers_table_cell_dependency_codec`; the raw field-3
+  root reference and repeated tracker field-6 records are cross-checked
+  against object metadata, local-reference framing, and declared paths, and
+  the opaque volatile name-dependency field is checked with a narrow raw-wire
+  presence scan (an empty coordinate set is not a dependency). The pivot guard
+  scans only `TST.TableModelArchive` field 85, requires one canonical local
+  `TSP.Reference` when present, and does not walk the table data-store graph.
+  The transaction charges the complete over-approximation (`selected changes ×
+  rooted topology` plus the quadratic table term and object term) against
+  `WireWork` before any changed component is scanned or rewritten. For the
+  save-token sidecar, the selector count is bounded by
+  `RewriteOptions.max_components`, the report keeps `additions = 0`, and the
+  caller precharges decompressed type-11006 payload bytes times the changed
+  semantic-operation upper bound for visitor locator matching (compressed
+  Snappy bytes are charged separately).
+- **Numbers comment clear.** The ownership pass charges complete BNC cell
+  payload bytes before the handwritten cell parser runs. Archive-owner
+  inspection accumulates header work and reference occurrences across every
+  physical component. The comment graph census applies one aggregate
+  semantic-reference ceiling before allocating its lookup sets and uses
+  bounded `HashSet` membership rather than quadratic scans.
+- **Numbers comment replies.** Comment-storage and metadata codecs may receive
+  conservative source-sized option profiles where the shared budget has no
+  residual adapter, and preparation can allocate private plan storage before
+  execution requirements are returned.
+- **Numbers split cell controls and Pop-Up Menus.** The exact-byte filter can
+  serialize the source `Archive` once for every structurally changed source
+  member before deciding whether that member edit is a no-op; that
+  serialization and its comparison bytes are charged. The same output-free
+  `Archive::encoded_len` preflight and immediate actual-length replay cover the
+  split scalar-control serializer. A split-component read reuses one cached
+  `RegistryFacts`/physical census and is bounded only by package-ingress
+  limits.
+- **Numbers display formats.** The Number and Percentage rewrites preflight the
+  bounded member count, maximum compressed bytes, compression-frame
+  allocations, and checked work totals; compressed members, edit lists, and
+  changed-name lists use fallible reservations, and changed names borrow the
+  immutable package catalogs. Conservative owner aggregate charges saturate to
+  the applicable ceiling before authorization. Dense format-list append updates
+  the entry and `next_list_id` cursor in one prepared rewrite. Candidate
+  readback keeps the caller's original message ceiling rather than raising it
+  to the candidate size.
+- **Keynote chart captions.** Caption input is capped at 64 MiB and copied
+  only after a fallible exact `String` reservation. The existing-caption
+  replacement stages the native text candidate and then the Metadata
+  save-token candidate. Every internal chart-caption codec traversal (source
+  scan, sizing, raw emission, candidate verification) is charged.
+- **Keynote physical table sort.** Bounded by source/candidate package,
+  entry/payload/object/message/reference, wire, row/column/key-cell,
+  BNC-offset, retained/scratch, allocation, component, and reassembly
+  ceilings. The permutation is planned without cloning each BNC payload.
+- **Keynote chart legend visibility.** The private codec applies its own
+  bounded message, field, work, nesting, output, retained-byte, allocation, and
+  scratch ceilings inside the package and archive limits.
+- **Keynote placeholder and slide-number visibility.** Before allocating its
+  output, the slide router charges exact
+  `6 * source.len() + output_len + 2 * parsed_fields` work.
+
+### Package-scale indexing
+
+Package-scale paths use indexes instead of repeated quadratic scans, charging
+retained memory and work to the transaction budget. Numbers comment metadata
+and reply validation use reserved ID/UUID/location indexes and one inbound
+census; the scalar display-format owners and persisted sort share a
+duplicate-rejecting physical-entry index. Pages footnote validation borrows
+metadata until preflight, uses fallible visitor growth, and reuses one sorted
+package graph census. Keynote chart-caption, movie-playback, table-title,
+table-header, and table-appearance verification use fallible catalogs and
+reference-frequency maps. The Keynote build-order owner performs fallible
+preflight before retaining build/chunk references, preserves complete nested
+reference bytes, reserves chunk groups before publication, and uses checked
+global chunk offsets after a permutation; its exact no-op classification
+requires both semantic identity and exact artifact equality.

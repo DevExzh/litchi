@@ -220,7 +220,7 @@ Under this record a part that was never decoded is pristine **by construction**:
 its payload cannot have been replaced, because no caller ever held it. The plan
 takes `PreservationAction::Copy` for such a member without decoding it and
 without comparing anything. This is not new authority: it is the same
-planning-evidence use of provenance that ADR 0005's 2026-08-21 amendment permits
+planning-evidence use of provenance that ADR 0005's OPC exact-source authorization rule permits
 and that the plan already relies on, and it does not touch
 `exact_source_authorized`, does not widen who may take whole-archive
 passthrough, and does not remove the retained source archive.
@@ -274,8 +274,7 @@ the eager path does not pay today.
 Acceptance requires, beyond the six admission gates:
 
 1. Byte-identical published output for every OOXML fixture in `test-data` across
-   every mutation scenario, by whole-stream digest, before and after — the
-   1,344-row oracle shape used before.
+   every mutation scenario, by whole-stream digest, before and after.
 2. Every refusal preserved by identity, at open and at first access: the
    corpus's existing open refusals, save refusals, and a constructed archive
    whose central directory under-declares a part, which must refuse with the

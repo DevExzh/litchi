@@ -65,13 +65,10 @@ cargo +nightly fuzz run keynote_slide_media_lifecycle \
   -runs=256 -max_total_time=60 -max_len=1024 -timeout=10 -rss_limit_mb=2048
 ```
 
-On 2026-09-07 the AddressSanitizer campaign passed all 256 runs with no
-findings and 244 MiB peak RSS. It used a temporary copy of the two command
-seeds and an isolated target directory; generated corpus mutations and build
-artifacts were disposable. Seed-contract assertions require successful movie
-and audio duplication/removal through both selector forms, and double-inverse
-replay is compared by resulting artifact bytes. This bounded smoke is E1
-robustness evidence, not exhaustive coverage or a broader native feature claim.
+Run it on a temporary copy of the two command seeds with an isolated target
+directory. Seed-contract assertions require successful movie and audio
+duplication/removal through both selector forms, and double-inverse replay is
+compared by resulting artifact bytes.
 
 `keynote_slide_text` is the focused title/body robustness target. It first
 offers arbitrary bytes to the bounded Keynote package ingress, then uses those
@@ -1057,20 +1054,15 @@ is appropriate for the root ingress target. Valid deep-message mutation and
 format-specific behavioral invariants belong in focused format-owner fuzz
 targets rather than weakening package validation here.
 
-## 2026-08-08 bounded sanitizer evidence
+## Root ingress sanitizer run
 
-The three native seeds above were copied to a private temporary corpus and
-their documented SHA-256 values were verified before this run. With
-`cargo-fuzz 0.13.2` and `rustc 1.99.0-nightly (1a98b1e13 2026-08-07)`, the
-root target completed this bounded AddressSanitizer/libFuzzer campaign:
+Run the root target over a private copy of the three native seeds above,
+after checking their documented SHA-256 values:
 
 ```sh
-cargo +nightly fuzz run parse_iwork /private/tmp/litchi-iwork-root-fuzz-1JVxsJ/corpus -- \
+cargo +nightly fuzz run parse_iwork <corpus-copy> -- \
   -max_total_time=60 -max_len=2097152 -timeout=10 -rss_limit_mb=2048
 ```
 
-It executed 152,219 inputs in 61 seconds, ending at coverage 7,454, feature
-count 12,062, a 249-input / 69 MiB corpus, and 566 MiB RSS. There was no crash,
-timeout, or out-of-memory finding. This records one bounded root-ingress
-sanitizer run only; it is not evidence of exhaustive fuzzing or of the focused
-deep-message campaigns still required from the format owners.
+A bounded root-ingress run does not replace the focused deep-message
+campaigns of the format owners.

@@ -3,13 +3,12 @@
 - Status: Accepted (2026-09-24, by the owner's decision; proposed
   2026-09-23)
 - Date: 2026-09-23
-- Supersedes: nothing. Amends: the 2026-09-16 amendment of
-  [ADR 0005](0005-io-memory-and-performance.md) titled "retained per-part digest
-  memos on an opened-presentation snapshot and its facade", by widening the one
-  noun it admits. Every other sentence of ADR 0005, and every other accepted
+- Supersedes: nothing. Amends: the section of
+  [ADR 0005](0005-io-memory-and-performance.md#retained-digest-memos) titled
+  "Retained digest memos", by widening the one noun it admits. Every other sentence of ADR 0005, and every other accepted
   record, is untouched.
-- Raised by: commit `99ce9c5e34`, which implemented such a memo, measured it, and was
-  reverted by `07207d2aef` because no accepted record admits it.
+- Raised by: an implementation of such a memo that was measured and then
+  reverted because no accepted record admitted it.
 
 ## Context
 
@@ -28,37 +27,28 @@ are, by allocation identity, the bytes the source snapshot's capture already
 classified. ADR 0003 asks a commit to validate the changed dependency closure;
 repeating the classification of unchanged bytes is not part of that obligation.
 
-The 2026-09-16 amendment of ADR 0005 already lets an opened-presentation
+ADR 0005's retained-digest-memo rule already lets an opened-presentation
 snapshot keep a memo over bytes its package holds, under a list of conditions,
 for exactly one kind of value: "a bounded table of **digests** over bytes the owner
-already holds". A notes-root classification is not a digest. Commit
-`99ce9c5e34` kept one anyway, as a `SlideRootMemo` on the snapshot, and
+already holds". A notes-root classification is not a digest. The reverted
+implementation kept one anyway, as a `SlideRootMemo` on the snapshot, and
 did not meet one condition: when the table could not be reserved it became
-empty instead of raising the typed resource error the amendment requires. The
-program's charter forbids implementing behaviour an accepted record does not
-admit, so the commit was reverted and this record asks for the admission
-explicitly.
+empty instead of raising the typed resource error the rule requires.
+Behaviour an accepted record does not admit is not implemented, so this
+record asks for the admission explicitly.
 
-What the memo was worth, measured with the harness's own public
-calls on the 100 × 100 deck (a probe built at every commit, median of three
-processes, core 8):
-
-| after | one-edit commit | one-edit edit/save total | medium one-edit total |
-| --- | ---: | ---: | ---: |
-| the borrowed notes scan (`8039963c33`) | 21.45 ms | 46.44 ms | 1.550 ms |
-| plus the memo (`99ce9c5e34`) | 2.13 ms | 27.11 ms | 1.346 ms |
-
-The commit fell from 21.4 to 2.1 ms (−90%) and the whole one-edit edit/save
-from 46.4 to 27.1 ms (−42%), with the published archive, the patch and the
-revision byte-identical, every refusal identical over the repository's PPTX
-corpus, and no `Part::blob` or `blob_arc` observation added. Without the memo
-the one-edit commit remains a second complete capture.
+On the 100 × 100 deck the memo removed most of the one-edit commit and
+roughly two fifths of a one-edit edit/save, with the published archive, the
+patch and the revision byte-identical, every refusal identical over the
+repository's PPTX corpus, and no `Part::blob` or `blob_arc` observation
+added. Without the memo the one-edit commit remains a second complete
+capture.
 
 ## Decision
 
 ### 1. What may be memoized
 
-The amendment's noun widens from *digests* to **small derived values of
+The digest-memo rule's noun widens from *digests* to **small derived values of
 payload bytes**: a value `v = f(b)` where
 
 - `f` is a deterministic, total function of the payload bytes `b` alone and of
@@ -73,12 +63,12 @@ payload bytes**: a value `v = f(b)` where
 - a failure of `f` is never memoized: only values `f` returned are stored, so a
   refusal is always recomputed from the bytes.
 
-A digest is one such value, so every memo the amendment admits today stays
+A digest is one such value, so every memo the rule admits today stays
 admitted unchanged.
 
-### 2. Under exactly the amendment's conditions
+### 2. Under exactly the digest-memo conditions
 
-Every condition of the 2026-09-16 amendment applies unchanged: the memo is keyed
+Every condition of ADR 0005's retained-digest-memo rule applies unchanged: the memo is keyed
 on the identity of an allocation the owner holds and retains a strong reference
 to it, so a hit proves byte identity; every entry names an allocation the owning
 snapshot's own package holds, which the implementation proves through that
@@ -108,7 +98,7 @@ propose that.
 
 ### 4. What re-applies
 
-With this record accepted, commit `99ce9c5e34` re-applies
+With this record accepted, the reverted implementation re-applies
 unchanged except for the rule in section 3: `SlideRootMemo::from_records`
 returns `Result<Self>` and its reservation failure becomes
 `Error::Allocation { resource: "opened-presentation slide-root memo", .. }`,
@@ -131,13 +121,13 @@ table header, at most 4,096 entries under the default `Limits::max_parts`
   no new record, only an implementing record that proves the conditions.
 - The widening does not admit memos of parsed trees, processed XML or any value
   whose size grows with the payload; those remain caches under ADR 0005, or
-  retention under its second 2026-09-16 amendment.
+  retention under its "Retained state that is not a cache" rule.
 
 ## Verification
 
 Acceptance should require, at minimum:
 
-1. The ten focused tests `99ce9c5e34` carried: a one-slide commit rescans
+1. Focused tests: a one-slide commit rescans
    exactly one slide; memo-assisted and cold captures agree on value and on
    refusal (CDATA, unbound prefix, first, middle and last slide); equal bytes in
    a new allocation miss; a foreign part whose `Arc` does not alias its payload
@@ -152,6 +142,3 @@ Acceptance should require, at minimum:
 4. A re-measurement of the harness's `pptx_semantic_one_edit_save` and
    `pptx_semantic_opened_transaction_phases` against the head without the memo,
    both legs built by one command.
-
-Nothing in this record may be implemented before a human accepts it, and an
-implementation must be measured before any of it is claimed.

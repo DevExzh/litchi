@@ -91,23 +91,11 @@ semantic CRUD, all six main content profiles in both conformance families,
 graph creation/replacement/removal/no-op, shared inbound refusal, root-dialect
 agreement, malformed XML, schema-order rejection, and conservative opaque-text
 no-op detection. Focused host tests cover new-package ownership, create/read/
-update/remove, semantic no-op reporting,
-absence, noncanonical target and relationship preservation across slide
-materialization, dynamic relationship-ID propagation, and safe Strict-writer
-refusal. The owner passes 71 unit tests, three doctests, and one compile-fail
-test; the focused host integration passes all eight tests. Exact producer-asset
-parity passes. Warning-denied Clippy is green for owner and focused host,
-warning-denied rustdoc is green for the owner, and targeted formatting and diff
-checks pass.
+update/remove, semantic no-op reporting, absence, noncanonical target and
+relationship preservation across slide materialization, dynamic
+relationship-ID propagation, safe Strict-writer refusal, and exact
+producer-asset parity.
 
-The `pptx_owner_native_smoke` example creates a slide and a two-row table, adds a
-typed definition for the table's referenced GUID, stores background, whole-
-table, and first-row region declarations, saves through the legacy writer
-composition seam, reopens, and checks the exact typed definition. Desktop
-PowerPoint for macOS opened the generated `table-style-owner.pptx` without a
-repair prompt, rendered the table and its text, and exposed the native Table
-Design and Table Layout tabs when it was selected. This is open-and-inspect
-evidence for that Transitional artifact and empty-region definition only. No
-PowerPoint edit/resave, reverse-read after an Office save, Strict native check,
-application-version matrix, allocation, latency, or detailed-style rendering
-claim follows.
+The `pptx_owner_native_smoke` example produces a two-row table with a typed
+definition for its referenced style GUID, saved and reopened, for native
+PowerPoint open-and-inspect checks.

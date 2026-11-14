@@ -82,7 +82,7 @@ after `build`. The adapter still owns the cost of reading and decoding IWA
 archives, and the follow-up integration must preserve that ownership rather
 than reintroducing archive dependencies into the leaf.
 
-## 2026-08-08 amendment: direct builder integration
+## Builder integration
 
 `IndexBuilder::add_reference_if_absent` is now the explicit idempotent adapter
 path: it returns whether an edge was inserted and preserves the same allocation
@@ -90,18 +90,16 @@ and endpoint checks as strict insertion. `IndexBuilder::add_reference` remains
 strict and continues to report `DuplicateReference`, so general callers do not
 silently lose duplicate diagnostics.
 
-The migration host's private adapter now inserts authoritative
-`MessageInfo.object_references` and schema-directed compatibility fallback
-references directly into `IndexBuilder` instead of constructing a temporary
-mutable `ReferenceGraph`. Null identifiers remain ignored, any non-empty
+Adapters insert authoritative `MessageInfo.object_references` and
+schema-directed compatibility fallback references directly into
+`IndexBuilder` instead of constructing a temporary mutable `ReferenceGraph`. Null identifiers remain ignored, any non-empty
 authoritative native reference list suppresses fallback even when its entries
 are null, repeated edges are deduplicated, final ordering remains deterministic,
 and `build_allow_missing_targets` continues to preserve dangling targets.
 `litchi-iwa-index` retains its canonical internal dependency on
-`litchi-iwa-graph`; only the redundant direct `litchi-iwa ->
-litchi-iwa-graph` edge and ordered debt 007 are removed.
+`litchi-iwa-graph`.
 
-## 2026-08-22 amendment: semantic projection and graph compatibility
+## Semantic projection
 
 The index now has an intentional archive-free semantic view in its public
 `semantic` module. `SemanticIndex` borrows an immutable `ObjectIndex` and
@@ -113,17 +111,10 @@ object identifier, a serialized token, or a handle that can be reused with a
 different semantic view. Package names, payloads, native identifiers, and
 graph snapshots remain outside this projection.
 
-At that point the original low-level graph surface remained source-compatible
-through the `ObjectIdIter` and `ReferenceGraphSnapshot` re-exports and the
-`ObjectIndex::reference_graph` method. The method was documented as a
-graph-identity compatibility bridge; new semantic code used the bounded
-`SemanticIndex` operations or the typed `ObjectIndex` queries instead. This
-preserved existing adapter compilation without making the graph snapshot part
-of the supported semantic hand-off.
-
-The compatibility period is closed. The public method is
-now `ObjectIndex::reference_snapshot`, a borrowed immutable typed projection;
-the deprecated `reference_graph` spelling is deleted. Likewise, the graph
-crate's raw-`u64` wrappers are deleted in favor of `ObjectId` methods, so a
+The low-level graph view is `ObjectIndex::reference_snapshot`, a borrowed
+immutable typed projection; it is not part of the supported semantic hand-off,
+for which code uses the bounded `SemanticIndex` operations or the typed
+`ObjectIndex` queries. The graph crate takes `ObjectId` rather than raw `u64`
+values, so a
 protobuf null identity is rejected by `ObjectId::try_from(0)` before graph
 operations rather than silently discarded.

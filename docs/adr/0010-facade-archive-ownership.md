@@ -76,23 +76,18 @@ or retained as a compatibility alias.
 
 ## Verification
 
-The dependency checker must report the removed edge as resolved only after the
-manifest no longer declares it, then pass after order 048 is deleted. Format
-detection tests separately establish semantic parity and cursor restoration;
-the boundary change alone is not evidence of native-format compatibility or a
-performance improvement.
+The dependency checker must reject a facade manifest that declares a direct
+archive implementation dependency. Format detection tests establish semantic
+parity and cursor restoration.
 
-## 2026-08-08 amendment: focused iWork detector
+## iWork detection
 
-The iWork detector named above has moved out of the migration host. The current
-leaf is `litchi-iwa-detect::{Format, bytes, reader, path}`; statements in this
-record naming `litchi_iwa::detect` describe the historical ownership at the
-time of the decision. Shared physical ZIP and IWA limits live below the three
-concrete format owners, while semantic malformed-input policy remains with
-Pages, Numbers, or Keynote. The root facade composes the focused detector and
-does not regain a raw archive dependency.
-
-## 2026-08-08 amendment: opaque prepared iWork source
+The iWork detector is `litchi-iwa-detect::{Format, bytes, reader, path}`;
+statements in this record naming `litchi_iwa::detect` refer to it. Shared
+physical ZIP and IWA limits live below the three concrete format owners, while
+semantic malformed-input policy remains with Pages, Numbers, or Keynote. The
+root facade composes the focused detector and does not regain a raw archive
+dependency.
 
 The permitted focused, opaque detection plan now exists as
 `litchi_iwa_detect::PreparedSource`. It owns one classified immutable package

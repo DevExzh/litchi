@@ -1086,10 +1086,10 @@ impl Package {
     /// Keep the memo of a capture of the current graph, re-projected onto
     /// `self.opc`'s own allocations, when this package holds none.
     ///
-    /// The ADR 0005 memo amendment's adoption clause says when the facade must
+    /// The adoption clause of ADR 0005's retained-digest-memo rule says when the facade must
     /// refresh its memo (every publication) and when it must release it (every
     /// mutation that publishes nothing); filling an empty slot from a snapshot
-    /// of the current, unmutated graph is permitted with the amendment's
+    /// of the current, unmutated graph is permitted with that rule's
     /// re-projection clause met in code: the memo kept is [`Self::memo_for`]'s
     /// projection, whatever the parts are. A filled slot is kept: it describes
     /// this same graph, because every mutation that publishes no snapshot

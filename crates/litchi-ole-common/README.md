@@ -70,19 +70,15 @@ to the format layer. The common object editor exposes
 replacement before cloning its outer editor. Opening consumes the original `Vec`,
 and a uniquely owned unchanged finish returns that allocation.
 
-## Validation evidence
+## Test coverage
 
-Validation covered:
+Tests cover:
 
 - OLE1 streams, including the read/preserve-only compatibility profiles and reversible edits.
 - OLE2 streams, covering presentation, TOC, native-stream, and target-selected object integration.
 - Common CFB and DOC source admission, including original allocation retention and prepared replacement validation.
 - OLEPS binding names and alternate-stream metadata.
 - In-repository integration coverage for [property-set editing](tests/property_set_editor.rs), [object integration](tests/object_streams.rs), [OLEDS streams](tests/ole_streams.rs), and [OLE1 objects](tests/ole1.rs).
-
-These batches validate the bounded APIs and their refusal paths. They do not
-claim universal native-producer compatibility, rendering, execution, or a
-performance profile.
 
 ## License
 

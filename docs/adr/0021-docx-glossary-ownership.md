@@ -189,20 +189,6 @@ limit, and allocation failures; atomic package create/update/remove; fixture
 round trips; warning-denied Clippy and rustdoc; formatting; manifest sorting;
 and executable crate-boundary policy.
 
-Native verification on the tested desktop Microsoft Word for macOS build first
-observed a DOCX without the later four-resource seed. Word opened it without
-repair in Compatibility Mode, did not expose the custom entry, and removed its
-glossary graph on resave. That negative result is consistent with templates
-being the native AutoText authoring container, but the subsequent seeded DOTX
-also changed the resource graph and therefore is not a controlled causal
-comparison. The seeded DOTX opened without repair. Word's AutoText dialog
-displayed the exact `Litchi AutoText` entry; inserting it placed `Litchi reusable
-native building block` in the real document. Word saved the template, ZIP
-integrity passed, and the canonical owner reverse-read the catalog entry and its
-building-block payload from the Office-saved copy. That reverse read also fixed
-the reader policy around Word's native `<w:types/>` rewrite. The Word UI
-observation separately confirmed the inserted body text. This verifies one
-Transitional text-only AutoText
-open/discover/insert/resave path in the observed Word Compatibility Mode on that
-build. Images, fields, linked or embedded resources, Strict documents, other
-Office versions, and performance remain outside the observed native scope.
+Word drops a glossary graph from a plain DOCX on resave and treats templates
+as the AutoText authoring container, so native AutoText checks use a seeded
+DOTX. The reader accepts Word's own `<w:types/>` rewrite of a saved entry.

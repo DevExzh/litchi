@@ -51,13 +51,7 @@ timestamp-formatting `unwrap` are removed from XLSB creation.
 
 ## Verification
 
-All 39 generated assets pass exact regeneration and source-parity tests.
-Focused `xml-minifier` tests and the three XLSB producer regressions pass.
-Warning-denied Clippy and rustdoc are green for `xml-minifier` and
-`litchi-ooxml`; formatting, manifest sorting, diff validation, the executable
-dependency policy, and a dependency-tree audit are also green.
-
-The boundary checker accepts 35 packages, 106 direct internal dependency
-declarations, and 13 explicit migration debts after removing this edge. Per
-explicit user direction, the previously green full-workspace suite is not
-repeated.
+Every generated asset must pass exact regeneration and source-parity tests,
+together with the focused `xml-minifier` tests and the XLSB producer
+regressions. The executable dependency policy must accept the workspace
+without this edge.

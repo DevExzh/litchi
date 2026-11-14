@@ -60,8 +60,7 @@ map below.
 
 For iWork, the concrete Pages, Keynote, and Numbers matrices own user-facing semantic and package
 claims. Shared `litchi-iwa-*` crates are substrate, not a fourth format. The legacy `litchi-iwa`
-migration host was deleted (last present
-at commit `4d8a3e161f`).
+migration host was deleted.
 
 iWork parsing is split by concrete application format: `litchi-pages` owns
 Pages (`.pages`), `litchi-keynote` owns Keynote (`.key`), and `litchi-numbers`

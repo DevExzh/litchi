@@ -19,11 +19,10 @@ turn a malformed package into a partially edited one.
 
 ## Decision
 
-Amendment on 2026-08-03: `litchi-pptx::notes` is the sole owner of the
-PresentationML notes model, bounded XML codec, package graph service, plain-
-text producer, and notes-master assets. The former `litchi-ooxml::pptx::notes`
-module, template accessor, slide XML writer, long type names, and forwarding
-aliases are removed. Its short contextual vocabulary is `Conformance`,
+`litchi-pptx::notes` is the sole owner of the PresentationML notes model,
+bounded XML codec, package graph service, plain-text producer, and
+notes-master assets. There are no forwarding aliases or long type names. Its
+short contextual vocabulary is `Conformance`,
 `Theme`, `Master`, `Slide`, and `Graph`; physical topology fields are private
 and available only through diagnostic accessors.
 
@@ -32,8 +31,7 @@ master, and theme payload exactly once. The focused `slide` read copies only
 the selected notes payload, and deletion continues to use the metadata-only
 index without payload copies. XML replacement returns the previous allocation.
 The owner accepts the presentation, slideshow, and template main-part content
-types in both macro-free and macro-enabled families; it does not inherit the
-old migration host's `.pptx`-only restriction.
+types in both macro-free and macro-enabled families, not only `.pptx`.
 
 The consuming `put` operation validates and stages the complete replacement,
 moves caller-owned buffers into canonical OPC parts, and invalidates signatures
@@ -82,34 +80,17 @@ package ownership. The shared notes master and its theme are retained.
   slide XML, ordering, shapes, notes, and shared notes infrastructure remain.
 - Planning memory scales with relationship metadata and staged relationship
   collections for built-in parts, not with copied notes or slide payloads.
-  This structural property is not a latency, throughput, or peak-memory
-  benchmark claim.
 - Whole-graph editing is move-first on storage, but the lifetime-free loaded
   graph deliberately pays one bounded payload copy. A separate borrowed graph
   view is not introduced until it can remain ergonomic and cannot outlive its
   package snapshot.
-- The Transitional producer has focused native PowerPoint open-and-inspect
-  evidence. Native edit/resave, Strict producer synthesis, other Office builds,
-  and broader notes interoperability remain separate gates.
 
 ## Verification
 
-Focused tests cover Strict and Transitional graphs, conformance-aware text
+Focused tests must cover Strict and Transitional graphs, conformance-aware text
 replacement, name and position selection on a saved and reopened two-slide
 deck, single and all-note deletion, idempotence, byte-identical slide XML,
 retained master/theme resources, case-folded stored keys, malformed graphs,
 unexpected incoming edges, ambiguous or missing names, out-of-range positions,
 signature-preserving no-ops, and dirty-writer rejection through both `Package`
 and `Presentation` reads and every package mutation entry.
-
-All 12 canonical owner tests, 4 reopened-package CRUD tests, the focused graph
-suite, mutable-slide regression, and notes-master minifier parity pass, together
-with warning-denied Clippy and rustdoc and scoped diff validation. Combined
-formatting, manifest, boundary, and protected-checklist checks are recorded in
-ADR 0008. The `pptx_with_fonts` example generated a Transitional six-slide
-artifact with one speaker-notes slide. Through Computer Use, desktop PowerPoint
-for macOS opened it without a repair dialog, marked slide 1 as having notes,
-and displayed the exact expected text in the Notes pane. No Office-side edit or
-resave was performed, the exact application version was not recorded, and this
-does not validate Strict master/theme synthesis. The previously green full-
-workspace suite is not repeated per explicit direction.

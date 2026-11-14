@@ -81,19 +81,15 @@ format adapters, rather than `litchi-iwa::object_index`, the destination.
 
 ## Verification
 
-`tools/check_crate_boundaries.py` must report `litchi-iwa` as a migration host
-and print its ordered debt list. Source/API audits must prove that supported
-Pages, Numbers, Keynote, and root facades expose no monolith or BNC bridge.
-Each removed debt item also requires focused tests and, where output changes,
-real Pages, Numbers, or Keynote application verification.
+`tools/check_crate_boundaries.py` reports no migration host and no migration
+debt. Source/API audits must prove that supported Pages, Numbers, Keynote, and
+root facades expose no monolith or BNC bridge.
 
 ## Outcome
 
 Every deletion-gate condition held and `crates/litchi-iwa` was deleted on
 2026-11-03. The boundary policy has no migration host and no migration debt;
 the policy's migration-host mechanism stays, and its tests use a synthetic
-host. The Verification section's requirement that the boundary tool report
-`litchi-iwa` as a migration host is superseded: the tool reports no migration
 host.
 
 The host's seams went with it: the `internal-iwork-source` feature no longer

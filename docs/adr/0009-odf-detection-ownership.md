@@ -75,7 +75,5 @@ intentionally breaking, consistent with ADR 0008.
 
 ## Verification
 
-The focused acceptance gate is the boundary checker and its unit regressions,
-followed by normal checks of both fuzz manifests. Fuzz executables need only
-compile during this migration slice; corpus campaigns and native Office round
-trips are separate evidence and are not implied by this ownership change.
+The boundary checker and its unit regressions are the acceptance gate,
+followed by checks of both fuzz manifests.

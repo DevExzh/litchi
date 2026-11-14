@@ -36,5 +36,5 @@ Untouched parsed charts continue to replay their original allocation exactly.
 
 Focused tests cover fixed-record-only mutation, unknown-record preservation,
 exact inverse replay, invalid semantic values, source conflicts, and no-op
-publication. The implementation relies on the fixed `Chart` grammar in
-`3rdparty/specs/[MS-OGRAPH]/2 Structures/2.4 Records.md` section 2.4.21.
+publication. The implementation relies on the fixed `Chart` grammar of `[MS-OGRAPH]`
+2.4.21.

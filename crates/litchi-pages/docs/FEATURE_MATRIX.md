@@ -118,7 +118,5 @@ edits preserve them.
 
 ## Retired migration host
 
-The broad `litchi-iwa` migration host has been deleted; the last commit that contains it
-is `4d8a3e161f`. Before the deletion every host public function was accounted for: migrated to a
-leaf or shared owner or retired with a reason. The rows that claimed no support were re-audited
-against that inventory; a row's mark still describes its own scope, not general CRUD.
+The broad `litchi-iwa` migration host has been deleted. Each row's mark describes its own
+scope, not general CRUD.

@@ -81,15 +81,9 @@ workbook relationships. That adapter is migration debt, not a second owner.
 
 ## Verification
 
-Nine owner tests cover Strict and Transitional round trips, MCE and extension
+Owner tests cover Strict and Transitional round trips, MCE and extension
 preservation, exact bounds, malformed/no-unwind rejection, semantic and numeric
 CRUD, ambiguity, graph multiplicity, signature-preserving no-ops, conformance
-replacement, shared-target removal, rollback, and real fixture loading. Two
-host tests cover consuming cache integration and restoration after writer
+replacement, shared-target removal, rollback, and real fixture loading. Host
+tests cover consuming cache integration and restoration after writer
 materialization.
-
-Warning-denied Clippy and rustdoc pass for `litchi-xlsx` and the focused
-`litchi-ooxml` host. The executable boundary checker accepts 35 packages, 106
-direct internal dependencies, and 13 explicit debts. Formatting, manifest,
-diff, and protected-checklist checks are part of the combined slice gate; per
-explicit direction, the previously green full-workspace suite is not repeated.

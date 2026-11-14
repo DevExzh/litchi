@@ -44,7 +44,7 @@ Office round trips.
 | [0029](0029-iwa-index-foundation.md) | Archive-free IWA object-index foundation |
 | [0030](0030-lazy-opc-part-decode.md) | Lazy OPC part decode behind the fallible package accessors |
 | [0031](0031-execution-context-budgets.md) | I/O concurrency, CPU task and executor budgets in the execution context |
-| [0032](0032-snapshot-derived-value-memos.md) | Snapshot memos of small derived values of payload bytes (widens ADR 0005's 2026-09-16 digest-memo amendment) |
+| [0032](0032-snapshot-derived-value-memos.md) | Snapshot memos of small derived values of payload bytes (widens ADR 0005's retained digest memos) |
 | [0033](0033-unified-operations-api.md) | Unified operations API over the per-format owners (`litchi-ops`), with read and write for every claimed format |
 | [0034](0034-unified-api-glossary-and-default-policies.md) | Canonical API vocabulary and strict default policies |
 

@@ -126,33 +126,18 @@ noncanonical targets, package absence, present-empty values, no-op byte and
 signature preservation, extension relationships, shared-inbound clear safety,
 structured multilingual keywords, all W3CDTF granularities, timezone-less
 date-times, arbitrary revision strings, malformed values, resource limits,
-failure atomicity, and no-unwind rejection. All 34 focused common tests pass.
-Five host integration tests create, update, clear, save, and reopen DOCX, PPTX,
-and XLSX packages through their public facades. Warning-denied Clippy and
-rustdoc are green for the common and host crates.
+failure atomicity, and no-unwind rejection. Host integration tests create,
+update, clear, save, and reopen DOCX, PPTX, and XLSX packages through their
+public facades.
 
-The XLSX late-save amendment adds three focused regressions. One observes
-shared payload ownership during an unchanged opened save and proves that the
-snapshot fast path is not entered. One injects a sink failure, checks exact
-core/application payload identity restoration and retained edit intent, then
-successfully retries and reopens the serialized property. One supplies invalid
-property text, proves the sink was never called and the package identity was
-restored, then repairs and retries. The common slot test separately proves that
-dropping a staged guard retains dirty intent and that consuming it clears only
-its lifetime-bound origin.
+XLSX late-save regressions observe shared payload ownership during an
+unchanged opened save and prove that the snapshot fast path is not entered;
+inject a sink failure, check exact core/application payload identity
+restoration and retained edit intent, then retry and reopen the serialized
+property; and supply invalid property text, prove the sink was never called
+and the package identity was restored, then repair and retry. The common slot
+test proves that dropping a staged guard retains dirty intent and that
+consuming it clears only its lifetime-bound origin.
 
-The `core_props_office` example generated the artifacts under
-`target/office-core-props`; its reproducible command is
-`cargo +1.89 run -p litchi-ooxml --example core_props_office --all-features`.
-The exact historical invocation and application versions were not recorded.
-Using Computer Use in Microsoft Word, PowerPoint, and Excel on macOS, all six
-authored and cleared artifacts opened without a repair prompt. Their native
-properties dialogs showed the expected values before clear and blank values
-afterward, and each document, slide, or worksheet rendered its expected
-content. This supports open-and-inspect compatibility for those artifacts on
-the tested desktop applications; it does not certify every Office version,
-extension graph, or metadata lexical form. Office-side edit/resave and
-reverse-read were not performed for this slice. Per explicit user direction,
-no redundant manual full-workspace run was scheduled; the repository's
-mandatory pre-commit hook subsequently ran and passed the workspace lib/
-integration and doctest gates.
+The `core_props_office` example produces authored and cleared DOCX, PPTX, and
+XLSX artifacts for native open-and-inspect checks of the properties dialogs.

@@ -133,13 +133,10 @@ Topology (ADR 0002, ADR 0024):
 - Dependencies point downward only. `litchi-ops` is facade-tier: no leaf or
   common crate may depend on it, and it does not traverse container internals
   or depend directly on `soapberry-zip` (ADR 0010).
-- When `litchi-ops` gains iWork leaf edges, its `--all-features` tree will
-  contain the iWork packages; the non-iWork release gate must then classify
-  `litchi-ops` like the facade (safe and unsafe feature closures) instead of
-  as a bulk root. That reclassification is part of the change that adds the
-  first iWork edge.
-  *Done (2026-10-15): `litchi-ops` and
-  `litchi-cli` left the bulk slice as the iWork-capable unified layer.*
+- Because `litchi-ops` has iWork leaf edges, its `--all-features` tree
+  contains the iWork packages; the non-iWork release gate classifies
+  `litchi-ops` and `litchi-cli` like the facade (safe and unsafe feature
+  closures) instead of as bulk roots.
 
 Format features of `litchi-ops` mirror the facade's per-format features; they
 are inert until the corresponding leaf edge exists.
@@ -309,8 +306,8 @@ facade migration blocks the merge until explained or fixed.
 - `python3 tools/check_crate_boundaries.py` and
   `python3 -m unittest tools/test_check_crate_boundaries.py` pass with the
   `litchi-ops -> litchi-core` edge registered.
-- `python3 tools/non_iwork_gate.py print` reports 66 workspace packages and 47
-  bulk packages; `python3 -m unittest tools.test_non_iwork_gate` passes.
+- `python3 tools/non_iwork_gate.py print` lists `litchi-ops` among the
+  workspace packages; `python3 -m unittest tools.test_non_iwork_gate` passes.
 - `cargo check`, warning-denied `cargo clippy`, and `cargo doc` with
   `RUSTDOCFLAGS=-Dwarnings` pass for `litchi-ops`.
 - Later milestones add the paired leaf-vs-unified benchmarks, the OfficeCLI

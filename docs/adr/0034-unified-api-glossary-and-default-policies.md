@@ -10,7 +10,7 @@ The owner requested this design for the unified-operations refactor on
 already belongs to the accepted unified-operations ADR in this branch. This
 record therefore takes 0034, preserving the existing ADR and its historical
 citations. Acceptance specifies the target contract; it does not claim
-that the migration waves or enforcement checker have landed.
+that the migration phases or enforcement checker have landed.
 
 ## Context
 
@@ -106,7 +106,7 @@ verbs move to `xlsx::Package`; `odt::Document` and `odp::Presentation` split
 into `Package` plus projection; `ods::Spreadsheet` is renamed `Workbook` and
 demoted to the projection beside the existing `ods::Package`. The facade-level
 `litchi::iwork::Document` unified reader is not renamed here; it is replaced
-by the UNIFIED_OPS `File` enum in milestone M0a.
+by the UNIFIED_OPS `File` enum in its facade merge.
 
 ### 3. Transaction vocabulary
 
@@ -193,7 +193,7 @@ becomes `edit()`, and `publish_document_commit()` /
   root keeps only ingress/egress error types. Boundary mapping uses typed
   variants (`#[from]` or explicit variants); string flattening of leaf errors
   (the `map_ooxml_error` pattern) is retired. The OOXML god-enums split per
-  module, staged with the rollout waves. This amends ADR 0004's "each crate
+  module, staged with the rollout phases. This amends ADR 0004's "each crate
   owns a typed error" clause, which its own iWork amendments had already
   superseded in practice.
 - Shared variant taxonomy with fixed payload shapes:
@@ -210,11 +210,11 @@ becomes `edit()`, and `publish_document_commit()` /
     `CollectionAllocation` folds into `Allocation`.
   - Expected failures are always typed; `Other(String)` narrows to genuinely
     internal errors, and the string-carrying legacy variants
-    (`ParseError(String)`, `InvalidFormat(String)`) shrink per wave.
+    (`ParseError(String)`, `InvalidFormat(String)`) shrink per phase.
 - Facade: `sheet::Workbook` returns typed `litchi_core::Error` instead of
   `Box<dyn Error + Send + Sync>`, and facade wrappers preserve leaf errors as
   typed sources. This is done now and subsumed by the UNIFIED_OPS error enum
-  at M0a.
+  in its facade merge.
 - Content redaction is a library-wide rule: errors, diagnostics, and `Debug`
   output never carry authored content (user text, entry names, sheet names);
   structural metadata (part paths, limit figures, positions, `FileFormat`)
@@ -306,23 +306,23 @@ becomes `edit()`, and `publish_document_commit()` /
 
 - This ADR records the rationale; `docs/API_GLOSSARY.md` is the living
   per-term lookup table (canonical name, banned names, per-family status,
-  wave). On acceptance of this record, ADR 0004 gains an amendment pointing
+  phase). On acceptance of this record, ADR 0004 gains an amendment pointing
   its conflicting clauses here.
 - Enforcement: a new `tools/check_api_glossary.py` generalizes the iWork
   rustdoc public-API gate pattern workspace-wide, with (a) a banned-name
   lint over public item names and (b) a shape check that any transaction
   family module exposes the complete `{Edit, Patch, Commit, Diagnostics,
-  Error, LimitKind}` set. Each wave registers its banned names, making "is
+  Error, LimitKind}` set. Each phase registers its banned names, making "is
   the rename done" a CI-decidable fact.
-- Waves: W0 governance (this record, the glossary document, the checker
-  skeleton); W1 iWork renames; W2 OOXML in docx → pptx → xlsx order; W3 ODF
-  (package split, atomic save, limits coverage); W4 legacy (doc/ppt/xls).
-  Facade-surface cleanup folds into the UNIFIED_OPS M0a migration so the
-  facade breaks once, not twice; leaf-crate unification precedes M0a so the
+- Phases, in order: governance (this record, the glossary document, the
+  checker skeleton); iWork renames; OOXML in docx → pptx → xlsx order; ODF
+  (package split, atomic save, limits coverage); legacy (doc/ppt/xls).
+  Facade-surface cleanup folds into the UNIFIED_OPS facade merge so the
+  facade breaks once, not twice; leaf-crate unification precedes that merge so the
   `File` enum maps onto already-unified names.
-- Per-wave gates: warning-denied build, tests, and Clippy; checker and
+- Per-phase gates: warning-denied build, tests, and Clippy; checker and
   glossary status flips in the same commit; docs, README, and examples
-  rewritten in the same commit; behavior-changing waves (ODF atomic save,
+  rewritten in the same commit; behavior-changing phases (ODF atomic save,
   iWork identity parameter) add CRUD-checklist evidence.
 
 ### 11. Deferred
@@ -352,10 +352,10 @@ remain on their own tracks (UNIFIED_OPS design, ADR 0003 deferrals).
 
 ## Verification
 
-- W0: the glossary document and checker skeleton exist; the checker runs in
+- Governance: the glossary document and checker skeleton exist; the checker runs in
   CI over the current tree with an empty banned list.
-- Each wave: `cargo build`/`test`/`clippy -D warnings` across the touched
-  feature combinations; the checker with that wave's banned names passes;
+- Each phase: `cargo build`/`test`/`clippy -D warnings` across the touched
+  feature combinations; the checker with that phase's banned names passes;
   glossary rows flip in the same commit; examples and docs compile and run.
 - Behavior changes carry evidence per the CRUD scenario checklist: ODF
   atomic save (failed-write leaves destination unchanged), iWork explicit

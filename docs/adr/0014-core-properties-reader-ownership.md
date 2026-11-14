@@ -55,13 +55,7 @@ cache at the umbrella seam. XLSB continues to call the common owner directly.
 
 ## Verification
 
-At ADR 0014 acceptance, focused tests covered relationship-selected lookup,
-absence, external and dangling targets, wrong content types, duplicate
-relationships, all then-modeled fields, time-zone normalization,
-writer/parser round trips, DTD and entity rejection, text budgets, and Apache
-POI OPC conformance fixtures. All 13 focused properties tests passed.
-Warning-denied Clippy and rustdoc were green for the common owner, migration
-host, and isolated OOXML facade, as were workspace lint and the executable
-boundary policy (35 packages, 107 direct internal dependencies, and 14
-explicit debt items). The previously green full-workspace test suite was not
-repeated.
+Focused tests cover relationship-selected lookup, absence, external and
+dangling targets, wrong content types, duplicate relationships, every modeled
+field, time-zone normalization, writer/parser round trips, DTD and entity
+rejection, text budgets, and Apache POI OPC conformance fixtures.

@@ -15,7 +15,7 @@ Relationship to existing ADRs: this plan introduces **no conflict** with any
 accepted ADR. It builds a facade-level unification layer *above* the parallel
 per-format semantic models mandated by ADR 0007, and it delegates all mutation
 to the snapshot/Edit/Commit/Patch machinery mandated by ADR 0003. A new ADR
-summarizing this design will be drafted as part of milestone M0.
+summarizing this design will be drafted during design consolidation.
 
 Implementation is additionally constrained by ADRs this design must comply
 with (surfaced by the 2026-10-01 review):
@@ -75,11 +75,11 @@ reuses the existing investment in 60+ crates, and complies with ADR 0007.
   `/footnote[2]`, `/comments/comment[3]`, `/slide[2]/notes`,
   `/slideMaster[1]/layout[2]`, chart parts. Without story axes the read
   projection (§5) and the property vocabulary (§6) would silently cover main
-  stories only. The M0 parser milestone explicitly includes story axes.
+  stories only. The parser track explicitly includes story axes.
 - Implementation home: extension of the existing `litchi-core::selector`
   vocabulary module. That module today holds only the typed vocabulary
   (`Position`, `Selector::{Name, Position, Id}`); no string parsing exists
-  anywhere in the workspace, so the grammar is new code on the M0 critical
+  anywhere in the workspace, so the grammar is new code on the critical
   path, not a small extension.
 
 ## 3. Transaction model: single-op sugar + atomic batch, immutable snapshots
@@ -106,7 +106,7 @@ reuses the existing investment in 60+ crates, and complies with ADR 0007.
   operation against the evolving package state in order. Atomicity is cheap —
   a failure discards the intermediate chain and the caller keeps the old
   snapshot — but every per-op commit pays dependency-closure validation, so
-  the executor carries a large-batch performance budget (validated at M2 with
+  the executor carries a large-batch performance budget (validated with the write kernel on
   ≥1k-operation batches).
 - Batch item payloads mirror OfficeCLI's full `BatchItem` shape — the 21 JSON
   keys `command` (alias `op`), `path`, `path2`, `parent`, `type`, `from`,
@@ -313,7 +313,7 @@ reuses the existing investment in 60+ crates, and complies with ADR 0007.
    `examples/{word,excel,ppt}/*.sh` scripts (14 word + 26 excel + 56 ppt) are
    ported as the CLI behavior-test corpus. Because pivot/slicer/animation/
    transition/3D/media/OLE scenarios are P2, the ported corpus goes green in
-   waves: M5 requires the v1-scope subset green, with every remaining delta
+   waves: acceptance closure requires the v1-scope subset green, with every remaining delta
    recorded.
 2. **In-house CRUD gate** — `docs/CRUD_Scenario_Checklist.md` (ADR 0008):
    create/read/update/delete/reorder evidence per opened-document scenario,
@@ -326,34 +326,35 @@ reuses the existing investment in 60+ crates, and complies with ADR 0007.
 
 ## 15. Milestones
 
-- **M0 — design consolidation + trunk migration**: draft the new ADR; scaffold
+- **Design consolidation and trunk migration**: draft the new ADR; scaffold
   `litchi-ops` and register it in the ADR 0024 inventory; then two tracks —
-  **M0a**: merge the existing facade open pipelines and `*Impl` enums into the
+  the **facade merge**: merge the existing facade open pipelines and `*Impl` enums into the
   flat `File` enum (including `Locked` / `Signed` states) behind a single
   `litchi::open()`, unify the error enum, normalize eager/source duality, and
-  switch all in-tree consumers in the same commit (see §16); **M0b**:
+  switch all in-tree consumers in the same commit (see §16); the **parser track**:
   implement the path/selector parser **including story axes** in
   `litchi-core::selector`. (Everything later depends on the parser.)
-- **M1 — unified read**: generic node view, `get/query`,
+- **Unified read**: generic node view, `get/query`,
   `view(outline/text/annotated/stats)`, capability-query skeleton. Agents can
   read every format.
-- **M2 — write kernel**: `set/add/remove/move/swap` for OOXML ×3, single-op
+- **Write kernel**: `set/add/remove/move/swap` for OOXML ×3, single-op
   transaction sugar, atomic batch (meeting the ≥1k-operation performance
   budget), property registry + coercions, typed errors with suggestions —
   plus the P0 structural surface: worksheet lifecycle, metadata, style
   application, numbering basics. **First working CRUD loop.**
-- **M3 — consumption surfaces**: Python write bindings (dual surface), CLI
+- **Consumption surfaces**: Python write bindings (dual surface), CLI
   binary, schema export + capabilities introspection.
-- **M4 — advanced capabilities**: CSV import, formula evaluation, typed chart
+- **Advanced capabilities**: CSV import, formula evaluation, typed chart
   and SmartArt CRUD — **plus the three new engines** (formatting-aware
   find/replace, template merge, TOC/field refresh), which dominate this
   milestone's cost and may justify splitting it.
-- **M5 — acceptance closure**: ported OfficeCLI corpus green for the v1 scope
+- **Acceptance closure**: ported OfficeCLI corpus green for the v1 scope
   (deferred deltas recorded), CRUD-gate evidence, full fidelity regression,
   Python pytest mirror.
 
-Each milestone is independently valuable: after M1 agents can read anything;
-after M2 they can modify OOXML; after M3 everything is scriptable.
+Each milestone is independently valuable: after unified read agents can read
+anything; after the write kernel they can modify OOXML; after the consumption
+surfaces everything is scriptable.
 
 ## 16. Migration from the existing partial unified API
 
@@ -410,9 +411,9 @@ executed in continuously buildable, dependency-ordered phases per ADR 0008.
   `WorkbookModel::{Owned, Source}`. Wiring Edit transactions requires no
   re-open.
 
-### 16.3 Obstacles to the flat `File` enum (identified in M0a)
+### 16.3 Obstacles to the flat `File` enum (identified in the facade merge)
 
-The following migration issues were resolved through M0a and subsequent waves.
+The following migration issues were resolved through the facade merge and later migration steps.
 
 1. Two `Result` types (typed `litchi_core::Error` vs the sheet family's
    `Box<dyn Error>`) unify to the typed error — breaking, accepted per

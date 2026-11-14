@@ -22,30 +22,12 @@ eager payload route both use this profile. Library-authored manifest and
 relationship members retain compactness as a debug-checked serializer quality
 property.
 
-> **Amended 2026-09-16** under the owner's decision
-> *"Original byte contract: loose the audit, accept non-compact XMLs."* Until
-> that amendment the compact output contract was asserted against original part
-> bytes as well, which refused 94 of 95 real OOXML packages at publication.
-> "Malformed known payloads fail before publication" below is the surviving
-> rule.
->
-> **Amended again 2026-09-16** under the
-> same decision. The decision names original part bytes; this amendment is its
-> implementation interpretation for eager planned payloads, including
-> source-spliced replacements, informed by the source-backed
-> replacement precedent. This is not an additional owner decision.
-> Compactness of this library's own serializers remains a quality property,
-> not a publication refusal, so the eager route no longer rejects a payload for
-> spelling. The paragraph above is rewritten to say that. What this amendment
-> does *not* move: every non-compactness check of the audit stays — UTF-8,
-> well-formedness, a single document element, character data only inside it,
-> the DTD and DOCTYPE refusal, the attribute grammar, a valid `xml:space` and
-> each finite budget — each still refused with the identical typed error before
-> any byte is emitted. Measured breadth that the eager change admits: its
-> 59 `NotCompact` refusals over 180 real `.xlsx` fixtures become 0, and a
-> preserved DOCX main part publishes on 54 of the 55 openable fixtures where
-> the earlier default policy
-> had to fall back to whole-document compaction on all 54.
+Non-compact spelling is never a publication refusal, including for eager
+planned payloads and source-spliced replacements. Every other audit check
+stays: UTF-8, well-formedness, a single document element, character data only
+inside it, the DTD and DOCTYPE refusal, the attribute grammar, a valid
+`xml:space`, and each finite budget, each refused with its typed error before
+any byte is emitted.
 
 Validation never mutates. It returns a deterministic `Report` of structured
 issues with severity, stable code, semantic/physical location, evidence,

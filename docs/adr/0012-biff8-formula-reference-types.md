@@ -66,7 +66,4 @@ Focused tests cover `IV` as the last accepted column; `IW`, `ZZZZ`, overflow-
 length column strings, and malformed rows as typed rejections; direct checked
 reference and area construction; exact encoded flag bits; Formula metadata
 decoding and validation; and public writer serialization returning an error
-without unwinding. The formula-metadata and focused writer regressions pass;
-the previously green broader formula gates remain the reference verification
-for this ADR. Per explicit user direction, the full-workspace test suite is
-not repeated.
+without unwinding.

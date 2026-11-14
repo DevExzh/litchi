@@ -90,37 +90,16 @@ update/remove, shared inbound refusal, bounds, malformed and nonempty scalar
 elements, failure atomicity, and the shared color vocabulary. Host tests cover
 the canonical producer bytes, package/document facades, relationship retention,
 Strict graph handling, body-edit byte preservation, duplicate/external graph
-refusal, and a real POI fixture. The complete owner gate passes 43 unit tests,
-two public API tests, and one doctest. Focused host gates pass two owner
-integrations, seven legacy-surface replacements, and four shared-color/
-underline regressions. Exact producer-asset parity also passes. Warning-denied
-Clippy and rustdoc are green for both owner and focused host, together with
-formatting, diff, panic-name, stale-name, and crate-boundary checks.
+refusal, a real POI fixture, and exact producer-asset parity.
 
-The native gate first separated the generated part into baseline, scalar-only,
-plain division, body-division, and block-quote artifacts. Word opened the
-baseline, scalar-only, bordered plain division, and borderless plain division
-without repair. It requested recovery for both `<w:bodyDiv/>` and
-`<w:blockQuote/>`. A scan of 60 checked-in Office packages found 54 web-settings
-parts, nine division-bearing parts, and 138 divisions: all 138 had a border,
-129 had `bodyDiv`, and all 129 producer markers used `w:val="1"`; no producer
-`blockQuote` example was present. The independent borderless artifact proves
-that borders remain optional despite that producer convention.
+Producer web-settings parts in the repository's Office packages always give a
+division a border and spell `bodyDiv` as `w:val="1"`; borders nevertheless
+remain optional in the model.
 
-That same native run exposed a host writer defect: `add_heading(_, 1)` used the
-display name `Heading 1` as a style ID, and levels four through nine were
-accepted without matching default catalog entries. The writer now emits
-`Heading1` through `Heading9` and installs every accepted built-in style. A
-closed `Outline::{H1, ..., H9}` type supplies the required wire levels zero
-through eight, and the style writer emits `w:outlineLvl`. A save/reopen
-regression proves that `Title` plus all nine heading IDs resolve with the exact
-structural outline levels in the saved style catalog.
-
-After those corrections, `docx_owner_native_smoke` generated a document containing
-scalar web settings, a body division, a block-quote division, a Heading 1, and
-ordinary text. Desktop Word for macOS opened `web-settings-owner.docx` without
-a recovery prompt, rendered both paragraphs, and selected the native Heading 1
-style for the heading. This is open-and-inspect evidence for that Transitional
-artifact only. It does not establish Office edit/resave preservation, a Strict
-native round trip, other Word versions, source-surgical extension editing, or
-measured performance.
+The host heading writer emits the style IDs `Heading1` through `Heading9`
+(not the display name `Heading 1`) and installs every accepted built-in
+heading style; each carries its structural `w:outlineLvl` (zero through
+eight). A save/reopen regression checks `Title` and all nine heading IDs.
+The `docx_owner_native_smoke` example produces an artifact with scalar web
+settings, a body division, a block-quote division, and a Heading 1 for native
+Word open-and-inspect checks.

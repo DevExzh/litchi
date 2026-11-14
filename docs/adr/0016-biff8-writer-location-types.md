@@ -51,7 +51,7 @@ The writer sorts page breaks into the order required by `[MS-XLS]` sections
 ranges; it does not repair a partially inserted rule. No compatibility aliases
 or unchecked public constructors are retained.
 
-The worksheet-view amendment applies the same policy to `[MS-XLS]` `Window2`,
+Worksheet views apply the same policy to `[MS-XLS]` `Window2`,
 `Scl`, `Pane`, and `Selection` records. The writer exposes contextual
 `view::{Scale, Mode, Pane, Selection, View}` instead of public option structs
 with independently mutable fields. `Scale` proves positive BIFF terms and the
@@ -67,10 +67,9 @@ setters cover origins, palette indices, zooms, panes, and selections.
 `put_scale`, `put_view`, and `put_pane` move accepted values into retained state
 and return the previous owned state. Pane/selection replacement validates the
 complete prospective view with a non-allocating four-pane bit mask before the
-first replacement. The old public option names, raw `set_zoom`,
-`set_worksheet_view`, and `split_panes` entry points are removed.
+first replacement.
 
-The shape-anchor amendment replaces the public field bags with
+Shape anchors use
 `writer::shape::{Point, Anchor, Behavior, Rect}`. `Point` proves the BIFF8 cell
 and offset domains in a six-byte representation; `Anchor` proves strict
 top-left/bottom-right ordering on both axes. `Behavior` exposes only the three
@@ -80,16 +79,15 @@ all retained collections and strings before mutation or object-ID allocation.
 Requested child IDs are also reserved before automatic group IDs are chosen,
 so insertion order cannot create a later collision.
 
-The SortData amendment gives its packed signed four-byte field private checked
+SortData gives its packed signed four-byte field private checked
 `Rw12` and `Col12` components. Public `writer::sort::{Row, Col, Range, Axis,
 Method, Parent, Dxf, IconSet, Icon, On, Key, Config}` keeps those wire details
 out of the facade. `Range::new` accepts inclusive checked row and column ranges;
 `Key::col` is valid for row sorting and `Key::row` for column sorting, making an
 ambiguous two-dimensional key unrepresentable. `put_sort` consumes a complete
 configuration and returns the previous one, `remove_sort` is idempotent, and
-`sort` lends the current state. The older root `XlsSort*`, `set_sort_data`, and
-`sort_data` surface is removed; the separate legacy `set_sort` BIFF record is
-not a SortData alias and remains intentionally distinct.
+`sort` lends the current state. The legacy `set_sort` BIFF record is not a SortData alias and remains
+intentionally distinct.
 
 ## Consequences
 
@@ -125,42 +123,17 @@ not a SortData alias and remains intentionally distinct.
 Focused adversarial tests cover exact maximum locations, overflow, reversed
 and overlapping ranges, count limits, invalid workbook-relative RTD sheets,
 serialization and reopen, failure atomicity, and `catch_unwind` rejection.
-Selected integration suites cover data tables, validation, page setup, RTD,
-Web publication, sorting, list objects, pivots, links, values, and worksheet
-views. All 38 selected integration tests and the three focused unit tests pass.
+Integration suites cover data tables, validation, page setup, RTD, Web
+publication, sorting, list objects, pivots, links, values, and worksheet
+views.
 
-The view amendment adds six unit tests, two typed writer/readback tests, five
-workbook-view tests, and two lint-regression tests. They cover exact record
-bytes, BIFF boundaries, compact flags, no-unwind rejection, byte-for-byte state
-equality after rejected edits, move-returned old state, and frozen/split
-round trips.
+View tests cover exact record bytes, BIFF boundaries, compact flags,
+no-unwind rejection, byte-for-byte state equality after rejected edits,
+move-returned old state, and frozen/split round trips. Shape and SortData
+tests cover exact packed bounds, axis/key coupling, wire round trips, invalid
+flag and rectangle states, allocation failure ordering, explicit/automatic ID
+collisions, and move-returned CRUD state.
 
-The `xls_styles_example` generated a BIFF8 workbook with one frozen row and
-column. Through Computer Use, desktop Excel for macOS opened it in expected
-Compatibility Mode without a repair prompt. After semantic navigation from the
-initial used range to `M30`, row 1 and column A remained visible, confirming
-that Excel interpreted the emitted frozen-pane records. No content edit or
-resave was performed, and the exact application version was not recorded; this
-does not certify every split-pane, selection, zoom, or view combination.
-
-The shape and SortData amendment adds 39 focused tests: six SortData unit
-tests, three shape-anchor units, six shape-group units, three SortData
-integrations, seven list-object integrations, five shape-writer integrations,
-four group-writer integrations, and five comment-writer integrations. They
-cover exact packed bounds, axis/key coupling, wire round trips, invalid flag and
-rectangle states, allocation failure ordering, explicit/automatic ID
-collisions, and move-returned CRUD state. The complete `litchi-xls` target also
-builds without running unrelated suites.
-
-The `odraw_native_smoke` example generated `odraw-smoke.xls` with a rectangle,
-text box, and grouped ellipse/text pair through the checked anchor API. Through
-the Computer Use skill, desktop Microsoft Excel for macOS opened it without a
-repair prompt in expected Compatibility Mode and rendered all objects, fills,
-text, and group placement. This is open-and-inspect evidence for that artifact
-only: Excel edit/resave, Litchi reverse-read after resave, an Office-version
-matrix, SortData UI behavior, and performance were not tested.
-
-Warning-denied Clippy and rustdoc, formatting, and diff validation are green
-for `litchi-xls`. Per explicit user direction, no redundant manual full-
-workspace run was scheduled; the repository's mandatory pre-commit hook later
-ran and passed the workspace lib/integration and doctest gates.
+The `xls_styles_example` (frozen row and column) and `odraw_native_smoke`
+(rectangle, text box, and grouped ellipse/text pair) examples produce
+artifacts for native Excel open-and-inspect checks.

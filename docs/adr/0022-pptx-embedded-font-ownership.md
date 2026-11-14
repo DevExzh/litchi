@@ -170,16 +170,6 @@ unknown XML preservation; failure atomicity; public downstream API compilation;
 reference packages from LibreOffice and Apache POI; feature-on/off builds; and
 warning-denied Clippy and rustdoc.
 
-Desktop Microsoft PowerPoint for macOS opened
-`target/office-verification/pptx-font-crud-generated.pptx` without repair or a
-font-license warning, rendered the visible Boldonse text, and reported
-`Boldonse` in the selected text box's font control. Computer Use changed `Test`
-to `Test Test`, saved a separate copy, closed it, and reopened that copy without
-repair. ZIP validation and the canonical reverse reader found the edited text,
-one Regular Boldonse face, one inert `application/x-fontdata` part, and the
-presentation-owned relationship. The observed copy retained the exact 36,187
-byte EOT payload and SHA-256, although the verifier intentionally permits a
-structurally valid Office normalization or re-subset. This certifies the tested
-Transitional EOT CRUD artifact on that desktop build, not the automatic raw
-OpenType-to-EOT wrapper, the standards-only `x-font-ttf` profile, Strict native
-behavior, other Office versions, or performance.
+Office may normalize or re-subset an embedded EOT payload on save, so the
+reverse-read check accepts any structurally valid face with the expected
+family and relationship rather than the exact source bytes.
