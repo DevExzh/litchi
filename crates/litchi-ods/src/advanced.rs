@@ -3861,6 +3861,13 @@ pub(crate) fn put_extended_style_graph(
     Ok(candidate)
 }
 
+#[cfg_attr(
+    target_pointer_width = "32",
+    expect(
+        clippy::absurd_extreme_comparisons,
+        reason = "the graph byte limit saturates to usize::MAX on 32-bit targets"
+    )
+)]
 fn extended_graph_markup_size(graph: &crate::data_style::Graph) -> Result<usize> {
     let mut size = 0usize;
     for style in &graph.number_styles {

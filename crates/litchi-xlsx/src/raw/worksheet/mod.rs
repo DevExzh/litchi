@@ -51,9 +51,12 @@ pub(crate) const MAX_SHARED_PROVISIONAL_EVENTS: usize = 131_072;
 const SPARSE_MARKER_HIT_LIMIT: usize = 16;
 const MARKER_COUNT_CHUNK_BYTES: usize = 64 * 1024;
 
-#[expect(
-    clippy::large_enum_variant,
-    reason = "short-lived owned parser result avoids an extra heap allocation"
+#[cfg_attr(
+    target_pointer_width = "64",
+    expect(
+        clippy::large_enum_variant,
+        reason = "short-lived owned parser result avoids an extra heap allocation"
+    )
 )]
 pub(crate) enum SourceParseAttempt {
     Complete(Result<Store>),

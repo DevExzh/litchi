@@ -3388,6 +3388,13 @@ fn enforce_markup_size(size: usize) -> Result<()> {
     }
 }
 
+#[cfg_attr(
+    target_pointer_width = "32",
+    expect(
+        clippy::absurd_extreme_comparisons,
+        reason = "the graph byte limit saturates to usize::MAX on 32-bit targets"
+    )
+)]
 fn enforce_graph_markup_size(size: usize) -> Result<()> {
     if size > MAX_STYLE_GRAPH_BYTES {
         invalid("ODS extended style graph exceeds its aggregate byte limit")

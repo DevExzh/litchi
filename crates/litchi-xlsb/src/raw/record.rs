@@ -45,6 +45,13 @@ impl Limits {
     }
 
     /// Validate the physical bounds of this raw limit profile.
+    #[cfg_attr(
+        target_pointer_width = "32",
+        expect(
+            clippy::absurd_extreme_comparisons,
+            reason = "the string unit limit equals usize::MAX on 32-bit targets"
+        )
+    )]
     pub const fn validate(self) -> Result<Self> {
         if self.payload > MAX_WIRE_PAYLOAD {
             return Err(Error::InvalidLimit {

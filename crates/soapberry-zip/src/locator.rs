@@ -1581,8 +1581,7 @@ mod tests {
             let call = self.reads.get();
             self.reads.set(call.saturating_add(1));
             if call >= 2 {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
+                return Err(std::io::Error::other(
                     "large-window regression issued an unexpected read",
                 ));
             }

@@ -65,6 +65,13 @@ impl TextStream {
     ///
     /// The reservation is fallible: one that cannot be made is refused with a
     /// typed error rather than aborting the process.
+    #[cfg_attr(
+        target_pointer_width = "32",
+        expect(
+            clippy::unnecessary_min_or_max,
+            reason = "the reservation cap equals usize::MAX on 32-bit targets"
+        )
+    )]
     pub(in crate::writer::core) fn try_new(
         text_start: usize,
         capacity: usize,

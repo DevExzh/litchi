@@ -4268,9 +4268,12 @@ impl Composition {
     ///
     /// Returns a structured common composition refusal while retaining the
     /// rejected work.
-    #[expect(
-        clippy::result_large_err,
-        reason = "composition refusals intentionally return the rejected prepared edit to the caller"
+    #[cfg_attr(
+        target_pointer_width = "64",
+        expect(
+            clippy::result_large_err,
+            reason = "composition refusals intentionally return the rejected prepared edit to the caller"
+        )
     )]
     pub(crate) fn join(&mut self, incoming: SubEdit) -> std::result::Result<&mut Self, JoinError> {
         let transaction_limits = incoming.transaction_limits;
