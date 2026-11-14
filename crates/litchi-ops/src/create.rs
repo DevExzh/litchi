@@ -254,7 +254,7 @@ pub fn create_with(format: FileFormat, options: &CreateOptions) -> Result<File> 
             .map(|file| file.into_file());
     }
 
-    #[cfg(feature = "iwork-adapter")]
+    #[cfg(iwork_adapter)]
     if matches!(
         format,
         FileFormat::Pages | FileFormat::Keynote | FileFormat::Numbers

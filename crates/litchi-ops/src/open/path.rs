@@ -17,7 +17,7 @@ use std::path::Path;
     feature = "odt",
     feature = "odp",
     odf_objects,
-    feature = "iwork-adapter",
+    iwork_adapter,
     all(
         any(unix, windows),
         any(
@@ -49,7 +49,7 @@ use crate::{File, OpenOptions};
     feature = "odt",
     feature = "odp",
     odf_objects,
-    feature = "iwork-adapter",
+    iwork_adapter,
     all(
         any(unix, windows),
         any(
@@ -85,7 +85,7 @@ pub(crate) fn stable_origin(path: &Path) -> Result<Arc<Path>> {
     feature = "odp",
     feature = "odt",
     odf_objects,
-    feature = "iwork-adapter"
+    iwork_adapter
 ))]
 fn keeps_origin(file: &File) -> bool {
     use litchi_core::FileFormat as Format;
@@ -183,7 +183,7 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
             feature = "odp",
             feature = "odt",
             odf_objects,
-            feature = "iwork-adapter"
+            iwork_adapter
         ))]
         let file = if keeps_origin(&file) {
             super::attach_origin(file, stable_origin(path)?)
@@ -278,7 +278,7 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
         feature = "odp",
         feature = "odt",
         odf_objects,
-        feature = "iwork-adapter"
+        iwork_adapter
     ))]
     let opened = if keeps_origin(&opened) {
         super::attach_origin(opened, stable_origin(path)?)
@@ -469,7 +469,7 @@ mod zip {
         )?;
         let file = super::super::bytes::zip_fallback(bytes, options, &detection_limits, tail)?;
         // An iWork package saves back to its path.
-        #[cfg(feature = "iwork-adapter")]
+        #[cfg(iwork_adapter)]
         if file.iwork().is_some() {
             return Ok(super::super::attach_origin(
                 file,

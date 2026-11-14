@@ -13,7 +13,7 @@
     feature = "odt",
     feature = "odp",
     odf_objects,
-    feature = "iwork-adapter"
+    iwork_adapter
 ))]
 use std::io;
 use std::io::Write;
@@ -118,7 +118,7 @@ impl File {
                     path,
                 })
             },
-            #[cfg(feature = "iwork-adapter")]
+            #[cfg(iwork_adapter)]
             Self::Pages(handle) | Self::Keynote(handle) | Self::Numbers(handle) => {
                 let (commit, path) = handle.add(_parent.into_path()?, _node.into_node()?)?;
                 Ok(Added {
@@ -248,7 +248,7 @@ impl File {
             | Self::Odf(handle) => handle
                 .move_to(_path.into_path()?, _to.into_placement()?)
                 .map(|commit| commit.after.into_file()),
-            #[cfg(feature = "iwork-adapter")]
+            #[cfg(iwork_adapter)]
             Self::Pages(handle) | Self::Keynote(handle) | Self::Numbers(handle) => handle
                 .move_to(_path.into_path()?, _to.into_placement()?)
                 .map(|commit| commit.after.into_file()),
@@ -341,7 +341,7 @@ impl File {
             | Self::Odf(handle) => handle
                 .remove(_target.into_target()?)
                 .map(|commit| commit.after.into_file()),
-            #[cfg(feature = "iwork-adapter")]
+            #[cfg(iwork_adapter)]
             Self::Pages(handle) | Self::Keynote(handle) | Self::Numbers(handle) => handle
                 .remove(_target.into_target()?)
                 .map(|commit| commit.after.into_file()),
@@ -437,7 +437,7 @@ impl File {
             | Self::Odf(handle) => handle
                 .swap(_a.into_path()?, _b.into_path()?)
                 .map(|commit| commit.after.into_file()),
-            #[cfg(feature = "iwork-adapter")]
+            #[cfg(iwork_adapter)]
             Self::Pages(handle) | Self::Keynote(handle) | Self::Numbers(handle) => handle
                 .swap(_a.into_path()?, _b.into_path()?)
                 .map(|commit| commit.after.into_file()),
@@ -597,7 +597,7 @@ impl File {
             | Self::Odf(handle) => handle
                 .set(_target.into_target()?, _props)
                 .map(|commit| commit.after.into_file()),
-            #[cfg(feature = "iwork-adapter")]
+            #[cfg(iwork_adapter)]
             Self::Pages(handle) | Self::Keynote(handle) | Self::Numbers(handle) => handle
                 .set(_target.into_target()?, _props)
                 .map(|commit| commit.after.into_file()),
@@ -657,7 +657,7 @@ impl File {
             feature = "odt",
             feature = "odp",
             odf_objects,
-            feature = "iwork-adapter"
+            iwork_adapter
         )),
         allow(
             clippy::only_used_in_recursion,
@@ -689,7 +689,7 @@ impl File {
                 handle.write_to(&mut counted)?;
                 Ok(counted.bytes)
             },
-            #[cfg(feature = "iwork-adapter")]
+            #[cfg(iwork_adapter)]
             Self::Pages(handle) | Self::Keynote(handle) | Self::Numbers(handle) => {
                 let mut counted = Counted { sink, bytes: 0 };
                 handle.write_to(&mut counted)?;
@@ -792,7 +792,7 @@ fn pending(file: &File, operation: &str) -> Error {
     feature = "odt",
     feature = "odp",
     odf_objects,
-    feature = "iwork-adapter"
+    iwork_adapter
 ))]
 pub(crate) struct Counted<W> {
     pub(crate) sink: W,
@@ -812,7 +812,7 @@ pub(crate) struct Counted<W> {
     feature = "odt",
     feature = "odp",
     odf_objects,
-    feature = "iwork-adapter"
+    iwork_adapter
 ))]
 impl<W: Write> Write for Counted<W> {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {

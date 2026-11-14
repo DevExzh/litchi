@@ -5,7 +5,7 @@
 use crate::format::doc::Doc;
 #[cfg(feature = "docx")]
 use crate::format::docx::Docx;
-#[cfg(feature = "iwork-adapter")]
+#[cfg(iwork_adapter)]
 use crate::format::iwork::Iwork;
 #[cfg(odf_objects)]
 use crate::format::odf_tree::OdfTree;
@@ -213,15 +213,15 @@ pub enum File {
     /// An Apple Pages document (`.pages`), read and written through the
     /// iWork object-tree adapter. Opened when the `pages` cargo feature
     /// is on.
-    #[cfg(feature = "iwork-adapter")]
+    #[cfg(iwork_adapter)]
     Pages(Iwork),
     /// An Apple Keynote presentation (`.key`); opened with the `keynote`
     /// feature.
-    #[cfg(feature = "iwork-adapter")]
+    #[cfg(iwork_adapter)]
     Keynote(Iwork),
     /// An Apple Numbers workbook (`.numbers`); opened with the `numbers`
     /// feature.
-    #[cfg(feature = "iwork-adapter")]
+    #[cfg(iwork_adapter)]
     Numbers(Iwork),
     /// An encrypted input: neither readable nor editable until it is
     /// unlocked with its password.
@@ -308,7 +308,7 @@ impl File {
     }
 
     /// The iWork handle of a Pages, Keynote or Numbers file.
-    #[cfg(feature = "iwork-adapter")]
+    #[cfg(iwork_adapter)]
     pub(crate) fn iwork(&self) -> Option<&Iwork> {
         match self {
             Self::Pages(handle) | Self::Keynote(handle) | Self::Numbers(handle) => Some(handle),
@@ -371,7 +371,7 @@ impl File {
             | Self::Odi(handle)
             | Self::Odb(handle)
             | Self::Odf(handle) => Some(handle.format()),
-            #[cfg(feature = "iwork-adapter")]
+            #[cfg(iwork_adapter)]
             Self::Pages(handle) | Self::Keynote(handle) | Self::Numbers(handle) => {
                 Some(handle.format())
             },
@@ -556,7 +556,7 @@ impl File {
             | Self::Odi(handle)
             | Self::Odb(handle)
             | Self::Odf(handle) => handle.text(),
-            #[cfg(feature = "iwork-adapter")]
+            #[cfg(iwork_adapter)]
             Self::Pages(handle) | Self::Keynote(handle) | Self::Numbers(handle) => handle.text(),
             #[cfg(feature = "ods")]
             Self::Ods(handle) => handle.text(),
@@ -607,7 +607,7 @@ impl File {
             | Self::Odi(handle)
             | Self::Odb(handle)
             | Self::Odf(handle) => handle.metadata(),
-            #[cfg(feature = "iwork-adapter")]
+            #[cfg(iwork_adapter)]
             Self::Pages(handle) | Self::Keynote(handle) | Self::Numbers(handle) => {
                 handle.metadata()
             },
@@ -660,7 +660,7 @@ impl File {
             | Self::Odf(handle) => handle
                 .tolerance_report()
                 .map(|report| ToleranceReport::Object(handle.format(), report)),
-            #[cfg(feature = "iwork-adapter")]
+            #[cfg(iwork_adapter)]
             Self::Pages(handle) | Self::Keynote(handle) | Self::Numbers(handle) => {
                 Ok(ToleranceReport::Untracked(handle.format()))
             },
@@ -820,7 +820,7 @@ impl std::fmt::Debug for File {
             | Self::Odi(handle)
             | Self::Odb(handle)
             | Self::Odf(handle) => handle.fmt(formatter),
-            #[cfg(feature = "iwork-adapter")]
+            #[cfg(iwork_adapter)]
             Self::Pages(handle) | Self::Keynote(handle) | Self::Numbers(handle) => {
                 handle.fmt(formatter)
             },

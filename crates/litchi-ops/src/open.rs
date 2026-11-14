@@ -182,20 +182,20 @@ pub fn open_with_tail<T: ZipTail>(
 /// of a format whose feature is off is `unsupported_format` naming the
 /// feature.
 #[cfg_attr(
-    not(feature = "iwork-adapter"),
+    not(iwork_adapter),
     allow(
         clippy::unnecessary_wraps,
         reason = "the directory route exists only with an iWork format"
     )
 )]
 fn open_directory(path: &Path, options: &OpenOptions, error: Error) -> Result<File> {
-    #[cfg(feature = "iwork-adapter")]
+    #[cfg(iwork_adapter)]
     if path.is_dir()
         && let Some(handle) = crate::format::iwork::Iwork::capture_directory(path, options)?
     {
         return Ok(handle.into_file());
     }
-    #[cfg(feature = "iwork-adapter")]
+    #[cfg(iwork_adapter)]
     if path.is_dir()
         && let Some(format) = crate::format::iwork::classify_directory(path)
     {
@@ -222,7 +222,7 @@ fn open_directory(path: &Path, options: &OpenOptions, error: Error) -> Result<Fi
             ),
         };
     }
-    #[cfg(not(feature = "iwork-adapter"))]
+    #[cfg(not(iwork_adapter))]
     let _ = (path, options);
     Err(error)
 }
@@ -446,7 +446,7 @@ fn signed_if(file: File, format: FileFormat, signed: bool, origin: crate::Signat
     feature = "odp",
     feature = "odt",
     odf_objects,
-    feature = "iwork-adapter"
+    iwork_adapter
 ))]
 pub(crate) fn attach_origin(file: File, origin: Arc<Path>) -> File {
     match file {
@@ -460,7 +460,7 @@ pub(crate) fn attach_origin(file: File, origin: Arc<Path>) -> File {
         File::Odg(tree) | File::Odc(tree) | File::Odi(tree) | File::Odb(tree) | File::Odf(tree) => {
             tree.with_origin(Some(origin)).into_file()
         },
-        #[cfg(feature = "iwork-adapter")]
+        #[cfg(iwork_adapter)]
         File::Pages(iwork) | File::Keynote(iwork) | File::Numbers(iwork) => {
             iwork.with_origin(Some(origin)).into_file()
         },

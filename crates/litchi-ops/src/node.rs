@@ -68,7 +68,7 @@ macro_rules! dispatch {
             Node::Odp($inner) => $body,
             #[cfg(odf_objects)]
             Node::Object($inner) => $body,
-            #[cfg(feature = "iwork-adapter")]
+            #[cfg(iwork_adapter)]
             Node::Iwork($inner) => $body,
             #[cfg(any(test, feature = "test-support"))]
             Node::Fake($inner) => $body,
@@ -85,7 +85,7 @@ macro_rules! dispatch {
                 feature = "ods",
                 feature = "odp",
                 odf_objects,
-                feature = "iwork-adapter",
+                iwork_adapter,
                 test,
                 feature = "test-support"
             )))]
@@ -153,7 +153,7 @@ pub(crate) use view::Project;
     feature = "odt",
     feature = "odp",
     odf_objects,
-    feature = "iwork-adapter"
+    iwork_adapter
 ))]
 pub(crate) use view::Source;
 pub use view::{
@@ -222,7 +222,7 @@ pub enum Node<'f> {
     #[cfg(odf_objects)]
     Object(crate::format::odf_tree::Node<'f>),
     /// An Apple Pages, Keynote or Numbers node (iWork object-tree adapter).
-    #[cfg(feature = "iwork-adapter")]
+    #[cfg(iwork_adapter)]
     Iwork(crate::format::iwork::Node<'f>),
     /// A node of the test-only fake format.
     #[cfg(any(test, feature = "test-support"))]
@@ -242,7 +242,7 @@ pub enum Node<'f> {
         feature = "ods",
         feature = "odp",
         odf_objects,
-        feature = "iwork-adapter",
+        iwork_adapter,
         test,
         feature = "test-support"
     )))]
@@ -438,7 +438,7 @@ impl<'f> Node<'f> {
     }
 
     /// Borrow the typed iWork node (Pages, Keynote, Numbers).
-    #[cfg(feature = "iwork-adapter")]
+    #[cfg(iwork_adapter)]
     #[must_use]
     pub fn as_iwork(&self) -> Option<&crate::format::iwork::Node<'f>> {
         match self {

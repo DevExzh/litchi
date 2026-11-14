@@ -150,7 +150,7 @@ impl<'q> Plan<'q> {
             {
                 crate::format::odf_tree::compile(query, format)
             },
-            #[cfg(feature = "iwork-adapter")]
+            #[cfg(iwork_adapter)]
             FileFormat::Pages | FileFormat::Keynote | FileFormat::Numbers
                 if crate::read::Adapter::of(format).is_some() =>
             {

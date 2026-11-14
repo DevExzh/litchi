@@ -438,7 +438,7 @@ pub enum Source {
     #[cfg(feature = "formula")]
     Formula(litchi_formula::FormulaError),
     /// A Pages, Keynote or Numbers leaf error.
-    #[cfg(feature = "iwork-adapter")]
+    #[cfg(iwork_adapter)]
     Iwork(crate::format::iwork::LeafError),
 }
 
@@ -539,7 +539,7 @@ impl Source {
             Self::OdpTailAppend(error) => Some(error),
             #[cfg(feature = "formula")]
             Self::Formula(error) => Some(error),
-            #[cfg(feature = "iwork-adapter")]
+            #[cfg(iwork_adapter)]
             Self::Iwork(error) => Some(error),
         }
     }
@@ -2841,9 +2841,9 @@ from_leaf!(
     litchi_crypto::ooxml::Error => Crypto, None
 );
 from_leaf!(#[cfg(feature = "formula")] litchi_formula::FormulaError => Formula, None);
-from_leaf!(#[cfg(feature = "iwork-adapter")] crate::format::iwork::LeafError => Iwork, None);
+from_leaf!(#[cfg(iwork_adapter)] crate::format::iwork::LeafError => Iwork, None);
 
-#[cfg(feature = "iwork-adapter")]
+#[cfg(iwork_adapter)]
 impl Classify for crate::format::iwork::LeafError {
     fn classify(&self) -> Class {
         Class::of(self.code())

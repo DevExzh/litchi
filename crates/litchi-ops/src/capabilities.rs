@@ -481,7 +481,7 @@ const SIGNED: Refusal = Refusal {
 /// creation, and removal, moving and swapping where the leaf has no such
 /// transaction.
 #[cfg_attr(
-    not(feature = "iwork-adapter"),
+    not(iwork_adapter),
     allow(dead_code, reason = "read only when an iWork format is compiled in")
 )]
 const IWORK_STRUCTURE: Refusal = Refusal {
@@ -977,7 +977,7 @@ impl Capabilities {
             {
                 return Support::Supported;
             }
-            #[cfg(feature = "iwork-adapter")]
+            #[cfg(iwork_adapter)]
             if let Some(writes) = self.adapter().and_then(crate::format::iwork::writes) {
                 return match verb {
                     Verb::Set | Verb::Edit | Verb::Batch => Support::Supported,
@@ -2950,7 +2950,7 @@ impl Element {
             || (crate::format::odf_tree::writes(self.adapter)
                 .is_some_and(|writes| writes.settable.contains(&self.data().canonical))
                 && readable);
-        #[cfg(feature = "iwork-adapter")]
+        #[cfg(iwork_adapter)]
         let settable = settable
             || (crate::format::iwork::writes(self.adapter)
                 .is_some_and(|writes| writes.settable.contains(&self.data().canonical))
@@ -3072,7 +3072,7 @@ impl Element {
             || (crate::format::odf_tree::writes(self.adapter)
                 .is_some_and(|writes| writes.addable.contains(&self.data().canonical))
                 && readable);
-        #[cfg(feature = "iwork-adapter")]
+        #[cfg(iwork_adapter)]
         let add = add
             || (crate::format::iwork::writes(self.adapter)
                 .is_some_and(|writes| writes.addable.contains(&self.data().canonical))
@@ -3158,7 +3158,7 @@ impl Element {
             || (crate::format::odf_tree::writes(self.adapter)
                 .is_some_and(|writes| writes.removable.contains(&self.data().canonical))
                 && readable);
-        #[cfg(feature = "iwork-adapter")]
+        #[cfg(iwork_adapter)]
         let remove = remove
             || (crate::format::iwork::writes(self.adapter)
                 .is_some_and(|writes| writes.removable.contains(&self.data().canonical))
@@ -3593,7 +3593,7 @@ fn option_gap(adapter: Adapter, index: usize) -> Option<Option<&'static GapSpec>
     if let Some(writes) = crate::format::odf_tree::writes(adapter) {
         return writes.gaps.get(index).map(Some);
     }
-    #[cfg(feature = "iwork-adapter")]
+    #[cfg(iwork_adapter)]
     if let Some(writes) = crate::format::iwork::writes(adapter) {
         return writes.gaps.get(index).map(Some);
     }

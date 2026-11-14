@@ -397,7 +397,7 @@ pub(crate) enum Source<'a> {
     #[cfg(feature = "odp")]
     Odp(crate::format::odp::Props<'a>),
     /// An object-tree node's values, aligned with its property table.
-    #[cfg(any(odf_objects, feature = "iwork-adapter"))]
+    #[cfg(any(odf_objects, iwork_adapter))]
     Tree(&'a [Option<Value<'static>>]),
 }
 
@@ -436,7 +436,7 @@ impl<'a> Source<'a> {
             Self::Odt(ref props) => props.get(index),
             #[cfg(feature = "odp")]
             Self::Odp(ref props) => props.get(index),
-            #[cfg(any(odf_objects, feature = "iwork-adapter"))]
+            #[cfg(any(odf_objects, iwork_adapter))]
             Self::Tree(values) => values.get(index)?.as_ref().map(Value::borrowed),
         }
     }
@@ -646,7 +646,7 @@ enum Inner<'n, 'f> {
     /// The object-tree iterator walks one item's children.
     #[cfg(odf_objects)]
     Object(crate::format::odf_tree::children::Children<'f>),
-    #[cfg(feature = "iwork-adapter")]
+    #[cfg(iwork_adapter)]
     Iwork(crate::format::iwork::children::Children<'f>),
 }
 
@@ -752,7 +752,7 @@ impl<'n, 'f> Children<'n, 'f> {
     }
 
     /// An iWork object-tree node's children.
-    #[cfg(feature = "iwork-adapter")]
+    #[cfg(iwork_adapter)]
     pub(crate) const fn iwork(children: crate::format::iwork::children::Children<'f>) -> Self {
         Self {
             inner: Inner::Iwork(children),
@@ -809,7 +809,7 @@ impl<'f> Iterator for Children<'_, 'f> {
             Inner::Odp(children) => children.next().map(|child| child.map(Node::Odp)),
             #[cfg(odf_objects)]
             Inner::Object(children) => children.next().map(|child| child.map(Node::Object)),
-            #[cfg(feature = "iwork-adapter")]
+            #[cfg(iwork_adapter)]
             Inner::Iwork(children) => children.next().map(|child| child.map(Node::Iwork)),
         };
         if matches!(item, Some(Err(_)) | None) {

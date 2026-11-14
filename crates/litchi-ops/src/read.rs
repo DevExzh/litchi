@@ -21,7 +21,7 @@ use litchi_core::FileFormat;
         feature = "odt",
         feature = "odp",
         odf_objects,
-        feature = "iwork-adapter"
+        iwork_adapter
     )),
     allow(
         clippy::only_used_in_recursion,
@@ -148,7 +148,7 @@ impl File {
                 let path = path.into_path()?;
                 crate::format::odf_tree::get(handle, &path)
             },
-            #[cfg(feature = "iwork-adapter")]
+            #[cfg(iwork_adapter)]
             Self::Pages(handle) | Self::Keynote(handle) | Self::Numbers(handle) => {
                 let path = path.into_path()?;
                 crate::format::iwork::get(handle, &path)
@@ -242,7 +242,7 @@ impl File {
                 let path = path.into_path()?;
                 crate::format::odf_tree::find(handle, &path)
             },
-            #[cfg(feature = "iwork-adapter")]
+            #[cfg(iwork_adapter)]
             Self::Pages(handle) | Self::Keynote(handle) | Self::Numbers(handle) => {
                 let path = path.into_path()?;
                 crate::format::iwork::find(handle, &path)
@@ -330,7 +330,7 @@ impl File {
             | Self::Odf(handle) => {
                 crate::format::odf_tree::query(handle, selector).map(Matches::object)
             },
-            #[cfg(feature = "iwork-adapter")]
+            #[cfg(iwork_adapter)]
             Self::Pages(handle) | Self::Keynote(handle) | Self::Numbers(handle) => {
                 crate::format::iwork::query(handle, selector).map(Matches::iwork)
             },
@@ -421,7 +421,7 @@ impl File {
             | Self::Odb(handle)
             | Self::Odf(handle) => crate::format::odf_tree::views::view_json(handle, mode)
                 .map(crate::view::Json::object),
-            #[cfg(feature = "iwork-adapter")]
+            #[cfg(iwork_adapter)]
             Self::Pages(handle) | Self::Keynote(handle) | Self::Numbers(handle) => {
                 crate::format::iwork::views::view_json(handle, mode).map(crate::view::Json::iwork)
             },
@@ -508,7 +508,7 @@ impl File {
             | Self::Odi(handle)
             | Self::Odb(handle)
             | Self::Odf(handle) => crate::format::odf_tree::views::view_to(handle, mode, output),
-            #[cfg(feature = "iwork-adapter")]
+            #[cfg(iwork_adapter)]
             Self::Pages(handle) | Self::Keynote(handle) | Self::Numbers(handle) => {
                 crate::format::iwork::views::view_to(handle, mode, output)
             },

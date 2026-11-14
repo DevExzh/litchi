@@ -260,7 +260,7 @@ fn every_format_has_one_answer_for_its_reads() {
                 );
             #[cfg(not(odf_objects))]
             let object_edit = false;
-            #[cfg(feature = "iwork-adapter")]
+            #[cfg(iwork_adapter)]
             let iwork_edit = crate::read::Adapter::of(format)
                 .and_then(crate::format::iwork::writes)
                 .is_some_and(|writes| match verb {
@@ -273,14 +273,14 @@ fn every_format_has_one_answer_for_its_reads() {
                     Verb::Move | Verb::Swap => !writes.movable.is_empty(),
                     _ => false,
                 });
-            #[cfg(not(feature = "iwork-adapter"))]
+            #[cfg(not(iwork_adapter))]
             let iwork_edit = false;
-            #[cfg(feature = "iwork-adapter")]
+            #[cfg(iwork_adapter)]
             let iwork_refusal = crate::read::Adapter::of(format)
                 .and_then(crate::format::iwork::writes)
                 .is_some()
                 && !iwork_edit;
-            #[cfg(not(feature = "iwork-adapter"))]
+            #[cfg(not(iwork_adapter))]
             let iwork_refusal = false;
             let odp_edit = format == FileFormat::Odp
                 && cfg!(feature = "odp")

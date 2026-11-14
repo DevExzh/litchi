@@ -186,7 +186,7 @@ enum Leaf {
     Odp(Box<crate::format::odp::write::Patch>),
     #[cfg(odf_objects)]
     Object(Box<crate::format::odf_tree::write::Patch>),
-    #[cfg(feature = "iwork-adapter")]
+    #[cfg(iwork_adapter)]
     Iwork(Box<crate::format::iwork::write::Patch>),
     #[cfg(feature = "xlsx")]
     Xlsx(Box<XlsxLeaf>),
@@ -861,7 +861,7 @@ impl Edit {
                 feature = "ods",
                 feature = "odt",
                 odf_objects,
-                feature = "iwork-adapter"
+                iwork_adapter
             ))]
             let operation_limits = self.limits.with_snapshot_budget(
                 self.limits
@@ -954,7 +954,7 @@ impl Edit {
                     handle.set_with_limits(target, props, &operation_limits)?,
                     (),
                 ),
-                #[cfg(feature = "iwork-adapter")]
+                #[cfg(iwork_adapter)]
                 File::Pages(handle) | File::Keynote(handle) | File::Numbers(handle) => wrap_iwork(
                     handle,
                     handle.set_with_limits(target, props, &operation_limits)?,
@@ -1001,7 +1001,7 @@ impl Edit {
             feature = "ods",
             feature = "odt",
             odf_objects,
-            feature = "iwork-adapter"
+            iwork_adapter
         ))]
         let operation_limits = self.limits.with_snapshot_budget(
             self.limits
@@ -1095,7 +1095,7 @@ impl Edit {
                 )?;
                 wrap_object(handle, commit, path)
             },
-            #[cfg(feature = "iwork-adapter")]
+            #[cfg(iwork_adapter)]
             File::Pages(handle) | File::Keynote(handle) | File::Numbers(handle) => {
                 let (commit, path) = handle.add_with_limits(
                     _parent.into_path()?,
@@ -1159,7 +1159,7 @@ impl Edit {
             feature = "ods",
             feature = "odt",
             odf_objects,
-            feature = "iwork-adapter"
+            iwork_adapter
         ))]
         let operation_limits = self.limits.with_snapshot_budget(
             self.limits
@@ -1253,7 +1253,7 @@ impl Edit {
                 )?;
                 wrap_object(handle, commit, path)
             },
-            #[cfg(feature = "iwork-adapter")]
+            #[cfg(iwork_adapter)]
             File::Pages(handle) | File::Keynote(handle) | File::Numbers(handle) => {
                 let (commit, path) = handle.add_with_limits(
                     _parent.into_path()?,
@@ -1349,7 +1349,7 @@ impl Edit {
                 feature = "ods",
                 feature = "odt",
                 odf_objects,
-                feature = "iwork-adapter"
+                iwork_adapter
             ))]
             let operation_limits = self.limits.with_snapshot_budget(
                 self.limits
@@ -1422,7 +1422,7 @@ impl Edit {
                     handle.remove_with_limits(target.clone(), &operation_limits)?,
                     (),
                 ),
-                #[cfg(feature = "iwork-adapter")]
+                #[cfg(iwork_adapter)]
                 File::Pages(handle) | File::Keynote(handle) | File::Numbers(handle) => wrap_iwork(
                     handle,
                     handle.remove_with_limits(target.clone(), &operation_limits)?,
@@ -1655,7 +1655,7 @@ impl Edit {
             feature = "ods",
             feature = "odt",
             odf_objects,
-            feature = "iwork-adapter"
+            iwork_adapter
         ))]
         let remaining_snapshot = self
             .limits
@@ -1674,7 +1674,7 @@ impl Edit {
             feature = "ods",
             feature = "odt",
             odf_objects,
-            feature = "iwork-adapter"
+            iwork_adapter
         ))]
         let operation_limits = self.limits.with_snapshot_budget(remaining_snapshot);
         self.execute(|file| match file {
@@ -1783,7 +1783,7 @@ impl Edit {
                 )?,
                 (),
             ),
-            #[cfg(feature = "iwork-adapter")]
+            #[cfg(iwork_adapter)]
             File::Pages(handle) | File::Keynote(handle) | File::Numbers(handle) => wrap_iwork(
                 handle,
                 handle.move_to_with_limits(
@@ -1837,7 +1837,7 @@ impl Edit {
             feature = "ods",
             feature = "odt",
             odf_objects,
-            feature = "iwork-adapter"
+            iwork_adapter
         ))]
         let remaining_snapshot = self
             .limits
@@ -1856,7 +1856,7 @@ impl Edit {
             feature = "ods",
             feature = "odt",
             odf_objects,
-            feature = "iwork-adapter"
+            iwork_adapter
         ))]
         let operation_limits = self.limits.with_snapshot_budget(remaining_snapshot);
         self.execute(|file| match file {
@@ -1925,7 +1925,7 @@ impl Edit {
                 handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &operation_limits)?,
                 (),
             ),
-            #[cfg(feature = "iwork-adapter")]
+            #[cfg(iwork_adapter)]
             File::Pages(handle) | File::Keynote(handle) | File::Numbers(handle) => wrap_iwork(
                 handle,
                 handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &operation_limits)?,
@@ -3679,7 +3679,7 @@ fn wrap_object<T>(
     ))
 }
 
-#[cfg(feature = "iwork-adapter")]
+#[cfg(iwork_adapter)]
 fn wrap_iwork<T>(
     _before: &crate::format::iwork::Iwork,
     commit: crate::format::iwork::write::Commit,
@@ -3810,7 +3810,7 @@ fn changed(steps: &[Step]) -> Result<bool> {
         }
         return Ok(!before.same_content(after));
     }
-    #[cfg(feature = "iwork-adapter")]
+    #[cfg(iwork_adapter)]
     if let (Some(before), Some(after)) = (first.before.iwork(), last.after.iwork()) {
         if let [
             Step {
@@ -3916,7 +3916,7 @@ fn same_snapshot(left: &File, right: &File) -> bool {
         | (File::Odi(left), File::Odi(right))
         | (File::Odb(left), File::Odb(right))
         | (File::Odf(left), File::Odf(right)) => left.same_snapshot(right),
-        #[cfg(feature = "iwork-adapter")]
+        #[cfg(iwork_adapter)]
         (File::Pages(left), File::Pages(right))
         | (File::Keynote(left), File::Keynote(right))
         | (File::Numbers(left), File::Numbers(right)) => left.same_snapshot(right),
@@ -4092,7 +4092,7 @@ fn admit(file: &File) -> Result<()> {
         | File::Odi(handle)
         | File::Odb(handle)
         | File::Odf(handle) => handle.admit_edit(),
-        #[cfg(feature = "iwork-adapter")]
+        #[cfg(iwork_adapter)]
         File::Pages(handle) | File::Keynote(handle) | File::Numbers(handle) => handle.admit_edit(),
         #[cfg(feature = "odp")]
         File::Odp(handle) => handle.admit_edit(),
@@ -4159,7 +4159,7 @@ fn check_source_for_replay(file: &File) -> Result<()> {
         | File::Odi(handle)
         | File::Odb(handle)
         | File::Odf(handle) => handle.check_source(),
-        #[cfg(feature = "iwork-adapter")]
+        #[cfg(iwork_adapter)]
         File::Pages(handle) | File::Keynote(handle) | File::Numbers(handle) => {
             handle.check_source()
         },

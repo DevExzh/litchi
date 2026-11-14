@@ -17,7 +17,7 @@
         feature = "odt",
         feature = "odp",
         odf_objects,
-        feature = "iwork-adapter"
+        iwork_adapter
     )),
     allow(
         dead_code,
@@ -115,7 +115,7 @@ enum Inner<'f, 'q> {
     Odp(Walk<'q, 'f, crate::format::odp::Nav<'f>>),
     #[cfg(odf_objects)]
     Object(crate::format::odf_tree::Walks<'q, 'f>),
-    #[cfg(feature = "iwork-adapter")]
+    #[cfg(iwork_adapter)]
     Iwork(crate::format::iwork::Walks<'q, 'f>),
     /// Keeps the lifetimes in use in builds without an adapter; uninhabited.
     #[allow(dead_code, reason = "uninhabited: only keeps the lifetimes in use")]
@@ -222,7 +222,7 @@ impl<'f, 'q> Matches<'f, 'q> {
     }
 
     /// The matches of an iWork object-tree walk (Pages, Keynote, Numbers).
-    #[cfg(feature = "iwork-adapter")]
+    #[cfg(iwork_adapter)]
     pub(crate) fn iwork(walks: crate::format::iwork::Walks<'q, 'f>) -> Self {
         Self {
             inner: Inner::Iwork(walks),
@@ -296,7 +296,7 @@ impl<'f, 'q> Matches<'f, 'q> {
                 inner: Inner::Object(walks.limit(n)),
                 fast: self.fast,
             },
-            #[cfg(feature = "iwork-adapter")]
+            #[cfg(iwork_adapter)]
             Inner::Iwork(walks) => Self {
                 inner: Inner::Iwork(walks.limit(n)),
                 fast: self.fast,
@@ -343,7 +343,7 @@ impl<'f, 'q> Matches<'f, 'q> {
             Inner::Odp(walk) => walk.plan(),
             #[cfg(odf_objects)]
             Inner::Object(walks) => walks.plan(),
-            #[cfg(feature = "iwork-adapter")]
+            #[cfg(iwork_adapter)]
             Inner::Iwork(walks) => walks.plan(),
             Inner::Never(never, _) => match *never {},
         }
@@ -389,7 +389,7 @@ impl<'f> Iterator for Matches<'f, '_> {
             Inner::Odp(walk) => walk.next_map(Node::Odp),
             #[cfg(odf_objects)]
             Inner::Object(walks) => walks.next(),
-            #[cfg(feature = "iwork-adapter")]
+            #[cfg(iwork_adapter)]
             Inner::Iwork(walks) => walks.next(),
             Inner::Never(never, _) => match *never {},
         }
@@ -424,7 +424,7 @@ impl<'f> Matches<'f, '_> {
             Inner::Odp(walk) => walk.next_fast_map(Node::Odp),
             #[cfg(odf_objects)]
             Inner::Object(walks) => walks.next(),
-            #[cfg(feature = "iwork-adapter")]
+            #[cfg(iwork_adapter)]
             Inner::Iwork(walks) => walks.next(),
             Inner::Never(never, _) => match *never {},
         }

@@ -355,7 +355,7 @@ pub(super) fn zip_fallback<T: ZipTail>(
     };
     #[cfg(not(any(feature = "odt", feature = "ods", feature = "odp", odf_objects)))]
     let _ = (options, detection_limits);
-    #[cfg(feature = "iwork-adapter")]
+    #[cfg(iwork_adapter)]
     let bytes = match crate::format::iwork::Iwork::detect_bytes(bytes, options)? {
         crate::format::iwork::Detected::Opened(file) => return Ok(file.into_file()),
         crate::format::iwork::Detected::Disabled(format) => {

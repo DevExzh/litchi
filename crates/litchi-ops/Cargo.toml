@@ -23,8 +23,9 @@ default = []
 # Keynote and Numbers packages through their leaf owners: `File::Pages`,
 # `File::Keynote` and `File::Numbers` hold the leaf `Package` behind one
 # object-tree adapter (`format::iwork`), whose internal umbrella is
-# `iwork-adapter`. Detection classifies iWork packages itself, as the last
-# ZIP candidate, through `litchi-iwa-detect`; the leaves' prepared-source
+# `iwork-adapter`; its code is gated on `cfg(iwork_adapter)` (build.rs),
+# set when at least one iWork format is on. Detection classifies iWork
+# packages itself, as the last ZIP candidate, through `litchi-iwa-detect`; the leaves' prepared-source
 # ingress (`Package::from_prepared_source`) adopts the detection's parsed
 # container without a second ZIP pass.
 # `encryption` adds `Locked::unlock`: OOXML package decryption
