@@ -185,3 +185,85 @@ fn a_document_that_is_not_its_source_is_refused_at_open() {
     let other: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(br#"{\rtf1\ansi X\par Y}"#.to_vec()));
     assert!(Package::open(&document, other, context()).is_err());
 }
+
+fn staging_refusal<T>(result: Result<T, TailAppendPublicationError>) -> String {
+    match result {
+        Ok(_) => "accepted".to_string(),
+        Err(TailAppendPublicationError::Plan(error)) => error.to_string(),
+        Err(other) => format!("{other:?}"),
+    }
+}
+
+#[test]
+fn an_edit_stages_one_batch_and_empty_appends_leave_it_unstaged() {
+    let source = open(SOURCE);
+    let mut edit = source.edit_tail_append().unwrap();
+    assert_eq!(format!("{edit:?}"), "Edit { paragraphs: 0, runs: 0, .. }");
+    edit.append_paragraphs(&[]).unwrap();
+    edit.append_text_paragraphs(&[]).unwrap();
+    edit.append_runs(&[]).unwrap();
+    assert_eq!(format!("{edit:?}"), "Edit { paragraphs: 0, runs: 0, .. }");
+
+    // A batch refused by preflight leaves the edit unstaged.
+    assert_eq!(
+        staging_refusal(edit.append_text_paragraphs(&["ok", "bad\u{0}"])),
+        "invalid RTF logical-tail text: control characters other than tab are not plain text"
+    );
+    assert_eq!(format!("{edit:?}"), "Edit { paragraphs: 0, runs: 0, .. }");
+
+    let runs = [
+        litchi_rtf::tail_append::PlainRun::new("one"),
+        litchi_rtf::tail_append::PlainRun::new("two"),
+    ];
+    let paragraphs = [
+        litchi_rtf::tail_append::PlainParagraph::new(&runs),
+        litchi_rtf::tail_append::PlainParagraph::new(&runs[..1]),
+    ];
+    edit.append_paragraphs(&paragraphs).unwrap();
+    assert_eq!(format!("{edit:?}"), "Edit { paragraphs: 2, runs: 3, .. }");
+
+    let second = "tail_append refused (unsupported_operation): the edit already has a staged batch";
+    assert_eq!(staging_refusal(edit.append_text_paragraphs(&["c"])), second);
+    assert_eq!(staging_refusal(edit.append_paragraphs(&[])), second);
+    assert_eq!(staging_refusal(edit.append_text_paragraphs(&[])), second);
+    assert_eq!(
+        staging_refusal(edit.append_runs(&[litchi_rtf::tail_append::PlainRun::new("c")])),
+        second
+    );
+    assert_eq!(staging_refusal(edit.append_runs(&[])), "accepted");
+    assert_eq!(format!("{edit:?}"), "Edit { paragraphs: 2, runs: 3, .. }");
+
+    let commit = edit.commit().unwrap();
+    let diagnostics = commit.diagnostics();
+    assert!(diagnostics.changed());
+    assert_eq!(
+        (
+            diagnostics.paragraphs(),
+            diagnostics.runs(),
+            diagnostics.input_bytes()
+        ),
+        (2, 3, 9)
+    );
+    assert_eq!(text_of(&bytes_of(commit.package())), "A\nB\nonetwo\none\n");
+}
+
+#[test]
+fn an_unstaged_edit_commits_no_batch() {
+    let source = open(SOURCE);
+    let mut edit = source.edit_tail_append().unwrap();
+    edit.append_text_paragraphs(&[]).unwrap();
+    let commit = edit.commit().unwrap();
+    let diagnostics = commit.diagnostics();
+    assert!(!diagnostics.changed());
+    assert_eq!(
+        (
+            diagnostics.paragraphs(),
+            diagnostics.runs(),
+            diagnostics.input_bytes(),
+            diagnostics.inserted_bytes(),
+            diagnostics.output_bytes()
+        ),
+        (0, 0, 0, 0, SOURCE.len())
+    );
+    assert_eq!(bytes_of(commit.package()), SOURCE);
+}

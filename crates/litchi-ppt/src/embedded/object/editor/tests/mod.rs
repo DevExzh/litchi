@@ -2,6 +2,7 @@
 
 mod limits;
 mod mapping;
+mod publication;
 mod rewrite;
 
 fn ppt_record(version: u16, kind: u16, data: &[u8]) -> Vec<u8> {

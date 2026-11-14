@@ -1212,3 +1212,108 @@ fn replay_commit_diagnostics_measure_forward_inverse_and_noop_output() {
     assert_eq!(facts.inserted_bytes(), 0);
     assert!(replayed_no_op.package().same_snapshot(&source));
 }
+
+fn staged_counts(edit: &litchi_rtf::tail_append::Edit) -> (usize, usize, usize) {
+    (edit.paragraph_count(), edit.run_count(), edit.input_bytes())
+}
+
+fn refusal_text<T>(result: Result<T, Error>) -> String {
+    match result {
+        Ok(_) => "accepted".to_string(),
+        Err(error) => error.to_string(),
+    }
+}
+
+const SECOND_BATCH: &str =
+    "tail_append refused (unsupported_operation): the edit already has a staged batch";
+
+#[test]
+fn an_edit_stages_one_batch_and_empty_appends_leave_it_unstaged() {
+    let source = Package::parse(r"{\rtf1\ansi A\par B}").unwrap();
+    let mut edit = source.edit_tail_append(TailSelector::Body);
+    assert_eq!(staged_counts(&edit), (0, 0, 0));
+    edit.append_paragraphs(&[]).unwrap();
+    edit.append_text_paragraphs(&[]).unwrap();
+    edit.append_runs(&[]).unwrap();
+    assert_eq!(staged_counts(&edit), (0, 0, 0));
+
+    // A batch refused by preflight leaves the edit unstaged.
+    assert_eq!(
+        refusal_text(edit.append_text_paragraphs(&["ok", "bad\u{0}"])),
+        "invalid RTF logical-tail text: control characters other than tab are not plain text"
+    );
+    assert_eq!(staged_counts(&edit), (0, 0, 0));
+
+    let runs = [PlainRun::new("one"), PlainRun::new("two")];
+    let paragraphs = [PlainParagraph::new(&runs), PlainParagraph::new(&runs[..1])];
+    edit.append_paragraphs(&paragraphs).unwrap();
+    assert_eq!(staged_counts(&edit), (2, 3, 9));
+
+    // Every later staging call is refused, an empty one included, except
+    // an empty run list, which is not a batch.
+    assert_eq!(
+        refusal_text(edit.append_text_paragraphs(&["c"])),
+        SECOND_BATCH
+    );
+    assert_eq!(refusal_text(edit.append_paragraphs(&[])), SECOND_BATCH);
+    assert_eq!(refusal_text(edit.append_text_paragraphs(&[])), SECOND_BATCH);
+    assert_eq!(
+        refusal_text(edit.append_runs(&[PlainRun::new("c")])),
+        SECOND_BATCH
+    );
+    assert_eq!(refusal_text(edit.append_runs(&[])), "accepted");
+    assert_eq!(staged_counts(&edit), (2, 3, 9));
+
+    let commit = edit.commit().unwrap();
+    let diagnostics = commit.diagnostics();
+    assert!(diagnostics.changed());
+    assert_eq!(diagnostics.operation_count(), 1);
+    assert_eq!(
+        (
+            diagnostics.paragraphs(),
+            diagnostics.runs(),
+            diagnostics.input_bytes()
+        ),
+        (2, 3, 9)
+    );
+    assert_eq!(commit.package().text(), "A\nB\nonetwo\none\n");
+}
+
+#[test]
+fn an_unstaged_edit_commits_and_plans_no_batch() {
+    let source = Package::parse(r"{\rtf1\ansi A\par B}").unwrap();
+    let mut edit = source.edit_tail_append(TailSelector::Body);
+    edit.append_text_paragraphs(&[]).unwrap();
+    let diagnostics = edit.commit().unwrap().diagnostics();
+    assert!(!diagnostics.changed());
+    assert_eq!(
+        (
+            diagnostics.operation_count(),
+            diagnostics.paragraphs(),
+            diagnostics.runs(),
+            diagnostics.input_bytes(),
+            diagnostics.inserted_bytes()
+        ),
+        (0, 0, 0, 0, 0)
+    );
+
+    let limits = TailAppendPublicationLimits::new(64, 64);
+    let plan = source
+        .edit_tail_append(TailSelector::Body)
+        .publication_plan(limits)
+        .unwrap();
+    assert!(plan.is_noop());
+    assert_eq!(
+        (plan.paragraphs(), plan.runs(), plan.input_bytes()),
+        (0, 0, 0)
+    );
+
+    let mut staged = source.edit_tail_append(TailSelector::Body);
+    staged.append_text_paragraphs(&["xy", "z"]).unwrap();
+    let plan = staged.publication_plan(limits).unwrap();
+    assert!(!plan.is_noop());
+    assert_eq!(
+        (plan.paragraphs(), plan.runs(), plan.input_bytes()),
+        (2, 2, 3)
+    );
+}

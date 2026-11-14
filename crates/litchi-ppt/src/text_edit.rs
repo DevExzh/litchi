@@ -6927,4 +6927,258 @@ mod tests {
             Err(Error::Refused(Refusal::ShapeNotFound))
         ));
     }
+
+    fn child_types(rest: &[crate::RecordType]) -> Vec<u16> {
+        let mut types = vec![
+            crate::RecordType::TextHeaderAtom as u16,
+            crate::RecordType::TextBytesAtom as u16,
+        ];
+        types.extend(rest.iter().map(|kind| *kind as u16));
+        types
+    }
+
+    fn closure_is_modeled(rest: &[crate::RecordType]) -> bool {
+        super::resize_dependency_closure_is_modeled(&child_types(rest), None, None, 3).unwrap()
+    }
+
+    #[test]
+    fn resize_closure_admits_each_position_free_record_once_in_any_order() {
+        use crate::RecordType::{
+            StyleTextPropAtom as Style, TextRulerAtom as Ruler, TextSpecInfoAtom as Special,
+        };
+        for accepted in [
+            &[][..],
+            &[Style],
+            &[Special],
+            &[Ruler],
+            &[Style, Special],
+            &[Special, Style],
+            &[Ruler, Style],
+            &[Style, Special, Ruler],
+            &[Style, Ruler, Special],
+            &[Special, Style, Ruler],
+            &[Special, Ruler, Style],
+            &[Ruler, Style, Special],
+            &[Ruler, Special, Style],
+        ] {
+            assert!(closure_is_modeled(accepted), "{accepted:?}");
+        }
+    }
+
+    #[test]
+    fn resize_closure_rejects_repeated_and_position_bearing_records() {
+        use crate::RecordType::{
+            StyleTextPropAtom as Style, TextBytesAtom as Bytes, TextHeaderAtom as Header,
+            TextInteractiveInfoAtom as Interactive, TextRulerAtom as Ruler,
+            TextSpecInfoAtom as Special,
+        };
+        for rejected in [
+            &[Style, Style][..],
+            &[Special, Special],
+            &[Ruler, Ruler],
+            &[Style, Special, Style],
+            &[Style, Special, Ruler, Special],
+            &[Ruler, Special, Style, Ruler],
+            &[Interactive],
+            &[Style, Interactive],
+            &[Style, Special, Ruler, Interactive],
+            &[Header],
+            &[Bytes],
+        ] {
+            assert!(!closure_is_modeled(rejected), "{rejected:?}");
+        }
+        // The body must open with its header and one text atom.
+        let modeled = |types: &[u16]| {
+            super::resize_dependency_closure_is_modeled(types, None, None, 3).unwrap()
+        };
+        assert!(!modeled(&[]));
+        assert!(!modeled(&[Header as u16]));
+        assert!(!modeled(&[Bytes as u16, Header as u16]));
+        assert!(!modeled(&[Header as u16, Ruler as u16]));
+        assert!(modeled(&[
+            Header as u16,
+            crate::RecordType::TextCharsAtom as u16
+        ]));
+    }
+
+    const TEXTBOX_UNITS: usize = 2;
+    const TEXTBOX_TEXT: [u8; 4] = [b'h', 0, b'i', 0];
+
+    fn text_header() -> Vec<u8> {
+        raw_record(
+            0,
+            0,
+            crate::RecordType::TextHeaderAtom as u16,
+            &[4, 0, 0, 0],
+        )
+    }
+
+    /// One paragraph run and one character run that cover `count` positions.
+    fn style_record(count: u32) -> Vec<u8> {
+        let mut payload = Vec::new();
+        payload.extend_from_slice(&count.to_le_bytes());
+        payload.extend_from_slice(&0_u16.to_le_bytes());
+        payload.extend_from_slice(&0_u32.to_le_bytes());
+        payload.extend_from_slice(&count.to_le_bytes());
+        payload.extend_from_slice(&0_u32.to_le_bytes());
+        raw_record(0, 0, crate::RecordType::StyleTextPropAtom as u16, &payload)
+    }
+
+    /// One special-info run that covers `count` positions.
+    fn special_info_record(count: u32) -> Vec<u8> {
+        let mut payload = Vec::new();
+        payload.extend_from_slice(&count.to_le_bytes());
+        payload.extend_from_slice(&0_u32.to_le_bytes());
+        raw_record(0, 0, crate::RecordType::TextSpecInfoAtom as u16, &payload)
+    }
+
+    fn ruler_record() -> Vec<u8> {
+        raw_record(0, 0, crate::RecordType::TextRulerAtom as u16, &[0, 0, 0, 0])
+    }
+
+    fn interactive_record() -> Vec<u8> {
+        raw_record(
+            0,
+            0,
+            crate::RecordType::TextInteractiveInfoAtom as u16,
+            &[0; 8],
+        )
+    }
+
+    fn insert_into(children: &[Vec<u8>]) -> Result<Vec<u8>, Error> {
+        let textbox = raw_record(0xF, 0, super::OFFICEART_CLIENT_TEXTBOX, &children.concat());
+        super::insert_into_textbox(&textbox, &TEXTBOX_TEXT, TEXTBOX_UNITS)
+    }
+
+    fn inserted_textbox(children: &[Vec<u8>]) -> Vec<u8> {
+        let mut payload = text_header();
+        payload.extend_from_slice(&raw_record(
+            0,
+            0,
+            crate::RecordType::TextCharsAtom as u16,
+            &TEXTBOX_TEXT,
+        ));
+        payload.extend_from_slice(&children.concat());
+        raw_record(0xF, 0, super::OFFICEART_CLIENT_TEXTBOX, &payload)
+    }
+
+    #[test]
+    fn textbox_insertion_resizes_each_position_free_record_in_source_order() {
+        assert_eq!(
+            insert_into(&[text_header()]).unwrap(),
+            inserted_textbox(&[])
+        );
+        assert_eq!(
+            insert_into(&[
+                text_header(),
+                style_record(1),
+                special_info_record(1),
+                ruler_record()
+            ])
+            .unwrap(),
+            inserted_textbox(&[style_record(3), special_info_record(3), ruler_record()])
+        );
+        assert_eq!(
+            insert_into(&[
+                text_header(),
+                ruler_record(),
+                special_info_record(1),
+                style_record(1)
+            ])
+            .unwrap(),
+            inserted_textbox(&[ruler_record(), special_info_record(3), style_record(3)])
+        );
+        assert_eq!(
+            insert_into(&[text_header(), special_info_record(1)]).unwrap(),
+            inserted_textbox(&[special_info_record(3)])
+        );
+    }
+
+    fn assert_no_text_atom(children: &[Vec<u8>]) {
+        let result = insert_into(children);
+        assert!(
+            matches!(result, Err(Error::Refused(Refusal::NoTextAtom))),
+            "{result:?}"
+        );
+    }
+
+    fn assert_dependency_closure(children: &[Vec<u8>]) {
+        let result = insert_into(children);
+        assert!(
+            matches!(result, Err(Error::Refused(Refusal::DependencyClosure))),
+            "{result:?}"
+        );
+    }
+
+    #[test]
+    fn textbox_insertion_refuses_bodies_it_cannot_classify() {
+        assert_no_text_atom(&[]);
+        assert_no_text_atom(&[ruler_record()]);
+        assert_no_text_atom(&[ruler_record(), text_header()]);
+        assert_no_text_atom(&[text_header(), interactive_record()]);
+        assert_no_text_atom(&[text_header(), text_header()]);
+        assert_no_text_atom(&[text_header(), style_record(1), style_record(1)]);
+        assert_no_text_atom(&[
+            text_header(),
+            special_info_record(1),
+            special_info_record(1),
+        ]);
+        assert_no_text_atom(&[text_header(), ruler_record(), ruler_record()]);
+        assert_no_text_atom(&[
+            text_header(),
+            style_record(1),
+            ruler_record(),
+            special_info_record(1),
+            style_record(1),
+        ]);
+        assert_no_text_atom(&[text_header(), ruler_record(), interactive_record()]);
+    }
+
+    #[test]
+    fn textbox_insertion_reports_the_first_failing_record() {
+        // A special-info run that covers more than the empty body and its
+        // paragraph mark cannot be resized.
+        assert_dependency_closure(&[text_header(), special_info_record(5)]);
+        assert_dependency_closure(&[text_header(), special_info_record(5), interactive_record()]);
+        assert_dependency_closure(&[
+            text_header(),
+            special_info_record(5),
+            special_info_record(5),
+        ]);
+        assert_dependency_closure(&[
+            text_header(),
+            ruler_record(),
+            special_info_record(5),
+            ruler_record(),
+        ]);
+        // An earlier unclassifiable or repeated record wins over a later
+        // record that cannot be resized.
+        assert_no_text_atom(&[text_header(), interactive_record(), special_info_record(5)]);
+        assert_no_text_atom(&[
+            text_header(),
+            ruler_record(),
+            ruler_record(),
+            special_info_record(5),
+        ]);
+        // A malformed record is a package error, also ahead of later records.
+        let malformed = raw_record(0, 0, crate::RecordType::StyleTextPropAtom as u16, &[1, 0]);
+        let result = insert_into(&[text_header(), malformed, interactive_record()]);
+        assert!(
+            matches!(
+                &result,
+                Err(Error::Package(crate::package::Error::Corrupted(message)))
+                    if message == "TextPFRun header is truncated"
+            ),
+            "{result:?}"
+        );
+        let result = insert_into(&[text_header(), style_record(7), style_record(1)]);
+        assert!(
+            matches!(
+                &result,
+                Err(Error::Package(crate::package::Error::Corrupted(message)))
+                    if message == "TextPFRun has invalid character coverage"
+            ),
+            "{result:?}"
+        );
+    }
 }

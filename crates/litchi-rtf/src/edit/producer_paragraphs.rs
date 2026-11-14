@@ -1232,3 +1232,595 @@ fn verify(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{Error, Package, segments};
+
+    /// The blocks `input` is cut into (source text, whether it is a
+    /// paragraph) and whether the last one has no `\par`, or the refusal.
+    fn cut(input: &str) -> Result<(Vec<(&str, bool)>, bool), String> {
+        let source = Package::parse(r"{\rtf1 \pard a\par}").unwrap();
+        match segments(&source, input) {
+            Ok(cut) => Ok((
+                cut.blocks
+                    .iter()
+                    .map(|block| (&input[block.range.clone()], block.paragraph))
+                    .collect(),
+                cut.unterminated_last,
+            )),
+            Err(Error::Refused(refusal)) => Err(refusal.reason().to_string()),
+            Err(other) => Err(format!("{other:?}")),
+        }
+    }
+
+    type Expected<'a> = Result<(&'a [(&'a str, bool)], bool), &'a str>;
+
+    #[track_caller]
+    fn assert_cut(input: &str, expected: Expected<'_>) {
+        let actual = cut(input);
+        let actual = actual
+            .as_ref()
+            .map(|(blocks, unterminated)| (blocks.as_slice(), *unterminated))
+            .map_err(String::as_str);
+        assert_eq!(actual, expected, "{input}");
+    }
+
+    #[test]
+    fn cuts_paragraphs_at_root_par_or_the_close_of_a_group_ending_in_par() {
+        assert_cut(
+            r"{\rtf1 \pard a\par \pard b\par}",
+            Ok((&[("\\pard a\\par ", true), ("\\pard b\\par", true)], false)),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \pard {\b b\par }\pard c\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("\\pard {\\b b\\par }", true),
+                    ("\\pard c\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \pard {\b {\i b\par } }\pard c\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("\\pard {\\b {\\i b\\par } }", true),
+                    ("\\pard c\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \pard {\b b\par c}\pard d\par}",
+            Err("a paragraph ends inside a group that continues with more content"),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \pard {\b b\par\par}\pard d\par}",
+            Err("a paragraph ends inside a group that continues with more content"),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \pard {\b b\par {\i c}}\pard d\par}",
+            Err("a paragraph ends inside a group that continues with more content"),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par}{{\par",
+            Ok((&[("\\pard a\\par", true)], false)),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \pard {\b b\par",
+            Err("the RTF root group is not closed"),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \pard {\b b\par }}",
+            Ok((
+                &[("\\pard a\\par ", true), ("\\pard {\\b b\\par }", true)],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par}{\b x\par",
+            Ok((&[("\\pard a\\par", true)], false)),
+        );
+    }
+
+    #[test]
+    fn cuts_table_rows_at_their_root_level_or_group_closing_row() {
+        assert_cut(
+            r"{\rtf1 \pard a\par \trowd x\cell y\cell\row \pard b\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("\\trowd x\\cell y\\cell\\row ", false),
+                    ("\\pard b\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \pard\intbl x\par y\cell\row \pard b\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("\\pard\\intbl x\\par y\\cell\\row ", false),
+                    ("\\pard b\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \trowd\trowd\intbl x\cell\row \pard b\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("\\trowd\\trowd\\intbl x\\cell\\row ", false),
+                    ("\\pard b\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \trowd {\b x\par y\cell}\row \pard b\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("\\trowd {\\b x\\par y\\cell}\\row ", false),
+                    ("\\pard b\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \trowd {\b x\cell\row } \pard b\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("\\trowd {\\b x\\cell\\row } ", false),
+                    ("\\pard b\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \trowd {\b {\i x\cell\row } } \pard b\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("\\trowd {\\b {\\i x\\cell\\row } } ", false),
+                    ("\\pard b\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \trowd {\b x\cell\row y}\pard b\par}",
+            Err("a paragraph ends inside a group that continues with more content"),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \trowd {\b x\cell\row\par}\pard b\par}",
+            Err("a paragraph ends inside a group that continues with more content"),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \trowd {\b x\cell\row }\trowd y\cell\row \pard b\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("\\trowd {\\b x\\cell\\row }", false),
+                    ("\\trowd y\\cell\\row ", false),
+                    ("\\pard b\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \trowd {\b x\cell\row }y\cell\row \pard b\par}",
+            Err(
+                "producer paragraph splicing refuses table rows that do not open and close at the body's root",
+            ),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \trowd x\cell}",
+            Err("a table row of the body has no \\row of its own"),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \trowd x\cell\row \intbl y\cell}",
+            Err("a table row of the body has no \\row of its own"),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par x\cell\row \pard b\par}",
+            Err(
+                "producer paragraph splicing refuses table rows that do not open and close at the body's root",
+            ),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par x\row \pard b\par}",
+            Err(
+                "producer paragraph splicing refuses table rows that do not open and close at the body's root",
+            ),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par {\b x\row }\pard b\par}",
+            Err(
+                "producer paragraph splicing refuses table rows that do not open and close at the body's root",
+            ),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par {\b \trowd x\cell\row }\pard b\par}",
+            Err(
+                "producer paragraph splicing refuses table rows that do not open and close at the body's root",
+            ),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par}{\trowd{\row",
+            Ok((&[("\\pard a\\par", true)], false)),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \trowd {\b x\cell\row",
+            Err("the RTF root group is not closed"),
+        );
+        assert_cut(
+            r"{\rtf1 \trowd \pard x\cell\row \pard a\par}",
+            Ok((
+                &[
+                    ("\\trowd \\pard x\\cell\\row ", false),
+                    ("\\pard a\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \trowd {\b x\cell\row }}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("\\trowd {\\b x\\cell\\row }", false),
+                ],
+                false,
+            )),
+        );
+    }
+
+    #[test]
+    fn cuts_section_break_blocks_through_their_section_controls() {
+        assert_cut(
+            r"{\rtf1 \pard a\par \pard {\b b\par\sect}\pard d\par}",
+            Err("a paragraph ends inside a group that continues with more content"),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \pard {\b b\par }\sect \pard d\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("\\pard {\\b b\\par }", true),
+                    ("\\sect \\pard d\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par {\*\foo x\cell\row\par\sect}\pard b\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("{\\*\\foo x\\cell\\row\\par\\sect}\\pard b\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \trowd {\*\foo x\par\row\sect} y\cell\row \pard b\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("\\trowd {\\*\\foo x\\par\\row\\sect} y\\cell\\row ", false),
+                    ("\\pard b\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \sect \sectd\cols2 \pard b\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("\\sect \\sectd\\cols2 \\pard b\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \sect\sectd b\par}",
+            Ok((
+                &[("\\pard a\\par ", true), ("\\sect\\sectd b\\par", true)],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \sect {\b b}\par}",
+            Ok((
+                &[("\\pard a\\par ", true), ("\\sect {\\b b}\\par", true)],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \sect {\b b\par }\pard c\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("\\sect {\\b b\\par }", true),
+                    ("\\pard c\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \sect }",
+            Ok((&[("\\pard a\\par ", true), ("\\sect ", true)], true)),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \sect\sect \pard b\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("\\sect\\sect \\pard b\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \sect\sectd\par \pard b\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("\\sect\\sectd\\par ", true),
+                    ("\\pard b\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\sect \pard b\par}",
+            Ok((&[("\\pard b\\par", true)], false)),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \pard b\sect \pard c\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("\\pard b\\sect \\pard c\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \sect \pard a\par}",
+            Ok((&[("\\pard a\\par", true)], false)),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \sect \trowd x\cell\row \pard b\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("\\sect \\trowd x\\cell\\row ", false),
+                    ("\\pard b\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \sect \pard \trowd x\cell\row \pard b\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("\\sect \\pard \\trowd x\\cell\\row ", false),
+                    ("\\pard b\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \trowd x\cell\sect\row \pard b\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("\\trowd x\\cell\\sect\\row ", false),
+                    ("\\pard b\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \pard {\b b\sect }\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("\\pard {\\b b\\sect }\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \trowd x\cell\row \sect \pard b\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("\\trowd x\\cell\\row ", false),
+                    ("\\sect \\pard b\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \sect",
+            Err("the RTF root group is not closed"),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \sbk \sectd\cols2 \pard b\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("\\sbk \\sectd\\cols2 ", false),
+                    ("\\pard b\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \sbk\sectd b\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("\\sbk\\sectd ", false),
+                    ("b\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \sbk {\b b}\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("\\sbk ", false),
+                    ("{\\b b}\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \sbk {\b b\par }\pard c\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("\\sbk ", false),
+                    ("{\\b b\\par }", true),
+                    ("\\pard c\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \sbk }",
+            Ok((&[("\\pard a\\par ", true), ("\\sbk ", false)], false)),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \sbk\sbk \pard b\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("\\sbk\\sbk ", false),
+                    ("\\pard b\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \sbk\sectd\par \pard b\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("\\sbk\\sectd\\par ", false),
+                    ("\\pard b\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\sbk \pard b\par}",
+            Ok((
+                &[
+                    ("\\pard a", true),
+                    ("\\sbk ", false),
+                    ("\\pard b\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \pard b\sbk \pard c\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("\\pard b", true),
+                    ("\\sbk ", false),
+                    ("\\pard c\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \sbk \pard a\par}",
+            Err("a section break precedes the body's first paragraph"),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \sbk \trowd x\cell\row \pard b\par}",
+            Err(
+                "producer paragraph splicing refuses table rows that do not open and close at the body's root",
+            ),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \sbk \pard \trowd x\cell\row \pard b\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("\\sbk ", false),
+                    ("\\pard \\trowd x\\cell\\row ", false),
+                    ("\\pard b\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \trowd x\cell\sbk\row \pard b\par}",
+            Err("producer paragraph splicing refuses section breaks inside groups or table rows"),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \pard {\b b\sbk }\par}",
+            Err("producer paragraph splicing refuses section breaks inside groups or table rows"),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \trowd x\cell\row \sbk \pard b\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("\\trowd x\\cell\\row ", false),
+                    ("\\sbk ", false),
+                    ("\\pard b\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \pard {\b b\par\sbk}\pard d\par}",
+            Err("a paragraph ends inside a group that continues with more content"),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par {\*\foo x\sbk}\pard b\par}",
+            Ok((
+                &[
+                    ("\\pard a\\par ", true),
+                    ("{\\*\\foo x\\sbk}\\pard b\\par", true),
+                ],
+                false,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \sbk",
+            Err("the RTF root group is not closed"),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \sbk x}",
+            Ok((
+                &[("\\pard a\\par ", true), ("\\sbk ", false), ("x", true)],
+                true,
+            )),
+        );
+        assert_cut(
+            r"{\rtf1 \pard a\par \sbk\par}",
+            Ok((&[("\\pard a\\par ", true), ("\\sbk\\par", false)], false)),
+        );
+    }
+}

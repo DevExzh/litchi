@@ -110,3 +110,152 @@ fn annotation_baseline_controls_fail_closed() {
         );
     }
 }
+
+/// Each parsed annotation as (author, initials, text), or the error.
+fn pending_metadata(source: &str) -> Result<Vec<(String, String, String)>, String> {
+    match Tree::parse(source, litchi_rtf::read::OpenOptions::default()) {
+        Ok(document) => Ok(document
+            .annotations()
+            .iter()
+            .map(|annotation| {
+                (
+                    annotation.author.to_string(),
+                    annotation.initials.to_string(),
+                    annotation.text.to_string(),
+                )
+            })
+            .collect()),
+        Err(litchi_rtf::Error::MalformedDocument(message)) => Err(message),
+        Err(other) => Err(format!("{other:?}")),
+    }
+}
+
+type ExpectedAnnotations<'a> = Result<&'a [(&'a str, &'a str, &'a str)], &'a str>;
+
+#[track_caller]
+fn assert_pending_metadata(source: &str, expected: ExpectedAnnotations<'_>) {
+    let actual = pending_metadata(source);
+    let actual: Result<Vec<(&str, &str, &str)>, &str> = actual
+        .as_ref()
+        .map(|annotations| {
+            annotations
+                .iter()
+                .map(|(author, initials, text)| (author.as_str(), initials.as_str(), text.as_str()))
+                .collect()
+        })
+        .map_err(String::as_str);
+    assert_eq!(
+        actual.as_deref().map_err(|message| *message),
+        expected,
+        "{source}"
+    );
+}
+
+#[test]
+fn pending_annotation_metadata_attaches_to_the_next_annotation_in_any_order() {
+    assert_pending_metadata(
+        r"{\rtf1{\*\atnauthor A}{\*\atnid I}\chatn{\*\annotation x}}",
+        Ok(&[("A", "I", "x")]),
+    );
+    assert_pending_metadata(
+        r"{\rtf1\chatn{\*\atnid I}{\*\atnauthor A}{\*\annotation x}}",
+        Ok(&[("A", "I", "x")]),
+    );
+    assert_pending_metadata(
+        r"{\rtf1{\*\atnid I}\chatn{\*\atnauthor A}{\*\annotation x}}",
+        Ok(&[("A", "I", "x")]),
+    );
+    assert_pending_metadata(r"{\rtf1\chatn{\*\annotation x}}", Ok(&[("", "", "x")]));
+    assert_pending_metadata(
+        r"{\rtf1{\*\atnauthor A}\chatn{\*\annotation x}\chatn{\*\annotation y}}",
+        Ok(&[("A", "", "x"), ("", "", "y")]),
+    );
+    assert_pending_metadata(
+        r"{\rtf1{\*\atnauthor A}\chatn{\*\annotation x}{\*\atnauthor B}{\*\atnid J}\chatn{\*\annotation y}}",
+        Ok(&[("A", "", "x"), ("B", "J", "y")]),
+    );
+    assert_pending_metadata(
+        r"{\rtf1\chatn{\*\annotation x}{\*\atnid J}\chatn{\*\annotation y}}",
+        Ok(&[("", "", "x"), ("", "J", "y")]),
+    );
+    assert_pending_metadata(
+        r"{\rtf1{\*\atnauthor}\chatn{\*\annotation x}}",
+        Ok(&[("", "", "x")]),
+    );
+}
+
+#[test]
+fn pending_annotation_metadata_refuses_repeats_missing_markers_and_orphans() {
+    assert_pending_metadata(
+        r"{\rtf1{\*\atnauthor A}{\*\atnauthor B}\chatn{\*\annotation x}}",
+        Err("duplicate pending RTF annotation author"),
+    );
+    assert_pending_metadata(
+        r"{\rtf1{\*\atnid I}{\*\atnid J}\chatn{\*\annotation x}}",
+        Err("duplicate pending RTF annotation initials"),
+    );
+    assert_pending_metadata(
+        r"{\rtf1\chatn\chatn{\*\annotation x}}",
+        Err("duplicate pending RTF annotation marker"),
+    );
+    assert_pending_metadata(
+        r"{\rtf1 a\chatn b\chatn{\*\annotation x}}",
+        Err("duplicate pending RTF annotation marker"),
+    );
+    assert_pending_metadata(
+        r"{\rtf1{\*\annotation x}}",
+        Err("RTF annotation destination requires a preceding chatn marker"),
+    );
+    assert_pending_metadata(
+        r"{\rtf1{\*\atnauthor A}{\*\annotation x}}",
+        Err("RTF annotation destination requires a preceding chatn marker"),
+    );
+    assert_pending_metadata(
+        r"{\rtf1\chatn{\*\annotation x}{\*\annotation y}}",
+        Err("RTF annotation destination requires a preceding chatn marker"),
+    );
+    assert_pending_metadata(
+        r"{\rtf1{\*\atnauthor A}x}",
+        Err("RTF document contains orphan annotation metadata"),
+    );
+    assert_pending_metadata(
+        r"{\rtf1{\*\atnid I}x}",
+        Err("RTF document contains orphan annotation metadata"),
+    );
+    assert_pending_metadata(
+        r"{\rtf1 x\chatn}",
+        Err("RTF document contains orphan annotation metadata"),
+    );
+    assert_pending_metadata(
+        r"{\rtf1\chatn{\*\annotation x}{\*\atnauthor B}}",
+        Err("RTF document contains orphan annotation metadata"),
+    );
+    assert_pending_metadata(
+        r"{\rtf1\chatn{\*\annotation x}{\*\atnid J}}",
+        Err("RTF document contains orphan annotation metadata"),
+    );
+    assert_pending_metadata(
+        r"{\rtf1\chatn{\*\annotation x}\chatn}",
+        Err("RTF document contains orphan annotation metadata"),
+    );
+    assert_pending_metadata(
+        r"{\rtf1{\*\atnauthor A}\chatn{\*\annotation x}{\*\atnauthor B}{\*\atnauthor C}}",
+        Err("duplicate pending RTF annotation author"),
+    );
+    assert_pending_metadata(
+        r"{\rtf1{\*\atnauthor}{\*\atnauthor B}\chatn{\*\annotation x}}",
+        Err("duplicate pending RTF annotation author"),
+    );
+    assert_pending_metadata(
+        r"{\rtf1{\*\atnauthor}x}",
+        Err("RTF document contains orphan annotation metadata"),
+    );
+    assert_pending_metadata(
+        r"{\rtf1{\*\atnauthor A}{\*\atnauthor B}x\chatn}",
+        Err("duplicate pending RTF annotation author"),
+    );
+    assert_pending_metadata(
+        r"{\rtf1\chatn{\*\atnid I}{\*\atnid J}}",
+        Err("duplicate pending RTF annotation initials"),
+    );
+}
