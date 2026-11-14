@@ -1142,18 +1142,48 @@ enum ExternalBookKind {
 /// records).
 ///
 /// ```text
-/// Before --SupBook--> Open --record outside the family--> Closed
-/// Open   --SupBook--> Open (the new book becomes current)
-/// Open   --other family record--> Open
+/// Before --SupBook--> Open { names_allowed: true } --record outside the family--> Closed
+/// Open   --SupBook--> Open { names_allowed: true } (the new book becomes current)
+/// Open   --XCT or ExternSheet--> Open { names_allowed: false }
+/// Open   --ExternName, CRN--> Open (unchanged)
 /// ```
 ///
 /// Continue never moves the state. A family record other than SupBook leaves
-/// `Before` unchanged. Every family record is refused in `Closed`.
+/// `Before` unchanged. Every family record is refused in `Closed`. ExternName
+/// is accepted only in `Open { names_allowed: true }`, so the names of a book
+/// must come before its caches and before any ExternSheet.
 #[derive(Debug, Clone, Copy)]
 enum ExternalBlockState {
     Before,
-    Open { current_book: usize },
+    Open {
+        current_book: usize,
+        names_allowed: bool,
+    },
     Closed,
+}
+
+/// Which records must come next because an earlier record declared them.
+///
+/// ```text
+/// Idle --XCT declaring n > 0 CRN--> CrnRun { remaining: n }
+/// CrnRun { remaining: n } --CRN--> CrnRun { remaining: n - 1 }, or Idle when n is 1
+/// Idle --ExternName declaring n > 0 more matrix values--> DdeValues { remaining: n }
+/// DdeValues { remaining: n } --Continue with k values--> DdeValues { remaining: n - k }, or Idle
+/// ```
+///
+/// In `CrnRun` every record other than CRN, and in `DdeValues` every record
+/// other than Continue, is refused. `remaining` is never zero. The stream must
+/// end in `Idle`.
+#[derive(Debug, Clone, Copy)]
+enum ContinuationState {
+    Idle,
+    CrnRun {
+        owner: (usize, usize),
+        remaining: usize,
+    },
+    DdeValues {
+        remaining: usize,
+    },
 }
 
 #[derive(Debug)]
@@ -1161,16 +1191,13 @@ struct ExternalPresenceState {
     books: [ExternalBookKind; MAX_EXTERNAL_BOOKS],
     book_count: usize,
     block: ExternalBlockState,
-    names_allowed: bool,
     extern_sheet_seen: bool,
-    pending_crn: usize,
-    pending_dde_values: usize,
+    continuation: ContinuationState,
     cached_cells: usize,
     external_names: usize,
     sheet_references: usize,
     external_present: bool,
     max_self_sheet: Option<usize>,
-    pending_xct: Option<(usize, usize)>,
     seen_xct: HashSet<(usize, usize)>,
     cache_cells: HashSet<(usize, usize, u16, u8)>,
 }
@@ -1181,16 +1208,13 @@ impl Default for ExternalPresenceState {
             books: [ExternalBookKind::SelfReference; MAX_EXTERNAL_BOOKS],
             book_count: 0,
             block: ExternalBlockState::Before,
-            names_allowed: false,
             extern_sheet_seen: false,
-            pending_crn: 0,
-            pending_dde_values: 0,
+            continuation: ContinuationState::Idle,
             cached_cells: 0,
             external_names: 0,
             sheet_references: 0,
             external_present: false,
             max_self_sheet: None,
-            pending_xct: None,
             seen_xct: HashSet::new(),
             cache_cells: HashSet::new(),
         }
@@ -1199,26 +1223,36 @@ impl Default for ExternalPresenceState {
 
 impl ExternalPresenceState {
     fn feed(&mut self, record_type: u16, data: &[u8]) -> Result<bool, Error> {
-        if self.pending_crn != 0 && record_type != CRN_RECORD_TYPE {
+        if matches!(self.continuation, ContinuationState::CrnRun { .. })
+            && record_type != CRN_RECORD_TYPE
+        {
             return Ok(false);
         }
-        if self.pending_dde_values != 0 && record_type != CONTINUE_RECORD_TYPE {
+        if matches!(self.continuation, ContinuationState::DdeValues { .. })
+            && record_type != CONTINUE_RECORD_TYPE
+        {
             return Ok(false);
         }
         if record_type == CONTINUE_RECORD_TYPE {
-            if self.pending_dde_values == 0 {
+            let ContinuationState::DdeValues { remaining } = self.continuation else {
                 return Ok(match self.block {
                     ExternalBlockState::Before | ExternalBlockState::Closed => true,
                     ExternalBlockState::Open { .. } => false,
                 });
-            }
-            let Some((count, consumed)) = count_ser_ar_values(data, self.pending_dde_values) else {
+            };
+            let Some((count, consumed)) = count_ser_ar_values(data, remaining) else {
                 return Ok(false);
             };
-            if count == 0 || consumed != data.len() || count > self.pending_dde_values {
+            if count == 0 || consumed != data.len() || count > remaining {
                 return Ok(false);
             }
-            self.pending_dde_values -= count;
+            self.continuation = if count == remaining {
+                ContinuationState::Idle
+            } else {
+                ContinuationState::DdeValues {
+                    remaining: remaining - count,
+                }
+            };
             return Ok(true);
         }
 
@@ -1260,8 +1294,8 @@ impl ExternalPresenceState {
         self.book_count += 1;
         self.block = ExternalBlockState::Open {
             current_book: index,
+            names_allowed: true,
         };
-        self.names_allowed = true;
         self.external_present |= matches!(
             kind,
             ExternalBookKind::External { .. }
@@ -1274,17 +1308,24 @@ impl ExternalPresenceState {
     fn feed_extern_name(&mut self, data: &[u8]) -> bool {
         let ExternalBlockState::Open {
             current_book: book_index,
+            names_allowed,
         } = self.block
         else {
             return false;
         };
-        if !self.names_allowed || book_index >= self.book_count {
+        if !names_allowed || book_index >= self.book_count {
             return false;
         }
         let Some(next_pending) = parse_external_name_presence(data, self.books[book_index]) else {
             return false;
         };
-        self.pending_dde_values = next_pending;
+        self.continuation = if next_pending == 0 {
+            ContinuationState::Idle
+        } else {
+            ContinuationState::DdeValues {
+                remaining: next_pending,
+            }
+        };
         let Some(next_count) = self.external_names.checked_add(1) else {
             return false;
         };
@@ -1295,6 +1336,7 @@ impl ExternalPresenceState {
     fn feed_xct(&mut self, data: &[u8]) -> Result<bool, Error> {
         let ExternalBlockState::Open {
             current_book: book_index,
+            ..
         } = self.block
         else {
             return Ok(false);
@@ -1319,14 +1361,24 @@ impl ExternalPresenceState {
         }
         try_hash_set_reserve(&mut self.seen_xct, 1, "external-link XCT ownership")?;
         self.seen_xct.insert(owner);
-        self.pending_xct = Some(owner);
-        self.pending_crn = usize::from(declared.unsigned_abs());
-        self.names_allowed = false;
+        let remaining = usize::from(declared.unsigned_abs());
+        self.continuation = if remaining == 0 {
+            ContinuationState::Idle
+        } else {
+            ContinuationState::CrnRun { owner, remaining }
+        };
+        self.block = ExternalBlockState::Open {
+            current_book: book_index,
+            names_allowed: false,
+        };
         Ok(true)
     }
 
     fn feed_crn(&mut self, data: &[u8]) -> Result<bool, Error> {
-        if self.pending_crn == 0 || data.len() < 4 {
+        let ContinuationState::CrnRun { owner, remaining } = self.continuation else {
+            return Ok(false);
+        };
+        if data.len() < 4 {
             return Ok(false);
         }
         let Some(last_column) = data.first().copied() else {
@@ -1343,9 +1395,6 @@ impl ExternalPresenceState {
         if count != values || consumed.checked_add(4) != Some(data.len()) {
             return Ok(false);
         }
-        let Some(owner) = self.pending_xct else {
-            return Ok(false);
-        };
         let Some(next_cached_cells) = self.cached_cells.checked_add(count) else {
             return Ok(false);
         };
@@ -1367,10 +1416,14 @@ impl ExternalPresenceState {
             self.cache_cells.insert((owner.0, owner.1, row, column));
         }
         self.cached_cells = next_cached_cells;
-        self.pending_crn -= 1;
-        if self.pending_crn == 0 {
-            self.pending_xct = None;
-        }
+        self.continuation = if remaining == 1 {
+            ContinuationState::Idle
+        } else {
+            ContinuationState::CrnRun {
+                owner,
+                remaining: remaining - 1,
+            }
+        };
         Ok(true)
     }
 
@@ -1403,7 +1456,10 @@ impl ExternalPresenceState {
             offset += 6;
         }
         self.extern_sheet_seen = true;
-        self.names_allowed = false;
+        match &mut self.block {
+            ExternalBlockState::Open { names_allowed, .. } => *names_allowed = false,
+            ExternalBlockState::Before | ExternalBlockState::Closed => {},
+        }
         self.sheet_references = self.sheet_references.saturating_add(count);
         self.sheet_references <= 1_370
     }
@@ -1444,8 +1500,7 @@ impl ExternalPresenceState {
     }
 
     fn finish(&self, internal_sheet_count: usize) -> bool {
-        self.pending_crn == 0
-            && self.pending_dde_values == 0
+        matches!(self.continuation, ContinuationState::Idle)
             && self
                 .max_self_sheet
                 .is_none_or(|maximum| maximum < internal_sheet_count)

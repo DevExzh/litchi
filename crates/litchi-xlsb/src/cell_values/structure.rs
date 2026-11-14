@@ -3296,6 +3296,30 @@ fn worksheet_relationship_flavor(package: &litchi_opc::OpcPackage) -> Result<(St
     Ok((fallback, WORKSHEET_CONTENT_TYPE.to_string()))
 }
 
+/// Where a workbook-part scan stands relative to the one sheet-catalog
+/// collection (BrtBeginBundleShs, its BrtBundleSh records, BrtEndBundleShs).
+///
+/// ```text
+/// Before --BrtBeginBundleShs--> Open --BrtEndBundleShs--> Closed
+/// Open   --BrtBundleSh--> Open (repeatable)
+/// ```
+///
+/// A BrtBeginBundleShs outside `Before`, a BrtBundleSh or BrtEndBundleShs
+/// outside `Open`, any other record in `Open`, and a part that does not end in
+/// `Closed` are refused.
+#[derive(Clone, Copy)]
+enum BundleBlockState {
+    Before,
+    Open,
+    Closed,
+}
+
+impl BundleBlockState {
+    fn is_open(self) -> bool {
+        matches!(self, Self::Open)
+    }
+}
+
 fn collect_bundle_records(
     source: &[u8],
     catalog_len: usize,
@@ -3309,22 +3333,19 @@ fn collect_bundle_records(
             resource: "XLSB sheet insertion catalog records",
             source,
         })?;
-    let mut open = false;
-    let mut seen = false;
-    let mut closed = false;
+    let mut bundle = BundleBlockState::Before;
     for item in Records::new(source, raw_limits) {
         let record = item?;
         match record.kind() {
             kind::BEGIN_BUNDLE_SHS => {
-                if open || seen || !record.payload().is_empty() {
+                if !matches!(bundle, BundleBlockState::Before) || !record.payload().is_empty() {
                     return Err(Error::InvalidFormat(
                         "Workbook has duplicate or malformed BrtBundleShs collections",
                     ));
                 }
-                open = true;
-                seen = true;
+                bundle = BundleBlockState::Open;
             },
-            kind::BUNDLE_SH if open => {
+            kind::BUNDLE_SH if bundle.is_open() => {
                 let mut tolerance_report = crate::leniency::ToleranceReport::default();
                 let ordinal =
                     u32::try_from(records.len()).map_err(|_error| Error::CapacityOverflow {
@@ -3344,15 +3365,14 @@ fn collect_bundle_records(
                 ));
             },
             kind::END_BUNDLE_SHS => {
-                if !open || !record.payload().is_empty() {
+                if !bundle.is_open() || !record.payload().is_empty() {
                     return Err(Error::InvalidFormat(
                         "Workbook has an unbalanced BrtEndBundleShs collection",
                     ));
                 }
-                open = false;
-                closed = true;
+                bundle = BundleBlockState::Closed;
             },
-            _ if open => {
+            _ if bundle.is_open() => {
                 return Err(Error::refused(
                     litchi_core::edit::RefusalKind::UnsupportedContent,
                     "edit",
@@ -3362,7 +3382,7 @@ fn collect_bundle_records(
             _ => {},
         }
     }
-    if open || !closed || !seen || records.len() != catalog_len {
+    if !matches!(bundle, BundleBlockState::Closed) || records.len() != catalog_len {
         return Err(Error::InvalidFormat(
             "Workbook BrtBundleSh count differs from catalog size",
         ));
@@ -3458,25 +3478,22 @@ fn rewrite_workbook_insert(
             source,
         })?;
     let mut bundle_count = 0usize;
-    let mut bundle_open = false;
-    let mut saw_bundle_collection = false;
-    let mut bundle_collection_closed = false;
+    let mut bundle = BundleBlockState::Before;
     let mut inserted = false;
     for item in Records::new(source, raw_limits) {
         let record = item?;
         let raw = record_bytes(source, &record, raw_limits)?;
         match record.kind() {
             kind::BEGIN_BUNDLE_SHS => {
-                if bundle_open || saw_bundle_collection || !record.payload().is_empty() {
+                if !matches!(bundle, BundleBlockState::Before) || !record.payload().is_empty() {
                     return Err(Error::InvalidFormat(
                         "Workbook has duplicate or malformed BrtBundleShs collections",
                     ));
                 }
-                saw_bundle_collection = true;
-                bundle_open = true;
+                bundle = BundleBlockState::Open;
                 output.extend_from_slice(raw);
             },
-            kind::BUNDLE_SH if bundle_open => {
+            kind::BUNDLE_SH if bundle.is_open() => {
                 if bundle_count == position {
                     output.extend_from_slice(&new_bundle_record);
                     inserted = true;
@@ -3492,7 +3509,7 @@ fn rewrite_workbook_insert(
                 ));
             },
             kind::END_BUNDLE_SHS => {
-                if !bundle_open || !record.payload().is_empty() {
+                if !bundle.is_open() || !record.payload().is_empty() {
                     return Err(Error::InvalidFormat(
                         "Workbook has an unbalanced BrtEndBundleShs collection",
                     ));
@@ -3501,11 +3518,10 @@ fn rewrite_workbook_insert(
                     output.extend_from_slice(&new_bundle_record);
                     inserted = true;
                 }
-                bundle_open = false;
-                bundle_collection_closed = true;
+                bundle = BundleBlockState::Closed;
                 output.extend_from_slice(raw);
             },
-            _ if bundle_open => {
+            _ if bundle.is_open() => {
                 return Err(Error::refused(
                     litchi_core::edit::RefusalKind::UnsupportedContent,
                     "edit",
@@ -3550,11 +3566,7 @@ fn rewrite_workbook_insert(
             },
         }
     }
-    if bundle_open
-        || !bundle_collection_closed
-        || !saw_bundle_collection
-        || bundle_count != catalog_len
-    {
+    if !matches!(bundle, BundleBlockState::Closed) || bundle_count != catalog_len {
         return Err(Error::InvalidFormat(
             "Workbook BrtBundleSh count differs from catalog size",
         ));
@@ -4570,22 +4582,19 @@ fn rewrite_workbook_remove(
     raw_limits: crate::raw::Limits,
 ) -> Result<Vec<u8>> {
     let mut bundle_count = 0usize;
-    let mut bundle_open = false;
-    let mut saw_collection = false;
-    let mut closed = false;
+    let mut bundle = BundleBlockState::Before;
     for item in Records::new(source, raw_limits) {
         let record = item?;
         match record.kind() {
             kind::BEGIN_BUNDLE_SHS => {
-                if bundle_open || saw_collection || !record.payload().is_empty() {
+                if !matches!(bundle, BundleBlockState::Before) || !record.payload().is_empty() {
                     return Err(Error::InvalidFormat(
                         "Workbook has duplicate or malformed BrtBundleShs collections",
                     ));
                 }
-                bundle_open = true;
-                saw_collection = true;
+                bundle = BundleBlockState::Open;
             },
-            kind::BUNDLE_SH if bundle_open => {
+            kind::BUNDLE_SH if bundle.is_open() => {
                 bundle_count = bundle_count.checked_add(1).ok_or(Error::CapacityOverflow {
                     resource: "XLSB removed catalog records",
                 })?;
@@ -4596,15 +4605,14 @@ fn rewrite_workbook_remove(
                 ));
             },
             kind::END_BUNDLE_SHS => {
-                if !bundle_open || !record.payload().is_empty() {
+                if !bundle.is_open() || !record.payload().is_empty() {
                     return Err(Error::InvalidFormat(
                         "Workbook has an unbalanced BrtEndBundleShs collection",
                     ));
                 }
-                bundle_open = false;
-                closed = true;
+                bundle = BundleBlockState::Closed;
             },
-            _ if bundle_open => {
+            _ if bundle.is_open() => {
                 return Err(Error::refused(
                     litchi_core::edit::RefusalKind::UnsupportedContent,
                     "edit",
@@ -4640,7 +4648,7 @@ fn rewrite_workbook_remove(
             },
         }
     }
-    if bundle_open || !closed || !saw_collection || bundle_count != catalog_len {
+    if !matches!(bundle, BundleBlockState::Closed) || bundle_count != catalog_len {
         return Err(Error::InvalidFormat(
             "Workbook BrtBundleSh count differs from catalog size",
         ));
@@ -5533,16 +5541,14 @@ fn rewrite_workbook_order(
             resource: "XLSB reordered catalog records",
             source,
         })?;
-    let mut saw_bundle_collection = false;
-    let mut bundle_open = false;
-    let mut bundle_collection_closed = false;
+    let mut bundle = BundleBlockState::Before;
     let mut records = Vec::new();
     for item in Records::new(source, raw_limits) {
         let record = item?;
         let raw = record_bytes(source, &record, raw_limits)?;
         match record.kind() {
             kind::BEGIN_BUNDLE_SHS => {
-                if bundle_open || saw_bundle_collection {
+                if !matches!(bundle, BundleBlockState::Before) {
                     return Err(Error::InvalidFormat(
                         "Workbook has duplicate or nested BrtBundleShs collections",
                     ));
@@ -5553,10 +5559,9 @@ fn rewrite_workbook_order(
                         found: record.payload().len(),
                     });
                 }
-                saw_bundle_collection = true;
-                bundle_open = true;
+                bundle = BundleBlockState::Open;
             },
-            kind::BUNDLE_SH if bundle_open => {
+            kind::BUNDLE_SH if bundle.is_open() => {
                 bundle_records.push(raw);
             },
             kind::BUNDLE_SH => {
@@ -5565,7 +5570,7 @@ fn rewrite_workbook_order(
                 ));
             },
             kind::END_BUNDLE_SHS => {
-                if !bundle_open {
+                if !bundle.is_open() {
                     return Err(Error::InvalidFormat(
                         "BrtEndBundleShs has no matching collection",
                     ));
@@ -5576,10 +5581,9 @@ fn rewrite_workbook_order(
                         found: record.payload().len(),
                     });
                 }
-                bundle_open = false;
-                bundle_collection_closed = true;
+                bundle = BundleBlockState::Closed;
             },
-            _ if bundle_open => {
+            _ if bundle.is_open() => {
                 return Err(Error::refused(
                     litchi_core::edit::RefusalKind::UnsupportedContent,
                     "edit",
@@ -5620,7 +5624,7 @@ fn rewrite_workbook_order(
         })?;
         records.push((record.kind(), raw));
     }
-    if bundle_open || !bundle_collection_closed || !saw_bundle_collection {
+    if !matches!(bundle, BundleBlockState::Closed) {
         return Err(Error::InvalidFormat(
             "Workbook sheet catalog has no complete BrtBundleSh collection",
         ));

@@ -755,23 +755,40 @@ fn decode_utf16(data: &[u8], record_type: u16, field: &str) -> Result<String> {
         .map_err(|_error| invalid(record_type, format!("{field} contains invalid UTF-16")))
 }
 
+/// Where the workbook globals stand relative to the DXF records, the STYLES
+/// collection and the TABLESTYLES collection that follows it.
+///
+/// ```text
+/// BeforeStyles --STYLE--> AfterStyles --STYLE--> AfterStyles
+/// AfterStyles  --TableStyles--> Catalog { ended: false }
+/// Catalog { ended: false } --TableStyle | TableStyleElement--> Catalog { ended: false }
+/// Catalog { .. } --STYLE or any record outside the family--> Catalog { ended: true }
+/// ```
+///
+/// DXF records are accepted only in `BeforeStyles`. TableStyles is refused
+/// in `BeforeStyles` (no STYLES yet) and in `Catalog` (duplicate). TableStyle
+/// is refused outside `Catalog { ended: false }`, TableStyleElement in
+/// `Catalog { ended: true }`. Ending the catalog first completes the open
+/// TableStyle, which fails when its declared element count is not met.
+enum TableStylesBlockState {
+    BeforeStyles,
+    AfterStyles,
+    Catalog { header: TableStyles, ended: bool },
+}
+
 pub(crate) struct TableStylesCollector {
-    header: Option<TableStyles>,
+    state: TableStylesBlockState,
     styles: Vec<TableStyle>,
     current_style: Option<TableStyle>,
-    family_closed: bool,
-    saw_style_record: bool,
     differential_format_count: usize,
 }
 
 impl TableStylesCollector {
     pub(crate) fn new() -> Self {
         Self {
-            header: None,
+            state: TableStylesBlockState::BeforeStyles,
             styles: Vec::new(),
             current_style: None,
-            family_closed: false,
-            saw_style_record: false,
             differential_format_count: 0,
         }
     }
@@ -788,7 +805,7 @@ impl TableStylesCollector {
 
         match record_type {
             DXF_RECORD_TYPE => {
-                if self.saw_style_record || self.header.is_some() {
+                if !matches!(self.state, TableStylesBlockState::BeforeStyles) {
                     return Err(invalid(
                         DXF_RECORD_TYPE,
                         "DXF record appears after the STYLES or TABLESTYLES collection",
@@ -802,29 +819,37 @@ impl TableStylesCollector {
                 }
                 self.differential_format_count += 1;
             },
-            STYLE_RECORD_TYPE => {
-                if self.header.is_some() {
-                    self.close_family()?;
-                }
-                self.saw_style_record = true;
+            STYLE_RECORD_TYPE => match self.state {
+                TableStylesBlockState::BeforeStyles | TableStylesBlockState::AfterStyles => {
+                    self.state = TableStylesBlockState::AfterStyles;
+                },
+                TableStylesBlockState::Catalog { .. } => self.close_family()?,
             },
-            TABLE_STYLES_RECORD_TYPE => {
-                if !self.saw_style_record {
+            TABLE_STYLES_RECORD_TYPE => match self.state {
+                TableStylesBlockState::BeforeStyles => {
                     return Err(invalid(
                         TABLE_STYLES_RECORD_TYPE,
                         "TableStyles appears before the required STYLES collection",
                     ));
-                }
-                if self.header.is_some() || self.family_closed {
+                },
+                TableStylesBlockState::Catalog { .. } => {
                     return Err(invalid(
                         TABLE_STYLES_RECORD_TYPE,
                         "duplicate or noncontiguous TableStyles",
                     ));
-                }
-                self.header = Some(TableStyles::parse_payload(data)?);
+                },
+                TableStylesBlockState::AfterStyles => {
+                    self.state = TableStylesBlockState::Catalog {
+                        header: TableStyles::parse_payload(data)?,
+                        ended: false,
+                    };
+                },
             },
             TABLE_STYLE_RECORD_TYPE => {
-                if self.header.is_none() || self.family_closed {
+                if !matches!(
+                    self.state,
+                    TableStylesBlockState::Catalog { ended: false, .. }
+                ) {
                     return Err(invalid(
                         TABLE_STYLE_RECORD_TYPE,
                         "TableStyle appears outside TABLESTYLES",
@@ -852,7 +877,10 @@ impl TableStylesCollector {
                 }
             },
             TABLE_STYLE_ELEMENT_RECORD_TYPE => {
-                if self.family_closed {
+                if matches!(
+                    self.state,
+                    TableStylesBlockState::Catalog { ended: true, .. }
+                ) {
                     return Err(invalid(
                         TABLE_STYLE_ELEMENT_RECORD_TYPE,
                         "TableStyleElement appears after TABLESTYLES ended",
@@ -872,7 +900,9 @@ impl TableStylesCollector {
                 }
                 style.elements.push(TableStyleElement::parse_payload(data)?);
             },
-            _ if self.header.is_some() => self.close_family()?,
+            _ if matches!(self.state, TableStylesBlockState::Catalog { .. }) => {
+                self.close_family()?;
+            },
             _ => {},
         }
         Ok(())
@@ -886,7 +916,8 @@ impl TableStylesCollector {
         Ok(())
     }
 
-    fn close_family(&mut self) -> Result<()> {
+    /// Completes the open TableStyle, if any, at the end of the catalog.
+    fn end_current_style(&mut self) -> Result<()> {
         if let Some(style) = &self.current_style
             && style.elements.len() != style.declared_element_count as usize
         {
@@ -895,8 +926,15 @@ impl TableStylesCollector {
                 "TABLESTYLES ended before the declared element count was satisfied",
             ));
         }
-        self.finish_current_style()?;
-        self.family_closed = true;
+        self.finish_current_style()
+    }
+
+    fn close_family(&mut self) -> Result<()> {
+        self.end_current_style()?;
+        match &mut self.state {
+            TableStylesBlockState::BeforeStyles | TableStylesBlockState::AfterStyles => {},
+            TableStylesBlockState::Catalog { ended, .. } => *ended = true,
+        }
         Ok(())
     }
 
@@ -904,17 +942,20 @@ impl TableStylesCollector {
         mut self,
         differential_format_count: usize,
     ) -> Result<Option<TableStyles>> {
-        if self.header.is_none() {
-            return Ok(None);
-        }
-        self.close_family()?;
+        let mut header =
+            match std::mem::replace(&mut self.state, TableStylesBlockState::BeforeStyles) {
+                TableStylesBlockState::BeforeStyles | TableStylesBlockState::AfterStyles => {
+                    return Ok(None);
+                },
+                TableStylesBlockState::Catalog { header, .. } => header,
+            };
+        self.end_current_style()?;
         if self.differential_format_count != differential_format_count {
             return Err(invalid(
                 DXF_RECORD_TYPE,
                 "DXF collector count disagrees with formatting ownership",
             ));
         }
-        let mut header = self.header.take().unwrap();
         header.custom_styles = self.styles;
         header.validate_complete(differential_format_count)?;
         Ok(Some(header))

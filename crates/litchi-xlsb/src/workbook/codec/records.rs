@@ -90,6 +90,24 @@ impl PivotCacheIdsState {
     }
 }
 
+/// Where the workbook part stands relative to its one optional book-view
+/// block.
+///
+/// ```text
+/// Before --BrtBeginBookViews--> Open --BrtEndBookViews--> Closed
+/// Open   --BrtBookView--> Open (repeatable)
+/// ```
+///
+/// A second BrtBeginBookViews (in `Open` or `Closed`), a BrtEndBookViews
+/// outside `Open` and a BrtBookView outside `Open` are refused, and so is a
+/// stream that ends in `Open`.
+#[derive(Clone, Copy)]
+enum BookViewsState {
+    Before,
+    Open,
+    Closed,
+}
+
 impl Workbook {
     /// Parse the workbook stream, recording every Excel-compatible repair
     /// into `report` (see [`crate::leniency`]).
@@ -108,8 +126,7 @@ impl Workbook {
         let defined_names = &mut info.defined_names;
         let mut worksheet_name_keys = HashSet::new();
         let is_1904 = &mut info.is_1904;
-        let mut book_views_open = false;
-        let mut book_views_seen = false;
+        let mut book_views = BookViewsState::Before;
         let mut max_book_view_catalog_position: Option<usize> = None;
         for record in iter.by_ref() {
             let record = record?;
@@ -121,14 +138,15 @@ impl Workbook {
                             found: record.payload().len(),
                         });
                     }
-                    if book_views_seen || book_views_open {
-                        return Err(crate::package::error::Error::Unrecognized {
-                            typ: "BrtBeginBookViews",
-                            val: "duplicate or nested book-view block",
-                        });
+                    match book_views {
+                        BookViewsState::Before => book_views = BookViewsState::Open,
+                        BookViewsState::Open | BookViewsState::Closed => {
+                            return Err(crate::package::error::Error::Unrecognized {
+                                typ: "BrtBeginBookViews",
+                                val: "duplicate or nested book-view block",
+                            });
+                        },
                     }
-                    book_views_seen = true;
-                    book_views_open = true;
                 },
                 kind::END_BOOK_VIEWS => {
                     if !record.payload().is_empty() {
@@ -137,16 +155,18 @@ impl Workbook {
                             found: record.payload().len(),
                         });
                     }
-                    if !book_views_open {
-                        return Err(crate::package::error::Error::Unrecognized {
-                            typ: "BrtEndBookViews",
-                            val: "book-view block has no matching begin record",
-                        });
+                    match book_views {
+                        BookViewsState::Open => book_views = BookViewsState::Closed,
+                        BookViewsState::Before | BookViewsState::Closed => {
+                            return Err(crate::package::error::Error::Unrecognized {
+                                typ: "BrtEndBookViews",
+                                val: "book-view block has no matching begin record",
+                            });
+                        },
                     }
-                    book_views_open = false;
                 },
                 kind::BOOK_VIEW => {
-                    if !book_views_open {
+                    if !matches!(book_views, BookViewsState::Open) {
                         return Err(crate::package::error::Error::Unrecognized {
                             typ: "BrtBookView",
                             val: "record is outside the book-view block",
@@ -287,7 +307,7 @@ impl Workbook {
                 },
             }
         }
-        if book_views_open {
+        if matches!(book_views, BookViewsState::Open) {
             return Err(crate::package::error::Error::Unrecognized {
                 typ: "BrtBeginBookViews",
                 val: "missing BrtEndBookViews record",

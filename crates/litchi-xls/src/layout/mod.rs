@@ -30,15 +30,38 @@ fn read_u16(data: &[u8], offset: usize) -> u16 {
     u16::from_le_bytes([data[offset], data[offset + 1]])
 }
 
+/// Where a worksheet stands relative to its COLUMNS collection (DefColWidth
+/// followed by COLINFO records) and its ROW records.
+///
+/// ```text
+/// Start          --DefColWidth--> Columns { has_colinfo: false }
+/// Start          --ROW--> Rows { after_columns: false }
+/// Columns { .. } --COLINFO--> Columns { has_colinfo: true }
+/// Columns { .. } --other record--> ColumnsEnded { .. }
+/// Columns { .. } | ColumnsEnded { .. } --ROW--> Rows { after_columns: true }
+/// Rows { .. }    --ROW--> Rows { .. }
+/// ```
+///
+/// DefColWidth is refused once a COLINFO or a ROW was seen; until then a
+/// repeated DefColWidth is accepted and leaves the state as it is, also in
+/// `ColumnsEnded`. COLINFO is accepted only in `Columns`: before any
+/// DefColWidth it is refused as missing its DefColWidth, after one as being
+/// outside the collection. Every other record leaves `Start`, `ColumnsEnded`
+/// and `Rows` unchanged.
+#[derive(Clone, Copy)]
+enum LayoutBlockState {
+    Start,
+    Columns { has_colinfo: bool },
+    ColumnsEnded { has_colinfo: bool },
+    Rows { after_columns: bool },
+}
+
 /// Enforces the worksheet-level record collections while preserving record order.
 pub(crate) struct Collector {
     rows: BTreeMap<u16, Row>,
     columns: Vec<Column>,
     last_row: Option<u16>,
-    saw_default_column_width: bool,
-    saw_columns: bool,
-    columns_closed: bool,
-    rows_started: bool,
+    state: LayoutBlockState,
 }
 
 impl Collector {
@@ -47,10 +70,7 @@ impl Collector {
             rows: BTreeMap::new(),
             columns: Vec::new(),
             last_row: None,
-            saw_default_column_width: false,
-            saw_columns: false,
-            columns_closed: false,
-            rows_started: false,
+            state: LayoutBlockState::Start,
         }
     }
 
@@ -61,34 +81,43 @@ impl Collector {
         formatting: &Formatting,
         tolerance: &mut ToleranceReport,
     ) -> Result<()> {
-        if self.saw_default_column_width
-            && record_type != COLINFO_RECORD_TYPE
-            && record_type != DEF_COL_WIDTH_RECORD_TYPE
-        {
-            self.columns_closed = true;
-        }
         match record_type {
-            DEF_COL_WIDTH_RECORD_TYPE => {
-                self.saw_default_column_width = true;
-                if self.saw_columns || self.rows_started {
+            DEF_COL_WIDTH_RECORD_TYPE => match self.state {
+                LayoutBlockState::Start => {
+                    self.state = LayoutBlockState::Columns { has_colinfo: false };
+                },
+                LayoutBlockState::Columns { has_colinfo: false }
+                | LayoutBlockState::ColumnsEnded { has_colinfo: false } => {},
+                LayoutBlockState::Columns { has_colinfo: true }
+                | LayoutBlockState::ColumnsEnded { has_colinfo: true }
+                | LayoutBlockState::Rows { .. } => {
                     return Err(invalid(
                         record_type,
                         "DefColWidth must begin the COLUMNS collection",
                     ));
-                }
+                },
             },
             COLINFO_RECORD_TYPE => {
-                if !self.saw_default_column_width {
-                    return Err(invalid(
-                        record_type,
-                        "COLINFO records require a preceding DefColWidth",
-                    ));
-                }
-                if self.columns_closed || self.rows_started {
-                    return Err(invalid(
-                        record_type,
-                        "COLINFO records must remain in the COLUMNS collection",
-                    ));
+                match self.state {
+                    LayoutBlockState::Columns { .. } => {},
+                    LayoutBlockState::Start
+                    | LayoutBlockState::Rows {
+                        after_columns: false,
+                    } => {
+                        return Err(invalid(
+                            record_type,
+                            "COLINFO records require a preceding DefColWidth",
+                        ));
+                    },
+                    LayoutBlockState::ColumnsEnded { .. }
+                    | LayoutBlockState::Rows {
+                        after_columns: true,
+                    } => {
+                        return Err(invalid(
+                            record_type,
+                            "COLINFO records must remain in the COLUMNS collection",
+                        ));
+                    },
                 }
                 if self.columns.len() == MAX_COLINFO_RECORDS {
                     return Err(invalid(
@@ -103,7 +132,7 @@ impl Collector {
                     tolerance,
                 );
                 self.columns.push(column);
-                self.saw_columns = true;
+                self.state = LayoutBlockState::Columns { has_colinfo: true };
             },
             ROW_RECORD_TYPE => {
                 let row = row::parse(data)?;
@@ -118,9 +147,23 @@ impl Collector {
                 }
                 self.last_row = Some(row.row());
                 self.rows.insert(row.row(), row);
-                self.rows_started = true;
+                self.state = LayoutBlockState::Rows {
+                    after_columns: match self.state {
+                        LayoutBlockState::Start => false,
+                        LayoutBlockState::Columns { .. }
+                        | LayoutBlockState::ColumnsEnded { .. } => true,
+                        LayoutBlockState::Rows { after_columns } => after_columns,
+                    },
+                };
             },
-            _ => {},
+            _ => match self.state {
+                LayoutBlockState::Columns { has_colinfo } => {
+                    self.state = LayoutBlockState::ColumnsEnded { has_colinfo };
+                },
+                LayoutBlockState::Start
+                | LayoutBlockState::ColumnsEnded { .. }
+                | LayoutBlockState::Rows { .. } => {},
+            },
         }
         Ok(())
     }

@@ -342,13 +342,36 @@ struct ClearWorkbookPlan {
     boundsheet_payloads: Vec<usize>,
 }
 
+/// Where FILEPASS will be inserted into a generated workbook-globals
+/// substream: directly after its BOF, or after the one WRITEPROTECT that
+/// directly follows the BOF.
+///
+/// ```text
+/// Unopened --globals BOF--> Open { after_writeprotect: false }
+/// Open { after_writeprotect: false } --WRITEPROTECT--> Open { after_writeprotect: true }
+/// Open { .. } --any other globals record--> Closed
+/// ```
+///
+/// A second WRITEPROTECT in `Open { after_writeprotect: true }` is refused.
+/// `offset` is the byte position right after the last record of the slot.
+/// A stream that never leaves `Unopened` has no BOF.
+#[derive(Clone, Copy)]
+enum FilepassSlotState {
+    Unopened,
+    Open {
+        offset: usize,
+        after_writeprotect: bool,
+    },
+    Closed {
+        offset: usize,
+    },
+}
+
 fn inspect_clear_workbook(workbook: &[u8]) -> Result<ClearWorkbookPlan> {
     let mut position = 0usize;
     let mut record_positions = std::collections::HashSet::new();
     let mut boundsheet_payloads = Vec::new();
-    let mut filepass_offset = None;
-    let mut filepass_slot_open = false;
-    let mut writeprotect_seen = false;
+    let mut filepass_slot = FilepassSlotState::Unopened;
     let mut codepage_seen = false;
     let mut globals_eof = None;
     let mut saw_filepass = false;
@@ -387,23 +410,35 @@ fn inspect_clear_workbook(workbook: &[u8]) -> Result<ClearWorkbookPlan> {
                         .to_string(),
                 ));
             }
-            filepass_offset = Some(record_end);
-            filepass_slot_open = true;
+            filepass_slot = FilepassSlotState::Open {
+                offset: record_end,
+                after_writeprotect: false,
+            };
         } else if sid == FILEPASS_SID {
             saw_filepass = true;
         }
-        if in_globals && filepass_slot_open && position != 0 {
-            if sid == WRITEPROTECT_SID {
-                if writeprotect_seen {
-                    return Err(Error::InvalidData(
-                        "generated workbook globals contain duplicate WRITEPROTECT records"
-                            .to_string(),
-                    ));
-                }
-                writeprotect_seen = true;
-                filepass_offset = Some(record_end);
-            } else {
-                filepass_slot_open = false;
+        if in_globals && position != 0 {
+            match filepass_slot {
+                FilepassSlotState::Open {
+                    offset,
+                    after_writeprotect,
+                } => {
+                    if sid == WRITEPROTECT_SID {
+                        if after_writeprotect {
+                            return Err(Error::InvalidData(
+                                "generated workbook globals contain duplicate WRITEPROTECT records"
+                                    .to_string(),
+                            ));
+                        }
+                        filepass_slot = FilepassSlotState::Open {
+                            offset: record_end,
+                            after_writeprotect: true,
+                        };
+                    } else {
+                        filepass_slot = FilepassSlotState::Closed { offset };
+                    }
+                },
+                FilepassSlotState::Unopened | FilepassSlotState::Closed { .. } => {},
             }
         }
         if in_globals && sid == CODEPAGE_SID {
@@ -432,9 +467,14 @@ fn inspect_clear_workbook(workbook: &[u8]) -> Result<ClearWorkbookPlan> {
             "generated Workbook stream already contains FILEPASS".to_string(),
         ));
     }
-    let filepass_offset = filepass_offset.ok_or_else(|| {
-        Error::InvalidData("generated Workbook stream is missing its BOF".to_string())
-    })?;
+    let filepass_offset = match filepass_slot {
+        FilepassSlotState::Unopened => {
+            return Err(Error::InvalidData(
+                "generated Workbook stream is missing its BOF".to_string(),
+            ));
+        },
+        FilepassSlotState::Open { offset, .. } | FilepassSlotState::Closed { offset } => offset,
+    };
     let globals_eof = globals_eof.ok_or_else(|| {
         Error::InvalidData("generated workbook globals are missing EOF".to_string())
     })?;
