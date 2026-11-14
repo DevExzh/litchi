@@ -7,7 +7,7 @@
 //! real (the scan is skipped), that it is exact (a memo-assisted capture
 //! equals a cold one, value and refusal alike), that it can never answer for
 //! bytes it did not classify, and every condition ADR 0032 and ADR 0005's
-//! 2026-09-16 memo amendment place on it:
+//! retained-digest-memo rule place on it:
 //!
 //! * keyed on allocation identity with a strong reference;
 //! * entries only for allocations the owning snapshot's package holds;
@@ -674,8 +674,8 @@ fn memo_assisted_recaptures_equal_plain_ones_over_the_pptx_corpus() -> Result<()
         for slide in positions.into_iter().filter(|&slide| slide < count) {
             let mut with_memo = source.edit();
             let mut plain_edit = without.edit();
-            let staged = with_memo.set_shape_text(slide, 0, "0760 corpus edit");
-            let staged_plain = plain_edit.set_shape_text(slide, 0, "0760 corpus edit");
+            let staged = with_memo.set_shape_text(slide, 0, "memo corpus edit");
+            let staged_plain = plain_edit.set_shape_text(slide, 0, "memo corpus edit");
             assert_eq!(
                 format!("{staged:?}"),
                 format!("{staged_plain:?}"),
@@ -713,7 +713,7 @@ fn memo_assisted_recaptures_equal_plain_ones_over_the_pptx_corpus() -> Result<()
         take_proved_root_hits();
     }
     println!(
-        "0760-memo-oracle fixtures={} captured={captured} identical_hits={hits} commits={committed}",
+        "slide-root-memo-oracle fixtures={} captured={captured} identical_hits={hits} commits={committed}",
         fixtures.len()
     );
     assert!(captured > 0 && hits > 0 && committed > 0);

@@ -40,8 +40,8 @@ const MAX_TEXT_FRAGMENTS: usize = 32 * 1024;
 const MAX_TEXT_BYTES: usize = 2 * 1024 * 1024;
 const MAX_COMMAND_BYTES: usize = 1024;
 const MAX_TITLE_INPUT_BYTES: usize = 1024;
-const PRIVATE_SELECTOR: &str = "__litchi_private_keynote_chart_axis_selector_112__";
-const PRIVATE_INPUT: &[u8] = b"__litchi_private_keynote_chart_axis_malformed_112__";
+const PRIVATE_SELECTOR: &str = "__litchi_private_keynote_chart_axis_selector__";
+const PRIVATE_INPUT: &[u8] = b"__litchi_private_keynote_chart_axis_malformed__";
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";
 const METADATA_MEMBER: &str = "Index/Metadata.iwa";

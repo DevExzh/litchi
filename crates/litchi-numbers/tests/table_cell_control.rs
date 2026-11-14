@@ -668,7 +668,7 @@ fn fixture(mode: FixtureMode) -> TestResult<Vec<u8>> {
 }
 
 /// Rebuild the synthetic graph with the component split used by the native
-/// Wave85 source: the rooted model lives in CalculationEngine, its tile is a
+/// split-owner source: the rooted model lives in CalculationEngine, its tile is a
 /// Tables member, format/control lists are separate list members, and the
 /// popup model is a separate current component.  Scalar controls are fully
 /// metadata-owned across those members; popup lifecycle tests use the same
@@ -3463,8 +3463,8 @@ fn split_components_reject_bad_edges_aliases_and_opaque_inbound_refs_atomically(
         let hostile = with_split_metadata_corruption(&source, corruption)?;
         assert_split_owner_rejects(&hostile, &format!("split edge {corruption:?}"))?;
     }
-    // Wave86 deliberately admits read-only compatibility for a uniquely
-    // edge-owned sidecar without its own ComponentInfo. Wave88 mutation is
+    // Reads deliberately admit read-only compatibility for a uniquely
+    // edge-owned sidecar without its own ComponentInfo. Mutation is
     // stricter because it cannot advance a missing component save token.
     let missing_format =
         with_split_metadata_corruption(&source, SplitMetadataCorruption::MissingFormatComponent)?;

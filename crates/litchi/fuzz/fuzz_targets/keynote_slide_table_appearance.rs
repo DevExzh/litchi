@@ -34,8 +34,8 @@ const MAX_TEXT_STORAGES: usize = 8 * 1024;
 const MAX_TEXT_FRAGMENTS: usize = 32 * 1024;
 const MAX_TEXT_BYTES: usize = 2 * 1024 * 1024;
 const MAX_COMMAND_BYTES: usize = 1024;
-const PRIVATE_SELECTOR: &str = "__litchi_private_keynote_appearance_selector_103__";
-const PRIVATE_INPUT: &[u8] = b"__litchi_private_keynote_appearance_input_103__";
+const PRIVATE_SELECTOR: &str = "__litchi_private_keynote_appearance_selector__";
+const PRIVATE_INPUT: &[u8] = b"__litchi_private_keynote_appearance_input__";
 const SOURCE_BUILT_PACKAGE: &[u8] =
     include_bytes!("../corpus/keynote_slide_table_headers/source_built.hex");
 const NATIVE_KEYNOTE: &[u8] = include_bytes!("../../../../test-data/iwork/keynote/basic.key");

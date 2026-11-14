@@ -40,7 +40,7 @@ impl Drop for ScratchDirectory {
 fn scratch_directory() -> ScratchDirectory {
     static NEXT: AtomicU64 = AtomicU64::new(0);
     let directory = std::env::temp_dir().join(format!(
-        "litchi-xls-0761-{}-{}",
+        "litchi-xls-durability-{}-{}",
         std::process::id(),
         NEXT.fetch_add(1, Ordering::Relaxed)
     ));
@@ -52,7 +52,7 @@ fn builder() -> Builder {
     let mut builder = Builder::new();
     let sheet = builder.add_worksheet("Notes").unwrap();
     builder
-        .write_string(sheet, 0, 0, "save durability 0761")
+        .write_string(sheet, 0, 0, "save durability check")
         .unwrap();
     builder.add_comment(sheet, 0, 1, "Author", "note").unwrap();
     builder

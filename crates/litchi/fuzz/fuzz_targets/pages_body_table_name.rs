@@ -21,9 +21,9 @@ const MAX_COMMAND_BYTES: usize = 1024;
 const MAX_NAME_BYTES: usize = 1024;
 const MAX_CATALOG_TABLES: usize = 128;
 const OVERSIZED_INPUT_BYTES: usize = MAX_INPUT_BYTES as usize + 1;
-const PRIVATE_TABLE: &str = "__litchi_private_pages_name_table_107__";
-const PRIVATE_INPUT: &[u8] = b"__litchi_private_pages_name_input_107__";
-const PRIVATE_NAME: &str = "__litchi_private_pages_name_value_107__";
+const PRIVATE_TABLE: &str = "__litchi_private_pages_name_table__";
+const PRIVATE_INPUT: &[u8] = b"__litchi_private_pages_name_input__";
+const PRIVATE_NAME: &str = "__litchi_private_pages_name_value__";
 const NATIVE_PAGES: &[u8] = include_bytes!("../../../../test-data/iwork/pages/basic.pages");
 const NATIVE_VISIBLE_PAGES: &[u8] =
     include_bytes!("../../../../test-data/iwork/pages/body-table-name-visible-native.pages");

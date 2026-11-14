@@ -361,7 +361,7 @@ fn witness_matrix() {
             Ok(Admission::DeclaredOnly),
         ),
         (
-            "declared only, escaped (W7 without a construct)",
+            "declared only, escaped, without a construct",
             document(&escaped, PARAGRAPH),
             Ok(Admission::DeclaredOnly),
         ),
@@ -379,7 +379,7 @@ fn witness_matrix() {
             Ok(Admission::Ignorable),
         ),
         (
-            "W6: ignorable attribute and leaf element",
+            "ignorable attribute and leaf element",
             document(
                 &format!(r#"{mc} mc:Ignorable="x""#),
                 r#"<w:p x:id="1"><w:r><x:flag/><w:t>A</w:t></w:r></w:p>"#,
@@ -395,7 +395,7 @@ fn witness_matrix() {
             Ok(Admission::IgnorableOpaque),
         ),
         (
-            "used ignorable prefix holding a run (W4)",
+            "used ignorable prefix holding a run",
             document(
                 &format!(r#"{mc} mc:Ignorable="x""#),
                 r#"<w:p><x:ext><w:r><w:t>HIDDEN</w:t></w:r></x:ext><w:r><w:t>B</w:t></w:r></w:p>"#,
@@ -416,7 +416,7 @@ fn witness_matrix() {
             Err(Refusal::HiddenContent),
         ),
         (
-            "AlternateContent in a run (W1)",
+            "AlternateContent in a run",
             document(
                 &mc,
                 r#"<w:p><w:r><mc:AlternateContent><mc:Choice Requires="w14"><w:t>BOX</w:t></mc:Choice><mc:Fallback><w:t>BOX</w:t></mc:Fallback></mc:AlternateContent></w:r></w:p>"#,
@@ -424,7 +424,7 @@ fn witness_matrix() {
             Err(Refusal::Element),
         ),
         (
-            "AlternateContent in the body (W2)",
+            "AlternateContent in the body",
             document(
                 &mc,
                 r#"<w:p/><mc:AlternateContent><mc:Choice Requires="w14"><w:p/></mc:Choice><mc:Fallback/></mc:AlternateContent><w:p/>"#,
@@ -432,7 +432,7 @@ fn witness_matrix() {
             Err(Refusal::Element),
         ),
         (
-            "AlternateContent through an escaped binding (W7)",
+            "AlternateContent through an escaped binding",
             document(
                 &escaped,
                 r#"<mc:AlternateContent><mc:Choice Requires="w14"><w:p/></mc:Choice></mc:AlternateContent>"#,
@@ -440,7 +440,7 @@ fn witness_matrix() {
             Err(Refusal::Element),
         ),
         (
-            "ProcessContent (W3)",
+            "ProcessContent",
             document(
                 &format!(r#"{mc} mc:Ignorable="x" mc:ProcessContent="x:wrap""#),
                 r#"<w:p><x:wrap><w:r><w:t>W</w:t></w:r></x:wrap></w:p>"#,
@@ -453,7 +453,7 @@ fn witness_matrix() {
             Err(Refusal::Directive),
         ),
         (
-            "MustUnderstand of an unknown namespace (W5)",
+            "MustUnderstand of an unknown namespace",
             document(&format!(r#"{mc} mc:MustUnderstand="x""#), PARAGRAPH),
             Err(Refusal::Directive),
         ),

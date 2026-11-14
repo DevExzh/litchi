@@ -34,8 +34,8 @@ const MAX_TEXT_FRAGMENTS: usize = 32 * 1024;
 const MAX_TEXT_BYTES: usize = 2 * 1024 * 1024;
 const MAX_COMMAND_BYTES: usize = 1024;
 const MAX_NAME_BYTES: usize = 1024;
-const PRIVATE_SLIDE_NAME: &str = "__litchi_private_keynote_name_slide_missing_109__";
-const PRIVATE_INPUT: &[u8] = b"__litchi_private_keynote_name_input_109__";
+const PRIVATE_SLIDE_NAME: &str = "__litchi_private_keynote_name_slide_missing__";
+const PRIVATE_INPUT: &[u8] = b"__litchi_private_keynote_name_input__";
 const SOURCE_BUILT_PACKAGE: &[u8] =
     include_bytes!("../corpus/keynote_slide_table_headers/source_built.hex");
 const LOCKED_PACKAGE: &[u8] = include_bytes!("../corpus/keynote_slide_table_headers/locked.hex");

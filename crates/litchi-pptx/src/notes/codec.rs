@@ -1884,7 +1884,7 @@ mod tests {
             }
         }
         println!(
-            "0743-notes-scan-oracle handcrafted compared={compared} accepted={}",
+            "notes-scan-oracle handcrafted compared={compared} accepted={}",
             compared - refused
         );
         assert!(refused > 0 && refused < compared);
@@ -1910,7 +1910,7 @@ mod tests {
             }
         }
         println!(
-            "0743-notes-scan-oracle corpus parts={} compared={compared} accepted={}",
+            "notes-scan-oracle corpus parts={} compared={compared} accepted={}",
             parts.len(),
             compared - refused
         );

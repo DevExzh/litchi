@@ -3125,13 +3125,13 @@ mod tests {
         // byte-compare each member exactly as it did before this change.
         let mut compared = OpcPackage::from_vec(source.clone(), SourceLimits::default())
             .expect("open compared source");
-        compared.rels_mut().remove("rIdAbsent0593");
+        compared.rels_mut().remove("rIdAbsentProbe");
         for partname in partnames(&compared) {
             compared
                 .get_part_mut(&partname)
                 .expect("compared part")
                 .rels_mut()
-                .remove("rIdAbsent0593");
+                .remove("rIdAbsentProbe");
         }
         let compared_output =
             PackageWriter::to_bytes(&compared).expect("publish byte-compared package");

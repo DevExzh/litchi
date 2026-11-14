@@ -549,11 +549,11 @@ class RawApiCoverageTests(unittest.TestCase):
 
     def test_active_lane_and_incomplete_state_fail_final_mode(self) -> None:
         active = entry("fixture::describe", "semantic_method", "active_lane")
-        active["lane"] = "0362ul-test"
+        active["lane"] = "fixture-lane"
         value = manifest([active])
         value["lanes"] = []
         value["lanes"].append({
-            "id": "0362ul-test", "package": "fixture", "scope": "fixture",
+            "id": "fixture-lane", "package": "fixture", "scope": "fixture",
             "disposition": "active_lane",
             "source": {
                 "path": "crates/fixture/src/lib.rs", "blob": "a" * 40,
@@ -597,7 +597,7 @@ class RawApiCoverageTests(unittest.TestCase):
 
     def test_undeclared_active_lane_is_rejected(self) -> None:
         active = entry("fixture::describe", "semantic_method", "active_lane")
-        active["lane"] = "0362ul-missing"
+        active["lane"] = "undeclared-lane"
         value = manifest([active])
         value["lanes"] = []
         path = self.root / "manifest.json"

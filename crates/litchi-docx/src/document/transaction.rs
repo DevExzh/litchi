@@ -14043,7 +14043,7 @@ mod tests {
             for index in sampled_positions(base.paragraph_count(), 16) {
                 let mut default_edit = base.edit();
                 let Ok(_staged) =
-                    default_edit.replace_paragraph_text(Position::new(index), "litchi 0660")
+                    default_edit.replace_paragraph_text(Position::new(index), "litchi edit")
                 else {
                     continue;
                 };
@@ -14051,7 +14051,7 @@ mod tests {
                     .edit()
                     .with_compaction_policy(CompactionPolicy::WholeDocument);
                 optin_edit
-                    .replace_paragraph_text(Position::new(index), "litchi 0660")
+                    .replace_paragraph_text(Position::new(index), "litchi edit")
                     .expect("the same rewrite is accepted under either policy");
                 let default_commit = default_edit.commit().unwrap();
                 let optin_commit = optin_edit.commit().unwrap();
@@ -14079,7 +14079,7 @@ mod tests {
                             .unwrap()
                             .text()
                             .unwrap(),
-                        "litchi 0660",
+                        "litchi edit",
                         "{} paragraph {index}",
                         path.display()
                     );

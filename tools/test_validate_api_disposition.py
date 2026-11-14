@@ -42,7 +42,7 @@ class DispositionValidationTests(unittest.TestCase):
              "detail": "review", "target": ""},
         ]
         disposition_rows = [
-            {**inventory_rows[0], "decision": "FIXED", "evidence": "record 0362; source line",
+            {**inventory_rows[0], "decision": "FIXED", "evidence": "source repair; source line",
              "owner": "format-owner"},
             {**inventory_rows[1], "decision": "BUILDER_DRAFT", "evidence": "builder module is authoring-only",
              "owner": "format-owner"},
@@ -142,7 +142,7 @@ class DispositionValidationTests(unittest.TestCase):
         ]
         disposition_rows = [
             {**row, "decision": decision,
-             "evidence": "record 0362ul2 exact source classification",
+             "evidence": "exact source classification",
              "owner": "coordinator"}
             for row, (_, decision) in zip(inventory_rows, semantic_rows)
         ]
@@ -199,7 +199,7 @@ class DispositionValidationTests(unittest.TestCase):
                 self.write_rows(
                     [row],
                     [{**row, "decision": decision,
-                      "evidence": "record 0362ul2 exact source classification",
+                      "evidence": "exact source classification",
                       "owner": "coordinator"}],
                 )
                 errors = validator.validate(self.inventory, self.disposition)
@@ -237,7 +237,7 @@ class DispositionValidationTests(unittest.TestCase):
                 disposition_rows.append({
                     **row,
                     "decision": decision,
-                    "evidence": "0362ul7 exact source definition and consumer",
+                    "evidence": "exact source definition and consumer",
                     "owner": "coordinator",
                 })
         self.assertEqual(len(inventory_rows), 49)
@@ -259,7 +259,7 @@ class DispositionValidationTests(unittest.TestCase):
             disposition_rows.append({
                 **row,
                 "decision": "RAW_READER_METHOD",
-                "evidence": "0362ul7 old capture only",
+                "evidence": "old capture only",
                 "owner": "coordinator",
             })
         self.write_rows(inventory_rows, disposition_rows)
@@ -324,7 +324,7 @@ class DispositionValidationTests(unittest.TestCase):
                     [{
                         **row,
                         "decision": decision,
-                        "evidence": "0362ul7 exact source-role review",
+                        "evidence": "exact source-role review",
                         "owner": "coordinator",
                     }],
                 )
@@ -412,7 +412,7 @@ class DispositionValidationTests(unittest.TestCase):
         )
         self.disposition.write_bytes(
             b"crate\tcategory\tpath\tdetail\ttarget\tdecision\tevidence\towner\r\n"
-            b"fixture\tmut_owner\tfixture::Package::set\t\t\tFIXED\trecord 0362\towner\r\n"
+            b"fixture\tmut_owner\tfixture::Package::set\t\t\tFIXED\tsource repair\towner\r\n"
         )
         self.assertEqual(validator.validate(self.inventory, self.disposition), [])
 

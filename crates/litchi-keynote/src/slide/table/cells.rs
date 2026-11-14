@@ -21,5 +21,5 @@ pub use litchi_iwa_common::table::read::CommentTimestamp as TableCommentTimestam
 /// A sparse semantic table read, including its positioned cell comments.
 pub use litchi_iwa_common::table::read::TableRead;
 
-// Exact-source transaction vocabulary of this family (ADR 0034 W1).
+// Exact-source transaction vocabulary of this family (ADR 0034).
 pub use crate::package::slide_table_cells::{Error, LimitKind, Path};

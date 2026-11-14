@@ -59,19 +59,19 @@ fn round_trip(
 ) -> TestResult {
     let source = bytes(package)?;
     let set = package
-        .set_table_cell_comment(sheet, table, position, "record 0318")
+        .set_table_cell_comment(sheet, table, position, "comment corpus note")
         .map_err(|error| format!("{label}: set {error:?}"))?;
     let reopened = Package::from_bytes(&bytes(set.package())?)?;
     assert_eq!(
         text(&reopened, sheet, table, position).as_deref(),
-        Some("record 0318"),
+        Some("comment corpus note"),
         "{label}"
     );
     assert!(
         reopened
             .table_cell_comments(sheet, table)?
             .iter()
-            .any(|(at, comment)| *at == position && comment.text() == "record 0318"),
+            .any(|(at, comment)| *at == position && comment.text() == "comment corpus note"),
         "{label}"
     );
     let restored = set

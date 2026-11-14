@@ -32,7 +32,7 @@ const MAX_ALLOCATIONS: usize = 4;
 const MAX_RETAINED_BYTES: usize = 256 * 1024;
 const MAX_SCRATCH_BYTES: usize = 128 * 1024;
 const OVERSIZED_INPUT_BYTES: usize = MAX_INPUT_BYTES + 1;
-const PRIVATE_SENTINEL: &str = "__litchi_private_keynote_chart_axis_title_112__";
+const PRIVATE_SENTINEL: &str = "__litchi_private_keynote_chart_axis_title__";
 
 const KINDS: [AxisTitleKind; 2] = [AxisTitleKind::Category, AxisTitleKind::Value];
 

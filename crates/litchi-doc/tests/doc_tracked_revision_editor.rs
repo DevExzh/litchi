@@ -255,7 +255,7 @@ fn ordinary_tracked_revision_save_reuses_the_opened_doc_layout() {
             0,
             "inserted ",
             RevisionKind::Insertion,
-            RevisionMetadata::new("0663"),
+            RevisionMetadata::new("Rev0"),
         )
         .expect("tracked edit should commit");
     let output = editor.finish().expect("tracked DOC save should finish");
@@ -322,9 +322,9 @@ fn every_readable_fixture_accepts_a_tracked_insertion_at_cp_zero() {
         let inserted = editor
             .add_text(
                 0,
-                "0768 ",
+                "Rev1 ",
                 RevisionKind::Insertion,
-                RevisionMetadata::new("0768"),
+                RevisionMetadata::new("Rev1"),
             )
             .unwrap_or_else(|error| panic!("{name} should accept the insertion: {error}"));
         assert_eq!((inserted.start_cp, inserted.end_cp), (0, 5), "{name}");
@@ -339,7 +339,7 @@ fn every_readable_fixture_accepts_a_tracked_insertion_at_cp_zero() {
             reopened.revisions().unwrap().iter().any(|revision| {
                 revision.kind == RevisionKind::Insertion
                     && (revision.start_cp, revision.end_cp) == (0, 5)
-                    && revision.author == "0768"
+                    && revision.author == "Rev1"
             }),
             "{name}"
         );
@@ -352,7 +352,7 @@ fn every_readable_fixture_accepts_a_tracked_insertion_at_cp_zero() {
         // source; its strict stylesheet rules are independent of the edit.
         match public_text(&source) {
             Some(_) => assert!(
-                public_text(&output).is_some_and(|text| text.contains("0768 ")),
+                public_text(&output).is_some_and(|text| text.contains("Rev1 ")),
                 "{name}"
             ),
             None => assert!(public_text(&output).is_none(), "{name}"),
@@ -407,9 +407,9 @@ fn tracked_insertion_at_the_saved_caret_keeps_the_caret_before_the_new_text() {
         editor
             .add_text(
                 0,
-                "0768 ",
+                "Rev1 ",
                 RevisionKind::Insertion,
-                RevisionMetadata::new("0768"),
+                RevisionMetadata::new("Rev1"),
             )
             .unwrap();
         let output = editor.clone().finish().unwrap();
@@ -419,7 +419,7 @@ fn tracked_insertion_at_the_saved_caret_keeps_the_caret_before_the_new_text() {
             .revisions()
             .unwrap()
             .iter()
-            .position(|revision| revision.author == "0768")
+            .position(|revision| revision.author == "Rev1")
             .unwrap();
         editor.reject(index).unwrap();
         let rejected = editor.finish().unwrap();
@@ -446,7 +446,7 @@ fn tracked_insertions_keep_rebuilt_chpx_pages_readable() {
                 0,
                 "x",
                 RevisionKind::Insertion,
-                RevisionMetadata::new("0768"),
+                RevisionMetadata::new("Rev1"),
             )
             .unwrap_or_else(|error| panic!("{path} should accept the insertion: {error}"));
         let output = editor.finish().unwrap();
@@ -457,7 +457,7 @@ fn tracked_insertions_keep_rebuilt_chpx_pages_readable() {
                 revision.start_cp,
                 revision.end_cp
             ) == (0, 1)
-                && revision.author == "0768"),
+                && revision.author == "Rev1"),
             "{path}"
         );
         assert_eq!(reopened.finish().unwrap(), output, "{path}");

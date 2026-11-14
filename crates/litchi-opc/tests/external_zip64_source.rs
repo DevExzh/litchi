@@ -15,7 +15,7 @@ const LARGE_URI: &str = "/large.bin";
 const LARGE_MEMBER: &[u8] = b"large.bin";
 const LARGE_DECLARED_BYTES: u64 = 4_294_967_296;
 const MAX_PHYSICAL_SOURCE_BYTES: usize = 64 * 1024 * 1024;
-const REPLACEMENT: &[u8] = b"<document>litchi 0415 source edit</document>";
+const REPLACEMENT: &[u8] = b"<document>litchi zip64 source edit</document>";
 
 #[derive(Debug, Clone)]
 struct RawRecord {

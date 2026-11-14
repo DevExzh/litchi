@@ -31,8 +31,8 @@ const MAX_REFERENCES: usize = 32 * 1024;
 const MAX_TEXT_STORAGES: usize = 8 * 1024;
 const MAX_TEXT_FRAGMENTS: usize = 32 * 1024;
 const MAX_TEXT_BYTES: usize = 2 * 1024 * 1024;
-const PRIVATE_SELECTOR: &str = "__litchi_private_keynote_chart_arrangement_selector_118__";
-const PRIVATE_INPUT: &[u8] = b"__litchi_private_keynote_chart_arrangement_malformed_118__";
+const PRIVATE_SELECTOR: &str = "__litchi_private_keynote_chart_arrangement_selector__";
+const PRIVATE_INPUT: &[u8] = b"__litchi_private_keynote_chart_arrangement_malformed__";
 
 // These are tiny source-built packages shared with the chart-title target.
 // They contain a valid slide/chart graph and deliberately avoid embedding a

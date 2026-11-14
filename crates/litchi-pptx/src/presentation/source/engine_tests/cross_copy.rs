@@ -59,7 +59,7 @@ fn source_backed_cross_copy_supports_one_relationship_free_chart_leaf() -> TestR
     assert_eq!(chart_relationship.id, slide_bindings.chart_ids[0]);
     assert_eq!(chart_relationship.target, "../charts/chart1.xml");
     assert_eq!(chart_relationship.target_mode, None);
-    assert!(slide_xml.contains("Chart 0383 0"));
+    assert!(slide_xml.contains("Copied Chart 0"));
     assert!(slide_xml.contains(CHART_GRAPHIC_URI));
     assert_eq!(
         list_chart_members(&output)?,
@@ -90,10 +90,10 @@ fn source_backed_cross_copy_preserves_multiple_chart_source_order() -> TestResul
     let output = publish(&source, &destination_fixture()?, 0, 1, 1)?;
     let slide_xml = chart_slide_xml(&output)?;
     let first = slide_xml
-        .find("Chart 0383 0")
+        .find("Copied Chart 0")
         .ok_or_else(|| Error::Invalid("first chart frame is missing".into()))?;
     let second = slide_xml
-        .find("Chart 0383 1")
+        .find("Copied Chart 1")
         .ok_or_else(|| Error::Invalid("second chart frame is missing".into()))?;
     assert!(
         first < second,
@@ -219,7 +219,7 @@ fn source_backed_cross_copy_allocates_chart_uri_and_slide_relationship_collision
         .collect();
     assert_eq!(chart_relationships.len(), 1);
     assert_eq!(chart_relationships[0].id, copied_chart_id);
-    assert!(slide_xml.contains("Chart 0383 0"));
+    assert!(slide_xml.contains("Copied Chart 0"));
     assert_eq!(new_chart_members.len(), 1);
     assert_eq!(
         chart_members.first().map(String::as_str),
@@ -302,7 +302,7 @@ fn source_backed_cross_copy_copies_charts_alongside_images() -> TestResult {
     let output = publish(&source, &destination_fixture()?, 0, 1, 1)?;
     let slide_xml = chart_slide_xml(&output)?;
     let slide_bindings = parse_slide_bindings(slide_xml.as_bytes())?;
-    assert!(slide_xml.contains("Chart 0383 0"));
+    assert!(slide_xml.contains("Copied Chart 0"));
     assert_eq!(slide_bindings.chart_ids.len(), 1);
     assert_eq!(slide_bindings.image_ids.len(), 1);
     let (_, _, rels_xml) = copied_slide_parts(&output)?;
@@ -658,7 +658,7 @@ fn append_direct_chart(bytes: &[u8], relationship_id: &str, index: usize) -> Tes
             .rfind(marker)
             .ok_or_else(|| Error::Invalid("chart fixture has no shape tree".into()))?;
         let frame = format!(
-            r#"<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="{}" name="Chart 0383 {}"/><p:cNvGraphicFramePr/><p:nvPr/></p:nvGraphicFramePr><p:xfrm><a:off x="1" y="2"/><a:ext cx="3" cy="4"/></p:xfrm><a:graphic><a:graphicData uri="{}" xmlns:c="{}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:chart r:id="{}"/></a:graphicData></a:graphic></p:graphicFrame>"#,
+            r#"<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="{}" name="Copied Chart {}"/><p:cNvGraphicFramePr/><p:nvPr/></p:nvGraphicFramePr><p:xfrm><a:off x="1" y="2"/><a:ext cx="3" cy="4"/></p:xfrm><a:graphic><a:graphicData uri="{}" xmlns:c="{}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:chart r:id="{}"/></a:graphicData></a:graphic></p:graphicFrame>"#,
             500 + index,
             index,
             CHART_GRAPHIC_URI,
@@ -690,7 +690,7 @@ fn chart_slide_xml(bytes: &[u8]) -> TestResult<String> {
             .map_err(|error| Error::Invalid(format!("cannot read chart slide {name}: {error}")))?;
         let xml = std::str::from_utf8(&payload)
             .map_err(|error| Error::Invalid(format!("chart slide is not UTF-8: {error}")))?;
-        if xml.contains("Chart 0383") {
+        if xml.contains("Copied Chart") {
             return Ok(xml.to_owned());
         }
     }

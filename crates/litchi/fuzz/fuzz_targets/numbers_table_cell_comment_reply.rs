@@ -37,9 +37,9 @@ const MAX_SCAN_ROWS: u32 = 8;
 const MAX_SCAN_COLUMNS: u32 = 8;
 const MAX_REPLY_ORDINALS: usize = 4;
 const OVERSIZED_INPUT_BYTES: usize = 512 * 1024 + 1;
-const PRIVATE_SHEET: &str = "__litchi_private_reply_sheet_93__";
-const PRIVATE_TABLE: &str = "__litchi_private_reply_table_93__";
-const PRIVATE_INPUT: &[u8] = b"__litchi_private_reply_input_93__";
+const PRIVATE_SHEET: &str = "__litchi_private_reply_sheet__";
+const PRIVATE_TABLE: &str = "__litchi_private_reply_table__";
+const PRIVATE_INPUT: &[u8] = b"__litchi_private_reply_input__";
 const ZIP_LOCAL_HEADER: &[u8] = b"PK\x03\x04";
 const NATIVE_COMMENT_METADATA: &[u8] =
     include_bytes!("../../../../test-data/iwork/numbers/comment-metadata-native-resaved.numbers");
@@ -699,7 +699,7 @@ fn reply_text(data: &[u8], offset: usize) -> String {
     let mut text = String::new();
     text.try_reserve(width + 24)
         .unwrap_or_else(|error| unreachable!("bounded reply text allocation: {error}"));
-    text.push_str("Wave93 reply ");
+    text.push_str("Fuzz reply ");
     for index in 0..width {
         let byte = data
             .get(offset.saturating_add(2).saturating_add(index))

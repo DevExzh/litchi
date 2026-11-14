@@ -156,13 +156,13 @@ fn first_edit<P: Clone>(edit: &mut Edit<P>) {
     let count = edit.source().unwrap().paragraph_count();
     for position in 0..count {
         if edit
-            .replace_paragraph_text(Position::new(position), "UO-0011 replaced")
+            .replace_paragraph_text(Position::new(position), "MCE replaced")
             .is_ok()
         {
             return;
         }
     }
-    edit.insert_paragraph(Position::new(count), "UO-0011 appended")
+    edit.insert_paragraph(Position::new(count), "MCE appended")
         .unwrap();
 }
 fn is_protection_refusal(error: &TransactionError) -> bool {
@@ -519,7 +519,7 @@ fn witness_matrix_on_both_owners_and_the_managed_route() {
             Expect::Admitted,
         ),
         (
-            "W6: ignorable attribute and leaf element",
+            "ignorable attribute and leaf element",
             document(
                 &format!(r#"{mc} mc:Ignorable="x""#),
                 r#"<w:p x:id="1"><w:r><x:flag/><w:t>first</w:t></w:r></w:p><w:p><w:r><w:t>second</w:t></w:r></w:p>"#,
@@ -529,7 +529,7 @@ fn witness_matrix_on_both_owners_and_the_managed_route() {
         (
             // Run-level alternate content is an opaque inline object; the
             // projection keeps every block where it is.
-            "W1: AlternateContent in a run",
+            "AlternateContent in a run",
             document(
                 &mc,
                 &format!(
@@ -547,7 +547,7 @@ fn witness_matrix_on_both_owners_and_the_managed_route() {
             Expect::Refused,
         ),
         (
-            "W2: AlternateContent in the body",
+            "AlternateContent in the body",
             document(
                 &mc,
                 r#"<w:p><w:r><w:t>P0</w:t></w:r></w:p><mc:AlternateContent><mc:Choice Requires="w14"><w:p><w:r><w:t>CHOICE</w:t></w:r></w:p></mc:Choice><mc:Fallback/></mc:AlternateContent><w:p><w:r><w:t>P2</w:t></w:r></w:p>"#,
@@ -555,7 +555,7 @@ fn witness_matrix_on_both_owners_and_the_managed_route() {
             Expect::Refused,
         ),
         (
-            "W7: AlternateContent through an escaped namespace",
+            "AlternateContent through an escaped namespace",
             document(
                 &escaped,
                 r#"<w:p><w:r><w:t>P0</w:t></w:r></w:p><mc:AlternateContent><mc:Choice Requires="w14"><w:p><w:r><w:t>CHOICE</w:t></w:r></w:p></mc:Choice><mc:Fallback/></mc:AlternateContent><w:p><w:r><w:t>P2</w:t></w:r></w:p>"#,
@@ -563,7 +563,7 @@ fn witness_matrix_on_both_owners_and_the_managed_route() {
             Expect::Refused,
         ),
         (
-            "W3: ProcessContent",
+            "ProcessContent",
             document(
                 &format!(r#"{mc} mc:Ignorable="x" mc:ProcessContent="x:wrap""#),
                 r#"<w:p><x:wrap><w:r><w:t>WRAPPED</w:t></w:r></x:wrap><w:r><w:t>B</w:t></w:r></w:p>"#,
@@ -571,7 +571,7 @@ fn witness_matrix_on_both_owners_and_the_managed_route() {
             Expect::Refused,
         ),
         (
-            "W4: used ignorable prefix holding a run",
+            "used ignorable prefix holding a run",
             document(
                 &format!(r#"{mc} mc:Ignorable="x""#),
                 r#"<w:p><x:ext><w:r><w:t>HIDDEN</w:t></w:r></x:ext><w:r><w:t>B</w:t></w:r></w:p>"#,
@@ -587,7 +587,7 @@ fn witness_matrix_on_both_owners_and_the_managed_route() {
             Expect::Refused,
         ),
         (
-            "W5: MustUnderstand of an unknown namespace",
+            "MustUnderstand of an unknown namespace",
             document(&format!(r#"{mc} mc:MustUnderstand="x""#), PARAGRAPHS),
             Expect::MustUnderstand,
         ),

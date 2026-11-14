@@ -519,7 +519,7 @@ fn word_2002_shapes_are_classified_by_their_protection_fields() {
     let word2002 = counted_fib(0x00C1, 0x88, 2, 0x0101, 594);
     assert_eq!(classify_bytes(&word2002, &dop2002), EditProtection::None);
 
-    // The same FIB with the 500-byte DOP the pre-0759 writer emitted. The
+    // The same FIB with the 500-byte DOP an earlier writer emitted. The
     // DopBase is complete and Dop2000/Dop2002 add no protection field.
     let short_writer = counted_fib(0x00C1, 0x88, 2, 0x0101, 500);
     assert_eq!(

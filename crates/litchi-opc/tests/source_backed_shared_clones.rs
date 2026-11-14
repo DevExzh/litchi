@@ -39,7 +39,7 @@ const SIGNED_FIXTURE: &str = "poi/test-data/xmldsign/ms-office-2010-signed.docx"
 /// any edit of it before output, for a sole owner and for every clone alike.
 const TRAILING_BYTE_FIXTURE: &str = "poi/test-data/slideshow/bug62513.pptx";
 const BUILT: &str = "built here";
-const COMMENT: &[u8] = b"<!-- record 0012 -->";
+const COMMENT: &[u8] = b"<!-- shared clone edit -->";
 
 fn fixture(name: &str) -> Vec<u8> {
     if name == BUILT {

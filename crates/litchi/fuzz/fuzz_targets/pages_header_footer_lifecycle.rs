@@ -15,7 +15,7 @@ const MAX_ENTRIES: usize = 128;
 const MAX_ENTRY_BYTES: u64 = 1024 * 1024;
 const MAX_TOTAL_BYTES: u64 = 4 * 1024 * 1024;
 const MAX_IWA_STREAM_BYTES: usize = 1024 * 1024;
-const PRIVATE_SECTION: &str = "__litchi_private_header_footer_section_78__";
+const PRIVATE_SECTION: &str = "__litchi_private_header_footer_section__";
 const NATIVE_PAGES: &[u8] = include_bytes!("../../../../test-data/iwork/pages/basic.pages");
 
 fuzz_target!(|data: &[u8]| {

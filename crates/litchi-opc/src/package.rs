@@ -6344,7 +6344,7 @@ mod tests {
 
     #[test]
     fn every_durability_level_publishes_the_exact_source_and_keeps_its_authorization() {
-        let bytes = with_eocd_comment(create_minimal_docx(), b"exact source 0761");
+        let bytes = with_eocd_comment(create_minimal_docx(), b"exact source comment");
         let package = OpcPackage::from_vec(bytes.clone(), SourceLimits::default())
             .expect("open owned package");
         let digest = package.exact_source_sha256();

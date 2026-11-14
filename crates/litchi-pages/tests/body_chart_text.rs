@@ -37,13 +37,13 @@ fn body_chart_title_and_axis_title_mutations_are_reversible() -> TestResult {
     let package = Package::from_bytes(NATIVE)?;
     let title = package
         .edit_body_chart_title(BodyChartSelector::index(0))?
-        .set("Pages W1-E title")?
+        .set("Pages chart title")?
         .commit()?;
     assert_eq!(
         title
             .package()
             .body_chart_title(BodyChartSelector::index(0))?,
-        Some("Pages W1-E title".to_owned())
+        Some("Pages chart title".to_owned())
     );
     let restored = title
         .package()
@@ -53,13 +53,13 @@ fn body_chart_title_and_axis_title_mutations_are_reversible() -> TestResult {
     for axis in [Axis::Category, Axis::Value] {
         let commit = package
             .edit_body_chart_axis_title(BodyChartSelector::index(0), axis)?
-            .set("Pages W1-E axis")?
+            .set("Pages chart axis")?
             .commit()?;
         assert_eq!(
             commit
                 .package()
                 .body_chart_axis_title(BodyChartSelector::index(0), axis)?,
-            Some("Pages W1-E axis".to_owned())
+            Some("Pages chart axis".to_owned())
         );
         let restored = commit
             .package()

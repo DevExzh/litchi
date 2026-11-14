@@ -37,13 +37,13 @@ fn chart_title_and_axis_title_mutations_are_reversible() -> TestResult {
     let package = Package::from_bytes(NATIVE)?;
     let title = package
         .edit_sheet_chart_title(SheetSelector::index(0), ChartSelector::index(0))?
-        .set("Numbers W1-E title")?
+        .set("Numbers chart title")?
         .commit()?;
     assert_eq!(
         title
             .package()
             .sheet_chart_title(SheetSelector::index(0), ChartSelector::index(0))?,
-        Some("Numbers W1-E title".to_owned())
+        Some("Numbers chart title".to_owned())
     );
     let restored = title
         .package()
@@ -53,7 +53,7 @@ fn chart_title_and_axis_title_mutations_are_reversible() -> TestResult {
     for axis in [Axis::Category, Axis::Value] {
         let commit = package
             .edit_sheet_chart_axis_title(SheetSelector::index(0), ChartSelector::index(0), axis)?
-            .set("Numbers W1-E axis")?
+            .set("Numbers chart axis")?
             .commit()?;
         assert_eq!(
             commit.package().sheet_chart_axis_title(
@@ -61,7 +61,7 @@ fn chart_title_and_axis_title_mutations_are_reversible() -> TestResult {
                 ChartSelector::index(0),
                 axis
             )?,
-            Some("Numbers W1-E axis".to_owned())
+            Some("Numbers chart axis".to_owned())
         );
         let restored = commit
             .package()

@@ -214,7 +214,7 @@ fn no_text_verb_panics_on_mutated_text_run_markup() -> Result<()> {
         edited += variant_edited;
     }
     println!(
-        "0755-text-run-mutations variants={} refused={refused} edited={edited}",
+        "text-run-mutations variants={} refused={refused} edited={edited}",
         variants.len()
     );
     assert!(refused > 0 && edited > 0);

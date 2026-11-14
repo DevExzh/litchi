@@ -738,7 +738,7 @@ mod tests {
 
 
 def add_numbers_table_cell_comment_reply_mutation_scaffold(root: Path) -> None:
-    """Create the frozen Wave93 reply mutation contract in a temp tree."""
+    """Create the frozen reply mutation contract in a temp tree."""
 
     semantic = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -1311,7 +1311,7 @@ def add_numbers_table_cell_pop_up_menu_canonical_scaffold(root: Path) -> None:
 
 
 def add_numbers_table_cell_control_canonical_scaffold(root: Path) -> None:
-    """Create the smallest complete Wave85 owner for boundary unit tests."""
+    """Create the smallest complete cell-control owner for boundary unit tests."""
 
     semantic = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -1576,7 +1576,7 @@ def add_numbers_table_cell_custom_format_canonical_scaffold(root: Path) -> None:
 
 
 def complete_numbers_table_cell_control_popup_split_scaffold(root: Path) -> None:
-    """Upgrade the Wave85 fixture to the positive Wave90 popup contract."""
+    """Upgrade the cell-control fixture to the positive split popup contract."""
 
     add_numbers_table_cell_control_canonical_scaffold(root)
     owner = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE
@@ -2374,7 +2374,7 @@ def add_keynote_slide_media_lifecycle_canonical_scaffold(root: Path) -> None:
 
 
 def add_keynote_chart_axis_title_canonical_scaffold(root: Path) -> None:
-    """Install a complete Wave112 axis-title boundary fixture."""
+    """Install a complete axis-title boundary fixture."""
 
     semantic = root / boundaries.KEYNOTE_CHART_AXIS_TITLE_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -2811,7 +2811,7 @@ def add_keynote_slide_table_lock_state_canonical_scaffold(root: Path) -> None:
 
 
 def add_keynote_slide_table_dimension_canonical_scaffold(root: Path) -> None:
-    """Install the smallest complete Wave108 Keynote dimension facade."""
+    """Install the smallest complete Keynote dimension facade."""
 
     semantic = root / boundaries.KEYNOTE_SLIDE_TABLE_DIMENSION_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -2892,7 +2892,7 @@ def add_keynote_slide_table_dimension_canonical_scaffold(root: Path) -> None:
 
 
 def add_keynote_slide_table_name_canonical_scaffold(root: Path) -> None:
-    """Install the smallest complete Wave109 Keynote name-owner fixture."""
+    """Install the smallest complete Keynote name-owner fixture."""
 
     semantic = root / boundaries.KEYNOTE_SLIDE_TABLE_NAME_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -3041,7 +3041,7 @@ def add_keynote_slide_table_headers_canonical_scaffold(
     include_fuzz: bool = True,
     include_tests: bool = True,
 ) -> None:
-    """Install the smallest complete Wave100 header-owner fixture.
+    """Install the smallest complete header-owner fixture.
 
     This fixture deliberately models the source topology rather than the
     native implementation.  It is used to prove that the checker has a
@@ -3221,7 +3221,7 @@ def add_keynote_slide_table_appearance_canonical_scaffold(
     include_fuzz: bool = True,
     include_tests: bool = True,
 ) -> None:
-    """Install the smallest complete Wave103 appearance-owner fixture."""
+    """Install the smallest complete appearance-owner fixture."""
 
     semantic = root / boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -4020,7 +4020,7 @@ def add_pages_table_appearance_canonical_scaffold(
     include_fuzz: bool = True,
     include_tests: bool = True,
 ) -> None:
-    """Install a complete synthetic Wave104 body-table appearance owner."""
+    """Install a complete synthetic body-table appearance owner."""
 
     semantic = root / boundaries.PAGES_TABLE_APPEARANCE_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -5243,7 +5243,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                 boundaries.audit_litchi_semantic_facade_source_topology(root), []
             )
 
-            # A package type or a retired W1 ingress name in the semantic
+            # A package type or a retired ingress name in the semantic
             # re-exports is rejected.
             source = original.replace(
                 "Error, LimitKind, OpenOptions, PackageError",

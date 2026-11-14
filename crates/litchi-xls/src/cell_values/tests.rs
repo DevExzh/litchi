@@ -2975,7 +2975,7 @@ fn matrix_outcome(bytes: Vec<u8>) -> String {
     }
 }
 
-/// A 0541-style first-error matrix over the two framing passes of
+/// A first-error matrix over the two framing passes of
 /// `Snapshot::from_bytes`.
 ///
 /// The private offset inventory (`parse_workbook_stream`) frames the Workbook

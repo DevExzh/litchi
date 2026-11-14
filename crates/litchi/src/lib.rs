@@ -792,7 +792,7 @@ three = ["litchi-ops/three"]
     #[cfg(litchi_unified)]
     #[test]
     fn the_unified_entry_point_is_present() {
-        let error = crate::open("/nonexistent/litchi-0334.docx").unwrap_err();
+        let error = crate::open("/nonexistent/litchi-missing.docx").unwrap_err();
         assert_eq!(error.code(), crate::Code::FileNotFound);
     }
 }

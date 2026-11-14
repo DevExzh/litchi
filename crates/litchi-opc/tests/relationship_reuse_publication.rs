@@ -121,7 +121,7 @@ fn reusing_a_package_relationship_publishes_what_taking_the_seam_publishes() {
     // is the oracle for "the capture is only ever a shortcut".
     let mut compared =
         OpcPackage::from_vec(bytes.clone(), SourceLimits::default()).expect("open compared leg");
-    compared.rels_mut().remove("rIdAbsent0647");
+    compared.rels_mut().remove("rIdAbsentReuse");
     let compared_output = PackageWriter::to_bytes(&compared).expect("publish compared leg");
 
     assert!(
@@ -170,7 +170,7 @@ fn reusing_a_part_relationship_publishes_what_taking_the_seam_publishes() {
         .get_part_mut(&drawing)
         .expect("drawing part")
         .rels_mut()
-        .remove("rIdAbsent0647");
+        .remove("rIdAbsentReuse");
     let compared_output = PackageWriter::to_bytes(&compared).expect("publish compared leg");
 
     let republished = reuse.get_part(&drawing).expect("drawing part").rels();
@@ -202,7 +202,7 @@ fn establishing_a_new_relationship_still_republishes_the_member() {
         .get_part_mut(&drawing)
         .expect("drawing part")
         .rels_mut()
-        .get_or_add(&reltype, "../media/image0647.png")
+        .get_or_add(&reltype, "../media/image-reuse.png")
         .r_id()
         .to_string();
     let output = PackageWriter::to_bytes(&package).expect("publish topology add");
@@ -221,7 +221,7 @@ fn establishing_a_new_relationship_still_republishes_the_member() {
             .expect("republished drawing part")
             .rels()
             .iter()
-            .any(|rel| rel.target_ref() == "../media/image0647.png"),
+            .any(|rel| rel.target_ref() == "../media/image-reuse.png"),
         "the established relationship must survive the round trip"
     );
 }

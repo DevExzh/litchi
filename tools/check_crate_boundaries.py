@@ -253,8 +253,8 @@ KEYNOTE_CHART_TITLE_LEGACY_CALL = re.compile(
     r"remove_slide_chart_title)(?![A-Za-z0-9_])[ \t\r\n]*\("
 )
 
-# Wave117 moves only the Keynote chart-legend visibility bit into the focused
-# package owner. Keep this seam independent from the remaining legacy legend
+# Only the Keynote chart-legend visibility bit lives in the focused package
+# owner. Keep this seam independent from the remaining legacy legend
 # style operations (fill, frame, font, stroke, and shadow), and from the
 # shared Pages/Numbers chart-options helper.
 KEYNOTE_CHART_LEGEND_OWNER_SOURCE = (
@@ -297,8 +297,8 @@ KEYNOTE_CHART_LEGEND_RAW_ID_TOKEN = re.compile(
     r"\b(?:native_id|object_id|drawable_object_id|chart_object_id|identifier)\b"
 )
 
-# Wave121 moves the Keynote chart Arrange-panel state behind the focused
-# package owner.  Pages and Numbers have their own focused owners as well, so
+# The Keynote chart Arrange-panel state lives behind the focused package
+# owner.  Pages and Numbers have their own focused owners as well, so
 # the former shared host shell is retired across all three formats.
 KEYNOTE_CHART_ARRANGEMENT_SEMANTIC_SOURCE = KEYNOTE_SOURCE_ROOT / "chart.rs"
 KEYNOTE_CHART_ARRANGEMENT_COMMON_SOURCE = Path(
@@ -667,7 +667,7 @@ KEYNOTE_CHART_CAPTION_PACKAGE_METHODS = frozenset(
     }
 )
 
-# Wave112 moves Keynote chart-axis-title reads and mutations behind the same
+# Keynote chart-axis-title reads and mutations live behind the same
 # selector-first package boundary as chart titles/captions.  Keep this gate
 # independent from the Pages/Numbers native axis helpers: those editors still
 # share the low-level chart-axis wire implementation until their own owners
@@ -1096,16 +1096,16 @@ KEYNOTE_MOVIE_CAPTION_EXTERNAL_REFERENCE_MARKERS = frozenset(
         "external_ref",
     }
 )
-# The Wave74 owner must account graph creation/removal and the existing text
-# path under one private transaction budget.  This deliberately accepts the
-# established ``CaptionPackageBudget``/``MovieCaptionBudget`` naming family
+# The movie-caption owner must account graph creation/removal and the existing
+# text path under one private transaction budget.  This deliberately accepts
+# the established ``CaptionPackageBudget``/``MovieCaptionBudget`` naming family
 # without exposing the type through the public facade.
 KEYNOTE_MOVIE_CAPTION_PACKAGE_BUDGET_TYPE = re.compile(
     r"(?m)^[ \t]*(?:pub[ \t]*\([ \t]*super[ \t]*\)[ \t]+)?struct[ \t]+"
     r"(?P<name>(?:Movie|Caption|Package)[A-Za-z0-9_]*Budget)\b"
 )
 
-# Wave75 moves the *title* edge of a Keynote movie into the same focused
+# The *title* edge of a Keynote movie lives in the same focused
 # package owner as the caption edge.  Keep this vocabulary separate from the
 # caption ratchet: a title implementation must prove its own semantic
 # facade, dual-edge codec, graph transition, and host retirement rather than
@@ -1328,8 +1328,8 @@ IWA_KEYNOTE_MOVIE_TITLE_CODEC_CALL = re.compile(
     r"(?:keynote_movie_title_codec|movie_title_codec)[ \t\r\n]*::[ \t\r\n]*"
     r"(?:decode|rewrite|validate)[A-Za-z0-9_]*\b"
 )
-# Wave82 moves the scalar playback edge of a file-backed Keynote movie into
-# the package crate.  This is intentionally separate from the title/caption
+# The scalar playback edge of a file-backed Keynote movie lives in the
+# package crate.  This is intentionally separate from the title/caption
 # graph ratchets above: playback changes only selected MovieArchive scalar
 # fields and must not acquire graph/Metadata ownership by implication.
 KEYNOTE_MOVIE_PLAYBACK_SEMANTIC_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "media.rs"
@@ -1513,8 +1513,8 @@ IWA_KEYNOTE_MOVIE_PLAYBACK_TYPED_METHODS = frozenset(
     }
 )
 
-# Wave110 retires the compatibility Keynote media readers after the focused
-# package owns semantic movie/audio reads.  The old reader methods and
+# The compatibility Keynote media readers are retired: the focused package
+# owns semantic movie/audio reads.  The old reader methods and
 # projection types must disappear from production and test-only source alike;
 # only the private graph fixture helpers (which use distinct names) remain
 # valid.  Scan the complete Keynote host tree plus integration/examples so an
@@ -1700,7 +1700,7 @@ IWA_IMAGE_ADJUSTMENTS_HOST_LEGACY_HELPER = re.compile(
 )
 
 
-# Wave87 moves Keynote movie geometry behind a selector-first package facade.
+# Keynote movie geometry lives behind a selector-first package facade.
 # Keep this separate from playback/title/caption and from generic image, shape,
 # or audio geometry. Geometry writes own preview invalidation as an explicit
 # transition concern.
@@ -1878,10 +1878,10 @@ KEYNOTE_MOVIE_GEOMETRY_PACKAGE_MARKER_GROUPS = {
         "deleted_previews",
     ),
 }
-# Wave111 is the completion seam for movie geometry.  The original Wave87
-# owner intentionally stopped at position/size and therefore still permits a
-# compatibility implementation for native Arrange angle/flip/flags.  Keep
-# that historical ratchet unchanged, but give the eventual expanded owner an
+# This is the completion seam for movie geometry.  The geometry owner
+# intentionally stopped at position/size and therefore still permits a
+# compatibility implementation for native Arrange angle/flip/flags.  Keep that
+# historical ratchet unchanged, but give the eventual expanded owner an
 # explicit activation token.  This avoids silently treating a partial owner as
 # complete while making the retirement contract executable once the semantic
 # and codec surfaces land together.
@@ -2353,8 +2353,8 @@ KEYNOTE_MEDIA_PROPERTIES_OWNER_MARKER_GROUPS = {
 }
 
 
-# Wave122 moves replacement of already-materialized Keynote slide movie/audio
-# data into one selector-first package owner.  The owner deliberately covers
+# Replacement of already-materialized Keynote slide movie/audio data lives
+# in one selector-first package owner.  The owner deliberately covers
 # the shared media payload edge (movie content, movie poster, and audio
 # content) without owning movie/audio creation, duplication, deletion,
 # playback, geometry, title/caption, or generic ``Draft::replace_media``
@@ -3504,7 +3504,7 @@ KEYNOTE_SLIDE_MEDIA_LIFECYCLE_METADATA_IDENTIFIER_CALLBACKS = {
     ),
 }
 
-# Wave98 moves existing canonical Keynote slide-table title settings behind a
+# Existing canonical Keynote slide-table title settings live behind a
 # selector-first package facade.  The strict Buffa projections remain shared
 # iWork codecs; this ratchet owns only the semantic facade and the bounded
 # Keynote transaction.
@@ -3601,13 +3601,13 @@ KEYNOTE_SLIDE_TABLE_TITLE_PACKAGE_MARKER_GROUPS = {
     "object/member locality": ("verify_locality",),
 }
 
-# Wave99 kept Keynote's physical row-reordering executor in the legacy host while
-# moving only the persisted field-44 sort configuration behind a selector-first
-# package facade. The compatibility host's normal physical entry points are
-# likewise selector-first; its older raw-ID methods remain declarations only
-# for source compatibility. This is deliberately a separate ratchet from the
-# title owner above: a table sort edit must not accidentally become a row/tile/
-# UID, metadata, or focused physical ``Sort Now`` migration.
+# Keynote's physical row-reordering executor stays in the legacy host; only the
+# persisted field-44 sort configuration lives behind a selector-first package
+# facade. The compatibility host's normal physical entry points are likewise
+# selector-first; its older raw-ID methods remain declarations only for source
+# compatibility. This is deliberately a separate ratchet from the title owner
+# above: a table sort edit must not accidentally become a row/tile/UID,
+# metadata, or focused physical ``Sort Now`` migration.
 KEYNOTE_SLIDE_TABLE_SORT_SEMANTIC_SOURCE = (
     KEYNOTE_SOURCE_ROOT / "slide" / "table" / "sort.rs"
 )
@@ -4256,7 +4256,7 @@ KEYNOTE_SLIDE_TABLE_SORT_PUBLIC_RAW_ID_PARAMETER = re.compile(
     r"(?=$|[^A-Za-z0-9_])"
 )
 
-# Wave105 exposes persisted Keynote slide-table lock state through the same
+# Persisted Keynote slide-table lock state is exposed through the same
 # selector-first package boundary as title and sort.  The native editor lock
 # module is retired.
 KEYNOTE_SLIDE_TABLE_LOCK_STATE_SEMANTIC_SOURCE = (
@@ -4358,7 +4358,7 @@ KEYNOTE_SLIDE_TABLE_LOCK_STATE_PUBLIC_RAW_ID_PARAMETER = re.compile(
     r"(?=$|[^A-Za-z0-9_])"
 )
 
-# Wave108 moves persisted Keynote slide-table row/column dimensions behind a
+# Persisted Keynote slide-table row/column dimensions live behind a
 # selector-first package owner. Keep this ratchet separate from the physical
 # geometry executor: persisted dimension settings must not retain raw native
 # identifiers, generated archives, or a public IWA editor surface.
@@ -4492,7 +4492,7 @@ KEYNOTE_SLIDE_TABLE_DIMENSION_OWNER_PATH = re.compile(
     r"[ \t\r\n]*(?:r#)?dimension)(?=[ \t\r\n]*(?:::|as\b|;|=))"
 )
 
-# Wave109 moves persisted Keynote slide-table display names behind the same
+# Persisted Keynote slide-table display names live behind the same
 # selector-first package boundary as the adjacent table configuration owners.
 # A name is semantic UTF-8 text; its owner may not expose the native model
 # identifier, archive/protobuf values, or a public raw-wire escape hatch.
@@ -4707,10 +4707,11 @@ KEYNOTE_SLIDE_TABLE_NAME_FUZZ_CORPORA = (
 )
 
 
-# Wave100 owns only the seven persisted header/footer/freeze/repetition scalar
-# fields of a Keynote slide table.  The package owner is deliberately separate
-# from the legacy editor: the latter still knows how to move rows/cells and
-# therefore must not become an accidental dependency of this scalar rewrite.
+# The slide-table header owner owns only the seven persisted
+# header/footer/freeze/repetition scalar fields of a Keynote slide table.  It
+# is deliberately separate from the legacy editor: the latter still knows how
+# to move rows/cells and therefore must not become an accidental dependency of
+# this scalar rewrite.
 KEYNOTE_SLIDE_TABLE_HEADERS_SEMANTIC_SOURCE = (
     KEYNOTE_SOURCE_ROOT / "slide" / "table" / "headers.rs"
 )
@@ -4996,10 +4997,10 @@ KEYNOTE_SLIDE_TABLE_HEADERS_FUZZ_CORPORA = (
     Path("crates/litchi/fuzz/corpus/keynote_slide_table_headers"),
 )
 
-# Wave103 moves complete Keynote slide-table appearance ownership behind the
+# Complete Keynote slide-table appearance ownership lives behind the
 # selector-first package facade.  The existing shared table-appearance codec
 # remains the strict wire seam; this inventory gates the package owner and
-# its host retirement independently from the Wave102 listing-only ratchet.
+# its host retirement independently from the listing-only ratchet.
 KEYNOTE_SLIDE_TABLE_APPEARANCE_SEMANTIC_SOURCE = (
     KEYNOTE_SOURCE_ROOT / "slide" / "table" / "appearance.rs"
 )
@@ -6938,12 +6939,12 @@ NUMBERS_TABLE_CELL_CONTROL_OWNER_REQUIRED_MARKERS = {
         r"(?<![A-Za-z0-9])(?:locality|verify_locality|candidate|reopen|same_content)(?![A-Za-z0-9])"
     ),
 }
-# Wave86 is intentionally a bounded cross-component slice. Reads and exact
+# The bounded split-graph contract is a cross-component slice. Reads and exact
 # no-ops may traverse a split graph, but every changed operation must refuse
-# before candidate/native allocation until a later wave owns multi-member
-# mutation. Require strict read/edge/locator proof and the early refusal
-# guard; do not require successful split writes, token batching, or
-# cross-component candidate/locality machinery.
+# before candidate/native allocation unless the popup lifecycle contract below
+# owns multi-member mutation. Require strict read/edge/locator proof and the
+# early refusal guard; do not require successful split writes, token batching,
+# or cross-component candidate/locality machinery.
 NUMBERS_TABLE_CELL_CONTROL_SPLIT_COMPONENT_SOURCE = Path(
     "crates/litchi-numbers/tests/table_cell_control.rs"
 )
@@ -6983,12 +6984,12 @@ NUMBERS_TABLE_CELL_CONTROL_BOUNDED_OWNER_REQUIRED_MARKERS = {
         re.IGNORECASE,
     ),
 }
-# Wave90 completes the split Pop-Up Menu graph under the generic CellControl
-# facade.  The earlier Wave86 contract deliberately required a refusal guard;
-# that guard must disappear once the owner can stage every changed member in a
-# single transaction.  Keep this contract separate from the scalar-control
-# bridge so Pages/Keynote adapters and the shared private cell-data-format
-# implementation remain out of scope.
+# The popup lifecycle contract completes the split Pop-Up Menu graph under the
+# generic CellControl facade.  The bounded split-graph contract deliberately
+# required a refusal guard; that guard must disappear once the owner can stage
+# every changed member in a single transaction.  Keep this contract separate
+# from the scalar-control bridge so Pages/Keynote adapters and the shared
+# private cell-data-format implementation remain out of scope.
 NUMBERS_TABLE_CELL_CONTROL_POPUP_SPLIT_OWNER_REQUIRED_MARKERS = {
     "per-member graph ownership": re.compile(
         r"(?<![A-Za-z0-9_])(?:NativePopUpGraphInput|NativePopUpMember|"
@@ -10131,8 +10132,8 @@ NUMBERS_EXTRACTOR_NO_EAGER_TABLE_DATA_LIST_SOURCE_PATTERNS = (
     ),
 )
 NUMBERS_COMMENT_SOURCE = Path("crates/litchi-numbers/src/package/comments.rs")
-# Wave91 adds a read-only, selector-first projection of direct table-cell
-# comment replies.  Keep this ratchet dormant until the canonical semantic
+# Direct table-cell comment replies have a read-only, selector-first
+# projection.  Keep this ratchet dormant until the canonical semantic
 # type is present: the existing root-comment owner and the raw-ID
 # Draft reply mutation/identity APIs remain compatibility surfaces.
 NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE = NUMBERS_COMMENT_SOURCE
@@ -10327,11 +10328,11 @@ NUMBERS_TABLE_CELL_COMMENT_REPLY_DEBUG_REDACTION = re.compile(
     r"authored[ \t\r\n_-]*(?:content|text)|content[ \t\r\n_-]*redact)"
 )
 
-# Wave93 owns mutation of an existing cell-comment reply thread.  The read
-# projection above intentionally remains a separate, already-landed contract:
-# seeing ``CommentReply`` alone must not retire the compatibility host or
-# activate these stronger checks.  Activation therefore requires one of the
-# mutation-only names below in non-test production source.
+# The reply mutation owner owns mutation of an existing cell-comment reply
+# thread.  The read projection above intentionally remains a separate,
+# already-landed contract: seeing ``CommentReply`` alone must not retire the
+# compatibility host or activate these stronger checks.  Activation therefore
+# requires one of the mutation-only names below in non-test production source.
 NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_SEMANTIC_SOURCE = Path(
     "crates/litchi-numbers/src/cell/comment.rs"
 )
@@ -10667,7 +10668,7 @@ NUMBERS_EXTRACTOR_NO_EAGER_FORMULA_SOURCE_PATTERNS = (
 RETIRED_IWA_NUMBERS_TABLE_READER_MODULES = frozenset(
     {"formula_renderer", "table", "table_extractor"}
 )
-# Wave108 gives the generated-free formula event visitor a low-level home in
+# The generated-free formula event visitor has a low-level home in
 # ``litchi-numbers-wire``.  The wire crate is allowed to depend on the
 # generated Numbers codec because it is the codec's immediate adapter; format
 # readers must consume this semantic owner instead of carrying another event
@@ -10727,9 +10728,9 @@ IWA_FORMULA_RENDER_LOCAL_VISITOR_DECLARATIONS = (
         ),
     ),
 )
-# Wave110 gives the Numbers cell-storage value envelope one low-level semantic
-# owner.  The owner returns only scalar values and unresolved table references;
-# it borrows the input bytes and leaves sidecar lookup to each format adapter.
+# The Numbers cell-storage value envelope has one low-level semantic owner.
+# The owner returns only scalar values and unresolved table references; it
+# borrows the input bytes and leaves sidecar lookup to each format adapter.
 # Keep this separate from the existing BNC/pre-BNC view audits: those views are
 # still valid wire-owned building blocks, while this module owns their shared
 # version dispatch and value interpretation.
@@ -10968,11 +10969,11 @@ IWA_NUMBERS_TABLE_DATA_LIST_SEGMENT_TOPOLOGY_FILTER = re.compile(
 IWA_NUMBERS_TABLE_DATA_LIST_SELECTION_STATE = re.compile(
     r"\b(?:selected_values|selected_keys|segment_count)\b"
 )
-# Wave109 moves the strict FormulaArchive envelope walk and schema validator
-# beside the shared formula event adapter.  It remains a generated-code
-# boundary: ``litchi-numbers-wire`` may inspect the generated-free codec, while
-# format readers retain only their owned byte wrapper, decoder calls, report
-# charging, and format-specific error mapping.
+# The strict FormulaArchive envelope walk and schema validator live beside the
+# shared formula event adapter.  It remains a generated-code boundary:
+# ``litchi-numbers-wire`` may inspect the generated-free codec, while format
+# readers retain only their owned byte wrapper, decoder calls, report charging,
+# and format-specific error mapping.
 IWA_NUMBERS_WIRE_FORMULA_ENVELOPE_SOURCE = Path(
     "crates/litchi-numbers-wire/src/formula_envelope.rs"
 )
@@ -11077,7 +11078,7 @@ IWA_NUMBERS_WIRE_FORMULA_ENVELOPE_PUBLIC_ENTRY = re.compile(
     r"(?m)^[ \t]*pub[ \t]+fn[ \t]+"
     r"(?:r#)?preflight_formula_envelope\b"
 )
-# Wave107 moves the allocation-conscious expression arena out of both format
+# The allocation-conscious expression arena lives outside both format
 # readers.  The readers retain only their format-specific budget adapters,
 # while the archive-free common renderer owns the handles, nodes, parts, and
 # iterative output walk.  Keep this audit separate from the older generated-
@@ -11939,10 +11940,10 @@ PAGES_TRANSACTION_FAMILY_BY_OWNER = {
 PAGES_TRANSACTION_SHARED_TYPES = {
     "metadata_edit": frozenset({"Diagnostics"}),
 }
-# Root aliases and ingress types deleted by W1 that have no prefix+short
-# spelling.  ``MetadataEdit*`` and ``SectionParagraphs*`` were never published
-# but are banned with the other prefixed spellings so the families stay
-# uniform.
+# Root aliases and ingress types deleted by the iWork rename that have no
+# prefix+short spelling.  ``MetadataEdit*`` and ``SectionParagraphs*`` were
+# never published but are banned with the other prefixed spellings so the
+# families stay uniform.
 PAGES_TRANSACTION_RETIRED_EXTRA_NAMES = frozenset(
     {
         "BodyTableHeaderSettings",
@@ -11970,7 +11971,7 @@ PAGES_TRANSACTION_FAMILY_RETIRED_ALIASES = {
 
 
 def _pages_transaction_legacy_names(owner: str) -> frozenset[str]:
-    """Return the deleted prefixed spellings and aliases of one W1 family."""
+    """Return the deleted prefixed spellings and aliases of one renamed family."""
 
     _, prefix, _, shorts, overrides = PAGES_TRANSACTION_FAMILY_BY_OWNER[owner]
     return frozenset(
@@ -12343,7 +12344,7 @@ PAGES_PACKAGE_OUTPUT_FORBIDDEN_NAMES = frozenset(
 PAGES_PACKAGE_OUTPUT_METHOD = "write_to"
 PAGES_PACKAGE_OUTPUT_ERROR = "WriteError"
 
-# Wave118 centralizes failure-atomic iWork package publication in the archive
+# Failure-atomic iWork package publication is centralized in the archive
 # crate.  Keep the owner and the three concrete package boundaries explicit so
 # a format crate cannot quietly grow a second tempfile/rename/sync policy.  The
 # owner module is intentionally public: the focused format crates and the
@@ -13566,7 +13567,7 @@ PAGES_TABLE_APPEARANCE_PUBLIC_NAMES = frozenset(
     + ("BodyTableSelector",)
 )
 # Public names that may legitimately be the target spelling of a ``pub use``
-# rename (none of the W1 transaction names may be renamed).
+# rename (none of the renamed transaction names may be renamed again).
 PAGES_TABLE_APPEARANCE_ALIAS_EXEMPT_NAMES = frozenset(
     PAGES_TABLE_APPEARANCE_SEMANTIC_TYPES + ("BodyTableSelector",)
 )
@@ -13792,8 +13793,8 @@ PAGES_TABLE_APPEARANCE_PUBLIC_RAW_ID_PARAMETER = re.compile(
     r"(?=$|[^A-Za-z0-9_])"
 )
 
-# Body-table spelling is also useful to callers which use the longer Wave104
-# name.  Keep these aliases as constants, not duplicate inventories.
+# Body-table spelling is also useful to callers which use the longer
+# body-table name.  Keep these aliases as constants, not duplicate inventories.
 PAGES_BODY_TABLE_APPEARANCE_SEMANTIC_SOURCE = PAGES_TABLE_APPEARANCE_SEMANTIC_SOURCE
 PAGES_BODY_TABLE_APPEARANCE_OWNER_SOURCE = PAGES_TABLE_APPEARANCE_OWNER_SOURCE
 PAGES_BODY_TABLE_APPEARANCE_EXPORT_SOURCES = PAGES_TABLE_APPEARANCE_EXPORT_SOURCES
@@ -13878,7 +13879,7 @@ PAGES_TABLE_HIDDEN_AXES_PUBLIC_NAMES = frozenset(
     + ("BodyTableSelector",)
 )
 # Public names that may legitimately be the target spelling of a rename
-# (none of the W1 transaction names may be renamed).
+# (none of the renamed transaction names may be renamed again).
 PAGES_TABLE_HIDDEN_AXES_ALIAS_EXEMPT_NAMES = frozenset(
     PAGES_TABLE_HIDDEN_AXES_SEMANTIC_TYPES + ("BodyTableSelector",)
 )
@@ -14045,11 +14046,11 @@ PAGES_TABLE_HIDDEN_AXES_FORBIDDEN_UID_MAP_LITERAL = re.compile(
 PAGES_TABLE_HIDDEN_AXES_LEGACY_OPT_IN_MARKER = re.compile(
     r"\ballow_legacy\b"
 )
-# Owner creation was intentionally ruled out for this migration wave: an
-# absent hidden-state owner may be read as empty, but a changed non-empty edit
-# must fail rather than inventing a graph, IDs, or metadata objects.  Keep the
-# check on the known construction helpers rather than banning ordinary
-# collection ``insert`` calls used to validate an existing owner.
+# The owner never creates a hidden-state graph: an absent hidden-state owner
+# may be read as empty, but a changed non-empty edit must fail rather than
+# inventing a graph, IDs, or metadata objects.  Keep the check on the known
+# construction helpers rather than banning ordinary collection ``insert`` calls
+# used to validate an existing owner.
 PAGES_TABLE_HIDDEN_AXES_FORBIDDEN_CREATION_MARKERS = (
     re.compile(r"\bNewIds\b"),
     re.compile(r"\ballocate_ids\b"),
@@ -17520,7 +17521,7 @@ def _is_pages_table_appearance_public_declaration(
 
 
 def _pages_table_appearance_owner_present(root: Path) -> bool:
-    """Activate Wave104 only after the private package owner is wired."""
+    """Activate the body-table appearance audit only after its owner is wired."""
 
     owner_path = root / PAGES_TABLE_APPEARANCE_OWNER_SOURCE
     package_path = root / PAGES_TABLE_APPEARANCE_EXPORT_SOURCES[1]
@@ -28088,7 +28089,7 @@ def audit_numbers_table_cell_control_facade_source_topology(
     )
     # The unified owner delegates the legacy Pop-Up Menu graph and its strict
     # metadata selector/edge proof through these package siblings. Include
-    # both in the bounded Wave86 graph contract.
+    # both in the bounded split-graph contract.
     owner_graph_paths = set(owner_related_paths)
     for popup_graph_name in (
         "table_cell_pop_up_menu.rs",
@@ -28170,11 +28171,11 @@ def audit_numbers_table_cell_control_facade_source_topology(
                 f"{label} transaction marker: {NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE}"
             )
 
-    # Keep the Wave86 refusal contract as a migration bridge only.  Once the
-    # Wave90 popup split lifecycle contract is complete, requiring the old
-    # refusal marker would make a successful multi-member owner fail the
-    # generic facade audit.  The dedicated Wave90 audit below owns the new
-    # positive contract and rejects stale refusal guards itself.
+    # Keep the split-graph refusal contract as a migration bridge only.  Once
+    # the popup split lifecycle contract is complete, requiring the old refusal
+    # marker would make a successful multi-member owner fail the generic facade
+    # audit.  The dedicated popup lifecycle audit below owns the new positive
+    # contract and rejects stale refusal guards itself.
     popup_split_owner_complete = (
         all(
             marker.search(owner_graph_code) is not None
@@ -28382,14 +28383,14 @@ def audit_numbers_table_cell_control_facade_source_topology(
 def audit_numbers_table_cell_control_popup_split_lifecycle_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
-    """Require the complete Wave90 split Pop-Up Menu lifecycle.
+    """Require the complete split Pop-Up Menu lifecycle.
 
     The public surface remains the selector-first ``CellControl`` facade.  A
     popup graph is nevertheless allowed to span several current component
     members, so the boundary must inspect the private popup native/metadata
     siblings as one ownership unit.  This ratchet intentionally checks
     positive lifecycle evidence (member edits, metadata transitions, cull and
-    candidate locality) and rejects the temporary Wave86 refusal guard.  It
+    candidate locality) and rejects the temporary split-graph refusal guard.  It
     does not scan the shared adapter or same-named Pages/Keynote code.
     """
 
@@ -32855,7 +32856,7 @@ def audit_iwa_shared_image_adjustments_source_topology(
 
 
 def _keynote_slide_table_appearance_owner_present(root: Path) -> bool:
-    """Return whether the complete Wave103 appearance owner is wired."""
+    """Return whether the complete slide-table appearance owner is wired."""
 
     owner_path = root / KEYNOTE_SLIDE_TABLE_APPEARANCE_OWNER_SOURCE
     package_path = root / KEYNOTE_SLIDE_TABLE_APPEARANCE_EXPORT_SOURCES[0]
@@ -33902,7 +33903,7 @@ def audit_numbers_table_cell_comment_reply_codec_rewrite_source_topology(
 ) -> list[str]:
     """Ratchet the prepared reply-rewrite codec independently of the owner.
 
-    The Wave91 facade intentionally remains a read-only projection.  This
+    The reply read facade intentionally remains a read-only projection.  This
     separate ratchet is dormant until a production (non-``cfg(test)``)
     ``CommentStorageReplyRewrite`` symbol appears in the strict codec.  Once
     that symbol lands, the codec must expose the complete prepared
@@ -33969,7 +33970,7 @@ def audit_numbers_table_cell_comment_reply_codec_rewrite_source_topology(
 
 
 def _numbers_table_cell_comment_reply_mutation_owner_present(root: Path) -> bool:
-    """Return whether Wave93 reply mutation is present in production source."""
+    """Return whether reply mutation is present in production source."""
 
     source_paths = [
         root / NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_SOURCE,
@@ -33995,9 +33996,9 @@ def _numbers_table_cell_comment_reply_mutation_owner_present(root: Path) -> bool
 def audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
-    """Enforce the Wave93 selector-first reply mutation boundary.
+    """Enforce the selector-first reply mutation boundary.
 
-    Wave91's plural read projection is intentionally independent from this
+    The plural reply read projection is intentionally independent from this
     ratchet.  Once a production mutation symbol appears, this check requires
     the complete semantic/transaction surface, a private owner, strict
     prepared codec usage, package-wide ownership and metadata proofs, and the
@@ -37110,7 +37111,7 @@ def _keynote_chart_arrangement_deprecated_legacy_methods(
 
 
 def _keynote_chart_axis_title_owner_present(root: Path) -> bool:
-    """Return whether the Wave112 axis-title owner crossed its wiring seam."""
+    """Return whether the axis-title owner crossed its wiring seam."""
 
     owner_path = root / KEYNOTE_CHART_AXIS_TITLE_OWNER_SOURCE
     package_path = root / KEYNOTE_CHART_AXIS_TITLE_EXPORT_SOURCES[0]
@@ -37571,7 +37572,7 @@ def audit_keynote_chart_axis_title_completion_source_topology(
     return sorted(set(violations))
 
 
-# Wave114 moves the complete Keynote value-axis scalar surface behind one
+# The complete Keynote value-axis scalar surface lives behind one
 # selector-first package owner.  Bounds, steps, and scale are intentionally
 # audited as one aggregate: three independently staged transactions could
 # each pass a local check while still losing source spans, violating locality,
@@ -37902,7 +37903,7 @@ KEYNOTE_CHART_AXIS_VALUE_SETTINGS_FUZZ_CORPORA = (
 
 
 def _keynote_chart_axis_value_settings_owner_present(root: Path) -> bool:
-    """Return whether the Wave114 value-axis owner crossed its wiring seam."""
+    """Return whether the value-axis owner crossed its wiring seam."""
 
     owner_path = root / KEYNOTE_CHART_AXIS_VALUE_SETTINGS_OWNER_SOURCE
     package_path = root / KEYNOTE_CHART_AXIS_VALUE_SETTINGS_EXPORT_SOURCES[0]
@@ -43592,7 +43593,7 @@ def audit_keynote_slide_drawable_comment_source_topology(
 
 
 def _keynote_movie_geometry_owner_present(root: Path) -> bool:
-    """Return whether the Wave87 geometry owner has crossed its activation seam."""
+    """Return whether the movie-geometry owner has crossed its activation seam."""
 
     owner_path = root / KEYNOTE_MOVIE_GEOMETRY_OWNER_SOURCE
     codec_path = root / KEYNOTE_MOVIE_GEOMETRY_CODEC_SOURCE
@@ -43935,11 +43936,11 @@ def audit_keynote_movie_geometry_completion_source_topology(
 ) -> list[str]:
     """Retire the last raw movie-geometry compatibility seam when activated.
 
-    Wave87 deliberately owns only position and displayed size.  The
-    compatibility host therefore still owns native angle, flip, and flags.
-    Wave111 uses an explicit ``MOVIE_GEOMETRY_COMPLETE``/capability token as a
-    handoff: until the semantic value, strict codec, and host bridge all
-    advertise the expanded surface this audit is dormant.  Once activated,
+    The geometry owner deliberately owns only position and displayed size.  The
+    compatibility host therefore still owns native angle, flip, and flags.  The
+    expanded owner uses an explicit ``MOVIE_GEOMETRY_COMPLETE``/capability
+    token as a handoff: until the semantic value, strict codec, and host bridge
+    all advertise the expanded surface this audit is dormant.  Once activated,
     every remaining raw declaration, identifier fallback, and native rewrite
     helper is a violation; the old compatibility-source exemption does not
     apply to the completed owner.
@@ -44795,7 +44796,7 @@ def audit_keynote_media_properties_resource_source_topology(
 
 
 def _keynote_slide_table_title_owner_present(root: Path) -> bool:
-    """Return whether the Wave98 slide-table title owner is active."""
+    """Return whether the slide-table title owner is active."""
 
     owner_path = root / KEYNOTE_SLIDE_TABLE_TITLE_OWNER_SOURCE
     package_path = root / KEYNOTE_SLIDE_TABLE_TITLE_EXPORT_SOURCES[0]
@@ -44986,7 +44987,7 @@ def audit_keynote_slide_table_title_resource_source_topology(
 
 
 def _keynote_slide_table_sort_owner_present(root: Path) -> bool:
-    """Return whether the Wave99 persisted-sort owner is active."""
+    """Return whether the persisted-sort owner is active."""
 
     owner_path = root / KEYNOTE_SLIDE_TABLE_SORT_OWNER_SOURCE
     package_path = root / KEYNOTE_SLIDE_TABLE_SORT_EXPORT_SOURCES[0]
@@ -45994,7 +45995,7 @@ def audit_keynote_slide_table_physical_sort_resource_source_topology(
 
 
 def _keynote_slide_table_lock_state_owner_present(root: Path) -> bool:
-    """Return whether the Wave105 persisted lock owner is active."""
+    """Return whether the persisted lock owner is active."""
 
     owner_path = root / KEYNOTE_SLIDE_TABLE_LOCK_STATE_OWNER_SOURCE
     package_path = root / KEYNOTE_SLIDE_TABLE_LOCK_STATE_EXPORT_SOURCES[0]
@@ -46220,7 +46221,7 @@ def audit_keynote_slide_table_lock_state_facade_source_topology(
 
 
 def _keynote_slide_table_dimension_owner_present(root: Path) -> bool:
-    """Return whether the Wave108 persisted-dimension owner is active."""
+    """Return whether the persisted-dimension owner is active."""
 
     owner_path = root / KEYNOTE_SLIDE_TABLE_DIMENSION_OWNER_SOURCE
     package_path = root / KEYNOTE_SLIDE_TABLE_DIMENSION_EXPORT_SOURCES[0]
@@ -46452,7 +46453,7 @@ def audit_keynote_slide_table_dimension_facade_source_topology(
 
 
 def _keynote_slide_table_name_owner_present(root: Path) -> bool:
-    """Return whether the Wave109 slide-table-name owner is active."""
+    """Return whether the slide-table-name owner is active."""
 
     owner_path = root / KEYNOTE_SLIDE_TABLE_NAME_OWNER_SOURCE
     package_path = root / KEYNOTE_SLIDE_TABLE_NAME_EXPORT_SOURCES[0]
@@ -46847,11 +46848,11 @@ def audit_keynote_slide_table_name_resource_source_topology(
 
 
 def _keynote_slide_table_headers_owner_present(root: Path) -> bool:
-    """Return whether the Wave100 slide-table-header owner is active.
+    """Return whether the slide-table-header owner is active.
 
     The owner gate intentionally stops at the package module declaration, as
-    with the adjacent Wave99 owner.  Until that wiring exists, an entirely
-    absent or staged owner leaves this migration baseline dormant.
+    with the adjacent persisted-sort owner.  Until that wiring exists, an
+    entirely absent or staged owner leaves this migration baseline dormant.
     """
 
     owner_path = root / KEYNOTE_SLIDE_TABLE_HEADERS_OWNER_SOURCE
@@ -47509,7 +47510,7 @@ def audit_pages_table_lock_facade_source_topology(root: Path = ROOT) -> list[str
                 table_lock_target = bool(
                     set(target_identifiers) & PAGES_TABLE_LOCK_ALIAS_TARGETS
                 ) or ("lock" in target_identifiers and "State" in target_identifiers)
-                # W1 deleted the ``BodyTableLockState`` alias: any type alias
+                # The ``BodyTableLockState`` alias is deleted: any type alias
                 # of ``State`` in ``table::lock`` is now an alternate route.
                 if path == semantic_path and "State" in target_identifiers:
                     table_lock_target = True
@@ -51203,7 +51204,7 @@ IWA_CHART_DATA_HOST_COMPAT_REEXPORT = re.compile(
     r"(?:r#)?ChartData\b"
 )
 
-# Wave102 moves fresh chart-grid authoring out of the compatibility host's
+# Fresh chart-grid authoring lives outside the compatibility host's
 # generated model.  The read/rewrite chart-data codec above intentionally
 # remains a separate owner: fresh grids have no source payload to rewrite and
 # therefore need a bounded, borrowed encoder that emits the native wire
@@ -52809,7 +52810,7 @@ def _audit_table_merge_transaction_source_topology(
             )
     facade_sources = [(package_path, package_source), (library_path, library_source)]
     if family_owner is not None:
-        # W1: only the family's public module re-exports the short names;
+        # Only the family's public module re-exports the short names;
         # the package and crate-root facades must not.  The shared helper
         # checks the owner visibility, the exact re-export and the deleted
         # prefixed spellings.
@@ -56287,7 +56288,7 @@ def _pages_public_module_scope(
 def _pages_transaction_family_violations(
     root: Path, owner: str, label: str | None = None
 ) -> list[str]:
-    """Check one W1 transaction family's owner, definitions and public module.
+    """Check one renamed transaction family's owner, definitions and public module.
 
     * ``package.rs`` declares the owner exactly ``pub(crate) mod <owner>;``
       (a ``pub mod`` owner or a private one is reported);
@@ -56471,7 +56472,7 @@ def audit_pages_transaction_family_source_topology(root: Path = ROOT) -> list[st
         _pages_retired_name_violations(
             root,
             PAGES_TRANSACTION_RETIRED_EXTRA_NAMES,
-            "Pages W1 retired alias/ingress family",
+            "Pages retired alias/ingress family",
         )
     )
 

@@ -19,7 +19,7 @@ pub enum Background {
     Unsupported,
 }
 
-// Exact-source transaction vocabulary of this family (ADR 0034 W1).
+// Exact-source transaction vocabulary of this family (ADR 0034).
 pub use crate::package::slide_background::{
     Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
 };

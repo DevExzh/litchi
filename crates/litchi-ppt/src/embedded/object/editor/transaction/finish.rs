@@ -363,7 +363,7 @@ mod candidate_finish_tests {
         .expect("PPT fixture")
     }
 
-    /// This is deliberately test-only: it is the pre-0734 writer ingress used
+    /// This is deliberately test-only: it is the earlier writer ingress used
     /// as a byte-parity oracle for the ownership handoff.
     fn write_package_reference(editor: &Editor, appended: &[u8]) -> Result<Vec<u8>> {
         let mut writer = OleWriter::new();
@@ -600,7 +600,7 @@ mod candidate_finish_tests {
             let persist_id = lean.document_persist_id;
             let record = lean.persisted_record(persist_id).unwrap();
             lean.replace_persisted_record(persist_id, record).unwrap();
-            // The pre-0745 open also copied both owned streams into the list.
+            // The earlier open path also copied both owned streams into the list.
             let mut materialized = lean.clone();
             let (document, current_user) = (
                 materialized.document.clone(),

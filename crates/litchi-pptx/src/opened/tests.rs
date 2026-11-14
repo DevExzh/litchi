@@ -4890,7 +4890,7 @@ fn mutation_corpus(base: &litchi_opc::OpcPackage) -> Result<Vec<(String, litchi_
         return Ok(vec![("base".to_owned(), base.clone())]);
     };
     let second = names.get(1).cloned().unwrap_or_else(|| first.clone());
-    let added = PackURI::new("/docProps/litchi-0655-extra.bin").map_err(Error::Invalid)?;
+    let added = PackURI::new("/docProps/litchi-probe-extra.bin").map_err(Error::Invalid)?;
 
     let mut corpus = Vec::new();
     corpus.push(("base".to_owned(), base.clone()));
@@ -4943,7 +4943,7 @@ fn mutation_corpus(base: &litchi_opc::OpcPackage) -> Result<Vec<(String, litchi_
             opc.get_part_mut(first)?.rels_mut().try_add_relationship(
                 "urn:producer:probe".into(),
                 "../media/probe.bin".into(),
-                "rIdProbe0655".into(),
+                "rIdProbePart".into(),
                 TargetMode::Internal,
             )?;
             Ok(true)
@@ -4952,7 +4952,7 @@ fn mutation_corpus(base: &litchi_opc::OpcPackage) -> Result<Vec<(String, litchi_
             opc.rels_mut().try_add_relationship(
                 "urn:producer:probe".into(),
                 "docProps/probe.bin".into(),
-                "rIdRootProbe0655".into(),
+                "rIdProbeRoot".into(),
                 TargetMode::Internal,
             )?;
             Ok(true)
@@ -4961,7 +4961,7 @@ fn mutation_corpus(base: &litchi_opc::OpcPackage) -> Result<Vec<(String, litchi_
             opc.rels_mut().try_add_relationship(
                 "urn:producer:probe".into(),
                 "https://example.invalid/probe".into(),
-                "rIdExternalProbe0655".into(),
+                "rIdProbeExternal".into(),
                 TargetMode::External,
             )?;
             Ok(true)
@@ -5065,7 +5065,7 @@ fn revision_v2_preserves_every_pairwise_verdict_over_the_pptx_corpus() -> Result
         pairs += assert_pairwise_verdicts_agree(&fixture.display().to_string(), &corpus)?;
     }
     println!(
-        "0655-oracle fixtures={} packages={} ordered_pairs={} disagreements=0",
+        "digest-oracle fixtures={} packages={} ordered_pairs={} disagreements=0",
         fixtures.len(),
         packages,
         pairs
@@ -5180,7 +5180,7 @@ fn part_digest_memo_resident_bytes() -> Result<()> {
             "memo resident bytes {bytes} exceed the stated bound for {entries} entries"
         );
         println!(
-            "0655-memo parts={} entries={} resident_bytes={} per_entry={:.1}",
+            "digest-memo parts={} entries={} resident_bytes={} per_entry={:.1}",
             package.opc.part_count(),
             entries,
             bytes,
@@ -5196,8 +5196,8 @@ fn part_digest_memo_resident_bytes() -> Result<()> {
 #[test]
 fn a_mismatched_blob_arc_part_is_never_memoized() -> Result<()> {
     let package = opened_plain_slides_package(2)?;
-    let honest = PackURI::new("/docProps/litchi-0655-honest.bin").map_err(Error::Invalid)?;
-    let liar = PackURI::new("/docProps/litchi-0655-liar.bin").map_err(Error::Invalid)?;
+    let honest = PackURI::new("/docProps/litchi-probe-honest.bin").map_err(Error::Invalid)?;
+    let liar = PackURI::new("/docProps/litchi-probe-liar.bin").map_err(Error::Invalid)?;
 
     let mut with_honest = (*package.opc).clone();
     with_honest.try_add_part(Box::new(BlobPart::new(
@@ -5258,7 +5258,7 @@ fn a_mismatched_blob_arc_part_is_never_memoized() -> Result<()> {
 #[test]
 fn the_memo_retains_every_allocation_it_keys() -> Result<()> {
     let package = opened_plain_slides_package(4)?;
-    let probe = PackURI::new("/docProps/litchi-0655-aba.bin").map_err(Error::Invalid)?;
+    let probe = PackURI::new("/docProps/litchi-probe-aba.bin").map_err(Error::Invalid)?;
     let mut opc = (*package.opc).clone();
     opc.try_add_part(Box::new(BlobPart::new(
         probe.clone(),
@@ -5522,7 +5522,7 @@ fn the_facade_memo_never_outlives_the_graph_it_describes() -> Result<()> {
     // the previous graph is released rather than carried across it.
     let mut props = package.custom_props()?;
     props
-        .insert("Litchi0655", "released")
+        .insert("LitchiMemoProbe", "released")
         .map_err(|error| Error::Invalid(error.to_string()))?;
     package.put_custom_props(props)?;
     assert_eq!(

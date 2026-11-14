@@ -1,6 +1,6 @@
-//! ADR 0034 W3 evidence for the immutable Formula `Package` owner: atomic
-//! save, typed caller-selected limits, deterministic fresh creation and exact
-//! no-op publication.
+//! The immutable Formula `Package` owner (ADR 0034): atomic save, typed
+//! caller-selected limits, deterministic fresh creation and exact no-op
+//! publication.
 
 #![allow(
     clippy::unwrap_used,

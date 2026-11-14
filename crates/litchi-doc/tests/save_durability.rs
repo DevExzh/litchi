@@ -36,7 +36,7 @@ impl Drop for ScratchDirectory {
 fn scratch_directory() -> ScratchDirectory {
     static NEXT: AtomicU64 = AtomicU64::new(0);
     let directory = std::env::temp_dir().join(format!(
-        "litchi-doc-0761-{}-{}",
+        "litchi-doc-durability-{}-{}",
         std::process::id(),
         NEXT.fetch_add(1, Ordering::Relaxed)
     ));
@@ -48,7 +48,7 @@ fn scratch_directory() -> ScratchDirectory {
 fn every_level_publishes_the_default_save_bytes() {
     let directory = scratch_directory();
     let mut writer = Builder::new();
-    writer.add_paragraph("save durability 0761").unwrap();
+    writer.add_paragraph("save durability check").unwrap();
     let package = writer.build().unwrap();
     let reference = directory.join("reference.doc");
     package.save(&reference).unwrap();
@@ -74,7 +74,7 @@ fn every_level_publishes_the_default_save_bytes() {
             .unwrap()
             .text()
             .unwrap()
-            .contains("save durability 0761")
+            .contains("save durability check")
     );
     assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 4);
 }

@@ -30,12 +30,12 @@ const MAX_REFERENCES: usize = 8 * 1024;
 const MAX_MATERIALIZED_CELLS: usize = 64 * 1024;
 const MAX_TEXT_BYTES: usize = 512 * 1024;
 const OVERSIZED_INPUT_BYTES: usize = 512 * 1024 + 1;
-const PRIVATE_SHEET: &str = "__litchi_private_control_sheet_85__";
-const PRIVATE_TABLE: &str = "__litchi_private_control_table_85__";
-const PRIVATE_INPUT: &[u8] = b"__litchi_private_control_input_85__";
+const PRIVATE_SHEET: &str = "__litchi_private_control_sheet__";
+const PRIVATE_TABLE: &str = "__litchi_private_control_table__";
+const PRIVATE_INPUT: &[u8] = b"__litchi_private_control_input__";
 const NATIVE_NUMBERS: &[u8] = include_bytes!("../../../../test-data/iwork/numbers/basic.numbers");
-/// The committed Wave86 split-owner source is retained as the Wave88
-/// multi-member write seed.  Its rooted model, tile, format/control lists,
+/// The committed split-owner source is retained as the multi-member write
+/// seed.  Its rooted model, tile, format/control lists,
 /// and Pop-Up model are separate current components with metadata edges.
 const SPLIT_COMPONENT_NUMBERS: &[u8] =
     include_bytes!("../corpus/numbers_table_cell_control/split_component_source.numbers");
@@ -337,7 +337,7 @@ fn exercise_reopened_replay(
 }
 
 /// Exercise the committed split-component graph independently from mutated
-/// fuzz input.  This is the Wave88 write gate: a successful changed
+/// fuzz input.  This is the multi-member write gate: a successful changed
 /// transaction must rewrite at least two native members, preserve the
 /// metadata external-edge/token closure, reopen the candidate, and support
 /// exact patch/inverse/conflict replay.  Older owners may reject the changed

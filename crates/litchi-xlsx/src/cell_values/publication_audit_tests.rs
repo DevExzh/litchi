@@ -106,7 +106,7 @@ const FIXED_ATTRIBUTES: usize = 6;
 /// counting the two on its `<ext>` wrapper.
 fn attribute_pad(attributes: usize) -> String {
     let mut remaining = attributes.checked_sub(2).expect("the wrapper's two");
-    let mut pad = String::from("<extLst><ext uri=\"{0747}\" xmlns:p=\"urn:litchi:0747:pad\">");
+    let mut pad = String::from("<extLst><ext uri=\"{test}\" xmlns:p=\"urn:litchi:test:pad\">");
     while remaining > 0 {
         let count = remaining.min(PAD_NAMES.len());
         pad.push_str("<p:a");
@@ -294,7 +294,7 @@ fn an_attribute_with_no_separator_is_admitted_by_planning_and_refused_by_the_aud
     // quick-xml's checked attribute iterator, which the value-only validator
     // uses, accepts `a="1"b="2"`; the audit's attribute grammar refuses the
     // missing separator even under the source policy.
-    let tail = "<extLst><ext uri=\"{0747}\" xmlns:p=\"urn:litchi:0747:pad\"><p:a a=\"1\"b=\"2\"/></ext></extLst>";
+    let tail = "<extLst><ext uri=\"{test}\" xmlns:p=\"urn:litchi:test:pad\"><p:a a=\"1\"b=\"2\"/></ext></extLst>";
     let source = worksheet("<c r=\"A1\"><v>1</v></c>", tail);
     let tag = source.find("<p:a").expect("fixture offset");
     let separator = tag + "<p:a a=\"1\"".len();

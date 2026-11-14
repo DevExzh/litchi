@@ -13,7 +13,7 @@ fn every_level_publishes_the_default_save_bytes() {
     builder
         .document()
         .unwrap()
-        .add_paragraph_with_text("save durability 0761");
+        .add_paragraph_with_text("save durability check");
     let package = builder.build().unwrap();
 
     let reference = directory.path().join("reference.docx");
@@ -50,7 +50,7 @@ fn every_level_publishes_the_default_save_bytes() {
             .unwrap()
             .text()
             .unwrap()
-            .contains("save durability 0761")
+            .contains("save durability check")
     );
     // Only the published files remain: no level leaves a temporary behind.
     assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 7);

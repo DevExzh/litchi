@@ -22,8 +22,8 @@ const MAX_EXPANDED_BYTES: u64 = 4 * 1024 * 1024;
 const MAX_IWA_STREAM_BYTES: usize = 1024 * 1024;
 const MAX_COMMAND_BYTES: usize = 1024;
 const OVERSIZED_INPUT_BYTES: usize = MAX_INPUT_BYTES as usize + 1;
-const PRIVATE_TABLE: &str = "__litchi_private_pages_appearance_table_104__";
-const PRIVATE_INPUT: &[u8] = b"__litchi_private_pages_appearance_input_104__";
+const PRIVATE_TABLE: &str = "__litchi_private_pages_appearance_table__";
+const PRIVATE_INPUT: &[u8] = b"__litchi_private_pages_appearance_input__";
 const NATIVE_PAGES: &[u8] = include_bytes!("../../../../test-data/iwork/pages/basic.pages");
 
 fuzz_target!(|data: &[u8]| {

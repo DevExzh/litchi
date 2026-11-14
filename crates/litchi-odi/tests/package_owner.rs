@@ -1,5 +1,5 @@
-//! ADR 0034 W3 evidence for the immutable ODI `Package` owner: atomic save,
-//! typed caller-selected limits, deterministic fresh creation and exact no-op
+//! The immutable ODI `Package` owner (ADR 0034): atomic save, typed
+//! caller-selected limits, deterministic fresh creation and exact no-op
 //! publication.
 
 #![allow(

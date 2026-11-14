@@ -2647,7 +2647,7 @@ mod tests {
                 accepted += ok;
             }
         }
-        println!("0743-text-oracle handcrafted compared={compared} accepted={accepted}");
+        println!("slide-text-oracle handcrafted compared={compared} accepted={accepted}");
         assert!(accepted > 0 && accepted < compared);
     }
 
@@ -2710,7 +2710,7 @@ mod tests {
                 parts += 1;
             }
         }
-        println!("0743-text-oracle corpus parts={parts} compared={compared} accepted={accepted}");
+        println!("slide-text-oracle corpus parts={parts} compared={compared} accepted={accepted}");
         assert!(parts >= 300 && accepted > 0 && accepted < compared);
     }
 

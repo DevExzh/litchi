@@ -93,9 +93,8 @@ fn explicit_password_path_preserves_mode_and_typed_password_failures() {
             let _ = std::fs::remove_dir_all(&self.0);
         }
     }
-    let directory = Scratch(
-        std::env::temp_dir().join(format!("litchi-xls-security-0201-{}", std::process::id())),
-    );
+    let directory =
+        Scratch(std::env::temp_dir().join(format!("litchi-xls-security-{}", std::process::id())));
     std::fs::create_dir(&directory.0).unwrap();
     let path = directory.0.join("protected.xls");
     let mode = EncryptionProfile::CryptoApiRc4 { key_bits: 72 };

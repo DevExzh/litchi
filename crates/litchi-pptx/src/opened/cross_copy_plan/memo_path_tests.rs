@@ -45,7 +45,7 @@ fn authored(prefix: &str, slides: usize) -> Result<Vec<u8>> {
     for index in 0..slides {
         presentation
             .add_slide()?
-            .set_title(&format!("change-0751-memo-{prefix}-{index}"));
+            .set_title(&format!("memo-path-{prefix}-{index}"));
     }
     let package = builder.build()?;
     package.to_bytes()
@@ -57,7 +57,7 @@ fn with_pictures(bytes: &[u8], slide: usize, pictures: &[(&str, &[u8])]) -> Resu
     for (index, (part_name, data)) in pictures.iter().enumerate() {
         edit.add_picture(
             slide,
-            format!("change-0751-memo-picture-{index}"),
+            format!("memo-path-picture-{index}"),
             &Resource::new(*part_name, "image/png", data.to_vec()),
             (800, 800, 72, 72),
         )?;

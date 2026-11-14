@@ -899,7 +899,7 @@ mod tests {
 
     #[test]
     fn bound_namespace_cache_borrows_long_resolver_uri() {
-        let uri = format!("urn:odp:0440:{}", "namespace-segment-".repeat(32));
+        let uri = format!("urn:odp:test:{}", "namespace-segment-".repeat(32));
         let xml = format!("<e xmlns:d=\"{uri}\" d:name=\"value\" plain=\"unqualified\"/>");
         let mut reader = NsReader::from_str(&xml);
         let mut buf = Vec::new();
@@ -941,8 +941,8 @@ mod tests {
 
     #[test]
     fn unqualified_attribute_does_not_take_default_namespace() {
-        const DEFAULT_URI: &[u8] = b"urn:odp:0440:default";
-        const QUALIFIED_URI: &[u8] = b"urn:odp:0440:qualified";
+        const DEFAULT_URI: &[u8] = b"urn:odp:test:default";
+        const QUALIFIED_URI: &[u8] = b"urn:odp:test:qualified";
         let xml = format!(
             "<e xmlns=\"{}\" xmlns:d=\"{}\" plain=\"unqualified\" d:name=\"qualified\"/>",
             std::str::from_utf8(DEFAULT_URI).unwrap(),
@@ -972,8 +972,8 @@ mod tests {
 
     #[test]
     fn scoped_namespace_rebind_is_safe_after_cache_drop() {
-        const OUTER_URI: &[u8] = b"urn:odp:0440:outer";
-        const INNER_URI: &[u8] = b"urn:odp:0440:inner";
+        const OUTER_URI: &[u8] = b"urn:odp:test:outer";
+        const INNER_URI: &[u8] = b"urn:odp:test:inner";
         let xml = format!(
             "<root xmlns:d=\"{}\"><child xmlns:d=\"{}\" d:name=\"inner\"/><sibling d:name=\"outer\"/></root>",
             std::str::from_utf8(OUTER_URI).unwrap(),

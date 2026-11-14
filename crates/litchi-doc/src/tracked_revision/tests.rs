@@ -444,9 +444,9 @@ fn tracked_insertion_at_a_selected_object_moves_the_selection_with_the_object() 
             editor
                 .add_text(
                     cp,
-                    "0768",
+                    "Rev1",
                     RevisionKind::Insertion,
-                    RevisionMetadata::new("0768"),
+                    RevisionMetadata::new("Rev1"),
                 )
                 .unwrap_or_else(|error| panic!("{name}: {error}"));
             let moved = editor.saved_selection().unwrap().unwrap();
@@ -468,7 +468,7 @@ fn tracked_insertion_at_a_selected_object_moves_the_selection_with_the_object() 
                 .revisions()
                 .unwrap()
                 .iter()
-                .position(|revision| revision.author == "0768")
+                .position(|revision| revision.author == "Rev1")
                 .unwrap();
             reopened.reject(index).unwrap();
             assert_eq!(
@@ -499,7 +499,7 @@ fn tracked_insertion_after_the_final_paragraph_mark_is_refused() {
                 cp,
                 "x",
                 RevisionKind::Insertion,
-                RevisionMetadata::new("0768"),
+                RevisionMetadata::new("Rev1"),
             )
             .unwrap_err();
         assert!(matches!(error, PackageError::Corrupted(_)), "{cp}: {error}");
@@ -510,7 +510,7 @@ fn tracked_insertion_after_the_final_paragraph_mark_is_refused() {
                 180,
                 "x",
                 RevisionKind::Insertion,
-                RevisionMetadata::new("0768"),
+                RevisionMetadata::new("Rev1"),
             )
             .unwrap_err()
             .to_string()
@@ -523,7 +523,7 @@ fn tracked_insertion_after_the_final_paragraph_mark_is_refused() {
             179,
             "x",
             RevisionKind::Insertion,
-            RevisionMetadata::new("0768"),
+            RevisionMetadata::new("Rev1"),
         )
         .unwrap();
     assert_eq!((inserted.start_cp, inserted.end_cp), (179, 180));

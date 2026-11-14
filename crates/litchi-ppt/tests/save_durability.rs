@@ -36,7 +36,7 @@ impl Drop for ScratchDirectory {
 fn scratch_directory() -> ScratchDirectory {
     static NEXT: AtomicU64 = AtomicU64::new(0);
     let directory = std::env::temp_dir().join(format!(
-        "litchi-ppt-0761-{}-{}",
+        "litchi-ppt-durability-{}-{}",
         std::process::id(),
         NEXT.fetch_add(1, Ordering::Relaxed)
     ));
@@ -50,7 +50,7 @@ fn every_level_publishes_the_default_save_bytes() {
     let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     writer
-        .add_textbox(slide, 40, 10, 300, 30, "save durability 0761")
+        .add_textbox(slide, 40, 10, 300, 30, "save durability check")
         .unwrap();
     let package = writer.build().unwrap();
     let reference = directory.join("reference.ppt");
