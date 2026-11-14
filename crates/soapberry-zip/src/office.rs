@@ -6869,10 +6869,41 @@ pub struct StreamingArchiveWriter<W: Write> {
     metadata_bytes: u64,
     total_uncompressed_bytes: u64,
     output_bytes: u64,
-    poisoned: bool,
+    state: StreamingWriterState,
     name_policy: StreamingNamePolicy,
-    last_limit: Option<StreamingLimitExceeded>,
     output_counter: Arc<AtomicU64>,
+}
+
+/// Lifecycle of a [`StreamingArchiveWriter`].
+///
+/// ```text
+/// Usable --a member's output or name recording failed--> Poisoned
+/// ```
+///
+/// `Poisoned` is terminal: every later member, entry and finish call is
+/// refused before it reaches the sink. A member refused before it starts,
+/// such as a duplicate name, leaves the writer `Usable`. A writer whose
+/// `start_entry` or `finish` fails is consumed, so it has no state of its own
+/// afterwards.
+#[derive(Clone, Copy)]
+enum StreamingWriterState {
+    /// No failure has poisoned the writer.
+    Usable,
+    /// A failure poisoned the writer; `limit` is the streaming byte limit
+    /// behind it, when it was one.
+    Poisoned {
+        limit: Option<StreamingLimitExceeded>,
+    },
+}
+
+impl StreamingWriterState {
+    /// The streaming byte limit that poisoned the writer, if any.
+    const fn limit(self) -> Option<StreamingLimitExceeded> {
+        match self {
+            Self::Usable => None,
+            Self::Poisoned { limit } => limit,
+        }
+    }
 }
 
 /// A consuming, bounded ZIP entry writer.
@@ -7090,9 +7121,8 @@ impl<W: Write> StreamingArchiveEntry<W> {
             metadata_bytes: next_metadata_bytes,
             total_uncompressed_bytes: next_total_uncompressed_bytes,
             output_bytes,
-            poisoned: false,
+            state: StreamingWriterState::Usable,
             name_policy,
-            last_limit: None,
             output_counter,
         };
         if let Err(error) = writer.name_policy.record(normalized_name) {
@@ -7100,7 +7130,7 @@ impl<W: Write> StreamingArchiveEntry<W> {
             return Err(StreamingArchiveFailure {
                 error,
                 progress: writer.progress(),
-                limit: writer.last_limit,
+                limit: writer.last_limit(),
             });
         }
         writer.refresh_output_bytes();
@@ -7245,9 +7275,8 @@ impl StreamingArchiveWriter<std::io::Cursor<Vec<u8>>> {
             metadata_bytes: 0,
             total_uncompressed_bytes: 0,
             output_bytes: 0,
-            poisoned: false,
+            state: StreamingWriterState::Usable,
             name_policy: StreamingNamePolicy::Ordinary(HashSet::new()),
-            last_limit: None,
             output_counter,
         }
     }
@@ -7273,9 +7302,8 @@ impl<W: Write> StreamingArchiveWriter<W> {
             metadata_bytes: 0,
             total_uncompressed_bytes: 0,
             output_bytes: 0,
-            poisoned: false,
+            state: StreamingWriterState::Usable,
             name_policy: StreamingNamePolicy::Ordinary(HashSet::new()),
-            last_limit: None,
             output_counter,
         }
     }
@@ -7321,9 +7349,8 @@ impl<W: Write> StreamingArchiveWriter<W> {
             metadata_bytes: 0,
             total_uncompressed_bytes: 0,
             output_bytes: 0,
-            poisoned: false,
+            state: StreamingWriterState::Usable,
             name_policy: StreamingNamePolicy::Ordinary(HashSet::new()),
-            last_limit: None,
             output_counter,
         };
         result.ensure_usable()?;
@@ -7387,9 +7414,8 @@ impl<W: Write> StreamingArchiveWriter<W> {
             metadata_bytes: 0,
             total_uncompressed_bytes: 0,
             output_bytes: 0,
-            poisoned: false,
+            state: StreamingWriterState::Usable,
             name_policy: StreamingNamePolicy::Generated(Box::new(plan)),
-            last_limit: None,
             output_counter,
         };
         result.ensure_usable()?;
@@ -7426,7 +7452,7 @@ impl<W: Write> StreamingArchiveWriter<W> {
     pub const fn progress(&self) -> StreamingArchiveProgress {
         StreamingArchiveProgress {
             output_bytes: self.output_bytes,
-            poisoned: self.poisoned,
+            poisoned: self.is_poisoned(),
         }
     }
 
@@ -7439,14 +7465,14 @@ impl<W: Write> StreamingArchiveWriter<W> {
     /// Whether a failed entry permanently poisons this writer.
     #[must_use]
     pub const fn is_poisoned(&self) -> bool {
-        self.poisoned
+        matches!(self.state, StreamingWriterState::Poisoned { .. })
     }
 
     /// Returns typed attribution for the byte ceiling that poisoned this
     /// writer, when the failure came from a streaming byte limit.
     #[must_use]
     pub const fn last_limit(&self) -> Option<StreamingLimitExceeded> {
-        self.last_limit
+        self.state.limit()
     }
 
     fn refresh_output_bytes(&mut self) {
@@ -7512,7 +7538,7 @@ impl<W: Write> StreamingArchiveWriter<W> {
     }
 
     fn ensure_usable(&self) -> Result<(), Error> {
-        if self.poisoned {
+        if self.is_poisoned() {
             return Err(ErrorKind::InvalidInput {
                 msg: format!(
                     "streaming archive writer is poisoned after {} accepted output bytes",
@@ -7529,9 +7555,8 @@ impl<W: Write> StreamingArchiveWriter<W> {
 
     fn poison(&mut self, error: Error) -> Error {
         let limit = streaming_limit_from_error(&error);
-        self.last_limit = limit;
         self.refresh_output_bytes();
-        self.poisoned = true;
+        self.state = StreamingWriterState::Poisoned { limit };
         match limit {
             Some(StreamingLimitExceeded {
                 resource: StreamingLimitResource::CompressedBytes,
@@ -7931,9 +7956,8 @@ impl<W: Write> StreamingArchiveWriter<W> {
             metadata_bytes,
             total_uncompressed_bytes,
             output_bytes,
-            poisoned: _,
+            state,
             name_policy,
-            last_limit,
             output_counter,
         } = self;
         let entry = match (if zip64 {
@@ -7945,7 +7969,7 @@ impl<W: Write> StreamingArchiveWriter<W> {
         {
             Ok(entry) => entry,
             Err(error) => {
-                let limit = streaming_limit_from_error(&error).or(last_limit);
+                let limit = streaming_limit_from_error(&error).or(state.limit());
                 let error = match limit {
                     Some(StreamingLimitExceeded {
                         resource: StreamingLimitResource::CompressedBytes,
@@ -8344,7 +8368,7 @@ impl<W: Write> StreamingArchiveWriter<W> {
             return Err(StreamingArchiveFailure {
                 error,
                 progress: self.progress(),
-                limit: self.last_limit,
+                limit: self.last_limit(),
             });
         }
         if !self.name_policy.is_complete() {
@@ -8367,7 +8391,7 @@ impl<W: Write> StreamingArchiveWriter<W> {
                 Ok((output.into_inner(), progress))
             },
             Err(error) => Err(StreamingArchiveFailure {
-                limit: streaming_limit_from_error(&error).or(self.last_limit),
+                limit: streaming_limit_from_error(&error).or(self.state.limit()),
                 error,
                 progress: StreamingArchiveProgress {
                     output_bytes: self.output_counter.load(Ordering::Acquire),

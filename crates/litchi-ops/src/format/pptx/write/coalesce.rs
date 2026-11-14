@@ -44,17 +44,48 @@ pub(crate) struct Plan {
     /// Rich formatting of the shape's body, a paragraph or a run;
     /// `None` for a text or geometry plan.
     format: Option<Box<Format>>,
-    changed: bool,
-    /// Whether the leaf reports the plan's change when the run stages it:
-    /// a table-cell plan, whose target is not read before
-    /// staging; `changed` is then unknown until the commit.
-    reported: bool,
+    change: ChangeReport,
     staged_bytes: usize,
     /// Original target text used to prove a signed cancellation.
     original_text: Option<String>,
     /// Whether the target is a text body of the slide's notes page,
     /// which a separate native call edits.
     notes: bool,
+}
+
+/// When a plan's change is known.
+///
+/// ```text
+/// shape text, geometry and formatting plans --planned--> Known(changed)
+/// table-cell and notes plans -----------------planned--> AtCommit
+/// ```
+///
+/// A plan keeps its report for its whole life. `AtCommit` plans are not read
+/// before staging: staging returns `false` for them, and the leaf reports each
+/// one's change when the run publishes it.
+#[derive(Clone, Copy)]
+enum ChangeReport {
+    /// The change, judged against the target read while planning.
+    Known(bool),
+    /// The leaf reports the change when the run publishes the plan.
+    AtCommit,
+}
+
+impl ChangeReport {
+    /// The change staging returns: `false` until the commit reports it.
+    const fn at_staging(self) -> bool {
+        match self {
+            Self::Known(changed) => changed,
+            Self::AtCommit => false,
+        }
+    }
+
+    const fn is_at_commit(self) -> bool {
+        match self {
+            Self::Known(_) => false,
+            Self::AtCommit => true,
+        }
+    }
 }
 
 /// A formatting plan's native target and admitted assignments.
@@ -398,7 +429,7 @@ impl Run {
         self.seen
             .try_reserve(1)
             .map_err(|source| TransactionError::Allocation { source })?;
-        let changed = plan.changed;
+        let changed = plan.change.at_staging();
         let charge = plan.charge();
         let key = plan.key();
         let scope = plan.scope();
@@ -685,8 +716,7 @@ fn shape_plan(
         },
         text: values.text,
         format: None,
-        changed,
-        reported: false,
+        change: ChangeReport::Known(changed),
         staged_bytes,
         original_text,
         notes: false,
@@ -859,8 +889,7 @@ fn format_plan(
             scope,
             values,
         })),
-        changed,
-        reported: false,
+        change: ChangeReport::Known(changed),
         staged_bytes,
         original_text,
         notes: false,
@@ -1013,7 +1042,7 @@ fn story_plan(
             "PPTX shape scene cache was lost during admission",
         ));
     };
-    let (shape, target, scope, changed, original_text) = match story.cell {
+    let (shape, target, scope, original_text) = match story.cell {
         None => {
             let notes_was_cached = cached.notes.is_some();
             if !notes_was_cached {
@@ -1055,7 +1084,6 @@ fn story_plan(
                 },
             };
             let shape = Position::new(*position);
-            let changed = false;
             let original_text = body
                 .as_ref()
                 .and_then(|body| story_text(body, story.paragraph, story.run));
@@ -1076,7 +1104,7 @@ fn story_plan(
                     Scope::Run(paragraph, run),
                 ),
             };
-            (shape, target, scope, changed, original_text)
+            (shape, target, scope, original_text)
         },
         Some((table, row, column)) => {
             let Some(&frame) = cached.tables.get(table) else {
@@ -1116,8 +1144,6 @@ fn story_plan(
                 story_text(body, story.paragraph, story.run)
             });
             let (row_at, column_at) = (Position::new(row), Position::new(column));
-            // The leaf reports the change when the run stages the plan.
-            let unknown = false;
             match (story.paragraph, story.run) {
                 (None, _) => (
                     shape,
@@ -1127,7 +1153,6 @@ fn story_plan(
                         column: column_at,
                     },
                     Scope::Cell(row, column),
-                    unknown,
                     original_text,
                 ),
                 (Some(paragraph), run) => {
@@ -1147,7 +1172,6 @@ fn story_plan(
                                 paragraph: Position::new(paragraph),
                             },
                             Scope::CellParagraph(row, column, paragraph),
-                            unknown,
                             original_text,
                         ),
                         Some(ordinal) => {
@@ -1164,7 +1188,6 @@ fn story_plan(
                                     run: Position::new(run),
                                 },
                                 Scope::CellRun(row, column, paragraph, run),
-                                unknown,
                                 original_text,
                             )
                         },
@@ -1186,8 +1209,7 @@ fn story_plan(
             scope,
             values,
         })),
-        changed,
-        reported: true,
+        change: ChangeReport::AtCommit,
         staged_bytes,
         original_text,
         notes,
@@ -1590,9 +1612,11 @@ fn stage_batch(
     // still use the bounded chunk API so the coalescer keeps its one-pass
     // publication cost; reported story plans stay on their per-edit path
     // below because their native result is needed for diagnostics.
-    if items.len() == 1 && !items[0].plan.reported {
-        stage_one(edit, &items[0].plan)?;
-        return Ok(usize::from(items[0].plan.changed));
+    if let [item] = items
+        && let ChangeReport::Known(changed) = item.plan.change
+    {
+        stage_one(edit, &item.plan)?;
+        return Ok(usize::from(changed));
     }
     if kind == BatchKind::Format {
         let mut edits = Vec::new();
@@ -1618,7 +1642,7 @@ fn stage_batch(
             )
             .map_err(allocation)?;
         chunks.extend(edits.chunks(litchi_pptx::opened::MAX_SHAPE_PROPERTIES_REPLACEMENTS));
-        if !items.iter().any(|item| item.plan.reported) {
+        if !items.iter().any(|item| item.plan.change.is_at_commit()) {
             return match edit {
                 NativeEdit::Source(edit) => edit
                     .set_text_property_chunks(Position::new(slide), &chunks)
@@ -1645,13 +1669,18 @@ fn stage_batch(
             .with_format(FileFormat::Pptx));
         }
         changes
-            .try_reserve(items.iter().filter(|item| item.plan.reported).count())
+            .try_reserve(
+                items
+                    .iter()
+                    .filter(|item| item.plan.change.is_at_commit())
+                    .count(),
+            )
             .map_err(allocation)?;
         changes.extend(
             items
                 .iter()
                 .zip(&flags)
-                .filter(|(item, _)| item.plan.reported)
+                .filter(|(item, _)| item.plan.change.is_at_commit())
                 .map(|(item, changed)| (item.index, *changed)),
         );
         return Ok(flags.iter().filter(|changed| **changed).count());
@@ -1770,7 +1799,7 @@ fn stage_notes(
         items
             .iter()
             .zip(&flags)
-            .filter(|(item, _)| item.plan.reported)
+            .filter(|(item, _)| item.plan.change.is_at_commit())
             .map(|(item, changed)| (item.index, *changed)),
     );
     Ok(flags.iter().filter(|changed| **changed).count())

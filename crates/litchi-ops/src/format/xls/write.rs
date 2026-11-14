@@ -1239,18 +1239,68 @@ pub(crate) mod coalesce {
         action: Action,
         staged_bytes: usize,
         changed: bool,
-        /// The authored scalar before this run.  Retaining it lets a signed
-        /// run prove a cancellation without comparing reserialized BIFF.
-        original: Option<NativeValue>,
-        /// Whether the authored cell existed in the original package.  This
-        /// stays separate from the staged target's current presence so a
-        /// remove/reinsert pair cannot turn an absent coordinate into a
-        /// false cancellation.
-        original_present: bool,
-        /// Stored errors and formulas do not have a comparable scalar value.
-        /// They remain barriers for signed cancellation even when a later
-        /// operation happens to produce `None`.
-        original_known: bool,
+        /// The authored cell before this run.  Retaining its scalar lets a
+        /// signed run prove a cancellation without comparing reserialized
+        /// BIFF.  It stays separate from the staged target's current
+        /// presence so a remove/reinsert pair cannot turn an absent
+        /// coordinate into a false cancellation.
+        original: CellProofState,
+    }
+
+    /// A cell as a signed cancellation proof sees it.
+    ///
+    /// A plan records the cell's state in the original package; the proof
+    /// then replays the run's actions over it, per coordinate:
+    ///
+    /// ```text
+    /// any state      --Set(v)-----------------> Present(v)
+    /// staged present --Clear------------------> Present(Blank)
+    /// staged present --Remove-----------------> Absent
+    /// staged absent  --Clear, Remove or Noop--> unchanged
+    /// ```
+    ///
+    /// The run is an exact no-op when every coordinate ends equal to its
+    /// original state and that state is not `Opaque`.
+    #[derive(Debug, Clone, PartialEq)]
+    enum CellProofState {
+        /// No authored cell, or an unsigned package, which needs no proof.
+        Absent,
+        /// An authored cell with this comparable scalar.
+        Present(NativeValue),
+        /// An authored cell without a comparable scalar, such as a stored
+        /// error.  It never proves a cancellation, even when a later
+        /// operation happens to leave the coordinate as it found it.
+        Opaque,
+    }
+
+    impl CellProofState {
+        /// The state of a plan's cell in the original package, which is
+        /// recorded only for a signed package.
+        fn original(signed: bool, present: bool, value: Option<NativeValue>) -> Self {
+            if !(signed && present) {
+                return Self::Absent;
+            }
+            match value {
+                Some(value) => Self::Present(value),
+                None => Self::Opaque,
+            }
+        }
+
+        /// Whether the coordinate holds an authored cell.
+        const fn is_present(&self) -> bool {
+            match self {
+                Self::Absent => false,
+                Self::Present(_) | Self::Opaque => true,
+            }
+        }
+
+        /// Whether the state can prove a cancellation.
+        const fn is_comparable(&self) -> bool {
+            match self {
+                Self::Absent | Self::Present(_) => true,
+                Self::Opaque => false,
+            }
+        }
     }
 
     impl Plan {
@@ -1382,15 +1432,12 @@ pub(crate) mod coalesce {
                     | CellAssignment::Format(_)
                     | CellAssignment::Noop => return Ok(None),
                 };
-                let original_known = !signed || !original_target.present || original.is_some();
                 Ok(Some(Plan {
                     target,
                     action,
                     staged_bytes: admitted.staged_bytes,
                     changed,
-                    original,
-                    original_present: signed && original_target.present,
-                    original_known,
+                    original: CellProofState::original(signed, original_target.present, original),
                 }))
             })();
             self.check_outside_run(source).and(result)
@@ -1465,7 +1512,6 @@ pub(crate) mod coalesce {
                         limits.max_staged_bytes(),
                     ));
                 }
-                let original_known = !signed || !original_target.present || original.is_some();
                 Ok(Some(Plan {
                     action: if target.present {
                         Action::Remove
@@ -1475,9 +1521,7 @@ pub(crate) mod coalesce {
                     target,
                     staged_bytes: WRITE_ENTRY_OVERHEAD,
                     changed: target.present,
-                    original,
-                    original_present: signed && original_target.present,
-                    original_known,
+                    original: CellProofState::original(signed, original_target.present, original),
                 }))
             })();
             self.check_outside_run(source).and(result)
@@ -1544,7 +1588,8 @@ pub(crate) mod coalesce {
             // even after an intermediate remove made the staged target
             // absent. Original absence stays a barrier so insertion is never
             // mistaken for restoring a missing coordinate.
-            (self.seen.contains(&plan.key()) && !(self.allow_repeated && plan.original_present))
+            (self.seen.contains(&plan.key())
+                && !(self.allow_repeated && plan.original.is_present()))
                 || self
                     .staged_bytes
                     .checked_add(plan.charge())
@@ -1552,7 +1597,8 @@ pub(crate) mod coalesce {
         }
 
         pub(crate) fn stage(&mut self, plan: Plan, index: usize) -> Result<bool> {
-            if (self.seen.contains(&plan.key()) && !(self.allow_repeated && plan.original_present))
+            if (self.seen.contains(&plan.key())
+                && !(self.allow_repeated && plan.original.is_present()))
                 || self
                     .staged_bytes
                     .checked_add(plan.charge())
@@ -1684,33 +1730,28 @@ pub(crate) mod coalesce {
     }
 
     fn logical_noop(items: &[Item]) -> bool {
-        type State = (bool, bool, Option<NativeValue>);
-        let mut final_values = std::collections::HashMap::<CellIdentity, State>::new();
-        let mut originals = std::collections::HashMap::<CellIdentity, State>::new();
+        let mut final_values = std::collections::HashMap::<CellIdentity, CellProofState>::new();
+        let mut originals = std::collections::HashMap::<CellIdentity, CellProofState>::new();
         for item in items {
             let plan = &item.plan;
             let key = plan.key();
-            let original = originals.entry(key).or_insert_with(|| {
-                (
-                    plan.original_present,
-                    plan.original_known,
-                    plan.original.clone(),
-                )
-            });
+            let original = originals
+                .entry(key)
+                .or_insert_with(|| plan.original.clone());
             let state = final_values.entry(key).or_insert_with(|| original.clone());
             match &plan.action {
-                Action::Set(value) => *state = (true, true, Some(value.clone())),
+                Action::Set(value) => *state = CellProofState::Present(value.clone()),
                 Action::Clear if plan.target.present => {
-                    *state = (true, true, Some(NativeValue::Blank));
+                    *state = CellProofState::Present(NativeValue::Blank);
                 },
-                Action::Remove if plan.target.present => *state = (false, true, None),
+                Action::Remove if plan.target.present => *state = CellProofState::Absent,
                 Action::Clear | Action::Remove | Action::Noop => {},
             }
         }
         !final_values.is_empty()
             && final_values
                 .into_iter()
-                .all(|(key, value)| value.1 && originals.get(&key) == Some(&value))
+                .all(|(key, value)| value.is_comparable() && originals.get(&key) == Some(&value))
     }
 
     fn apply_item(edit: &mut litchi_xls::package::edit::Edit, item: &Item) -> Result<()> {
