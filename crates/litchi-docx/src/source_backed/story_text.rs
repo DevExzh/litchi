@@ -5914,3 +5914,204 @@ impl std::fmt::Display for LimitKind {
         formatter.write_str(self.as_str())
     }
 }
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the story and glossary scanners accept before, around and after their roots.
+
+    use super::*;
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// The rows built around one root element given as its start tag,
+    /// content, end tag and empty-element form.
+    fn envelope_rows(
+        open: &str,
+        body: &str,
+        close: &str,
+        empty: &str,
+    ) -> Vec<(&'static str, String)> {
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+            ("root then CDATA", format!("{d}<![CDATA[x]]>")),
+            ("root then reference", format!("{d}&amp;")),
+            ("reference before root", format!("&amp;{d}")),
+            ("whitespace then root", format!(" \n{d}")),
+        ]
+    }
+
+    /// Run `read` over every row; each expected line is the row label
+    /// followed by the result.
+    fn assert_envelope_matrix(root: [&str; 4], expected: &[&str], read: impl Fn(&str) -> String) {
+        let [open, body, close, empty] = root;
+        let actual = envelope_rows(open, body, close, empty)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(&xml)))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: std::result::Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    #[test]
+    fn main_story_envelope() {
+        assert_envelope_matrix(
+            [
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">"#,
+                "<w:body><w:p><w:r><w:t>x</w:t></w:r></w:p></w:body>",
+                "</w:document>",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+            ],
+            &[
+                "empty input: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"story XML root is incomplete\" }))",
+                "whitespace only: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"story XML root is incomplete\" }))",
+                "declaration only: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"story XML root is incomplete\" }))",
+                "empty-element root: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"main story must contain exactly one body\" }))",
+                "start and end root: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"main story must contain exactly one body\" }))",
+                "root then whitespace: Ok(layout)",
+                "root then comment: Ok(layout)",
+                "root then PI: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"processing instructions are not accepted\" }))",
+                "root then text: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"non-whitespace text occurs outside story root\" }))",
+                "root then second root: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"multiple story roots\" }))",
+                "root then foreign start: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"multiple story roots\" }))",
+                "root then foreign empty: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"multiple story roots\" }))",
+                "declaration after root: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"XML declarations are only accepted before the story root\" }))",
+                "two declarations: Ok(layout)",
+                "comment before declaration: Ok(layout)",
+                "text before root: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"non-whitespace text occurs outside story root\" }))",
+                "unterminated root: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"story XML root is incomplete\" }))",
+                "stray end tag: Document(InvalidFormat(\"invalid story XML: ill-formed document: close tag `</foreign>` does not match any open tag\"))",
+                "DOCTYPE: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"DOCTYPE declarations are not accepted\" }))",
+                "top-level CDATA: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"CDATA sections are not accepted\" }))",
+                "declaration then root: Ok(layout)",
+                "whitespace before declaration: Ok(layout)",
+                "PI before declaration: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"processing instructions are not accepted\" }))",
+                "comment then root: Ok(layout)",
+                "PI then root: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"processing instructions are not accepted\" }))",
+                "root then text then second root: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"non-whitespace text occurs outside story root\" }))",
+                "empty-element root then root: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"multiple story roots\" }))",
+                "declaration after empty-element root: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"XML declarations are only accepted before the story root\" }))",
+                "root then CDATA: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"CDATA sections are not accepted\" }))",
+                "root then reference: Ok(layout)",
+                "reference before root: Ok(layout)",
+                "whitespace then root: Ok(layout)",
+            ],
+            |xml| {
+                outcome(
+                    scan_story(
+                        xml.as_bytes(),
+                        &Selector::Main,
+                        None,
+                        Limits::default(),
+                        None,
+                    ),
+                    |_layout| "layout".to_owned(),
+                )
+            },
+        );
+    }
+
+    #[test]
+    fn glossary_envelope() {
+        assert_envelope_matrix(
+            [
+                r#"<w:glossaryDocument xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">"#,
+                r#"<w:docParts><w:docPart><w:docPartPr><w:name w:val="a"/></w:docPartPr><w:docPartBody><w:p><w:r><w:t>x</w:t></w:r></w:p></w:docPartBody></w:docPart></w:docParts>"#,
+                "</w:glossaryDocument>",
+                r#"<w:glossaryDocument xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+            ],
+            &[
+                "empty input: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"glossary XML root is incomplete\" }))",
+                "whitespace only: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"glossary XML root is incomplete\" }))",
+                "declaration only: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"glossary XML root is incomplete\" }))",
+                "empty-element root: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"glossary root must contain docParts\" }))",
+                "start and end root: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"glossary root must contain docParts\" }))",
+                "root then whitespace: Ok(1 layouts)",
+                "root then comment: Ok(1 layouts)",
+                "root then PI: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"processing instructions are not accepted\" }))",
+                "root then text: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"non-whitespace text occurs outside glossary root\" }))",
+                "root then second root: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"multiple glossary roots\" }))",
+                "root then foreign start: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"multiple glossary roots\" }))",
+                "root then foreign empty: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"multiple glossary roots\" }))",
+                "declaration after root: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"XML declarations are only accepted before the glossary root\" }))",
+                "two declarations: Ok(1 layouts)",
+                "comment before declaration: Ok(1 layouts)",
+                "text before root: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"non-whitespace text occurs outside glossary root\" }))",
+                "unterminated root: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"glossary XML root is incomplete\" }))",
+                "stray end tag: Document(InvalidFormat(\"invalid glossary XML: ill-formed document: close tag `</foreign>` does not match any open tag\"))",
+                "DOCTYPE: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"DOCTYPE declarations are not accepted\" }))",
+                "top-level CDATA: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"CDATA sections are not accepted\" }))",
+                "declaration then root: Ok(1 layouts)",
+                "whitespace before declaration: Ok(1 layouts)",
+                "PI before declaration: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"processing instructions are not accepted\" }))",
+                "comment then root: Ok(1 layouts)",
+                "PI then root: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"processing instructions are not accepted\" }))",
+                "root then text then second root: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"non-whitespace text occurs outside glossary root\" }))",
+                "empty-element root then root: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"multiple glossary roots\" }))",
+                "declaration after empty-element root: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"XML declarations are only accepted before the glossary root\" }))",
+                "root then CDATA: Document(Refused(Refusal { kind: UnsupportedContent, operation: \"source-backed story text\", reason: \"CDATA sections are not accepted\" }))",
+                "root then reference: Ok(1 layouts)",
+                "reference before root: Ok(1 layouts)",
+                "whitespace then root: Ok(1 layouts)",
+            ],
+            |xml| {
+                outcome(
+                    scan_glossary_many(
+                        xml.as_bytes(),
+                        &[GlossarySelector::ByIndex(0)],
+                        None,
+                        Limits::default(),
+                        None,
+                    ),
+                    |layouts| format!("{} layouts", layouts.len()),
+                )
+            },
+        );
+    }
+}

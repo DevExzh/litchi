@@ -3053,3 +3053,140 @@ fn limit(resource: &'static str, actual: usize, maximum: usize) -> Error {
 fn invalid(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
 }
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the drawing scanner accepts before, around and after `w:document`.
+
+    use super::*;
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// The rows built around one root element given as its start tag,
+    /// content, end tag and empty-element form.
+    fn envelope_rows(
+        open: &str,
+        body: &str,
+        close: &str,
+        empty: &str,
+    ) -> Vec<(&'static str, String)> {
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+            ("root then CDATA", format!("{d}<![CDATA[x]]>")),
+            ("root then reference", format!("{d}&amp;")),
+            ("reference before root", format!("&amp;{d}")),
+            ("whitespace then root", format!(" \n{d}")),
+        ]
+    }
+
+    /// Run `read` over every row; each expected line is the row label
+    /// followed by the result.
+    fn assert_envelope_matrix(root: [&str; 4], expected: &[&str], read: impl Fn(&str) -> String) {
+        let [open, body, close, empty] = root;
+        let actual = envelope_rows(open, body, close, empty)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(&xml)))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: fmt::Debug>(
+        result: std::result::Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    #[test]
+    fn source_drawing_envelope() {
+        assert_envelope_matrix(
+            [
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">"#,
+                "<w:body><w:p/></w:body>",
+                "</w:document>",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+            ],
+            &[
+                "empty input: InvalidFormat(\"DOCX main story XML has an incomplete root\")",
+                "whitespace only: InvalidFormat(\"DOCX main story XML has an incomplete root\")",
+                "declaration only: InvalidFormat(\"DOCX main story XML has an incomplete root\")",
+                "empty-element root: Ok(Transitional Transitional)",
+                "start and end root: Ok(Transitional Transitional)",
+                "root then whitespace: Ok(Transitional Transitional)",
+                "root then comment: Ok(Transitional Transitional)",
+                "root then PI: Ok(Transitional Transitional)",
+                "root then text: InvalidFormat(\"non-whitespace DOCX text appears outside the root\")",
+                "root then second root: InvalidFormat(\"DOCX main story has content after its root\")",
+                "root then foreign start: InvalidFormat(\"DOCX main story has content after its root\")",
+                "root then foreign empty: InvalidFormat(\"DOCX main story has content after its root\")",
+                "declaration after root: InvalidFormat(\"DOCX XML declaration is not at the beginning of the main story\")",
+                "two declarations: InvalidFormat(\"DOCX XML declaration is not at the beginning of the main story\")",
+                "comment before declaration: Ok(Transitional Transitional)",
+                "text before root: InvalidFormat(\"non-whitespace DOCX text appears outside the root\")",
+                "unterminated root: InvalidFormat(\"DOCX main story XML has an incomplete root\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: InvalidFormat(\"DOCTYPE is forbidden in DOCX drawing scan\")",
+                "top-level CDATA: InvalidFormat(\"DOCX CDATA appears outside the root\")",
+                "declaration then root: Ok(Transitional Transitional)",
+                "whitespace before declaration: Ok(Transitional Transitional)",
+                "PI before declaration: Ok(Transitional Transitional)",
+                "comment then root: Ok(Transitional Transitional)",
+                "PI then root: Ok(Transitional Transitional)",
+                "root then text then second root: InvalidFormat(\"non-whitespace DOCX text appears outside the root\")",
+                "empty-element root then root: InvalidFormat(\"DOCX main story has content after its root\")",
+                "declaration after empty-element root: InvalidFormat(\"DOCX XML declaration is not at the beginning of the main story\")",
+                "root then CDATA: InvalidFormat(\"DOCX CDATA appears outside the root\")",
+                "root then reference: InvalidFormat(\"DOCX entity reference appears outside the root\")",
+                "reference before root: InvalidFormat(\"DOCX entity reference appears outside the root\")",
+                "whitespace then root: Ok(Transitional Transitional)",
+            ],
+            |xml| {
+                outcome(
+                    SourceDrawing::scan(xml.as_bytes(), 0, ScanLimits::default()),
+                    |drawing| format!("{:?} {:?}", drawing.dialect, drawing.relationship_dialect),
+                )
+            },
+        );
+    }
+}

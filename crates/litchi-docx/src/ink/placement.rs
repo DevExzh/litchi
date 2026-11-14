@@ -2140,4 +2140,282 @@ mod tests {
         )));
         assert!(!choice_supported(&names));
     }
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// The rows built around one root element given as its start tag,
+    /// content, end tag and empty-element form.
+    fn envelope_rows(
+        open: &str,
+        body: &str,
+        close: &str,
+        empty: &str,
+    ) -> Vec<(&'static str, String)> {
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+            ("root then CDATA", format!("{d}<![CDATA[x]]>")),
+            ("root then reference", format!("{d}&amp;")),
+            ("reference before root", format!("&amp;{d}")),
+            ("whitespace then root", format!(" \n{d}")),
+        ]
+    }
+
+    /// Run `read` over every row; each expected line is the row label
+    /// followed by the result.
+    fn assert_envelope_matrix(root: [&str; 4], expected: &[&str], read: impl Fn(&str) -> String) {
+        let [open, body, close, empty] = root;
+        let actual = envelope_rows(open, body, close, empty)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(&xml)))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: std::result::Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    const ENVELOPE_OPEN: &str = r#"<q:document xmlns:q="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:z="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wpi="http://schemas.microsoft.com/office/word/2010/wordprocessingInk">"#;
+    const ENVELOPE_EMPTY: &str = r#"<q:document xmlns:q="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:z="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wpi="http://schemas.microsoft.com/office/word/2010/wordprocessingInk"/>"#;
+    const ENVELOPE_HOST: &str = r#"<q:body><q:p><q:r><m:AlternateContent xmlns:m="http://schemas.openxmlformats.org/markup-compatibility/2006"><m:Choice Requires="wpi"><q:r/></m:Choice><m:Fallback><q:pict xmlns:v="urn:schemas-microsoft-com:vml"><v:shape><v:imagedata z:id="oldImage"/></v:shape></q:pict></m:Fallback></m:AlternateContent></q:r></q:p></q:body>"#;
+
+    /// The first complete `m:AlternateContent` host in `xml`, or the whole
+    /// input when there is none.
+    fn envelope_host(xml: &str) -> Range<usize> {
+        match (
+            xml.find("<m:AlternateContent"),
+            xml.find("</m:AlternateContent>"),
+        ) {
+            (Some(start), Some(end)) => start..end + "</m:AlternateContent>".len(),
+            _ => 0..xml.len(),
+        }
+    }
+
+    #[test]
+    fn paragraph_candidates_envelope() {
+        assert_envelope_matrix(
+            [
+                ENVELOPE_OPEN,
+                "<q:body><q:p/></q:body>",
+                "</q:document>",
+                ENVELOPE_EMPTY,
+            ],
+            &[
+                "empty input: Invalid(\"DOCX source has an unterminated XML root\")",
+                "whitespace only: Invalid(\"DOCX source has an unterminated XML root\")",
+                "declaration only: Invalid(\"DOCX source has an unterminated XML root\")",
+                "empty-element root: Ok(0)",
+                "start and end root: Ok(0)",
+                "root then whitespace: Ok(1)",
+                "root then comment: Ok(1)",
+                "root then PI: Invalid(\"DOCX source rejects DTDs and processing instructions\")",
+                "root then text: Invalid(\"DOCX source has non-whitespace text outside its root\")",
+                "root then second root: Invalid(\"DOCX source has more than one XML root\")",
+                "root then foreign start: Invalid(\"DOCX source has more than one XML root\")",
+                "root then foreign empty: Invalid(\"DOCX source has more than one XML root\")",
+                "declaration after root: Invalid(\"DOCX source has an XML declaration outside its prolog\")",
+                "two declarations: Invalid(\"DOCX source has an XML declaration outside its prolog\")",
+                "comment before declaration: Invalid(\"DOCX source has an XML declaration outside its prolog\")",
+                "text before root: Invalid(\"DOCX source has non-whitespace text outside its root\")",
+                "unterminated root: Invalid(\"DOCX source has an unterminated XML root\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"DOCX source rejects DTDs and processing instructions\")",
+                "top-level CDATA: Invalid(\"DOCX source has CDATA outside its root\")",
+                "declaration then root: Ok(1)",
+                "whitespace before declaration: Invalid(\"DOCX source has an XML declaration outside its prolog\")",
+                "PI before declaration: Invalid(\"DOCX source rejects DTDs and processing instructions\")",
+                "comment then root: Ok(1)",
+                "PI then root: Invalid(\"DOCX source rejects DTDs and processing instructions\")",
+                "root then text then second root: Invalid(\"DOCX source has non-whitespace text outside its root\")",
+                "empty-element root then root: Invalid(\"DOCX source has more than one XML root\")",
+                "declaration after empty-element root: Invalid(\"DOCX source has an XML declaration outside its prolog\")",
+                "root then CDATA: Invalid(\"DOCX source has CDATA outside its root\")",
+                "root then reference: Invalid(\"DOCX source has a reference outside its root\")",
+                "reference before root: Invalid(\"DOCX source has a reference outside its root\")",
+                "whitespace then root: Ok(1)",
+            ],
+            |xml| {
+                outcome(
+                    scan_paragraph_candidates(xml.as_bytes(), StoryDialect::Transitional, limits()),
+                    |candidates| candidates.len().to_string(),
+                )
+            },
+        );
+    }
+
+    #[test]
+    fn fallback_start_envelope() {
+        assert_envelope_matrix(
+            [
+                ENVELOPE_OPEN,
+                ENVELOPE_HOST,
+                "</q:document>",
+                ENVELOPE_EMPTY,
+            ],
+            &[
+                "empty input: Invalid(\"DOCX Ink AlternateContent host range is invalid\")",
+                "whitespace only: Invalid(\"DOCX source has an unterminated XML root\")",
+                "declaration only: Invalid(\"DOCX source has an unterminated XML root\")",
+                "empty-element root: Invalid(\"DOCX Ink host range does not cover an AlternateContent element\")",
+                "start and end root: Invalid(\"DOCX Ink AlternateContent host range was not found\")",
+                "root then whitespace: Ok(<m:Fallback>)",
+                "root then comment: Ok(<m:Fallback>)",
+                "root then PI: Invalid(\"DOCX source rejects DTDs and processing instructions\")",
+                "root then text: Invalid(\"DOCX source has non-whitespace text outside its root\")",
+                "root then second root: Invalid(\"DOCX source has more than one XML root\")",
+                "root then foreign start: Invalid(\"DOCX source has more than one XML root\")",
+                "root then foreign empty: Invalid(\"DOCX source has more than one XML root\")",
+                "declaration after root: Invalid(\"DOCX source has an XML declaration outside its prolog\")",
+                "two declarations: Invalid(\"DOCX source has an XML declaration outside its prolog\")",
+                "comment before declaration: Invalid(\"DOCX source has an XML declaration outside its prolog\")",
+                "text before root: Invalid(\"DOCX source has non-whitespace text outside its root\")",
+                "unterminated root: Invalid(\"DOCX source has an unterminated XML root\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"DOCX source rejects DTDs and processing instructions\")",
+                "top-level CDATA: Invalid(\"DOCX source has CDATA outside its root\")",
+                "declaration then root: Ok(<m:Fallback>)",
+                "whitespace before declaration: Invalid(\"DOCX source has an XML declaration outside its prolog\")",
+                "PI before declaration: Invalid(\"DOCX source rejects DTDs and processing instructions\")",
+                "comment then root: Ok(<m:Fallback>)",
+                "PI then root: Invalid(\"DOCX source rejects DTDs and processing instructions\")",
+                "root then text then second root: Invalid(\"DOCX source has non-whitespace text outside its root\")",
+                "empty-element root then root: Invalid(\"DOCX source has more than one XML root\")",
+                "declaration after empty-element root: Invalid(\"DOCX Ink host range does not cover an AlternateContent element\")",
+                "root then CDATA: Invalid(\"DOCX source has CDATA outside its root\")",
+                "root then reference: Invalid(\"DOCX source has a reference outside its root\")",
+                "reference before root: Invalid(\"DOCX source has a reference outside its root\")",
+                "whitespace then root: Ok(<m:Fallback>)",
+            ],
+            |xml| {
+                outcome(
+                    fallback_start(xml.as_bytes(), envelope_host(xml), limits()),
+                    |range| xml[range].to_owned(),
+                )
+            },
+        );
+    }
+
+    #[test]
+    fn retarget_fallbacks_envelope() {
+        assert_envelope_matrix(
+            [
+                ENVELOPE_OPEN,
+                ENVELOPE_HOST,
+                "</q:document>",
+                ENVELOPE_EMPTY,
+            ],
+            &[
+                "empty input: package SourceBackedOverlayUnavailable { reason: \"source XML '/part.xml' must contain one closed root element\" }",
+                "whitespace only: package SourceBackedOverlayUnavailable { reason: \"source XML '/part.xml' must contain one closed root element\" }",
+                "declaration only: package SourceBackedOverlayUnavailable { reason: \"source XML '/part.xml' must contain one closed root element\" }",
+                "empty-element root: Invalid(\"DOCX Ink fallback retarget range must cover a complete AlternateContent\")",
+                "start and end root: Invalid(\"DOCX Ink fallback retarget range does not identify AlternateContent\")",
+                "root then whitespace: Ok(true)",
+                "root then comment: Ok(true)",
+                "root then PI: Invalid(\"DOCX source rejects DTDs and processing instructions\")",
+                "root then text: package SourceBackedOverlayUnavailable { reason: \"source XML has text outside its root\" }",
+                "root then second root: package SourceBackedOverlayUnavailable { reason: \"source XML '/part.xml' must contain one closed root element\" }",
+                "root then foreign start: package SourceBackedOverlayUnavailable { reason: \"source XML '/part.xml' must contain one closed root element\" }",
+                "root then foreign empty: package SourceBackedOverlayUnavailable { reason: \"source XML '/part.xml' must contain one closed root element\" }",
+                "declaration after root: package SourceBackedOverlayUnavailable { reason: \"source XML declaration is out of place\" }",
+                "two declarations: package SourceBackedOverlayUnavailable { reason: \"source XML declaration is out of place\" }",
+                "comment before declaration: package SourceBackedOverlayUnavailable { reason: \"source XML declaration is out of place\" }",
+                "text before root: package SourceBackedOverlayUnavailable { reason: \"source XML has text outside its root\" }",
+                "unterminated root: package SourceBackedOverlayUnavailable { reason: \"source XML '/part.xml' must contain one closed root element\" }",
+                "stray end tag: package XmlError(\"source XML '/part.xml' is malformed: ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: package SourceBackedOverlayUnavailable { reason: \"source XML DTDs are not permitted\" }",
+                "top-level CDATA: package SourceBackedOverlayUnavailable { reason: \"source XML has CDATA outside its root\" }",
+                "declaration then root: Ok(true)",
+                "whitespace before declaration: package SourceBackedOverlayUnavailable { reason: \"source XML declaration is out of place\" }",
+                "PI before declaration: package SourceBackedOverlayUnavailable { reason: \"source XML declaration is out of place\" }",
+                "comment then root: Ok(true)",
+                "PI then root: Invalid(\"DOCX source rejects DTDs and processing instructions\")",
+                "root then text then second root: package SourceBackedOverlayUnavailable { reason: \"source XML has text outside its root\" }",
+                "empty-element root then root: package SourceBackedOverlayUnavailable { reason: \"source XML '/part.xml' must contain one closed root element\" }",
+                "declaration after empty-element root: package SourceBackedOverlayUnavailable { reason: \"source XML declaration is out of place\" }",
+                "root then CDATA: package SourceBackedOverlayUnavailable { reason: \"source XML has CDATA outside its root\" }",
+                "root then reference: package SourceBackedOverlayUnavailable { reason: \"source XML has a reference outside its root\" }",
+                "reference before root: package SourceBackedOverlayUnavailable { reason: \"source XML has a reference outside its root\" }",
+                "whitespace then root: Ok(true)",
+            ],
+            |xml| {
+                let mut writer = StreamingArchiveWriter::new(
+                    soapberry_zip::office::StreamingArchiveLimits::default(),
+                );
+                writer
+                    .write_stored(
+                        "[Content_Types].xml",
+                        br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Override PartName="/part.xml" ContentType="application/xml"/></Types>"#,
+                    )
+                    .unwrap();
+                writer.write_stored("part.xml", xml.as_bytes()).unwrap();
+                let package = OpcPackage::from_bytes(
+                    &writer.finish_to_bytes().unwrap(),
+                    litchi_opc::SourceLimits::default(),
+                )
+                .unwrap();
+                let source = match package.source_xml_part(&PackURI::new("/part.xml").unwrap()) {
+                    Ok(source) => source,
+                    Err(error) => return format!("package {error:?}"),
+                };
+                outcome(
+                    retarget_fallbacks(
+                        &source,
+                        &[(envelope_host(xml), "newImage")],
+                        StoryDialect::Transitional,
+                        limits(),
+                    ),
+                    |part| {
+                        String::from_utf8_lossy(part.bytes())
+                            .contains("z:id=\"newImage\"")
+                            .to_string()
+                    },
+                )
+            },
+        );
+    }
 }

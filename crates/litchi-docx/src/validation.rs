@@ -1804,3 +1804,144 @@ fn count_issue(
         limits,
     )
 }
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the visible main-document inspection accepts before, around and after `w:document`.
+
+    use super::*;
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// The rows built around one root element given as its start tag,
+    /// content, end tag and empty-element form.
+    fn envelope_rows(
+        open: &str,
+        body: &str,
+        close: &str,
+        empty: &str,
+    ) -> Vec<(&'static str, String)> {
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+            ("root then CDATA", format!("{d}<![CDATA[x]]>")),
+            ("root then reference", format!("{d}&amp;")),
+            ("reference before root", format!("&amp;{d}")),
+            ("whitespace then root", format!(" \n{d}")),
+        ]
+    }
+
+    /// Run `read` over every row; each expected line is the row label
+    /// followed by the result.
+    fn assert_envelope_matrix(root: [&str; 4], expected: &[&str], read: impl Fn(&str) -> String) {
+        let [open, body, close, empty] = root;
+        let actual = envelope_rows(open, body, close, empty)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(&xml)))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    #[test]
+    fn visible_main_document_envelope() {
+        assert_envelope_matrix(
+            [
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">"#,
+                "<w:body><w:p/></w:body>",
+                "</w:document>",
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+            ],
+            &[
+                "empty input: Issue(docx.main_document.malformed_xml: The visible main-document XML is not well formed.)",
+                "whitespace only: Issue(docx.main_document.malformed_xml: The visible main-document XML is not well formed.)",
+                "declaration only: Issue(docx.main_document.malformed_xml: The visible main-document XML is not well formed.)",
+                "empty-element root: Ok([\"docx.main_document.body_missing\", \"docx.main_document.supported_blocks\"])",
+                "start and end root: Ok([\"docx.main_document.body_missing\", \"docx.main_document.supported_blocks\"])",
+                "root then whitespace: Ok([\"docx.main_document.supported_blocks\"])",
+                "root then comment: Ok([\"docx.main_document.supported_blocks\"])",
+                "root then PI: Issue(docx.main_document.malformed_xml: The visible main-document XML is not well formed or contains an unsupported XML construct.)",
+                "root then text: Issue(docx.main_document.malformed_xml: The visible main-document XML is not well formed or contains an unsupported XML construct.)",
+                "root then second root: Issue(docx.main_document.malformed_xml: The visible main-document XML is not well formed or contains an unsupported XML construct.)",
+                "root then foreign start: Issue(docx.main_document.malformed_xml: The visible main-document XML is not well formed or contains an unsupported XML construct.)",
+                "root then foreign empty: Issue(docx.main_document.malformed_xml: The visible main-document XML is not well formed or contains an unsupported XML construct.)",
+                "declaration after root: Issue(docx.main_document.malformed_xml: The visible main-document XML is not well formed or contains an unsupported XML construct.)",
+                "two declarations: Issue(docx.main_document.malformed_xml: The visible main-document XML is not well formed or contains an unsupported XML construct.)",
+                "comment before declaration: Issue(docx.main_document.malformed_xml: The visible main-document XML is not well formed or contains an unsupported XML construct.)",
+                "text before root: Issue(docx.main_document.malformed_xml: The visible main-document XML is not well formed or contains an unsupported XML construct.)",
+                "unterminated root: Issue(docx.main_document.malformed_xml: The visible main-document XML is not well formed.)",
+                "stray end tag: Issue(docx.main_document.malformed_xml: The visible main-document XML is not well formed.)",
+                "DOCTYPE: Issue(docx.main_document.malformed_xml: The visible main-document XML is not well formed or contains an unsupported XML construct.)",
+                "top-level CDATA: Issue(docx.main_document.malformed_xml: The visible main-document XML is not well formed or contains an unsupported XML construct.)",
+                "declaration then root: Ok([\"docx.main_document.supported_blocks\"])",
+                "whitespace before declaration: Issue(docx.main_document.malformed_xml: The visible main-document XML is not well formed or contains an unsupported XML construct.)",
+                "PI before declaration: Issue(docx.main_document.malformed_xml: The visible main-document XML is not well formed or contains an unsupported XML construct.)",
+                "comment then root: Ok([\"docx.main_document.supported_blocks\"])",
+                "PI then root: Issue(docx.main_document.malformed_xml: The visible main-document XML is not well formed or contains an unsupported XML construct.)",
+                "root then text then second root: Issue(docx.main_document.malformed_xml: The visible main-document XML is not well formed or contains an unsupported XML construct.)",
+                "empty-element root then root: Issue(docx.main_document.malformed_xml: The visible main-document XML is not well formed or contains an unsupported XML construct.)",
+                "declaration after empty-element root: Issue(docx.main_document.malformed_xml: The visible main-document XML is not well formed or contains an unsupported XML construct.)",
+                "root then CDATA: Issue(docx.main_document.malformed_xml: The visible main-document XML is not well formed or contains an unsupported XML construct.)",
+                "root then reference: Issue(docx.main_document.malformed_xml: The visible main-document XML is not well formed or contains an unsupported XML construct.)",
+                "reference before root: Issue(docx.main_document.malformed_xml: The visible main-document XML is not well formed or contains an unsupported XML construct.)",
+                "whitespace then root: Ok([\"docx.main_document.supported_blocks\"])",
+            ],
+            |xml| match inspect_visible_xml(
+                xml.as_bytes(),
+                "/word/document.xml",
+                Limits::default(),
+                ValidationLimits::default(),
+            ) {
+                Ok(issues) => format!(
+                    "Ok({:?})",
+                    issues.iter().map(ValidationIssue::code).collect::<Vec<_>>()
+                ),
+                Err(InspectionFailure::Blocked(reason)) => format!("Blocked({reason})"),
+                Err(InspectionFailure::Issue(issue)) => {
+                    format!("Issue({}: {})", issue.code(), issue.message())
+                },
+                Err(InspectionFailure::Ingress(error)) => format!("Ingress({error:?})"),
+                Err(InspectionFailure::Allocation { resource }) => {
+                    format!("Allocation({resource})")
+                },
+                Err(InspectionFailure::Report(error)) => format!("Report({error:?})"),
+            },
+        );
+    }
+}

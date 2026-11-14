@@ -1812,4 +1812,197 @@ mod tests {
         assert_eq!(format!("{}", RevisionType::MoveTo), "Move To");
         assert_eq!(format!("{}", RevisionType::FormatChange), "Format Change");
     }
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// The rows built around one root element given as its start tag,
+    /// content, end tag and empty-element form.
+    fn envelope_rows(
+        open: &str,
+        body: &str,
+        close: &str,
+        empty: &str,
+    ) -> Vec<(&'static str, String)> {
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+            ("root then CDATA", format!("{d}<![CDATA[x]]>")),
+            ("root then reference", format!("{d}&amp;")),
+            ("reference before root", format!("&amp;{d}")),
+            ("whitespace then root", format!(" \n{d}")),
+        ]
+    }
+
+    /// Run `read` over every row; each expected line is the row label
+    /// followed by the result.
+    fn assert_envelope_matrix(root: [&str; 4], expected: &[&str], read: impl Fn(&str) -> String) {
+        let [open, body, close, empty] = root;
+        let actual = envelope_rows(open, body, close, empty)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(&xml)))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: fmt::Debug>(
+        result: std::result::Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    #[test]
+    fn revision_fragment_envelope() {
+        assert_envelope_matrix(
+            [
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">"#,
+                r#"<w:ins w:id="1" w:author="Alice"><w:r><w:t>x</w:t></w:r></w:ins>"#,
+                "</w:p>",
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+            ],
+            &[
+                "empty input: InvalidFormat(\"revision XML has no root element\")",
+                "whitespace only: InvalidFormat(\"revision XML has no root element\")",
+                "declaration only: InvalidFormat(\"revision XML has no root element\")",
+                "empty-element root: Ok()",
+                "start and end root: Ok()",
+                "root then whitespace: Ok(Insert \"x\")",
+                "root then comment: Ok(Insert \"x\")",
+                "root then PI: Ok(Insert \"x\")",
+                "root then text: InvalidFormat(\"revision XML has text outside its root element\")",
+                "root then second root: InvalidFormat(\"revision XML has multiple root elements\")",
+                "root then foreign start: InvalidFormat(\"revision XML has multiple root elements\")",
+                "root then foreign empty: InvalidFormat(\"revision XML has multiple root elements\")",
+                "declaration after root: InvalidFormat(\"revision XML declaration must appear once at the beginning\")",
+                "two declarations: InvalidFormat(\"revision XML declaration must appear once at the beginning\")",
+                "comment before declaration: InvalidFormat(\"revision XML declaration must appear once at the beginning\")",
+                "text before root: InvalidFormat(\"revision XML has text outside its root element\")",
+                "unterminated root: InvalidFormat(\"truncated revision XML fragment\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: InvalidFormat(\"DTD declarations are not permitted in revision XML\")",
+                "top-level CDATA: InvalidFormat(\"revision XML has CDATA outside its root element\")",
+                "declaration then root: Ok(Insert \"x\")",
+                "whitespace before declaration: InvalidFormat(\"revision XML declaration must appear once at the beginning\")",
+                "PI before declaration: InvalidFormat(\"revision XML declaration must appear once at the beginning\")",
+                "comment then root: Ok(Insert \"x\")",
+                "PI then root: Ok(Insert \"x\")",
+                "root then text then second root: InvalidFormat(\"revision XML has text outside its root element\")",
+                "empty-element root then root: InvalidFormat(\"revision XML has multiple root elements\")",
+                "declaration after empty-element root: InvalidFormat(\"revision XML declaration must appear once at the beginning\")",
+                "root then CDATA: InvalidFormat(\"revision XML has CDATA outside its root element\")",
+                "root then reference: InvalidFormat(\"revision XML has a reference outside its root element\")",
+                "reference before root: InvalidFormat(\"revision XML has a reference outside its root element\")",
+                "whitespace then root: Ok(Insert \"x\")",
+            ],
+            |xml| {
+                outcome(parse_revisions(xml.as_bytes()), |revisions| {
+                    revisions
+                        .iter()
+                        .map(|revision| {
+                            format!("{:?} {:?}", revision.revision_type(), revision.text())
+                        })
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                })
+            },
+        );
+    }
+
+    /// An empty-element revision as the root closes the fragment.
+    #[test]
+    fn revision_fragment_empty_revision_root_envelope() {
+        assert_envelope_matrix(
+            [
+                r#"<w:ins xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:id="1" w:author="Alice">"#,
+                r#"<w:r><w:t>x</w:t></w:r>"#,
+                "</w:ins>",
+                r#"<w:ins xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:id="1" w:author="Alice"/>"#,
+            ],
+            &[
+                "empty input: InvalidFormat(\"revision XML has no root element\")",
+                "whitespace only: InvalidFormat(\"revision XML has no root element\")",
+                "declaration only: InvalidFormat(\"revision XML has no root element\")",
+                "empty-element root: Ok(Insert \"\")",
+                "start and end root: Ok(Insert \"\")",
+                "root then whitespace: Ok(Insert \"x\")",
+                "root then comment: Ok(Insert \"x\")",
+                "root then PI: Ok(Insert \"x\")",
+                "root then text: InvalidFormat(\"revision XML has text outside its root element\")",
+                "root then second root: InvalidFormat(\"revision XML has multiple root elements\")",
+                "root then foreign start: InvalidFormat(\"revision XML has multiple root elements\")",
+                "root then foreign empty: InvalidFormat(\"revision XML has multiple root elements\")",
+                "declaration after root: InvalidFormat(\"revision XML declaration must appear once at the beginning\")",
+                "two declarations: InvalidFormat(\"revision XML declaration must appear once at the beginning\")",
+                "comment before declaration: InvalidFormat(\"revision XML declaration must appear once at the beginning\")",
+                "text before root: InvalidFormat(\"revision XML has text outside its root element\")",
+                "unterminated root: InvalidFormat(\"truncated revision XML fragment\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: InvalidFormat(\"DTD declarations are not permitted in revision XML\")",
+                "top-level CDATA: InvalidFormat(\"revision XML has CDATA outside its root element\")",
+                "declaration then root: Ok(Insert \"x\")",
+                "whitespace before declaration: InvalidFormat(\"revision XML declaration must appear once at the beginning\")",
+                "PI before declaration: InvalidFormat(\"revision XML declaration must appear once at the beginning\")",
+                "comment then root: Ok(Insert \"x\")",
+                "PI then root: Ok(Insert \"x\")",
+                "root then text then second root: InvalidFormat(\"revision XML has text outside its root element\")",
+                "empty-element root then root: InvalidFormat(\"revision XML has multiple root elements\")",
+                "declaration after empty-element root: InvalidFormat(\"revision XML declaration must appear once at the beginning\")",
+                "root then CDATA: InvalidFormat(\"revision XML has CDATA outside its root element\")",
+                "root then reference: InvalidFormat(\"revision XML has a reference outside its root element\")",
+                "reference before root: InvalidFormat(\"revision XML has a reference outside its root element\")",
+                "whitespace then root: Ok(Insert \"x\")",
+            ],
+            |xml| {
+                outcome(parse_revisions(xml.as_bytes()), |revisions| {
+                    revisions
+                        .iter()
+                        .map(|revision| {
+                            format!("{:?} {:?}", revision.revision_type(), revision.text())
+                        })
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                })
+            },
+        );
+    }
 }

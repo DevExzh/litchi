@@ -16727,3 +16727,194 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the tracked-revision fragment scanner accepts before, around and after its root.
+
+    use super::*;
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// The rows built around one root element given as its start tag,
+    /// content, end tag and empty-element form.
+    fn envelope_rows(
+        open: &str,
+        body: &str,
+        close: &str,
+        empty: &str,
+    ) -> Vec<(&'static str, String)> {
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+            ("root then CDATA", format!("{d}<![CDATA[x]]>")),
+            ("root then reference", format!("{d}&amp;")),
+            ("reference before root", format!("&amp;{d}")),
+            ("whitespace then root", format!(" \n{d}")),
+        ]
+    }
+
+    /// Run `read` over every row; each expected line is the row label
+    /// followed by the result.
+    fn assert_envelope_matrix(root: [&str; 4], expected: &[&str], read: impl Fn(&str) -> String) {
+        let [open, body, close, empty] = root;
+        let actual = envelope_rows(open, body, close, empty)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(&xml)))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: std::result::Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    fn revision_fragment_outcome(xml: &str, kind: RevisionKind) -> String {
+        outcome(scan_revision_fragment(xml.as_bytes(), kind, &[]), |info| {
+            format!(
+                "open_end={} close_start={} children={} names={}",
+                info.root_open_end,
+                info.root_close_start,
+                info.child_ranges.len(),
+                info.deleted_text_names.len()
+            )
+        })
+    }
+
+    #[test]
+    fn insertion_fragment_envelope() {
+        assert_envelope_matrix(
+            [
+                r#"<w:ins xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:id="1" w:author="A">"#,
+                "<w:r><w:t>x</w:t></w:r>",
+                "</w:ins>",
+                r#"<w:ins xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:id="1" w:author="A"/>"#,
+            ],
+            &[
+                "empty input: RevisionDependency",
+                "whitespace only: RevisionDependency",
+                "declaration only: RevisionDependency",
+                "empty-element root: Ok(open_end=101 close_start=101 children=0 names=0)",
+                "start and end root: Ok(open_end=100 close_start=100 children=0 names=0)",
+                "root then whitespace: Ok(open_end=100 close_start=123 children=1 names=0)",
+                "root then comment: Ok(open_end=100 close_start=123 children=1 names=0)",
+                "root then PI: Ok(open_end=100 close_start=123 children=1 names=0)",
+                "root then text: RevisionDependency",
+                "root then second root: RevisionDependency",
+                "root then foreign start: RevisionDependency",
+                "root then foreign empty: RevisionDependency",
+                "declaration after root: RevisionDependency",
+                "two declarations: RevisionDependency",
+                "comment before declaration: RevisionDependency",
+                "text before root: RevisionDependency",
+                "unterminated root: RevisionDependency",
+                "stray end tag: RevisionDependency",
+                "DOCTYPE: RevisionDependency",
+                "top-level CDATA: RevisionDependency",
+                "declaration then root: RevisionDependency",
+                "whitespace before declaration: RevisionDependency",
+                "PI before declaration: RevisionDependency",
+                "comment then root: Ok(open_end=108 close_start=131 children=1 names=0)",
+                "PI then root: Ok(open_end=108 close_start=131 children=1 names=0)",
+                "root then text then second root: RevisionDependency",
+                "empty-element root then root: RevisionDependency",
+                "declaration after empty-element root: RevisionDependency",
+                "root then CDATA: RevisionDependency",
+                "root then reference: RevisionDependency",
+                "reference before root: RevisionDependency",
+                "whitespace then root: Ok(open_end=102 close_start=125 children=1 names=0)",
+            ],
+            |xml| revision_fragment_outcome(xml, RevisionKind::Insertion),
+        );
+    }
+
+    #[test]
+    fn deletion_fragment_envelope() {
+        assert_envelope_matrix(
+            [
+                r#"<w:del xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:id="1" w:author="A">"#,
+                "<w:r><w:delText>x</w:delText></w:r>",
+                "</w:del>",
+                r#"<w:del xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:id="1" w:author="A"/>"#,
+            ],
+            &[
+                "empty input: RevisionDependency",
+                "whitespace only: RevisionDependency",
+                "declaration only: RevisionDependency",
+                "empty-element root: Ok(open_end=101 close_start=101 children=0 names=0)",
+                "start and end root: Ok(open_end=100 close_start=100 children=0 names=0)",
+                "root then whitespace: Ok(open_end=100 close_start=135 children=1 names=2)",
+                "root then comment: Ok(open_end=100 close_start=135 children=1 names=2)",
+                "root then PI: Ok(open_end=100 close_start=135 children=1 names=2)",
+                "root then text: RevisionDependency",
+                "root then second root: RevisionDependency",
+                "root then foreign start: RevisionDependency",
+                "root then foreign empty: RevisionDependency",
+                "declaration after root: RevisionDependency",
+                "two declarations: RevisionDependency",
+                "comment before declaration: RevisionDependency",
+                "text before root: RevisionDependency",
+                "unterminated root: RevisionDependency",
+                "stray end tag: RevisionDependency",
+                "DOCTYPE: RevisionDependency",
+                "top-level CDATA: RevisionDependency",
+                "declaration then root: RevisionDependency",
+                "whitespace before declaration: RevisionDependency",
+                "PI before declaration: RevisionDependency",
+                "comment then root: Ok(open_end=108 close_start=143 children=1 names=2)",
+                "PI then root: Ok(open_end=108 close_start=143 children=1 names=2)",
+                "root then text then second root: RevisionDependency",
+                "empty-element root then root: RevisionDependency",
+                "declaration after empty-element root: RevisionDependency",
+                "root then CDATA: RevisionDependency",
+                "root then reference: RevisionDependency",
+                "reference before root: RevisionDependency",
+                "whitespace then root: Ok(open_end=102 close_start=137 children=1 names=2)",
+            ],
+            |xml| revision_fragment_outcome(xml, RevisionKind::Deletion),
+        );
+    }
+}

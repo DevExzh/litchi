@@ -6704,6 +6704,88 @@ mod envelope_tests {
         assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
     }
 
+    /// Rows around an element whose prefix is never declared, which the
+    /// validator skips when unknown namespaces are allowed.
+    fn undeclared_prefix_rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        let x = "<x:a></x:a>";
+        vec![
+            ("undeclared prefix only", x.to_owned()),
+            ("undeclared prefix empty only", "<x:a/>".to_owned()),
+            ("unterminated undeclared prefix", "<x:a>".to_owned()),
+            ("undeclared prefix then root", format!("{x}{d}")),
+            ("undeclared prefix empty then root", format!("<x:a/>{d}")),
+            ("root then undeclared prefix", format!("{d}{x}")),
+            ("root then undeclared prefix empty", format!("{d}<x:a/>")),
+            ("root inside undeclared prefix", format!("<x:a>{d}</x:a>")),
+            (
+                "empty-element root inside undeclared prefix",
+                format!("<x:a>{empty}</x:a>"),
+            ),
+            (
+                "two empty-element roots inside undeclared prefix",
+                format!("<x:a>{empty}{empty}</x:a>"),
+            ),
+            (
+                "declaration after undeclared prefix",
+                format!("{x}{DECLARATION}"),
+            ),
+            (
+                "declaration after undeclared prefix then root",
+                format!("{x}{DECLARATION}{d}"),
+            ),
+            (
+                "declaration after undeclared prefix empty then root",
+                format!("<x:a/>{DECLARATION}{d}"),
+            ),
+            (
+                "declaration around undeclared prefix",
+                format!("{DECLARATION}{x}{DECLARATION}"),
+            ),
+            (
+                "comment after undeclared prefix then declaration",
+                format!("{x}<!--c-->{DECLARATION}"),
+            ),
+            (
+                "whitespace after undeclared prefix then declaration",
+                format!("{x} {DECLARATION}"),
+            ),
+            ("text after undeclared prefix", format!("{x}text")),
+            ("comment after undeclared prefix", format!("{x}<!--c-->")),
+            (
+                "declaration inside undeclared prefix then root",
+                format!("<x:a>{DECLARATION}{d}</x:a>"),
+            ),
+            (
+                "comment inside undeclared prefix then declaration",
+                format!("<x:a><!--c-->{DECLARATION}</x:a>"),
+            ),
+            (
+                "text inside undeclared prefix",
+                "<x:a>text</x:a>".to_owned(),
+            ),
+        ]
+    }
+
+    fn assert_undeclared_prefix_matrix(
+        root: &Root<'_>,
+        expected: &[&str],
+        read: impl Fn(&[u8]) -> String,
+    ) {
+        let actual = undeclared_prefix_rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(xml.as_bytes())))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
     fn outcome<T, E: std::fmt::Debug>(
         result: Result<T, E>,
         summary: impl Fn(T) -> String,
@@ -6760,6 +6842,167 @@ mod envelope_tests {
                     format!("{value:?}")
                 })
             },
+        );
+    }
+
+    fn slide_root() -> Root<'static> {
+        Root {
+            open: r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">"#,
+            body: r"<p:cSld><p:spTree/></p:cSld>",
+            close: r"</p:sld>",
+            empty: r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#,
+        }
+    }
+
+    fn source_closure(xml: &[u8], allow_unknown_namespaces: bool) -> String {
+        outcome(
+            super::validate_xml(
+                xml,
+                b"sld",
+                super::RootNamespace::PresentationMl,
+                true,
+                true,
+                false,
+                false,
+                allow_unknown_namespaces,
+                "slide",
+                None,
+            ),
+            |value| format!("{value:?}"),
+        )
+    }
+
+    /// The source-closure validation, with unknown namespaces refused.
+    #[test]
+    fn source_closure_validation_envelope() {
+        assert_matrix(
+            &slide_root(),
+            &[
+                "empty input: Xml(\"slide is not one closed root\")",
+                "whitespace only: Xml(\"slide is not one closed root\")",
+                "declaration only: Xml(\"slide is not one closed root\")",
+                "empty-element root: Ok(Transitional)",
+                "start and end root: Ok(Transitional)",
+                "root then whitespace: Ok(Transitional)",
+                "root then comment: Ok(Transitional)",
+                "root then PI: Refused(Refusal { kind: UnsupportedContent, operation: \"slide_copy\", reason: \"the selected slide cannot be copied losslessly because it contains markup-compatibility content\" })",
+                "root then text: Xml(\"slide contains text outside its root\")",
+                "root then second root: Xml(\"slide contains more than one root element\")",
+                "root then foreign start: Xml(\"slide contains more than one root element\")",
+                "root then foreign empty: Xml(\"slide contains more than one root element\")",
+                "declaration after root: Xml(\"slide contains a misplaced or repeated XML declaration\")",
+                "two declarations: Xml(\"slide contains a misplaced or repeated XML declaration\")",
+                "comment before declaration: Xml(\"slide contains a misplaced or repeated XML declaration\")",
+                "text before root: Xml(\"slide contains text outside its root\")",
+                "unterminated root: Xml(\"slide is not one closed root\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Refused(Refusal { kind: UnsupportedContent, operation: \"slide_copy\", reason: \"the selected slide cannot be copied losslessly because it contains markup-compatibility content\" })",
+                "top-level CDATA: Xml(\"slide contains character data outside its root\")",
+                "declaration then root: Ok(Transitional)",
+                "whitespace before declaration: Xml(\"slide contains a misplaced or repeated XML declaration\")",
+                "PI before declaration: Refused(Refusal { kind: UnsupportedContent, operation: \"slide_copy\", reason: \"the selected slide cannot be copied losslessly because it contains markup-compatibility content\" })",
+                "comment then root: Ok(Transitional)",
+                "PI then root: Refused(Refusal { kind: UnsupportedContent, operation: \"slide_copy\", reason: \"the selected slide cannot be copied losslessly because it contains markup-compatibility content\" })",
+                "root then text then second root: Xml(\"slide contains text outside its root\")",
+                "empty-element root then root: Xml(\"slide contains more than one root element\")",
+                "declaration after empty-element root: Xml(\"slide contains a misplaced or repeated XML declaration\")",
+            ],
+            |xml| source_closure(xml, false),
+        );
+        assert_undeclared_prefix_matrix(
+            &slide_root(),
+            &[
+                "undeclared prefix only: Refused(Refusal { kind: UnsupportedContent, operation: \"slide_copy\", reason: \"the selected slide cannot be copied losslessly because its semantic surface is unsupported\" })",
+                "undeclared prefix empty only: Refused(Refusal { kind: UnsupportedContent, operation: \"slide_copy\", reason: \"the selected slide cannot be copied losslessly because its semantic surface is unsupported\" })",
+                "unterminated undeclared prefix: Refused(Refusal { kind: UnsupportedContent, operation: \"slide_copy\", reason: \"the selected slide cannot be copied losslessly because its semantic surface is unsupported\" })",
+                "undeclared prefix then root: Refused(Refusal { kind: UnsupportedContent, operation: \"slide_copy\", reason: \"the selected slide cannot be copied losslessly because its semantic surface is unsupported\" })",
+                "undeclared prefix empty then root: Refused(Refusal { kind: UnsupportedContent, operation: \"slide_copy\", reason: \"the selected slide cannot be copied losslessly because its semantic surface is unsupported\" })",
+                "root then undeclared prefix: Xml(\"slide contains more than one root element\")",
+                "root then undeclared prefix empty: Xml(\"slide contains more than one root element\")",
+                "root inside undeclared prefix: Refused(Refusal { kind: UnsupportedContent, operation: \"slide_copy\", reason: \"the selected slide cannot be copied losslessly because its semantic surface is unsupported\" })",
+                "empty-element root inside undeclared prefix: Refused(Refusal { kind: UnsupportedContent, operation: \"slide_copy\", reason: \"the selected slide cannot be copied losslessly because its semantic surface is unsupported\" })",
+                "two empty-element roots inside undeclared prefix: Refused(Refusal { kind: UnsupportedContent, operation: \"slide_copy\", reason: \"the selected slide cannot be copied losslessly because its semantic surface is unsupported\" })",
+                "declaration after undeclared prefix: Refused(Refusal { kind: UnsupportedContent, operation: \"slide_copy\", reason: \"the selected slide cannot be copied losslessly because its semantic surface is unsupported\" })",
+                "declaration after undeclared prefix then root: Refused(Refusal { kind: UnsupportedContent, operation: \"slide_copy\", reason: \"the selected slide cannot be copied losslessly because its semantic surface is unsupported\" })",
+                "declaration after undeclared prefix empty then root: Refused(Refusal { kind: UnsupportedContent, operation: \"slide_copy\", reason: \"the selected slide cannot be copied losslessly because its semantic surface is unsupported\" })",
+                "declaration around undeclared prefix: Refused(Refusal { kind: UnsupportedContent, operation: \"slide_copy\", reason: \"the selected slide cannot be copied losslessly because its semantic surface is unsupported\" })",
+                "comment after undeclared prefix then declaration: Refused(Refusal { kind: UnsupportedContent, operation: \"slide_copy\", reason: \"the selected slide cannot be copied losslessly because its semantic surface is unsupported\" })",
+                "whitespace after undeclared prefix then declaration: Refused(Refusal { kind: UnsupportedContent, operation: \"slide_copy\", reason: \"the selected slide cannot be copied losslessly because its semantic surface is unsupported\" })",
+                "text after undeclared prefix: Refused(Refusal { kind: UnsupportedContent, operation: \"slide_copy\", reason: \"the selected slide cannot be copied losslessly because its semantic surface is unsupported\" })",
+                "comment after undeclared prefix: Refused(Refusal { kind: UnsupportedContent, operation: \"slide_copy\", reason: \"the selected slide cannot be copied losslessly because its semantic surface is unsupported\" })",
+                "declaration inside undeclared prefix then root: Refused(Refusal { kind: UnsupportedContent, operation: \"slide_copy\", reason: \"the selected slide cannot be copied losslessly because its semantic surface is unsupported\" })",
+                "comment inside undeclared prefix then declaration: Refused(Refusal { kind: UnsupportedContent, operation: \"slide_copy\", reason: \"the selected slide cannot be copied losslessly because its semantic surface is unsupported\" })",
+                "text inside undeclared prefix: Refused(Refusal { kind: UnsupportedContent, operation: \"slide_copy\", reason: \"the selected slide cannot be copied losslessly because its semantic surface is unsupported\" })",
+            ],
+            |xml| source_closure(xml, false),
+        );
+    }
+
+    /// The source-closure validation that skips elements whose namespace
+    /// prefix is undeclared: such an element closed at the top level before
+    /// any root still leaves the part without a root.
+    #[test]
+    fn unknown_namespace_validation_envelope() {
+        assert_matrix(
+            &slide_root(),
+            &[
+                "empty input: Xml(\"slide is not one closed root\")",
+                "whitespace only: Xml(\"slide is not one closed root\")",
+                "declaration only: Xml(\"slide is not one closed root\")",
+                "empty-element root: Ok(Transitional)",
+                "start and end root: Ok(Transitional)",
+                "root then whitespace: Ok(Transitional)",
+                "root then comment: Ok(Transitional)",
+                "root then PI: Refused(Refusal { kind: UnsupportedContent, operation: \"slide_copy\", reason: \"the selected slide cannot be copied losslessly because it contains markup-compatibility content\" })",
+                "root then text: Xml(\"slide contains text outside its root\")",
+                "root then second root: Xml(\"slide contains more than one root element\")",
+                "root then foreign start: Xml(\"slide contains more than one root element\")",
+                "root then foreign empty: Xml(\"slide contains more than one root element\")",
+                "declaration after root: Xml(\"slide contains a misplaced or repeated XML declaration\")",
+                "two declarations: Xml(\"slide contains a misplaced or repeated XML declaration\")",
+                "comment before declaration: Xml(\"slide contains a misplaced or repeated XML declaration\")",
+                "text before root: Xml(\"slide contains text outside its root\")",
+                "unterminated root: Xml(\"slide is not one closed root\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Refused(Refusal { kind: UnsupportedContent, operation: \"slide_copy\", reason: \"the selected slide cannot be copied losslessly because it contains markup-compatibility content\" })",
+                "top-level CDATA: Xml(\"slide contains character data outside its root\")",
+                "declaration then root: Ok(Transitional)",
+                "whitespace before declaration: Xml(\"slide contains a misplaced or repeated XML declaration\")",
+                "PI before declaration: Refused(Refusal { kind: UnsupportedContent, operation: \"slide_copy\", reason: \"the selected slide cannot be copied losslessly because it contains markup-compatibility content\" })",
+                "comment then root: Ok(Transitional)",
+                "PI then root: Refused(Refusal { kind: UnsupportedContent, operation: \"slide_copy\", reason: \"the selected slide cannot be copied losslessly because it contains markup-compatibility content\" })",
+                "root then text then second root: Xml(\"slide contains text outside its root\")",
+                "empty-element root then root: Xml(\"slide contains more than one root element\")",
+                "declaration after empty-element root: Xml(\"slide contains a misplaced or repeated XML declaration\")",
+            ],
+            |xml| source_closure(xml, true),
+        );
+        assert_undeclared_prefix_matrix(
+            &slide_root(),
+            &[
+                "undeclared prefix only: Xml(\"slide is not one closed root\")",
+                "undeclared prefix empty only: Xml(\"slide is not one closed root\")",
+                "unterminated undeclared prefix: Xml(\"slide is not one closed root\")",
+                "undeclared prefix then root: Xml(\"slide contains more than one root element\")",
+                "undeclared prefix empty then root: Ok(Transitional)",
+                "root then undeclared prefix: Xml(\"slide contains more than one root element\")",
+                "root then undeclared prefix empty: Xml(\"slide contains more than one root element\")",
+                "root inside undeclared prefix: Ok(Transitional)",
+                "empty-element root inside undeclared prefix: Ok(Transitional)",
+                "two empty-element roots inside undeclared prefix: Xml(\"slide contains more than one root element\")",
+                "declaration after undeclared prefix: Xml(\"slide is not one closed root\")",
+                "declaration after undeclared prefix then root: Xml(\"slide contains more than one root element\")",
+                "declaration after undeclared prefix empty then root: Ok(Transitional)",
+                "declaration around undeclared prefix: Xml(\"slide contains a misplaced or repeated XML declaration\")",
+                "comment after undeclared prefix then declaration: Xml(\"slide contains a misplaced or repeated XML declaration\")",
+                "whitespace after undeclared prefix then declaration: Xml(\"slide contains a misplaced or repeated XML declaration\")",
+                "text after undeclared prefix: Xml(\"slide contains text outside its root\")",
+                "comment after undeclared prefix: Xml(\"slide is not one closed root\")",
+                "declaration inside undeclared prefix then root: Ok(Transitional)",
+                "comment inside undeclared prefix then declaration: Xml(\"slide contains a misplaced or repeated XML declaration\")",
+                "text inside undeclared prefix: Xml(\"slide is not one closed root\")",
+            ],
+            |xml| source_closure(xml, true),
         );
     }
 }
