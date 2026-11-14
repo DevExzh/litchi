@@ -1,4 +1,4 @@
-//! LENIENCY_AUDIT F9.8: one unreadable typed cell value no longer fails the
+//! One unreadable typed cell value no longer fails the
 //! whole spreadsheet. The cell is kept with its displayed text and its value
 //! degrades to `CellValue::Unknown` carrying the declared type and the raw
 //! lexical, the way LibreOffice's Calc import keeps the cell and continues.

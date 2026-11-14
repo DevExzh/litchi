@@ -239,7 +239,7 @@ fn tolerated_repairs_complete_with_a_warning_rather_than_a_clean_pass() {
     let mut bytes = sample_file();
     let sector_size = 1usize << u16::from_le_bytes([bytes[0x1e], bytes[0x1f]]);
     // Append one physical sector that the FAT marks allocated but no chain
-    // claims: a recorded default repair (leniency audit F7.1).
+    // claims: a recorded default repair.
     bytes.resize(bytes.len() + sector_size, 0);
     let orphan = bytes.len() / sector_size - 2;
     let first_fat_sector = read_u32(&bytes, 0x4c) as usize;

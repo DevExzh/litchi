@@ -848,7 +848,7 @@ impl RawTextScan {
                 return Err(invalid("DTD declarations are not permitted in slide text"));
             },
             // A processing instruction is legal XML that carries no slide content;
-            // it is skipped (audit finding 6.3) and recorded once by the part's
+            // it is skipped and recorded once by the part's
             // shape scene.
             Event::PI(_) => {},
             Event::Decl(_) => {
@@ -1017,7 +1017,7 @@ struct SemanticTextParser<'a> {
     objects: usize,
     paragraph_separator: &'a str,
     /// Depth of the foreign `*:t` element (not DrawingML `a:t`) whose
-    /// subtree is being skipped, if any (audit finding 6.9).
+    /// subtree is being skipped, if any.
     foreign_text_depth: Option<usize>,
     /// The repairs this parse applied: one
     /// [`MarkupDefect::ForeignTextElement`] per skipped foreign subtree.
@@ -1251,7 +1251,7 @@ impl<'a> SemanticTextParser<'a> {
 
     /// Skip a foreign `*:t` element (an extension payload's `x:t`, a
     /// PresentationML `p:t`) and its subtree, recording the skip: text
-    /// extraction reads only DrawingML `a:t` (audit finding 6.9).
+    /// extraction reads only DrawingML `a:t`.
     fn skip_foreign_text(&mut self) {
         self.tolerance.record(MarkupDefect::ForeignTextElement, 0);
     }
@@ -1427,7 +1427,7 @@ impl<'a> SemanticTextParser<'a> {
                 }
             },
             // Character data outside DrawingML text is ordinary XML that
-            // carries no slide text (audit finding 6.9): it is validated and
+            // carries no slide text: it is validated and
             // ignored, like a text node there. Inside the root only; the
             // root-level forms are refused above and by the raw scan.
             Event::CData(_) if self.budget.depth == 0 => {
@@ -1469,7 +1469,7 @@ impl<'a> SemanticTextParser<'a> {
                 return Err(invalid("DTD declarations are not permitted in slide text"));
             },
             // A processing instruction is legal XML that carries no slide content;
-            // it is skipped (audit finding 6.3) and recorded once by the part's
+            // it is skipped and recorded once by the part's
             // shape scene.
             Event::PI(_) => {},
             Event::Comment(comment) => {
@@ -1835,7 +1835,7 @@ impl<'a> SlidePart<'a> {
     /// [`Self::text`], appending the repairs the extraction applied to
     /// `tolerance`, stamped with this part's name: each foreign `*:t`
     /// element whose subtree was skipped is a
-    /// [`crate::MarkupDefect::ForeignTextElement`] (audit finding 6.9).
+    /// [`crate::MarkupDefect::ForeignTextElement`].
     ///
     /// # Errors
     ///
@@ -2254,7 +2254,7 @@ mod tests {
                     return Err(invalid("DTD declarations are not permitted in slide text"));
                 },
                 // A processing instruction is legal XML that carries no slide content;
-                // it is skipped (audit finding 6.3) and recorded once by the part's
+                // it is skipped and recorded once by the part's
                 // shape scene.
                 Event::PI(_) => {},
                 Event::Decl(_) => {

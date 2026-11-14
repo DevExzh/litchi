@@ -21,8 +21,8 @@ pub enum TargetMode {
 }
 
 impl TargetMode {
-    /// Read a source `TargetMode` value the way Apache POI does (LENIENCY_AUDIT
-    /// 8.7): ASCII case-insensitively, with any other value read as
+    /// Read a source `TargetMode` value the way Apache POI does: ASCII
+    /// case-insensitively, with any other value read as
     /// `External` so it can never cause part resolution. The second element
     /// names the repair applied, if any.
     pub(crate) fn parse_tolerant(value: &str) -> (Self, Option<RelationshipDefect>) {
@@ -79,7 +79,7 @@ pub struct Relationship {
     target_mode: TargetMode,
 
     /// Whether `r_id` was read from a source manifest, where an `Id` that is
-    /// not an XML ID is admitted verbatim (LENIENCY_AUDIT 2.12). Canonical
+    /// not an XML ID is admitted verbatim. Canonical
     /// serialization carries such an `Id` forward; authored relationships
     /// keep the XML ID check.
     source_admitted_id: bool,
@@ -148,7 +148,7 @@ impl Relationship {
     }
 
     /// Whether this relationship's `Id` was admitted from a source manifest
-    /// rather than authored (LENIENCY_AUDIT 2.12).
+    /// rather than authored.
     #[inline]
     pub(crate) fn has_source_admitted_id(&self) -> bool {
         self.source_admitted_id
@@ -471,8 +471,7 @@ impl Relationships {
     }
 
     /// Add a relationship read from a source manifest (or carried over from
-    /// one), whose `Id` was admitted at ingress even when it is not an XML ID
-    /// (LENIENCY_AUDIT 2.12).
+    /// one), whose `Id` was admitted at ingress even when it is not an XML ID.
     pub(crate) fn try_add_source_relationship(
         &mut self,
         reltype: String,

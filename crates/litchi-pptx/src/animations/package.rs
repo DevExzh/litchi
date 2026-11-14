@@ -426,7 +426,7 @@ fn scan_hosts_with_limits(xml: &[u8], limits: Limits) -> Result<HashMap<u32, Hos
                     .ok_or_else(|| animation_relationship_error("unbalanced slide XML"))?;
             },
             // Processing instructions are skipped like the timing parser
-            // skips them (audit finding 6.3); the slide's shape scene records
+            // skips them; the slide's shape scene records
             // them.
             Event::DocType(_) => {
                 return invalid_relationship("DTDs are rejected in slide XML");

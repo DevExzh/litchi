@@ -1,4 +1,4 @@
-//! Audit finding F3.11 in adjunct parts: trailing payload bytes in table,
+//! Reserved-layout repairs in adjunct parts: trailing payload bytes in table,
 //! PivotCache, connections, and comments parts, and reserved `Cell` flag bits
 //! on the binary-index point lookup, are repaired and recorded. Each fixture
 //! injects one deviation into a conformant workbook; the unmodified workbook

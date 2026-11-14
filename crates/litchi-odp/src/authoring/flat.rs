@@ -205,7 +205,7 @@ impl Presentation {
     }
 
     /// Everything a tolerant read repaired while this presentation was
-    /// parsed (LENIENCY_AUDIT F9.10).
+    /// parsed.
     ///
     /// An empty report means the document conformed; see
     /// [`litchi_odf_common::leniency::ToleranceReport`].

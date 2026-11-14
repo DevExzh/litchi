@@ -1,4 +1,4 @@
-//! LENIENCY_AUDIT F9.2 at the ODP facade: a manifest without a `/` root
+//! At the ODP facade, a manifest without a `/` root
 //! entry, or whose root entry has an empty media type, falls back to the
 //! `mimetype` member through every ODP open path, and the fallback is
 //! recorded on the document handle's tolerance report. A conflicting

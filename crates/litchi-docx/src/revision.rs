@@ -1666,7 +1666,7 @@ mod tests {
             </w:p>"#
         );
 
-        // A non-UTC dateUtc is dropped and recorded, never fatal (F2.5).
+        // A non-UTC dateUtc is dropped and recorded, never fatal.
         let mut report = ToleranceReport::default();
         let revisions =
             parse_revisions_tolerant(xml.as_bytes(), &[], Limits::default(), &mut report).unwrap();

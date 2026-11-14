@@ -122,7 +122,7 @@ impl Presentation {
         parser.parse_shared_document_with_limits(&powerpoint_document, source_limits)?;
 
         // The live UserEditAtom, recovered by a stream scan when the Current
-        // User stream is missing or its edit offset is unusable (F5.6).
+        // User stream is missing or its edit offset is unusable.
         let head_user_edit = crate::slide::directory::locate_head_user_edit(
             &powerpoint_document,
             current_user_data.as_deref(),
@@ -314,7 +314,7 @@ impl Presentation {
         parser.parse_shared_document_with_limits(&powerpoint_document, source_limits)?;
 
         // The live UserEditAtom, recovered by a stream scan when the Current
-        // User stream is missing or its edit offset is unusable (F5.6).
+        // User stream is missing or its edit offset is unusable.
         let head_user_edit = crate::slide::directory::locate_head_user_edit(
             &powerpoint_document,
             current_user_data.as_deref(),

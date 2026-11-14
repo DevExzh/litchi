@@ -1,5 +1,5 @@
-//! Packages carrying cataloged OPC non-conformities (docs/LENIENCY_AUDIT.md
-//! section 8) open by default, and every repair is recorded in the package's
+//! Packages carrying cataloged OPC non-conformities open by default, and every
+//! repair is recorded in the package's
 //! tolerance report. A conformant control package reports clean through every
 //! ingress path.
 
@@ -117,7 +117,7 @@ fn relationship_type(package: &OpcPackage, source: &str, id: &str) -> Option<Str
 const STYLES_TYPE: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles";
 
-/// LENIENCY_AUDIT 8.5: a duplicated relationship `Id` keeps the first
+/// A duplicated relationship `Id` keeps the first
 /// relationship (LibreOffice's first match) and records the dropped one.
 #[test]
 fn duplicate_relationship_id_keeps_the_first_and_is_recorded() {
@@ -142,7 +142,7 @@ fn duplicate_relationship_id_keeps_the_first_and_is_recorded() {
     assert_round_trips(&bytes);
 }
 
-/// LENIENCY_AUDIT 8.6: an internal target that cannot be resolved to a part
+/// An internal target that cannot be resolved to a part
 /// name (literal space, backslash, absolute URI, root escape) stays visible
 /// as a dangling relationship, is not followed, and is recorded.
 #[test]
@@ -189,7 +189,7 @@ fn unresolvable_internal_targets_stay_dangling_and_are_recorded() {
     assert_round_trips(&bytes);
 }
 
-/// LENIENCY_AUDIT 8.7: `TargetMode` is matched case-insensitively (recorded
+/// `TargetMode` is matched case-insensitively (recorded
 /// when non-canonical); any other value reads as `External` (Apache POI) so
 /// it can never resolve to a part, and is recorded.
 #[test]
@@ -245,7 +245,7 @@ fn target_mode_is_case_insensitive_and_unknown_modes_read_as_external() {
     assert_round_trips(&bytes);
 }
 
-/// LENIENCY_AUDIT 8.8: a relationship with a missing or empty `Target` or
+/// A relationship with a missing or empty `Target` or
 /// `Type` is skipped and recorded; its Id stays free for a later
 /// well-formed relationship.
 #[test]
@@ -290,7 +290,7 @@ fn relationships_without_target_or_type_are_skipped_and_recorded() {
     assert_round_trips(&bytes);
 }
 
-/// LENIENCY_AUDIT 8.9: duplicate `Default`/`Override` mappings keep the first
+/// Duplicate `Default`/`Override` mappings keep the first
 /// mapping (LibreOffice's first-match lookup) and record the dropped ones.
 #[test]
 fn duplicate_content_type_mappings_keep_the_first_and_are_recorded() {
@@ -356,7 +356,7 @@ fn entries(report: &ToleranceReport) -> Vec<(Defect, &str, Option<&str>, Option<
 
 const CONTENT_TYPES_PART: &str = "/[Content_Types].xml";
 
-/// LENIENCY_AUDIT 8.10: relationships parts declared with another content
+/// Relationships parts declared with another content
 /// type are still read as relationships (identified by name, as LibreOffice
 /// and Apache POI do) and the declaration is recorded per part.
 #[test]
@@ -394,7 +394,7 @@ fn relationships_parts_declared_with_another_type_are_read_and_recorded() {
     assert_round_trips(&bytes);
 }
 
-/// LENIENCY_AUDIT 8.11: unknown elements, unknown attributes, character
+/// Unknown elements, unknown attributes, character
 /// data, and CDATA in either manifest are ignored and recorded.
 #[test]
 fn manifest_shape_deviations_are_ignored_and_recorded() {
@@ -471,7 +471,7 @@ fn manifest_shape_deviations_are_ignored_and_recorded() {
     assert_round_trips(&bytes);
 }
 
-/// LENIENCY_AUDIT 8.12: a `ContentType` or `Extension` outside the RFC 2616
+/// A `ContentType` or `Extension` outside the RFC 2616
 /// grammar is kept verbatim (LibreOffice's opaque strings) and recorded.
 #[test]
 fn content_type_grammar_deviations_are_kept_verbatim_and_recorded() {
@@ -667,7 +667,7 @@ fn edited_packages_keep_source_content_types_verbatim_but_check_authored_ones() 
     );
 }
 
-/// LENIENCY_AUDIT 2.12 (packaging half): a non-empty relationship `Id` that
+/// A non-empty relationship `Id` that
 /// is not an XML ID is kept verbatim — LibreOffice and Apache POI treat it as
 /// an opaque string — and recorded on every ingress path.
 #[test]

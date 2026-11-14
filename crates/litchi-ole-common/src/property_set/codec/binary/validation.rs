@@ -95,7 +95,7 @@ fn parse_stream_with_mode(data: &[u8], allow_indirect: bool) -> Result<Stream, O
     // section's implied range ends at the next section's offset or at the
     // stream end. POI and LibreOffice read sections by offset; a size field
     // that overruns that range (padding-aware writers round it up) is
-    // clamped to it and recorded (leniency audit F7.12). Offsets themselves
+    // clamped to it and recorded. Offsets themselves
     // stay strictly validated above.
     let mut tolerance = ToleranceReport::default();
     let mut starts = try_vec_with_capacity(descriptors.len(), "property-set section ranges")?;
@@ -524,7 +524,7 @@ fn parse_section(
 ) -> Result<Section, OleError> {
     checked_range(data, 0, SECTION_HEADER_SIZE, "section header")?;
     // The caller derived this range from the section size field, clamped to
-    // the section's descriptor-implied range (leniency audit F7.12).
+    // the section's descriptor-implied range.
     read_u32(data, 0, "section size")?;
     let property_count = usize::try_from(read_u32(data, 4, "property count")?)
         .map_err(|_conversion_error| invalid("Property count is too large"))?;
@@ -611,7 +611,7 @@ fn parse_section(
                     // its default on an unknown page), decode with the
                     // default used when PID 1 is absent, Windows-1252; the
                     // unrepresentable PID 1 is dropped from the model and
-                    // the fallback recorded (leniency audit F7.9).
+                    // the fallback recorded.
                     tolerance.record(StringDefect::UnsupportedCodePage, u32::from(page));
                     (None, None)
                 },
@@ -659,8 +659,8 @@ fn parse_section(
             },
             // One malformed value no longer costs every other property in
             // the section: as POI resolves properties independently and Word
-            // shows the readable ones, the property is dropped and recorded
-            // (leniency audit F7.11). Only grammar failures degrade;
+            // shows the readable ones, the property is dropped and recorded.
+            // Only grammar failures degrade;
             // allocation failures and resource limits stay fatal.
             Err(OleError::InvalidFormat(_)) => {
                 tolerance.record(PropertyDefect::MalformedValue, *identifier);
@@ -732,8 +732,7 @@ fn parse_dictionary(
         }
         // The declared length bounds the name and counts its terminator.
         // Like POI (`Section.readDictionary`) the name is read to that
-        // length; a missing terminator is recorded, not rejected (leniency
-        // audit F7.10).
+        // length; a missing terminator is recorded, not rejected.
         let name = if codepage == UNICODE_CODEPAGE {
             let byte_len = length
                 .checked_mul(2)

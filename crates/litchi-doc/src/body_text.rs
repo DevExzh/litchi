@@ -6399,8 +6399,8 @@ mod tests {
         // FIB pair 1 (fcStshf/lcbStshf) is owned by the public reader's
         // stylesheet parse, not by the strict body-text owner. A one-byte
         // stylesheet is a framing error, which stays fatal under every
-        // leniency (optional tables such as the RSID list now degrade instead,
-        // see LENIENCY_AUDIT F1.1), while the strict owner ignores it.
+        // leniency (optional tables such as the RSID list now degrade
+        // instead), while the strict owner ignores it.
         let pointer = 154 + 8;
         word[pointer + 4..pointer + 8].copy_from_slice(&1_u32.to_le_bytes());
         package

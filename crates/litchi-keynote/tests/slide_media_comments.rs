@@ -1378,8 +1378,8 @@ fn duplicate_selected_native_commented_movie_preserves_comment_graph() -> TestRe
 
 #[test]
 fn duplicate_and_remove_selected_native_commented_audio_preserves_comment_graph() -> TestResult {
-    // This permanent source was produced by the programmatic native probe
-    // recorded in ADR 0028.  It already contains Audio A's comment/reply, so
+    // This permanent source was produced by a programmatic native Keynote
+    // probe.  It already contains Audio A's comment/reply, so
     // this focused test does not need the deprecated host comment mutator to
     // manufacture a source package.
     let source_package = Package::from_bytes(NATIVE_AUDIO_COMMENT_REMOVAL)?;

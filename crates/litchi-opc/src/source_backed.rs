@@ -940,8 +940,8 @@ fn inspect_relationship_append_child(
             b"Type" if type_attribute.is_none() => type_attribute = Some(value),
             b"Target" if target_attribute.is_none() => target_attribute = Some(value),
             b"TargetMode" if !target_mode_seen => {
-                // Read exactly as package ingress read it (LENIENCY_AUDIT
-                // 8.7), so the source manifest still matches its catalog.
+                // Read exactly as package ingress read it, so the source
+                // manifest still matches its catalog.
                 target_mode = TargetMode::parse_tolerant(&value).0;
                 target_mode_seen = true;
             },
@@ -987,7 +987,7 @@ fn inspect_relationship_append_child(
                 "Relationship requires a non-empty Target",
             )
         })?;
-    // Read exactly as package ingress read it (LENIENCY_AUDIT 2.12): a
+    // Read exactly as package ingress read it: a
     // non-XML-ID source Id was admitted verbatim and recorded at open.
     if !crate::pkgreader::admissible_source_relationship_id(&id) {
         return Err(relationship_manifest_append_error(
@@ -2828,7 +2828,7 @@ impl SourceTopologyPlan {
             .ok_or_else(|| overlay_unavailable("topology relationship field bytes overflow"))?;
         // An added relationship's Id is authored and must be an XML ID. A
         // replacement or removal names an existing relationship, whose
-        // source Id may have been admitted verbatim (LENIENCY_AUDIT 2.12).
+        // source Id may have been admitted verbatim.
         let id_valid = match operation {
             TopologyRelationshipOperation::Add { .. } => is_xml_id(r_id),
             TopologyRelationshipOperation::Replace { .. }
@@ -7560,7 +7560,7 @@ impl SourceBackedPackage {
             parts_by_name.insert(part.partname.clone(), index);
             catalog_parts.push(CatalogPart {
                 partname: part.partname,
-                // Admitted verbatim by the catalog reader (LENIENCY_AUDIT 8.12).
+                // Admitted verbatim by the catalog reader.
                 content_type: ContentType::from_admitted_source(part.content_type),
                 relationships,
                 entry_id,
@@ -7887,7 +7887,7 @@ impl SourceBackedPackage {
             parts_by_name.insert(part.partname.clone(), index);
             catalog_parts.push(CatalogPart {
                 partname: part.partname,
-                // Admitted verbatim by the catalog reader (LENIENCY_AUDIT 8.12).
+                // Admitted verbatim by the catalog reader.
                 content_type: ContentType::from_admitted_source(part.content_type),
                 relationships,
                 entry_id,

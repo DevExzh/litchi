@@ -18,8 +18,8 @@
 //! a record's defined layout, and producer obligations for which MS-XLSB
 //! defines no reader-side refusal. Each substitutes the value documented on
 //! the corresponding [`ReservedFieldDefect`], [`LayoutDefect`], or
-//! [`ValueEncodingDefect`] variant. The value-encoding repairs (audit finding
-//! F3.12) cover Boolean bytes, `BErr` codes, and UTF-16 in cell values,
+//! [`ValueEncodingDefect`] variant. The value-encoding repairs cover Boolean
+//! bytes, `BErr` codes, and UTF-16 in cell values,
 //! formula caches, shared strings, sheet/defined/font/format names and
 //! comments, plus `BrtDVal`/`BrtDVal14` flag words.
 //! They are applied in the workbook stream (`BrtCalcProp`, `BrtBundleSh`,
@@ -34,7 +34,7 @@
 //! **Opt-in repairs** trade strictness for reach behind explicit [`Leniency`]
 //! variants. [`Leniency::TolerateCachedNumbers`] repairs the
 //! [`CachedNumberDefect`] class (MS-XLSB 2.5.153 `Xnum` caches that are NaN,
-//! infinite, denormalized, or negative zero, audit finding F3.10): a NaN cache
+//! infinite, denormalized, or negative zero): a NaN cache
 //! has no unambiguous ground truth, so the repair is never applied by
 //! default. Select it with [`OpenOptions::leniency`](crate::OpenOptions::leniency)
 //! on any configured open route, for example
@@ -136,7 +136,7 @@ pub enum Leniency {
     #[default]
     Strict,
     /// Also repair and record the cached-number defects listed by
-    /// [`CachedNumberDefect`] (audit finding F3.10).
+    /// [`CachedNumberDefect`].
     ///
     /// MS-XLSB 2.5.153 makes a finite, normalized `Xnum` a producer
     /// obligation, but add-ins and RTD feeds cache NaN and infinities and
@@ -161,8 +161,8 @@ impl Leniency {
 /// A reserved or undefined bit field that carried a nonzero value.
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of the
-/// reserved-field repairs a read applies under every [`Leniency`] variant
-/// (audit finding F3.11). In each case MS-XLSB says the bits "MUST be 0 and
+/// reserved-field repairs a read applies under every [`Leniency`] variant.
+/// In each case MS-XLSB says the bits "MUST be 0 and
 /// MUST be ignored" (or are "undefined and MUST be ignored"); Excel reads
 /// past them, so the reader masks the field down to its defined bits and
 /// keeps every defined bit. The recorded [`ToleratedDefect::observed`] value
@@ -227,8 +227,8 @@ impl ReservedFieldDefect {
 /// A record whose layout deviated from MS-XLSB in a way Excel reads past.
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of the
-/// layout repairs a read applies under every [`Leniency`] variant (audit
-/// finding F3.11). Record framing and truncated required fields stay hard
+/// layout repairs a read applies under every [`Leniency`] variant. Record
+/// framing and truncated required fields stay hard
 /// errors. `ConditionalNullText` permits only a wholly omitted unused suffix.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -318,7 +318,7 @@ impl LayoutDefect {
 
 /// A cached `Xnum` value outside the domain MS-XLSB 2.5.153 allows.
 ///
-/// Audit finding F3.10. These repairs are **opt-in**: they are applied only
+/// These repairs are **opt-in**: they are applied only
 /// under [`Leniency::TolerateCachedNumbers`]; under [`Leniency::Strict`] the
 /// cell-value snapshot and the binary-index lookup reject such a value as
 /// before, while materialized worksheets keep passing the stored `f64`
@@ -357,7 +357,7 @@ pub(crate) enum CachedNumber {
     NumError,
 }
 
-/// A value-domain defect in an individual value (audit finding F3.12).
+/// A value-domain defect in an individual value.
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of the
 /// value repairs a read applies under every [`Leniency`] variant. Each matches
@@ -425,8 +425,7 @@ pub enum Defect {
     /// recorded; its record type, location, and observed value are zero.
     Package(litchi_opc::leniency::Defect),
     /// A core- or custom-properties defect `litchi_ooxml_common` repaired
-    /// while the package metadata was read (`litchi_ooxml_common::leniency`,
-    /// audit findings 8.1–8.4).
+    /// while the package metadata was read (`litchi_ooxml_common::leniency`).
     ///
     /// The XLSB reader does not read metadata at open; a caller that reads it
     /// alongside the workbook folds the metadata report in with

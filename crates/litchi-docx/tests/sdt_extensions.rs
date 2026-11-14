@@ -340,7 +340,7 @@ fn occurrences_preserve_missing_and_duplicate_ids_and_all_st_on_off_forms() {
         r#"<w:sdtPr xmlns:w="{W}" xmlns:mc="{MC}" xmlns:f="{FORMAT}" mc:Ignorable="f"><w:lock w:val="sdtLocked" f:formattingAllowed="true"/></w:sdtPr>"#
     );
     // formattingAllowed on a non-content lock is dropped and recorded; the
-    // lock itself is kept (leniency F2.8).
+    // lock itself is kept.
     let inventory = Inventory::parse(invalid.as_bytes(), &Default::default()).unwrap();
     assert!(
         inventory.occurrences()[0]

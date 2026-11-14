@@ -1256,7 +1256,7 @@ impl PackageReader {
                     }
                 },
                 // Character data is ignored by Apache POI and LibreOffice
-                // alike (LENIENCY_AUDIT 8.11); it is recorded, not stored.
+                // alike; it is recorded, not stored.
                 // Whitespace-only text never reaches here (`trim_text`).
                 Event::Text(text) if !text.as_ref().is_empty() => {
                     if skip_from.is_none() {
@@ -2119,8 +2119,7 @@ impl PackageReader {
     /// maps a reserved relationship name onto some *other* type breaks a
     /// producer rule only: LibreOffice and Apache POI identify relationship
     /// parts purely by name, and the part is parsed as relationships either
-    /// way. The fixed type is substituted and the declared one recorded
-    /// (LENIENCY_AUDIT 8.10).
+    /// way. The fixed type is substituted and the declared one recorded.
     fn relationship_part_content_type(
         content_types: &ContentTypeMap,
         partname: &PackURI,
@@ -2376,7 +2375,7 @@ fn inspect_relationship_element(
         // Annex C closes the content model as a producer rule. Apache POI
         // queries only `Relationship` elements; LibreOffice's SAX handler
         // throws. Skipping cannot invent a relationship, so the element and
-        // its subtree are skipped and recorded (LENIENCY_AUDIT 8.11).
+        // its subtree are skipped and recorded.
         let name = String::from_utf8_lossy(element.name().as_ref()).into_owned();
         report.record(
             RelationshipDefect::UnknownElement,
@@ -2429,7 +2428,7 @@ fn inspect_relationship_element(
             b"xmlns" => {},
             name if name.starts_with(b"xmlns:") => {},
             // Apache POI and LibreOffice both ignore attributes they do not
-            // query (LENIENCY_AUDIT 8.11); recorded once the Id is known.
+            // query; recorded once the Id is known.
             name => {
                 unknown_attributes
                     .try_reserve(1)
@@ -2550,7 +2549,7 @@ fn required_relationship_attribute(value: Option<String>, name: &str) -> Result<
     })
 }
 
-/// Admit a source relationship `Id` (LENIENCY_AUDIT 2.12).
+/// Admit a source relationship `Id`.
 ///
 /// ST_RelationshipId is `xsd:ID`, but `r:id` references resolve it by string
 /// equality: LibreOffice and Apache POI both keep it as an opaque string. A
@@ -2577,7 +2576,7 @@ pub(crate) fn admit_relationship_id(
 
 /// Whether a relationship `Id` read from a source manifest is admissible:
 /// non-empty and free of control characters. An admissible `Id` need not be
-/// an XML ID (LENIENCY_AUDIT 2.12); authored ones must be.
+/// an XML ID; authored ones must be.
 pub(crate) fn admissible_source_relationship_id(id: &str) -> bool {
     !id.is_empty() && !id.chars().any(char::is_control)
 }
@@ -2950,7 +2949,7 @@ mod tests {
 
     #[test]
     fn invalid_internal_relationship_targets_stay_dangling_and_are_recorded() {
-        // LENIENCY_AUDIT 8.6: an unresolvable internal target is not followed.
+        // An unresolvable internal target is not followed.
         let relationships = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="officeDocument" Target="../escape.xml"/></Relationships>"#;
         let bytes = package_bytes(relationships, b"document");
         let physical = PhysPkgReader::new(&bytes, SourceLimits::default()).unwrap();
@@ -3258,7 +3257,7 @@ mod tests {
         }
     }
 
-    /// LENIENCY_AUDIT 8.11: unknown elements (with their subtrees), unknown
+    /// Unknown elements (with their subtrees), unknown
     /// attributes, character data, and CDATA are ignored and recorded.
     #[test]
     fn relationships_manifest_shape_deviations_are_ignored_and_recorded() {
@@ -3421,7 +3420,7 @@ mod tests {
             assert!(PackageReader::parse_rels_xml(xml.as_bytes(), "/word").is_err());
         }
 
-        // LENIENCY_AUDIT 2.12: a non-empty Id that is not an XML ID is kept
+        // A non-empty Id that is not an XML ID is kept
         // verbatim and recorded.
         for id in ["1bad", "r:id", "1"] {
             let xml = relationships_xml(&format!(
@@ -3449,7 +3448,7 @@ mod tests {
             assert_eq!(recorded.item(), Some(id));
         }
 
-        // LENIENCY_AUDIT 8.8: a relationship without Type or Target is skipped.
+        // A relationship without Type or Target is skipped.
         for child in [
             r#"<Relationship Id="rId1" Target="part.xml"/>"#,
             r#"<Relationship Id="rId1" Type="urn:test"/>"#,
@@ -3461,7 +3460,7 @@ mod tests {
             assert!(parsed.is_empty(), "{child}");
         }
 
-        // LENIENCY_AUDIT 8.7: TargetMode is read case-insensitively, and an
+        // TargetMode is read case-insensitively, and an
         // unrecognized value is read as External.
         for (mode, expected) in [
             ("external", TargetMode::External),
@@ -3475,7 +3474,7 @@ mod tests {
             assert_eq!(parsed[0].target_mode, expected, "{mode}");
         }
 
-        // LENIENCY_AUDIT 8.5: a duplicated Id keeps the first relationship.
+        // A duplicated Id keeps the first relationship.
         let duplicate = relationships_xml(
             r#"<Relationship Id="rId1" Type="urn:a" Target="a.xml"/><Relationship Id="rId1" Type="urn:b" Target="b.xml"/>"#,
         );

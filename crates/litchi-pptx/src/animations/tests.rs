@@ -362,7 +362,7 @@ mod integration_tests {
     }
 
     /// Stale cross-references that used to fail the whole timing tree are
-    /// skipped per entry and recorded (leniency-audit finding 6.1).
+    /// skipped per entry and recorded.
     #[test]
     fn repairs_and_records_stale_and_unhostable_targets() {
         use crate::leniency::{Defect, TimingDefect};

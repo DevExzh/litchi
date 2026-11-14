@@ -49,7 +49,7 @@ impl Props {
     /// Returns an error when input violates OOXML constraints, exceeds a configured
     /// bound, or an underlying XML or package operation fails.
     ///
-    /// On read the host check is advisory (LENIENCY_AUDIT 8.4): a reserved
+    /// On read the host check is advisory: a reserved
     /// property scoped to another host, or one whose value lacks the inferred
     /// format, is skipped and recorded as
     /// [`ReservedProperty`](crate::leniency::CustomPropertiesDefect::ReservedProperty)

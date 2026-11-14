@@ -594,8 +594,8 @@ impl Workbook {
     ) -> Result<Self> {
         let leniency = options.leniency;
         // The packaging repairs come first (they were made before the
-        // workbook part could be read), then the open-time catalog sites
-        // (findings 4.7/4.8); see `crate::leniency`.
+        // workbook part could be read), then the open-time catalog sites;
+        // see `crate::leniency`.
         let mut tolerance = ToleranceReport::default();
         tolerance.append_package(package.tolerance_report());
         let (workbook_uri, flavor, catalog, sheet_parts, shared_strings_uri, styles_uri) = {
@@ -1978,7 +1978,7 @@ impl Inner {
     }
 
     /// Repair stale style indexes in a freshly parsed worksheet store before
-    /// it is published to the read cache (audit finding 4.2).
+    /// it is published to the read cache.
     ///
     /// Each repair is recorded in the store's own tolerance report. The
     /// commit-time verification paths keep using `validate_styles`, which

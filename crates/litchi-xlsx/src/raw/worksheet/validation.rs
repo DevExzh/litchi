@@ -21,7 +21,7 @@ pub(crate) fn parse_defaults_element(
     mut tolerance: Option<&mut ToleranceReport>,
 ) -> Result<Defaults> {
     validate_defaults_attributes(element, resolver)?;
-    // Out-of-domain defaults (leniency finding 4.1) are dropped and recorded
+    // Out-of-domain defaults are dropped and recorded
     // when `tolerance` is supplied; without it they keep their errors.
     let mut repair = |error: crate::Error| match tolerance.as_deref_mut() {
         Some(report) => {

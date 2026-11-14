@@ -131,7 +131,7 @@ fn revision_metadata_requires_xsd_track_change_fields_and_values() {
             String::from_utf8_lossy(xml)
         );
     }
-    // Optional or keying metadata degrades per revision (leniency F2.5): the
+    // Optional or keying metadata degrades per revision: the
     // revision is kept and the repair is recorded by the document listing.
     for (xml, id, author, date) in [
         (

@@ -483,7 +483,7 @@ pub struct OleFile<R: Read + Seek> {
     /// Every reference-compatible repair the open applied.
     tolerance: ToleranceReport,
     /// Whether some sibling tree violates the MS-CFB 2.6.4 name ordering,
-    /// so name lookups must scan instead of descending (leniency audit F7.3).
+    /// so name lookups must scan instead of descending.
     misordered_siblings: bool,
 }
 
@@ -506,7 +506,7 @@ pub(crate) struct ParsedOleIndex {
     pub(crate) dir_name_data: Vec<Option<DirectoryNameData>>,
     /// Every reference-compatible repair the open applied.
     pub(crate) tolerance: ToleranceReport,
-    /// Whether name lookups must scan sibling trees (leniency audit F7.3).
+    /// Whether name lookups must scan sibling trees.
     pub(crate) misordered_siblings: bool,
 }
 
@@ -1089,7 +1089,7 @@ impl<R: Read + Seek> OleFile<R> {
         }
         // MS-CFB 2.2 asks producers to zero these six bytes; they carry no
         // semantics and POI, LibreOffice, and ole32 never read them. Ignore
-        // and record (leniency audit F7.6).
+        // and record.
         let reserved_header_bytes = header[0x22..0x28] != [0; 6];
 
         // Validate shifts before using them. Untrusted shift counts must never reach `<<`.
@@ -1143,7 +1143,7 @@ impl<R: Read + Seek> OleFile<R> {
         // and reads as zeroes past the end of the file; a sector that starts at
         // or beyond the end is still rejected.
         // MS-CFB 2.2 defines each table's start sector and count separately.
-        // The count is authoritative (leniency audit F7.5): with a zero count
+        // The count is authoritative: with a zero count
         // the start is ignored, as POI (`HeaderBlock`) never reads it and
         // zero-initializing writers store 0 there; a MiniFAT with a nonzero
         // count but a special start marker (ENDOFCHAIN or FREESECT, which
@@ -1634,7 +1634,7 @@ impl<R: Read + Seek> OleFile<R> {
         let mut root_entry = None;
         if num_entries > 0 {
             let mut root = self.parse_directory_entry(&dir_data[0..DIRENTRY_SIZE], 0)?;
-            // The root has no siblings (F7.7); validation recorded any stale
+            // The root has no siblings; validation recorded any stale
             // links.
             root.sid_left = NOSTREAM;
             root.sid_right = NOSTREAM;
@@ -1708,7 +1708,7 @@ impl<R: Read + Seek> OleFile<R> {
     }
 
     /// Treats a zero-length stream whose start sector is not `ENDOFCHAIN`
-    /// as empty (leniency audit F7.2).
+    /// as empty.
     ///
     /// MS-CFB prescribes no start value for an empty stream and a zero-byte
     /// read never consults it; POI and LibreOffice return an empty stream
@@ -1877,7 +1877,7 @@ impl<R: Read + Seek> OleFile<R> {
     }
 
     /// Ends a chain whose FAT or MiniFAT entries continue past its declared
-    /// length at its last declared sector (leniency audit F7.1).
+    /// length at its last declared sector.
     ///
     /// Only the in-memory table changes: every reader then stops exactly
     /// where the declared size does, as POI's and LibreOffice's
@@ -1910,7 +1910,7 @@ impl<R: Read + Seek> OleFile<R> {
     /// is what surplus chain links and interrupted saves leave behind. No
     /// validated chain reaches it and no reader reads it, so it is recorded
     /// as [`AllocationDefect::UnclaimedAllocatedSector`] rather than
-    /// rejected (leniency audit F7.1).
+    /// rejected.
     fn validate_physical_sector_layout(&mut self) -> Result<(), OleError> {
         for (sector, role) in self.sector_roles.iter().enumerate() {
             let entry = self.fat.get(sector).copied().ok_or_else(|| {
@@ -1984,7 +1984,7 @@ impl<R: Read + Seek> OleFile<R> {
         }
         // LibreOffice takes SID 0 as the root by position without checking
         // its name (`StgDirStrm::SetupEntry`), and the root has no siblings:
-        // traversal starts at its child. Record and ignore (F7.7).
+        // traversal starts at its child. Record and ignore.
         if root.name != "Root Entry" || root.sid_left != NOSTREAM || root.sid_right != NOSTREAM {
             tolerance.record(DirectoryDefect::RootEntryFields, 0);
         }
@@ -2042,7 +2042,7 @@ impl<R: Read + Seek> OleFile<R> {
                     // MS-CFB 2.6.4 constrains writers only; LibreOffice never
                     // checks the order and POI looks names up linearly.
                     // Bounds, acyclicity, and unique ownership above stay
-                    // enforced; lookups switch to a scan (leniency audit F7.3).
+                    // enforced; lookups switch to a scan.
                     tolerance.record(DirectoryDefect::SiblingNameOrder, sid);
                     misordered = true;
                 }
@@ -2072,7 +2072,7 @@ impl<R: Read + Seek> OleFile<R> {
         // MS-CFB never requires every entry to be reachable, and POI and
         // LibreOffice materialize only what the root reaches; orphans are
         // the residue of interrupted saves. An unreachable entry is treated
-        // as unused and recorded (leniency audit F7.4). Its sectors stay
+        // as unused and recorded. Its sectors stay
         // unclaimed, so no reader can reach them either.
         for (sid, slot) in entries.iter_mut().enumerate() {
             if slot.is_some() && !owned.contains(sid) {
@@ -2090,7 +2090,7 @@ impl<R: Read + Seek> OleFile<R> {
     ///
     /// MS-CFB 2.6 states its per-entry field rules as producer "MUST"s with
     /// no reader behavior. The fields that carry no meaning for reading are
-    /// repaired and recorded (leniency audit F7.7), as LibreOffice
+    /// repaired and recorded, as LibreOffice
     /// (`StgEntry::Load`) and POI do: an undefined node color, a storage's
     /// start sector and size, a stream's child link, leftover bytes in an
     /// unused entry, and forbidden name characters. Entry type, name length,
@@ -2350,7 +2350,7 @@ impl<R: Read + Seek> OleFile<R> {
                     OleError::CorruptedFile("directory entry end offset overflow".to_string())
                 })?;
                 let mut entry = self.parse_directory_entry(&dir_data[offset..end], sid)?;
-                // A stream's child link is never followed (F7.7); validation
+                // A stream's child link is never followed; validation
                 // recorded any stale value.
                 if entry.entry_type == STGTY_STREAM {
                     entry.sid_child = NOSTREAM;
@@ -3608,8 +3608,8 @@ impl<R: Read + Seek> OleFile<R> {
             Ok(None) | Err(DirectoryNameError::ForbiddenCharacter(_)) => {},
             Err(_) => return Err(OleError::StreamNotFound),
         }
-        // A stored name may carry a character MS-CFB forbids writers to use
-        // (leniency audit F7.7); such a query can only match such an entry.
+        // A stored name may carry a character MS-CFB forbids writers to use;
+        // such a query can only match such an entry.
         let target_name = directory_name_data_allowing_forbidden(name)
             .map_err(|_error| OleError::StreamNotFound)?;
         self.find_child_by_name_with(sid, |entry_name| target_name.compare(entry_name))
@@ -4115,7 +4115,7 @@ fn read_u32_le(bytes: &[u8], description: &str) -> Result<u32, OleError> {
 /// `tree_root`.
 ///
 /// A validated, ordered tree is searched by descent. When open-time
-/// validation recorded a name-ordering violation (leniency audit F7.3) the
+/// validation recorded a name-ordering violation the
 /// descent could miss an entry, so every node of the tree is scanned in
 /// order instead, as POI's linear name lookup does, and the first match
 /// wins. Both forms visit at most one node per directory entry, a final
@@ -5608,7 +5608,7 @@ mod tests {
 
                 assert!(result.is_ok(), "{case}: {result:?}");
                 // An allocated sector no chain claims is recorded, not
-                // rejected (leniency audit F7.1).
+                // rejected.
                 if role == PhysicalSectorRole::Unclaimed && marker != FREESECT {
                     assert_eq!(
                         file.tolerance.defects(),

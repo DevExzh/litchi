@@ -24,8 +24,7 @@
 //! repeated ownership, and every configurable resource limit
 //! ([`crate::OleFileLimits`]) are rejected under every variant.
 //!
-//! The defect enumerations are closed and sized to the compound-file findings
-//! of the leniency audit (F7.1–F7.7). A variant whose repair has not landed
+//! The defect enumerations are closed. A variant whose repair has not landed
 //! yet says so in its documentation; until then the reader still rejects that
 //! deviation and the variant is never recorded.
 //!
@@ -89,13 +88,13 @@ pub enum Leniency {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum HeaderDefect {
-    /// The six reserved header bytes at offset 0x22 were not zero (F7.6).
+    /// The six reserved header bytes at offset 0x22 were not zero.
     ///
     /// The bytes are ignored, as POI (`HeaderBlock`), LibreOffice
     /// (`StgHeader::Load`), and ole32 do; they carry no semantics. The
     /// context is zero.
     ReservedBytes,
-    /// The MiniFAT start sector and sector count disagreed (F7.5).
+    /// The MiniFAT start sector and sector count disagreed.
     ///
     /// The count is authoritative, as in POI: a zero count ignores the start
     /// sector, and a nonzero count with an `ENDOFCHAIN`/`FREESECT` start
@@ -103,7 +102,7 @@ pub enum HeaderDefect {
     /// unless a stream needs one. The context is the stored start sector.
     MiniFatStartCount,
     /// The DIFAT sector count was zero but the start sector was not
-    /// `ENDOFCHAIN` (F7.5).
+    /// `ENDOFCHAIN`.
     ///
     /// The start sector is ignored, as POI never reads it for a zero count.
     /// A nonzero count without a start sector stays fatal, because the FAT
@@ -134,7 +133,7 @@ impl HeaderDefect {
 pub enum AllocationDefect {
     /// A stream's FAT or MiniFAT chain continued past the sectors its
     /// declared size needs, or its last needed sector carried a marker other
-    /// than `ENDOFCHAIN` (F7.1).
+    /// than `ENDOFCHAIN`.
     ///
     /// MS-CFB 2.6.1 makes the stream size authoritative. POI
     /// (`DocumentInputStream`) and LibreOffice (`StgDataStrm`) read exactly
@@ -144,14 +143,14 @@ pub enum AllocationDefect {
     /// (SID 0 for the root mini stream).
     ChainLongerThanSize,
     /// A physical sector no validated structure or stream claims carried an
-    /// allocation marker instead of `FREESECT` (F7.1).
+    /// allocation marker instead of `FREESECT`.
     ///
     /// This is what surplus chain links and interrupted saves leave behind.
     /// MS-CFB defines no reader behavior for unreferenced sectors and no
     /// reference reader inspects them; the sector is never read. The
     /// context is the physical sector index.
     UnclaimedAllocatedSector,
-    /// A zero-length stream's start sector was not `ENDOFCHAIN` (F7.2).
+    /// A zero-length stream's start sector was not `ENDOFCHAIN`.
     ///
     /// A zero-byte read is unaffected by the field; POI and LibreOffice
     /// return an empty stream regardless of it. The reader treats the stream
@@ -184,7 +183,7 @@ impl AllocationDefect {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum DirectoryDefect {
-    /// A sibling tree violated the MS-CFB 2.6.4 name ordering (F7.3).
+    /// A sibling tree violated the MS-CFB 2.6.4 name ordering.
     ///
     /// The ordering constrains writers; LibreOffice never checks it and POI
     /// looks children up by a linear name scan. Bounds, acyclicity, and
@@ -192,7 +191,7 @@ pub enum DirectoryDefect {
     /// file fall back to an exhaustive, bounded scan of each sibling tree,
     /// returning the first match in tree order.
     SiblingNameOrder,
-    /// A non-empty directory entry was not reachable from the root (F7.4).
+    /// A non-empty directory entry was not reachable from the root.
     ///
     /// POI and LibreOffice materialize only entries reachable from the root;
     /// orphans are the classic residue of crash-interrupted saves. The entry
@@ -200,35 +199,34 @@ pub enum DirectoryDefect {
     /// any allocated sectors it held are additionally recorded as
     /// [`AllocationDefect::UnclaimedAllocatedSector`].
     UnreachableEntry,
-    /// A directory node color byte was neither red nor black (F7.7).
+    /// A directory node color byte was neither red nor black.
     ///
     /// The color only balances the tree; LibreOffice ignores it and lookup
     /// never reads it. The entry is treated as black.
     NodeColor,
-    /// A storage entry carried a nonzero start sector or size (F7.7).
+    /// A storage entry carried a nonzero start sector or size.
     ///
     /// Storages own no allocation, so the fields are never read; LibreOffice
     /// does not check them.
     StorageAllocationFields,
-    /// A stream entry carried a child link (F7.7).
+    /// A stream entry carried a child link.
     ///
     /// Streams have no children; the link is cleared in memory and never
     /// followed, as LibreOffice never checks it.
     StreamChildLink,
     /// The root entry's name or sibling links deviated from MS-CFB 2.6.2
-    /// The root entry's name or sibling links deviated from MS-CFB 2.6.2
-    /// (F7.7).
+    /// The root entry's name or sibling links deviated from MS-CFB 2.6.2.
     ///
     /// SID 0 is the root by position, as LibreOffice takes it; the root has
     /// no siblings, so its links are cleared in memory and never followed.
     /// The context is zero.
     RootEntryFields,
-    /// An unused (`STGTY_EMPTY`) entry carried leftover name bytes (F7.7).
+    /// An unused (`STGTY_EMPTY`) entry carried leftover name bytes.
     ///
     /// The entry stays unused and nothing else in it is read, as LibreOffice
     /// forces such entries empty (tdf#112399).
     EmptyEntryResidue,
-    /// A directory name contained a character MS-CFB 2.6.1 forbids (F7.7).
+    /// A directory name contained a character MS-CFB 2.6.1 forbids.
     ///
     /// The rule constrains writers and POI enforces none on read: the name
     /// is kept as an opaque lookup key, and lookups by that exact name work.

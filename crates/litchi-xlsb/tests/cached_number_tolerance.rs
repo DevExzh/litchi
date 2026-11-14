@@ -1,4 +1,4 @@
-//! Audit finding F3.10: cached `Xnum` values that are NaN, infinite,
+//! Cached `Xnum` values that are NaN, infinite,
 //! denormalized, or negative zero. The repair is opt-in
 //! (`Leniency::TolerateCachedNumbers`); by default the cell-value snapshot and
 //! the indexed lookup still refuse such a value.

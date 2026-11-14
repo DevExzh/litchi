@@ -1398,7 +1398,7 @@ impl Store {
     }
 
     /// Repair every cell, row, and column style index at or beyond the
-    /// workbook's `cellXfs` count (audit finding 4.2) and record each repair.
+    /// workbook's `cellXfs` count and record each repair.
     ///
     /// Excel substitutes the default format for a stale index. The stale
     /// index becomes the mandatory default format, `cellXfs` entry 0, so the

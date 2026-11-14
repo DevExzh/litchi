@@ -100,7 +100,7 @@ fn validates_smart_tag_settings() {
     let invalid_on_off = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:doNotEmbedSmartTags w:val="maybe"/></w:settings>"#;
     assert!(DocumentSettings::extract_from_xml(invalid_on_off).is_err());
 
-    // Duplicate singletons are recorded and the later value wins (F2.3).
+    // Duplicate singletons are recorded and the later value wins.
     let duplicate = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:doNotEmbedSmartTags/><w:doNotEmbedSmartTags w:val="0"/></w:settings>"#;
     let parsed = DocumentSettings::extract_from_xml(duplicate).unwrap();
     assert!(!parsed.do_not_embed_smart_tags());
@@ -233,8 +233,8 @@ fn strict_and_transitional_compatibility_flag_domains_are_exhaustive() {
         let strict = format!(
             r#"<w:settings xmlns:w="http://purl.oclc.org/ooxml/wordprocessingml/main"><w:compat><w:{raw}/></w:compat></w:settings>"#
         );
-        // Transitional-only flags in a Strict part are kept and recorded
-        // (leniency F2.2), never fatal.
+        // Transitional-only flags in a Strict part are kept and recorded,
+        // never fatal.
         let parsed = DocumentSettings::extract_from_xml(strict.as_bytes()).unwrap();
         assert_eq!(parsed.compatibility_options()[0].flag(), flag);
         if flag.is_strict() {
@@ -260,7 +260,7 @@ fn strict_and_transitional_compatibility_flag_domains_are_exhaustive() {
         let unknown = format!(
             r#"<w:settings xmlns:w="{namespace}"><w:compat><w:vendorCompat/></w:compat></w:settings>"#
         );
-        // Unknown flags are skipped and recorded (leniency F2.2).
+        // Unknown flags are skipped and recorded.
         let parsed = DocumentSettings::extract_from_xml(unknown.as_bytes()).unwrap();
         assert!(parsed.compatibility_options().is_empty());
         assert_eq!(
@@ -293,7 +293,7 @@ fn parses_empty_and_strict_compat_groups() {
 
 #[test]
 fn rejects_invalid_compat_groups() {
-    // A repeated group merges over the first and is recorded (F2.3).
+    // A repeated group merges over the first and is recorded.
     let duplicate = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat><w:useFELayout/></w:compat><w:compat><w:spaceForUL/></w:compat></w:settings>"#;
     let parsed = DocumentSettings::extract_from_xml(duplicate).unwrap();
     assert_eq!(parsed.compatibility_options().len(), 2);
@@ -603,7 +603,7 @@ fn rejects_invalid_editing_settings() {
     assert!(reject(br#"<w:clrSchemeMapping w:bg1="light7"/>"#).is_err());
     assert!(reject(br#"<w:writeProtection w:val="maybe"/>"#).is_err());
 
-    // Duplicate singletons are Word-compatible repairs (F2.3): the later
+    // Duplicate singletons are Word-compatible repairs: the later
     // element wins and each repeat is recorded.
     let view = reject(br#"<w:view w:val="print"/><w:view w:val="web"/>"#).unwrap();
     assert_eq!(view.view(), Some(View::Web));

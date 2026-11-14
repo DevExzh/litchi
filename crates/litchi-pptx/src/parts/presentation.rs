@@ -153,7 +153,7 @@ impl<'a> PresentationPart<'a> {
     /// Read the ordered slide references without hydrating slide parts.
     ///
     /// Slide-list defects `PowerPoint` and LibreOffice read past are
-    /// repaired (audit finding 6.7): a `p:sldId` repeating an earlier entry's
+    /// repaired: a `p:sldId` repeating an earlier entry's
     /// slide ID, relationship ID, or target part is skipped (first wins), and
     /// foreign children, attributes, or character data inside `p:sldIdLst`
     /// are ignored. The owned handles record these repairs at open

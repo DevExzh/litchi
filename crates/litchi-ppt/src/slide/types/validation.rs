@@ -19,9 +19,9 @@ pub(super) fn is_ppt10_tag_name(record: &Record) -> bool {
 }
 
 /// Whether a failure converting one `OfficeArt` shape is confined to that
-/// shape's content, so the shape can be dropped and its siblings kept
-/// (finding F5.11). The slide directory applies the same test to one
-/// slide's slide-list text (finding F5.10).
+/// shape's content, so the shape can be dropped and its siblings kept.
+/// The slide directory applies the same test to one
+/// slide's slide-list text.
 ///
 /// Content checks surface as `Corrupted`/`InvalidFormat` or as an
 /// `OfficeArt` property/geometry/shape/image validation failure. I/O,

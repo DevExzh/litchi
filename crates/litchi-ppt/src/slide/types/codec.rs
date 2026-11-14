@@ -142,7 +142,7 @@ impl Slide<'_> {
     }
 
     /// Convert one shape and, for a group, each of its children, isolating
-    /// failures per shape (finding F5.11).
+    /// failures per shape.
     ///
     /// `PowerPoint` and LibreOffice render the remaining shapes of a slide
     /// when one is unreadable, so a content-level failure converting one

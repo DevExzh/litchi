@@ -1,5 +1,4 @@
-//! Leniency acceptance tests for the litchi-ppt findings of
-//! `docs/LENIENCY_AUDIT.md`.
+//! Leniency acceptance tests for the litchi-ppt tolerance repairs.
 //!
 //! Each fixture is a complete `.ppt` written by the crate's writer, then
 //! patched in place (same length, so record framing and the persist
@@ -308,7 +307,7 @@ fn style_atom_framing_corruption_stays_fatal() {
 }
 
 // ---------------------------------------------------------------------------
-// F5.3: text enumeration / ColorIndexStruct / indent-level range checks.
+// Text enumeration / ColorIndexStruct / indent-level range checks.
 // ---------------------------------------------------------------------------
 
 use litchi_ppt::writer::text_format::{
@@ -505,7 +504,7 @@ fn undefined_text_color_index_reads_as_unset_and_is_recorded() {
 }
 
 // ---------------------------------------------------------------------------
-// F5.11: per-shape error isolation.
+// Per-shape error isolation.
 // ---------------------------------------------------------------------------
 
 /// `OutlineTextRefAtom` record type: strictly a four-byte atom.
@@ -706,7 +705,7 @@ fn corpus_presentations_report_nothing() {
 }
 
 // ---------------------------------------------------------------------------
-// Open-time slide-list and persist-chain repairs (F5.4-F5.7).
+// Open-time slide-list and persist-chain repairs.
 // ---------------------------------------------------------------------------
 
 /// `SlidePersistAtom` record header: version/instance 0, type 1011, 20 bytes.
@@ -1262,7 +1261,7 @@ fn nonconforming_user_edit_length_is_read_and_recorded() {
 }
 
 // ---------------------------------------------------------------------------
-// F5.9 (opt-in): cyclic UserEdit chain.
+// Opt-in: cyclic UserEdit chain.
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -1493,7 +1492,7 @@ fn property_set_repairs_join_the_open_time_report() {
 }
 
 // ---------------------------------------------------------------------------
-// F5.10: slide-list container cross-checks degrade instead of failing.
+// Slide-list container cross-checks degrade instead of failing.
 // ---------------------------------------------------------------------------
 
 /// The unique offset of `pattern` in `bytes`.
@@ -1567,7 +1566,7 @@ fn unreadable_slide_list_text_is_isolated_to_its_slide() {
 }
 
 // ---------------------------------------------------------------------------
-// F5.8: Current User fixed fields POI never validates.
+// Current User fixed fields POI never validates.
 // ---------------------------------------------------------------------------
 
 #[test]

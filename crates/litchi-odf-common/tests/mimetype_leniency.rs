@@ -1,4 +1,4 @@
-//! LENIENCY_AUDIT F9.1: a re-zipped package whose `mimetype` member is
+//! A re-zipped package whose `mimetype` member is
 //! deflated, carries a local extra field, or is not the first entry opens by
 //! default through every package owner and detector, and the deviation is
 //! recorded in the opening [`ToleranceReport`]. A conforming package records

@@ -10,7 +10,8 @@ const PERSIST_INCREMENTAL: u16 = 6002;
 /// Merge one directory into `mapping`, first-wins (the chain is walked
 /// newest first).
 ///
-/// Without a report (the editor) every deviation is an error. With a report (the read path, finding F5.7), the deviations LibreOffice
+/// Without a report (the editor) every deviation is an error. With a report
+/// (the read path), the deviations LibreOffice
 /// reads past are repaired and recorded instead of rejected, as
 /// `svdfppt.cxx` does: a pointer to a record other than a
 /// `PersistDirectoryAtom` contributes nothing, a zero-count entry header is
@@ -96,7 +97,7 @@ mod tests {
         (result, defects)
     }
 
-    /// The editor stays strict; the read path repairs and records (F5.7).
+    /// The editor stays strict; the read path repairs and records.
     #[test]
     fn read_path_repairs_what_the_editor_rejects() {
         use crate::Defect;

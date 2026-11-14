@@ -521,7 +521,7 @@ fn powerpoint_locations_require_escaped_names_and_host_boundaries() {
     let mut package = OpcPackage::new();
     publish(&mut package, properties, Host::PowerPoint).expect("host-aware write");
     Props::read_for(&package, Host::PowerPoint).expect("host-aware read");
-    // LENIENCY_AUDIT 8.4: on read the host scope is advisory.
+    // On read the host scope is advisory.
     let word = Props::read_for(&package, Host::Word).expect("advisory on read");
     assert!(!word.contains(HEADER_LOCATIONS));
     assert!(word.contains(HEADER_TEXT));
@@ -555,7 +555,7 @@ fn recorded(props: &Props) -> Vec<(crate::leniency::CustomPropertiesDefect, Opti
         .collect()
 }
 
-/// LENIENCY_AUDIT 8.3: one bad property costs only that property. Unknown
+/// One bad property costs only that property. Unknown
 /// variant types, unparseable values, missing/invalid identity, duplicate
 /// PIDs and names, unknown root children, PIs and unknown entities are each
 /// skipped and recorded; the good properties survive.
@@ -614,7 +614,7 @@ fn package_reads_skip_bad_custom_properties_and_record_them() {
     assert!(Props::read(&package_with_custom(&format!("{PREFIX}<property"))).is_err());
 }
 
-/// LENIENCY_AUDIT 8.4: reserved sensitivity-label checks are advisory on
+/// Reserved sensitivity-label checks are advisory on
 /// read — a property scoped to another host or with a malformed value is
 /// skipped and recorded instead of failing the document; writes stay strict.
 #[test]

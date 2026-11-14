@@ -25,7 +25,7 @@ pub(crate) fn read(document: &[u8], edit_offset: u32) -> Result<(BTreeMap<u32, u
 /// [`crate::Leniency::TolerateUserEditChainDefects`] and a report is given:
 /// then the walk stops at the repeated offset, keeps the mappings collected
 /// so far — newest first, so the live objects are already covered — and
-/// records [`crate::UserEditChainDefect::Cycle`] (finding F5.9), as
+/// records [`crate::UserEditChainDefect::Cycle`], as
 /// LibreOffice stops its walk (`svdfppt.cxx`). The chain-length bound stays
 /// an error.
 pub(crate) fn read_reporting(

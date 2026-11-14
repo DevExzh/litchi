@@ -92,7 +92,7 @@ fn recorded(report: &ToleranceReport) -> Vec<(Defect, u64)> {
     report.iter().map(|d| (d.defect, d.offset)).collect()
 }
 
-// F9.4: undefined control symbols are ignored the way Word and LibreOffice
+// Undefined control symbols are ignored the way Word and LibreOffice
 // ignore them, and every one is recorded.
 #[test]
 fn undefined_control_symbols_are_ignored_and_recorded_by_default() {
@@ -149,7 +149,7 @@ fn undefined_control_symbol_offsets_count_transport_bytes() {
     );
 }
 
-// F9.6: unpaired UTF-16 surrogates decode to U+FFFD, as Word and LibreOffice
+// Unpaired UTF-16 surrogates decode to U+FFFD, as Word and LibreOffice
 // show them, and each substitution is recorded.
 #[test]
 fn unpaired_surrogates_become_replacement_characters_and_are_recorded() {
@@ -216,7 +216,7 @@ fn word_style_surrogate_pairs_with_fallbacks_decode_cleanly_in_destinations() {
     assert_clean(document.tolerance_report());
 }
 
-// F9.5: malformed parameter shapes take Word's interpretation (LibreOffice's
+// Malformed parameter shapes take Word's interpretation (LibreOffice's
 // `RTFTokenizer::dispatchKeyword`) and every repair is recorded.
 #[test]
 fn malformed_parameter_shapes_take_words_interpretation_and_are_recorded() {
@@ -291,7 +291,7 @@ fn parameter_shapes_in_destinations_are_repaired() {
     );
 }
 
-// F9.3: content after the root group is ignored by default; groups left open
+// Content after the root group is ignored by default; groups left open
 // at end of input are closed only under the named opt-in.
 #[test]
 fn content_after_the_root_group_is_ignored_and_recorded_by_default() {
@@ -357,7 +357,7 @@ fn the_opt_in_keeps_truncated_tokens_and_nesting_limits_fatal() {
     assert!(Package::parse_with_options(&deep, options).is_err());
 }
 
-// F9.7: malformed `\'hh` escapes stay fatal by default and decode the way
+// Malformed `\'hh` escapes stay fatal by default and decode the way
 // LibreOffice decodes them under the named opt-in.
 #[test]
 fn malformed_hex_escapes_are_rejected_by_default() {
@@ -457,7 +457,7 @@ fn documents_opened_through_an_opt_in_stay_editable() {
     assert_eq!(commit.package().paragraph_count(), 2);
 }
 
-// F9.12: undefined or undecodable font charsets and code pages fall back to
+// Undefined or undecodable font charsets and code pages fall back to
 // the document code page, as LibreOffice does, and are recorded.
 #[test]
 fn unsupported_font_charsets_and_code_pages_fall_back_and_are_recorded() {

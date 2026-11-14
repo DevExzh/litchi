@@ -1,4 +1,4 @@
-//! LENIENCY_AUDIT F9.9: an unknown or foreign-namespace child of
+//! An unknown or foreign-namespace child of
 //! `table:calculation-settings` is skipped with its subtree, and a
 //! `table:null-date` after `table:iteration` is accepted, the way
 //! LibreOffice's `ScXMLCalculationSettingsContext` reads them. Every ODS

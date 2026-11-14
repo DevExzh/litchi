@@ -263,8 +263,8 @@ impl Default for Limits {
 }
 
 impl ViewProperties {
-    /// Parse a view-properties part (`p:viewPr`), applying the repairs of
-    /// audit finding 6.11 ([`ViewDefect`]): unknown attributes and child
+    /// Parse a view-properties part (`p:viewPr`), applying the repairs
+    /// ([`ViewDefect`]): unknown attributes and child
     /// elements are ignored, children are accepted in any order, and a
     /// repeated child keeps its first occurrence. Use
     /// [`Self::parse_with_tolerance`] to collect the repairs, or
@@ -324,7 +324,7 @@ impl ViewProperties {
                 limits.max_input_bytes(),
             ));
         }
-        // Processing instructions are inert (audit finding 6.3): skipped
+        // Processing instructions are inert: skipped
         // from the semantic input, recorded once for the part.
         let (xml, instructions) = crate::markup::without_processing_instructions(xml)?;
         if instructions {
@@ -677,7 +677,7 @@ fn attach(stack: &mut [Node], root: &mut Option<Node>, n: Node) -> Result<()> {
     Ok(())
 }
 
-/// Where a projection records the repairs it applies (audit finding 6.11):
+/// Where a projection records the repairs it applies:
 /// a report for the tolerant read, or nothing for the strict read, which
 /// refuses any markup that would need a repair.
 struct Tol<'r> {

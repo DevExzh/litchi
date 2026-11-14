@@ -1,5 +1,4 @@
-//! OPC core-properties metadata extraction: tolerant reads (LENIENCY_AUDIT
-//! 8.1), strict decoding for the writer.
+//! OPC core-properties metadata extraction: tolerant reads, strict decoding for the writer.
 
 use super::{
     CORE_PROPERTIES_NAMESPACE, Core, Dialect, Keywords, MAX_PROPERTY_TEXT, MAX_XML_BYTES,
@@ -98,7 +97,7 @@ pub(crate) fn read_core_with_report(
 }
 
 /// Decode the relationship-selected core-properties payload, repairing and
-/// recording a non-UTF-8 payload and a dialect mismatch (LENIENCY_AUDIT 8.1).
+/// recording a non-UTF-8 payload and a dialect mismatch.
 pub(super) fn decode_selected(
     bytes: &[u8],
     part: &str,
@@ -246,8 +245,8 @@ pub(super) fn decode(xml: &str) -> Result<(Core, Dialect)> {
     )
 }
 
-/// Decode core-properties XML, repairing the producer-rule deviations of
-/// LENIENCY_AUDIT 8.1 and recording each into `recorder`.
+/// Decode core-properties XML, repairing the producer-rule deviations and
+/// recording each into `recorder`.
 ///
 /// Word and LibreOffice look properties up one by one and ignore what they do
 /// not understand, so a deviation costs at most the deviating property:
@@ -792,7 +791,7 @@ fn validate_attributes(
     let owner = property.map_or("coreProperties", property_str);
     let mut has_w3cdtf = false;
     // Every attribute OPC M4.4/M4.5 or the schema rejects is a producer-rule
-    // deviation: ignored and recorded (LENIENCY_AUDIT 8.1).
+    // deviation: ignored and recorded.
     let unexpected = |recorder: &mut Recorder<'_>, raw_key: &[u8]| {
         recorder.record(
             CorePropertiesDefect::UnexpectedAttribute,
@@ -946,7 +945,7 @@ fn apply_property(
         CoreProperty::Category => props.category = Some(value),
         CoreProperty::ContentStatus => props.content_status = Some(value),
         CoreProperty::Version => props.version = Some(value),
-        // An unparseable date costs only that property (LENIENCY_AUDIT 8.1).
+        // An unparseable date costs only that property.
         CoreProperty::Created | CoreProperty::Modified => match time::W3c::new(value.clone()) {
             Ok(parsed) if property == CoreProperty::Created => props.created = Some(parsed),
             Ok(parsed) => props.modified = Some(parsed),
@@ -1179,7 +1178,7 @@ mod tests {
             assert_eq!(error_family(&eager), error_family(&deferred));
         }
 
-        // LENIENCY_AUDIT 8.2: both readers repair a dangling relationship the
+        // Both readers repair a dangling relationship the
         // same way and record the same defect.
         let mut eager_report = ToleranceReport::default();
         assert!(
@@ -1237,7 +1236,7 @@ mod tests {
         assert!(matches!(read(&wrong), Err(Error::ContentType { .. })));
     }
 
-    /// LENIENCY_AUDIT 8.2: an orphaned part, a second core-typed part, and a
+    /// An orphaned part, a second core-typed part, and a
     /// relationship owned by a part are read past and recorded.
     #[test]
     fn orphaned_duplicate_and_misplaced_graph_anomalies_are_recorded() {
@@ -1397,7 +1396,7 @@ mod tests {
         assert!(read(&package).is_err());
     }
 
-    /// LENIENCY_AUDIT 8.1: duplicates keep the first value, unknown elements
+    /// Duplicates keep the first value, unknown elements
     /// (including other dcterms terms) are skipped with their subtree, and an
     /// unparseable date drops only that property — each recorded.
     #[test]
@@ -1427,7 +1426,7 @@ mod tests {
         assert!(decode_recorded(&conformant).1.is_empty());
     }
 
-    /// LENIENCY_AUDIT 8.1: OPC M4.4/M4.5 attribute rules are producer rules —
+    /// OPC M4.4/M4.5 attribute rules are producer rules —
     /// a missing W3CDTF type is accepted, and `xml:lang`, misplaced or
     /// misspelled `xsi:type`, and foreign attributes are ignored; recorded.
     #[test]
@@ -1465,7 +1464,7 @@ mod tests {
         );
     }
 
-    /// LENIENCY_AUDIT 8.1: a non-UTF-8 payload is decoded lossily and a
+    /// A non-UTF-8 payload is decoded lossily and a
     /// dialect mismatch is accepted; both are recorded on the read path.
     #[test]
     fn non_utf8_payloads_and_dialect_mismatches_are_recorded() {
@@ -1620,7 +1619,7 @@ mod tests {
             ))
             .is_err()
         );
-        // LENIENCY_AUDIT 8.1: POI's M4.3-M4.5 failure fixtures are producer
+        // POI's M4.3-M4.5 failure fixtures are producer
         // deviations Word and LibreOffice open; each is repaired and recorded.
         for (name, expected) in [
             (

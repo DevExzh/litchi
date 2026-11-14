@@ -1,4 +1,4 @@
-//! Audit finding F3.12: Boolean bytes other than 0/1, undefined `BErr`
+//! Boolean bytes other than 0/1, undefined `BErr`
 //! codes, unpaired UTF-16 surrogates, and undefined data-validation enums or
 //! reserved bits are repaired by default the way Excel reads them, and every
 //! repair is recorded. The unmodified workbook is the control.

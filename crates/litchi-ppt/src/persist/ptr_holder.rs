@@ -46,7 +46,7 @@ impl PersistPtrHolder {
     }
 
     /// Parse a `PersistPtrHolder`, repairing per-entry defects into
-    /// `report` instead of rejecting the whole holder (finding F5.7).
+    /// `report` instead of rejecting the whole holder.
     ///
     /// A zero-count entry header is skipped
     /// ([`crate::PersistDefect::ZeroCountPersistRun`]) and a persist ID
@@ -261,7 +261,7 @@ mod tests {
     }
 
     /// Zero-count entries are skipped and repeated persist IDs keep their
-    /// first offset, recorded, instead of voiding the holder (F5.7).
+    /// first offset, recorded, instead of voiding the holder.
     #[test]
     fn repairs_zero_count_and_duplicate_entries_per_entry() {
         use crate::{Defect, PersistDefect};

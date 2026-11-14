@@ -40,7 +40,7 @@ pub(crate) struct OpenOutputs {
     pub(crate) definitions: Vec<Definition>,
     /// The typed worksheets in document order (pass 4).
     pub(crate) sheets: Vec<Sheet>,
-    /// The content repairs applied while parsing (LENIENCY_AUDIT F9.8, F9.9),
+    /// The content repairs applied while parsing,
     /// for the opening document handle to carry after its package report.
     pub(crate) tolerance: litchi_odf_common::leniency::ToleranceReport,
 }

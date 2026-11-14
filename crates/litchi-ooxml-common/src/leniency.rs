@@ -37,11 +37,9 @@
 //! `litchi_opc::leniency` — into their document-level report by iterating
 //! them (each [`ToleratedDefect`] carries its class and location).
 //!
-//! # Status
-//!
-//! Live for findings 8.1 (core-properties body), 8.2 (core-properties graph),
-//! 8.3 (custom-properties records), and 8.4 (reserved sensitivity-label
-//! properties, advisory on read) of `docs/LENIENCY_AUDIT.md`.
+//! The repaired classes cover the core-properties body and graph, the
+//! custom-properties records, and the reserved sensitivity-label properties
+//! (advisory on read).
 
 use std::fmt;
 
@@ -66,8 +64,8 @@ pub enum Leniency {
     Strict,
 }
 
-/// A core-properties defect (finding 8.1 body rules, finding 8.2 graph rules)
-/// repaired the way Word and LibreOffice repair it.
+/// A core-properties defect (body rules and graph rules) repaired
+/// the way Word and LibreOffice repair it.
 ///
 /// The recorded [`ToleratedDefect::part`] is the core-properties part (or,
 /// for graph defects, the part the defect is about), [`ToleratedDefect::item`]
@@ -159,7 +157,7 @@ impl CorePropertiesDefect {
     }
 }
 
-/// A custom-properties defect (findings 8.3 and 8.4) repaired the way Word
+/// A custom-properties defect repaired the way Word
 /// repairs it: per property, never for the whole set.
 ///
 /// The recorded [`ToleratedDefect::part`] is the custom-properties part,

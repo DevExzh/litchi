@@ -54,7 +54,7 @@ impl Part<'_> {
     /// Returns an error if the operation fails.
     pub fn chart_info(&self) -> Result<Info> {
         let mut state = ChartScanState::new();
-        // Processing instructions are inert (audit finding 6.3): skipped
+        // Processing instructions are inert: skipped
         // from the semantic input, recorded once for the part.
         let (xml, instructions) = crate::markup::without_processing_instructions(self.xml_bytes())?;
         if instructions {
@@ -161,7 +161,7 @@ impl Part<'_> {
         if !state.seen_chart || !state.seen_plot_area {
             // `CT_ChartSpace` requires `c:chart` and `CT_Chart` requires
             // `c:plotArea`; without them no plot type can be found, so the
-            // chart type stays unknown (audit finding 6.10).
+            // chart type stays unknown.
             state.chart_type = Type::Unknown;
             state.tolerance.record(ChartDefect::MissingElement, 0);
         }
@@ -320,7 +320,7 @@ fn inspect_plot_element(
             Some("bar") => Type::Bar,
             // `ST_BarDir` has only `bar` and `col`; LibreOffice reads the
             // attribute with `getToken(XML_val, XML_col)`, so a missing or
-            // unknown direction is a column chart (audit finding 6.10).
+            // unknown direction is a column chart.
             _ => {
                 state.tolerance.record(ChartDefect::BarDirection, 0);
                 Type::Column
@@ -342,7 +342,7 @@ enum StructuralElement {
 impl ChartScanState {
     /// Mark `element` seen; `false` (and a recorded
     /// [`ChartDefect::DuplicateElement`]) when an earlier occurrence already
-    /// won, so the caller ignores this one (audit finding 6.10).
+    /// won, so the caller ignores this one.
     fn first_occurrence(&mut self, element: StructuralElement) -> bool {
         let seen = match element {
             StructuralElement::Chart => &mut self.seen_chart,

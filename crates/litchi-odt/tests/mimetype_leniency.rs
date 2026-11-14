@@ -1,4 +1,4 @@
-//! LENIENCY_AUDIT F9.1 at the ODT facade: a re-zipped package whose
+//! At the ODT facade, a re-zipped package whose
 //! `mimetype` member is deflated, carries a local extra field, or is not the
 //! first entry opens by default through every ODT open path, and the
 //! deviation is recorded on the document handle's tolerance report.

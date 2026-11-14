@@ -142,15 +142,15 @@ impl Presentation {
     ///
     /// An empty report means the document conformed; see
     /// [`litchi_odf_common::leniency::ToleranceReport`]. Package repairs come
-    /// first, then the content repairs of the slide scan (LENIENCY_AUDIT
-    /// F9.10). Slides are parsed lazily, so the first call to this method
+    /// first, then the content repairs of the slide scan. Slides are parsed
+    /// lazily, so the first call to this method
     /// (or to [`Self::slides`]) runs that scan once.
     #[inline]
     #[must_use]
     pub fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
         self.inner.tolerance.get_or_init(|| {
             let mut merged = self.inner.package.tolerance_report().clone();
-            // Content repairs (LENIENCY_AUDIT F9.10) are found by the slide
+            // Content repairs are found by the slide
             // scan. A scan that fails outright reports its error through
             // `slides()`; the report then lists the package repairs only.
             if let Ok((_slides, content)) = Parser::parse_slides_with_report(

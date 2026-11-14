@@ -123,8 +123,8 @@ impl Editor {
     /// Read the live persist mapping from the `UserEdit` chain whose newest
     /// atom sits at `head_offset` (see
     /// `crate::slide::directory::locate_head_user_edit`), repairing
-    /// persist-directory defects into `report` (finding F5.7) and, when
-    /// `leniency` opts in, breaking a cyclic chain (finding F5.9).
+    /// persist-directory defects into `report` and, when
+    /// `leniency` opts in, breaking a cyclic chain.
     pub(crate) fn inspect_live_mapping_at(
         document: &[u8],
         head_offset: u32,

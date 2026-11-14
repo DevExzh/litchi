@@ -69,7 +69,7 @@ fn raw_unsafe_xml_is_rejected_at_ingress_or_changed_publication() {
         "?><!DOCTYPE office:document-content [<!ENTITY x 'bad'>]>",
         1,
     );
-    // A prologue DOCTYPE is ignored (leniency F9.11): it is blanked before
+    // A prologue DOCTYPE is ignored: it is blanked before
     // any parser sees it, so its entity stays undeclared and a reference to
     // it is still rejected.
     assert!(Package::from_bytes(&raw_package(&dtd)).is_ok());

@@ -41,8 +41,8 @@ pub(crate) const MAX_LIST_LEVEL: u8 = 8;
 ///
 /// `w:ilvl` is an unbounded `ST_DecimalNumber`, but Word models only levels
 /// 0–8. A non-negative integer above 8 (including one too large for any
-/// integer type) is clamped to 8 and reported as clamped (`true`);
-/// LENIENCY_AUDIT 2.9. Anything that is not a non-negative decimal integer
+/// integer type) is clamped to 8 and reported as clamped (`true`).
+/// Anything that is not a non-negative decimal integer
 /// returns `None`.
 pub(crate) fn parse_list_level(raw: &str) -> Option<(u8, bool)> {
     let digits = raw.strip_prefix('+').unwrap_or(raw);

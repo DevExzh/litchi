@@ -1,4 +1,4 @@
-//! LENIENCY_AUDIT F9.11 at the ODS facade: a document type declaration in
+//! At the ODS facade, a document type declaration in
 //! the `content.xml` prologue is ignored without being processed, as
 //! LibreOffice's SAX import ignores it, through every ODS open path, and
 //! the repair is recorded on the document handle. Entity references that a

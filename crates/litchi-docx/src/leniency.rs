@@ -23,8 +23,7 @@
 //! **Opt-in repairs** trade strict conformance for reach and stay gated by
 //! [`Leniency`] variants. There are no opt-in repairs yet: [`Leniency::Strict`]
 //! is the only variant, so every read applies the same contract. Judgment-call
-//! repairs land behind explicit variants as the roadmap findings that need
-//! them are implemented.
+//! repairs land behind explicit variants as they are implemented.
 //!
 //! This mirrors the contract `litchi_doc::leniency` provides for legacy
 //! binary documents so the two Word readers behave the same way.
@@ -40,36 +39,36 @@
 //! calls in call order. The aggregation sits behind a mutex so the facades
 //! keep their `&self` receivers; `tolerance_report` returns a snapshot.
 //!
-//! Recording sites, by finding:
+//! Recording sites:
 //!
-//! - 2.1 — [`Document::write_text_to`](crate::Document::write_text_to) (and
+//! - [`Document::write_text_to`](crate::Document::write_text_to) (and
 //!   the source-backed package sink) records [`TextDefect`].
-//! - 2.2, 2.3 — [`Document::settings`](crate::Document::settings) records
+//! - [`Document::settings`](crate::Document::settings) records
 //!   [`SettingsDefect`]; the parsed
 //!   [`DocumentSettings`](crate::settings::DocumentSettings) also carries its
 //!   own report for the package-level settings shortcuts.
-//! - 2.4, 2.6 — [`Document::numbering`](crate::Document::numbering),
+//! - [`Document::numbering`](crate::Document::numbering),
 //!   [`Document::numbering_snapshot`](crate::Document::numbering_snapshot),
 //!   and the list resolvers ([`Document::list_items`](crate::Document::list_items)
 //!   and friends) record [`NumberingDefect`]; the
 //!   [`numbering::Collection`](crate::numbering::Collection) carries its own.
-//! - 2.6 (style level), 2.9 — the list resolvers record [`NumberingDefect::LevelOutOfRange`]
-//!   for a paragraph `w:ilvl` above 8 and merge the [`StyleDefect`]s of the
+//! - The list resolvers record [`NumberingDefect::LevelOutOfRange`] for a
+//!   paragraph `w:ilvl` above 8 and merge the [`StyleDefect`]s of the
 //!   [`Styles`](crate::styles::Styles) they load, which carries its own.
-//! - 2.10 — [`Document::drawing_objects`](crate::Document::drawing_objects)
+//! - [`Document::drawing_objects`](crate::Document::drawing_objects)
 //!   (and the pinned source-backed one) record [`DrawingDefect`]; each
 //!   [`Object`](crate::drawing::Object) keeps its raw preset token.
-//! - 2.11 — [`Document::fields`](crate::Document::fields) (and the pinned
+//! - [`Document::fields`](crate::Document::fields) (and the pinned
 //!   source-backed one) record [`FieldDefect`].
-//! - 2.5 — [`Document::revisions`](crate::Document::revisions) and the pinned
+//! - [`Document::revisions`](crate::Document::revisions) and the pinned
 //!   source-backed `Document::revisions` record [`RevisionDefect`].
-//! - 2.7 — [`Document::section_inventory`](crate::Document::section_inventory)
+//! - [`Document::section_inventory`](crate::Document::section_inventory)
 //!   (and the source-backed inventories) record [`SectionDefect`];
 //!   [`Section`](crate::Section) and the inventory carry their own.
-//! - 2.12 — the section decoders record
+//! - The section decoders record
 //!   [`SectionDefect::NonConformingRelationshipId`] through the same carriers
-//!   as 2.7.
-//! - 2.8 — [`Document::content_controls`](crate::Document::content_controls)
+//!   as the section inventory.
+//! - [`Document::content_controls`](crate::Document::content_controls)
 //!   records [`ContentControlDefect`]; the
 //!   [`content_control::Inventory`](crate::content_control::Inventory) carries
 //!   its own.
@@ -118,7 +117,7 @@ pub(crate) const MAX_REPORT_HEAP_BYTES: usize = MAX_RECORDED_DEFECTS * size_of::
 ///
 /// No opt-in repairs exist yet, so `Strict` is currently the only variant and
 /// the default: every read applies the same contract. Variants gate
-/// judgment-call repairs as the roadmap findings that need them land.
+/// judgment-call repairs as they land.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Leniency {
     /// Reject every defect whose repair requires opting in.

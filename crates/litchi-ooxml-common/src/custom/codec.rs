@@ -39,7 +39,7 @@ pub(crate) fn decode(xml: &[u8]) -> Result<Props> {
 }
 
 /// Decode custom-properties XML, repairing per property and recording each
-/// repair into the returned collection's report (LENIENCY_AUDIT 8.3).
+/// repair into the returned collection's report.
 pub(crate) fn decode_tolerant(xml: &[u8], part: &str) -> Result<Props> {
     let mut report = ToleranceReport::default();
     let mut props = decode_with(xml, &mut Sink::tolerant(&mut report, part))?;

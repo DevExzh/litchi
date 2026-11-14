@@ -18,14 +18,13 @@
 //! **Opt-in repairs** trade strict conformance for reach and stay gated by
 //! [`Leniency`] variants, passed to the `*_with_leniency` open functions of
 //! [`crate::Workbook`] and [`crate::SourceBackedWorkbook`]. The one
-//! judgment-call class on the roadmap — sheet-name authoring rules enforced
-//! at load time (audit finding 4.8) — is gated by
+//! judgment-call class — sheet-name authoring rules enforced
+//! at load time — is gated by
 //! [`Leniency::TolerateSheetNameRules`].
 //!
-//! The defect enumerations are sized to the litchi-xlsx section of
-//! `docs/LENIENCY_AUDIT.md` (findings 4.1–4.12). A variant whose recording
+//! The defect enumerations are closed. A variant whose recording
 //! site has not landed yet is documented as a *roadmap contract*: it fixes
-//! the repair the finding will apply, and no read produces it today.
+//! the repair it will apply, and no read produces it today.
 //!
 //! # Where recording sites plug in
 //!
@@ -44,17 +43,16 @@
 //!   [`Defect::Package`] entries at [`Location::Part`] together with the
 //!   packaging report's unrecorded count, so every open path — owned,
 //!   source-backed, `Package::workbook`, decrypted — lists the manifest
-//!   repairs its package made. Catalog findings (4.7 `activeTab` /
-//!   `localSheetId`, 4.8 sheet names) thread `&mut ToleranceReport` into the
+//!   repairs its package made. Catalog repairs (`activeTab` /
+//!   `localSheetId`, sheet names) thread `&mut ToleranceReport` into the
 //!   catalog parse and record [`CatalogDefect`]s located at
 //!   [`Location::Workbook`] or [`Location::DefinedName`].
 //! * **Per worksheet.** A worksheet's parsed cell store carries its own
 //!   report, filled while that store was built: the streaming worksheet
 //!   parser threads `&mut ToleranceReport` through cell materialization
-//!   (findings 4.3, 4.4, 4.6, 4.9 record [`CellDefect`]s at
-//!   [`Location::Cell`]; 4.1 and 4.10 record [`WorksheetDefect`]s), and the
-//!   style cross-reference pass that runs before the store is published
-//!   (finding 4.2) takes the store mutably and records at the cell, row, or
+//!   (recording [`CellDefect`]s at [`Location::Cell`] and
+//!   [`WorksheetDefect`]s), and the style cross-reference pass that runs
+//!   before the store is published takes the store mutably and records at the cell, row, or
 //!   column it repaired. Because the report
 //!   lives *in* the store, every path that builds one — owned workbook,
 //!   source-backed workbook, edit and readback planning — carries the repairs
@@ -68,7 +66,7 @@
 //!   each entry with its sheet position in [`ToleratedDefect::sheet`]. Sheets
 //!   that were never read have not been parsed, so they cannot have been
 //!   repaired; reading every sheet first yields the complete report.
-//!   Shared-string repairs (4.5, 4.12) are recorded when the table is parsed
+//!   Shared-string repairs are recorded when the table is parsed
 //!   and join the aggregate the same way, at [`Location::SharedStringTable`]
 //!   or [`Location::SharedStringItem`].
 //!
@@ -86,30 +84,30 @@
 //! report, every worksheet store carries the report of the parse that built
 //! it, and the aggregates above expose them. Live recording sites:
 //!
-//! * OPC packaging findings 8.5–8.9 — folded from the package's own report
+//! * OPC packaging repairs — folded from the package's own report
 //!   at open as [`Defect::Package`]. Shared metadata repairs (core and
-//!   custom document properties, findings 8.1–8.4) are not read by the
+//!   custom document properties) are not read by the
 //!   workbook facades; a caller that reads them with
 //!   `litchi_ooxml_common::properties::read_with_report` folds that report
 //!   in with [`ToleranceReport::append_properties`] as
 //!   [`Defect::Properties`]. Custom properties read through
 //!   `Package::custom_props` carry their own report on the returned value.
-//! * finding 4.1 — the worksheet event parser (`raw/worksheet/codec.rs`,
+//! * row and column geometry — the worksheet event parser (`raw/worksheet/codec.rs`,
 //!   with `sheetFormatPr` in `raw/worksheet/validation.rs`) records
 //!   [`WorksheetDefect::RowHeightOutOfRange`],
 //!   [`WorksheetDefect::ColumnWidthOutOfRange`], and
 //!   [`WorksheetDefect::SheetFormatDefaultOutOfRange`] at the row, column
 //!   range, or worksheet. The standalone `raw::parse_worksheet_defaults`
 //!   reader has no report and keeps its errors.
-//! * finding 4.2 — `Store::repair_style_indexes`, run by both read facades
+//! * style indexes — `Store::repair_style_indexes`, run by both read facades
 //!   before a worksheet store is published, records
 //!   [`CellDefect::StyleIndexOutOfRange`] at the cell, row, or column.
-//! * findings 4.3 and 4.4 — cell materialization
+//! * cell values and shared-string references — cell materialization
 //!   (`raw/worksheet/semantic.rs`) records [`CellDefect::MalformedNumber`],
 //!   [`CellDefect::MalformedBoolean`], [`CellDefect::MalformedDate`],
 //!   [`CellDefect::SharedStringIndexOutOfRange`], and
 //!   [`CellDefect::MissingSharedStringTable`] at the cell.
-//! * findings 4.5 and 4.12 — the shared-string table parse
+//! * the shared-string table — the shared-string table parse
 //!   (`raw/strings.rs`) records [`SharedStringsDefect::CountHint`],
 //!   [`SharedStringsDefect::RunStructure`], and
 //!   [`SharedStringsDefect::UnpairedEscape`]; each workbook handle keeps the
@@ -117,21 +115,21 @@
 //!   after the open-time entries, with no sheet. The bounded selected
 //!   dependency scan reports such a table as irregular and the read falls
 //!   back to the repairing parse.
-//! * finding 4.6 — shared-formula resolution (`raw/worksheet/semantic.rs`)
+//! * shared formulas — shared-formula resolution (`raw/worksheet/semantic.rs`)
 //!   records [`CellDefect::BrokenSharedFormulaGroup`] at each repaired cell.
-//! * findings 4.7 and 4.8 — the open-time catalog parse (`raw/catalog.rs`)
+//! * the workbook catalog — the open-time catalog parse (`raw/catalog.rs`)
 //!   records [`CatalogDefect::ActiveTabOutOfRange`] and
 //!   [`CatalogDefect::LocalSheetIdOutOfRange`]; under the opt-in
 //!   [`Leniency::TolerateSheetNameRules`] it also records
 //!   [`CatalogDefect::SheetNameRules`]. The standalone `raw::parse_catalog`
 //!   and the feature snapshots that re-read the catalog for editing keep the
 //!   historical errors.
-//! * findings 4.9 and 4.10 — the worksheet event parser records
+//! * formulas and worksheet sequencing — the worksheet event parser records
 //!   [`CellDefect::FormulaLeadingEquals`] and [`CellDefect::EmptyFormula`]
 //!   at the cell, and [`WorksheetDefect::MisplacedElement`],
 //!   [`WorksheetDefect::CountMismatch`], and
 //!   [`WorksheetDefect::RowOutOfOrder`].
-//! * finding 4.11 — `style::theme::Theme::parse` records [`ThemeDefect`]s
+//! * the theme color scheme — `style::theme::Theme::parse` records [`ThemeDefect`]s
 //!   in the parsed theme's own report; no workbook handle parses the theme.
 //!
 //! Whenever the selected-range scanner meets a cell or worksheet one of the
@@ -175,7 +173,7 @@ pub enum Leniency {
     #[default]
     Strict,
     /// [`Leniency::Strict`], plus admit sheet names that break Excel's
-    /// authoring rules (audit finding 4.8) — over 31 characters, a reserved
+    /// authoring rules — over 31 characters, a reserved
     /// character (`* ? / \ : [ ]`), or a leading/trailing apostrophe.
     ///
     /// ECMA-376 §18.2.18 types `sheet/@name` as `ST_Xstring` with no such
@@ -197,7 +195,7 @@ pub enum Leniency {
 #[non_exhaustive]
 pub enum CellDefect {
     /// A cell's `s` attribute (or a row's / column's style) names an index at
-    /// or beyond the workbook's `cellXfs` count (audit finding 4.2).
+    /// or beyond the workbook's `cellXfs` count.
     ///
     /// ECMA-376 §18.3.1.4 requires the index to reference `cellXfs` but gives
     /// no basis for rejecting the sheet over a stale one; Excel substitutes
@@ -207,20 +205,19 @@ pub enum CellDefect {
     /// guard and is still a hard error.
     StyleIndexOutOfRange,
     /// A `t="s"` cell names a shared-string index at or beyond the table's
-    /// length (audit finding 4.4).
+    /// length.
     ///
     /// Excel repairs the cell; LibreOffice resolves the lookup to empty. The
     /// reader substitutes an empty string, matching the LibreOffice result.
     /// An index that is not an unsigned integer at all stays a hard error.
     SharedStringIndexOutOfRange,
-    /// A `t="s"` cell appears in a workbook that has no shared-string part
-    /// (audit finding 4.4).
+    /// A `t="s"` cell appears in a workbook that has no shared-string part.
     ///
     /// The reader substitutes an empty string for each such cell, exactly as
     /// for an out-of-range index into an empty table.
     MissingSharedStringTable,
     /// A number `<v>` does not parse as a finite `xsd:double` — `1,234.56`,
-    /// `1E+999`, `NaN` (audit finding 4.3).
+    /// `1E+999`, `NaN`.
     ///
     /// LibreOffice converts lossily and Apache POI keeps the raw string; the
     /// reader keeps the raw string without inventing a number: the cell is
@@ -228,20 +225,19 @@ pub enum CellDefect {
     /// On a formula cell the malformed cached value is dropped and the
     /// formula kept (Excel recalculates it).
     MalformedNumber,
-    /// A boolean `<v>` is outside `{0, 1, true, false}` (audit finding 4.3).
+    /// A boolean `<v>` is outside `{0, 1, true, false}`.
     ///
     /// Read as LibreOffice reads it — `true`/`false` in any ASCII case, and
     /// any finite number as non-zero-is-true. A lexical neither form covers
     /// (for example `yes`) is demoted to `Cell::Unknown` with kind `b`
     /// instead of being guessed; a formula's cached value is then dropped.
     MalformedBoolean,
-    /// A `t="d"` value is outside the accepted ISO 8601 layouts (audit
-    /// finding 4.3). The value is demoted to its text.
+    /// A `t="d"` value is outside the accepted ISO 8601 layouts. The value is demoted to its text.
     MalformedDate,
     /// A shared-formula group is structurally inconsistent — a would-be
     /// master without `ref` or expression, not first in its `ref`, or a
     /// second master for one `si`; a member without a master or outside the
-    /// master's range (audit finding 4.6).
+    /// master's range.
     ///
     /// LibreOffice falls back to plain cells for an unusable shared
     /// reference. A would-be master keeps its own expression verbatim as an
@@ -251,12 +247,12 @@ pub enum CellDefect {
     /// as a plain cell holding its cached value. The location is the
     /// repaired cell. A `ref` that is not a range lexical stays fatal.
     BrokenSharedFormulaGroup,
-    /// An `<f>` starts with `=` (audit finding 4.9). Naive generators write
+    /// An `<f>` starts with `=`. Naive generators write
     /// `<f>=SUM(A1:A2)</f>`; LibreOffice's compiler accepts the `=` and Excel
     /// repairs. One leading `=` (after any leading whitespace) is stripped; a
     /// second one stays a hard error.
     FormulaLeadingEquals,
-    /// A scalar or array `<f>` is empty (audit finding 4.9). LibreOffice
+    /// A scalar or array `<f>` is empty. LibreOffice
     /// skips an empty formula; the cell reads without one, keeping its
     /// cached value.
     EmptyFormula,
@@ -295,32 +291,32 @@ impl CellDefect {
 /// A worksheet-level structural-advisory defect repaired the way Excel
 /// repairs it.
 ///
-/// Every variant is live: the geometry variants (audit finding 4.1) and the
-/// sequencing and advisory-count variants (finding 4.10).
+/// Every variant is live: the geometry variants and the
+/// sequencing and advisory-count variants.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum WorksheetDefect {
-    /// A row `ht` lies outside 0..=409 points (finding 4.1). ECMA-376 types
+    /// A row `ht` lies outside 0..=409 points. ECMA-376 types
     /// `ht` as a plain `xsd:double`; 409 is Excel's authoring ceiling and
     /// LibreOffice writes taller rows. A height past 409 (including `+inf`)
     /// clamps to 409; a negative or `NaN` height is dropped, so the row
     /// takes the sheet default, as LibreOffice reads a negative `ht`. The
     /// location is the row.
     RowHeightOutOfRange,
-    /// A column `width` lies outside 0..=255 characters (finding 4.1). A
+    /// A column `width` lies outside 0..=255 characters. A
     /// width past 255 clamps to 255; a negative or `NaN` width is dropped,
     /// so the columns take the sheet default. The location is the column
     /// range of the `col` record.
     ColumnWidthOutOfRange,
-    /// A `sheetFormatPr` default is negative, non-finite, or out of range
-    /// (finding 4.1): `defaultColWidth` and `baseColWidth` are dropped, so
+    /// A `sheetFormatPr` default is negative, non-finite, or out of range:
+    /// `defaultColWidth` and `baseColWidth` are dropped, so
     /// the application default applies; a required `defaultRowHeight` is
     /// replaced with Excel's 15-point default. A missing or unparseable
     /// attribute stays a hard error.
     SheetFormatDefaultOutOfRange,
     /// `dimension`, `sheetFormatPr`, `cols`, or `mergeCells` appears out of
     /// schema order, or `dimension` is repeated, lacks `ref`, or has an
-    /// unparseable `ref` (finding 4.10). ECMA-376 §18.3.1.35 makes
+    /// unparseable `ref`. ECMA-376 §18.3.1.35 makes
     /// `dimension` informational and Excel and LibreOffice recompute it. The
     /// element is accepted position-independently; the first `dimension`
     /// wins and an unusable one is ignored. A repeated `sheetData`, `cols`,
@@ -328,12 +324,12 @@ pub enum WorksheetDefect {
     /// [`Location::Worksheet`].
     MisplacedElement,
     /// `mergeCells/@count` disagrees with its records, or `cols` /
-    /// `mergeCells` is empty (finding 4.10). The counts are informational
+    /// `mergeCells` is empty. The counts are informational
     /// (§18.3.1.55); the records are authoritative, as for the
     /// shared-string hints. Located at [`Location::Worksheet`].
     CountMismatch,
-    /// A row appears after a higher-numbered row, or a row index repeats
-    /// (finding 4.10). Rows are sorted; a repeated row merges last-wins —
+    /// A row appears after a higher-numbered row, or a row index repeats.
+    /// Rows are sorted; a repeated row merges last-wins —
     /// its later properties and cells replace earlier ones at the same
     /// index — as Apache POI's sorted row map does. A cell repeated within
     /// one row stays fatal. Located at the row.
@@ -368,22 +364,22 @@ impl WorksheetDefect {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum CatalogDefect {
-    /// `workbookView/@activeTab` names a sheet past the catalog (finding
-    /// 4.7). ECMA-376 types it as an unconstrained `unsignedInt` and it goes
+    /// `workbookView/@activeTab` names a sheet past the catalog. ECMA-376 types
+    /// it as an unconstrained `unsignedInt` and it goes
     /// stale when other tools delete sheets. The active tab falls back to
     /// the first sheet — LibreOffice's reading, and the value an absent
     /// `activeTab` means. Located at [`Location::Workbook`].
     ActiveTabOutOfRange,
-    /// A `definedName/@localSheetId` names a sheet past the catalog (finding
-    /// 4.7). A scope naming no sheet cannot be resolved; the name is dropped,
+    /// A `definedName/@localSheetId` names a sheet past the catalog. A scope
+    /// naming no sheet cannot be resolved; the name is dropped,
     /// as LibreOffice drops it, rather than promoted to a workbook-global
     /// name that could shadow another. Located at [`Location::DefinedName`],
     /// the name's zero-based position among the catalog's defined names.
     LocalSheetIdOutOfRange,
     /// A sheet name violates Excel's authoring rules — over 31 characters,
-    /// a reserved character, or a leading/trailing apostrophe (finding 4.8).
-    /// The name is retained verbatim. This is the one judgment-call repair on
-    /// the xlsx roadmap: it applies only under the opt-in
+    /// a reserved character, or a leading/trailing apostrophe.
+    /// The name is retained verbatim. This is the one judgment-call repair in
+    /// this crate: it applies only under the opt-in
     /// [`Leniency::TolerateSheetNameRules`]; under [`Leniency::Strict`] the
     /// name fails the open. Located at [`Location::Sheet`].
     SheetNameRules,
@@ -406,9 +402,9 @@ impl CatalogDefect {
 /// A shared-string table (`xl/sharedStrings.xml`) defect.
 ///
 /// Recorded by the workbook handles' shared-string parse (`raw/strings.rs`):
-/// [`SharedStringsDefect::CountHint`] (audit finding 4.5) at
+/// [`SharedStringsDefect::CountHint`] at
 /// [`Location::SharedStringTable`], and [`SharedStringsDefect::RunStructure`]
-/// and [`SharedStringsDefect::UnpairedEscape`] (finding 4.12) at
+/// and [`SharedStringsDefect::UnpairedEscape`] at
 /// [`Location::SharedStringItem`]. That parser reads item text only, so a
 /// malformed run property cannot fail it; [`SharedStringsDefect::RunProperty`]
 /// is a *roadmap contract* for the standalone `raw::shared_strings::Table`
@@ -417,21 +413,21 @@ impl CatalogDefect {
 #[non_exhaustive]
 pub enum SharedStringsDefect {
     /// `sst/@count` or `sst/@uniqueCount` is unparseable, negative, or past
-    /// 2³¹−1 (finding 4.5). ECMA-376 §18.4.9 makes both optional and
+    /// 2³¹−1. ECMA-376 §18.4.9 makes both optional and
     /// informational; Excel and LibreOffice ignore them. The hint is treated
     /// as absent — the items are authoritative — as the crate's tolerant
     /// twin parser already does. One entry per malformed hint, at
     /// [`Location::SharedStringTable`].
     CountHint,
     /// An item mixes simple and rich text, or repeats a `<t>` in the item
-    /// or in one run (finding 4.12). LibreOffice appends every text portion;
+    /// or in one run. LibreOffice appends every text portion;
     /// the reader keeps every text element's characters in document order,
     /// so no text is lost.
     RunStructure,
-    /// A run property is duplicated, unknown, or malformed (finding 4.12).
+    /// A run property is duplicated, unknown, or malformed.
     /// The property is dropped; an unknown underline reads as single.
     RunProperty,
-    /// An `_xHHHH_` escape encodes an unpaired surrogate (finding 4.12).
+    /// An `_xHHHH_` escape encodes an unpaired surrogate.
     /// The escape decodes to U+FFFD, as reference decoders do; one entry
     /// per affected item.
     UnpairedEscape,
@@ -452,7 +448,7 @@ impl SharedStringsDefect {
 
 /// A theme color-scheme (`a:clrScheme`) defect.
 ///
-/// Recorded by `style::theme::Theme::parse` (audit finding 4.11) into the
+/// Recorded by `style::theme::Theme::parse` into the
 /// parsed theme's own report (`Theme::tolerance_report`), at
 /// [`Location::ColorSchemeSlot`]. The theme parser is not on the
 /// workbook-open path. LibreOffice dispatches color-scheme children by name,

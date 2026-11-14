@@ -194,7 +194,7 @@ impl ContentTypeMap {
                     }
                 },
                 // Character data is ignored by Apache POI and LibreOffice
-                // alike (LENIENCY_AUDIT 8.11); it is recorded, not stored.
+                // alike; it is recorded, not stored.
                 // Whitespace-only text never reaches here (`trim_text`).
                 Event::Text(text) if !text.as_ref().is_empty() => {
                     if skip_from.is_none() {
@@ -282,7 +282,7 @@ impl ContentTypeMap {
     /// Add a Default mapping. ECMA-376 Part 2 §9.1.2.2 allows one Default
     /// per extension as a producer rule; a later duplicate (compared ASCII
     /// case-insensitively) is dropped and recorded, keeping the first mapping
-    /// as LibreOffice's first-match lookup does (LENIENCY_AUDIT 8.9).
+    /// as LibreOffice's first-match lookup does.
     fn add_default(
         &mut self,
         extension: String,
@@ -450,7 +450,7 @@ fn inspect_element(
         // Annex C closes the content model as a producer rule. Apache POI
         // skips every element it does not query; LibreOffice's SAX handler
         // throws. Skipping cannot invent a mapping, so the element and its
-        // subtree are skipped and recorded (LENIENCY_AUDIT 8.11).
+        // subtree are skipped and recorded.
         let name = String::from_utf8_lossy(element.name().as_ref()).into_owned();
         report.record(
             ContentTypeDefect::UnknownElement,
@@ -496,7 +496,7 @@ fn record_unknown_attributes(report: &mut ToleranceReport, key: &str, unknown: &
     }
 }
 
-/// Admit a source `ContentType` value (LENIENCY_AUDIT 8.12).
+/// Admit a source `ContentType` value.
 ///
 /// A value that breaks the RFC 2616 grammar is kept verbatim and recorded:
 /// LibreOffice stores and compares content types as opaque strings, and the
@@ -525,7 +525,7 @@ fn admit_content_type(
     }
 }
 
-/// Admit a source `Default` `Extension` value (LENIENCY_AUDIT 8.12): kept
+/// Admit a source `Default` `Extension` value: kept
 /// verbatim and recorded when it breaks the extension grammar, except an
 /// empty value or one carrying control characters.
 fn admit_extension(
@@ -590,7 +590,7 @@ fn required_attributes(
             content_type = Some(value);
         } else if raw_name != b"xmlns" && !raw_name.starts_with(b"xmlns:") {
             // Apache POI and LibreOffice both ignore attributes they do not
-            // query (LENIENCY_AUDIT 8.11); the caller records it.
+            // query; the caller records it.
             unknown
                 .try_reserve(1)
                 .map_err(|source| allocation("OPC unknown content-type attributes", source))?;
@@ -701,7 +701,7 @@ mod tests {
             .collect()
     }
 
-    /// LENIENCY_AUDIT 8.11: unknown elements (with their subtrees), unknown
+    /// Unknown elements (with their subtrees), unknown
     /// mapping attributes, character data, and CDATA are ignored and
     /// recorded; the known mappings around them are read normally.
     #[test]
@@ -804,7 +804,7 @@ mod tests {
         ));
     }
 
-    /// LENIENCY_AUDIT 8.12: grammar deviations in `ContentType` and
+    /// Grammar deviations in `ContentType` and
     /// `Extension` are kept verbatim and recorded; empty values and control
     /// characters stay fatal.
     #[test]
@@ -862,7 +862,7 @@ mod tests {
 
     #[test]
     fn case_equivalent_defaults_and_overrides_keep_the_first_and_are_recorded() {
-        // LENIENCY_AUDIT 8.9: first-wins, as LibreOffice's first-match lookup.
+        // First-wins, as LibreOffice's first-match lookup.
         let duplicates = manifest(
             r#"<Default Extension="xml" ContentType="application/xml"/><Default Extension="XML" ContentType="text/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.first+xml"/><Override PartName="/WORD/DOCUMENT.XML" ContentType="text/xml"/>"#,
         );

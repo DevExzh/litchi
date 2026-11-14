@@ -192,8 +192,7 @@ pub enum NotEligibleReason {
     /// A text payload contains an XML reference unavailable to this observer.
     GeneralReference,
     /// A number or boolean value lexical is malformed. The materialized
-    /// parser repairs and records it (see `crate::leniency`, audit finding
-    /// 4.3); this scanner never repairs.
+    /// parser repairs and records it (see `crate::leniency`); this scanner never repairs.
     IrregularValue,
 }
 
@@ -711,8 +710,8 @@ impl<'a> PlainScanner<'a> {
         } = cell;
         if selected {
             let semantic = if saw_value && !value.trim().is_empty() {
-                // A malformed lexical is repaired by the materialized parser
-                // (audit finding 4.3), never by this scanner.
+                // A malformed lexical is repaired by the materialized parser,
+                // never by this scanner.
                 let number =
                     Number::new(value.into_boxed_str()).map_err(|_| PlainScanError::Fallback)?;
                 Cell::Value(Value::Number(number))
@@ -1318,8 +1317,7 @@ impl<'a> Scanner<'a> {
                 .merge_count
                 .is_some_and(|count| usize::try_from(count).ok() != Some(self.merges.len()))
         {
-            // Repaired and recorded by the materialized parser (audit
-            // finding 4.10).
+            // Repaired and recorded by the materialized parser.
             return Ok((
                 RangeScanOutcome::NotEligible(NotEligibleReason::MergeSemantics),
                 None,
@@ -1551,7 +1549,7 @@ impl<'a> Scanner<'a> {
     }
 
     /// A misplaced, repeated, or unusable `dimension` is repaired and
-    /// recorded by the materialized parser (audit finding 4.10); this scanner
+    /// recorded by the materialized parser; this scanner
     /// never repairs, so it defers such a worksheet.
     fn start_dimension(&mut self, element: &SemanticElement<'_>) -> Result<Option<Frame>> {
         if self.sheet_data.seen() || self.seen_dimension {
@@ -1665,7 +1663,7 @@ impl<'a> Scanner<'a> {
 
     /// Whether `mergeCells` sits where the schema puts it. A duplicate is
     /// fatal; a misplaced one is repaired and recorded by the materialized
-    /// parser (audit finding 4.10), so the caller defers the worksheet.
+    /// parser, so the caller defers the worksheet.
     fn validate_merge_cells_placement(&self) -> Result<bool> {
         if self.seen_merge_cells {
             return Err(invalid("worksheet has duplicate mergeCells elements"));
@@ -1770,8 +1768,7 @@ impl<'a> Scanner<'a> {
                 return Ok(None);
             }
             if number == self.previous_row {
-                // Repaired last-wins by the materialized parser (audit
-                // finding 4.10).
+                // Repaired last-wins by the materialized parser.
                 self.mark(NotEligibleReason::Ordering);
                 return Ok(None);
             }
@@ -1959,8 +1956,7 @@ impl<'a> Scanner<'a> {
     }
 
     /// An empty `mergeCells` or a count disagreeing with its records is
-    /// repaired and recorded by the materialized parser (audit finding
-    /// 4.10); this scanner defers the worksheet.
+    /// repaired and recorded by the materialized parser; this scanner defers the worksheet.
     fn finish_merge_cells(&mut self) {
         if self.merges.is_empty()
             || self
@@ -1996,7 +1992,7 @@ impl<'a> Scanner<'a> {
             }
             if formula.trim().is_empty() || formula.trim_start().starts_with('=') {
                 // The materialized parser repairs and records an empty
-                // expression or a leading '=' (audit finding 4.9); this
+                // expression or a leading '='; this
                 // scanner never repairs.
                 self.mark(NotEligibleReason::FormulaSemantics);
                 return Ok(());
@@ -2008,7 +2004,7 @@ impl<'a> Scanner<'a> {
         };
         if cell.saw_value && !regular_lexical(cell.kind, &cell.value) {
             // The materialized parser repairs and records a malformed value
-            // lexical (audit finding 4.3); this scanner never repairs.
+            // lexical; this scanner never repairs.
             self.mark(NotEligibleReason::IrregularValue);
             return Ok(());
         }

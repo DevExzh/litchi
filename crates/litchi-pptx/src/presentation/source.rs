@@ -141,7 +141,7 @@ pub(super) struct SourceInner {
     pub(super) semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
     /// Every non-structural defect repaired while the source was opened, in
     /// discovery order: the OPC manifest repairs folded from `litchi_opc`,
-    /// then the slide-list repairs of audit finding 6.7. Repairs a
+    /// then the slide-list repairs. Repairs a
     /// deferred slide read performs surface at that read's own entry point.
     /// See [`crate::leniency`].
     pub(super) tolerance: crate::leniency::ToleranceReport,
@@ -1602,7 +1602,7 @@ impl SourceBackedPresentation {
     ) -> Result<Self> {
         package.check_execution()?;
         let mut tolerance = crate::leniency::ToleranceReport::default();
-        // OPC manifest repairs (audit findings 8.5-8.9) were applied while
+        // OPC manifest repairs were applied while
         // the deferred package was opened; they come first.
         tolerance.append_package(package.tolerance_report());
         let repairs_before_catalog = tolerance.total();

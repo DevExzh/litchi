@@ -586,7 +586,7 @@ fn stream_allocation_validation_matches_the_fresh_map_form_on_faulted_files() {
     }
     // The faults reach the cycle, overlap, truncation, marker, bounds and
     // ownership refusals, the recorded surplus-chain and stale empty-start
-    // repairs (leniency audit F7.1, F7.2), and some leave the file valid.
+    // repairs, and some leave the file valid.
     let seen = |needle: &str| outcomes.keys().any(|key| key.contains(needle));
     for needle in [
         "accepted",

@@ -87,7 +87,7 @@ fn rejects_invalid_settings_and_records_out_of_order_ones() {
         .replace("t:null-year=\"0\"", "t:null-year=\"1930\"")
         .replace("t:steps=\"0\"", "t:steps=\"1\"")
         .replace("not-a-date", "1899-12-30");
-    // LENIENCY_AUDIT F9.9: LibreOffice reads either child order, so the
+    // LibreOffice reads either child order, so the
     // reordered settings are accepted and the repair is recorded.
     let (settings, report) =
         super::codec::parse_with_report(&out_of_order, crate::XmlStreamLimits::default()).unwrap();

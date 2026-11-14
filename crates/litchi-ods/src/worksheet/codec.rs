@@ -216,7 +216,7 @@ impl Attributes {
 
     /// Build the cell run, degrading an unreadable typed value.
     ///
-    /// A typed value that cannot be read (LENIENCY_AUDIT F9.8) is kept as
+    /// A typed value that cannot be read is kept as
     /// [`CellValue::Unknown`] with its declared type and raw lexical, the
     /// way LibreOffice keeps the cell and continues the import; the second
     /// element is then the [`ContentDefect::CellValueUnparseable`] context
@@ -1790,8 +1790,7 @@ impl WorksheetHandler {
 
     /// Validate the end-of-document state and build the worksheet list.
     ///
-    /// The second element lists the cell values degraded while parsing
-    /// (LENIENCY_AUDIT F9.8).
+    /// The second element lists the cell values degraded while parsing.
     pub(crate) fn finish(self) -> Result<(Vec<Sheet>, ToleranceReport)> {
         if !self.stack.is_empty()
             || self.current_sheet.is_some()

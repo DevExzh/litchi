@@ -326,7 +326,7 @@ fn source_metadata_matches_dialects_absence_and_graph_failures() {
     let wrong_source =
         source_backed::Package::from_read_at(Arc::new(OwnedSource::new(wrong_dialect))).unwrap();
     // A core-properties namespace that disagrees with its relationship type
-    // is repaired and recorded by the OPC/ooxml-common reader (leniency F8.1),
+    // is repaired and recorded by the OPC/ooxml-common reader,
     // so the read succeeds instead of failing.
     assert_eq!(
         wrong_source.metadata().unwrap().title.as_deref(),

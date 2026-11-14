@@ -54,7 +54,7 @@ fn rejects_invalid_names_and_types_and_records_invalid_colors() {
     invalid_type[DIRENTRY_SIZE + 66] = 3;
     assert!(validate(&invalid_type).is_err());
 
-    // An undefined color is a recorded default repair (leniency audit F7.7).
+    // An undefined color is a recorded default repair.
     let mut invalid_color = valid_directory(1);
     invalid_color[DIRENTRY_SIZE + 67] = 2;
     assert!(report(&invalid_color).contains(crate::DirectoryDefect::NodeColor));
@@ -74,8 +74,8 @@ fn accepts_non_black_tree_roots_and_records_invalid_ordering() {
     let root_offset = reversed_root as usize * DIRENTRY_SIZE;
     reversed[root_offset + 68..root_offset + 72].copy_from_slice(&right.to_le_bytes());
     reversed[root_offset + 72..root_offset + 76].copy_from_slice(&left.to_le_bytes());
-    // A name-ordering violation is a recorded default repair (leniency
-    // audit F7.3), not a rejection.
+    // A name-ordering violation is a recorded default repair, not a
+    // rejection.
     let report = OleFile::<Cursor<Vec<u8>>>::validate_directory(&reversed, 512).unwrap();
     assert!(report.contains(crate::DirectoryDefect::SiblingNameOrder));
 }
@@ -92,6 +92,6 @@ fn accepts_black_height_mismatch_and_records_stream_children() {
     let stream_sid = read_sid(&stream_child, 0, 76);
     let offset = stream_sid as usize * DIRENTRY_SIZE + 76;
     stream_child[offset..offset + 4].copy_from_slice(&stream_sid.to_le_bytes());
-    // A stream's child link is ignored and recorded (leniency audit F7.7).
+    // A stream's child link is ignored and recorded.
     assert!(report(&stream_child).contains(crate::DirectoryDefect::StreamChildLink));
 }

@@ -262,7 +262,7 @@ impl Default for Limits {
 impl Properties {
     /// Parse a presentation-properties part (`p:presentationPr`).
     ///
-    /// Processing instructions are skipped (audit finding 6.3); use
+    /// Processing instructions are skipped; use
     /// [`Self::parse_with_tolerance`] to have the skip recorded, or
     /// [`Self::parse_strict`] to refuse them.
     ///

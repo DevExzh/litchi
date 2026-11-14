@@ -32,8 +32,8 @@ pub struct Package {
     pub(crate) semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
     /// Every non-structural defect repaired while the package was opened, in
     /// discovery order: the OPC manifest repairs folded from
-    /// `litchi_opc` ([`crate::Defect::Package`]), the slide-list repairs of
-    /// audit finding 6.7, then the core- and custom-properties repairs folded
+    /// `litchi_opc` ([`crate::Defect::Package`]), the slide-list repairs,
+    /// then the core- and custom-properties repairs folded
     /// from `litchi_ooxml_common` ([`crate::Defect::Properties`]). Repairs a
     /// lazy slide parse performs surface at that parse's own entry point.
     /// See [`crate::leniency`].

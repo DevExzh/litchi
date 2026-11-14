@@ -697,8 +697,8 @@ impl SourceBackedWorkbook {
             ))
         })?;
         // The packaging repairs come first (they were made before the
-        // workbook part could be read), then the open-time catalog sites
-        // (findings 4.7/4.8); see `crate::leniency`.
+        // workbook part could be read), then the open-time catalog sites;
+        // see `crate::leniency`.
         let mut tolerance = ToleranceReport::default();
         tolerance.append_package(package.tolerance_report());
         let catalog_bytes = workbook.data()?;
@@ -2252,7 +2252,7 @@ impl SourceInner {
     }
 
     /// Repair stale style indexes in a freshly parsed worksheet store before
-    /// it is published to the read cache (audit finding 4.2).
+    /// it is published to the read cache.
     ///
     /// Each repair is recorded in the store's own tolerance report.
     fn repair_styles(&self, store: &mut Store) -> Result<()> {
@@ -3781,7 +3781,7 @@ mod tests {
                 None,
             );
             // An unselected dangling reference still forces the materializing
-            // fallback, which repairs B1 (audit finding 4.4) and records it.
+            // fallback, which repairs B1 and records it.
             let workbook = SourceBackedWorkbook::from_reader(Cursor::new(invalid)).unwrap();
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             assert_text(sheet.cell("A1").unwrap(), "selected");
@@ -3823,7 +3823,7 @@ mod tests {
         #[test]
         fn invalid_and_missing_dependency_refs_0364_fall_back_to_a_recorded_repair() {
             use crate::leniency::{CellDefect, Defect};
-            // Audit findings 4.4 and 4.2: an irregular dependency makes the
+            // An irregular dependency makes the
             // selected scanner fall back to the materializing parse, which
             // repairs the cell and records the repair in the sheet report.
             for (bytes, defect, style) in [
@@ -5098,7 +5098,7 @@ mod tests {
                 r#"<sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData><mergeCells count="2"><mergeCell ref="A1:B2"/><mergeCell ref="B2:C3"/></mergeCells>"#,
             );
             // A merge count disagreeing with its records is repaired and
-            // recorded (leniency finding 4.10), so it is not listed here.
+            // recorded, so it is not listed here.
             let out_of_grid = worksheet_xml(
                 r#"<sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData><mergeCells count="1"><mergeCell ref="XFE1:XFF1"/></mergeCells>"#,
             );

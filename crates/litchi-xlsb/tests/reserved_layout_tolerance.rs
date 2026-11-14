@@ -1,4 +1,4 @@
-//! Audit finding F3.11: reserved bits, strict layouts, and trailing payload
+//! Reserved bits, strict layouts, and trailing payload
 //! bytes are repaired the way Excel reads past them, and every repair is
 //! recorded. Each fixture is a conformant workbook with one deviation
 //! injected; the unmodified workbook is the control and repairs nothing.

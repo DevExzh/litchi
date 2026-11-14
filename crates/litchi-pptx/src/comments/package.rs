@@ -18,8 +18,8 @@ use std::collections::{HashMap, HashSet};
 
 /// Load the presentation's legacy comment graph.
 ///
-/// The read applies the `PowerPoint`-compatible comment repairs of audit
-/// finding 6.12 ([`CommentDefect`]): a comment with `idx="0"` or one
+/// The read applies the `PowerPoint`-compatible comment repairs
+/// ([`CommentDefect`]): a comment with `idx="0"` or one
 /// repeating an earlier `(authorId, idx)` key is kept instead of failing the
 /// whole graph. [`load_presentation_comments_with_tolerance`] reports what
 /// was repaired; the edit functions of this module load through
@@ -64,7 +64,7 @@ pub(crate) fn load_presentation_comments_with_tolerance_and_limits(
 
 /// Load the legacy comment graph without any repair: a comment index of `0`
 /// or a repeated `(authorId, idx)` key — within a slide or across the
-/// presentation — is an error, as before audit finding 6.12. Every comment
+/// presentation — is an error. Every comment
 /// edit function of this module loads through this contract.
 ///
 /// # Errors

@@ -556,7 +556,7 @@ fn inventory_enforces_explicit_section_limit_at_the_boundary() {
     ));
 }
 
-/// Leniency F2.7: a column model Word lays out despite schema deviations is
+/// A column model Word lays out despite schema deviations is
 /// repaired per section and recorded with offsets into the section XML.
 #[test]
 fn column_model_deviations_are_repaired_and_recorded() {

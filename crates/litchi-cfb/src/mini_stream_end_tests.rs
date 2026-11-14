@@ -684,7 +684,7 @@ fn a_real_producer_stream_ending_in_the_partial_mini_sector_reads() {
     assert_eq!(original.len(), 51_712);
     // The producer also writes FREESECT into its storages' start sector
     // fields. Storages own no allocation, so the reader ignores and records
-    // them (leniency audit F7.7) and the unmodified file opens. Normalizing
+    // them and the unmodified file opens. Normalizing
     // those fields to ENDOFCHAIN, and nothing else, gives the conformant
     // file the checks below examine.
     let unmodified =

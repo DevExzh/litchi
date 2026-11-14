@@ -56,7 +56,7 @@ fn lazy_slide_access_leaves_the_open_report_clean() {
 }
 
 // ---------------------------------------------------------------------------
-// Audit finding 6.1: stale timing targets and duplicate shape IDs.
+// Stale timing targets and duplicate shape IDs.
 // ---------------------------------------------------------------------------
 
 use litchi_opc::PackURI;
@@ -355,7 +355,7 @@ fn structural_timing_corruption_stays_fatal() {
 }
 
 // ---------------------------------------------------------------------------
-// Audit finding 6.2: one malformed transform degrades only its own shape.
+// One malformed transform degrades only its own shape.
 // ---------------------------------------------------------------------------
 
 use litchi_pptx::ShapeDefect;
@@ -453,7 +453,7 @@ fn ill_formed_shape_xml_stays_fatal() {
 }
 
 // ---------------------------------------------------------------------------
-// Audit finding 6.4: placeholder `p:ext` owner hygiene.
+// Placeholder `p:ext` owner hygiene.
 // ---------------------------------------------------------------------------
 
 const SLIDE2: &str = "/ppt/slides/slide2.xml";
@@ -542,7 +542,7 @@ fn conformant_placeholder_extensions_report_nothing() {
 }
 
 // ---------------------------------------------------------------------------
-// Audit findings 6.5/6.6: transition attribute domains.
+// Transition attribute domains.
 // ---------------------------------------------------------------------------
 
 use litchi_pptx::TransitionDefect;
@@ -640,7 +640,7 @@ fn out_of_domain_transition_tokens_and_times_are_repaired_and_recorded() {
 }
 
 // ---------------------------------------------------------------------------
-// Audit finding 6.7: presentation slide-list uniqueness and child hygiene.
+// Presentation slide-list uniqueness and child hygiene.
 // ---------------------------------------------------------------------------
 
 use litchi_pptx::PresentationDefect;
@@ -736,7 +736,7 @@ fn conformant_slide_list_records_nothing_and_invalid_entries_stay_fatal() {
 }
 
 // ---------------------------------------------------------------------------
-// Audit finding 6.3: processing instructions are skipped, recorded once.
+// Processing instructions are skipped, recorded once.
 // ---------------------------------------------------------------------------
 
 use litchi_pptx::MarkupDefect;
@@ -794,7 +794,7 @@ fn processing_instructions_are_skipped_and_recorded_once_per_part() {
 }
 
 // ---------------------------------------------------------------------------
-// Audit finding 6.8: unparseable shape ID / placeholder index.
+// Unparseable shape ID / placeholder index.
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -945,14 +945,14 @@ fn core_properties_repairs_are_folded_into_the_open_report() {
 fn ill_formed_package_manifests_stay_fatal() {
     let deck = shapes_with_member("ppt/_rels/presentation.xml.rels", |xml| {
         // An unclosed root element is ill-formed XML under every reader;
-        // unknown-but-well-formed elements are skipped since F8.11.
+        // unknown-but-well-formed elements are skipped.
         xml.replacen("</Relationships>", "", 1)
     });
     assert!(Package::from_reader(std::io::Cursor::new(deck)).is_err());
 }
 
 // ---------------------------------------------------------------------------
-// Audit finding 6.12: legacy comment index 0 and duplicate (authorId, idx).
+// Legacy comment index 0 and duplicate (authorId, idx).
 // ---------------------------------------------------------------------------
 
 use litchi_pptx::CommentDefect;
@@ -1125,7 +1125,7 @@ fn conformant_comments_record_nothing_and_malformed_comments_stay_fatal() {
 }
 
 // ---------------------------------------------------------------------------
-// Audit finding 6.9: foreign `t` elements and character data outside `a:t`.
+// Foreign `t` elements and character data outside `a:t`.
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -1192,7 +1192,7 @@ fn foreign_text_elements_are_skipped_and_recorded_by_text_extraction() {
 }
 
 // ---------------------------------------------------------------------------
-// Audit finding 6.10: chart-info barDir, duplicates, missing structure.
+// Chart-info barDir, duplicates, missing structure.
 // ---------------------------------------------------------------------------
 
 use litchi_pptx::ChartDefect;
@@ -1273,7 +1273,7 @@ fn chart_info_repairs_are_applied_and_recorded() {
 }
 
 // ---------------------------------------------------------------------------
-// Audit finding 6.11: view-properties allow-lists and child order.
+// View-properties allow-lists and child order.
 // ---------------------------------------------------------------------------
 
 use litchi_pptx::ViewDefect;
@@ -1355,7 +1355,7 @@ fn view_properties_ignore_unknown_markup_and_accept_any_order() {
 }
 
 // ---------------------------------------------------------------------------
-// Audit finding 6.3 remainder: feature readers with a report carrier.
+// Feature readers with a report carrier.
 // ---------------------------------------------------------------------------
 
 const PI: &str = "<?publisher stage=\"2\"?>";

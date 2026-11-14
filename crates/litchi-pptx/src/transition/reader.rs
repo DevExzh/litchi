@@ -321,7 +321,7 @@ pub fn read(xml: &[u8], limits: Limits) -> Result<Option<Transition>> {
                 ));
             },
             // A processing instruction carries no effect content; it is
-            // skipped (audit finding 6.3) and recorded by the owner part's
+            // skipped and recorded by the owner part's
             // shape scene.
             Event::Comment(_) | Event::CData(_) | Event::GeneralRef(_)
                 if capture
@@ -474,7 +474,7 @@ fn classify_child(
         Ok(kind) => kind,
         // A known effect whose attribute value lies outside its domain is
         // kept verbatim as a raw effect, like an effect element this reader
-        // does not know (audit findings 6.5 and 6.6). Every `Invalid` the
+        // does not know. Every `Invalid` the
         // effect parsers raise is such a value-domain failure; XML and
         // resource-limit errors pass through.
         Err(Error::Invalid(_)) => {
@@ -743,7 +743,7 @@ fn parse_speed(value: &str) -> Result<Speed> {
 }
 
 /// Treat a `p:transition` attribute whose value lies outside its domain as
-/// absent and record the repair (audit finding 6.6); other errors pass
+/// absent and record the repair; other errors pass
 /// through.
 fn tolerate<T>(parsed: Result<T>, repairs: &mut ToleranceReport) -> Result<Option<T>> {
     match parsed {

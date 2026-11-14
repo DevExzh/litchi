@@ -105,8 +105,7 @@ impl SlideDirectory {
     }
 
     /// Build the directory from a "Current User" stream, repairing
-    /// non-structural slide-list defects into `report` (findings F5.4 and
-    /// F5.5; see [`SlideListDefect`]).
+    /// non-structural slide-list defects into `report` (see [`SlideListDefect`]).
     #[cfg(test)]
     pub(crate) fn build_with_limits(
         document_data: &[u8],
@@ -156,8 +155,7 @@ impl SlideDirectory {
         }
         // MS-PPT 2.3.3 requires 28 or 32 bytes; POI pads short reads and
         // LibreOffice never inspects recLen. Every field read here lies in
-        // the first 28 bytes, so accept any longer atom and record it
-        // (finding F5.12).
+        // the first 28 bytes, so accept any longer atom and record it.
         if user_edit.data_len < 28 {
             return Err(Error::Corrupted(format!(
                 "UserEditAtom has invalid length {}",
@@ -208,7 +206,7 @@ impl SlideDirectory {
         // MS-PPT 2.4.14.3 defines one presentation slide list. POI returns
         // the first instance-0 list and dispatches on the record type alone,
         // so a later duplicate is ignored and a nonconforming version nibble
-        // is read anyway; both are recorded (finding F5.10).
+        // is read anyway; both are recorded.
         let mut slide_list = None;
         let mut presentation_lists = 0u32;
         for child in document.extract_slide_list_with_texts() {
@@ -281,7 +279,7 @@ impl SlideDirectory {
                 // Slide-list text is isolated per slide: a content-level
                 // failure leaves this slide's outline interactions and
                 // references empty, as LibreOffice ignores slide-list text it
-                // cannot map; limits stay fatal (finding F5.10). The text
+                // cannot map; limits stay fatal. The text
                 // bodies the slide's shapes reference are isolated the same
                 // way, after the interactions and references, so a body that
                 // cannot be framed never drops them.
@@ -387,7 +385,7 @@ impl SlideDirectory {
 ///
 /// The "Current User" stream's `offsetToCurrentEdit` names it. When the
 /// stream is missing, or the offset is zero or does not land on a
-/// well-formed `UserEditAtom` (finding F5.6), the document stream's
+/// well-formed `UserEditAtom`, the document stream's
 /// top-level records are scanned and the last well-formed `UserEditAtom`
 /// wins — LibreOffice's recovery (`svdfppt.cxx`) — and the recovery is
 /// recorded as a [`PersistDefect`]. A Current User stream that declares
@@ -446,7 +444,7 @@ pub(crate) fn locate_head_user_edit(
 }
 
 /// Whether `offset` (nonzero) holds a `UserEditAtom` header — version 0,
-/// instance 0, a payload of at least 28 bytes (finding F5.12) — that fits
+/// instance 0, a payload of at least 28 bytes — that fits
 /// in the stream.
 fn is_live_user_edit(document_data: &[u8], offset: u32) -> bool {
     offset != 0
@@ -542,7 +540,7 @@ fn append_list_text(list_text: &mut String, record: &Record) {
 /// Decode one presentation `SlidePersistAtom` into a directory entry,
 /// repairing non-structural defects into `report`.
 ///
-/// Returns `Ok(None)` for an entry that is dropped (findings F5.4 and F5.5);
+/// Returns `Ok(None)` for an entry that is dropped;
 /// a slide record whose own framing overruns the document stream stays an
 /// error.
 fn directory_entry(
@@ -618,7 +616,7 @@ fn directory_entry(
 ///
 /// A persist ID the live directory does not map, an offset whose record
 /// header lies outside the stream, or a header of another record type is a
-/// stale reference LibreOffice skips (finding F5.5). A `SlideContainer`
+/// stale reference LibreOffice skips. A `SlideContainer`
 /// header whose length overruns the stream is broken framing and stays an
 /// error.
 fn resolves_to_slide(
@@ -827,7 +825,7 @@ mod tests {
     }
 
     /// One bad slide-list entry is dropped (or repaired) and recorded; the
-    /// rest of the directory still builds (F5.4).
+    /// rest of the directory still builds.
     #[test]
     fn repairs_duplicate_and_malformed_entries_per_entry() {
         use crate::Defect;
@@ -891,7 +889,7 @@ mod tests {
     }
 
     /// A nonconforming SlidePersistAtom header is read by field offset when
-    /// the fields are present and dropped when they are not (F5.4).
+    /// the fields are present and dropped when they are not.
     #[test]
     fn reads_nonconforming_slide_persist_atoms_by_offset() {
         use crate::Defect;
@@ -950,7 +948,7 @@ mod tests {
 
     /// A slide reference the live persist directory does not map, that maps
     /// outside the stream, or that maps to another record is skipped and
-    /// recorded, as LibreOffice skips it (F5.5).
+    /// recorded, as LibreOffice skips it.
     #[test]
     fn skips_stale_slide_references() {
         use crate::Defect;
@@ -1019,7 +1017,7 @@ mod tests {
     }
 
     /// A usable Current User edit offset is taken as is; a missing stream or
-    /// an unusable offset recovers the last top-level UserEditAtom (F5.6).
+    /// an unusable offset recovers the last top-level UserEditAtom.
     #[test]
     fn recovers_the_live_user_edit_by_stream_scan() {
         use crate::Defect;
@@ -1061,7 +1059,7 @@ mod tests {
         assert_eq!(locate(&longer, None).0.unwrap(), later);
     }
 
-    /// The head UserEditAtom may be longer than 28 bytes (recorded, F5.12)
+    /// The head UserEditAtom may be longer than 28 bytes (recorded)
     /// but never shorter.
     #[test]
     fn accepts_long_head_user_edits_and_rejects_short_ones() {

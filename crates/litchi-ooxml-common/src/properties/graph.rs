@@ -19,8 +19,9 @@ pub(super) fn inspect(package: &OpcPackage) -> Result<Graph> {
     inspect_parts(|| Ok(package.iter_parts()), package.rels(), || Ok(()), None)
 }
 
-/// Inspect the graph for a read, repairing and recording the anomalies of
-/// LENIENCY_AUDIT 8.2 into `report`.
+/// Inspect the graph for a read, repairing and recording its anomalies
+/// (an orphaned part, a dangling relationship, duplicate typed parts) into
+/// `report`.
 pub(super) fn inspect_tolerant(
     package: &OpcPackage,
     report: &mut ToleranceReport,
@@ -145,7 +146,7 @@ impl GraphPart for litchi_opc::PreparedPartView {
 /// Locate the relationship-selected core-properties part.
 ///
 /// With a `report`, the graph anomalies Word, LibreOffice and POI read past
-/// (LENIENCY_AUDIT 8.2) are repaired and recorded instead of failing: a
+/// are repaired and recorded instead of failing: a
 /// core-properties relationship owned by a part is ignored, a second
 /// core-typed part is dead weight beside the relationship-selected one, an
 /// orphaned part means no core properties, and a dangling relationship means

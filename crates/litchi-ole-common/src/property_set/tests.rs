@@ -125,8 +125,8 @@ fn rejects_duplicate_offsets_and_drops_truncated_values() {
     duplicate[68..72].copy_from_slice(&24u32.to_le_bytes());
     assert!(Stream::parse(&duplicate).is_err());
 
-    // A value overrunning its property range is dropped and recorded
-    // (leniency audit F7.11); the rest of the section stays readable.
+    // A value overrunning its property range is dropped and recorded;
+    // the rest of the section stays readable.
     let mut truncated = summary_property_stream();
     truncated[84..88].copy_from_slice(&u32::MAX.to_le_bytes());
     let stream = Stream::parse(&truncated).unwrap();

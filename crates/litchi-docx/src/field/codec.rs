@@ -1366,7 +1366,7 @@ impl PendingSimpleField {
         // `CT_SimpleField@instr` is required, but LibreOffice starts the
         // field with whatever instruction it has (none) and keeps its result,
         // and Word keeps the rest of the document's fields. Keep the field
-        // with an empty instruction and record it (LENIENCY_AUDIT 2.11).
+        // with an empty instruction and record it.
         let instruction = instruction.unwrap_or_else(|| {
             tolerance.record(crate::leniency::FieldDefect::MissingInstruction, offset);
             String::new()

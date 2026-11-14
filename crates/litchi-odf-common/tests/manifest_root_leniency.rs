@@ -1,4 +1,4 @@
-//! LENIENCY_AUDIT F9.2: a manifest without a `/` root entry, or whose root
+//! A manifest without a `/` root entry, or whose root
 //! entry declares an empty media type, falls back to the `mimetype` member
 //! the way LibreOffice does. Every package owner opens it by default and
 //! records the fallback; a conforming manifest records nothing, and a

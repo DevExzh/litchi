@@ -16,8 +16,7 @@
 //! documented on the corresponding defect variant ([`TimingDefect`],
 //! [`ShapeDefect`]). Every `PresentationML` repair implemented so far is in
 //! this class; the first members are the timing-tree cross-reference repairs
-//! of audit finding 6.1 (orphaned animation/build targets and duplicated
-//! shape IDs).
+//! (orphaned animation/build targets and duplicated shape IDs).
 //!
 //! **Opt-in repairs** trade strict conformance for reach and stay gated by
 //! [`Leniency`] variants. No `PresentationML` repair currently needs that
@@ -36,17 +35,17 @@
 //!   [`crate::SourceBackedPresentation`], carry the report assembled while
 //!   the package was opened and expose it as `tolerance_report()`. Opening
 //!   reads the presentation slide list, so its [`PresentationDefect`]
-//!   repairs (audit finding 6.7) are recorded here, stamped with the
+//!   repairs are recorded here, stamped with the
 //!   presentation part name. For [`crate::Package`] the open-time catalog
 //!   read is advisory: a slide list it cannot read stays the lazy
 //!   accessors' error, exactly as before.
 //! * The packaging and metadata reports of the lower layers are folded in
 //!   rather than kept alongside. The OPC report (`litchi_opc`'s
-//!   relationship and content-type repairs, audit findings 8.5–8.9) leads
+//!   relationship and content-type repairs) leads
 //!   both open-time reports as [`Defect::Package`]. [`crate::Package`] also
 //!   reads the core and custom properties at open — advisorily, a part they
 //!   reject stays its accessor's error — and appends their repairs
-//!   (`litchi_ooxml_common`, findings 8.1–8.4) as [`Defect::Properties`],
+//!   (`litchi_ooxml_common`) as [`Defect::Properties`],
 //!   followed by the presentation-properties (`presProps.xml`) repairs that
 //!   back the lazy [`crate::Package::math_properties`] read.
 //!   [`crate::SourceBackedPresentation`] reads only the presentation root at
@@ -60,7 +59,7 @@
 //!   after the fact. [`crate::Slide::animations`] (and the free
 //!   [`crate::animations::parse_package_slide`]) returns a
 //!   [`crate::animations::Sequence`] whose `tolerance_report()` lists every
-//!   finding-6.1 repair, each stamped with the slide's part name
+//!   timing-tree repair, each stamped with the slide's part name
 //!   ([`ToleratedDefect::part`]) and the shape ID concerned
 //!   ([`ToleratedDefect::context`]). The parse entry points have
 //!   `*_with_tolerance` companions taking `&mut ToleranceReport` (explicit
@@ -78,7 +77,7 @@
 //!   stamps its slide part name. The report shares the value's retained
 //!   read-state allocation, so a conforming transition stays one cache line.
 //!
-//! # Timing-tree repairs (audit finding 6.1)
+//! # Timing-tree repairs
 //!
 //! [`crate::animations::Sequence::parse_slide_xml`] — the read default
 //! behind every package-aware entry point — no longer fails the whole slide
@@ -106,7 +105,7 @@
 //! [`crate::animations::Sequence::parse_slide_xml_strict`], which rejects
 //! any slide whose parse needed a repair.
 //!
-//! # Shape-scene repairs (audit finding 6.2)
+//! # Shape-scene repairs
 //!
 //! [`crate::shape::Scene::read`] — behind `shapes()` on slides, layouts, and
 //! masters — no longer fails every shape on the owner over one malformed
@@ -123,7 +122,7 @@
 //! placement. XML well-formedness, the scene's structural grammar, and its
 //! size/depth/count limits stay hard errors.
 //!
-//! # Placeholder extension repairs (audit finding 6.4)
+//! # Placeholder extension repairs
 //!
 //! A placeholder's `p:extLst` no longer fails the scene over extension
 //! arity. `CT_Extension` is `xsd:any processContents="lax"` with any number
@@ -140,7 +139,7 @@
 //! placeholder, shape, and scene survive. The lossless placeholder-type
 //! *edit* planner in `master_layout` keeps its strict owner validation.
 //!
-//! # Transition repairs (audit finding 6.5)
+//! # Transition repairs
 //!
 //! A wheel (`p:wheel`) or reverse wheel (`p14:wheelReverse`) whose `spokes`
 //! is an `xsd:unsignedInt` outside {1, 2, 3, 4, 8} no longer fails the
@@ -156,7 +155,7 @@
 //! edit planner still refuses to splice over a transition whose read needed
 //! a repair.
 //!
-//! # Transition token domains (audit finding 6.6)
+//! # Transition token domains
 //!
 //! An attribute value outside its domain no longer fails the whole
 //! transition. On a known effect element (`dir`, `orient`, `pattern`, morph
@@ -174,7 +173,7 @@
 //! original value. Duplicate attributes, nested markup inside typed
 //! effects, XML well-formedness, and the read limits stay hard errors.
 //!
-//! # Slide-list repairs (audit finding 6.7)
+//! # Slide-list repairs
 //!
 //! [`crate::parts::PresentationPart::slide_references`] — behind
 //! [`crate::Presentation::slides`] and the source-backed catalog — keeps the
@@ -193,7 +192,7 @@
 //! the opened-presentation transactions — keep the strict contract and
 //! refuse a slide list that needed a repair.
 //!
-//! # Processing instructions (audit finding 6.3)
+//! # Processing instructions
 //!
 //! The slide-owner read surfaces skip processing instructions instead of
 //! failing the part: the shape scene, semantic slide text, the timing
@@ -269,7 +268,7 @@
 //! (`presentation/embedded/*`). Each needs a report on its returned value
 //! (or a `*_with_tolerance` companion) before it can skip them.
 //!
-//! # Semantic slide text (audit finding 6.9)
+//! # Semantic slide text
 //!
 //! Slide text extraction ([`crate::Slide::text`], the source-backed slide
 //! text, and the presentation text sink) no longer fails over markup that
@@ -286,7 +285,7 @@
 //! unbalanced DrawingML `a:t`, and the size/depth/count limits stay hard
 //! errors.
 //!
-//! # Chart inspection (audit finding 6.10)
+//! # Chart inspection
 //!
 //! [`crate::chart::Part::chart_info`] no longer fails the inspection over
 //! chart structure LibreOffice reads past. A missing or unknown `c:barDir`
@@ -299,7 +298,7 @@
 //! part. XML well-formedness, a missing or foreign `c:chartSpace` root, and
 //! nested title text stay hard errors.
 //!
-//! # View properties (audit finding 6.11)
+//! # View properties
 //!
 //! [`crate::view_properties::ViewProperties::parse`] and
 //! [`crate::view_properties::load_from_package`] no longer fail
@@ -317,7 +316,7 @@
 //! [`crate::view_properties::ViewProperties::parse_strict`] keeps the old
 //! contract and backs the slide-order edit planner's metadata inspection.
 //!
-//! # Shape metadata (audit finding 6.8)
+//! # Shape metadata
 //!
 //! A `p:cNvPr@id` that is not an `unsignedInt` leaves the shape without an
 //! ID ([`ShapeDefect::InvalidShapeId`]), and an unparseable `p:ph@idx`
@@ -325,7 +324,7 @@
 //! ([`ShapeDefect::InvalidPlaceholderIndex`]); the scene, the shape, and its
 //! siblings are kept.
 //!
-//! # Legacy comments (audit finding 6.12)
+//! # Legacy comments
 //!
 //! [`crate::comments::load_presentation_comments`] and
 //! [`crate::comments::parse_slide_comments`] no longer fail the comment
@@ -370,7 +369,7 @@ pub enum Leniency {
     /// Reject every defect whose repair requires opting in.
     ///
     /// This is the default and currently the only variant: every
-    /// `PresentationML` repair on the leniency roadmap is
+    /// `PresentationML` repair is
     /// `PowerPoint`-compatible, so the [`TimingDefect`] repairs are applied
     /// and recorded here too, and no opt-in gate exists yet.
     #[default]
@@ -386,7 +385,7 @@ pub enum Leniency {
 /// do with markup ECMA-376 does not constrain, so applying it never changes
 /// what a conforming presentation means.
 ///
-/// The variants are the recording contract of leniency-audit finding 6.1: the
+/// The variants are the recording contract of the timing-tree repairs: the
 /// slide timing parser records them, and the repairs above are applied.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -730,7 +729,7 @@ impl MarkupDefect {
     }
 }
 
-/// The class of legacy slide-comment defect (`p:cmLst`, audit finding 6.12)
+/// The class of legacy slide-comment defect (`p:cmLst`)
 /// the comment reader repairs.
 ///
 /// Closed by design, and repaired under every [`Leniency`] variant. Each
@@ -773,7 +772,7 @@ impl CommentDefect {
 }
 
 /// The class of chart-part defect the chart inspection
-/// ([`crate::chart::Part::chart_info`], audit finding 6.10) repairs.
+/// ([`crate::chart::Part::chart_info`]) repairs.
 ///
 /// Closed by design, and repaired under every [`Leniency`] variant. The
 /// context is `0`; the part is the chart part.
@@ -815,8 +814,7 @@ impl ChartDefect {
     }
 }
 
-/// The class of view-properties defect (`viewProps.xml`, audit finding
-/// 6.11) the reader repairs.
+/// The class of view-properties defect (`viewProps.xml`) the reader repairs.
 ///
 /// Closed by design, and repaired under every [`Leniency`] variant.
 /// `viewProps.xml` is non-authoring metadata (window panes, zoom, guides),

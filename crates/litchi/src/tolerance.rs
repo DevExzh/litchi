@@ -2,7 +2,7 @@
 //!
 //! Every format crate applies reference-compatible repairs to non-structural
 //! deviations and *records* each one in its own bounded `ToleranceReport`
-//! (see `docs/LENIENCY_AUDIT.md`, "The tolerance contract").
+//! (see "The tolerance contract" on [`ToleranceReport`]).
 //! [`File::tolerance_report`](crate::File::tolerance_report) returns the
 //! report the opened file's format handle keeps, wrapped in
 //! [`ToleranceReport`], so one call works for every format while the

@@ -362,8 +362,8 @@ pub(super) fn decrypt_powerpoint_document(
     if !matches!(user_edit.data_len, 28 | 32) {
         // A nonconforming length is never accepted for an encrypted
         // presentation. An unencrypted one is left to the plaintext read
-        // path, which accepts any length of at least 28 bytes (finding
-        // F5.12) — unless the atom names an encryption session.
+        // path, which accepts any length of at least 28 bytes — unless the atom
+        // names an encryption session.
         if current_user.is_encrypted() || user_edit.data_len < 28 {
             return Err(Error::MalformedEncryptionHeader(format!(
                 "UserEditAtom has invalid length {}",

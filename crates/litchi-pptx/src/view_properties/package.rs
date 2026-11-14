@@ -22,8 +22,8 @@ pub fn load_from_package(package: &OpcPackage, limits: Limits) -> Result<Option<
     load_from_package_with_tolerance(package, &mut ToleranceReport::default(), limits)
 }
 
-/// [`load_from_package`], appending each view-properties repair (audit
-/// finding 6.11) to `tolerance`, stamped with the view-properties part name.
+/// [`load_from_package`], appending each view-properties repair to `tolerance`,
+/// stamped with the view-properties part name.
 ///
 /// # Errors
 ///

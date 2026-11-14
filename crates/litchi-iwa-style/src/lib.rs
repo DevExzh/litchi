@@ -1,5 +1,4 @@
-//! Shared drawing-style and media engines of the iWork owners (ADR 0024
-//! 2026-10-26 amendment).
+//! Shared drawing-style and media engines of the iWork owners (ADR 0024).
 //!
 //! The Pages, Numbers and Keynote packages consume this crate privately; no
 //! facade re-exports it (ADR 0028's rule for focused low-level crates). It

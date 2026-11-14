@@ -203,7 +203,7 @@ fn slide_reference_owner_skips_case_equivalent_target_parts_first_wins() {
         .presentation()
         .expect("presentation root should remain valid");
     // The second entry resolves to the first slide's part: it is skipped
-    // (leniency audit finding 6.7) and the repair is recorded at open.
+    // and the repair is recorded at open.
     let references = presentation.slide_references().unwrap();
     assert_eq!(references.len(), 1);
     assert_ne!(references[0].id(), second.id());

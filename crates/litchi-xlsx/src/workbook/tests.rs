@@ -799,7 +799,7 @@ fn styles_graph_table_and_cell_references_are_checked() {
         .set_blob(
             br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" s="1"/></row></sheetData></worksheet>"#.to_vec(),
         );
-    // Audit finding 4.2: a stale style index no longer kills the sheet. It
+    // A stale style index no longer kills the sheet. It
     // reads with the default format (cellXfs 0) and the repair is recorded.
     let dangling = Package::from_opc(dangling).expect("lazy worksheet");
     let sheet = dangling.sheet(0usize).expect("lookup").expect("sheet");
@@ -1171,7 +1171,7 @@ fn validated_worksheet_store_adoption_requires_exact_bytes_and_lineage() {
     assert!(distinct_lineage.inner.sheets[0].cells.get().is_none());
 }
 
-/// Audit finding 4.4 through the owned facade: a dangling shared-string
+/// Through the owned facade, a dangling shared-string
 /// reference opens by default, reads empty, and is recorded; the conformant
 /// control reports clean; malformed worksheet XML is still fatal.
 #[test]

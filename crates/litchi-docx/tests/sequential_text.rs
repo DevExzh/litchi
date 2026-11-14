@@ -873,7 +873,7 @@ fn truncated_documents_refuse_at_end_of_input_with_unchanged_message_and_progres
     }
 }
 
-/// Finding 2.1: an OMML equation inside a paragraph must not kill the
+/// An OMML equation inside a paragraph must not kill the
 /// semantic text sink. The `m:t` subtree is skipped as opaque — its text is
 /// absent from the output, not garbled into it — and the skip is recorded
 /// with the byte offset of the `m:t` start tag in both facades' reports.
@@ -951,7 +951,7 @@ fn conformant_extraction_leaves_both_reports_clean() {
     assert!(source_package.tolerance_report().is_clean());
 }
 
-/// Finding 2.1, realistic shape: a display equation (`m:oMathPara`) whose
+/// Realistic shape: a display equation (`m:oMathPara`) whose
 /// `m:t` text carries entity references and CDATA, OMML run properties that
 /// embed WordprocessingML `w:rPr`, and an inline DrawingML `a:t`. Every
 /// foreign `*:t` subtree is opaque — none of its text leaks into the output —

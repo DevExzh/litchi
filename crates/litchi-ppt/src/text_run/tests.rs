@@ -268,7 +268,7 @@ fn recorded(report: &crate::leniency::ToleranceReport) -> Vec<(crate::Defect, u3
 }
 
 /// Undefined paragraph enumeration values degrade to unset (or the default
-/// tab type) and out-of-range indent levels clamp, each recorded (F5.3).
+/// tab type) and out-of-range indent levels clamp, each recorded.
 #[test]
 fn repairs_invalid_paragraph_enumerations() {
     use crate::{Defect, TextPropDefect};
@@ -431,7 +431,7 @@ fn repairs_invalid_text_cf_color_and_rejects_invalid_baseline_values() {
     let mut color = super::super::text_prop::TextProp::new("font.color", 4, 0x40000);
     color.value = 0x0800_0000;
     invalid_color.properties.push(color);
-    // An undefined ColorIndexStruct index degrades to an unset color (F5.3).
+    // An undefined ColorIndexStruct index degrades to an unset color.
     let mut report = crate::leniency::ToleranceReport::default();
     let formatting = formatting_from_style(&invalid_color, &mut report).unwrap();
     assert_eq!(formatting.font_color, None);

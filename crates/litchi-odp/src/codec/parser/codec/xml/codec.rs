@@ -53,7 +53,7 @@ impl Parser {
                     if ns_class != NsClass::Animation
                         || Kind::from_local_name(child.local_name().as_ref()).is_none() =>
                 {
-                    // LENIENCY_AUDIT F9.10: LibreOffice's AnimationNodeContext
+                    // LibreOffice's AnimationNodeContext
                     // creates no node for an element it cannot map and
                     // skips its subtree; the enclosing node is kept.
                     record_unknown_animation(
@@ -890,7 +890,7 @@ impl Parser {
     }
 
     /// [`Self::parse_slides_with_styles`], also returning the content
-    /// repairs the slide scan applied (LENIENCY_AUDIT F9.10).
+    /// repairs the slide scan applied.
     pub(crate) fn parse_slides_with_report(
         xml_content: &str,
         styles_xml: Option<&str>,
@@ -1321,7 +1321,7 @@ impl Parser {
                         },
                         _ if in_notes => {},
                         Element::UnknownAnimation if in_slide => {
-                            // LENIENCY_AUDIT F9.10: skip the unmappable
+                            // Skip the unmappable
                             // animation subtree and keep the slide, as
                             // LibreOffice's Impress import does.
                             record_unknown_animation(tolerance, false, slide_index);
@@ -3252,7 +3252,7 @@ fn sink_push_reference(
     sink_push_decoded_text(paragraph, value, value.len())
 }
 
-/// Record one skipped animation element (LENIENCY_AUDIT F9.10): context 0
+/// Record one skipped animation element: context 0
 /// for an unknown animation-namespace element, 1 for a foreign-namespace
 /// element inside an animation node, located at its slide.
 fn record_unknown_animation(tolerance: &mut ToleranceReport, foreign: bool, slide_index: usize) {

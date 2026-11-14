@@ -302,7 +302,7 @@ impl SpeakerNotes {
     /// non-structural defect repaired while they were parsed to `report`.
     ///
     /// Records the [`crate::TextPropDefect`] classes repaired while shape
-    /// text is parsed (F5.1/F5.2), each located by this notes page's persist
+    /// text is parsed, each located by this notes page's persist
     /// ID and the text box's shape ID. The shapes and their repairs are
     /// parsed once and cached together, so every call appends the same
     /// entries.

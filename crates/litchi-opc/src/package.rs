@@ -1500,7 +1500,7 @@ impl OpcPackage {
     /// declared for `partname`.
     ///
     /// Source content types are admitted verbatim at ingress even when they
-    /// break the MIME grammar (LENIENCY_AUDIT 8.12, recorded in the tolerance
+    /// break the MIME grammar (recorded in the tolerance
     /// report), so a regenerated manifest may carry such a value forward
     /// unchanged; content types the caller authors keep the grammar check.
     pub(crate) fn content_type_is_from_source(

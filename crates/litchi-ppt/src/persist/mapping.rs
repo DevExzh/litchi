@@ -28,7 +28,7 @@ impl PersistMapping {
     ///
     /// Each holder is parsed per entry
     /// ([`PersistPtrHolder::parse_with_report`]): a zero-count entry or a
-    /// duplicated persist ID no longer voids the holder (finding F5.7). The
+    /// duplicated persist ID no longer voids the holder. The
     /// repairs are not enumerable through this method; use
     /// [`Self::build_from_records_with_report`] to enumerate them.
     ///

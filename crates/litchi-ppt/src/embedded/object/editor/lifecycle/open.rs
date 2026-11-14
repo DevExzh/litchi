@@ -49,8 +49,8 @@ pub(crate) fn inspect_live_mapping(
 }
 
 /// Read the live persist mapping, repairing persist-directory defects into
-/// `report` (finding F5.7) and, when `leniency` opts in, breaking a cyclic
-/// `UserEdit` chain (finding F5.9).
+/// `report` and, when `leniency` opts in, breaking a cyclic
+/// `UserEdit` chain.
 pub(crate) fn inspect_live_mapping_at(
     document: &[u8],
     current_edit_offset: u32,

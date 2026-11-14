@@ -19,20 +19,19 @@
 //! **Opt-in repairs** trade strict conformance for reach and stay gated by
 //! [`Leniency`] variants, selected through
 //! [`crate::OpenOptions::leniency`]. The one opt-in class today is breaking
-//! a cyclic `UserEdit` chain ([`UserEditChainDefect`], finding F5.9 in
-//! `docs/LENIENCY_AUDIT.md`) under
+//! a cyclic `UserEdit` chain ([`UserEditChainDefect`]) under
 //! [`Leniency::TolerateUserEditChainDefects`].
 //!
 //! This mirrors the contract `crates/litchi-doc/src/leniency.rs` and
 //! `crates/litchi-xls/src/leniency.rs` provide for the other legacy readers
 //! so all three behave the same way.
 //!
-//! # Roadmap state
+//! # Recorded repairs
 //!
-//! The following findings from `docs/LENIENCY_AUDIT.md` record into this
-//! report today, all `PowerPoint`-compatible (default) repairs:
+//! The following classes record into this report, all
+//! `PowerPoint`-compatible (default) repairs unless marked opt-in:
 //!
-//! - **F5.1** ([`TextPropDefect::StyleTextPropCoverage`]) — the read path
+//! - [`TextPropDefect::StyleTextPropCoverage`] — the read path
 //!   parses `StyleTextPropAtom` with the clamping POI/LibreOffice posture
 //!   (coverage clamped to the text length + 1, parsing stopped at the first
 //!   unreadable run, trailing bytes dropped) and records each clamp. The
@@ -41,21 +40,21 @@
 //!   strict [`crate::StyleTextPropAtom`] codec stay in use by the writer and
 //!   the text-edit/reparse-verification path, which must not rewrite bytes
 //!   it cannot frame exactly.
-//! - **F5.2** ([`TextPropDefect::ReservedBulletFlagBits`],
-//!   [`TextPropDefect::ReservedWrapFlagBits`]) — reserved
+//! - [`TextPropDefect::ReservedBulletFlagBits`],
+//!   [`TextPropDefect::ReservedWrapFlagBits`] — reserved
 //!   `BulletFlags`/`PFWrapFlags` bits are masked to the defined set instead
 //!   of rejecting the paragraph; the defined bits are still applied.
-//! - **F5.3** ([`TextPropDefect::UnknownTextAlignment`],
+//! - [`TextPropDefect::UnknownTextAlignment`],
 //!   [`TextPropDefect::UnknownFontAlignment`],
 //!   [`TextPropDefect::UnknownTextDirection`],
 //!   [`TextPropDefect::UnknownTabType`],
 //!   [`TextPropDefect::IndentLevelOutOfRange`],
-//!   [`TextPropDefect::InvalidColorIndex`]) — undefined text enumeration
+//!   [`TextPropDefect::InvalidColorIndex`] — undefined text enumeration
 //!   values leave the property unset (a tab stop keeps its position as a
 //!   left tab), indent levels above 4 clamp to 4, and an undefined
 //!   `ColorIndexStruct` index reads as an unset color, instead of rejecting
 //!   the text box.
-//! - **F5.11** ([`ShapeDefect`]) — shape conversion is isolated per shape:
+//! - [`ShapeDefect`] — shape conversion is isolated per shape:
 //!   a shape whose content cannot be read is dropped and recorded
 //!   ([`ShapeDefect::UnreadableShape`]) while its siblings are kept, a
 //!   duplicated `TextRulerAtom` or round-trip shape atom keeps its first
@@ -64,28 +63,28 @@
 //!   An outline text reference that selects no readable slide-list text
 //!   body leaves its shape with empty text
 //!   ([`ShapeDefect::UnresolvedOutlineTextRef`]).
-//! - **F5.4** ([`SlideListDefect`]) — the slide directory degrades per
+//! - [`SlideListDefect`] — the slide directory degrades per
 //!   entry instead of failing the open: a nonconforming `SlidePersistAtom`
 //!   header is read by field offset (POI/LibreOffice), a truncated atom or a
 //!   null `persistIdRef`/`slideId` drops that entry, a repeated `slideId` or
 //!   `persistIdRef` keeps the first entry, and `cTexts` above 8 clamps to 8.
 //!   These are open-time repairs.
-//! - **F5.5** ([`SlideListDefect::StaleSlidePersistRef`]) — a slide whose
+//! - [`SlideListDefect::StaleSlidePersistRef`] — a slide whose
 //!   persist ID the live persist directory does not map, or that maps
 //!   outside the document stream or to a record other than a
 //!   `SlideContainer`, is skipped as LibreOffice skips it; the presentation
 //!   opens with the remaining slides. A `SlideContainer` whose own length
 //!   overruns the stream stays fatal.
-//! - **F5.6** ([`PersistDefect::MissingCurrentUser`],
-//!   [`PersistDefect::UnusableCurrentEditOffset`]) — when the "Current User"
+//! - [`PersistDefect::MissingCurrentUser`],
+//!   [`PersistDefect::UnusableCurrentEditOffset`] — when the "Current User"
 //!   stream is missing or its edit offset does not land on a well-formed
 //!   `UserEditAtom`, the live `UserEditAtom` is recovered by scanning the
 //!   document stream's top-level records for the last one, LibreOffice's
 //!   algorithm. A recovered atom that names an encryption session is
 //!   rejected rather than read as plaintext.
-//! - **F5.7** ([`PersistDefect::PersistDirectoryRecordType`],
+//! - [`PersistDefect::PersistDirectoryRecordType`],
 //!   [`PersistDefect::ZeroCountPersistRun`],
-//!   [`PersistDefect::DuplicatePersistId`]) — persist-directory decoding on
+//!   [`PersistDefect::DuplicatePersistId`] — persist-directory decoding on
 //!   the read path ignores a directory pointer to another record type, skips
 //!   zero-count entry headers, and keeps the first offset of a persist ID
 //!   repeated within one directory, as LibreOffice does. The public
@@ -93,26 +92,26 @@
 //!   [`crate::PersistMapping::build_from_records_with_report`] apply the
 //!   same repairs per entry instead of dropping a whole holder. A truncated
 //!   or misaligned directory stays an error.
-//! - **F5.8** ([`PersistDefect::CurrentUserNameLength`],
-//!   [`PersistDefect::CurrentUserHeader`], [`PersistDefect::CurrentUserSize`])
+//! - [`PersistDefect::CurrentUserNameLength`],
+//!   [`PersistDefect::CurrentUserHeader`], [`PersistDefect::CurrentUserSize`]
 //!   — a "Current User" `lenUserName` above 255, or one the stream
 //!   truncates, reads as no username (POI's posture), and a nonzero
 //!   recVer/recInstance or a `size` other than 20 is ignored, instead of
 //!   failing the open. The record type and header token identify the
 //!   stream and its encryption state, so they are still validated.
-//! - **F5.10** ([`SlideListDefect::SlideListVersion`],
+//! - [`SlideListDefect::SlideListVersion`],
 //!   [`SlideListDefect::DuplicateSlideList`],
-//!   [`SlideListDefect::UnreadableSlideListText`]) — the presentation
+//!   [`SlideListDefect::UnreadableSlideListText`] — the presentation
 //!   `SlideListWithTextContainer` is found by record type and instance
 //!   whatever its version nibble, a duplicate one is ignored (first wins,
 //!   POI), and a slide whose slide-list text interactions or outline
 //!   references cannot be read keeps empty ones instead of failing the
 //!   open.
-//! - **F5.12** ([`PersistDefect::UserEditAtomLength`]) — the live
+//! - [`PersistDefect::UserEditAtomLength`] — the live
 //!   `UserEditAtom` may carry any payload of at least 28 bytes, as the
 //!   mid-chain walk already allowed; `encryptSessionPersistIdRef` is
 //!   consulted only when 32 bytes are present.
-//! - **F5.9** (opt-in, [`UserEditChainDefect::Cycle`]) — under
+//! - Opt-in: [`UserEditChainDefect::Cycle`] — under
 //!   [`Leniency::TolerateUserEditChainDefects`] a `UserEdit` chain that
 //!   revisits an edit offset is cut at the repeat, keeping the newer
 //!   mappings; under [`Leniency::Strict`] it stays an error.
@@ -180,7 +179,7 @@ const MAX_RECORDED_DEFECTS: usize = 1024;
 /// and recorded under every variant, including [`Leniency::Strict`].
 ///
 /// The enumeration is non-exhaustive because opt-in variants arrive with the
-/// roadmap findings that need them; new variants are never a breaking
+/// repairs that need them; new variants are never a breaking
 /// change for callers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[non_exhaustive]
@@ -192,7 +191,7 @@ pub enum Leniency {
     #[default]
     Strict,
     /// Also repair and record the `UserEdit`-chain defects listed by
-    /// [`UserEditChainDefect`] (finding F5.9).
+    /// [`UserEditChainDefect`].
     TolerateUserEditChainDefects,
 }
 
@@ -206,8 +205,7 @@ impl Leniency {
     }
 }
 
-/// The class of `UserEdit`-chain defect an opted-in read may repair
-/// (finding F5.9).
+/// The class of `UserEdit`-chain defect an opted-in read may repair.
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of
 /// what [`Leniency::TolerateUserEditChainDefects`] may change about a
@@ -249,14 +247,13 @@ impl UserEditChainDefect {
 /// or reserved, so applying it never changes what a conforming presentation
 /// means.
 ///
-/// Each variant implements one finding of `docs/LENIENCY_AUDIT.md` (F5.1,
-/// F5.2, F5.3) and is recorded by the text-box read path.
+/// Each variant is recorded by the text-box read path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum TextPropDefect {
     /// A `StyleTextPropAtom` run's `charactersCovered` did not tile exactly
     /// the text length plus one, a run was truncated, or the atom had
-    /// trailing bytes (finding F5.1).
+    /// trailing bytes.
     ///
     /// MS-PPT 2.9.40–2.9.41 require coverage equal to the character count
     /// plus one, but nothing prescribes rejecting the document when a
@@ -271,7 +268,7 @@ pub enum TextPropDefect {
     /// for the writer and reparse-verification path.
     StyleTextPropCoverage,
     /// A `TextPFRun`'s two-byte `bulletFlags` carried bits outside the set
-    /// MS-PPT 2.9.22 defines (finding F5.2).
+    /// MS-PPT 2.9.22 defines.
     ///
     /// MS-PPT 2.9.22 defines bits 0x0001–0x0008 and states the remaining
     /// twelve bits "MUST be zero and MUST be ignored". `PowerPoint`, POI,
@@ -281,7 +278,7 @@ pub enum TextPropDefect {
     /// bit that survives.
     ReservedBulletFlagBits,
     /// A `TextPFRun`'s two-byte `wrapFlags` carried bits outside the set
-    /// MS-PPT 2.9.25 defines (finding F5.2).
+    /// MS-PPT 2.9.25 defines.
     ///
     /// MS-PPT 2.9.25 defines bits 0x0001–0x0004 and states the remaining
     /// thirteen bits "MUST be zero and MUST be ignored". As with
@@ -291,7 +288,7 @@ pub enum TextPropDefect {
     ReservedWrapFlagBits,
     /// A `TextPFRun`'s `textAlignment` was outside `TextAlignmentEnum`
     /// (MS-PPT 2.13, values 0–6); the alignment is left unset, so the
-    /// inherited/default alignment applies (finding F5.3).
+    /// inherited/default alignment applies.
     ///
     /// Newer and non-Microsoft producers emit values PowerPoint does not
     /// define; PowerPoint opens such text with default formatting,
@@ -299,25 +296,23 @@ pub enum TextPropDefect {
     /// leaves unknown values uninterpreted. The context is the raw value.
     UnknownTextAlignment,
     /// A `TextPFRun`'s `fontAlign` was outside `TextFontAlignmentEnum`
-    /// (MS-PPT 2.13, values 0–3); the property is left unset (finding
-    /// F5.3). The context is the raw value.
+    /// (MS-PPT 2.13, values 0–3); the property is left unset. The context is the raw value.
     UnknownFontAlignment,
     /// A `TextPFRun`'s `textDirection` was outside `TextDirectionEnum`
-    /// (MS-PPT 2.13, values 0–1); the property is left unset (finding
-    /// F5.3). The context is the raw value.
+    /// (MS-PPT 2.13, values 0–1); the property is left unset. The context is the raw value.
     UnknownTextDirection,
     /// A `TabStop`'s `type` was outside `TextTabTypeEnum` (MS-PPT 2.13,
     /// values 0–3); the tab stop keeps its position with left alignment, the
-    /// default tab type (finding F5.3). The context is the raw value.
+    /// default tab type. The context is the raw value.
     UnknownTabType,
     /// A `TextPFRun`'s `indentLevel` exceeded the 0–4 range MS-PPT 2.2.13
-    /// allows; it is clamped to 4 (finding F5.3). The context is the raw
+    /// allows; it is clamped to 4. The context is the raw
     /// level.
     IndentLevelOutOfRange,
     /// A text or bullet `ColorIndexStruct` carried an index other than the
     /// scheme slots 0x00–0x07, RGB (0xFE), or undefined (0xFF) that MS-PPT
     /// defines; the color is treated as unset and the raw value is
-    /// kept for round-trip (finding F5.3). The context is the raw 32-bit
+    /// kept for round-trip. The context is the raw 32-bit
     /// `ColorIndexStruct`.
     InvalidColorIndex,
 }
@@ -353,7 +348,7 @@ impl TextPropDefect {
 }
 
 /// The class of `OfficeArt` shape defect the reader repairs the way
-/// `PowerPoint` and LibreOffice repair it (finding F5.11).
+/// `PowerPoint` and LibreOffice repair it.
 ///
 /// This enumeration is closed by design. Every repair is applied under every
 /// [`Leniency`] variant, including [`Leniency::Strict`], on the slide and
@@ -363,7 +358,7 @@ impl TextPropDefect {
 #[non_exhaustive]
 pub enum ShapeDefect {
     /// One shape could not be converted and was dropped; its siblings, and
-    /// the rest of the slide, are still read (finding F5.11).
+    /// the rest of the slide, are still read.
     ///
     /// `PowerPoint` and LibreOffice render the remaining shapes of a slide
     /// when one is unreadable, so a content-level failure while one shape is
@@ -377,7 +372,7 @@ pub enum ShapeDefect {
     /// siblings (top-level shapes of the drawing, or children of a group).
     UnreadableShape,
     /// A `ClientTextbox` carried more than one `TextRulerAtom`; the first is
-    /// kept and every later one ignored (finding F5.11).
+    /// kept and every later one ignored.
     ///
     /// MS-PPT 2.9.43 defines a single optional ruler, and POI's
     /// `EscherTextboxWrapper` tolerates several. The context is the
@@ -387,7 +382,7 @@ pub enum ShapeDefect {
     /// (`RoundTripHFPlaceholder12Atom`, `RoundTripNewPlaceholderId12Atom`,
     /// `RoundTripShapeId12Atom`, or
     /// `RoundTripShapeCheckSumForCustomLayouts12Atom`) more than once; the
-    /// first occurrence is kept (finding F5.11).
+    /// first occurrence is kept.
     ///
     /// Duplicated round-trip atoms are exactly what round-tripping producers
     /// emit, and none of the reference readers reject them. The context is
@@ -395,8 +390,7 @@ pub enum ShapeDefect {
     DuplicateRoundTripAtom,
     /// A round-trip placeholder atom named a placeholder ID outside the set
     /// MS-PPT defines (7–10 for `RoundTripHFPlaceholder12Atom`, 25–26 for
-    /// `RoundTripNewPlaceholderId12Atom`); the identity is treated as absent
-    /// (finding F5.11).
+    /// `RoundTripNewPlaceholderId12Atom`); the identity is treated as absent.
     ///
     /// POI never validates these IDs. The context is
     /// `(record type << 16) | placeholder ID`.
@@ -438,7 +432,7 @@ impl ShapeDefect {
 }
 
 /// The class of presentation slide-list defect the reader repairs the way
-/// LibreOffice and POI repair it (findings F5.4, F5.5, and F5.10).
+/// LibreOffice and POI repair it.
 ///
 /// These repairs happen while the presentation is opened, so they are
 /// recorded in [`crate::Presentation::tolerance_report`]. Each entry's
@@ -451,48 +445,48 @@ pub enum SlideListDefect {
     /// A presentation `SlidePersistAtom`'s record header deviated from
     /// recVer 0 / recInstance 0 / recLen 0x14, but the atom still holds the
     /// four fields the reader uses; they are read by offset, as POI
-    /// (`SlidePersistAtom.java`) and LibreOffice (`svdfppt.cxx`) read them
-    /// (finding F5.4). The context is the atom's payload length.
+    /// (`SlidePersistAtom.java`) and LibreOffice (`svdfppt.cxx`) read them.
+    /// The context is the atom's payload length.
     SlidePersistAtomHeader,
     /// A presentation `SlidePersistAtom` was too short to hold
     /// `persistIdRef`, `cTexts`, and `slideId`; the entry and its text
-    /// records are dropped (finding F5.4). The context is the atom's payload
+    /// records are dropped. The context is the atom's payload
     /// length.
     TruncatedSlidePersistAtom,
     /// A presentation `SlidePersistAtom` had a null `persistIdRef` or
     /// `slideId`; the entry and its text records are dropped, as LibreOffice
-    /// skips entries whose persist reference is unusable (finding F5.4). The
+    /// skips entries whose persist reference is unusable. The
     /// context is the `slideId`.
     NullSlideReference,
     /// A presentation `SlidePersistAtom`'s `cTexts` exceeded 8; it is clamped
-    /// to 8 and the slide kept (finding F5.4). POI and LibreOffice never
+    /// to 8 and the slide kept. POI and LibreOffice never
     /// consult the count. The context is the raw `cTexts`.
     TextPlaceholderCount,
     /// A presentation `SlidePersistAtom` repeated an earlier entry's
     /// `slideId`; the first entry wins and the duplicate is dropped with its
-    /// text records (finding F5.4). The context is the `slideId`.
+    /// text records. The context is the `slideId`.
     DuplicateSlideId,
     /// A presentation `SlidePersistAtom` repeated an earlier entry's
     /// `persistIdRef`; the first entry wins and the duplicate is dropped
-    /// with its text records (finding F5.4). The context is the `slideId`.
+    /// with its text records. The context is the `slideId`.
     DuplicateSlidePersistRef,
     /// A presentation `SlidePersistAtom` referenced a persist ID that the
     /// live persist directory does not map, or that maps outside the
     /// document stream or to a record other than a `SlideContainer`; the
-    /// slide is skipped, as LibreOffice skips it (`svdfppt.cxx`) (finding
-    /// F5.5). Incrementally saved files carry such stale references. The
+    /// slide is skipped, as LibreOffice skips it (`svdfppt.cxx`). Incrementally
+    /// saved files carry such stale references. The
     /// context is the `slideId`.
     StaleSlidePersistRef,
     /// The presentation `SlideListWithTextContainer` (instance 0) carried a
     /// record-version nibble other than 0xF; it is still read as the
     /// container its record type names, as POI and LibreOffice dispatch on
-    /// the record type alone (finding F5.10). The context is the version
+    /// the record type alone. The context is the version
     /// nibble.
     SlideListVersion,
     /// The `DocumentContainer` held more than one presentation
     /// `SlideListWithTextContainer` (instance 0); the first is read and each
     /// later one ignored, as POI's `Document.getSlideSlideListWithText`
-    /// returns the first (finding F5.10). Incrementally saved files can
+    /// returns the first. Incrementally saved files can
     /// accrete duplicates. The context is the dropped list's one-based
     /// ordinal among the instance-0 lists (2 for the first duplicate).
     DuplicateSlideList,
@@ -500,7 +494,7 @@ pub enum SlideListDefect {
     /// text references, or text bodies) could not be read; that slide keeps
     /// empty outline interactions and references, or empty text bodies when
     /// only the bodies failed, and every other slide is unaffected, as
-    /// LibreOffice ignores slide-list text it cannot map (finding F5.10).
+    /// LibreOffice ignores slide-list text it cannot map.
     /// A shape that references a body of such a slide keeps empty text
     /// ([`ShapeDefect::UnresolvedOutlineTextRef`]). Resource limits stay
     /// fatal. The context is the `slideId`.
@@ -545,7 +539,7 @@ impl SlideListDefect {
 }
 
 /// The class of `UserEdit`/persist-chain defect the reader repairs the way
-/// LibreOffice or POI repairs it (findings F5.6–F5.8 and F5.12).
+/// LibreOffice or POI repairs it.
 ///
 /// These repairs happen while the presentation is opened, so they are
 /// recorded in [`crate::Presentation::tolerance_report`]; the context is
@@ -559,24 +553,24 @@ pub enum PersistDefect {
     /// The package has no "Current User" stream; the live `UserEditAtom`
     /// was recovered by scanning the document stream's top-level records
     /// for the last `UserEditAtom`, as LibreOffice does (`pptin.cxx` treats
-    /// the stream as optional; `svdfppt.cxx` scans) (finding F5.6). The
+    /// the stream as optional; `svdfppt.cxx` scans). The
     /// context is the recovered atom's stream offset.
     MissingCurrentUser,
     /// The "Current User" stream's `offsetToCurrentEdit` was zero, pointed
     /// outside the document stream, or did not land on a well-formed
     /// `UserEditAtom`; the live `UserEditAtom` was recovered by the same
-    /// scan as [`Self::MissingCurrentUser`] (finding F5.6). The context is
+    /// scan as [`Self::MissingCurrentUser`]. The context is
     /// the recovered atom's stream offset.
     UnusableCurrentEditOffset,
     /// The "Current User" stream's `lenUserName` exceeded the 255 MS-PPT
     /// 2.3.2 allows, or the stream truncated the username and release
     /// fields; the username is treated as absent, as POI treats it
-    /// (`CurrentUserAtom.java`), and LibreOffice never reads it (finding
-    /// F5.8). The context is the raw `lenUserName`.
+    /// (`CurrentUserAtom.java`), and LibreOffice never reads it. The context is
+    /// the raw `lenUserName`.
     CurrentUserNameLength,
     /// The live `UserEditAtom`'s payload was longer than 28 bytes but not
     /// the 28 or 32 MS-PPT 2.3.3 allows; every field the reader uses lies in
-    /// the first 28 bytes, so the atom is read as is (finding F5.12). POI
+    /// the first 28 bytes, so the atom is read as is. POI
     /// pads short reads without checking the declared length
     /// (`UserEditAtom.java`) and LibreOffice reads the fixed fields without
     /// inspecting it. Shorter atoms stay an error. The context is the
@@ -585,27 +579,27 @@ pub enum PersistDefect {
     /// A `UserEditAtom`'s `offsetPersistDirectory` pointed at a record other
     /// than a `PersistDirectoryAtom`; that edit contributes no persist
     /// entries and the chain walk continues, as LibreOffice only processes
-    /// the directory when the target record is one (`svdfppt.cxx`) (finding
-    /// F5.7). The context is the record type found there.
+    /// the directory when the target record is one (`svdfppt.cxx`). The context
+    /// is the record type found there.
     PersistDirectoryRecordType,
     /// A `PersistDirectoryEntry` header declared zero offsets; it is skipped
     /// (LibreOffice's read loop simply does not run for it, and POI advances
-    /// past it) (finding F5.7). The context is the entry's base persist ID.
+    /// past it). The context is the entry's base persist ID.
     ZeroCountPersistRun,
     /// A persist ID appeared more than once within one persist directory;
     /// the first offset wins, matching LibreOffice (`svdfppt.cxx`) and the
-    /// newest-first merge of the chain (finding F5.7). The context is the
+    /// newest-first merge of the chain. The context is the
     /// persist ID.
     DuplicatePersistId,
     /// The "Current User" atom's packed recVer/recInstance word was not
     /// zero; the atom is read by field offset, as POI's
-    /// `CurrentUserAtom.java` reads it without validating the header
-    /// (finding F5.8). The record type is still checked. The context is the
+    /// `CurrentUserAtom.java` reads it without validating the header.
+    /// The record type is still checked. The context is the
     /// raw packed word.
     CurrentUserHeader,
     /// The "Current User" atom's `size` field was not 20; the atom is read
-    /// by field offset, as POI reads it without consulting the field
-    /// (finding F5.8). The context is the raw `size`.
+    /// by field offset, as POI reads it without consulting the field.
+    /// The context is the raw `size`.
     CurrentUserSize,
 }
 

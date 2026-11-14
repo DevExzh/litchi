@@ -29,13 +29,13 @@ pub struct CurrentUser {
     username: String,
     /// The raw `lenUserName` when it exceeded 255 or the stream truncated
     /// the username/release fields, so the username was treated as absent
-    /// (finding F5.8, the POI posture).
+    /// (the POI posture).
     unusable_username_length: Option<u16>,
     /// The raw packed `recVer`/`recInstance` word when it was not zero; the
-    /// atom is read by field offset anyway (finding F5.8).
+    /// atom is read by field offset anyway.
     nonconforming_header: Option<u16>,
     /// The raw `size` field when it was not 20; the atom is read by field
-    /// offset anyway (finding F5.8).
+    /// offset anyway.
     nonconforming_size: Option<u32>,
 }
 
@@ -55,7 +55,7 @@ impl CurrentUser {
         let username_len = u16::from_le_bytes([data[20], data[21]]) as usize;
         if username_len > 255 {
             // The parser treats the username as absent and reads only the
-            // fixed fields (finding F5.8).
+            // fixed fields.
             return Ok(stream_len.min(CURRENT_USER_MIN_SIZE));
         }
         let release_end = CURRENT_USER_MIN_SIZE
@@ -113,7 +113,7 @@ impl CurrentUser {
         // record type, `svdfppt.cxx`). MS-PPT 2.3.2 also fixes recVer,
         // recInstance, and `size`, but POI's `CurrentUserAtom` validates none
         // of them and reads every field by offset; do the same and expose
-        // the deviation for recording (finding F5.8).
+        // the deviation for recording.
         let ver_instance = u16::from_le_bytes([data[0], data[1]]);
         let record_type = u16::from_le_bytes([data[2], data[3]]);
         if record_type != CURRENT_USER_RECORD_TYPE {
@@ -144,7 +144,7 @@ impl CurrentUser {
         // "as if there was no username set" (CurrentUserAtom.java) and
         // LibreOffice ignores it; only offsetToCurrentEdit and the token are
         // load-bearing. Do the same when the length is out of range or the
-        // stream truncates the username and release fields (finding F5.8).
+        // stream truncates the username and release fields.
         let ansi_start = CURRENT_USER_MIN_SIZE;
         let release_start = ansi_start + username_len;
         let unicode_start = release_start + 4;
@@ -191,19 +191,18 @@ impl CurrentUser {
     }
 
     /// The raw `lenUserName` when it was out of range or truncated and the
-    /// username was therefore treated as absent (finding F5.8).
+    /// username was therefore treated as absent.
     pub(crate) fn unusable_username_length(&self) -> Option<u16> {
         self.unusable_username_length
     }
 
     /// The raw packed `recVer`/`recInstance` word when it was not zero and
-    /// was ignored (finding F5.8).
+    /// was ignored.
     pub(crate) fn nonconforming_header(&self) -> Option<u16> {
         self.nonconforming_header
     }
 
-    /// The raw `size` field when it was not 20 and was ignored (finding
-    /// F5.8).
+    /// The raw `size` field when it was not 20 and was ignored.
     pub(crate) fn nonconforming_size(&self) -> Option<u32> {
         self.nonconforming_size
     }
@@ -345,7 +344,7 @@ mod tests {
     }
 
     /// An out-of-range or truncated username length reads as no username
-    /// (F5.8, the POI posture); the load-bearing fields still parse.
+    /// (the POI posture); the load-bearing fields still parse.
     #[test]
     fn unusable_username_length_reads_as_no_username() {
         let mut long = current_user_stream(b"AB", Some("AB"), UNENCRYPTED_HEADER_TOKEN);
@@ -373,7 +372,7 @@ mod tests {
     }
 
     /// A nonzero recVer/recInstance or a `size` other than 20 is read by
-    /// field offset (F5.8, the POI posture) and exposed for recording; the
+    /// field offset (the POI posture) and exposed for recording; the
     /// record type and header token still identify the stream.
     #[test]
     fn fixed_header_fields_are_ignored_but_the_identifying_fields_are_not() {

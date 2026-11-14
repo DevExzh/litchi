@@ -482,8 +482,8 @@ fn parse_anchor_id(element: &BytesStart<'_>) -> Result<Option<AnchorId>> {
 ///
 /// LibreOffice imports such a shape with an unknown preset type
 /// (`PresetShapeGeometryContext`) and Word renders it best-effort, so the
-/// object is kept rather than failing the paragraph's inventory
-/// (LENIENCY_AUDIT 2.10). Malformed attributes stay errors.
+/// object is kept rather than failing the paragraph's inventory.
+/// Malformed attributes stay errors.
 #[inline]
 fn parse_preset(element: &BytesStart<'_>) -> Result<std::result::Result<Preset, String>> {
     let Some(value) = strict_attribute(element, b"prst")? else {

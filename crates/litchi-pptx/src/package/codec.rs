@@ -301,11 +301,11 @@ impl Package {
         let part_bytes = Self::part_bytes_for(&opc)?;
         let main = opc.main_document_part()?;
         let presentation = PresentationPart::from_part(main)?;
-        // Slide-list repairs (audit finding 6.7) are recorded at open. A slide
+        // Slide-list repairs are recorded at open. A slide
         // list the catalog reader rejects stays the lazy accessors' error, as
         // before: opening never parsed the slide list to fail on it.
         let mut tolerance = crate::leniency::ToleranceReport::default();
-        // OPC manifest repairs (audit findings 8.5-8.9) come first: they were
+        // OPC manifest repairs come first: they were
         // applied before any PresentationML part could be read.
         tolerance.append_package(opc.tolerance_report());
         let _deferred_catalog_error = presentation.slide_references_with_tolerance(&mut tolerance);

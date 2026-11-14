@@ -11,7 +11,7 @@ use crate::outline::Outline;
 pub const DEFAULT_BASE_WIDTH: u8 = 8;
 
 /// The default row height, in points, a read substitutes for an unusable
-/// `sheetFormatPr/@defaultRowHeight` (leniency finding 4.1): Excel's default
+/// `sheetFormatPr/@defaultRowHeight`: Excel's default
 /// for its standard 11-point body font.
 pub(crate) const DEFAULT_ROW_HEIGHT: f64 = 15.0;
 

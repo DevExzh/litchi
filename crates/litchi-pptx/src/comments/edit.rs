@@ -68,8 +68,9 @@ impl Edit<'_> {
 
     /// Load the presentation's legacy comment graph.
     ///
-    /// The read applies the `PowerPoint`-compatible comment repairs of audit
-    /// finding 6.12 ([`CommentDefect`](crate::leniency::CommentDefect)): a comment with `idx="0"` or one
+    /// The read applies the `PowerPoint`-compatible comment repairs
+    /// ([`CommentDefect`](crate::leniency::CommentDefect)): a comment with
+    /// `idx="0"` or one
     /// repeating an earlier `(authorId, idx)` key is kept instead of failing the
     /// whole graph. [`load_presentation_comments_with_tolerance`] reports what
     /// was repaired; the verbs of this edit load through

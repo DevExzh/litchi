@@ -31,7 +31,7 @@ pub struct Info {
 
 impl Info {
     /// The repairs the chart inspection applied, stamped with the chart
-    /// part name (audit finding 6.10, [`crate::leniency::ChartDefect`]). An
+    /// part name ([`crate::leniency::ChartDefect`]). An
     /// empty report means the inspected structure conformed.
     #[must_use]
     pub fn tolerance_report(&self) -> &crate::leniency::ToleranceReport {

@@ -457,7 +457,7 @@ fn utf16z_string(data: &[u8]) -> Option<String> {
 /// `ClientTextbox` and `ClientData` headers and the header of every child
 /// record they hold.
 ///
-/// Shape-level isolation (finding F5.11) drops a shape whose *content*
+/// Shape-level isolation drops a shape whose *content*
 /// cannot be read; a shape failing this check is structural corruption and
 /// stays fatal for the whole drawing.
 pub(crate) fn validate_host_framing(shape: &Shape<'_>) -> Result<()> {
@@ -809,7 +809,7 @@ fn is_text_container(kind: u16) -> bool {
 /// Without a report every deviation is an error. With a report (the slide
 /// and notes read path), a duplicated round-trip atom keeps its first
 /// occurrence and an undefined placeholder ID is treated as absent, each
-/// recorded as a [`crate::ShapeDefect`] (finding F5.11). Record framing and
+/// recorded as a [`crate::ShapeDefect`]. Record framing and
 /// each atom's header and size stay errors either way.
 pub(crate) fn powerpoint12_shape_metadata(
     shape: &Shape<'_>,

@@ -96,7 +96,7 @@ impl ThemeColorSlot {
     }
 
     /// The Office theme's value for this slot, which a repaired theme
-    /// substitutes for a missing or malformed slot (leniency finding 4.11).
+    /// substitutes for a missing or malformed slot.
     #[must_use]
     pub fn default_value(self) -> ThemeColorValue {
         let rgb = match self {
@@ -191,7 +191,7 @@ pub struct Theme {
     minor_font: Option<String>,
     /// Verbatim `a:fmtScheme` XML, preserved inert.
     format_scheme_xml: String,
-    /// Color-scheme repairs (leniency finding 4.11).
+    /// Color-scheme repairs.
     tolerance: ToleranceReport,
 }
 
@@ -252,8 +252,8 @@ impl Theme {
 
     /// Parse a theme part.
     ///
-    /// The color scheme is read the way LibreOffice reads it (audit finding
-    /// 4.11): slots are matched by element name in any order (the first
+    /// The color scheme is read the way LibreOffice reads it: slots are matched
+    /// by element name in any order (the first
     /// occurrence wins), a missing slot or one whose color is malformed or
     /// not an `a:srgbClr`/`a:sysClr` takes the Office theme's value
     /// ([`ThemeColorSlot::default_value`]), and an `a:sysClr` without its
@@ -621,7 +621,7 @@ mod tests {
         assert_eq!(theme.rgb(ThemeColorSlot::Dk2), [0x1F, 0x49, 0x7D]);
     }
 
-    /// Audit finding 4.11: slots match by name, missing or malformed slots
+    /// Slots match by name, missing or malformed slots
     /// take the Office default, a `sysClr` without `lastClr` resolves by
     /// name; each repair is recorded at the slot.
     #[test]

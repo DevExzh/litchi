@@ -30,7 +30,7 @@ fn transition_reader_keeps_invalid_powerpoint_2010_ripple_direction_raw() {
     );
 
     // The out-of-domain token degrades the effect to a raw effect and is
-    // recorded (leniency audit finding 6.6); the transition's timing reads.
+    // recorded; the transition's timing reads.
     let transition = read(
         slide_xml(&invalid).as_bytes(),
         litchi_pptx::transition::Limits::DEFAULT,

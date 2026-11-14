@@ -3157,7 +3157,7 @@ impl SharedOleFile {
             Ok(None) | Err(crate::directory_name::DirectoryNameError::ForbiddenCharacter(_)) => {},
             Err(_) => return Err(OleError::StreamNotFound),
         }
-        // See `OleFile::find_child_by_name` (leniency audit F7.7).
+        // See `OleFile::find_child_by_name`.
         let target = crate::directory_name::directory_name_data_allowing_forbidden(name)
             .map_err(|_error| OleError::StreamNotFound)?;
         self.find_child_by_name_with(sid, |entry_name| target.compare(entry_name))

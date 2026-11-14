@@ -54,7 +54,7 @@ fn materialized_answer(xml: &str) -> Result<(), String> {
 }
 
 /// Require write-path admission to refuse `xml` with exactly `expected`
-/// while the read parse repairs it (audit finding 4.10).
+/// while the read parse repairs it.
 #[track_caller]
 fn assert_admission_refusal(xml: &str, expected: &str) {
     match super::parse_refusing_repairs(xml.as_bytes(), || Ok(None)) {
@@ -404,7 +404,7 @@ fn rejects_malformed_grid_defaults_and_descent() {
         );
     }
 
-    // Out-of-domain defaults are repaired by the read parse (finding 4.1)
+    // Out-of-domain defaults are repaired by the read parse
     // but keep their errors in write-path admission and in the standalone
     // defaults reader, which has no report to record into.
     for body in [
@@ -539,7 +539,7 @@ fn rejects_malformed_dimensions_and_row_properties() {
     }
 }
 
-/// Audit finding 4.1: out-of-domain row and column geometry clamps to the
+/// Out-of-domain row and column geometry clamps to the
 /// domain edge (or drops a negative/`NaN` value) and is recorded; the
 /// write-path admission parse keeps the historical errors, and an
 /// unparseable lexical stays fatal everywhere.
@@ -669,7 +669,7 @@ fn clamps_and_records_out_of_domain_geometry() {
     }
 }
 
-/// Audit finding 4.6: a broken shared-formula group is repaired per cell
+/// A broken shared-formula group is repaired per cell
 /// and recorded at the cell; write-path admission keeps the errors.
 #[test]
 fn repairs_and_records_broken_shared_formula_groups() {
@@ -774,7 +774,7 @@ fn repairs_and_records_broken_shared_formula_groups() {
     assert!(store.tolerance_report().is_clean());
 }
 
-/// Audit finding 4.10: schema-sequence violations and advisory counts are
+/// Schema-sequence violations and advisory counts are
 /// repaired and recorded; write-path admission keeps the errors.
 #[test]
 fn repairs_and_records_worksheet_sequencing_and_advisory_metadata() {
@@ -1098,7 +1098,7 @@ fn rejects_missing_shared_strings_bad_indexes_and_formula_markers() {
     assert!(super::parse_refusing_repairs(marked.as_bytes(), || Ok(None)).is_err());
 }
 
-/// Audit finding 4.9: one leading `=` is stripped and an empty scalar or
+/// One leading `=` is stripped and an empty scalar or
 /// array expression is dropped, each recorded at the cell; write-path
 /// admission keeps the errors and a doubled `=` stays fatal.
 #[test]
@@ -1166,7 +1166,7 @@ fn repairs_and_records_leading_equals_and_empty_formulas() {
     assert!(parse(doubled.as_bytes(), || Ok(None)).is_err());
 }
 
-/// Audit finding 4.4: the read path repairs a dangling shared-string
+/// The read path repairs a dangling shared-string
 /// reference to an empty string and records it; a malformed index lexical
 /// is still fatal.
 #[test]
@@ -1218,7 +1218,7 @@ fn validates_typed_date_cells_without_normalizing_the_lexeme() {
             if date.as_str() == "2026-07-31T12:34:56.250-07:00"
     ));
 
-    // An invalid date is demoted to its text and recorded (finding 4.3);
+    // An invalid date is demoted to its text and recorded;
     // write-path admission still refuses it.
     let invalid = br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="d"><v>2026-02-29</v></c></row></sheetData></worksheet>"#;
     let store = parse(invalid, || Ok(None)).expect("demoted date");
@@ -1230,7 +1230,7 @@ fn validates_typed_date_cells_without_normalizing_the_lexeme() {
     assert!(super::parse_refusing_repairs(invalid, || Ok(None)).is_err());
 }
 
-/// Audit finding 4.3: malformed number, boolean, and date lexicals are
+/// Malformed number, boolean, and date lexicals are
 /// repaired per cell and recorded at the cell, instead of failing the
 /// sheet; write-path admission keeps the historical errors.
 #[test]
@@ -2068,8 +2068,8 @@ mod streaming_0362_selected_tests {
         );
         assert_not_eligible(&decreasing_cells, "A1", NotEligibleReason::Ordering);
 
-        // A repeated row is repaired last-wins by the materialized parser
-        // (leniency finding 4.10); the scanner defers to it.
+        // A repeated row is repaired last-wins by the materialized parser;
+        // the scanner defers to it.
         let duplicate_row = worksheet(r#"<sheetData><row r="1"/><row r="1"/></sheetData>"#);
         assert_not_eligible(&duplicate_row, "A1", NotEligibleReason::Ordering);
 
@@ -3296,7 +3296,7 @@ mod streaming_0365_range_tests {
     fn streaming_0365_range_validates_global_duplicates_order_and_late_xml_errors() {
         let duplicate_row =
             worksheet(r#"<sheetData><row r="1"/><row r="2"/><row r="2"/></sheetData>"#);
-        // Repaired last-wins by the materialized parser (leniency 4.10).
+        // Repaired last-wins by the materialized parser.
         assert!(matches!(
             scan_range_xml(&duplicate_row, "A1"),
             Ok(RangeScanOutcome::NotEligible(NotEligibleReason::Ordering))
@@ -3622,7 +3622,7 @@ mod streaming_0367_merge_tests {
             Ok(ScanOutcome::Eligible(_))
         ));
 
-        // Repaired and recorded by the read parse (leniency finding 4.10);
+        // Repaired and recorded by the read parse;
         // the scan defers to it.
         let empty = worksheet(r#"<sheetData/><mergeCells count="0"/>"#);
         assert!(matches!(
@@ -3732,7 +3732,7 @@ mod streaming_0367_merge_tests {
             Ok(ScanOutcome::NotEligible(NotEligibleReason::Styles)) => {},
             other => panic!("expected the style fallback verdict, got {other:?}"),
         }
-        // The read parse repairs the late `<cols>` (leniency finding 4.10)
+        // The read parse repairs the late `<cols>`
         // and then refuses the duplicate `<mergeCells>`; write-path
         // admission refuses the late `<cols>` first.
         super::assert_materialized_refusal(
@@ -3747,7 +3747,7 @@ mod streaming_0367_merge_tests {
         );
 
         // A genuinely early `<mergeCells>` on an unmarked worksheet is
-        // repaired by the read parse (leniency finding 4.10), so the scan
+        // repaired by the read parse, so the scan
         // defers to it.
         let early = worksheet(r#"<mergeCells><mergeCell ref="A1:B1"/></mergeCells><sheetData/>"#);
         match scan_xml(&early, "A1") {
@@ -4304,8 +4304,8 @@ mod streaming_0400_numeric_scratch_tests {
 
     #[test]
     fn streaming_0401_numeric_elision_defers_malformed_numbers_to_the_repairing_parser() {
-        // The materialized parser repairs and records a malformed number
-        // (leniency finding 4.3); the scanner never repairs, so a selected
+        // The materialized parser repairs and records a malformed number;
+        // the scanner never repairs, so a selected
         // or unselected malformed lexical defers to it.
         for (value, expected) in [
             ("not-a-number", "invalid worksheet number 'not-a-number'"),
@@ -4421,7 +4421,7 @@ mod streaming_0400_numeric_scratch_tests {
 
     #[test]
     fn streaming_0400_dimension_defers_malformed_duplicate_and_late_metadata() {
-        // The read parse repairs and records each (leniency finding 4.10);
+        // The read parse repairs and records each;
         // the scan never repairs, so it defers.
         for xml in [
             worksheet(r#"<dimension/><sheetData/>"#),
@@ -4585,8 +4585,7 @@ mod change_0658_ineligibility_gate_tests {
                     r#"<sheetData><row r="1"><c r="A1"><f t="shared" si="0">A2</f><v>1</v></c></row></sheetData>"#,
                 ),
                 NotEligibleReason::FormulaSemantics,
-                // The materialized parser repairs the broken group (leniency
-                // finding 4.6) instead of failing.
+                // The materialized parser repairs the broken group instead of failing.
                 None,
             ),
             (
@@ -4611,7 +4610,7 @@ mod change_0658_ineligibility_gate_tests {
                     r#"<sheetData><row r="2"><c r="A2"><v>2</v></c></row><row r="1"><c r="A1"><v>1</v></c></row></sheetData>"#,
                 ),
                 NotEligibleReason::Ordering,
-                // The read parse sorts the rows (leniency finding 4.10).
+                // The read parse sorts the rows.
                 None,
             ),
             (

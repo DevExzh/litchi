@@ -3,7 +3,7 @@
 //!
 //! Every format crate applies reference-compatible repairs to non-structural
 //! deviations and *records* each one in its own bounded `ToleranceReport`
-//! (see `docs/LENIENCY_AUDIT.md`, "The tolerance contract").
+//! (see "The tolerance contract" on [`ToleranceReport`]).
 //! [`File::tolerance_report`](crate::File::tolerance_report) returns that
 //! report wrapped in [`ToleranceReport`], so one call works for every format
 //! while the detailed, per-format defect classes stay one `match` away.
@@ -22,6 +22,30 @@ use litchi_core::detection::FileFormat;
 /// crate's own report, whose entries name the repaired defect class and its
 /// location; see that crate's `leniency` module for the closed set of
 /// repairs. Variants exist only for the formats enabled in this build.
+///
+/// # The tolerance contract
+///
+/// Every format reader follows the same three rules, modeled on
+/// `litchi_doc::leniency` and `litchi_xls::leniency`:
+///
+/// 1. **Reference-compatible repairs are applied by default and recorded.**
+///    Under every `Leniency` variant, including the default `Strict`, a
+///    reader repairs data the specification leaves undefined but real
+///    producers emit anyway — data Word, Excel, `PowerPoint` and LibreOffice
+///    read past without complaint. Each repair substitutes the value
+///    documented on its defect variant and is recorded in the crate's bounded
+///    `ToleranceReport` (overflow is counted by `unrecorded()`). Nothing is
+///    swallowed silently: an empty report means the document conformed, and
+///    the same file without the deviation repairs nothing.
+/// 2. **Repairs that involve a judgment call are opt-in.** They stay behind
+///    an explicit `Leniency` variant (for example
+///    `Leniency::TolerateStylesheetDefects` in `litchi_doc`, or
+///    `Leniency::TolerateFormattingDefects` in `litchi_xls`); without it the
+///    deviation is still an error.
+/// 3. **Structural corruption and security limits stay hard errors.**
+///    Malformed framing (record, sector or piece-table grammar, ill-formed
+///    XML), broken stream grammar, unsupported or absent decryption material,
+///    and configured resource limits are rejected under every variant.
 ///
 /// # When lazily parsed parts contribute
 ///

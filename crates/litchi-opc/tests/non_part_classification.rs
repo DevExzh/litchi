@@ -180,7 +180,7 @@ fn rejects_multiple_case_equivalent_content_types_members() {
 fn types_relationship_parts_from_the_reserved_name_and_records_contradictions() {
     // §9.2 fixes the Relationships part content type, so an omitted mapping is
     // fine, and a conflicting one is a producer-rule deviation that is
-    // repaired to the fixed type and recorded (LENIENCY_AUDIT 8.10).
+    // repaired to the fixed type and recorded.
     fn package_with_rels_default(rels_content_type: Option<&str>) -> Vec<u8> {
         let default = rels_content_type
             .map(|value| format!(r#"<Default Extension="rels" ContentType="{value}"/>"#))

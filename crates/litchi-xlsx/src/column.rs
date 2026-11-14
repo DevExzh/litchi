@@ -28,7 +28,7 @@ impl Width {
         f64::from_bits(self.0)
     }
 
-    /// Repair an out-of-domain read value (leniency finding 4.1).
+    /// Repair an out-of-domain read value.
     ///
     /// A width past 255 characters (including `+inf`) clamps to 255, the
     /// Office ceiling. A negative or `NaN` width yields `None`, so the

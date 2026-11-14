@@ -295,7 +295,7 @@ impl<'a> Scene<'a> {
 
     /// The repairs this read applied, in discovery order.
     ///
-    /// A shape whose transform is malformed (audit finding 6.2) keeps its
+    /// A shape whose transform is malformed keeps its
     /// place in the scene with no [`Bounds`] and is recorded here as
     /// [`ShapeDefect::MalformedTransform`] with its shape ID. Scenes built
     /// through a part view ([`crate::Slide::shapes`] and the layout/master
@@ -484,7 +484,7 @@ struct Active {
     seen_offset: bool,
     seen_extent: bool,
     /// The shape's first `a:off`/`a:ext` lacked, mangled, or negated a
-    /// coordinate; its geometry degrades to absent (audit finding 6.2).
+    /// coordinate; its geometry degrades to absent.
     malformed_transform: bool,
     markers: u8,
     text_depth: Option<usize>,
@@ -507,7 +507,7 @@ struct Active {
     /// The open opaque `p:ext` already recorded an owner-hygiene repair.
     placeholder_ext_owner_defect: bool,
     /// A p232 grammar violation dropped this placeholder's type extension;
-    /// the rest of its extension list is skipped (audit finding 6.4).
+    /// the rest of its extension list is skipped.
     placeholder_ext_degraded: bool,
     seen_placeholder_type_ext: bool,
     seen_placeholder_type: bool,
@@ -745,8 +745,7 @@ impl<'a> Scanner<'a> {
                     return Err(Error::Invalid("DOCTYPE is forbidden in shape XML".into()));
                 },
                 // Processing instructions are legal XML 1.0 and carry no
-                // shape content: skip them, recording once per owner part
-                // (audit finding 6.3).
+                // shape content: skip them, recording once per owner part.
                 Event::PI(_) => {
                     if !self.seen_processing_instruction {
                         self.seen_processing_instruction = true;
@@ -767,7 +766,7 @@ impl<'a> Scanner<'a> {
     }
 
     /// Turn a placeholder-extension grammar violation into a recorded
-    /// repair (audit finding 6.4): the placeholder keeps no p232 type
+    /// repair: the placeholder keeps no p232 type
     /// extension and the rest of its extension list is skipped. Every other
     /// error passes through unchanged.
     fn tolerate_placeholder_extension(&mut self, result: Result<()>) -> Result<()> {
@@ -947,7 +946,7 @@ impl<'a> Scanner<'a> {
             let index = active.index as usize;
             let name = unqualified_attribute_value(element, b"name", decoder)?;
             // An unparseable ID is non-structural metadata the record
-            // already models as absent (audit finding 6.8).
+            // already models as absent.
             let id = match unqualified_attribute_value(element, b"id", decoder)? {
                 Some(value) => {
                     let parsed = value.parse::<u32>().ok();
@@ -984,8 +983,7 @@ impl<'a> Scanner<'a> {
             let owner = active.index;
             let record_index = owner as usize;
             let kind = unqualified_attribute_value(element, b"type", decoder)?;
-            // An unparseable index falls back to the schema default `0`
-            // (audit finding 6.8).
+            // An unparseable index falls back to the schema default `0`.
             let index = match unqualified_attribute_value(element, b"idx", decoder)? {
                 Some(value) => value.parse::<u32>().unwrap_or_else(|_err| {
                     let id = shape_id(&self.records, owner);

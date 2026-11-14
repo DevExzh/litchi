@@ -344,7 +344,7 @@ fn rejects_malformed_numbering_order_without_panicking() {
     }
 
     // A mismatched override level and a dangling abstract reference degrade
-    // per item (leniency F2.4) instead of failing the part.
+    // per item instead of failing the part.
     let degraded = parse(br#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:num w:numId="2"><w:lvlOverride w:ilvl="0"><w:lvl w:ilvl="1"/></w:lvlOverride><w:abstractNumId w:val="1"/></w:num></w:numbering>"#).unwrap();
     assert!(degraded.nums().is_empty());
     assert_defects(
@@ -619,7 +619,7 @@ fn ignorable_prefix_lists_refuse_a_repeated_prefix_at_any_length() {
     ))));
 }
 
-/// Leniency F2.4: each bad value degrades only its own property, and every
+/// Each bad value degrades only its own property, and every
 /// repair is recorded with the offending element's offset.
 #[test]
 fn bad_values_degrade_per_item_and_are_recorded() {

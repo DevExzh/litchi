@@ -5,7 +5,7 @@
 //!
 //! Detection is also document-less: its probes return a bare classification
 //! and cannot hand back a [`crate::leniency::ToleranceReport`]. The container
-//! repair for a deflated or re-zipped `mimetype` member (LENIENCY_AUDIT F9.1)
+//! repair for a deflated or re-zipped `mimetype` member
 //! therefore signals a tolerated deviation by *succeeding*: the classification
 //! itself is the signal, and the record is carried by the subsequent open.
 //! Callers that need the record open through [`prepared_or_original`] (see
@@ -348,7 +348,7 @@ pub fn bytes(value: &[u8], limits: Limits) -> Result<Option<Format>> {
         };
         // The central archive structure is validated here. A compressed,
         // extra-field-carrying, or relocated `mimetype` member is a tolerated
-        // container deviation (LENIENCY_AUDIT F9.1) recorded by the
+        // container deviation recorded by the
         // subsequent open, so it no longer withholds the classification.
         let archive = soapberry_zip::office::ArchiveReader::new(
             value,
@@ -931,7 +931,7 @@ fn tolerant_mime_from_index<R: soapberry_zip::ReaderAt>(
 }
 
 /// Classify complete bytes from a `mimetype` member that deviates from the
-/// strict offset-0 grammar (LENIENCY_AUDIT F9.1).
+/// strict offset-0 grammar.
 ///
 /// The member is located by name through the central directory under the
 /// default finite archive limits. Any archive failure — non-ZIP input, a

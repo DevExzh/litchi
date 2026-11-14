@@ -63,7 +63,7 @@ pub struct Package<'data> {
     manifest: Arc<super::manifest::Manifest>,
     mimetype: String,
     password: Option<&'data str>,
-    /// The LENIENCY_AUDIT F9.2 root media-type fallback this view adopted,
+    /// The manifest root media-type fallback this view adopted,
     /// as the [`crate::leniency::PackageDefect::ManifestRootMediaTypeMissing`]
     /// context.
     manifest_root_fallback: Option<u16>,
@@ -1338,7 +1338,7 @@ fn manifest_root_fallback(manifest: &super::manifest::Manifest, mimetype: &str) 
 }
 
 /// Adopt the `mimetype` member's value as the manifest root media type when
-/// the manifest leaves it empty (LENIENCY_AUDIT F9.2), recording the repair.
+/// the manifest leaves it empty, recording the repair.
 ///
 /// This is LibreOffice's media-type fallback (`ZipPackage::parseManifest`):
 /// an absent or empty root is not a conflict. Two non-empty values that
@@ -1927,7 +1927,7 @@ impl OwnedPackage {
             meta: Arc::default(),
         };
         // A manifest without a usable root media type falls back to the
-        // `mimetype` member (LENIENCY_AUDIT F9.2); every borrowed view adopts
+        // `mimetype` member; every borrowed view adopts
         // it in `Package::from_archive`, and the open records it once here.
         // A package whose manifest cannot be read is left for the borrowed
         // view to reject exactly as before.
@@ -2272,7 +2272,7 @@ impl<'data> Package<'data> {
             XmlStreamLimits::owner_default_value(),
         )?;
         // An absent or empty manifest root media type falls back to the
-        // `mimetype` member (LENIENCY_AUDIT F9.2). The owning
+        // `mimetype` member. The owning
         // `OwnedPackage` records the repair once at open.
         let root_fallback = manifest_root_fallback(&manifest, &mimetype);
         if root_fallback.is_some() {
@@ -3126,7 +3126,7 @@ mod tests {
             zip.finish().unwrap();
         }
 
-        // LENIENCY_AUDIT F9.1: a re-zipped package whose `mimetype` member is
+        // A re-zipped package whose `mimetype` member is
         // not the first entry opens the way LibreOffice opens it, and the
         // relocation is recorded rather than swallowed.
         let source = CountingSource::new(zip_buffer);

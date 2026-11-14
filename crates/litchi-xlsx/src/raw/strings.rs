@@ -206,7 +206,7 @@ pub(crate) struct Selected {
     /// construct that this dependency scan does not model.
     pub(crate) unsupported_rich: bool,
     /// Whether the table carries a defect the materializing parse repairs
-    /// and records (audit finding 4.5, a malformed count hint). The caller
+    /// and records (a malformed count hint). The caller
     /// must fall back to that parse.
     pub(crate) irregular: bool,
 }
@@ -358,7 +358,7 @@ impl<'a> SelectedParser<'a> {
                 .as_mut()
                 .ok_or_else(|| invalid("shared-string text outside an item"))?;
             // Mixed or repeated text is repaired and recorded by the
-            // materializing parse (audit finding 4.12).
+            // materializing parse.
             if item.state.text().is_err() {
                 self.irregular = true;
             }
@@ -454,7 +454,7 @@ impl<'a> SelectedParser<'a> {
         item.text_state.finish()?;
         if item.text_state.irregular {
             // An unpaired surrogate escape is repaired and recorded by the
-            // materializing parse (audit finding 4.12).
+            // materializing parse.
             self.irregular = true;
             return Ok(());
         }
@@ -482,7 +482,7 @@ impl<'a> SelectedParser<'a> {
     }
 
     /// Check the advisory count hints. A malformed hint is repaired and
-    /// recorded by the materializing parse (audit finding 4.5); this scan
+    /// recorded by the materializing parse; this scan
     /// never repairs, so it reports the table as irregular instead.
     fn parse_root_hints(&mut self, element: &SemanticElement<'_>) {
         for name in ["uniqueCount", "count"] {
@@ -567,7 +567,7 @@ struct SpreadsheetTextState {
     high_surrogate: Option<u16>,
     decoded_chars: usize,
     /// An escape encoded an unpaired surrogate; the materializing parse
-    /// decodes it to U+FFFD and records it (audit finding 4.12).
+    /// decodes it to U+FFFD and records it.
     irregular: bool,
 }
 
@@ -814,7 +814,7 @@ impl<'r> Parser<'r> {
     }
 
     /// Accept an item whose text elements break the content model — simple
-    /// and rich text mixed, or a repeated `t` (audit finding 4.12) — keeping
+    /// and rich text mixed, or a repeated `t` — keeping
     /// every text element's characters in document order, as LibreOffice
     /// appends each portion; or refuse it with `error`.
     fn tolerate_run_structure(&mut self, error: crate::Error) -> Result<()> {
@@ -828,7 +828,7 @@ impl<'r> Parser<'r> {
     ///
     /// ECMA-376 §18.4.9 makes `count`/`uniqueCount` optional informational
     /// attributes that Excel and LibreOffice ignore. When repairs apply, an
-    /// unparseable or out-of-range hint (audit finding 4.5) is treated as
+    /// unparseable or out-of-range hint is treated as
     /// absent and recorded; the table's items are authoritative either way.
     fn count_hint(
         &mut self,
@@ -993,7 +993,7 @@ pub(crate) fn decode_spreadsheet_text(value: &str) -> Result<String> {
 }
 
 /// Decode `_xHHHH_` escapes. With `lossy`, an escape encoding an unpaired
-/// surrogate decodes to U+FFFD instead of failing (audit finding 4.12), and
+/// surrogate decodes to U+FFFD instead of failing, and
 /// the returned flag reports whether any such replacement was made.
 fn decode_spreadsheet_text_with(value: &str, lossy: bool) -> Result<(String, bool)> {
     let mut replaced = false;
@@ -1315,8 +1315,8 @@ mod tests {
 
         assert!(!selected.irregular);
 
-        // A malformed hint is repaired by the materializing parse (finding
-        // 4.5); the dependency scan reports the table as irregular instead.
+        // A malformed hint is repaired by the materializing parse; the
+        // dependency scan reports the table as irregular instead.
         let invalid = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" uniqueCount="NaN"/>"#;
         assert!(
             streaming_0364_default(invalid, &[])
@@ -1445,7 +1445,7 @@ mod tests {
         assert!(parse(excessive).is_err());
     }
 
-    /// Audit finding 4.12: mixed or repeated text elements keep every
+    /// Mixed or repeated text elements keep every
     /// portion in document order and an unpaired surrogate escape decodes to
     /// U+FFFD, each recorded at the item; the strict parse keeps the errors,
     /// and the dependency scan reports the table as irregular.

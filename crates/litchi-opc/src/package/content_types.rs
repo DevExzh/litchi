@@ -613,7 +613,7 @@ pub(crate) fn with_part_overrides(
         ));
     }
     // Authored content types keep the MIME grammar check; only values read
-    // from a source manifest are admitted verbatim (LENIENCY_AUDIT 8.12).
+    // from a source manifest are admitted verbatim.
     for (_, content_type) in overrides {
         validate_content_type(content_type).map_err(|reason| OpcError::InvalidContentType {
             value: (*content_type).to_owned(),

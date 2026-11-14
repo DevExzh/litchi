@@ -40,7 +40,7 @@ impl TextRunExtractor {
     /// exactly (clamped, per POI/LibreOffice), and
     /// [`TextPropDefect::ReservedBulletFlagBits`] /
     /// [`TextPropDefect::ReservedWrapFlagBits`] when a `TextPFRun` carries
-    /// reserved flag bits (masked to the defined set), and the F5.3 classes
+    /// reserved flag bits (masked to the defined set), and the value-domain classes
     /// when a text enumeration value, indent level, or `ColorIndexStruct`
     /// index is out of range (left unset or clamped).
     ///
@@ -102,7 +102,7 @@ impl TextRunExtractor {
     ///
     /// The read path parses with the clamping POI/LibreOffice posture
     /// ([`crate::text_prop::parse_style_text_prop_atom_with_report`]) and
-    /// records each repaired framing defect (finding F5.1); the strict
+    /// records each repaired framing defect; the strict
     /// parsers ([`crate::text_prop::parse_style_text_prop_atom_strict`],
     /// [`crate::StyleTextPropAtom`]) are retained for the writer and the
     /// text-edit/reparse-verification path.
@@ -219,7 +219,7 @@ fn is_defined_color_index(raw: u32) -> bool {
     matches!((raw >> 24) as u8, 0x00..=0x07 | 0xFE | 0xFF)
 }
 
-/// Record an undefined `ColorIndexStruct` index (finding F5.3). The color is
+/// Record an undefined `ColorIndexStruct` index. The color is
 /// treated as unset; the raw value is kept for round-trip.
 fn tolerate_color_index(raw: Option<u32>, report: &mut ToleranceReport) {
     if let Some(raw) = raw.filter(|raw| !is_defined_color_index(*raw)) {
@@ -368,7 +368,7 @@ pub(super) fn paragraph_formatting_from_style(
     // Values outside an MS-PPT 2.13 enumeration come from newer or
     // non-Microsoft producers; PowerPoint opens them with default formatting
     // and LibreOffice branches only on values it knows. Leave the property
-    // unset and record it (finding F5.3).
+    // unset and record it.
     let mut enumerated = |name: &str, defect: TextPropDefect, max: i32| {
         let value = style.get_value(name)?;
         if (0..=max).contains(&value) {
@@ -418,8 +418,7 @@ pub(super) fn paragraph_formatting_from_style(
                         2 => ParagraphTabAlignment::Right,
                         3 => ParagraphTabAlignment::Decimal,
                         // An undefined TextTabTypeEnum keeps the tab stop's
-                        // position with the default (left) alignment
-                        // (finding F5.3).
+                        // position with the default (left) alignment.
                         raw => {
                             report.record(TextPropDefect::UnknownTabType, u32::from(raw));
                             ParagraphTabAlignment::Left

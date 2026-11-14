@@ -43,16 +43,14 @@
 //! several packages. [`ToleranceReport::unrecorded`] must be carried over
 //! too, so the merged total stays exact.
 //!
-//! # Status
+//! # Repaired classes
 //!
-//! Live for findings 8.5–8.12 of `docs/LENIENCY_AUDIT.md`: duplicate
-//! relationship `Id` (8.5), unresolvable internal target (8.6), `TargetMode`
-//! casing and value (8.7), missing `Target`/`Type` (8.8), duplicate
-//! content-type mappings (8.9), a relationships part declared with another
-//! content type (8.10), manifest shape — unknown elements and attributes,
-//! character data and CDATA in `[Content_Types].xml` and `.rels` (8.11) —
-//! and `ContentType`/`Extension` grammar (8.12) — plus a non-XML-ID
-//! relationship `Id` (2.12, the packaging half of a docx finding).
+//! A duplicate relationship `Id`, an unresolvable internal target,
+//! `TargetMode` casing and value, a missing `Target`/`Type`, duplicate
+//! content-type mappings, a relationships part declared with another content
+//! type, manifest shape (unknown elements and attributes, character data and
+//! CDATA in `[Content_Types].xml` and `.rels`), `ContentType`/`Extension`
+//! grammar, and a non-XML-ID relationship `Id`.
 //!
 //! Where the references differ the more tolerant one is followed, and only
 //! when the repair cannot change which part is which: relationships-part

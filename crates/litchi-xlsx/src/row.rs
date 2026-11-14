@@ -30,7 +30,7 @@ impl Height {
         f64::from_bits(self.0)
     }
 
-    /// Repair an out-of-domain read value (leniency finding 4.1).
+    /// Repair an out-of-domain read value.
     ///
     /// A height past 409 points (including `+inf`) clamps to 409, Excel's
     /// row-height ceiling. A negative or `NaN` height has no meaningful edge

@@ -1,6 +1,6 @@
-//! Hand-built ZIP fixtures for the ODF leniency repairs (LENIENCY_AUDIT
-//! F9.1 `mimetype` container layouts, and member rewrites of corpus files for
-//! the later F9.x findings).
+//! Hand-built ZIP fixtures for the ODF leniency repairs (`mimetype`
+//! container layouts, and member rewrites of corpus files for the content
+//! repairs).
 //!
 //! The builder writes every byte of the local headers, central directory, and
 //! end record itself, so each fixture carries exactly one controlled
@@ -262,14 +262,13 @@ pub(crate) fn edit_member(
     bytes
 }
 
-/// Remove the manifest's `/` root `file-entry` element (LENIENCY_AUDIT F9.2).
+/// Remove the manifest's `/` root `file-entry` element.
 pub(crate) fn without_manifest_root(manifest: &str) -> String {
     let (start, end) = manifest_root_span(manifest);
     format!("{}{}", &manifest[..start], &manifest[end..])
 }
 
-/// Blank the `media-type` of the manifest's `/` root entry (LENIENCY_AUDIT
-/// F9.2).
+/// Blank the `media-type` of the manifest's `/` root entry.
 pub(crate) fn with_empty_manifest_root_media_type(manifest: &str) -> String {
     let (start, end) = manifest_root_span(manifest);
     let element = &manifest[start..end];

@@ -193,7 +193,7 @@ fn plan_relationship_publications_inner(
                         return Err(OpcError::SignedSourceRequiresExplicitPolicy);
                     }
                     // A replacement keeps the Id, and with it the Id's
-                    // provenance (LENIENCY_AUDIT 2.12).
+                    // provenance.
                     let source_admitted_id = existing.has_source_admitted_id();
                     effective.remove(&change.r_id);
                     if source_admitted_id {

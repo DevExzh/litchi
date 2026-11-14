@@ -76,10 +76,10 @@ impl EscherTextboxWrapper {
     /// defect in `report`.
     ///
     /// Records [`crate::TextPropDefect`] classes repaired while the textbox's
-    /// `StyleTextPropAtom` is parsed: clamped run coverage (F5.1) and masked
-    /// reserved `BulletFlags`/`PFWrapFlags` bits (F5.2), plus ignored
+    /// `StyleTextPropAtom` is parsed: clamped run coverage and masked
+    /// reserved `BulletFlags`/`PFWrapFlags` bits, plus ignored
     /// duplicate `TextRulerAtom` records
-    /// ([`crate::ShapeDefect::DuplicateTextRuler`], F5.11). A detached
+    /// ([`crate::ShapeDefect::DuplicateTextRuler`]). A detached
     /// text-box payload knows neither its slide nor its shape, so the
     /// recorded [`crate::DefectLocation`] fields stay `None`; the slide and
     /// notes shape readers fill them in.
@@ -155,7 +155,7 @@ impl EscherTextboxWrapper {
             .map(|record| TextRuler::parse(&record.data))
             .transpose()?;
         // MS-PPT 2.9.43 defines one optional ruler; POI tolerates several.
-        // Keep the first and record every ignored duplicate (F5.11).
+        // Keep the first and record every ignored duplicate.
         for (ordinal, _) in (1u32..).zip(ruler_records) {
             report.record(crate::leniency::ShapeDefect::DuplicateTextRuler, ordinal);
         }

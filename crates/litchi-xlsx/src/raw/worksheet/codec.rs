@@ -682,7 +682,7 @@ impl<'c> Parser<'c> {
         Ok(store)
     }
 
-    /// Merge repeated rows last-wins (audit finding 4.10): a later record
+    /// Merge repeated rows last-wins: a later record
     /// of a row replaces the earlier row properties, and a later cell at an
     /// address replaces the earlier cell. Lane cells precede reader cells in
     /// document order.
@@ -846,8 +846,8 @@ impl<'c> Parser<'c> {
             && is_spreadsheetml_name(namespace, element.name(), b"dimension")
         {
             // `dimension` is informational (ECMA-376 §18.3.1.35) and endemic
-            // garbage; Excel and LibreOffice recompute it (audit finding
-            // 4.10). It is accepted in any position, the first one wins, and
+            // garbage; Excel and LibreOffice recompute it. It is accepted in
+            // any position, the first one wins, and
             // an unusable `ref` is ignored.
             if self.seen_columns || self.sheet_data.seen() {
                 self.tolerate(
@@ -913,8 +913,7 @@ impl<'c> Parser<'c> {
             if self.seen_merges {
                 return Err(invalid("worksheet has duplicate mergeCells elements"));
             }
-            // Merges are collected position-independently (audit finding
-            // 4.10).
+            // Merges are collected position-independently.
             match self.sheet_data {
                 SheetDataStage::Before => self.tolerate(
                     WorksheetDefect::MisplacedElement,
@@ -1017,7 +1016,7 @@ impl<'c> Parser<'c> {
         self.seen_rows
             .try_reserve(1)
             .map_err(|source| allocation("worksheet parser row index set", source))?;
-        // Rows out of order or repeated (audit finding 4.10) are accepted:
+        // Rows out of order or repeated are accepted:
         // the store sorts rows, and a repeated row's cells and properties
         // merge last-wins when the parse finishes, as Apache POI's sorted
         // row map does.
@@ -1464,7 +1463,7 @@ impl<'c> Parser<'c> {
             Context::Cell => self.finish_cell(),
             Context::Row => self.finish_row(),
             // Empty collections and advisory counts that disagree with their
-            // records (audit finding 4.10): the records are authoritative.
+            // records: the records are authoritative.
             Context::Columns if self.column_records == 0 => self.tolerate(
                 WorksheetDefect::CountMismatch,
                 Location::Worksheet,
@@ -1531,7 +1530,7 @@ impl<'c> Parser<'c> {
             && cell.formula.trim_start().starts_with('=')
         {
             // Naive generators write `<f>=SUM(A1:A2)</f>`; LibreOffice's
-            // compiler accepts the `=` and Excel repairs (audit finding 4.9):
+            // compiler accepts the `=` and Excel repairs:
             // strip one leading `=`. A second one stays fatal.
             let error = invalid("worksheet formula must omit the leading '='");
             let stripped = cell.formula.trim_start()[1..].to_owned();
@@ -1548,7 +1547,7 @@ impl<'c> Parser<'c> {
         ) && cell.formula.is_empty()
         {
             // An empty expression is schema-valid but meaningless;
-            // LibreOffice skips it (audit finding 4.9). The cell reads
+            // LibreOffice skips it. The cell reads
             // without a formula, keeping any cached value.
             let error = invalid("worksheet formula expression is empty");
             let report = self.repair_sink().ok_or(error)?;

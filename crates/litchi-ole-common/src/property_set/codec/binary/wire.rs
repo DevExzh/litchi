@@ -159,11 +159,11 @@ impl ByteSink for CountingWriter {
 /// property contributes at most one entry per repair class.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Repairs {
-    /// A string held malformed MBCS or unpaired UTF-16 (F7.8).
+    /// A string held malformed MBCS or unpaired UTF-16.
     pub(crate) lossy_decode: bool,
-    /// A string was not NUL-terminated within its declared size (F7.10).
+    /// A string was not NUL-terminated within its declared size.
     pub(crate) missing_terminator: bool,
-    /// A nested reserved word or trailing padding was not zero (F7.11).
+    /// A nested reserved word or trailing padding was not zero.
     pub(crate) nonzero_padding: bool,
 }
 
@@ -311,7 +311,7 @@ impl<'a> ValueReader<'a> {
     /// The offset table bounds every value, so trailing bytes carry nothing.
     /// MS-OLEPS asks producers to zero them; fast-saved documents leave
     /// garbage there, and POI and Word read past it. Nonzero padding is
-    /// noted in `repairs` instead of rejected (leniency audit F7.11).
+    /// noted in `repairs` instead of rejected.
     pub(super) fn finish_padding(&mut self) {
         let remaining = &self.data[self.position..];
         if remaining.iter().any(|byte| *byte != 0) {
@@ -321,8 +321,8 @@ impl<'a> ValueReader<'a> {
     }
 
     /// Reads a reserved 16-bit word that MS-OLEPS/MS-OSHARED ask producers
-    /// to zero, noting a nonzero value in `repairs` instead of rejecting it
-    /// (leniency audit F7.11). The top-level reserved word was already
+    /// to zero, noting a nonzero value in `repairs` instead of rejecting it.
+    /// The top-level reserved word was already
     /// ignored; nested ones now match it.
     pub(super) fn read_reserved_u16(&mut self, description: &str) -> Result<(), OleError> {
         if self.read_u16(description)? != 0 {
@@ -475,7 +475,7 @@ pub(super) fn read_unicode_string(
 /// size alone bounds the string and producers disagree on whether it counts
 /// the terminator. Like POI (`CodePageString`) the string is read to its
 /// declared size and a missing terminator is noted in `repairs` rather than
-/// rejected (leniency audit F7.10).
+/// rejected.
 pub(super) fn ansi_text_end(raw: &[u8], repairs: &mut Repairs) -> usize {
     if raw.last() != Some(&0) {
         repairs.missing_terminator = true;
@@ -495,8 +495,8 @@ pub(super) fn utf16_text_end(raw: &[u8], repairs: &mut Repairs) -> usize {
         .map_or(raw.len() & !1, |terminator_index| terminator_index * 2)
 }
 
-/// Decodes UTF-16LE, substituting U+FFFD for unpaired surrogates (leniency
-/// audit F7.8) and noting the substitution in `repairs`.
+/// Decodes UTF-16LE, substituting U+FFFD for unpaired surrogates and noting
+/// the substitution in `repairs`.
 ///
 /// Windows' property reader and POI's replacing decoders do the same; one
 /// malformed string must not cost the caller every other property.
@@ -536,7 +536,7 @@ pub(super) fn decode_utf16_lossy(
 }
 
 /// Decodes an MBCS string, substituting U+FFFD for malformed sequences
-/// (leniency audit F7.8) and noting the substitution in `repairs`.
+/// and noting the substitution in `repairs`.
 ///
 /// `MultiByteToWideChar`, which ole32's property reader uses, substitutes a
 /// default character the same way. An unsupported code page stays an error.

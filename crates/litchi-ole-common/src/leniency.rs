@@ -25,8 +25,7 @@
 //! descriptor and section framing that leaves the stream, offset arithmetic
 //! overflow, and every allocation or size ceiling.
 //!
-//! The defect enumerations are closed and sized to the property-set findings
-//! of the leniency audit (F7.8–F7.12). A variant whose repair is not applied
+//! The defect enumerations are closed. A variant whose repair is not applied
 //! says so in its documentation; the parser rejects that deviation and the
 //! variant is never recorded.
 //!
@@ -89,7 +88,7 @@ pub enum Leniency {
 #[non_exhaustive]
 pub enum StringDefect {
     /// An ANSI string held a malformed multibyte sequence, or a UTF-16
-    /// string an unpaired surrogate (F7.8).
+    /// string an unpaired surrogate.
     ///
     /// The string is decoded with U+FFFD substituted for each malformed
     /// sequence, as `MultiByteToWideChar` and Java's replacing decoders do;
@@ -97,14 +96,14 @@ pub enum StringDefect {
     /// dictionary). The original bytes are not retained, so the property-set
     /// editor refuses to rewrite such a stream.
     LossyDecode,
-    /// A string was not NUL-terminated within its declared size (F7.10).
+    /// A string was not NUL-terminated within its declared size.
     ///
     /// The declared bytes are decoded up to the first terminator, or whole
     /// when none is present, as POI does; the size field alone bounds the
     /// string, so nothing is lost and a rewrite adds the terminator. One
     /// entry is recorded per affected property (PID 0 for the dictionary).
     MissingTerminator,
-    /// PID 1 named a code page outside the supported table (F7.9).
+    /// PID 1 named a code page outside the supported table.
     ///
     /// The section's strings are decoded as Windows-1252, the default when
     /// PID 1 is absent (LibreOffice likewise keeps its default encoding for
@@ -134,13 +133,13 @@ impl StringDefect {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum PropertyDefect {
-    /// A nested reserved word or trailing padding was not zero (F7.11).
+    /// A nested reserved word or trailing padding was not zero.
     ///
     /// The bytes are ignored, as the parser already did for the top-level
     /// reserved word; the offset table bounds every value, so they carry
     /// nothing and a rewrite zeroes them.
     NonZeroPadding,
-    /// One property's value could not be parsed (F7.11).
+    /// One property's value could not be parsed.
     ///
     /// The property (and any dictionary name for it) is dropped so every
     /// other property in the section stays readable, as POI's per-property
@@ -172,21 +171,21 @@ impl PropertyDefect {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum StreamDefect {
-    /// The stream version was neither 0 nor 1 (F7.12, opt-in class).
+    /// The stream version was neither 0 nor 1 (opt-in class).
     ///
     /// Not repaired: the parser rejects this deviation. POI rejects any
     /// nonzero format word outright, and a newer version may carry semantics
     /// this grammar cannot represent, so a repair would be a judgment call
     /// for a future opt-in [`Leniency`] variant.
     UnsupportedVersion,
-    /// The section count was outside 1..=2 (F7.12, opt-in class).
+    /// The section count was outside 1..=2 (opt-in class).
     ///
     /// Not repaired: the parser rejects this deviation. Skipping sections
     /// beyond the two the model represents would silently lose content, so
     /// it is left to a future opt-in [`Leniency`] variant.
     SectionCount,
     /// A section's size field overran the range its descriptor implies: the
-    /// next section's offset, or the stream end (F7.12).
+    /// next section's offset, or the stream end.
     ///
     /// Sections are located by offset, as POI and LibreOffice read them; the
     /// size is clamped to the implied range. Duplicate and out-of-range

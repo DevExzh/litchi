@@ -251,7 +251,7 @@ pub fn parse_character_properties(data: &[u8], offset: &mut usize, mask: u32) ->
 /// Based on Apache POI's `StyleTextPropAtom` parsing logic.
 /// Returns (`paragraph_styles`, `character_styles`).
 ///
-/// The parse is lenient (finding F5.1's posture): run coverage is clamped to
+/// The parse is lenient: run coverage is clamped to
 /// `text_length + 1`, each section stops at its first unreadable run, and
 /// trailing bytes are dropped. Repairs applied along the way are *not*
 /// enumerable through this convenience function; the crate's text-box read
@@ -273,7 +273,7 @@ pub fn parse_style_text_prop_atom(
 /// Parse `StyleTextPropAtom` data the way POI and LibreOffice read it,
 /// recording every deviation from the strict MS-PPT framing in `report`.
 ///
-/// This is the read-path posture for leniency finding F5.1: run coverage is
+/// This is the read-path posture: run coverage is
 /// clamped to what remains of `text_length + 1`, each of the paragraph and
 /// character sections stops at its first unreadable run (a zero-length run or
 /// a truncated header or property payload), and trailing bytes are dropped.
@@ -725,7 +725,7 @@ mod tests {
         report
     }
 
-    /// F5.1: the reporting parser records a defect exactly when the strict
+    /// The reporting parser records a defect exactly when the strict
     /// parser rejects the coverage framing, so a conformant atom always
     /// yields a clean report and nothing the strict parser refuses is
     /// repaired silently.

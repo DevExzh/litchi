@@ -1554,7 +1554,7 @@ fn select_one_with_errors_around_selected_index() {
     assert_equivalent(&broken, None, "select-one with error on deselected page");
     assert!(Parser::parse_slide_with_styles_at(&broken, None, 2).is_err());
 
-    // LENIENCY_AUDIT F9.10: skipped unknown animation subtrees keep both
+    // Skipped unknown animation subtrees keep both
     // passes equivalent, including the transition definitions fed to the
     // collector from inside the skipped subtree.
     let skipped = doc(

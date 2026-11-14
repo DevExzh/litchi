@@ -17,8 +17,8 @@ use litchi_sheet::{Cell as Address, Rect};
 
 /// Materialize one raw cell record.
 ///
-/// With `tolerance` present, a dangling shared-string reference (audit
-/// finding 4.4) is repaired to an empty string and recorded at the cell;
+/// With `tolerance` present, a dangling shared-string reference is repaired to
+/// an empty string and recorded at the cell;
 /// without it, the reference fails the parse as it historically did.
 pub(super) fn materialize(
     raw: RawCell<'_>,
@@ -83,7 +83,7 @@ pub(super) fn materialize(
             },
             RawFormulaKind::Unknown(value) => Kind::Unknown(value.into()),
         };
-        // A malformed cached value (finding 4.3) is dropped: the formula is
+        // A malformed cached value is dropped: the formula is
         // authoritative and Excel recalculates it.
         let cached = match raw.value.as_deref() {
             Some(value) => match parse_value(
@@ -102,7 +102,7 @@ pub(super) fn materialize(
     } else if let Some(value) = raw.value.as_deref() {
         match parse_value(raw.cell_type.as_deref(), value, strings, address, tolerance)? {
             Parsed::Value(value) => value.map_or(Cell::Empty, Cell::Value),
-            // Demoted with its lexical preserved (finding 4.3).
+            // Demoted with its lexical preserved.
             Parsed::Malformed => Cell::Unknown(Unknown::new(
                 raw.cell_type.as_deref().unwrap_or("n"),
                 Some(value.to_owned()),
@@ -151,14 +151,14 @@ fn formula_range_rect(range: FormulaRange) -> Result<Rect> {
 enum Parsed {
     /// The typed value (`None` for an empty numeric lexical).
     Value(Option<Value>),
-    /// A number or boolean lexical no reading can type (audit finding 4.3);
+    /// A number or boolean lexical no reading can type;
     /// the repair was recorded and the caller demotes the cell.
     Malformed,
 }
 
 /// Read one `<v>` lexical by cell type.
 ///
-/// With `tolerance` present, malformed lexicals (audit finding 4.3) are
+/// With `tolerance` present, malformed lexicals are
 /// repaired and recorded at the cell: an unparseable or non-finite number is
 /// [`Parsed::Malformed`]; a boolean is read the way LibreOffice reads it —
 /// `true`/`false` in any ASCII case, any number as non-zero-is-true — and
@@ -221,7 +221,7 @@ fn parse_value(
                 ),
             };
             // Excel repairs the cell and LibreOffice resolves the lookup to
-            // empty (audit finding 4.4): substitute an empty string.
+            // empty: substitute an empty string.
             let tolerance = tolerance.ok_or(error)?;
             tolerance.record(defect, Location::Cell(address));
             parsed(Value::Text(Text::from("")))
@@ -276,7 +276,7 @@ fn parse_shared_string_index(value: &str) -> Result<usize> {
 
 /// Resolve shared-formula groups into per-cell scalar formulas.
 ///
-/// With `tolerance` present, a structurally broken group (audit finding 4.6)
+/// With `tolerance` present, a structurally broken group
 /// is repaired per cell and recorded at the cell as
 /// [`CellDefect::BrokenSharedFormulaGroup`], the way LibreOffice falls back to
 /// plain cells for an unusable shared reference:

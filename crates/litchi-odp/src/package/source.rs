@@ -940,8 +940,8 @@ impl SourceBackedPresentation {
     ///
     /// An empty report means the document conformed; see
     /// [`litchi_odf_common::leniency::ToleranceReport`]. Package repairs come
-    /// first, then the content repairs of the slide scan (LENIENCY_AUDIT
-    /// F9.10). Slides are parsed lazily, so the first call to this method
+    /// first, then the content repairs of the slide scan. Slides are parsed
+    /// lazily, so the first call to this method
     /// (or a complete slide scan) runs that scan once.
     #[inline]
     #[must_use]
@@ -953,7 +953,7 @@ impl SourceBackedPresentation {
         }
         self.tolerance.get_or_init(|| {
             let mut merged = self.open_tolerance.clone();
-            // Content repairs (LENIENCY_AUDIT F9.10) are found by the slide
+            // Content repairs are found by the slide
             // scan; a scan that fails outright reports its error through
             // `slides()`, and the report then lists the package repairs only.
             if let Ok((_slides, content)) = self.parse_slides_from_source() {

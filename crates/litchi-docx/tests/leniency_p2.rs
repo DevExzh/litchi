@@ -81,7 +81,7 @@ fn defects(report: &litchi_docx::ToleranceReport) -> Vec<(Defect, u64)> {
 }
 
 // ---------------------------------------------------------------------------
-// F2.9 — list level (`w:ilvl`) above 8; style outline level above 9
+// List level (`w:ilvl`) above 8; style outline level above 9
 // ---------------------------------------------------------------------------
 
 const LISTS: &str = "ComplexNumberedLists.docx";
@@ -269,7 +269,7 @@ fn non_numeric_levels_stay_fatal() {
 }
 
 // ---------------------------------------------------------------------------
-// F2.10 — unknown `a:prstGeom@prst`
+// Unknown `a:prstGeom@prst`
 // ---------------------------------------------------------------------------
 
 const SHAPES: &str = "../../libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx";
@@ -397,7 +397,7 @@ fn malformed_shape_preset_attribute_stays_fatal() {
 }
 
 // ---------------------------------------------------------------------------
-// F2.11 — `w:fldSimple` without `w:instr`
+// `w:fldSimple` without `w:instr`
 // ---------------------------------------------------------------------------
 
 const MAIL_MERGE: &str = "../../libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx";
@@ -501,7 +501,7 @@ fn unbalanced_simple_field_stays_fatal() {
 }
 
 // ---------------------------------------------------------------------------
-// F2.12 — header/footer relationship ID that is not an XML ID
+// Header/footer relationship ID that is not an XML ID
 // ---------------------------------------------------------------------------
 
 const HEADERS: &str = "headerFooter.docx";
@@ -612,7 +612,7 @@ fn empty_header_relationship_id_stays_fatal() {
 }
 
 // ---------------------------------------------------------------------------
-// F2.6 follow-up — style-level `w:numPr` without `w:numId`
+// Style-level `w:numPr` without `w:numId`
 // ---------------------------------------------------------------------------
 
 /// `ComplexNumberedLists.docx` with numbering on the `ListParagraph` style,
@@ -780,7 +780,7 @@ fn report_entries(
         .collect()
 }
 
-/// F2.12 end to end: litchi-opc admits the non-XML-ID `.rels` `Id` verbatim
+/// End to end: litchi-opc admits the non-XML-ID `.rels` `Id` verbatim
 /// (recorded as `RelationshipDefect::NonConformingId`), so the equally
 /// numeric `r:id` resolves and the header text is read.
 #[test]

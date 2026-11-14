@@ -321,7 +321,7 @@ fn prologue_doctype_span(xml: &[u8]) -> Option<(usize, usize)> {
 }
 
 /// Neutralize a document type declaration in the prologue of an ODF
-/// `content.xml` (LENIENCY_AUDIT F9.11), returning whether one was found.
+/// `content.xml`, returning whether one was found.
 ///
 /// ODF 1.2 documents are not DTD-validated and XML lets a non-validating
 /// processor skip the declaration; LibreOffice's SAX import ignores it, so

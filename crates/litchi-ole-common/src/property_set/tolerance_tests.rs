@@ -118,7 +118,7 @@ fn compound_file(stream: &[u8]) -> Vec<u8> {
     output.into_inner()
 }
 
-// --- F7.8: strict MBCS and UTF-16 decode ---
+// --- Strict MBCS and UTF-16 decode ---
 
 #[test]
 fn malformed_mbcs_and_utf16_strings_decode_lossily_and_are_recorded() {
@@ -179,7 +179,7 @@ fn malformed_mbcs_and_utf16_strings_decode_lossily_and_are_recorded() {
         .unwrap();
 }
 
-// --- F7.9: PID 1 code page outside the supported table ---
+// --- PID 1 code page outside the supported table ---
 
 #[test]
 fn unsupported_codepage_falls_back_to_windows_1252_and_is_recorded() {
@@ -212,7 +212,7 @@ fn unsupported_codepage_falls_back_to_windows_1252_and_is_recorded() {
     }
 }
 
-// --- F7.10: strings not NUL-terminated within their declared size ---
+// --- Strings not NUL-terminated within their declared size ---
 
 #[test]
 fn unterminated_strings_are_read_to_their_declared_size_and_recorded() {
@@ -288,7 +288,7 @@ fn unterminated_dictionary_names_are_read_to_their_declared_length() {
     assert_eq!(parsed, clean);
 }
 
-// --- F7.11: one malformed property fails the stream; nested padding ---
+// --- One malformed property fails the stream; nested padding ---
 
 #[test]
 fn nested_reserved_words_and_trailing_padding_are_ignored_and_recorded() {
@@ -400,7 +400,7 @@ fn one_malformed_property_is_dropped_and_the_rest_stay_readable() {
     );
 }
 
-// --- F7.12: stream header exactness ---
+// --- Stream header exactness ---
 
 #[test]
 fn section_size_overrunning_its_implied_range_is_clamped_and_recorded() {

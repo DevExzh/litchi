@@ -582,7 +582,7 @@ fn open_rejects_fat_stream_short_excess_and_terminal_markers() {
     );
 
     // A chain continuing past the declared size is a recorded default
-    // repair (leniency audit F7.1), whatever the surplus link holds.
+    // repair, whatever the surplus link holds.
     for surplus in [FREESECT, 0] {
         let mut excess = regular_stream_file();
         let terminal = regular_data_terminal_sector(&excess);

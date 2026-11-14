@@ -1,4 +1,4 @@
-//! LENIENCY_AUDIT F9.10: an animation element the reader cannot map — an
+//! An animation element the reader cannot map — an
 //! unknown `anim:` element or a foreign-namespace element inside an
 //! animation node — is skipped with its subtree, the way LibreOffice's
 //! `AnimationNodeContext` skips tokens it does not know, instead of failing

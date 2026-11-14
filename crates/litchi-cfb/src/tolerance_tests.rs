@@ -176,7 +176,7 @@ fn pattern(len: usize, seed: u8) -> Vec<u8> {
         .collect()
 }
 
-// --- F7.1: FAT chain longer than the declared stream size ---
+// --- FAT chain longer than the declared stream size ---
 
 #[test]
 fn regular_stream_chain_longer_than_its_size_is_truncated_and_recorded() {
@@ -289,7 +289,7 @@ fn chain_faults_within_the_declared_length_stay_fatal() {
     }
 }
 
-// --- F7.2: zero-size stream whose start sector is not ENDOFCHAIN ---
+// --- Zero-size stream whose start sector is not ENDOFCHAIN ---
 
 #[test]
 fn empty_stream_with_a_stale_start_sector_reads_as_empty_and_is_recorded() {
@@ -338,7 +338,7 @@ fn empty_root_mini_stream_with_a_stale_start_sector_is_recorded() {
     assert_eq!(read_both(&bytes, &["Data"]), data);
 }
 
-// --- F7.3: red-black sibling-tree name-ordering violation ---
+// --- Red-black sibling-tree name-ordering violation ---
 
 /// Swaps the left and right links of the sibling-tree node at `entry`.
 fn swap_sibling_links(bytes: &mut [u8], entry: usize) {
@@ -439,7 +439,7 @@ fn sibling_tree_cycles_stay_fatal_when_ordering_is_tolerated() {
     ));
 }
 
-// --- F7.4: directory entries unreachable from the root ---
+// --- Directory entries unreachable from the root ---
 
 /// Unlinks the entry named `name` from its parent sibling tree, provided it
 /// is a leaf there, and returns its SID.
@@ -554,7 +554,7 @@ fn unreachable_storage_subtree_and_its_sectors_are_recorded() {
     assert_eq!(read_both(&bytes, &["Keep"]), b"kept");
 }
 
-// --- F7.6: CFB header reserved bytes must be zero ---
+// --- CFB header reserved bytes must be zero ---
 
 #[test]
 fn nonzero_reserved_header_bytes_are_ignored_and_recorded() {
@@ -569,7 +569,7 @@ fn nonzero_reserved_header_bytes_are_ignored_and_recorded() {
     assert_eq!(read_both(&bytes, &["Data"]), data);
 }
 
-// --- F7.5: MiniFAT/DIFAT start-sector vs count cross-check ---
+// --- MiniFAT/DIFAT start-sector vs count cross-check ---
 
 #[test]
 fn table_start_sectors_disagreeing_with_a_zero_count_are_ignored_and_recorded() {
@@ -622,7 +622,7 @@ fn table_start_count_repairs_never_invent_missing_tables() {
     ));
 }
 
-// --- F7.7: directory-entry field byte-exactness bundle ---
+// --- Directory-entry field byte-exactness bundle ---
 
 #[test]
 fn meaningless_directory_entry_fields_are_ignored_and_recorded() {

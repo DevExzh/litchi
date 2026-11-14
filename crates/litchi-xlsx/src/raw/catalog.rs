@@ -98,8 +98,8 @@ impl WorkbookInfo {
         }
     }
 
-    /// Admit a sheet name that breaks Excel's authoring rules (audit finding
-    /// 4.8) when [`Leniency::TolerateSheetNameRules`] is in effect, recording
+    /// Admit a sheet name that breaks Excel's authoring rules when
+    /// [`Leniency::TolerateSheetNameRules`] is in effect, recording
     /// it at the sheet's catalog position; otherwise keep the error. An
     /// empty name is never admitted: nothing could address the sheet.
     fn tolerate_sheet_name(&mut self, error: NameError, position: usize) -> Result<()> {
@@ -251,7 +251,7 @@ impl WorkbookInfo {
             ));
             // `activeTab` is an unconstrained unsignedInt (ECMA-376 §18.2.30)
             // that goes stale when other tools delete sheets. LibreOffice
-            // falls back to the first sheet (audit finding 4.7).
+            // falls back to the first sheet.
             let tolerance = info.tolerance.as_mut().ok_or(error)?;
             tolerance.record(CatalogDefect::ActiveTabOutOfRange, Location::Workbook);
             info.active_tab = Some(0);
@@ -270,7 +270,7 @@ impl WorkbookInfo {
                     defined_name.name
                 ));
                 // A scope naming no sheet cannot be resolved; LibreOffice
-                // drops such a name (audit finding 4.7).
+                // drops such a name.
                 let tolerance = info.tolerance.as_mut().ok_or(error)?;
                 tolerance.record(
                     CatalogDefect::LocalSheetIdOutOfRange,

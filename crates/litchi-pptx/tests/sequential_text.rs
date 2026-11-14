@@ -328,7 +328,7 @@ fn mce_fallback_is_processed_and_foreign_text_is_skipped() {
     let package = Package::from_bytes(&foreign).expect("foreign-text package");
     let presentation = package.presentation().expect("foreign-text presentation");
     let mut output = Vec::new();
-    // A foreign `*:t` is skipped, not read as text (leniency audit 6.9); the
+    // A foreign `*:t` is skipped, not read as text; the
     // skip is recorded by `Slide::text_with_tolerance`.
     presentation
         .write_text_to(&mut output, parity_options(true))

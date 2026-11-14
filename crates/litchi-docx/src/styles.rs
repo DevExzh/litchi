@@ -541,7 +541,7 @@ impl<'a> Styles<'a> {
                     } else {
                         // `CT_NumPr` makes `w:numId` optional: the style
                         // inherits its numbering along `basedOn`, with any
-                        // `w:ilvl` as a level override (LENIENCY_AUDIT 2.6).
+                        // `w:ilvl` as a level override.
                         builder.level_override = pending_level.take();
                         tolerance.record(
                             crate::leniency::StyleDefect::NumPrMissingNumId,

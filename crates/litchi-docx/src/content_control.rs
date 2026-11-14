@@ -2413,8 +2413,8 @@ mod tests {
             r#"<w:sdtPr xmlns:w="W"><w:id w:val="1"/><w:placeholder/><w:placeholder/></w:sdtPr>"#,
             r#"<w:sdtPr xmlns:w="W"><w:id w:val="1"/><w:dataBinding w:xpath="/x"/></w:sdtPr>"#,
         ];
-        // Each malformed property degrades only itself and is recorded
-        // (leniency F2.8); the control and the inventory survive.
+        // Each malformed property degrades only itself and is recorded;
+        // the control and the inventory survive.
         for xml in invalid {
             let xml = xml.replace("xmlns:w=\"W\"", &format!("xmlns:w=\"{W}\""));
             let inventory = Inventory::parse(xml.as_bytes(), &Default::default()).unwrap();
@@ -2568,7 +2568,7 @@ mod tests {
             mce = std::str::from_utf8(MCE_NAMESPACE).unwrap(),
             format = FORMATTING_ALLOWED_NAMESPACE,
         );
-        // The lock is kept and the misplaced qualifier dropped (F2.8).
+        // The lock is kept and the misplaced qualifier dropped.
         let inventory = Inventory::parse(invalid.as_bytes(), &Default::default()).unwrap();
         let control = inventory.occurrences()[0].control();
         assert!(control.is_lock_delete());

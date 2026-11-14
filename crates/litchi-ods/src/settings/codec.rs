@@ -454,8 +454,8 @@ enum CalculationMember {
     /// The settings element or one of its typed children, whose attributes
     /// must all be owned for an edit to be lossless.
     Owned,
-    /// An unknown child (or its descendant) that the semantic parse skips
-    /// (LENIENCY_AUDIT F9.9); its presence makes the span opaque so a
+    /// An unknown child (or its descendant) that the semantic parse skips;
+    /// its presence makes the span opaque so a
     /// rewrite refuses instead of dropping it.
     Unknown,
     /// Outside the calculation-settings subtree.

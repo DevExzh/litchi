@@ -171,8 +171,7 @@ pub(crate) fn directory_name_data(name: &str) -> Result<DirectoryNameData, Direc
 
 /// [`directory_name_data`] without the MS-CFB 2.6.1 forbidden-character
 /// rule, which constrains writers only. Reads use it to keep a stored name
-/// carrying `/`, `\`, `:`, or `!` as an opaque lookup key (leniency audit
-/// F7.7); authoring keeps the full rule.
+/// carrying `/`, `\`, `:`, or `!` as an opaque lookup key; authoring keeps the full rule.
 pub(crate) fn directory_name_data_allowing_forbidden(
     name: &str,
 ) -> Result<DirectoryNameData, DirectoryNameError> {

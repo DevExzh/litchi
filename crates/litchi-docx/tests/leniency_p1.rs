@@ -102,7 +102,7 @@ fn settings_package(settings_xml: &str) -> Vec<u8> {
 }
 
 // ---------------------------------------------------------------------------
-// F2.2 — unknown `w:compat` flag name
+// Unknown `w:compat` flag name
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -186,7 +186,7 @@ fn ill_formed_settings_xml_stays_fatal() {
 }
 
 // ---------------------------------------------------------------------------
-// F2.3 — duplicate singleton settings elements
+// Duplicate singleton settings elements
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -234,7 +234,7 @@ fn singleton_settings_record_nothing() {
 }
 
 // ---------------------------------------------------------------------------
-// F2.4 — numbering model degrades per item
+// Numbering model degrades per item
 // ---------------------------------------------------------------------------
 
 const NUMBERING_REL: &str =
@@ -384,7 +384,7 @@ fn ill_formed_numbering_xml_stays_fatal() {
 }
 
 // ---------------------------------------------------------------------------
-// F2.5 — tracked revision without w:author
+// Tracked revision without w:author
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -452,7 +452,7 @@ fn ill_formed_revision_xml_stays_fatal() {
 }
 
 // ---------------------------------------------------------------------------
-// F2.6 — w:numPr with only w:ilvl
+// w:numPr with only w:ilvl
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -549,7 +549,7 @@ fn complete_numpr_records_nothing() {
 }
 
 // ---------------------------------------------------------------------------
-// F2.7 — section column without w:w / column-model validation
+// Section column without w:w / column-model validation
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -613,7 +613,7 @@ fn conformant_section_columns_record_nothing() {
 }
 
 // ---------------------------------------------------------------------------
-// F2.8 — one malformed w:sdtPr degrades only its control
+// One malformed w:sdtPr degrades only its control
 // ---------------------------------------------------------------------------
 
 fn sdt(properties: &str, text: &str) -> String {

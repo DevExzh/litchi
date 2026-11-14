@@ -1,4 +1,4 @@
-//! Acceptance tests for the litchi-xlsx section of `docs/LENIENCY_AUDIT.md`.
+//! Acceptance tests for the litchi-xlsx tolerance repairs.
 //!
 //! Each test patches one member of a conformant workbook so that it carries a
 //! single cataloged deviation, then requires that the owned and the
@@ -179,7 +179,7 @@ fn worksheet_entries(report: &ToleranceReport) -> Vec<(Defect, Option<u32>, Tole
         .collect()
 }
 
-/// Finding 4.1: out-of-domain row and column geometry clamps (or drops a
+/// Out-of-domain row and column geometry clamps (or drops a
 /// negative value) and is recorded at the row, column range, or worksheet.
 #[test]
 fn out_of_domain_geometry_is_clamped_and_recorded() {
@@ -231,7 +231,7 @@ fn out_of_domain_geometry_is_clamped_and_recorded() {
     assert_eq!(sheet.defaults().unwrap().unwrap().height().get(), 15.0);
 }
 
-/// Finding 4.3: malformed number, boolean, and date lexicals are repaired per
+/// Malformed number, boolean, and date lexicals are repaired per
 /// cell and recorded at the cell; a cold source-backed selected read defers
 /// to the repairing parse instead of failing.
 #[test]
@@ -295,7 +295,7 @@ fn malformed_value_lexicals_are_repaired_per_cell_and_recorded() {
     ));
 }
 
-/// Finding 4.5: malformed `sst` count hints are ignored and recorded at the
+/// Malformed `sst` count hints are ignored and recorded at the
 /// table; a cold source-backed shared-string read falls back to the
 /// repairing parse.
 #[test]
@@ -327,7 +327,7 @@ fn malformed_shared_string_count_hints_are_ignored_and_recorded() {
     assert_eq!(source.tolerance_report(), report);
 }
 
-/// Finding 4.6: an orphaned shared-formula member keeps its cached value,
+/// An orphaned shared-formula member keeps its cached value,
 /// loses the formula it cannot be given, and is recorded at the cell.
 #[test]
 fn orphaned_shared_formula_member_keeps_its_cached_value() {
@@ -359,7 +359,7 @@ fn orphaned_shared_formula_member_keeps_its_cached_value() {
     );
 }
 
-/// Finding 4.7: a stale `activeTab` falls back to the first sheet and a
+/// A stale `activeTab` falls back to the first sheet and a
 /// defined name scoped to a missing sheet is dropped; both are recorded at
 /// open.
 #[test]
@@ -406,7 +406,7 @@ fn stale_active_tab_and_local_sheet_id_are_repaired_at_open() {
     assert_eq!(source.active_sheet().unwrap().unwrap().name(), "Flags");
 }
 
-/// Finding 4.8 (opt-in): a sheet name breaking Excel's authoring rules fails
+/// Opt-in: a sheet name breaking Excel's authoring rules fails
 /// the default open, and opens verbatim with a recorded repair under
 /// `Leniency::TolerateSheetNameRules`.
 #[test]
@@ -497,7 +497,7 @@ fn sheet_name_authoring_rules_are_tolerated_only_when_opted_in() {
     );
 }
 
-/// Finding 4.9: a leading `=` is stripped and an empty expression dropped,
+/// A leading `=` is stripped and an empty expression dropped,
 /// each recorded at the cell; a cold source-backed read defers to the
 /// repairing parse.
 #[test]
@@ -541,7 +541,7 @@ fn leading_equals_and_empty_formulas_are_repaired_and_recorded() {
     );
 }
 
-/// Finding 4.10: schema-sequence violations and advisory counts are
+/// Schema-sequence violations and advisory counts are
 /// repaired and recorded; rows out of order sort and a repeated row merges
 /// last-wins.
 #[test]
@@ -596,7 +596,7 @@ fn worksheet_sequencing_and_advisory_metadata_are_repaired_and_recorded() {
     );
 }
 
-/// Finding 4.11: the theme parser (a public API, not on the workbook-open
+/// The theme parser (a public API, not on the workbook-open
 /// path) repairs color-scheme deviations in the fixture's own theme part and
 /// records each at its slot; the unmodified part reports clean.
 #[test]
@@ -639,7 +639,7 @@ fn theme_color_scheme_deviations_are_repaired_and_recorded() {
     );
 }
 
-/// Finding 4.12: a structurally imperfect shared-string item keeps its text
+/// A structurally imperfect shared-string item keeps its text
 /// and an unpaired surrogate escape decodes to U+FFFD; each is recorded at
 /// the item instead of failing every string cell.
 #[test]

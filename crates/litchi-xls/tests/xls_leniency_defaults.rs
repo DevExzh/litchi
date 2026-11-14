@@ -293,7 +293,7 @@ fn the_unmodified_fixture_is_clean_on_both_paths() {
 }
 
 // ---------------------------------------------------------------------------
-// F3.2: CODEPAGE without an exact codec
+// CODEPAGE without an exact codec
 // ---------------------------------------------------------------------------
 
 /// The fixture with its `CODEPAGE` set to `codepage`, plus the record offset.
@@ -342,7 +342,7 @@ fn a_supported_code_page_records_nothing() {
 }
 
 // ---------------------------------------------------------------------------
-// F3.3: worksheet-name rules (opt-in: Leniency::TolerateSheetNameDefects)
+// Worksheet-name rules (opt-in: Leniency::TolerateSheetNameDefects)
 // ---------------------------------------------------------------------------
 
 /// Rewrite the `nth` sheet's `BoundSheet8.stName` to `name`, compressed when
@@ -448,7 +448,7 @@ fn the_sheet_name_opt_in_records_nothing_for_conforming_names() {
 }
 
 // ---------------------------------------------------------------------------
-// F3.4: Palette reserved byte, color count, duplicates
+// Palette reserved byte, color count, duplicates
 // ---------------------------------------------------------------------------
 
 /// A `Palette` payload of `count` entries, entry `i` colored `(i, i, i)` with
@@ -535,7 +535,7 @@ fn a_palette_whose_length_contradicts_its_count_is_still_refused() {
 }
 
 // ---------------------------------------------------------------------------
-// F3.5: Font scalar fields (opt-in: Leniency::TolerateFormattingDefects)
+// Font scalar fields (opt-in: Leniency::TolerateFormattingDefects)
 // ---------------------------------------------------------------------------
 
 /// The fixture with the physical-index-`nth` font's weight set to `weight`
@@ -604,7 +604,7 @@ fn conforming_fonts_record_nothing_under_the_opt_in() {
 }
 
 // ---------------------------------------------------------------------------
-// F3.6: BoundSheet8 reserved bits, visibility 3, unknown type, trailing bytes
+// BoundSheet8 reserved bits, visibility 3, unknown type, trailing bytes
 // ---------------------------------------------------------------------------
 
 /// The two-sheet fixture with the second `BoundSheet8` payload edited.
@@ -668,7 +668,7 @@ fn a_bound_sheet_too_short_for_its_name_is_still_refused() {
 }
 
 // ---------------------------------------------------------------------------
-// F3.7: XF alignment / border / fill enumerations
+// XF alignment / border / fill enumerations
 // ---------------------------------------------------------------------------
 
 /// The fixture with XF 15 — the default cell XF the number uses — edited.
@@ -744,7 +744,7 @@ fn undefined_xf_enumerations_read_as_defaults_and_are_recorded() {
 }
 
 // ---------------------------------------------------------------------------
-// F3.8: unpaired UTF-16 surrogates and out-of-order formatting runs
+// Unpaired UTF-16 surrogates and out-of-order formatting runs
 // ---------------------------------------------------------------------------
 
 /// A one-string `SST` payload holding `units` as uncompressed UTF-16, with
@@ -929,7 +929,7 @@ fn an_unpaired_font_name_surrogate_decodes_to_the_replacement_character() {
 }
 
 // ---------------------------------------------------------------------------
-// F3.9: number-format, font, and XFCRC cross-references
+// Number-format, font, and XFCRC cross-references
 // ---------------------------------------------------------------------------
 
 const XFCRC: u16 = 0x087C;

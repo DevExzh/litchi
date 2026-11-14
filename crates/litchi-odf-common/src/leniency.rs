@@ -13,12 +13,12 @@
 //! them would cost the caller the entire document over packaging that cannot
 //! change what a conforming file means. Each substitutes the value documented
 //! on the corresponding [`PackageDefect`] variant. This class implements the
-//! `mimetype`-member grammar repairs of LENIENCY_AUDIT F9.1: every package
+//! `mimetype`-member grammar repairs: every package
 //! open path (owned, positional source-backed, and the prepared detection
 //! handoff) accepts a compressed, extra-field-carrying, or relocated
 //! `mimetype` member, reads it by name, validates its content exactly, and
-//! records the deviation. It also covers the manifest root-entry fallback of
-//! LENIENCY_AUDIT F9.2: a manifest without a `/` entry, or whose `/` entry
+//! records the deviation. It also covers the manifest root-entry fallback:
+//! a manifest without a `/` entry, or whose `/` entry
 //! has an empty media type, adopts the `mimetype` member's value, exactly as
 //! LibreOffice's media-type fallback does; two non-empty values that disagree
 //! stay a hard error. A conforming package yields an empty report.
@@ -32,8 +32,8 @@
 //!
 //! **Opt-in repairs** trade strict conformance for reach and stay gated by
 //! [`Leniency`] variants. No ODF repair currently requires a judgment call,
-//! so [`Leniency::Strict`] is the only variant; opt-in variants land here as
-//! the roadmap adds repairs that need one.
+//! so [`Leniency::Strict`] is the only variant; opt-in variants land here when
+//! a repair needs one.
 //!
 //! This mirrors the contract `crates/litchi-doc/src/leniency.rs` established
 //! for legacy Word documents so every reader in the workspace reports
@@ -85,13 +85,13 @@ pub enum Leniency {
 /// layouts ODF 1.2 Part 3 §3.3 constrains only for producers, so applying it
 /// never changes what a conforming document means.
 ///
-/// The `Mimetype*` variants are the `mimetype`-member grammar repairs of
-/// LENIENCY_AUDIT F9.1. One package can record several of them (for example a
+/// The `Mimetype*` variants are the `mimetype`-member grammar repairs. One
+/// package can record several of them (for example a
 /// deflated member that is also not first), in the order listed here.
 /// Everything else about the member stays strict: its content must name the
 /// expected MIME type exactly, and an encrypted or unreadable member is a hard
 /// error. [`PackageDefect::ManifestRootMediaTypeMissing`] is the manifest
-/// root-entry fallback of LENIENCY_AUDIT F9.2.
+/// root-entry fallback.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum PackageDefect {
@@ -176,7 +176,7 @@ pub enum ContentDefect {
     /// `percentage` cell whose `office:value` is absent or not a finite
     /// decimal (a locale-comma `"1,5"`, `"NaN"`, an empty string), a
     /// `boolean` cell whose value is not `true`/`false`/`1`/`0`, or a `date`
-    /// or `time` cell without its value attribute (LENIENCY_AUDIT F9.8).
+    /// or `time` cell without its value attribute.
     ///
     /// LibreOffice's Calc import never aborts on one bad cell value: a failed
     /// numeric conversion leaves the cell at a default value and the import
@@ -191,7 +191,7 @@ pub enum ContentDefect {
     CellValueUnparseable,
     /// A child of `table:calculation-settings` other than `table:null-date`
     /// and `table:iteration` — a vendor or LibreOffice extension element, or
-    /// an element of a later ODF version (LENIENCY_AUDIT F9.9).
+    /// an element of a later ODF version.
     ///
     /// ODF 1.2 Part 1 §3.3 makes foreign elements ignorable, and LibreOffice's
     /// `ScXMLCalculationSettingsContext::createFastChildContext` returns no
@@ -202,8 +202,7 @@ pub enum ContentDefect {
     /// 1 for an unknown table-namespace child. There is no location.
     CalculationSettingsUnknownChild,
     /// `table:null-date` followed `table:iteration` inside
-    /// `table:calculation-settings`, against the schema's sequence order
-    /// (LENIENCY_AUDIT F9.9).
+    /// `table:calculation-settings`, against the schema's sequence order.
     ///
     /// LibreOffice dispatches each child by name and reads either order. The
     /// repair accepts both settings exactly as in schema order; a duplicate
@@ -212,8 +211,7 @@ pub enum ContentDefect {
     /// An ODP slide's animation tree contained an element the reader cannot
     /// map: an animation-namespace element outside the SMIL vocabulary the
     /// reader models (newer SMIL constructs, a later ODF version), or a
-    /// foreign-namespace element inside an animation node (LENIENCY_AUDIT
-    /// F9.10).
+    /// foreign-namespace element inside an animation node.
     ///
     /// ODF 1.2 Part 1 §3.3 makes foreign elements ignorable and the SMIL
     /// profile is extensible. LibreOffice's `AnimationNodeContext`
@@ -226,8 +224,8 @@ pub enum ContentDefect {
     /// element inside an animation node; the location is the slide
     /// ([`DefectLocation::Slide`]).
     UnknownAnimationElement,
-    /// `content.xml` carried a document type declaration in its prologue
-    /// (LENIENCY_AUDIT F9.11), as old generator pipelines (DocBook-to-ODF
+    /// `content.xml` carried a document type declaration in its prologue,
+    /// as old generator pipelines (DocBook-to-ODF
     /// stylesheets, OpenOffice.org 1.x-style prologues, hand-assembled
     /// parts) emit.
     ///

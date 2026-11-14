@@ -200,7 +200,7 @@ fn validate_canonical_relationship_values(
             return Err(invalid("relationship fields must not be empty"));
         }
         // A source Id that is not an XML ID was admitted verbatim at ingress
-        // and is carried forward (LENIENCY_AUDIT 2.12); authored Ids must be
+        // and is carried forward; authored Ids must be
         // XML IDs.
         let id = relationship.r_id();
         let admitted = crate::pkgreader::is_xml_id(id)

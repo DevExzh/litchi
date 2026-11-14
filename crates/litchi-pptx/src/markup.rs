@@ -11,7 +11,7 @@ use crate::{Error, Result};
 /// `xml` without its processing instructions, and whether it had any.
 ///
 /// Processing instructions are legal XML 1.0 (§2.6) that carry no OOXML
-/// content (audit finding 6.3), but the shared markup-compatibility
+/// content, but the shared markup-compatibility
 /// processor and several feature codecs refuse them. A tolerant reader runs
 /// its semantic parse over this output and records
 /// [`crate::MarkupDefect::ProcessingInstruction`] when the flag is set; the

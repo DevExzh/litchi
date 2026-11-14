@@ -55,8 +55,7 @@ fn rejects_invalid_visual_extension_values() {
         let source = format!(
             r#"<w:document xmlns:w="{W}" xmlns:w15="{W15}" xmlns:mc="{MC}" mc:Ignorable="w15"><w:body><w:sdtPr>{body}</w:sdtPr></w:body></w:document>"#
         );
-        // Invalid values degrade only the property and are recorded
-        // (leniency F2.8).
+        // Invalid values degrade only the property and are recorded.
         let inventory = Inventory::parse(source.as_bytes(), &Default::default()).unwrap();
         let control = inventory.occurrences()[0].control();
         assert_eq!(control.appearance(), None, "{body}");

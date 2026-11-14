@@ -453,7 +453,7 @@ fn a_malformed_relationship_part_keeps_its_error_anywhere_in_a_run() {
 
 #[test]
 fn a_duplicate_relationship_id_keeps_its_repair_anywhere_in_a_run() {
-    // LENIENCY_AUDIT 8.5: a duplicated Id is a recorded first-wins repair,
+    // A duplicated Id is a recorded first-wins repair,
     // and coalescing the structural fetch must not move that verdict.
     for position in [0usize, 3, 7] {
         let bytes = run_package(8, Some((position, duplicate_id_rels())));

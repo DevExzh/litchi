@@ -105,7 +105,7 @@ pub fn parse(xml: &str, limits: XmlStreamLimits) -> OdfResult<Option<Settings>> 
 /// An unknown or foreign-namespace child of `table:calculation-settings` is
 /// skipped with its whole subtree and a `table:null-date` that follows
 /// `table:iteration` is accepted, each recorded as a
-/// [`ContentDefect`] (LENIENCY_AUDIT F9.9), exactly as LibreOffice's
+/// [`ContentDefect`], exactly as LibreOffice's
 /// `ScXMLCalculationSettingsContext` ignores children it does not handle.
 ///
 /// # Errors
@@ -223,7 +223,7 @@ enum OpenPhase {
     Children,
     /// Inside a `table:null-date` or `table:iteration` written with an end tag.
     Child,
-    /// Inside an unknown child subtree being skipped (F9.9), `depth` (at
+    /// Inside an unknown child subtree being skipped, `depth` (at
     /// least one) open elements deep.
     Skipping { depth: usize },
 }
@@ -523,7 +523,7 @@ fn parse_settings_attributes(
 /// [`ContentDefect::CalculationSettingsUnknownChild`] and returns `false`;
 /// the caller skips its subtree, the way LibreOffice's
 /// `ScXMLCalculationSettingsContext::createFastChildContext` returns no
-/// context for it (LENIENCY_AUDIT F9.9).
+/// context for it.
 fn settings_child(
     settings: &mut Settings,
     resolver: &NamespaceResolver,

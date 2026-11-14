@@ -407,7 +407,7 @@ fn raw_zip_negatives_are_rejected_by_the_open_boundary() {
         assert!(Package::from_bytes(&raw_negative_package(xml)).is_err());
     }
     // A prologue DOCTYPE is ignored without being processed (the shared ODF
-    // leniency F9.11, as LibreOffice's SAX import does), so the template
+    // repair, as LibreOffice's SAX import does), so the template
     // opens with the same body; an entity such a DTD would declare stays
     // undeclared, so a body that references one is still refused.
     let dtd = COMPACT_CONTENT.replacen(

@@ -1214,7 +1214,7 @@ fn parse_reference(
     if !is_xml_id(&relationship_id) {
         // ST_RelationshipId is an xsd:ID, but relationship lookup is literal
         // string equality, so Word and LibreOffice resolve a numeric ID such
-        // as "0" or "1" (LENIENCY_AUDIT 2.12). Keep it and record it.
+        // as "0" or "1". Keep it and record it.
         tolerance.record(SectionDefect::NonConformingRelationshipId, offset as u64);
     }
     Ok(Reference {

@@ -1196,7 +1196,7 @@ fn tolerated(slide: &Slide<'_>) -> Vec<(crate::Defect, u32, crate::DefectLocatio
 }
 
 /// Duplicated round-trip placeholder atoms keep the first occurrence and
-/// undefined placeholder IDs read as absent; both are recorded (F5.11).
+/// undefined placeholder IDs read as absent; both are recorded.
 #[test]
 fn repairs_duplicate_or_undefined_powerpoint12_placeholder_atoms() {
     use crate::{Defect, DefectLocation, HeaderFooterPlaceholder, NewPlaceholder, ShapeDefect};
@@ -1278,8 +1278,8 @@ fn repairs_duplicate_or_undefined_powerpoint12_placeholder_atoms() {
     }
 }
 
-/// A round-trip atom with a malformed header or size drops its shape alone
-/// (F5.11); a truncated atom breaks `ClientData` framing and stays fatal.
+/// A round-trip atom with a malformed header or size drops its shape alone;
+/// a truncated atom breaks `ClientData` framing and stays fatal.
 #[test]
 fn isolates_malformed_powerpoint12_placeholder_atoms_per_shape() {
     use crate::{Defect, DefectLocation, ShapeDefect};

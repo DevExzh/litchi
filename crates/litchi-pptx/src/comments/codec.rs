@@ -122,7 +122,7 @@ fn parse_comment_authors_document(
 }
 
 /// Parse a legacy slide comment list (`p:cmLst`), applying the
-/// `PowerPoint`-compatible repairs of audit finding 6.12: a comment with
+/// `PowerPoint`-compatible repairs: a comment with
 /// `idx="0"` is kept as written, and a comment repeating an earlier
 /// `(authorId, idx)` key is kept after it (see [`CommentDefect`]). Use
 /// [`parse_slide_comments_with_tolerance`] to collect what was repaired, or
@@ -659,7 +659,7 @@ fn parse_document_processed(
 /// comments owner treats them as inert source markup. Remove PIs only from
 /// the temporary semantic input; source-bound collaboration codecs continue
 /// to retain the original bytes for exact no-ops and inverse patches. The
-/// flag reports whether any were removed (audit finding 6.3).
+/// flag reports whether any were removed.
 fn process_comment_mce(xml: &[u8], limits: Limits) -> Result<(Cow<'_, [u8]>, bool)> {
     let (filtered, found) = crate::markup::without_processing_instructions(xml)?;
     let mce_limits = MceLimits {
