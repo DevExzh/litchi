@@ -1,6 +1,6 @@
 //! Emits one append-only PPT `UserEdit` transaction.
 
-use super::super::{Editor, Result, mapping, rewrite};
+use super::super::{EditState, Editor, Result, mapping, rewrite};
 use crate::package::Error;
 use crate::writer::{PersistPtrBuilder, UserEditAtom};
 use litchi_cfb::{OleFile, OleWriter};
@@ -8,15 +8,19 @@ use std::collections::BTreeMap;
 use std::io::{self, Cursor, Seek, SeekFrom, Write};
 
 pub(crate) fn finish(mut editor: Editor) -> Result<Vec<u8>> {
-    if !editor.changed {
-        ensure_output_limit(editor.original.len(), editor.max_output_bytes, "source")?;
-        let mut original = Vec::new();
-        original
-            .try_reserve_exact(editor.original.len())
-            .map_err(|_err| Error::AllocationFailed("PowerPoint editor source"))?;
-        original.extend_from_slice(&editor.original);
-        return Ok(original);
-    }
+    let rewrite_object_list = match editor.state {
+        EditState::Unchanged => {
+            ensure_output_limit(editor.original.len(), editor.max_output_bytes, "source")?;
+            let mut original = Vec::new();
+            original
+                .try_reserve_exact(editor.original.len())
+                .map_err(|_err| Error::AllocationFailed("PowerPoint editor source"))?;
+            original.extend_from_slice(&editor.original);
+            return Ok(original);
+        },
+        EditState::Changed => false,
+        EditState::ObjectListChanged => true,
+    };
     if editor.signed {
         return Err(Error::Corrupted(
             "signed PPT is not eligible for a changed OLE publication".into(),
@@ -43,7 +47,7 @@ pub(crate) fn finish(mut editor: Editor) -> Result<Vec<u8>> {
             checked_projected_len(projected_len, record.len(), editor.max_output_bytes)?;
     }
 
-    let rewritten_document = if editor.rewrite_object_list {
+    let rewritten_document = if rewrite_object_list {
         let document = rewritten_object_list(&editor)?;
         editor.mappings.insert(
             editor.document_persist_id,
@@ -340,7 +344,7 @@ mod bounded_cursor_tests {
 
 #[cfg(test)]
 mod candidate_finish_tests {
-    use super::super::super::{Editor, Result};
+    use super::super::super::{EditState, Editor, Result};
     use super::{
         BoundedCursor, append_checked, checked_projected_len, output_limit_error,
         persist_directory_record_len, stream_refs, validate_rewrite,
@@ -387,7 +391,7 @@ mod candidate_finish_tests {
 
     fn finish_reference(mut editor: Editor) -> Result<Vec<u8>> {
         assert!(
-            editor.changed,
+            editor.state != EditState::Unchanged,
             "the reference helper covers changed commits"
         );
 
@@ -411,7 +415,7 @@ mod candidate_finish_tests {
                 checked_projected_len(projected_len, record.len(), editor.max_output_bytes)?;
         }
 
-        let rewritten_document = if editor.rewrite_object_list {
+        let rewritten_document = if editor.state == EditState::ObjectListChanged {
             let document = super::rewritten_object_list(&editor)?;
             editor.mappings.insert(
                 editor.document_persist_id,

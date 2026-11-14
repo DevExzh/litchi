@@ -564,6 +564,15 @@ struct OwnedParagraph {
     runs: Vec<String>,
 }
 
+/// The one batch an append transaction stages, with the run and input-byte
+/// counts its preflight observed. It holds at least one paragraph: an empty
+/// append stages nothing and leaves the transaction an exact no-op.
+struct StagedBatch {
+    paragraphs: Vec<OwnedParagraph>,
+    run_count: usize,
+    input_bytes: usize,
+}
+
 /// A detached, selector-first append transaction.
 ///
 /// ```
@@ -582,9 +591,8 @@ pub struct Edit {
     source: Package,
     selector: TailSelector,
     limits: SemanticLimits,
-    paragraphs: Vec<OwnedParagraph>,
-    run_count: usize,
-    input_bytes: usize,
+    /// `None` until a non-empty batch is staged; a second batch is refused.
+    staged: Option<StagedBatch>,
 }
 
 impl Edit {
@@ -595,9 +603,7 @@ impl Edit {
             source: source.clone(),
             selector,
             limits: SemanticLimits::default(),
-            paragraphs: Vec::new(),
-            run_count: 0,
-            input_bytes: 0,
+            staged: None,
         }
     }
 
@@ -634,19 +640,27 @@ impl Edit {
     /// Number of staged paragraphs.
     #[must_use]
     pub fn paragraph_count(&self) -> usize {
-        self.paragraphs.len()
+        self.staged
+            .as_ref()
+            .map_or(0, |batch| batch.paragraphs.len())
     }
 
     /// Number of staged runs.
     #[must_use]
     pub const fn run_count(&self) -> usize {
-        self.run_count
+        match &self.staged {
+            Some(batch) => batch.run_count,
+            None => 0,
+        }
     }
 
     /// UTF-8 bytes copied from the caller's submitted text.
     #[must_use]
     pub const fn input_bytes(&self) -> usize {
-        self.input_bytes
+        match &self.staged {
+            Some(batch) => batch.input_bytes,
+            None => 0,
+        }
     }
 
     /// Stages one or more borrowed plain paragraphs atomically.
@@ -659,7 +673,7 @@ impl Edit {
         &mut self,
         paragraphs: &[PlainParagraph<'_>],
     ) -> Result<&mut Self, Error> {
-        if !self.paragraphs.is_empty() {
+        if self.staged.is_some() {
             return Err(Error::unsupported_operation(
                 "the edit already has a staged batch",
             ));
@@ -698,16 +712,18 @@ impl Edit {
             }
             owned.push(OwnedParagraph { runs });
         }
-        self.paragraphs = owned;
-        self.run_count = observed_runs;
-        self.input_bytes = observed_input_bytes;
+        self.staged = Some(StagedBatch {
+            paragraphs: owned,
+            run_count: observed_runs,
+            input_bytes: observed_input_bytes,
+        });
         Ok(self)
     }
 
     /// Alias that makes the plain-text ownership boundary explicit at call
     /// Convenience staging method for one plain-text run per paragraph.
     pub fn append_text_paragraphs(&mut self, paragraphs: &[&str]) -> Result<&mut Self, Error> {
-        if !self.paragraphs.is_empty() {
+        if self.staged.is_some() {
             return Err(Error::unsupported_operation(
                 "the edit already has a staged batch",
             ));
@@ -823,25 +839,29 @@ impl Edit {
         let source_version = self.source.source_version();
 
         let (root_close, inserted_len, input_bytes, paragraphs, runs, ends_with_par) =
-            if self.paragraphs.is_empty() {
-                // An empty append remains an exact identity transition, but the
-                // publication-only path still proves that the source is eligible
-                // for direct output before it touches the sink.  The established
-                // semantic commit path retains its broader exact-no-op behavior.
-                let proof = prove_splice_source(&self.source, self.selector)?;
-                (source_length, 0, 0, 0, 0, proof.ends_with_par)
-            } else {
-                let proof = prove_splice_source(&self.source, self.selector)?;
-                let inserted_len =
-                    encoded_inserted_len(&self.source, &self.paragraphs, proof.ends_with_par)?;
-                (
-                    proof.root_close,
-                    inserted_len,
-                    self.input_bytes,
-                    self.paragraphs.len(),
-                    self.run_count,
-                    proof.ends_with_par,
-                )
+            match &self.staged {
+                None => {
+                    // An empty append remains an exact identity transition, but
+                    // the publication-only path still proves that the source is
+                    // eligible for direct output before it touches the sink.  The
+                    // established semantic commit path retains its broader
+                    // exact-no-op behavior.
+                    let proof = prove_splice_source(&self.source, self.selector)?;
+                    (source_length, 0, 0, 0, 0, proof.ends_with_par)
+                },
+                Some(batch) => {
+                    let proof = prove_splice_source(&self.source, self.selector)?;
+                    let inserted_len =
+                        encoded_inserted_len(&self.source, &batch.paragraphs, proof.ends_with_par)?;
+                    (
+                        proof.root_close,
+                        inserted_len,
+                        batch.input_bytes,
+                        batch.paragraphs.len(),
+                        batch.run_count,
+                        proof.ends_with_par,
+                    )
+                },
             };
         if inserted_len > self.limits.max_inserted_bytes {
             return Err(Error::Limit {
@@ -896,11 +916,12 @@ impl Edit {
             None
         };
 
-        let inserted = if inserted_len == 0 {
-            Box::new([])
-        } else {
-            encode_inserted(&self.source, &self.paragraphs, ends_with_par, inserted_len)?
-                .into_boxed_slice()
+        let inserted = match &self.staged {
+            Some(batch) if inserted_len != 0 => {
+                encode_inserted(&self.source, &batch.paragraphs, ends_with_par, inserted_len)?
+                    .into_boxed_slice()
+            },
+            Some(_) | None => Box::new([]),
         };
         if inserted.len() != inserted_len {
             return Err(Error::unsupported_source(
@@ -934,8 +955,7 @@ impl Edit {
                 "the selector is not supported by this edit family",
             )));
         }
-        let operation_count = usize::from(!self.paragraphs.is_empty());
-        if self.paragraphs.is_empty() {
+        let Some(batch) = &self.staged else {
             let source_bytes = self.source.source_bytes().map_or(0, <[u8]>::len);
             let patch = Patch::no_op(self.source.clone(), self.selector);
             return Ok(Commit {
@@ -943,7 +963,7 @@ impl Edit {
                 patch,
                 diagnostics: Diagnostics {
                     changed: false,
-                    operation_count,
+                    operation_count: 0,
                     paragraphs: 0,
                     runs: 0,
                     input_bytes: 0,
@@ -952,7 +972,7 @@ impl Edit {
                     output_bytes: source_bytes,
                 },
             });
-        }
+        };
         let proof = prove_splice_source(&self.source, self.selector)?;
         let source_bytes = self
             .source
@@ -961,7 +981,7 @@ impl Edit {
                 "snapshot has no exact RTF source",
             ))?;
         let inserted_len =
-            encoded_inserted_len(&self.source, &self.paragraphs, proof.ends_with_par)?;
+            encoded_inserted_len(&self.source, &batch.paragraphs, proof.ends_with_par)?;
         if inserted_len > self.limits.max_inserted_bytes {
             return Err(Error::Limit {
                 kind: LimitKind::InsertedBytes,
@@ -993,7 +1013,7 @@ impl Edit {
         }
         let inserted = encode_inserted(
             &self.source,
-            &self.paragraphs,
+            &batch.paragraphs,
             proof.ends_with_par,
             inserted_len,
         )?;
@@ -1022,7 +1042,7 @@ impl Edit {
         verify_candidate(
             &self.source,
             &candidate,
-            &self.paragraphs,
+            &batch.paragraphs,
             proof.ends_with_par,
         )?;
         let patch = Patch {
@@ -1041,10 +1061,10 @@ impl Edit {
             patch,
             diagnostics: Diagnostics {
                 changed: true,
-                operation_count,
-                paragraphs: self.paragraphs.len(),
-                runs: self.run_count,
-                input_bytes: self.input_bytes,
+                operation_count: 1,
+                paragraphs: batch.paragraphs.len(),
+                runs: batch.run_count,
+                input_bytes: batch.input_bytes,
                 source_bytes: source_bytes.len(),
                 inserted_bytes: output_len.saturating_sub(source_bytes.len()),
                 output_bytes: output_len,
@@ -1646,9 +1666,8 @@ pub(crate) struct TailAppendSourceEdit {
     proof: TailAppendSourceProof,
     selector: TailSelector,
     limits: SemanticLimits,
-    paragraphs: Vec<OwnedParagraph>,
-    run_count: usize,
-    input_bytes: usize,
+    /// `None` until a non-empty batch is staged; a second batch is refused.
+    staged: Option<StagedBatch>,
 }
 
 impl fmt::Debug for TailAppendSourceEdit {
@@ -1658,9 +1677,12 @@ impl fmt::Debug for TailAppendSourceEdit {
             .field("proof", &self.proof)
             .field("selector", &self.selector)
             .field("limits", &self.limits)
-            .field("paragraphs", &self.paragraphs.len())
-            .field("run_count", &self.run_count)
-            .field("input_bytes", &self.input_bytes)
+            .field("paragraphs", &self.paragraph_count())
+            .field("run_count", &self.run_count())
+            .field(
+                "input_bytes",
+                &self.staged.as_ref().map_or(0, |batch| batch.input_bytes),
+            )
             .finish()
     }
 }
@@ -1678,9 +1700,7 @@ impl TailAppendSourceEdit {
             proof,
             selector,
             limits: SemanticLimits::default(),
-            paragraphs: Vec::new(),
-            run_count: 0,
-            input_bytes: 0,
+            staged: None,
         }
     }
 
@@ -1706,13 +1726,18 @@ impl TailAppendSourceEdit {
     /// Number of staged paragraphs.
     #[must_use]
     pub(crate) fn paragraph_count(&self) -> usize {
-        self.paragraphs.len()
+        self.staged
+            .as_ref()
+            .map_or(0, |batch| batch.paragraphs.len())
     }
 
     /// Number of staged runs.
     #[must_use]
     pub(crate) const fn run_count(&self) -> usize {
-        self.run_count
+        match &self.staged {
+            Some(batch) => batch.run_count,
+            None => 0,
+        }
     }
 
     /// Stages one bounded batch of borrowed plain paragraphs.
@@ -1720,7 +1745,7 @@ impl TailAppendSourceEdit {
         &mut self,
         paragraphs: &[PlainParagraph<'_>],
     ) -> Result<&mut Self, Error> {
-        if !self.paragraphs.is_empty() {
+        if self.staged.is_some() {
             return Err(Error::unsupported_operation(
                 "the edit already has a staged batch",
             ));
@@ -1729,9 +1754,11 @@ impl TailAppendSourceEdit {
             return Ok(self);
         }
         let (owned, run_count, input_bytes) = stage_plain_paragraphs(paragraphs, self.limits)?;
-        self.paragraphs = owned;
-        self.run_count = run_count;
-        self.input_bytes = input_bytes;
+        self.staged = Some(StagedBatch {
+            paragraphs: owned,
+            run_count,
+            input_bytes,
+        });
         Ok(self)
     }
 
@@ -1740,7 +1767,7 @@ impl TailAppendSourceEdit {
         &mut self,
         paragraphs: &[&str],
     ) -> Result<&mut Self, Error> {
-        if !self.paragraphs.is_empty() {
+        if self.staged.is_some() {
             return Err(Error::unsupported_operation(
                 "the edit already has a staged batch",
             ));
@@ -1860,24 +1887,22 @@ impl TailAppendSourceEdit {
                 maximum: self.proof.source_limit,
             })
         })?;
-        let root_close = if self.paragraphs.is_empty() {
-            source_length_usize
-        } else {
-            self.proof.root_close
+        let root_close = match &self.staged {
+            None => source_length_usize,
+            Some(_) => self.proof.root_close,
         };
         if root_close > source_length_usize {
             return Err(TailAppendPublicationError::Plan(Error::unsupported_source(
                 "source-backed root-close proof is outside the source",
             )));
         }
-        let inserted_len = if self.paragraphs.is_empty() {
-            0
-        } else {
-            encoded_inserted_len_for_body(
+        let inserted_len = match &self.staged {
+            None => 0,
+            Some(batch) => encoded_inserted_len_for_body(
                 self.proof.body_nonempty,
-                &self.paragraphs,
+                &batch.paragraphs,
                 self.proof.ends_with_par,
-            )?
+            )?,
         };
         if inserted_len > self.limits.max_inserted_bytes {
             return Err(TailAppendPublicationError::Plan(Error::Limit {
@@ -1952,16 +1977,15 @@ impl TailAppendSourceEdit {
         } else {
             None
         };
-        let inserted = if inserted_len == 0 {
-            Box::new([])
-        } else {
-            encode_inserted_for_body(
+        let inserted = match &self.staged {
+            Some(batch) if inserted_len != 0 => encode_inserted_for_body(
                 self.proof.body_nonempty,
-                &self.paragraphs,
+                &batch.paragraphs,
                 self.proof.ends_with_par,
                 inserted_len,
             )?
-            .into_boxed_slice()
+            .into_boxed_slice(),
+            Some(_) | None => Box::new([]),
         };
         if inserted.len() != inserted_len {
             return Err(TailAppendPublicationError::Plan(Error::unsupported_source(
@@ -2035,6 +2059,10 @@ impl TailAppendSourceEdit {
             let _ = reservation.commit(0);
         }
         let source_digest = self.proof.source_digest.clone();
+        let (input_bytes, paragraphs, runs) = match &self.staged {
+            Some(batch) => (batch.input_bytes, batch.paragraphs.len(), batch.run_count),
+            None => (0, 0, 0),
+        };
         Ok(TailAppendSourcePublicationPlan {
             source: self.source,
             proof: self.proof,
@@ -2047,9 +2075,9 @@ impl TailAppendSourceEdit {
             source_digest,
             target_digest,
             source_bytes: source_length_usize,
-            input_bytes: self.input_bytes,
-            paragraphs: self.paragraphs.len(),
-            runs: self.run_count,
+            input_bytes,
+            paragraphs,
+            runs,
         })
     }
 }

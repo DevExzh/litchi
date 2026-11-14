@@ -3440,6 +3440,51 @@ fn insert_into_officeart(
     rebuild(record, &data).map_err(Into::into)
 }
 
+/// A record that may follow the text atom of a body whose text length
+/// changes: it holds no character position, or one run whose coverage is
+/// resized with the text.
+#[derive(Clone, Copy)]
+enum PositionFreeRecord {
+    /// `StyleTextPropAtom`, resized.
+    Style,
+    /// `TextSpecialInfoAtom`, resized.
+    SpecialInfo,
+    /// `TextRulerAtom`, kept exact.
+    Ruler,
+}
+
+/// The records seen after a text body's text atom, in source order.
+///
+/// Each position-free record is admitted at most once, in any order. Any
+/// other record, or a repeated one, ends the classification: the body is not
+/// one whose length can change.
+#[derive(Default)]
+struct TextBodyShape {
+    style: bool,
+    special_info: bool,
+    ruler: bool,
+}
+
+impl TextBodyShape {
+    /// Admits the next record after the text atom, or `None` when the body
+    /// is not one whose length can change.
+    fn admit(&mut self, record_type: u16) -> Option<PositionFreeRecord> {
+        let (record, seen) = if record_type == RecordType::StyleTextPropAtom as u16 {
+            (PositionFreeRecord::Style, &mut self.style)
+        } else if record_type == RecordType::TextSpecInfoAtom as u16 {
+            (PositionFreeRecord::SpecialInfo, &mut self.special_info)
+        } else if record_type == RecordType::TextRulerAtom as u16 {
+            (PositionFreeRecord::Ruler, &mut self.ruler)
+        } else {
+            return None;
+        };
+        if std::mem::replace(seen, true) {
+            return None;
+        }
+        Some(record)
+    }
+}
+
 fn insert_into_textbox(textbox: &[u8], encoded: &[u8], units: usize) -> Result<Vec<u8>> {
     let records = children(textbox)?.collect::<PackageResult<Vec<_>>>()?;
     let [header, rest @ ..] = records.as_slice() else {
@@ -3448,12 +3493,7 @@ fn insert_into_textbox(textbox: &[u8], encoded: &[u8], units: usize) -> Result<V
     if record_type(header)? != RecordType::TextHeaderAtom as u16 {
         return Err(Error::Refused(Refusal::NoTextAtom));
     }
-    let resizable = [
-        RecordType::StyleTextPropAtom as u16,
-        RecordType::TextSpecInfoAtom as u16,
-        RecordType::TextRulerAtom as u16,
-    ];
-    let mut seen = [false; 3];
+    let mut shape = TextBodyShape::default();
     let mut data = Vec::with_capacity(textbox.len().saturating_add(encoded.len() + 8));
     data.extend_from_slice(header);
     let length = u32::try_from(encoded.len())
@@ -3463,24 +3503,20 @@ fn insert_into_textbox(textbox: &[u8], encoded: &[u8], units: usize) -> Result<V
     data.extend_from_slice(&length.to_le_bytes());
     data.extend_from_slice(encoded);
     for record in rest {
-        let kind = record_type(record)?;
-        let Some(slot) = resizable.iter().position(|candidate| *candidate == kind) else {
-            // Another record may hold a character position.
+        // Another record, or a repeated one, may hold a character position.
+        let Some(kind) = shape.admit(record_type(record)?) else {
             return Err(Error::Refused(Refusal::NoTextAtom));
         };
-        if std::mem::replace(&mut seen[slot], true) {
-            return Err(Error::Refused(Refusal::NoTextAtom));
-        }
-        match slot {
-            0 => data.extend_from_slice(
+        match kind {
+            PositionFreeRecord::Style => data.extend_from_slice(
                 &crate::StyleTextPropAtom::resize_single_run_record(record, 0, units)?
                     .ok_or(Error::Refused(Refusal::DependencyClosure))?,
             ),
-            1 => data.extend_from_slice(
+            PositionFreeRecord::SpecialInfo => data.extend_from_slice(
                 &crate::TextSpecialInfoRuns::resize_single_run_record(record, 0, units)?
                     .ok_or(Error::Refused(Refusal::DependencyClosure))?,
             ),
-            _ => data.extend_from_slice(record),
+            PositionFreeRecord::Ruler => data.extend_from_slice(record),
         }
     }
     rebuild(textbox, &data).map_err(Into::into)
@@ -4059,17 +4095,9 @@ fn resize_dependency_closure_is_modeled(
     if *header != text_header || (*text != text_bytes && *text != text_chars) {
         return Ok(false);
     }
-    let resizable = [
-        RecordType::StyleTextPropAtom as u16,
-        RecordType::TextSpecInfoAtom as u16,
-        RecordType::TextRulerAtom as u16,
-    ];
-    let mut seen = [false; 3];
+    let mut shape = TextBodyShape::default();
     for child_type in rest {
-        let Some(slot) = resizable.iter().position(|kind| kind == child_type) else {
-            return Ok(false);
-        };
-        if std::mem::replace(&mut seen[slot], true) {
+        if shape.admit(*child_type).is_none() {
             return Ok(false);
         }
     }

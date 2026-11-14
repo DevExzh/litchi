@@ -24,7 +24,7 @@ pub(crate) fn replace_persisted_record(
 
     let mut candidate = editor.clone();
     candidate.staged_storage.insert(persist_id, record);
-    candidate.changed = true;
+    candidate.state = candidate.state.with_staged_change();
     *editor = candidate;
     Ok(())
 }
@@ -54,7 +54,7 @@ pub(crate) fn insert_persisted_record(
 
     let mut candidate = editor.clone();
     candidate.staged_storage.insert(persist_id, record);
-    candidate.changed = true;
+    candidate.state = candidate.state.with_staged_change();
     *editor = candidate;
     Ok(())
 }

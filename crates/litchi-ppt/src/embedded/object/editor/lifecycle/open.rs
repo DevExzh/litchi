@@ -1,6 +1,6 @@
 //! Package discovery and initial persisted-record state.
 
-use super::super::{Collection, Editor, Result, mapping, rewrite};
+use super::super::{Collection, EditState, Editor, Result, mapping, rewrite};
 use crate::package::{Error, SourceLimits};
 use litchi_cfb::OleFile;
 use litchi_ole_common::protection::is_protected_component;
@@ -150,8 +150,7 @@ fn open_with_limit(
         collection,
         staged_storage: BTreeMap::default(),
         removed_persist_ids: HashSet::default(),
-        rewrite_object_list: false,
-        changed: false,
+        state: EditState::Unchanged,
         layout: litchi_cfb::SectorLayoutPolicy::default(),
         signed,
     })

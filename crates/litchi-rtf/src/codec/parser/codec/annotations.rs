@@ -53,12 +53,12 @@ impl Parser<'_> {
                 "RTF annotation count exceeds the safety limit".to_string(),
             ));
         }
-        if !self.pending_annotation_mark {
+        if !self.pending_annotation.mark {
             return Err(crate::Error::MalformedDocument(
                 "RTF annotation destination requires a preceding chatn marker".to_string(),
             ));
         }
-        self.pending_annotation_mark = false;
+        self.pending_annotation.mark = false;
         self.pos += 2; // ignorable marker and annotation destination
         let mut reference = None;
         let mut date = None;
@@ -314,8 +314,8 @@ impl Parser<'_> {
             annotation_type: super::super::super::annotation::AnnotationType::Comment,
             id,
             has_reference,
-            author: Cow::Owned(std::mem::take(&mut self.pending_annotation_author)),
-            initials: Cow::Owned(std::mem::take(&mut self.pending_annotation_initials)),
+            author: Cow::Owned(self.pending_annotation.author.take().unwrap_or_default()),
+            initials: Cow::Owned(self.pending_annotation.initials.take().unwrap_or_default()),
             date: date.map(Cow::Owned),
             text: Cow::Owned(text.trim_end_matches(['\r', '\n']).to_string()),
             shapes,
@@ -328,8 +328,6 @@ impl Parser<'_> {
             icon: icon.map(Cow::Owned),
             time: time.map(Cow::Owned),
         };
-        self.pending_annotation_author_seen = false;
-        self.pending_annotation_initials_seen = false;
         annotation.validate()?;
         let index = self.annotations.len();
         self.record_annotation_source(index, text_tokens, close_token);
@@ -413,10 +411,7 @@ impl Parser<'_> {
                 "RTF document contains an orphan annotation range".to_string(),
             ));
         }
-        if self.pending_annotation_author_seen
-            || self.pending_annotation_initials_seen
-            || self.pending_annotation_mark
-        {
+        if !self.pending_annotation.is_empty() {
             return Err(crate::Error::MalformedDocument(
                 "RTF document contains orphan annotation metadata".to_string(),
             ));

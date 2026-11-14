@@ -27,6 +27,43 @@ use std::sync::Arc;
 
 type Result<T> = std::result::Result<T, Error>;
 
+/// What [`Editor::finish`] publishes.
+///
+/// - `Unchanged`: nothing was staged; `finish` returns the source bytes.
+/// - `Changed`: a record or a stream was staged; `finish` appends the staged
+///   records, a persist directory and a `UserEdit` atom.
+/// - `ObjectListChanged`: the external-object list was changed as well;
+///   `finish` also appends a rewritten document record after the staged
+///   records.
+///
+/// ```text
+/// Unchanged         --record or stream staged----------> Changed
+/// Changed           --record or stream staged----------> Changed
+/// Unchanged/Changed --object added, removed, reordered--> ObjectListChanged
+/// ObjectListChanged --anything staged-----------------> ObjectListChanged
+/// ```
+///
+/// No transition leads back: unstaging a record, or staging the live bytes
+/// again, leaves the state as it is ([`Editor::has_net_change`] compares
+/// content). A refused staging call leaves it unchanged. A signed source is
+/// refused at `finish` in both changed states.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum EditState {
+    Unchanged,
+    Changed,
+    ObjectListChanged,
+}
+
+impl EditState {
+    /// The state after a record or a stream is staged.
+    pub(super) const fn with_staged_change(self) -> Self {
+        match self {
+            Self::Unchanged | Self::Changed => Self::Changed,
+            Self::ObjectListChanged => Self::ObjectListChanged,
+        }
+    }
+}
+
 /// Appends a new PPT incremental edit; existing persisted bytes never move.
 #[derive(Clone)]
 pub(crate) struct Editor {
@@ -53,8 +90,7 @@ pub(crate) struct Editor {
     pub(super) collection: Collection,
     pub(super) staged_storage: BTreeMap<u32, Vec<u8>>,
     pub(super) removed_persist_ids: HashSet<u32>,
-    pub(super) rewrite_object_list: bool,
-    pub(super) changed: bool,
+    pub(super) state: EditState,
     pub(super) layout: litchi_cfb::SectorLayoutPolicy,
     /// Whether the source carries a digital-signature component. Such an
     /// editor was opened for staging only: [`Self::finish`] refuses any
@@ -265,7 +301,7 @@ impl Editor {
         } else {
             self.streams.push((vec![name.to_string()], data));
         }
-        self.changed = true;
+        self.state = self.state.with_staged_change();
         Ok(())
     }
 
@@ -316,7 +352,7 @@ impl Editor {
     /// a reorder back to the source order or a storage replacement with the
     /// exact live record is no net change.
     pub(crate) fn has_net_change(&self, source: &Collection) -> Result<bool> {
-        if !self.changed {
+        if self.state == EditState::Unchanged {
             return Ok(false);
         }
         if self.collection != *source || !self.removed_persist_ids.is_empty() {

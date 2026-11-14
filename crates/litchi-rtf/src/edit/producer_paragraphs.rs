@@ -59,6 +59,41 @@ enum Reset {
     Character,
 }
 
+/// Where the body cut stands at the root while the tokens are read.
+///
+/// - `Normal`: between paragraphs or inside one.
+/// - `Row`: inside a table row, from `\trowd` or `\intbl` at the root
+///   through its `\row`. Its cell `\par` and `\cell` controls are not body
+///   paragraph boundaries.
+/// - `Section`: after a root-level section break, while root-level control
+///   words other than `\pard` follow it. The break and those controls are a
+///   block of their own that is not a body paragraph.
+/// - `AwaitingGroupClose { ends_row }`: a `\par` ended a paragraph inside a
+///   formatting group (`{\b text\par}`, as Word and WordPad write), or a
+///   `\row` ended a table row inside one (`ends_row`). The boundary falls
+///   where the group closes back to the root; only whitespace may come first.
+///
+/// ```text
+/// Normal  --root \trowd or \intbl------------> Row
+/// Row     --root \row------------------------> Normal
+/// Row     --\row inside a formatting group---> AwaitingGroupClose { ends_row: true }
+/// Normal  --\par inside a formatting group---> AwaitingGroupClose { ends_row: false }
+/// AwaitingGroupClose --group closes to root--> Normal
+/// Normal  --root section break---------------> Section
+/// Section --root control word but \pard------> Section
+/// Section --any other token------------------> Normal, which then reads that token
+/// ```
+///
+/// A body that ends in `Row`, or in `AwaitingGroupClose { ends_row: true }`,
+/// has a table row without its own `\row`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootState {
+    Normal,
+    Row,
+    Section,
+    AwaitingGroupClose { ends_row: bool },
+}
+
 const GROUP_CONTINUES: &str = "a paragraph ends inside a group that continues with more content";
 
 /// One paragraph's source segment: from the end of the previous paragraph's
@@ -290,30 +325,19 @@ fn segments(source: &Package, input: &str) -> Result<Segments, Error> {
     // (header, note, field, picture, `\*` extension) whose `\par` controls
     // belong to another story.
     let mut destinations: Vec<bool> = Vec::new();
-    // A `\par` that ends a character-formatting group (`{\b text\par}`,
-    // as Word and WordPad write) bounds its paragraph where the group
-    // closes back to the root; content after it inside the group does not.
-    let mut pending_group_par = false;
-    // Whether the pending group boundary ends a table row.
-    let mut pending_row = false;
+    let mut state = RootState::Normal;
     let mut first_fallback = None;
     // The generated list marker group (`{\listtext ...}`, `{\pntext ...}`)
     // that precedes a paragraph belongs to it: its start, and its end once
     // closed, while nothing else followed at the root.
     let mut marker: Option<(usize, Option<usize>)> = None;
     let mut controls = Vec::new();
-    // Inside a table row: from `\trowd` or `\intbl` at the root through
-    // its `\row`, whose cell `\par`/`\cell` controls are not body
-    // paragraph boundaries. Each boundary records whether it ends a row.
-    let mut in_row = false;
+    // Whether each boundary ends a block that is not a body paragraph (a
+    // table row or a section break block).
     let mut rows: Vec<bool> = Vec::new();
     let mut unknown = Vec::new();
-    // A root-level `\sect` and the section controls after it, through the
-    // next paragraph reset, text or group, are a block of their own that is
-    // not a body paragraph.
-    let mut in_section = false;
     for (token, span) in tokens.iter().zip(&spans) {
-        if in_section {
+        if state == RootState::Section {
             match token {
                 Token::Control(control) if depth == 1 && !matches!(control, ControlWord::Pard) => {
                     continue;
@@ -321,7 +345,7 @@ fn segments(source: &Package, input: &str) -> Result<Segments, Error> {
                 _ => {
                     boundaries.push(span.start);
                     rows.push(true);
-                    in_section = false;
+                    state = RootState::Normal;
                 },
             }
         }
@@ -356,19 +380,15 @@ fn segments(source: &Package, input: &str) -> Result<Segments, Error> {
         {
             unknown.push(span.start);
         }
-        if pending_group_par {
+        if let RootState::AwaitingGroupClose { ends_row } = state {
             match token {
                 Token::CloseBrace => {
                     depth = depth.saturating_sub(1);
                     destinations.pop();
                     if depth == 1 {
                         boundaries.push(boundary_end(input, span.end));
-                        rows.push(pending_row);
-                        if pending_row {
-                            in_row = false;
-                        }
-                        pending_group_par = false;
-                        pending_row = false;
+                        rows.push(ends_row);
+                        state = RootState::Normal;
                     }
                     continue;
                 },
@@ -410,9 +430,9 @@ fn segments(source: &Package, input: &str) -> Result<Segments, Error> {
                 }
             },
             Token::Control(ControlWord::TableRowDefaults | ControlWord::InTable)
-                if depth == 1 && !in_destination && !in_row =>
+                if depth == 1 && !in_destination && state != RootState::Row =>
             {
-                in_row = true;
+                state = RootState::Row;
                 if boundaries.is_empty() && first_start.is_none() {
                     first_start = Some(match marker {
                         Some((start, Some(_))) => start,
@@ -420,19 +440,23 @@ fn segments(source: &Package, input: &str) -> Result<Segments, Error> {
                     });
                 }
             },
-            Token::Control(ControlWord::TableRow) if depth == 1 && in_row => {
+            Token::Control(ControlWord::TableRow) if depth == 1 && state == RootState::Row => {
                 boundaries.push(boundary_end(input, span.end));
                 rows.push(true);
-                in_row = false;
+                state = RootState::Normal;
             },
-            Token::Control(ControlWord::TableRow) if depth > 1 && in_row && !in_destination => {
+            Token::Control(ControlWord::TableRow)
+                if depth > 1 && state == RootState::Row && !in_destination =>
+            {
                 // A row that ends a formatting group (`{\b ...\row }`, as
                 // Word writes it) ends where the group closes.
-                pending_group_par = true;
-                pending_row = true;
+                state = RootState::AwaitingGroupClose { ends_row: true };
             },
-            Token::Control(ControlWord::Par | ControlWord::TableCell) if in_row => {},
-            Token::Control(ControlWord::Pard) if depth == 1 && boundaries.is_empty() && !in_row => {
+            Token::Control(ControlWord::Par | ControlWord::TableCell)
+                if state == RootState::Row => {},
+            Token::Control(ControlWord::Pard)
+                if depth == 1 && boundaries.is_empty() && state != RootState::Row =>
+            {
                 // The last paragraph reset before the first boundary opens
                 // the first paragraph; header destinations precede it, and
                 // so does a list marker group just before the reset.
@@ -456,8 +480,13 @@ fn segments(source: &Package, input: &str) -> Result<Segments, Error> {
                 // them.
                 first_fallback.get_or_insert(span.start);
             },
-            Token::Control(ControlWord::Par) if depth > 1 && !in_destination && !in_row => {
-                pending_group_par = true;
+            Token::Control(ControlWord::Par)
+                if depth > 1 && !in_destination && state != RootState::Row =>
+            {
+                // A `\par` that ends a character-formatting group bounds its
+                // paragraph where the group closes back to the root; content
+                // after it inside the group does not.
+                state = RootState::AwaitingGroupClose { ends_row: false };
             },
             Token::Control(ControlWord::TableRow | ControlWord::TableCell) if !in_destination => {
                 return Err(Error::unsupported_source(
@@ -465,7 +494,7 @@ fn segments(source: &Package, input: &str) -> Result<Segments, Error> {
                 ));
             },
             Token::Control(ControlWord::SectionBreak)
-                if depth == 1 && !in_destination && !in_row && !pending_group_par =>
+                if depth == 1 && !in_destination && state == RootState::Normal =>
             {
                 let start =
                     boundaries
@@ -480,7 +509,7 @@ fn segments(source: &Package, input: &str) -> Result<Segments, Error> {
                     boundaries.push(span.start);
                     rows.push(false);
                 }
-                in_section = true;
+                state = RootState::Section;
             },
             Token::Control(ControlWord::SectionBreak) if !in_destination => {
                 return Err(Error::unsupported_source(
@@ -500,10 +529,15 @@ fn segments(source: &Package, input: &str) -> Result<Segments, Error> {
     ))?;
     // Document-level controls before the body are in effect everywhere.
     controls.retain(|(range, _)| range.start >= first_start);
-    if in_row {
-        return Err(Error::unsupported_source(
-            "a table row of the body has no \\row of its own",
-        ));
+    match state {
+        RootState::Row | RootState::AwaitingGroupClose { ends_row: true } => {
+            return Err(Error::unsupported_source(
+                "a table row of the body has no \\row of its own",
+            ));
+        },
+        RootState::Normal
+        | RootState::Section
+        | RootState::AwaitingGroupClose { ends_row: false } => {},
     }
     let mut blocks = Vec::new();
     blocks

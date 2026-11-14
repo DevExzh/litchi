@@ -1,6 +1,6 @@
 //! External-object collection mutations and storage staging.
 
-use super::super::{Editor, ExternalObject, Result};
+use super::super::{EditState, Editor, ExternalObject, Result};
 use crate::embedded::storage::Storage;
 use crate::package::Error;
 
@@ -17,8 +17,7 @@ pub(crate) fn add(
     candidate
         .staged_storage
         .insert(persist_id, storage.to_record_bytes()?);
-    candidate.rewrite_object_list = true;
-    candidate.changed = true;
+    candidate.state = EditState::ObjectListChanged;
     *editor = candidate;
     Ok(persist_id)
 }
@@ -41,7 +40,7 @@ pub(crate) fn replace_storage(
     editor
         .staged_storage
         .insert(persist_id, storage.to_record_bytes()?);
-    editor.changed = true;
+    editor.state = editor.state.with_staged_change();
     Ok(())
 }
 
@@ -62,8 +61,7 @@ pub(crate) fn remove(editor: &mut Editor, id: u32) -> Result<ExternalObject> {
         }
         candidate.staged_storage.remove(&persist);
     }
-    candidate.rewrite_object_list = true;
-    candidate.changed = true;
+    candidate.state = EditState::ObjectListChanged;
     *editor = candidate;
     Ok(removed)
 }
@@ -71,8 +69,7 @@ pub(crate) fn remove(editor: &mut Editor, id: u32) -> Result<ExternalObject> {
 pub(crate) fn reorder(editor: &mut Editor, ids: &[u32]) -> Result<()> {
     let mut candidate = editor.clone();
     candidate.collection.reorder(ids)?;
-    candidate.rewrite_object_list = true;
-    candidate.changed = true;
+    candidate.state = EditState::ObjectListChanged;
     *editor = candidate;
     Ok(())
 }

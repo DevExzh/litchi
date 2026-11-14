@@ -1,4 +1,4 @@
-use super::super::{Collection, Editor};
+use super::super::{Collection, EditState, Editor};
 use crate::package::Error;
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
@@ -42,8 +42,7 @@ fn rejects_a_projected_incremental_stream_above_the_publication_limit() {
         },
         staged_storage,
         removed_persist_ids: HashSet::new(),
-        rewrite_object_list: false,
-        changed: true,
+        state: EditState::Changed,
         layout: litchi_cfb::SectorLayoutPolicy::default(),
         signed: false,
     };

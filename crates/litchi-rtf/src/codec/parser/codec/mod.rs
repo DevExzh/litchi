@@ -1538,6 +1538,26 @@ impl Default for State {
     }
 }
 
+/// Metadata read ahead of the annotation destination it belongs to.
+///
+/// The author (`\atnauthor`), the initials (`\atnid`) and the `\chatn`
+/// marker may come in any order, each at most once; an annotation
+/// destination requires the marker and takes all three. A read author or
+/// initials is `Some` even when its text is empty. Anything still pending at
+/// the end of the document is orphan metadata.
+#[derive(Default)]
+struct PendingAnnotation {
+    author: Option<String>,
+    initials: Option<String>,
+    mark: bool,
+}
+
+impl PendingAnnotation {
+    const fn is_empty(&self) -> bool {
+        self.author.is_none() && self.initials.is_none() && !self.mark
+    }
+}
+
 /// RTF Parser.
 pub(crate) struct Parser<'a> {
     /// Token stream
@@ -1809,13 +1829,8 @@ pub(crate) struct Parser<'a> {
     annotations: Vec<super::super::annotation::Annotation<'a>>,
     /// Parsed annotation reference ranges by numeric identifier.
     annotation_ranges: HashMap<i32, (usize, Option<usize>)>,
-    /// Author metadata immediately preceding an annotation destination.
-    pending_annotation_author: String,
-    pending_annotation_author_seen: bool,
-    /// Author initials immediately preceding an annotation destination.
-    pending_annotation_initials: String,
-    pending_annotation_initials_seen: bool,
-    pending_annotation_mark: bool,
+    /// Metadata for the next annotation destination.
+    pending_annotation: PendingAnnotation,
     /// Footnotes and endnotes
     notes: Vec<super::super::section::Note<'a>>,
     note_options: crate::NoteOptions,

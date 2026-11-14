@@ -936,26 +936,24 @@ impl Parser<'_> {
                             return Ok(true);
                         },
                         Some(Token::Control(ControlWord::AnnotationAuthor)) => {
-                            if self.pending_annotation_author_seen {
+                            if self.pending_annotation.author.is_some() {
                                 return Err(crate::Error::MalformedDocument(
                                     "duplicate pending RTF annotation author".to_string(),
                                 ));
                             }
-                            self.pending_annotation_author =
-                                self.parse_ignorable_text_destination()?;
-                            self.pending_annotation_author_seen = true;
+                            self.pending_annotation.author =
+                                Some(self.parse_ignorable_text_destination()?);
                             self.states.pop();
                             return Ok(true);
                         },
                         Some(Token::Control(ControlWord::AnnotationInitials)) => {
-                            if self.pending_annotation_initials_seen {
+                            if self.pending_annotation.initials.is_some() {
                                 return Err(crate::Error::MalformedDocument(
                                     "duplicate pending RTF annotation initials".to_string(),
                                 ));
                             }
-                            self.pending_annotation_initials =
-                                self.parse_ignorable_text_destination()?;
-                            self.pending_annotation_initials_seen = true;
+                            self.pending_annotation.initials =
+                                Some(self.parse_ignorable_text_destination()?);
                             self.states.pop();
                             return Ok(true);
                         },

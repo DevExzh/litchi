@@ -283,12 +283,12 @@ impl<'a> Parser<'a> {
                 if !text_buffer.is_empty() {
                     self.flush_text_buffer(text_buffer)?;
                 }
-                if self.pending_annotation_mark {
+                if self.pending_annotation.mark {
                     return Err(crate::Error::MalformedDocument(
                         "duplicate pending RTF annotation marker".to_string(),
                     ));
                 }
-                self.pending_annotation_mark = true;
+                self.pending_annotation.mark = true;
                 self.pos += 1;
             },
             ControlWord::Revised(_)
