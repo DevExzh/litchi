@@ -804,4 +804,77 @@ mod xml_envelope_tests {
             assert_eq!(actual, expected, "{label}: {input:?}");
         }
     }
+
+    /// Freezes how a `worksheet` element nested inside an unmodelled child is read: its end
+    /// marks the root closed while the real root is still open, which only the element stack
+    /// keeps apart from a closed root.
+    #[test]
+    fn ignored_errors_nested_worksheet_matrix() {
+        const OPEN: &str =
+            r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#;
+        const ENTRY: &str =
+            r#"<ignoredErrors><ignoredError sqref="A1" numberStoredAsText="1"/></ignoredErrors>"#;
+        let rows: [(&str, String, &str); 10] = [
+            (
+                "nested worksheet inside an unmodelled child",
+                format!("{OPEN}<foo><worksheet></worksheet></foo></worksheet>"),
+                "Ok(None)",
+            ),
+            (
+                "nested empty worksheet inside an unmodelled child",
+                format!("{OPEN}<foo><worksheet/></foo></worksheet>"),
+                "Ok(None)",
+            ),
+            (
+                "worksheet as a direct root child",
+                format!("{OPEN}<worksheet></worksheet></worksheet>"),
+                "Ok(None)",
+            ),
+            (
+                "nested worksheet then content inside the root",
+                format!("{OPEN}<foo><worksheet></worksheet></foo><bar/><baz></baz></worksheet>"),
+                "Ok(None)",
+            ),
+            (
+                "nested worksheet then the root left open",
+                format!("{OPEN}<foo><worksheet></worksheet></foo>"),
+                "Err(Invalid(\"unterminated ignoredErrors XML\"))",
+            ),
+            (
+                "nested worksheet then a declaration inside the root",
+                format!(
+                    "{OPEN}<foo><worksheet></worksheet></foo><?xml version=\"1.0\"?></worksheet>"
+                ),
+                "Err(Invalid(\"invalid ignoredErrors XML declaration position\"))",
+            ),
+            (
+                "nested worksheet then a second root",
+                format!("{OPEN}<foo><worksheet></worksheet></foo></worksheet>{OPEN}</worksheet>"),
+                "Err(Invalid(\"ignoredErrors XML contains multiple roots\"))",
+            ),
+            (
+                "ignoredErrors read from a nested worksheet",
+                format!("{OPEN}<foo><worksheet>{ENTRY}</worksheet></foo></worksheet>"),
+                "Ok(Some(1))",
+            ),
+            (
+                "ignoredErrors in the root after a nested worksheet",
+                format!("{OPEN}<foo><worksheet></worksheet></foo>{ENTRY}</worksheet>"),
+                "Ok(Some(1))",
+            ),
+            (
+                "ignoredErrors in both the nested and the real worksheet",
+                format!("{OPEN}<foo><worksheet>{ENTRY}</worksheet></foo>{ENTRY}</worksheet>"),
+                "Err(Invalid(\"duplicate worksheet ignoredErrors element\"))",
+            ),
+        ];
+        for (label, input, expected) in rows {
+            let actual = match super::parse_worksheet_ignored_errors(input.as_bytes()) {
+                Ok(Some(collection)) => format!("Ok(Some({}))", collection.entries.len()),
+                Ok(None) => "Ok(None)".to_owned(),
+                Err(error) => format!("Err({error:?})"),
+            };
+            assert_eq!(actual, expected, "{label}: {input:?}");
+        }
+    }
 }

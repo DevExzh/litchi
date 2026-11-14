@@ -3064,3 +3064,122 @@ mod tests {
         assert_eq!(shared.as_slice(), &[4]);
     }
 }
+
+#[cfg(test)]
+mod xml_envelope_tests {
+    use super::validate_opaque_fragment;
+
+    /// Freezes how an opaque fragment is checked before and after its single root element,
+    /// one row per document shape.
+    #[test]
+    fn opaque_fragment_envelope_matrix() {
+        const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+        let root = "<a></a>";
+        let rows: [(&str, String); 26] = [
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", "<a/>".to_owned()),
+            ("start and end root", root.to_owned()),
+            ("root then whitespace", format!("{root}\n ")),
+            ("root then comment", format!("{root}<!--c-->")),
+            (
+                "root then processing instruction",
+                format!("{root}<?pi x?>"),
+            ),
+            ("root then text", format!("{root}text")),
+            ("root then a second identical root", format!("{root}{root}")),
+            (
+                "root then a foreign element, start form",
+                format!("{root}<b></b>"),
+            ),
+            (
+                "root then a foreign element, empty form",
+                format!("{root}<b/>"),
+            ),
+            ("declaration after the root", format!("{root}{DECLARATION}")),
+            (
+                "two declarations",
+                format!("{DECLARATION}{DECLARATION}{root}"),
+            ),
+            (
+                "comment before the declaration",
+                format!("<!--c-->{DECLARATION}{root}"),
+            ),
+            ("text before the root", format!("text{root}")),
+            ("unterminated root", "<a>".to_owned()),
+            ("stray end tag", format!("{root}</a>")),
+            ("DOCTYPE", format!("<!DOCTYPE a>{root}")),
+            (
+                "top-level CDATA before the root",
+                format!("<![CDATA[x]]>{root}"),
+            ),
+            (
+                "top-level CDATA after the root",
+                format!("{root}<![CDATA[x]]>"),
+            ),
+            (
+                "empty-element root then a second root",
+                "<a/><a/>".to_owned(),
+            ),
+            (
+                "empty-element root then a start root",
+                "<a/><a></a>".to_owned(),
+            ),
+            ("nested same name", "<a><a></a><a/></a>".to_owned()),
+            (
+                "text and CDATA inside the root",
+                "<a>t<![CDATA[x]]></a>".to_owned(),
+            ),
+            ("top-level entity", format!("&amp;{root}")),
+        ];
+        let expected: &[&str] = &[
+            "Err(Invalid(\"opaque XML fragment has no complete root\"))",
+            "Err(Invalid(\"opaque XML fragment has no complete root\"))",
+            "Err(Invalid(\"opaque XML declarations are not admitted\"))",
+            "Ok",
+            "Ok",
+            "Ok",
+            "Ok",
+            "Ok",
+            "Err(Invalid(\"opaque XML fragment has top-level text\"))",
+            "Err(Invalid(\"opaque XML fragment has multiple roots\"))",
+            "Err(Invalid(\"opaque XML fragment has multiple roots\"))",
+            "Err(Invalid(\"opaque XML fragment has multiple roots\"))",
+            "Err(Invalid(\"opaque XML declarations are not admitted\"))",
+            "Err(Invalid(\"opaque XML declarations are not admitted\"))",
+            "Err(Invalid(\"opaque XML declarations are not admitted\"))",
+            "Err(Invalid(\"opaque XML fragment has top-level text\"))",
+            "Err(Invalid(\"opaque XML fragment has no complete root\"))",
+            "Err(Invalid(\"invalid opaque XML: ill-formed document: close tag `</a>` does not match any open tag\"))",
+            "Err(Invalid(\"opaque XML DOCTYPE is not admitted\"))",
+            "Err(Invalid(\"opaque XML fragment has top-level CDATA\"))",
+            "Err(Invalid(\"opaque XML fragment has top-level CDATA\"))",
+            "Err(Invalid(\"opaque XML fragment has multiple roots\"))",
+            "Err(Invalid(\"opaque XML fragment has multiple roots\"))",
+            "Ok",
+            "Ok",
+            "Err(Invalid(\"opaque XML fragment has a top-level entity\"))",
+        ];
+        let actual = rows
+            .iter()
+            .map(
+                |(_, input)| match validate_opaque_fragment(input.as_bytes()) {
+                    Ok(()) => "Ok".to_owned(),
+                    Err(error) => format!("Err({error:?})"),
+                },
+            )
+            .collect::<Vec<_>>();
+        let listing = actual
+            .iter()
+            .map(|value| format!("    {value:?},\n"))
+            .collect::<String>();
+        assert_eq!(actual.len(), expected.len(), "actual rows:\n{listing}");
+        for (((label, input), actual), expected) in rows.iter().zip(&actual).zip(expected) {
+            assert_eq!(
+                actual, expected,
+                "{label}: {input:?}\nactual rows:\n{listing}"
+            );
+        }
+    }
+}

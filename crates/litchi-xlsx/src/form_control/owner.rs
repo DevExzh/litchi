@@ -9745,3 +9745,393 @@ mod tests {
         assert_eq!(budget.used(Resource::Objects), 0);
     }
 }
+
+#[cfg(test)]
+mod xml_envelope_tests {
+    use super::{
+        OwnerLimits, OwnerResult, parse_drawing, parse_vml, parse_vml_client_fields,
+        parse_worksheet, validate_drawing_anchors,
+    };
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// The document shapes every reader below is run over. `open`, `close` and `empty` spell
+    /// the reader's root element; `nested_open` and `nested_close` spell an element with the
+    /// root's expanded name, placed inside an unmodelled child of the root.
+    fn rows(
+        open: &str,
+        close: &str,
+        empty: &str,
+        nested_open: &str,
+        nested_close: &str,
+    ) -> Vec<(&'static str, String)> {
+        let root = format!("{open}{close}");
+        let nested = format!("<other>{nested_open}{nested_close}</other>");
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", root.clone()),
+            ("root then whitespace", format!("{root}\n ")),
+            ("root then comment", format!("{root}<!--c-->")),
+            (
+                "root then processing instruction",
+                format!("{root}<?pi x?>"),
+            ),
+            ("root then text", format!("{root}text")),
+            ("root then a second identical root", format!("{root}{root}")),
+            (
+                "root then a foreign element, start form",
+                format!("{root}<foreign></foreign>"),
+            ),
+            (
+                "root then a foreign element, empty form",
+                format!("{root}<foreign/>"),
+            ),
+            ("declaration after the root", format!("{root}{DECLARATION}")),
+            (
+                "two declarations",
+                format!("{DECLARATION}{DECLARATION}{root}"),
+            ),
+            (
+                "comment before the declaration",
+                format!("<!--c-->{DECLARATION}{root}"),
+            ),
+            ("text before the root", format!("text{root}")),
+            ("unterminated root", open.to_owned()),
+            ("stray end tag", format!("{root}{close}")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{root}")),
+            (
+                "top-level CDATA before the root",
+                format!("<![CDATA[x]]>{root}"),
+            ),
+            (
+                "top-level CDATA after the root",
+                format!("{root}<![CDATA[x]]>"),
+            ),
+            (
+                "one declaration then the root",
+                format!("{DECLARATION}{root}"),
+            ),
+            ("text inside the root", format!("{open}text{close}")),
+            (
+                "nested root name inside a child",
+                format!("{open}{nested}{close}"),
+            ),
+            (
+                "nested root name then a start child",
+                format!("{open}{nested}<later></later>{close}"),
+            ),
+            (
+                "nested root name then an empty child",
+                format!("{open}{nested}<later/>{close}"),
+            ),
+            (
+                "nested root name then text",
+                format!("{open}{nested}text{close}"),
+            ),
+            (
+                "nested root name then CDATA",
+                format!("{open}{nested}<![CDATA[x]]>{close}"),
+            ),
+            (
+                "nested root name, root left open",
+                format!("{open}{nested}"),
+            ),
+            (
+                "nested root name then a second root",
+                format!("{open}{nested}{close}{root}"),
+            ),
+            (
+                "nested root name directly under the root",
+                format!("{open}{nested_open}{nested_close}{close}"),
+            ),
+        ]
+    }
+
+    fn run<T>(
+        rows: &[(&'static str, String)],
+        read: impl Fn(&[u8]) -> OwnerResult<T>,
+        summary: impl Fn(&T) -> String,
+    ) -> Vec<String> {
+        rows.iter()
+            .map(|(_, input)| match read(input.as_bytes()) {
+                Ok(value) => format!("Ok({})", summary(&value)),
+                Err(error) => format!("Err({error:?})"),
+            })
+            .collect()
+    }
+
+    fn assert_rows(rows: &[(&'static str, String)], actual: &[String], expected: &[&str]) {
+        let listing = actual
+            .iter()
+            .map(|value| format!("    {value:?},\n"))
+            .collect::<String>();
+        assert_eq!(actual.len(), expected.len(), "actual rows:\n{listing}");
+        for (((label, input), actual), expected) in rows.iter().zip(actual).zip(expected) {
+            assert_eq!(
+                actual, expected,
+                "{label}: {input:?}\nactual rows:\n{listing}"
+            );
+        }
+    }
+
+    const XDR_OPEN: &str = r#"<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing">"#;
+    const XDR_CLOSE: &str = "</xdr:wsDr>";
+    const XDR_EMPTY: &str = r#"<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"/>"#;
+    const SML_OPEN: &str =
+        r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#;
+    const SML_CLOSE: &str = "</worksheet>";
+    const SML_EMPTY: &str =
+        r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#;
+    const VML_OPEN: &str = r#"<xml xmlns:v="urn:schemas-microsoft-com:vml">"#;
+    const VML_CLOSE: &str = "</xml>";
+    const VML_EMPTY: &str = r#"<xml xmlns:v="urn:schemas-microsoft-com:vml"/>"#;
+
+    #[test]
+    fn drawing_anchor_envelope_matrix() {
+        let rows = rows(XDR_OPEN, XDR_CLOSE, XDR_EMPTY, "<xdr:wsDr>", "</xdr:wsDr>");
+        let limits = OwnerLimits::default();
+        let actual = run(
+            &rows,
+            |xml| validate_drawing_anchors(xml, &limits, None),
+            |()| String::new(),
+        );
+        assert_rows(
+            &rows,
+            &actual,
+            &[
+                "Err(Invalid(\"DrawingML XML is unterminated\"))",
+                "Err(Invalid(\"DrawingML XML is unterminated\"))",
+                "Err(Invalid(\"DrawingML XML is unterminated\"))",
+                "Err(Invalid(\"DrawingML XML is unterminated\"))",
+                "Ok()",
+                "Ok()",
+                "Ok()",
+                "Ok()",
+                "Ok()",
+                "Err(Invalid(\"DrawingML XML has an unexpected or duplicate root element\"))",
+                "Err(Invalid(\"DrawingML XML has an unexpected or duplicate root element\"))",
+                "Ok()",
+                "Ok()",
+                "Ok()",
+                "Ok()",
+                "Ok()",
+                "Err(Invalid(\"DrawingML XML is unterminated\"))",
+                "Err(Invalid(\"ill-formed document: close tag `</xdr:wsDr>` does not match any open tag\"))",
+                "Ok()",
+                "Ok()",
+                "Ok()",
+                "Ok()",
+                "Ok()",
+                "Ok()",
+                "Err(Invalid(\"DrawingML XML has content after its root\"))",
+                "Ok()",
+                "Ok()",
+                "Ok()",
+                "Err(Invalid(\"DrawingML XML is unterminated\"))",
+                "Err(Invalid(\"DrawingML XML has an unexpected or duplicate root element\"))",
+                "Ok()",
+            ],
+        );
+    }
+
+    #[test]
+    fn worksheet_owner_envelope_matrix() {
+        let rows = rows(
+            SML_OPEN,
+            SML_CLOSE,
+            SML_EMPTY,
+            "<worksheet>",
+            "</worksheet>",
+        );
+        let limits = OwnerLimits::default();
+        let actual = run(
+            &rows,
+            |xml| parse_worksheet(xml, &limits, None),
+            |scan| scan.controls.len().to_string(),
+        );
+        assert_rows(
+            &rows,
+            &actual,
+            &[
+                "Err(Invalid(\"worksheet XML is unterminated or has no root\"))",
+                "Err(Invalid(\"worksheet XML is unterminated or has no root\"))",
+                "Err(Invalid(\"worksheet XML is unterminated or has no root\"))",
+                "Ok(0)",
+                "Ok(0)",
+                "Ok(0)",
+                "Ok(0)",
+                "Ok(0)",
+                "Ok(0)",
+                "Err(Invalid(\"worksheet XML has an unexpected or duplicate root element\"))",
+                "Err(Invalid(\"worksheet XML has an unexpected or duplicate root element\"))",
+                "Err(Invalid(\"worksheet XML has an unexpected or duplicate root element\"))",
+                "Ok(0)",
+                "Ok(0)",
+                "Ok(0)",
+                "Ok(0)",
+                "Err(Invalid(\"worksheet XML is unterminated or has no root\"))",
+                "Err(Invalid(\"ill-formed document: close tag `</worksheet>` does not match any open tag\"))",
+                "Ok(0)",
+                "Ok(0)",
+                "Ok(0)",
+                "Ok(0)",
+                "Ok(0)",
+                "Ok(0)",
+                "Err(Invalid(\"worksheet XML has content after its root\"))",
+                "Err(Invalid(\"worksheet XML has content after its root\"))",
+                "Ok(0)",
+                "Ok(0)",
+                "Err(Invalid(\"worksheet XML is unterminated or has no root\"))",
+                "Err(Invalid(\"worksheet XML has an unexpected or duplicate root element\"))",
+                "Ok(0)",
+            ],
+        );
+    }
+
+    #[test]
+    fn drawing_shape_envelope_matrix() {
+        let rows = rows(XDR_OPEN, XDR_CLOSE, XDR_EMPTY, "<xdr:wsDr>", "</xdr:wsDr>");
+        let limits = OwnerLimits::default();
+        let actual = run(
+            &rows,
+            |xml| parse_drawing(xml, &limits, None),
+            |shapes| shapes.len().to_string(),
+        );
+        assert_rows(
+            &rows,
+            &actual,
+            &[
+                "Err(Invalid(\"DrawingML XML is unterminated or has no root\"))",
+                "Err(Invalid(\"DrawingML XML is unterminated or has no root\"))",
+                "Err(Invalid(\"DrawingML XML is unterminated or has no root\"))",
+                "Err(Invalid(\"DrawingML empty root is not admitted\"))",
+                "Ok(0)",
+                "Ok(0)",
+                "Ok(0)",
+                "Ok(0)",
+                "Ok(0)",
+                "Err(Invalid(\"DrawingML XML has an unexpected or duplicate root element\"))",
+                "Err(Invalid(\"DrawingML XML has an unexpected or duplicate root element\"))",
+                "Err(Invalid(\"DrawingML empty root is not admitted\"))",
+                "Ok(0)",
+                "Ok(0)",
+                "Ok(0)",
+                "Ok(0)",
+                "Err(Invalid(\"DrawingML XML is unterminated or has no root\"))",
+                "Err(Invalid(\"ill-formed document: close tag `</xdr:wsDr>` does not match any open tag\"))",
+                "Ok(0)",
+                "Ok(0)",
+                "Ok(0)",
+                "Ok(0)",
+                "Ok(0)",
+                "Ok(0)",
+                "Err(Invalid(\"DrawingML XML has content after its root\"))",
+                "Err(Invalid(\"DrawingML XML has content after its root\"))",
+                "Ok(0)",
+                "Ok(0)",
+                "Err(Invalid(\"DrawingML XML is unterminated or has no root\"))",
+                "Err(Invalid(\"DrawingML XML has an unexpected or duplicate root element\"))",
+                "Ok(0)",
+            ],
+        );
+    }
+
+    #[test]
+    fn vml_shape_envelope_matrix() {
+        let rows = rows(VML_OPEN, VML_CLOSE, VML_EMPTY, "<xml>", "</xml>");
+        let limits = OwnerLimits::default();
+        let actual = run(
+            &rows,
+            |xml| parse_vml(xml, &limits, None),
+            |shapes| shapes.len().to_string(),
+        );
+        assert_rows(
+            &rows,
+            &actual,
+            &[
+                "Err(Invalid(\"VML XML has no root element\"))",
+                "Err(Invalid(\"VML XML has no root element\"))",
+                "Err(Invalid(\"VML XML has no root element\"))",
+                "Err(Invalid(\"VML empty element is outside the root element\"))",
+                "Ok(0)",
+                "Ok(0)",
+                "Ok(0)",
+                "Ok(0)",
+                "Err(Invalid(\"VML XML has non-whitespace content outside its root\"))",
+                "Err(Invalid(\"VML XML has more than one root element\"))",
+                "Err(Invalid(\"VML XML has more than one root element\"))",
+                "Err(Invalid(\"VML empty element is outside the root element\"))",
+                "Ok(0)",
+                "Ok(0)",
+                "Ok(0)",
+                "Err(Invalid(\"VML XML has non-whitespace content outside its root\"))",
+                "Err(Invalid(\"VML XML has no root element\"))",
+                "Err(Invalid(\"ill-formed document: close tag `</xml>` does not match any open tag\"))",
+                "Ok(0)",
+                "Err(Invalid(\"VML XML has non-whitespace content outside its root\"))",
+                "Err(Invalid(\"VML XML has non-whitespace content outside its root\"))",
+                "Ok(0)",
+                "Ok(0)",
+                "Ok(0)",
+                "Err(Invalid(\"VML XML has content after its root\"))",
+                "Err(Invalid(\"VML ClientData XML has content after its root\"))",
+                "Err(Invalid(\"VML XML has non-whitespace content outside its root\"))",
+                "Err(Invalid(\"VML XML has non-whitespace content outside its root\"))",
+                "Err(Invalid(\"VML XML is unterminated\"))",
+                "Err(Invalid(\"VML XML has more than one root element\"))",
+                "Ok(0)",
+            ],
+        );
+    }
+
+    #[test]
+    fn vml_client_data_envelope_matrix() {
+        let rows = rows(VML_OPEN, VML_CLOSE, VML_EMPTY, "<xml>", "</xml>");
+        let limits = OwnerLimits::default();
+        let actual = run(
+            &rows,
+            |xml| parse_vml_client_fields(xml, &limits, None),
+            |fields| fields.len().to_string(),
+        );
+        assert_rows(
+            &rows,
+            &actual,
+            &[
+                "Err(Invalid(\"VML ClientData XML is unterminated\"))",
+                "Err(Invalid(\"VML ClientData XML is unterminated\"))",
+                "Err(Invalid(\"VML ClientData XML is unterminated\"))",
+                "Err(Invalid(\"VML ClientData empty root is not admitted\"))",
+                "Ok(0)",
+                "Ok(0)",
+                "Ok(0)",
+                "Ok(0)",
+                "Err(Invalid(\"VML ClientData XML has non-whitespace content outside its root\"))",
+                "Err(Invalid(\"VML ClientData XML has an unexpected or duplicate root\"))",
+                "Err(Invalid(\"VML ClientData XML has an unexpected or duplicate root\"))",
+                "Err(Invalid(\"VML ClientData empty root is not admitted\"))",
+                "Ok(0)",
+                "Ok(0)",
+                "Ok(0)",
+                "Err(Invalid(\"VML ClientData XML has non-whitespace content outside its root\"))",
+                "Err(Invalid(\"VML ClientData XML is unterminated\"))",
+                "Err(Invalid(\"ill-formed document: close tag `</xml>` does not match any open tag\"))",
+                "Ok(0)",
+                "Err(Invalid(\"VML ClientData XML has non-whitespace content outside its root\"))",
+                "Err(Invalid(\"VML ClientData XML has non-whitespace content outside its root\"))",
+                "Ok(0)",
+                "Ok(0)",
+                "Ok(0)",
+                "Err(Invalid(\"VML ClientData XML has content after its root\"))",
+                "Err(Invalid(\"VML ClientData XML has content after its root\"))",
+                "Err(Invalid(\"VML ClientData XML has non-whitespace content outside its root\"))",
+                "Err(Invalid(\"VML ClientData XML has non-whitespace content outside its root\"))",
+                "Err(Invalid(\"VML ClientData XML is unterminated\"))",
+                "Err(Invalid(\"VML ClientData XML has an unexpected or duplicate root\"))",
+                "Ok(0)",
+            ],
+        );
+    }
+}

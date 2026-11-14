@@ -6812,3 +6812,126 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod xml_envelope_tests {
+    use super::{Limits, parse};
+
+    /// Freezes how a survey part is read before and after its `survey` root, one row per
+    /// document shape.
+    #[test]
+    fn survey_envelope_matrix() {
+        const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+        const OPEN: &str = r#"<survey xmlns="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" id="7" guid="{01234567-89ab-cdef-0123-456789abcdef}" title="Survey">"#;
+        const BODY: &str =
+            r#"<questions><question binding="1" text="Pick one" type="choice"/></questions>"#;
+        const CLOSE: &str = "</survey>";
+        const EMPTY: &str = r#"<survey xmlns="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" id="7" guid="{01234567-89ab-cdef-0123-456789abcdef}" title="Survey"/>"#;
+        let root = format!("{OPEN}{BODY}{CLOSE}");
+        let rows: [(&str, String); 27] = [
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", EMPTY.to_owned()),
+            ("start and end root", root.clone()),
+            ("root then whitespace", format!("{root}\n ")),
+            ("root then comment", format!("{root}<!--c-->")),
+            (
+                "root then processing instruction",
+                format!("{root}<?pi x?>"),
+            ),
+            ("root then text", format!("{root}text")),
+            ("root then a second identical root", format!("{root}{root}")),
+            (
+                "root then a foreign element, start form",
+                format!("{root}<foreign></foreign>"),
+            ),
+            (
+                "root then a foreign element, empty form",
+                format!("{root}<foreign/>"),
+            ),
+            ("declaration after the root", format!("{root}{DECLARATION}")),
+            (
+                "two declarations",
+                format!("{DECLARATION}{DECLARATION}{root}"),
+            ),
+            (
+                "comment before the declaration",
+                format!("<!--c-->{DECLARATION}{root}"),
+            ),
+            ("text before the root", format!("text{root}")),
+            ("unterminated root", format!("{OPEN}{BODY}")),
+            ("stray end tag", format!("{root}{CLOSE}")),
+            ("DOCTYPE", format!("<!DOCTYPE survey>{root}")),
+            (
+                "top-level CDATA before the root",
+                format!("<![CDATA[x]]>{root}"),
+            ),
+            (
+                "top-level CDATA after the root",
+                format!("{root}<![CDATA[x]]>"),
+            ),
+            (
+                "one declaration then the root",
+                format!("{DECLARATION}{root}"),
+            ),
+            ("root then an empty-element root", format!("{root}{EMPTY}")),
+            ("foreign root", "<other></other>".to_owned()),
+            ("root without questions", format!("{OPEN}{CLOSE}")),
+            ("comment then the root", format!("<!--c-->{root}")),
+            (
+                "survey named inside the root",
+                format!("{OPEN}<survey></survey>{BODY}{CLOSE}"),
+            ),
+        ];
+        let expected: &[&str] = &[
+            "Err(Invalid(\"unterminated survey XML\"))",
+            "Err(Invalid(\"unterminated survey XML\"))",
+            "Err(Invalid(\"unterminated survey XML\"))",
+            "Err(Invalid(\"survey XML has an empty required container\"))",
+            "Ok(questions: 1)",
+            "Ok(questions: 1)",
+            "Ok(questions: 1)",
+            "Err(Invalid(\"DTD and processing instructions are rejected in survey XML\"))",
+            "Err(Invalid(\"unexpected text in survey XML\"))",
+            "Err(Invalid(\"survey part requires a Survey-namespace survey root\"))",
+            "Err(Invalid(\"survey part requires a Survey-namespace survey root\"))",
+            "Err(Invalid(\"survey part requires a Survey-namespace survey root\"))",
+            "Ok(questions: 1)",
+            "Ok(questions: 1)",
+            "Ok(questions: 1)",
+            "Err(Invalid(\"unexpected text in survey XML\"))",
+            "Err(Invalid(\"unterminated survey XML\"))",
+            "Err(Invalid(\"invalid survey XML: ill-formed document: close tag `</survey>` does not match any open tag\"))",
+            "Err(Invalid(\"DTD and processing instructions are rejected in survey XML\"))",
+            "Err(Invalid(\"unexpected CDATA in survey XML\"))",
+            "Err(Invalid(\"unexpected CDATA in survey XML\"))",
+            "Ok(questions: 1)",
+            "Err(Invalid(\"survey part requires a Survey-namespace survey root\"))",
+            "Err(Invalid(\"survey part requires a Survey-namespace survey root\"))",
+            "Err(Invalid(\"survey requires at least one question\"))",
+            "Ok(questions: 1)",
+            "Err(Invalid(\"unexpected survey element 'survey'\"))",
+        ];
+        let actual = rows
+            .iter()
+            .map(
+                |(_, input)| match parse(input.as_bytes(), &Limits::default()) {
+                    Ok(survey) => format!("Ok(questions: {})", survey.questions().values().len()),
+                    Err(error) => format!("Err({error:?})"),
+                },
+            )
+            .collect::<Vec<_>>();
+        let listing = actual
+            .iter()
+            .map(|value| format!("    {value:?},\n"))
+            .collect::<String>();
+        assert_eq!(actual.len(), expected.len(), "actual rows:\n{listing}");
+        for (((label, input), actual), expected) in rows.iter().zip(&actual).zip(expected) {
+            assert_eq!(
+                actual, expected,
+                "{label}: {input:?}\nactual rows:\n{listing}"
+            );
+        }
+    }
+}

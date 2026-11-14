@@ -545,3 +545,134 @@ fn anchor_child_order_is_the_schema_sequence_in_both_readers() {
     }
     assert_eq!(accepted, 3);
 }
+
+/// Freezes how the source drawing scanner treats what precedes, follows or replaces the
+/// `xdr:wsDr` root, one row per document shape.
+#[test]
+fn source_drawing_envelope_matrix() {
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+    let open = format!(r#"<xdr:wsDr xmlns:xdr="{XDR}">"#);
+    let close = "</xdr:wsDr>";
+    let empty = format!(r#"<xdr:wsDr xmlns:xdr="{XDR}"/>"#);
+    let root = format!("{open}{close}");
+    let rows: [(&str, String); 30] = [
+        ("empty input", String::new()),
+        ("whitespace only", " \n".to_owned()),
+        ("declaration only", DECLARATION.to_owned()),
+        ("empty-element root", empty.clone()),
+        ("start and end root", root.clone()),
+        ("root then whitespace", format!("{root}\n ")),
+        ("root then comment", format!("{root}<!--c-->")),
+        (
+            "root then processing instruction",
+            format!("{root}<?pi x?>"),
+        ),
+        ("root then text", format!("{root}text")),
+        ("root then a second identical root", format!("{root}{root}")),
+        (
+            "root then a foreign element, start form",
+            format!("{root}<foreign></foreign>"),
+        ),
+        (
+            "root then a foreign element, empty form",
+            format!("{root}<foreign/>"),
+        ),
+        ("declaration after the root", format!("{root}{DECLARATION}")),
+        (
+            "two declarations",
+            format!("{DECLARATION}{DECLARATION}{root}"),
+        ),
+        (
+            "comment before the declaration",
+            format!("<!--c-->{DECLARATION}{root}"),
+        ),
+        ("text before the root", format!("text{root}")),
+        ("unterminated root", open.clone()),
+        ("stray end tag", format!("{root}{close}")),
+        ("DOCTYPE", format!("<!DOCTYPE x>{root}")),
+        (
+            "top-level CDATA before the root",
+            format!("<![CDATA[x]]>{root}"),
+        ),
+        (
+            "top-level CDATA after the root",
+            format!("{root}<![CDATA[x]]>"),
+        ),
+        (
+            "one declaration then the root",
+            format!("{DECLARATION}{root}"),
+        ),
+        (
+            "whitespace then the declaration",
+            format!(" {DECLARATION}{root}"),
+        ),
+        (
+            "declaration inside the root",
+            format!("{open}{DECLARATION}{close}"),
+        ),
+        ("empty-element root then text", format!("{empty}text")),
+        (
+            "empty-element root then a second root",
+            format!("{empty}{empty}"),
+        ),
+        ("text inside the root", format!("{open}text{close}")),
+        ("whitespace before the root", format!(" \n{root}")),
+        (
+            "nested wsDr inside the root",
+            format!("{open}<xdr:wsDr></xdr:wsDr>{close}"),
+        ),
+        ("comment then the root", format!("<!--c-->{root}")),
+    ];
+    let expected: &[&str] = &[
+        "Err(Invalid(\"source-backed XLSX drawing: drawing XML has an incomplete xdr:wsDr root\"))",
+        "Err(Invalid(\"source-backed XLSX drawing: drawing XML has an incomplete xdr:wsDr root\"))",
+        "Err(Invalid(\"source-backed XLSX drawing: drawing XML has an incomplete xdr:wsDr root\"))",
+        "Ok(pictures: 0)",
+        "Ok(pictures: 0)",
+        "Ok(pictures: 0)",
+        "Ok(pictures: 0)",
+        "Ok(pictures: 0)",
+        "Err(Invalid(\"source-backed XLSX drawing: non-whitespace text appears outside xdr:wsDr\"))",
+        "Err(Invalid(\"source-backed XLSX drawing: drawing XML contains a second root element\"))",
+        "Err(Invalid(\"source-backed XLSX drawing: drawing XML contains a second root element\"))",
+        "Err(Invalid(\"source-backed XLSX drawing: drawing XML contains a second root element\"))",
+        "Err(Invalid(\"source-backed XLSX drawing: XML declaration is not at the beginning of drawing XML\"))",
+        "Err(Invalid(\"source-backed XLSX drawing: XML declaration is not at the beginning of drawing XML\"))",
+        "Ok(pictures: 0)",
+        "Err(Invalid(\"source-backed XLSX drawing: non-whitespace text appears outside xdr:wsDr\"))",
+        "Err(Invalid(\"source-backed XLSX drawing: drawing XML has an incomplete xdr:wsDr root\"))",
+        "Err(Invalid(\"source-backed XLSX drawing: source-backed drawing XML: ill-formed document: close tag `</xdr:wsDr>` does not match any open tag\"))",
+        "Err(Invalid(\"source-backed XLSX drawing: DOCTYPE is forbidden in drawing XML\"))",
+        "Err(Invalid(\"source-backed XLSX drawing: CDATA appears outside drawing XML\"))",
+        "Err(Invalid(\"source-backed XLSX drawing: CDATA appears outside drawing XML\"))",
+        "Ok(pictures: 0)",
+        "Ok(pictures: 0)",
+        "Err(Invalid(\"source-backed XLSX drawing: XML declaration is not at the beginning of drawing XML\"))",
+        "Err(Invalid(\"source-backed XLSX drawing: non-whitespace text appears outside xdr:wsDr\"))",
+        "Err(Invalid(\"source-backed XLSX drawing: drawing XML contains a second root element\"))",
+        "Err(Invalid(\"source-backed XLSX drawing: known drawing container contains non-whitespace text\"))",
+        "Ok(pictures: 0)",
+        "Ok(pictures: 0)",
+        "Ok(pictures: 0)",
+    ];
+    let actual = rows
+        .iter()
+        .map(
+            |(_, input)| match SourceDrawing::scan(input.as_bytes(), 0, ScanLimits::default()) {
+                Ok(source) => format!("Ok(pictures: {})", source.pictures().len()),
+                Err(error) => format!("Err({error:?})"),
+            },
+        )
+        .collect::<Vec<_>>();
+    let listing = actual
+        .iter()
+        .map(|value| format!("    {value:?},\n"))
+        .collect::<String>();
+    assert_eq!(actual.len(), expected.len(), "actual rows:\n{listing}");
+    for (((label, input), actual), expected) in rows.iter().zip(&actual).zip(expected) {
+        assert_eq!(
+            actual, expected,
+            "{label}: {input:?}\nactual rows:\n{listing}"
+        );
+    }
+}

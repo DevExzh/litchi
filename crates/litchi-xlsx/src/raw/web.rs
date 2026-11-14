@@ -714,3 +714,136 @@ mod tests {
         assert_eq!(read(&replaced, &SourceLimits::default()).unwrap(), bindings);
     }
 }
+
+#[cfg(test)]
+mod xml_envelope_tests {
+    use litchi_opc::SourceLimits;
+
+    use super::read;
+
+    /// Freezes how the binding reader treats what precedes, follows or replaces the
+    /// `worksheet` root, one row per document shape.
+    #[test]
+    fn web_bindings_envelope_matrix() {
+        const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+        const OPEN: &str =
+            r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#;
+        const EMPTY: &str =
+            r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#;
+        const CLOSE: &str = "</worksheet>";
+        let root = format!("{OPEN}<sheetData/>{CLOSE}");
+        let rows: [(&str, String); 28] = [
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", EMPTY.to_owned()),
+            ("start and end root", root.clone()),
+            ("root then whitespace", format!("{root}\n ")),
+            ("root then comment", format!("{root}<!--c-->")),
+            (
+                "root then processing instruction",
+                format!("{root}<?pi x?>"),
+            ),
+            ("root then text", format!("{root}text")),
+            ("root then a second identical root", format!("{root}{root}")),
+            (
+                "root then a foreign element, start form",
+                format!("{root}<foreign></foreign>"),
+            ),
+            (
+                "root then a foreign element, empty form",
+                format!("{root}<foreign/>"),
+            ),
+            ("declaration after the root", format!("{root}{DECLARATION}")),
+            (
+                "two declarations",
+                format!("{DECLARATION}{DECLARATION}{root}"),
+            ),
+            (
+                "comment before the declaration",
+                format!("<!--c-->{DECLARATION}{root}"),
+            ),
+            ("text before the root", format!("text{root}")),
+            ("unterminated root", format!("{OPEN}<sheetData/>")),
+            ("stray end tag", format!("{root}{CLOSE}")),
+            ("DOCTYPE", format!("<!DOCTYPE worksheet>{root}")),
+            (
+                "top-level CDATA before the root",
+                format!("<![CDATA[x]]>{root}"),
+            ),
+            (
+                "top-level CDATA after the root",
+                format!("{root}<![CDATA[x]]>"),
+            ),
+            (
+                "one declaration then the root",
+                format!("{DECLARATION}{root}"),
+            ),
+            (
+                "empty-element root then a second root",
+                format!("{EMPTY}{EMPTY}"),
+            ),
+            (
+                "empty-element root then a start root",
+                format!("{EMPTY}{root}"),
+            ),
+            ("root then an empty-element root", format!("{root}{EMPTY}")),
+            ("foreign root", "<other></other>".to_owned()),
+            (
+                "worksheet named directly under the root",
+                format!("{OPEN}<worksheet></worksheet>{CLOSE}"),
+            ),
+            ("foreign end tag at depth zero", format!("{OPEN}</other>")),
+        ];
+        let expected: &[&str] = &[
+            "Err(Invalid(\"worksheet XML has a missing or unterminated SpreadsheetML root\"))",
+            "Err(Invalid(\"worksheet XML has a missing or unterminated SpreadsheetML root\"))",
+            "Err(Invalid(\"worksheet XML has a missing or unterminated SpreadsheetML root\"))",
+            "Ok(0)",
+            "Ok(0)",
+            "Ok(0)",
+            "Ok(0)",
+            "Ok(0)",
+            "Ok(0)",
+            "Err(Invalid(\"worksheet XML must have one SpreadsheetML worksheet root\"))",
+            "Err(Invalid(\"worksheet XML must have one SpreadsheetML worksheet root\"))",
+            "Err(Invalid(\"worksheet XML must have one SpreadsheetML worksheet root\"))",
+            "Ok(0)",
+            "Ok(0)",
+            "Ok(0)",
+            "Ok(0)",
+            "Err(Invalid(\"worksheet XML has a missing or unterminated SpreadsheetML root\"))",
+            "Err(Invalid(\"ill-formed document: close tag `</worksheet>` does not match any open tag\"))",
+            "Err(Invalid(\"DTD is forbidden in worksheet XML\"))",
+            "Ok(0)",
+            "Ok(0)",
+            "Ok(0)",
+            "Err(Invalid(\"worksheet XML must have one SpreadsheetML worksheet root\"))",
+            "Err(Invalid(\"worksheet XML must have one SpreadsheetML worksheet root\"))",
+            "Err(Invalid(\"worksheet XML must have one SpreadsheetML worksheet root\"))",
+            "Err(Invalid(\"worksheet XML must have one SpreadsheetML worksheet root\"))",
+            "Ok(0)",
+            "Err(Invalid(\"ill-formed document: expected `</worksheet>`, but `</other>` was found\"))",
+        ];
+        let actual = rows
+            .iter()
+            .map(
+                |(_, input)| match read(input.as_bytes(), &SourceLimits::default()) {
+                    Ok(bindings) => format!("Ok({})", bindings.len()),
+                    Err(error) => format!("Err({error:?})"),
+                },
+            )
+            .collect::<Vec<_>>();
+        let listing = actual
+            .iter()
+            .map(|value| format!("    {value:?},\n"))
+            .collect::<String>();
+        assert_eq!(actual.len(), expected.len(), "actual rows:\n{listing}");
+        for (((label, input), actual), expected) in rows.iter().zip(&actual).zip(expected) {
+            assert_eq!(
+                actual, expected,
+                "{label}: {input:?}\nactual rows:\n{listing}"
+            );
+        }
+    }
+}

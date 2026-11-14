@@ -2388,3 +2388,152 @@ fn matches_frame(frame: Frame, element: &litchi_ooxml_common::mce::SemanticEnd<'
     (namespace == SPREADSHEETML_NAMESPACE || namespace == STRICT_SPREADSHEETML_NAMESPACE)
         && local == expected
 }
+
+#[cfg(test)]
+mod xml_envelope_tests {
+    use std::io::Cursor;
+
+    use litchi_ooxml_common::mce::{Capabilities, StreamLimits};
+    use litchi_sheet::Rect;
+
+    use super::{RangeScanOutcome, scan_range};
+
+    /// Freezes how the range scanner treats what precedes, follows or replaces the
+    /// `worksheet` root, one row per document shape.
+    #[test]
+    fn range_scan_envelope_matrix() {
+        const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+        const OPEN: &str =
+            r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#;
+        const EMPTY: &str =
+            r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#;
+        const CLOSE: &str = "</worksheet>";
+        let root = format!(
+            r#"{OPEN}<sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData>{CLOSE}"#
+        );
+        let rows: [(&str, String); 28] = [
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", EMPTY.to_owned()),
+            ("start and end root", root.clone()),
+            ("root then whitespace", format!("{root}\n ")),
+            ("root then comment", format!("{root}<!--c-->")),
+            (
+                "root then processing instruction",
+                format!("{root}<?pi x?>"),
+            ),
+            ("root then text", format!("{root}text")),
+            ("root then a second identical root", format!("{root}{root}")),
+            (
+                "root then a foreign element, start form",
+                format!("{root}<foreign></foreign>"),
+            ),
+            (
+                "root then a foreign element, empty form",
+                format!("{root}<foreign/>"),
+            ),
+            ("declaration after the root", format!("{root}{DECLARATION}")),
+            (
+                "two declarations",
+                format!("{DECLARATION}{DECLARATION}{root}"),
+            ),
+            (
+                "comment before the declaration",
+                format!("<!--c-->{DECLARATION}{root}"),
+            ),
+            ("text before the root", format!("text{root}")),
+            ("unterminated root", format!("{OPEN}<sheetData/>")),
+            ("stray end tag", format!("{root}{CLOSE}")),
+            ("DOCTYPE", format!("<!DOCTYPE worksheet>{root}")),
+            (
+                "top-level CDATA before the root",
+                format!("<![CDATA[x]]>{root}"),
+            ),
+            (
+                "top-level CDATA after the root",
+                format!("{root}<![CDATA[x]]>"),
+            ),
+            (
+                "one declaration then the root",
+                format!("{DECLARATION}{root}"),
+            ),
+            (
+                "empty-element root then a second root",
+                format!("{EMPTY}{EMPTY}"),
+            ),
+            (
+                "empty-element root then a start root",
+                format!("{EMPTY}{root}"),
+            ),
+            ("root then an empty-element root", format!("{root}{EMPTY}")),
+            ("root without sheetData", format!("{OPEN}{CLOSE}")),
+            ("foreign root", "<other><sheetData/></other>".to_owned()),
+            (
+                "worksheet named directly under the root",
+                format!("{OPEN}<worksheet></worksheet><sheetData/>{CLOSE}"),
+            ),
+        ];
+        let expected: &[&str] = &[
+            "Err(Mce { error: NonConformant(\"missing document root\"), prior_mce_error: None, raw_error: None, active_error: None })",
+            "Err(Mce { error: NonConformant(\"missing document root\"), prior_mce_error: None, raw_error: None, active_error: None })",
+            "Err(Mce { error: NonConformant(\"missing document root\"), prior_mce_error: None, raw_error: None, active_error: None })",
+            "Err(Callback { raw_error: None, active_error: Some(Invalid(\"worksheet XML is missing required sheetData\")) })",
+            "Eligible(1)",
+            "Eligible(1)",
+            "Eligible(1)",
+            "Err(Mce { error: NonConformant(\"DTD and processing instructions are rejected\"), prior_mce_error: None, raw_error: None, active_error: None })",
+            "Err(Mce { error: NonConformant(\"text outside document root\"), prior_mce_error: None, raw_error: None, active_error: None })",
+            "Err(Mce { error: NonConformant(\"multiple roots\"), prior_mce_error: None, raw_error: None, active_error: None })",
+            "Err(Mce { error: NonConformant(\"multiple roots\"), prior_mce_error: None, raw_error: None, active_error: None })",
+            "Err(Mce { error: NonConformant(\"multiple roots\"), prior_mce_error: None, raw_error: None, active_error: None })",
+            "Err(Mce { error: NonConformant(\"late XML declaration\"), prior_mce_error: None, raw_error: None, active_error: None })",
+            "Err(Mce { error: NonConformant(\"late XML declaration\"), prior_mce_error: None, raw_error: None, active_error: None })",
+            "Err(Mce { error: NonConformant(\"late XML declaration\"), prior_mce_error: None, raw_error: None, active_error: None })",
+            "Err(Mce { error: NonConformant(\"text outside document root\"), prior_mce_error: None, raw_error: None, active_error: None })",
+            "Err(Mce { error: NonConformant(\"unterminated XML\"), prior_mce_error: None, raw_error: None, active_error: None })",
+            "Err(Mce { error: Xml(\"ill-formed document: close tag `</worksheet>` does not match any open tag\"), prior_mce_error: None, raw_error: None, active_error: None })",
+            "Err(Mce { error: NonConformant(\"DTD and processing instructions are rejected\"), prior_mce_error: None, raw_error: None, active_error: None })",
+            "Err(Mce { error: NonConformant(\"CDATA outside document root\"), prior_mce_error: None, raw_error: None, active_error: None })",
+            "Err(Mce { error: NonConformant(\"CDATA outside document root\"), prior_mce_error: None, raw_error: None, active_error: None })",
+            "Eligible(1)",
+            "Err(Mce { error: NonConformant(\"multiple roots\"), prior_mce_error: None, raw_error: None, active_error: None })",
+            "Err(Mce { error: NonConformant(\"multiple roots\"), prior_mce_error: None, raw_error: None, active_error: None })",
+            "Err(Mce { error: NonConformant(\"multiple roots\"), prior_mce_error: None, raw_error: None, active_error: None })",
+            "Err(Callback { raw_error: None, active_error: Some(Invalid(\"worksheet XML is missing required sheetData\")) })",
+            "Err(Callback { raw_error: None, active_error: Some(Invalid(\"worksheet XML must have one SpreadsheetML worksheet root\")) })",
+            "NotEligible(UnsupportedStructure)",
+        ];
+        let actual = rows
+            .iter()
+            .map(|(_, input)| {
+                let mut cursor = Cursor::new(input.as_bytes());
+                match scan_range(
+                    &mut cursor,
+                    &Capabilities::default(),
+                    &StreamLimits::default(),
+                    Rect::from_a1("A1:B2").expect("valid range"),
+                ) {
+                    Ok(RangeScanOutcome::Eligible(selected)) => {
+                        format!("Eligible({})", selected.cells.len())
+                    },
+                    Ok(RangeScanOutcome::NotEligible(reason)) => {
+                        format!("NotEligible({reason:?})")
+                    },
+                    Err(error) => format!("Err({error:?})"),
+                }
+            })
+            .collect::<Vec<_>>();
+        let listing = actual
+            .iter()
+            .map(|value| format!("    {value:?},\n"))
+            .collect::<String>();
+        assert_eq!(actual.len(), expected.len(), "actual rows:\n{listing}");
+        for (((label, input), actual), expected) in rows.iter().zip(&actual).zip(expected) {
+            assert_eq!(
+                actual, expected,
+                "{label}: {input:?}\nactual rows:\n{listing}"
+            );
+        }
+    }
+}

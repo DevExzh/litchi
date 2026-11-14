@@ -6702,3 +6702,131 @@ mod tests {
         assert!(properties.root_extension_list().is_none());
     }
 }
+
+#[cfg(test)]
+mod xml_envelope_tests {
+    use super::parse;
+    use crate::form_control::{FORM_CONTROL_NAMESPACE, Limits};
+
+    /// Freezes how a form-control part is read before and after its `x14:formControlPr`
+    /// root, one row per document shape.
+    #[test]
+    fn form_control_envelope_matrix() {
+        const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+        let open = format!(r#"<x14:formControlPr xmlns:x14="{FORM_CONTROL_NAMESPACE}">"#);
+        let close = "</x14:formControlPr>";
+        let empty = format!(r#"<x14:formControlPr xmlns:x14="{FORM_CONTROL_NAMESPACE}"/>"#);
+        let root = format!("{open}{close}");
+        let rows: [(&str, String); 27] = [
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.clone()),
+            ("start and end root", root.clone()),
+            ("root then whitespace", format!("{root}\n ")),
+            ("root then comment", format!("{root}<!--c-->")),
+            (
+                "root then processing instruction",
+                format!("{root}<?pi x?>"),
+            ),
+            ("root then text", format!("{root}text")),
+            ("root then a second identical root", format!("{root}{root}")),
+            (
+                "root then a foreign element, start form",
+                format!("{root}<foreign></foreign>"),
+            ),
+            (
+                "root then a foreign element, empty form",
+                format!("{root}<foreign/>"),
+            ),
+            ("declaration after the root", format!("{root}{DECLARATION}")),
+            (
+                "two declarations",
+                format!("{DECLARATION}{DECLARATION}{root}"),
+            ),
+            (
+                "comment before the declaration",
+                format!("<!--c-->{DECLARATION}{root}"),
+            ),
+            ("text before the root", format!("text{root}")),
+            ("unterminated root", open.clone()),
+            ("stray end tag", format!("{root}{close}")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{root}")),
+            (
+                "top-level CDATA before the root",
+                format!("<![CDATA[x]]>{root}"),
+            ),
+            (
+                "top-level CDATA after the root",
+                format!("{root}<![CDATA[x]]>"),
+            ),
+            (
+                "one declaration then the root",
+                format!("{DECLARATION}{root}"),
+            ),
+            (
+                "empty-element root then a second root",
+                format!("{empty}{empty}"),
+            ),
+            (
+                "empty-element root then a start root",
+                format!("{empty}{root}"),
+            ),
+            ("root then an empty-element root", format!("{root}{empty}")),
+            ("text inside the root", format!("{open}text{close}")),
+            ("comment then the root", format!("<!--c-->{root}")),
+        ];
+        let expected: &[&str] = &[
+            "Err(Invalid(\"form-control XML does not contain one closed root\"))",
+            "Err(Invalid(\"form-control XML does not contain one closed root\"))",
+            "Err(Invalid(\"form-control XML does not contain one closed root\"))",
+            "Ok(items: 0)",
+            "Ok(items: 0)",
+            "Ok(items: 0)",
+            "Ok(items: 0)",
+            "Ok(items: 0)",
+            "Err(Invalid(\"form-control XML has non-whitespace top-level text\"))",
+            "Err(Invalid(\"form-control part requires one x14:formControlPr root\"))",
+            "Err(Invalid(\"form-control element has no namespace\"))",
+            "Err(Invalid(\"form-control element has no namespace\"))",
+            "Ok(items: 0)",
+            "Ok(items: 0)",
+            "Ok(items: 0)",
+            "Err(Invalid(\"form-control XML has non-whitespace top-level text\"))",
+            "Err(Invalid(\"form-control XML does not contain one closed root\"))",
+            "Err(Invalid(\"form-control XML error: ill-formed document: close tag `</x14:formControlPr>` does not match any open tag\"))",
+            "Err(Invalid(\"DOCTYPE is not admitted in formControlPr\"))",
+            "Err(Invalid(\"CDATA is not admitted outside opaque extLst\"))",
+            "Err(Invalid(\"CDATA is not admitted outside opaque extLst\"))",
+            "Ok(items: 0)",
+            "Err(Invalid(\"form-control part requires one x14:formControlPr root\"))",
+            "Err(Invalid(\"form-control part requires one x14:formControlPr root\"))",
+            "Err(Invalid(\"form-control part requires one x14:formControlPr root\"))",
+            "Err(Invalid(\"form-control XML has non-whitespace top-level text\"))",
+            "Ok(items: 0)",
+        ];
+        let actual = rows
+            .iter()
+            .map(
+                |(_, input)| match parse(input.as_bytes(), &Limits::default()) {
+                    Ok(properties) => format!(
+                        "Ok(items: {})",
+                        properties.item_list().map_or(0, |items| items.len())
+                    ),
+                    Err(error) => format!("Err({error:?})"),
+                },
+            )
+            .collect::<Vec<_>>();
+        let listing = actual
+            .iter()
+            .map(|value| format!("    {value:?},\n"))
+            .collect::<String>();
+        assert_eq!(actual.len(), expected.len(), "actual rows:\n{listing}");
+        for (((label, input), actual), expected) in rows.iter().zip(&actual).zip(expected) {
+            assert_eq!(
+                actual, expected,
+                "{label}: {input:?}\nactual rows:\n{listing}"
+            );
+        }
+    }
+}
