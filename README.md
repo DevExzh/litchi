@@ -367,7 +367,7 @@ Buffer values.
 
 - **[API Reference](https://docs.rs/litchi)** - Complete API documentation
 - **[OFFICE_API_GUIDE.md](docs/OFFICE_API_GUIDE.md)** - Comprehensive guide with examples
-- **[FEATURE_MATRIX.md](docs/FEATURE_MATRIX.md)** - Feature comparison with Apache POI
+- **[FEATURE_MATRIX.md](docs/FEATURE_MATRIX.md)** - Feature support checklists for every format
 - **[Examples](crates/litchi/examples/)** - Working code examples:
   - [`to_markdown.rs`](crates/litchi/examples/to_markdown.rs) - Convert any document or presentation through `litchi::open`
   - [`sheet_eval_mvp.rs`](crates/litchi/examples/sheet_eval_mvp.rs) - Evaluate formulas on a workbook opened with `litchi::open`
@@ -388,7 +388,7 @@ Buffer values.
 - 🟡 Element and property coverage beyond the P0 set; `capabilities()` lists each handle's typed gaps
 - 🟡 Advanced formatting (conditional formatting rules, SmartArt layout) in every format
 
-See [docs/FEATURE_MATRIX.md](docs/FEATURE_MATRIX.md) for a detailed feature comparison with Apache POI.
+See [docs/FEATURE_MATRIX.md](docs/FEATURE_MATRIX.md) for the feature support checklists of every format.
 
 ## License
 

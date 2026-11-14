@@ -1,29 +1,23 @@
 # ODG Feature Matrix
 
-This matrix records the public `litchi-odg` contract for packaged ODG and flat
-FODG. iWork formats are not part of this crate's scope.
-
-| Mark | Meaning |
-|---|---|
-| yes | Supported for the narrow scope in Notes |
-| partial | Partial, preservation-only, or deliberately refused outside a safe closure |
-| no | No public support |
+Feature checklist for packaged ODG and flat FODG. yes Supported · partial Partial · no
+Unsupported · N/A Not applicable.
 
 | Feature | Status | Read | Write | Notes |
 |---|---|---|---|---|
-| ODG package snapshot | yes | yes | N/A | The immutable `Package` owner and its read-only `Drawing` projection retain exact bytes and expose bounded pages, layers, shapes, metadata, styles, and safe member names. |
-| Package semantic model | partial | yes | partial | Namespace-aware parsing requires one `office:document-content` / `office:body` / `office:drawing` chain. Pages expose identity, style, master, page-local layers, bounded shapes, inert `form:id` declarations, signature/encryption policy, and package resources. Global layers from `styles.xml`, layer policy, shape kind/name/layer/style/text style/z-index/geometry/path/text/accessibility, shared inert `drawing::Frame` context, and media occurrences are typed without conflating page-local and global scope. Unknown markup remains exact source provenance. |
-| Unified package transaction | yes | yes | yes | One transaction composes checked page name/style/structure, arbitrary automatic-style properties, page-local layers, shape/group, geometry/path/style, inert arbitrary form widgets/control references, text/name/layer, and referenced or detached package-resource operations. A public group selection owns the complete flattened nested closure and supports checked descendant geometry/text/control edits plus bounded bulk style/text edits. Group removal owns its complete XML subtree; page rename and layer/style/form/resource removal are dependency checked. Commit audits authored fragments, performs a bounded full reopen/readback, and returns an exact-source reversible patch. Adjacent exact-lineage patches compose. |
-| Durable patches and collaboration | yes | N/A | yes | Versioned reversible patches use deterministic canonical JSON, exact-source preconditions, bounded content-addressed blobs for structural/resource changes, inverse application, and full package reopen. Exact-lineage sub-edits join in stable identifier order only when effects are disjoint; overlap is reported structurally. Three-way planning is non-mutating and requires explicit conflict resolution. |
-| History and transfer bounds | yes | N/A | yes | Snapshot history has explicit step/weight limits, deterministic eviction, undo/redo, and non-mutating over-budget refusal. Durable JSON, operation values, blob counts/sizes, composition effects, and conflicts all have finite bounds. |
-| Rewrite refusal | yes | N/A | yes | Split/mixed/CDATA/entity text, noncompact whole-source structural rewrites, encrypted packages, and unsupported ownership return errors rather than silently rewriting. Signed packages require an explicit signature-removal policy. |
-| Compact XML | yes | N/A | yes | Authored XML has no indentation, padded markup, DTD, or custom entities. Fine-grained provenance splices audit only bounded replacement fragments and preserve unrelated producer formatting exactly; structural rewrites still require compact source XML. |
-| Flat FODG snapshots and patches | partial | yes | partial | `FlatDrawing` preserves source bytes, inventories bounded pages/shapes, and has an independent source-checked reversible text patch chain. |
-| Geometry, paths, styles, resources, forms | yes | yes | yes | Existing box geometry, line/connector/measure endpoints, polygon/polyline view-box point lists, transforms, SVG path data, graphic/page-style references, inert `draw:control` references, typed arbitrary automatic-style properties, and arbitrary inert form widget kinds/attributes are editable. Advanced geometry supports source-backed replacement and compact insertion with full reopen and durable package inversion. Named gradient, hatch, fill-image, marker, opacity, and stroke-dash resources have typed arbitrary-attribute inventory plus dependency-checked CRUD. Referenced media can be replaced or deliberately detached; safe unreferenced members can be added/removed. Unknown active behavior remains inert. |
-| Page transitions and SMIL metadata | partial | yes | partial | Drawing-page styles expose bounded `presentation:transition-*`, SMIL type/subtype/direction/fade color, duration, and inert sound links. Automatic styles and named `styles.xml` owners have source-span CRUD with exact reopen/durable inverse coverage; shared style references and producer-markup-changing sound edits are refused. Playback is outside the contract. |
-| 3D and enhanced geometry owners | partial | yes | N/A | `dr3d:scene/light/cube/sphere/extrude/rotate` are typed inert shape kinds. Custom-shape `draw:enhanced-geometry` exposes bounded recognized attributes and ordered equation/handle children. Source markup remains authoritative and no rendering or geometry evaluation is performed. |
-| Image maps, contours, and glue points | partial | yes | N/A | `draw:frame`-owned `draw:image-map` rectangle/circle/polygon areas, inert link metadata, frame contour owners, and direct shape `draw:glue-point` owners are namespace-aware, bounded, schema-order checked, and source-fragment retaining. No link activation or geometry/rendering behavior is provided. |
-| Cross-drawing transfer | yes | N/A | yes | A provenance-bound compact shape/group plan retains the complete XML subtree, stable layer closure, recursive style-definition and named Draw resource closure, inert form declarations, and package-local resource bytes. Destination insertion copies missing dependencies and deterministically remaps same-name/different-style, named style-resource, form-ID, and resource-path collisions while rewriting owned references. It validates and fully reopens the whole result and publishes durably. |
-| Active content | yes | yes | partial | Namespace-aware bounded inventory reports scripts, XML events, presentation actions, DDE sources, external links, and embedded objects. Default writes preserve their exact inert provenance without execution; `ActiveContentWritePolicy::Refuse` blocks transaction, durable replay, and joined publication roots. |
-| Templates, encryption, signatures | partial | yes | partial | OTG template build/open/edit is explicit and preserves the template media type. Fresh ODG authoring supports validated password encryption, document signing, or both; password-protected drawings open inertly, signature metadata is typed, and signature math can be verified without a trust claim. Signed/encrypted state and lifecycle capabilities are public. Typed per-operation dispositions classify existing encrypted rewrite as exact-source-only, password change/re-encryption as finally unsupported, stale-signature removal as supported, and transactional re-signing as finally unsupported. |
-| Limits and evidence | yes | yes | yes | Parsing caps depth, pages, layers, shapes, active-content surfaces, forms, named style resources, extracted text, group bulk edits, replacement values/resources, durable blobs, and output. Tests cover multiple genuine LibreOffice Draw packages, complex real Fontwork and nested-group changed/full-reopen/inverse paths, real resource XML preservation, collision-remapped nested group/style/named-style-resource/form/media transfer closure, structural/box/line/points/transform/path/style/form/resource publication, durable reopen/inverse/stale refusal, join conflicts/order, non-mutating three-way planning, bounded history, fresh encrypted-and-signed authoring with verification plus typed existing-package refusal, OTG/security/active-content policy, raw hostile ZIP truncation/depth/structure/DTD cases, and noncompact rewrite refusal. |
+| ODG package snapshot | yes | yes | N/A | |
+| Package semantic model | partial | yes | partial | |
+| Unified package transaction | yes | yes | yes | |
+| Durable patches and collaboration | yes | N/A | yes | |
+| History and transfer bounds | yes | N/A | yes | |
+| Rewrite refusal | yes | N/A | yes | |
+| Compact XML | yes | N/A | yes | |
+| Flat FODG snapshots and patches | partial | yes | partial | Text patches only |
+| Geometry, paths, styles, resources, forms | yes | yes | yes | |
+| Page transitions and SMIL metadata | partial | yes | partial | No playback |
+| 3D and enhanced geometry owners | partial | yes | N/A | No rendering or geometry evaluation |
+| Image maps, contours, and glue points | partial | yes | N/A | No link activation or rendering |
+| Cross-drawing transfer | yes | N/A | yes | |
+| Active content | yes | yes | partial | Inert; never executed |
+| Templates, encryption, signatures | partial | yes | partial | No re-encryption or re-signing of existing packages |
+| Limits and evidence | yes | yes | yes | |

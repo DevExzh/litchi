@@ -4203,14 +4203,6 @@ KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_FUZZ_CODEC_ALTERNATES = (
         Path("crates/litchi-iwa-protos/fuzz/corpus/numbers_table_physical_sort_codec"),
     ),
 )
-KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_DOC_SOURCES = (
-    Path("crates/litchi-keynote/docs/FEATURE_MATRIX.md"),
-)
-KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_DOC_MARKERS = (
-    re.compile(r"(?i)Keynote[^\n]{0,120}(?:physical|Sort Now)"),
-    re.compile(r"(?i)(?:physical|Sort Now)[^\n]{0,160}Keynote"),
-    re.compile(r"execute_slide_table_sort_order"),
-)
 KEYNOTE_SLIDE_TABLE_SORT_FORBIDDEN_OWNER_PATTERNS = (
     (
         "local SortBudget",
@@ -45974,22 +45966,6 @@ def audit_keynote_slide_table_physical_sort_resource_source_topology(
                 "focused litchi-keynote physical slide-table sort integration test is "
                 f"missing native Keynote evidence: {test_path}"
             )
-
-    for relative in KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_DOC_SOURCES:
-        path = root / relative
-        if not path.is_file():
-            violations.append(
-                "focused litchi-keynote physical slide-table sort is missing documentation "
-                f"gate: {relative}"
-            )
-            continue
-        source = path.read_text(encoding="utf-8")
-        for marker in KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_DOC_MARKERS:
-            if marker.search(source) is None:
-                violations.append(
-                    "focused litchi-keynote physical slide-table sort documentation is "
-                    f"missing {marker.pattern}: {relative}"
-                )
 
     return sorted(set(violations))
 

@@ -1,149 +1,98 @@
 # Keynote Feature Matrix
 
-This is the authoritative feature matrix for the public `litchi-keynote` crate and native
-Keynote (`.key`) packages. It is the format-specific companion to the repository
-[feature-matrix index](../../../docs/FEATURE_MATRIX.md). The matrix describes the focused owner
-crate. The retired migration host is described in [Retired migration host](#retired-migration-host).
-
-The audited source tree is a development snapshot at the current checkout. Focused ownership
-claims below are grounded in the source and the dated ADR verification records; an uncommitted
-working tree is not release evidence. Keynote's `.key` container and IWA/protobuf payloads are
-treated as native application data. This document does not claim complete conformance with an
-unpublished or reverse-engineered Keynote schema, rendering fidelity, or application compatibility.
-
-## Status model
-
-| Mark | Meaning |
-|------|---------|
-| ✅ | The documented feature scope has a public typed implementation |
-| 🟡 | Support is bounded, partial, metadata-only, pass-through, preservation-only, or otherwise limited |
-| ❌ | No public typed support is currently available |
-| N/A | The concept does not apply to the format or direction |
-
-`Read` and `Write` are independent directions. A `🟡` direction is not a claim of general CRUD:
-it may describe a subset, an existing-object-only transaction, an inert serializer, or exact
-preservation. A passing synthetic round trip does not establish native Keynote acceptance.
-
-## Ownership and ingress boundaries
-
-The focused owner is `litchi-keynote`. [`Package`](../src/package.rs) retains an exact
-regular-ZIP artifact and exposes selected source-bound transactions for slide state, chart
-metadata, movie geometry/playback, existing slide media data, soundtrack
-references/items, physical table sorting, and one existing cell's Number display format.
-[`Presentation`](../src/presentation.rs) is the archive-free read-only semantic projection
-(`Package::presentation()` projects it from an open package): its path ingress accepts a
-ZIP or app-authored package directory, but it intentionally drops exact bytes, media, previews,
-and editing state. Package directories therefore have semantic-read support only. Detached
-[`Show`](../src/show.rs#L334) and [`Slide`](../src/slide.rs#L45) builders construct values, not
-writable `.key` packages.
-
-Every changed focused transaction is expected to authorize the exact source, enforce finite
-physical/wire/semantic limits, validate the selected ownership graph, reopen the candidate, and
-read back the requested value. A transaction is still limited to the feature named in its row;
-it is not a general Keynote package editor.
+Feature checklist for Apple Keynote (`.key`) packages. ✅ Supported · 🟡 Partial · ❌ Unsupported ·
+N/A Not applicable. Writes edit existing packages unless a row says otherwise.
 
 ## Package and semantic projection
 
 | Feature | Status | Read | Write | Notes |
-|---------|--------|------|-------|-------|
-| Existing `.key` ZIP ingress from path or bytes | ✅ | ✅ | N/A | `Package::open` and `Package::from_bytes` validate the native root, retain the source artifact, and accept explicit archive/semantic profiles ([package ingress](../src/package.rs), [native fixture](../tests/native_fixture.rs)). |
-| Exact retained-artifact stream to a caller sink | ✅ | N/A | ✅ | `Package::write_to` emits the retained bytes and unmodeled members/fields unchanged; it does not flush, sync, rename, or atomically publish a filesystem path ([writer](../src/package.rs), [exact no-op test](../tests/native_fixture.rs)). |
-| Archive-free ZIP or package-directory semantic presentation | ✅ | ✅ | N/A | `Presentation::open` and `Presentation::from_bytes` (configured through `OpenOptions` with checked `SourceLimits`/`SemanticLimits`) retain only the bounded show, slides, text, source metadata, and statistics; directory input has no exact package artifact or edit path ([presentation boundary](../src/presentation.rs), [directory parity test](../tests/native_fixture.rs)). |
-| Semantic show, slide order, text, notes, media/build summaries | 🟡 | ✅ | N/A | Rooted graph projection is typed and immutable, but the model intentionally exposes only selected content and no native IDs ([show model](../src/show.rs#L334), [slide model](../src/slide.rs#L45)). |
-| Unknown ZIP members, IWA components, and protobuf fields | 🟡 | ✅ | 🟡 | Untouched exact artifacts are retained; focused rewrites preserve unselected records only within each transaction's locality proof. Opaque/unsupported compression or unmodeled ownership can cause a typed refusal rather than a semantic edit ([physical source](../src/package.rs), [transaction source checks](../src/package/edit.rs#L281)). |
-| Focused source-bound transactions and reversible patches | 🟡 | ✅ | 🟡 | Selected owners expose one bounded operation per commit, exact-source authorization, inverse patches, and candidate rereadback; coverage is not a composable/durable patch history, and native acceptance remains operation-specific rather than a green suite claim ([base transaction](../src/package/edit.rs#L79), [slide-order transaction](../src/package/slide_order.rs#L151)). |
-| Fresh `.key` package creation | 🟡 | N/A | 🟡 | [`builder::Builder`](../src/builder.rs) writes a new `.key` package (ledger family `builder`). It does not author every structure the application can. |
-| Durable patch serialization, composition, merge, and history | ❌ | N/A | ❌ | Focused patches retain process-local source/target artifacts or logical deltas; there is no stable patch format, composition/merge protocol, or persistent history API. |
-| Durable atomic filesystem save | 🟡 | N/A | 🟡 | `Package::save` delegates staged regular-file publication, flush/sync, identity checks, and atomic replacement to the archive-owned boundary; platform/filesystem durability caveats and committed post-replacement errors remain explicit. `write_to` is still a caller-owned streaming sink and does not itself publish a path ([save API](../src/package.rs#L854), [save boundary](../src/lib.rs#L141)). |
-| Metadata and properties sidecar | 🟡 | ✅ | ❌ | `Package::metadata` reads semantic show data plus the canonical `Metadata/Properties.plist`; no focused metadata editor is exposed ([metadata reader](../src/package.rs), [metadata fixture assertion](../tests/native_fixture.rs)). |
+|---|---|---|---|---|
+| Existing `.key` ZIP ingress from path or bytes | ✅ | ✅ | N/A | |
+| Exact retained-artifact stream to a caller sink | ✅ | N/A | ✅ | |
+| Archive-free ZIP or package-directory semantic presentation | ✅ | ✅ | N/A | |
+| Semantic show, slide order, text, notes, media/build summaries | 🟡 | ✅ | N/A | Selected content only |
+| Unknown ZIP members, IWA components, and protobuf fields | 🟡 | ✅ | 🟡 | Preserved, not understood |
+| Focused source-bound transactions and reversible patches | 🟡 | ✅ | 🟡 | One operation per commit |
+| Fresh `.key` package creation | 🟡 | N/A | 🟡 | |
+| Durable patch serialization, composition, merge, and history | ❌ | N/A | ❌ | |
+| Durable atomic filesystem save | 🟡 | N/A | 🟡 | |
+| Metadata and properties sidecar | 🟡 | ✅ | ❌ | |
 
 ## Slides, text, settings, and playback state
 
 | Feature | Status | Read | Write | Notes |
-|---------|--------|------|-------|-------|
-| Slide selection by checked position or unique navigator name | ✅ | ✅ | N/A | Selectors are semantic and reject empty/ambiguous names; native object identifiers remain private ([selector](../src/selector.rs#L1), [show selection](../src/show.rs#L375)). |
-| Existing slide skip/include state | ✅ | ✅ | ✅ | One existing slide can be skipped or included with an exact-source patch and full candidate reopen; this does not add, duplicate, or reorder slides ([edit API](../src/package/edit.rs#L99), [skip tests](../tests/skip_state.rs#L1)). |
-| Existing slide move/reorder | 🟡 | ✅ | 🟡 | One move per transaction over the admitted flat slide topology; destinations are final positions and unsupported/hierarchical topologies refuse ([slide-order API](../src/package/slide_order.rs#L166), [order tests](../tests/slide_order.rs#L1)). |
-| Existing slide deletion | 🟡 | ✅ | 🟡 | Deletes one selected existing slide, refuses deletion of the final slide, preserves selected package data according to ownership checks, and provides an inverse; no general lifecycle manager ([deletion API](../src/package/slide_delete.rs#L619), [deletion tests](../tests/slide_delete.rs#L900)). |
-| Slide insertion, duplication, or fresh slide creation | 🟡 | N/A | 🟡 | `slide::creation::Edit` adds and duplicates slides and sets their layout, and `Package::{slide_layouts, default_slide_layout}` read the layouts it can use. Ledger family `slide.lifecycle`. |
-| Existing title/body placeholder text | 🟡 | ✅ | 🟡 | Plain text and bounded UTF-16 replacement are supported for existing, exclusively owned title/body storages; slide-number placeholders are visibility-only and dependent/inline-marker cases refuse ([text API](../src/package/slide_text.rs#L739), [text tests](../tests/slide_text.rs#L832)). |
-| Existing speaker notes text | 🟡 | ✅ | 🟡 | Reads and edits an existing notes storage by selector and text span; absent notes are not synthesized ([notes API](../src/package/slide_notes.rs#L575), [notes tests](../tests/slide_notes.rs#L408)). |
-| Per-slide placeholder visibility | 🟡 | ✅ | 🟡 | Existing title/body/slide-number roles can be shown or hidden; missing roles remain distinct and this does not change the show-wide slide-number preference ([visibility API](../src/package/slide_placeholder_visibility.rs#L675), [visibility tests](../tests/slide_placeholder_visibility.rs#L188)). |
-| Rich-text storage inspection and plain-text projection | 🟡 | ✅ | N/A | Semantic slides expose text storages/ranges and rooted plain text; this is not a complete style, list, link, revision, or inline-object model ([slide text values](../src/slide.rs#L121), [native text projection](../tests/rich_storage.rs#L1)). |
-| Rich-text styles, lists, links, revisions, and inline-object CRUD | 🟡 | 🟡 | 🟡 | `slide::drawable::Edit` sets text, text properties, hyperlinks and comments on drawables, and `Package::{edit_slide_table_cell_text, edit_slide_table_cell_lists}` edit table-cell rich text and lists. Ledger families `text.*`, `table.cell_rich_text`. Revisions and inline-object CRUD have no public API. |
-| Show dimensions and playback settings | 🟡 | ✅ | 🟡 | Typed size, mode, slide-number/loop/autoplay/idle settings support existing-source replacement with candidate verification; no playback engine or rendering behavior is provided ([settings API](../src/package/show_settings.rs#L416), [settings tests](../tests/show_settings.rs#L1067)). |
-| Slide transitions | 🟡 | ✅ | 🟡 | Existing modern transition envelopes expose bounded effects, timing, direction, delivery, and opaque fields; clear writes a native no-effect value and does not synthesize legacy-only transitions ([transition API](../src/package/slide_transition.rs#L1150), [transition values](../src/transition.rs#L760), [transition tests](../tests/slide_transition.rs#L1062)). |
-| Slide backgrounds | 🟡 | ✅ | 🟡 | Effective/inherited and direct overrides support none, solid, and validated gradients; unsupported, image, and future fills are observable as `Background::Unsupported`, retained in exact source artifacts, and refused for changed edits. Image-background semantics and rendering are not modeled ([background API](../src/package/slide_background.rs#L489), [background values](../src/background.rs#L8), [background tests](../tests/slide_background.rs#L1)). |
-| Builds and animation summaries | 🟡 | ✅ | ❌ | Slides expose bounded build/effect summaries and durations; there is no playback runtime ([build model](../src/build.rs#L205), [semantic decode](../src/package.rs#L1240)). |
-| Existing build playback order | 🟡 | ✅ | 🟡 | One existing build can be moved by checked semantic position on a selector-chosen slide. The focused E1 owner rewrites the modern slide build and chunk-reference lists together, preserves complete nested reference bytes, validates contiguous chunk groups and admitted start semantics, fully reopens changed candidates, and returns an exact-source inverse. The retired migration host's raw-ID reorder/move routes were removed before the host was deleted. Build effects, timing values, lifecycle, legacy field-3 lists, and native-app acceptance remain outside this E1-only owner ([build-order owner](../src/package/slide_build_order.rs#L1)). |
-| Shapes, groups, lines, transforms, and z-order editing | 🟡 | ✅ | 🟡 | `slide::drawable::Edit` adds, restyles, moves and removes shapes and lines and changes z-order; `Package::slide_drawable_list` enumerates them. Groups are not authored. Ledger families `drawable.shape`, `drawable.order`, `drawable.list`. |
-| Masters, templates, themes, layouts, guides, and inheritance authoring | ❌ | 🟡 | ❌ | Some inherited style/background effects are read while resolving selected owners, but there is no public focused master/theme/layout lifecycle API ([background inheritance](../src/package/slide_background.rs#L1)). |
-| Comments | 🟡 | ✅ | 🟡 | `slide::drawable::Edit` adds and removes drawable text comments and replies, and `Package::edit_slide_table_cell_comment` edits table-cell comments. Ledger families `text.comment`, `table.cell_comment`. |
-| Collaboration and coauthoring | ❌ | ❌ | ❌ | No focused semantic or package API exposes collaboration state, revision resolution, or coauthoring. |
+|---|---|---|---|---|
+| Slide selection by checked position or unique navigator name | ✅ | ✅ | N/A | |
+| Existing slide skip/include state | ✅ | ✅ | ✅ | |
+| Existing slide move/reorder | 🟡 | ✅ | 🟡 | Flat slide topology only |
+| Existing slide deletion | 🟡 | ✅ | 🟡 | The last slide cannot be deleted |
+| Slide insertion, duplication, or fresh slide creation | 🟡 | N/A | 🟡 | |
+| Existing title/body placeholder text | 🟡 | ✅ | 🟡 | Plain text only |
+| Existing speaker notes text | 🟡 | ✅ | 🟡 | Absent notes are not created |
+| Per-slide placeholder visibility | 🟡 | ✅ | 🟡 | |
+| Rich-text storage inspection and plain-text projection | 🟡 | ✅ | N/A | |
+| Rich-text styles, lists, links, revisions, and inline-object CRUD | 🟡 | 🟡 | 🟡 | No revisions or inline-object editing |
+| Show dimensions and playback settings | 🟡 | ✅ | 🟡 | No playback |
+| Slide transitions | 🟡 | ✅ | 🟡 | |
+| Slide backgrounds | 🟡 | ✅ | 🟡 | None, solid and gradient fills only |
+| Builds and animation summaries | 🟡 | ✅ | ❌ | |
+| Existing build playback order | 🟡 | ✅ | 🟡 | |
+| Shapes, groups, lines, transforms, and z-order editing | 🟡 | ✅ | 🟡 | Groups cannot be authored |
+| Masters, templates, themes, layouts, guides, and inheritance authoring | ❌ | 🟡 | ❌ | |
+| Comments | 🟡 | ✅ | 🟡 | |
+| Collaboration and coauthoring | ❌ | ❌ | ❌ | |
 
 ## Tables
 
 | Feature | Status | Read | Write | Notes |
-|---------|--------|------|-------|-------|
-| Table selection/discovery in an existing slide | 🟡 | 🟡 | N/A | Property owners use a checked positional [`TableSelector`](../src/slide/table.rs#L26) and private graph admission; there is no public table catalog or stable table identity. |
-| Table name | 🟡 | ✅ | 🟡 | Existing table names have selector-driven source-bound read/edit/clear behavior; locked or unsupported ownership graphs refuse ([table-name API](../src/package/slide_table_name.rs#L379), [tests](../tests/slide_table_name.rs#L839)). |
-| Table title visibility/settings | 🟡 | ✅ | 🟡 | Existing table title state can be read and replaced; this is presentation metadata, not table content ([table-title API](../src/package/slide_table_title.rs#L558), [tests](../tests/slide_table_title.rs#L271)). |
-| Table appearance and style metadata | 🟡 | ✅ | 🟡 | Bounded appearance/banding/gridline/row-sizing values are edited through existing table style ownership; arbitrary style graph creation is not claimed ([appearance API](../src/package/slide_table_appearance.rs#L1007), [tests](../tests/slide_table_appearance.rs#L893)). |
-| Table dimensions | 🟡 | ✅ | 🟡 | Existing row/column point-size dimensions have checked edits; no row/column insertion or deletion ([dimension API](../src/package/slide_table_dimension.rs#L871), [tests](../tests/slide_table_dimension.rs#L879)). |
-| Header/footer/freeze/repeat settings | 🟡 | ✅ | 🟡 | Existing table header settings expose bounded presentation and repeat/freeze metadata; this is not print layout or cell topology ([headers API](../src/package/slide_table_headers.rs#L763), [tests](../tests/slide_table_headers.rs#L1042)). |
-| Table lock state | 🟡 | ✅ | 🟡 | Existing table lock state is readable and source-bound editable; a locked table can reject unrelated property edits ([lock API](../src/package/slide_table_lock_state.rs#L787), [tests](../tests/slide_table_lock_state.rs#L709)). |
-| Persisted table sort configuration | 🟡 | ✅ | 🟡 | Reads/writes persisted sort rules and ranges only; it does not invoke Keynote's physical “Sort Now” executor or move row data. Physical row movement is the separate focused owner below ([sort values](../src/slide/table/sort.rs#L1), [sort transaction](../src/package/slide_table_sort_order.rs#L564), [sort tests](../tests/slide_table_sort_order.rs#L1)). |
-| Physical table row sorting (“Sort Now”) | 🟡 | 🟡 | 🟡 | The focused Keynote existing-table owner executes persisted order through selector-first `Package::{execute_slide_table_sort_order,execute_slide_table_sort_order_to_rows}` and exact-source `edit/apply` transactions; no public row/value reader is exposed. Admission is limited to the canonical type-6001 table-model route and explicitly proven tile, data-list, header, UID, and empty pre-BNC sentinel shapes. Sort keys are finite scalar text, number, boolean, date, and duration values: text uses Rust lexical ordering, numeric/date/duration values use `f64::total_cmp`-based deterministic ordering except that signed zeroes compare equal and retain source order, booleans use their ordinary ordering, and mixed scalar domains fail closed. Duplicate keys retain deterministic source-row order. Strict wire preflight precedes private borrowed Buffa lazy views; unknown/unselected bytes remain source-authoritative. Formula/error, rich-text, comment, merge, filter/group/category/pivot/spill/conditional, hidden/non-positional, imported/provenance, cross-tile/cross-bucket, non-empty stroke, unknown mutable, and other unproven row-affine dependencies refuse atomically. Physical verification uses fallibly reserved direct position indexes rather than repeated linear lookups, with work and retained memory charged to the transaction budget. Exact-source patches/inverses, candidate reopen/readback, bounded locality, and preview invalidation are source-level contracts. A disposable Computer Use run opened a pre-hardening candidate in Keynote 14.4 and showed the expected order, but the current strict owner rejects that app-authored source because model field 39 identifies an unowned conditional-style CalculationEngine dependency graph. The run therefore remains external exploratory evidence, not current-owner E3/E4 promotion; the checked-in native fixture has no table and the checked-in evidence test records hashes without launching Keynote. Native acceptance remains pending ([semantic values](../src/slide/table/physical_sort.rs#L1), [physical owner](../src/package/slide_table_physical_sort.rs#L1), [integration tests](../tests/slide_table_physical_sort.rs#L1)). |
-| Existing table-cell Number display format | 🟡 | ✅ | 🟡 | A checked `At` inside a selector-chosen existing table exposes the Number display family through Keynote-local semantic values for automatic or fixed decimal places, negative style, and thousands separators. Read/edit/apply use an exact-source patch, strict graph admission, bounded candidate reopen/readback, no-op/inverse/conflict checks, and no public native IDs. It does not edit the cell value or formula, synthesize a cell, or cover other format families. A current-producer native Keynote source changed B2 from `42.50` to `42.500`; Keynote opened the focused candidate without repair or conversion, then native save/close/reopen preserved the result and strict reread was an exact no-op. This is bounded, operation-specific E4 evidence, not general cell-format or package-native support ([semantic values](../src/slide/table/number_format.rs#L1), [focused owner](../src/package/slide_table_cell_number_format.rs#L1), [example](../examples/edit_table_cell_number_format.rs#L1)). |
-| Slide-table merged-cell geometry | 🟡 | ✅ | 🟡 | Public cached metadata path [`MergeReader::slide_table_merges`](../src/package/slide_table_merges/reader.rs) retains a checked component catalog and compact object index, accepts checked slide/table selectors, and uses bounded borrowed Buffa decoding without constructing a semantic document; its hidden migration ingress can reuse coordinator-owned shared component archives. [`Package::slide_table_merges`](../src/package/slide_table_merges.rs) remains the convenient source-preserving snapshot route, while [`Package::{edit_slide_table_merges,apply_slide_table_merges}`](../src/package/slide_table_merges/transaction.rs) stages checked `Region` merge/unmerge edits for one existing table. Exact-source no-op/inverse/conflict patches, source-order normalization, bounded archive/wire preflight, candidate reopen/readback, locality, preview invalidation, malformed/limit handling, and unknown-field preservation are covered by focused tests. Unsupported merge-region-map dependencies fail closed. [Focused tests](../tests/slide_table_merges.rs) cover the source contract. Native 14.4 merge and unmerge copies opened, saved, closed, reopened, and passed strict Package/MergeReader geometry readback. Cell contents remain source-authoritative. |
-| Cell mutations, formulas, formats, and row/column topology | 🟡 | ✅ | 🟡 | `Package::{slide_table_cells, edit_slide_table_topology, edit_slide_table_lifecycle, edit_slide_table_layout}` and `slide::drawable::Edit::{set_table_cell, set_table_formula_cached}` read and write slide-table cells, formulas with their cached results (no formula is evaluated), and table structure. Ledger families `table.cells`, `table.formula`, `table.topology`, `table.lifecycle`, `table.cell_format`. |
+|---|---|---|---|---|
+| Table selection/discovery in an existing slide | 🟡 | 🟡 | N/A | |
+| Table name | 🟡 | ✅ | 🟡 | |
+| Table title visibility/settings | 🟡 | ✅ | 🟡 | |
+| Table appearance and style metadata | 🟡 | ✅ | 🟡 | |
+| Table dimensions | 🟡 | ✅ | 🟡 | Sizes only; no row or column insertion |
+| Header/footer/freeze/repeat settings | 🟡 | ✅ | 🟡 | |
+| Table lock state | 🟡 | ✅ | 🟡 | |
+| Persisted table sort configuration | 🟡 | ✅ | 🟡 | Does not move rows |
+| Physical table row sorting (“Sort Now”) | 🟡 | 🟡 | 🟡 | Existing tables only |
+| Existing table-cell Number display format | 🟡 | ✅ | 🟡 | |
+| Slide-table merged-cell geometry | 🟡 | ✅ | 🟡 | |
+| Cell mutations, formulas, formats, and row/column topology | 🟡 | ✅ | 🟡 | Formulas not evaluated |
 
 ## Charts
 
 | Feature | Status | Read | Write | Notes |
-|---------|--------|------|-------|-------|
-| Existing slide chart catalog and visible titles | 🟡 | ✅ | 🟡 | A selected slide exposes chart summaries by source order/title and an existing chart title transaction; no chart creation or graph transfer ([chart catalog API](../src/package/slide_chart_title.rs#L509), [chart values](../src/chart.rs#L130), [tests](../tests/slide_chart_title.rs#L245)). |
-| Existing chart captions | 🟡 | ✅ | 🟡 | Existing chart captions can be read/replaced/cleared through source-bound transactions; captions are not chart data or styling ([caption API](../src/package/slide_chart_caption.rs#L1062), [tests](../tests/slide_chart_caption.rs#L1346)). |
-| Existing chart axis titles | 🟡 | ✅ | 🟡 | Existing chart axis titles have bounded selector-driven read/edit behavior for modeled axes; operation-specific native save/close/reopen and strict reread evidence supports a bounded E4 claim ([axis-title API](../src/package/slide_chart_axis_title.rs#L1411), [tests](../tests/slide_chart_axis_title.rs#L24)). |
-| Existing primary value-axis settings | 🟡 | ✅ | 🟡 | Bounded bounds, steps, and scale settings are source-bound edited and reread; native save/close/reopen evidence supports a bounded E4 claim. This is not a full chart axis/style model ([value-axis API](../src/package/slide_chart_value_axis.rs#L1518), [tests](../tests/slide_chart_value_axis.rs#L1)). |
-| Existing chart Arrange interaction flags | 🟡 | ✅ | 🟡 | The focused owner reads and source-boundedly replaces only `ChartArrangement::{locked,constrain_proportions}` through selector-first `Package::{slide_chart_arrangement,edit_slide_chart_arrangement,apply_slide_chart_arrangement}`. Strict wire preflight, private lazy Buffa inspection, exact no-op/inverse/conflict checks, candidate reopen, semantic readback, and preview preservation are part of the transaction. |
-| Existing chart legend visibility | 🟡 | ✅ | 🟡 | The focused owner reads the effective legend-visibility bit (an absent native field means `false`) and source-boundedly replaces it for an existing chart through selector-first `Package::{slide_chart_legend_visible,edit_slide_chart_legend,apply_slide_chart_legend}`. Native field presence, IDs, and raw records stay private; strict wire validation precedes the lazy Buffa projection, with exact no-op/change/inverse, locality, candidate readback, and preview invalidation on changed writes. This does not own legend layout, fill/frame/font/stroke/shadow styling, chart data, or CRUD. |
-| Chart data, series, types, legend layout/styles, and chart CRUD | 🟡 | 🟡 | 🟡 | `chart::lifecycle::Edit` adds, duplicates and removes charts and sets their data and direction; `chart::style`, `chart::axis` and `chart::legend` edit their appearance. Ledger families `chart.lifecycle`, `chart.style`. Formula-backed series are not evaluated. |
-
-The checked-in [`table-discovery.key`](../../../test-data/iwork/keynote/table-discovery.key)
-fixture is a native Keynote 14.4 producer sample derived from `basic.key`; it
-contains a Plain 5-by-4 table with `Buffa discovery` in A1. The listing path
-uses its bounded table-model discovery projection for name and dimensions
-only. This fixture does not promote focused physical sorting,
-Litchi table mutation, native byte parity, or broader table support.
+|---|---|---|---|---|
+| Existing slide chart catalog and visible titles | 🟡 | ✅ | 🟡 | |
+| Existing chart captions | 🟡 | ✅ | 🟡 | |
+| Existing chart axis titles | 🟡 | ✅ | 🟡 | |
+| Existing primary value-axis settings | 🟡 | ✅ | 🟡 | |
+| Existing chart Arrange interaction flags | 🟡 | ✅ | 🟡 | |
+| Existing chart legend visibility | 🟡 | ✅ | 🟡 | |
+| Chart data, series, types, legend layout/styles, and chart CRUD | 🟡 | 🟡 | 🟡 | Formula-backed series not evaluated |
 
 ## Movies, images, audio, and soundtrack
 
 | Feature | Status | Read | Write | Notes |
-|---------|--------|------|-------|-------|
-| Existing movie/audio drawable inventory and metadata | 🟡 | ✅ | N/A | `Slide::movies` preserves the complete source order of audio, file movies, placeholders, and live video; `audio` and `video_movies` are filtered views. Summaries retain optional geometry, original/natural size, transform, playback, and duration without native IDs. Typed properties preserve sparse fields, while materialized content/poster reads validate the selected asset closure. Native placeholder save/close/reopen and synthetic live-video cases cover read parity; raw host readers are retired ([media values](../src/slide/media.rs), [discovery tests](../tests/slide_media_discovery.rs), [properties tests](../tests/slide_media_properties.rs), [media-data owner](../src/package/slide_media_replacement.rs)). |
-| Existing movie title and caption | 🟡 | ✅ | 🟡 | Existing file-backed movie title/caption fields have selector-driven exact-source transactions; no media resource lifecycle ([title API](../src/package/slide_movie_title.rs#L421), [caption API](../src/package/slide_movie_caption.rs#L598), [caption tests](../tests/slide_movie_caption.rs#L741)). |
-| Existing file-backed movie geometry and transform | 🟡 | ✅ | 🟡 | Selector-first `Package::{slide_movie_geometry,slide_movie_transform,edit_slide_movie_geometry,apply_slide_movie_geometry}` owns finite position, positive displayed size, rotation, and reflection for an existing file-backed movie. Exact-source patches/inverses, strict wire validation before private lazy Buffa inspection, candidate reopen/readback, locality, and preview invalidation are bounded by the transaction; no general drawable graph or media lifecycle is exposed. Native save/close/reopen readback covers the geometry owner; the raw geometry bridge is retired; movie/audio creation, duplication, removal, and properties now have focused owners, while generic asset lifecycle remains host-side ([geometry API](../src/package/slide_movie_geometry.rs#L822), [semantic values](../src/slide/media.rs#L36), [tests](../tests/slide_movie_geometry.rs#L1)). |
-| Existing file-backed movie/audio playback settings | 🟡 | ✅ | 🟡 | Selector-first `Package::{slide_movie_playback_settings,edit_slide_movie_playback_settings,apply_slide_movie_playback_settings}` reads and edits bounded trim, poster, loop, and volume settings for existing file-backed movie or audio controls. The private codec strictly preflights raw wire before its lazy Buffa view and preserves unknown source bytes; candidate reopen/readback and exact-source conflicts/inverses are checked. This is metadata editing only: no playback engine, generic asset insertion/removal, or package-wide native claim. Existing content/poster bytes are handled by the separate focused owner below. One file-backed movie has operation-specific native open/save/close/reopen and strict reread coverage ([playback API](../src/package/slide_movie_playback.rs#L664), [semantic values](../src/slide/media.rs#L215), [tests](../tests/slide_movie_playback.rs#L1)). |
-| Existing slide movie/audio content and movie poster bytes | 🟡 | ✅ | 🟡 | Selector-first `Package::{slide_media_data,edit_slide_media_data,apply_slide_media_data}` reads borrowed bytes for materialized file/audio/placeholder/live-video drawables and replaces content for an existing file/audio drawable or a poster for an existing file movie. A sparse drawable can read its remaining poster without a content reference; mutation still requires content. Callers use checked `SlideSelector`, source-order `MovieSelector`, and `MediaPart`; native IDs, `DataInfo` records, and ZIP paths remain private. Exact-source no-op/inverse/stale-conflict checks, shared-record propagation, ownership closure, finite limits, candidate readback, and preview invalidation are bounded by the transaction. The checked-in native source establishes the admitted graph shape; a combined candidate opened in Keynote 14.4 without repair, and native save/actual-close/exact-reopen preserved all four objects, captions, geometry, playback, and the three replacement payloads. Strict Litchi reread of the native-resaved artifact passed six shared-record reads and six exact no-op writes, establishing operation-specific E4. Keynote displayed the replacement movie's video-derived first frame; the arbitrary PNG poster is verified as byte-preserved storage, not as a visual preview match. Creation, duplication, removal, generic asset lifecycle, and media decoding remain outside this owner ([media-data owner](../src/package/slide_media_replacement.rs#L1), [focused tests](../tests/slide_media_replacement.rs#L1)). |
-| Image/movie/audio bytes and generic asset insertion/replacement/deletion | 🟡 | ✅ | 🟡 | `Package::{media_assets, slide_media_assets, media_asset_data, edit_media_asset_data}` read and replace assets, and `slide::drawable::Edit::add_image` and `slide::image::lifecycle::Edit` add, duplicate and remove images. Ledger families `media.asset`, `drawable.image`. |
-| Existing soundtrack playback settings | 🟡 | ✅ | 🟡 | Reads and edits existing volume/mode settings while preserving the existing media collection; it never creates a soundtrack ([settings API](../src/package/soundtrack_settings.rs#L152), [tests](../tests/soundtrack_settings.rs#L92)). |
-| Existing soundtrack media-reference order | 🟡 | ✅ | 🟡 | `Package::soundtrack_items` exposes the bounded source order as semantic item summaries, while `soundtrack::order::{Edit,Patch,Commit}` and `Package::{edit_soundtrack_order,apply_soundtrack_order}` move one existing in-package reference after strict root/show/soundtrack ownership checks. The focused transaction preserves unknown fields and unrelated members, supports exact no-op/inverse/conflict behavior, and does not create or reorder media assets. No general soundtrack graph editor is provided ([semantic items](../src/soundtrack/items.rs#L311), [order API](../src/package/soundtrack_order.rs#L363), [order tests](../tests/soundtrack_order.rs#L1)). |
-| Soundtrack audio item lifecycle | 🟡 | ✅ | 🟡 | `soundtrack::items` owns bounded read/add/insert/replace/remove transactions with opaque source-bound handles; focused tests cover exact apply/inverse, conflicts, shared occurrences, malformed references, and aggregate-only preservation, and a focused fuzz target/corpus is present. The duplicate legacy item API is retired. One genuine replacement candidate passed Keynote save/close/reopen without repair, but this is representative replacement evidence rather than operation-wide native certification; soundtrack creation and general asset CRUD remain unsupported ([semantic surface](../src/soundtrack/items.rs), [package owner](../src/package/soundtrack_items.rs), [lifecycle tests](../tests/soundtrack_items.rs), [example](../examples/edit_soundtrack_items.rs)). |
+|---|---|---|---|---|
+| Existing movie/audio drawable inventory and metadata | 🟡 | ✅ | N/A | |
+| Existing movie title and caption | 🟡 | ✅ | 🟡 | |
+| Existing file-backed movie geometry and transform | 🟡 | ✅ | 🟡 | |
+| Existing file-backed movie/audio playback settings | 🟡 | ✅ | 🟡 | |
+| Existing slide movie/audio content and movie poster bytes | 🟡 | ✅ | 🟡 | |
+| Image/movie/audio bytes and generic asset insertion/replacement/deletion | 🟡 | ✅ | 🟡 | |
+| Existing soundtrack playback settings | 🟡 | ✅ | 🟡 | A soundtrack is never created |
+| Existing soundtrack media-reference order | 🟡 | ✅ | 🟡 | |
+| Soundtrack audio item lifecycle | 🟡 | ✅ | 🟡 | No soundtrack creation |
 
 ## Security, limits, and explicit non-goals
 
 | Feature | Status | Read | Write | Notes |
-|---------|--------|------|-------|-------|
-| ZIP/IWA/wire/semantic resource ceilings | 🟡 | ✅ | 🟡 | Physical archive limits and semantic ceilings cover input bytes, entries, component bytes, objects, slides, references, text storages/fragments, text bytes, wire fields/depth/work, and focused transaction output; aggregate graph/live-memory accounting is not a complete global budget (limits, [semantic preflight](../src/package.rs)). |
-| Safe regular-file path ingress | ✅ | ✅ | N/A | `Package::open` documents descriptor-safe regular-file handling, no-follow behavior, mutation checks, and a bytes-ingress fallback; platform profiles fail closed when unavailable ([path ingress](../src/package.rs), [directory reader boundary](../src/presentation.rs)). |
-| Encrypted/password-protected packages | ❌ | ❌ | ❌ | Password/decryption support is not implemented; encrypted sources are rejected by the shared iWork detector ([detector boundary](../../litchi-iwa-detect/src/lib.rs#L1)). |
-| Digital signatures and trust verification | ❌ | ❌ | ❌ | No Keynote signature verification, certificate trust, invalidation, or re-signing API is exposed. |
-| External links/resources, actions, and playback targets | 🟡 | 🟡 | ❌ | Exact package preservation can retain opaque/inert values, but the focused crate does not fetch, resolve, follow, play, or execute external targets ([package preservation](../src/package.rs)). |
-| Macros, scripts, controls, and embedded code execution | ❌ | 🟡 | ❌ | No execution or activation path is provided; any opaque payload is data only. |
-| Rendering, layout calculation, playback, PDF/HTML export, and automation | ❌ | ❌ | ❌ | The crate edits package data and semantic metadata; it does not render or drive Keynote ([semantic presentation scope](../src/presentation.rs)). |
-
-## Retired migration host
-
-The broad `litchi-iwa` migration host has been deleted. Each row's mark describes its own
-scope, not general CRUD.
+|---|---|---|---|---|
+| ZIP/IWA/wire/semantic resource ceilings | 🟡 | ✅ | 🟡 | |
+| Safe regular-file path ingress | ✅ | ✅ | N/A | |
+| Encrypted/password-protected packages | ❌ | ❌ | ❌ | |
+| Digital signatures and trust verification | ❌ | ❌ | ❌ | |
+| External links/resources, actions, and playback targets | 🟡 | 🟡 | ❌ | Inert; never fetched or played |
+| Macros, scripts, controls, and embedded code execution | ❌ | 🟡 | ❌ | |
+| Rendering, layout calculation, playback, PDF/HTML export, and automation | ❌ | ❌ | ❌ | |

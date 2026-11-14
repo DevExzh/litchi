@@ -1,28 +1,20 @@
 # OpenDocument Formula Feature Matrix
 
-This matrix records `litchi-odf-formula` support for packaged formula
-documents and their MathML content. The crate is a bounded checked MathML tree
-and package facade, not a complete MathML validator, OpenFormula spreadsheet
-parser, or evaluation engine.
-
-| Mark | Meaning |
-|---|---|
-| ✅ | Supported for the narrow scope in Notes |
-| 🟡 | Partial, generic, bounded, or whole-root only |
-| ❌ | No public support |
-| N/A | The direction does not apply |
+Feature checklist for packaged formula documents and their MathML content. ✅ Supported ·
+🟡 Partial · ❌ Unsupported · N/A Not applicable. Not a complete MathML validator or evaluation
+engine.
 
 | Feature | Status | Read | Write | Notes |
 |---|---|---|---|---|
-| Formula package open/create/save | ✅ | ✅ | ✅ | `Package` owns ingress (`open*`, `from_bytes*`, `from_reader*` with `OpenOptions`, `from_prepared_package`), `Builder::build`, `edit`/`apply` and atomic `save`; `Formula` is the read-only projection. Formula/template MIME is validated; public package operations retain auxiliary members and can publish a replacement root. |
-| Exact unmodified preservation | ✅ | ✅ | N/A | Original archive and `content.xml` bytes remain exact while unmodified. A changed root is canonically reserialized. |
-| MathML XML parsing | ✅ | ✅ | ✅ | The iterative parser requires one MathML `math` root, rejects malformed XML and duplicate expanded attributes, enforces finite ceilings, and validates supported MathML 2 presentation and content models while closing nodes. |
-| MathML semantic model | ✅ | ✅ | ✅ | Presentation kinds plus every checked Content MathML structure and all accepted named symbols are publicly classified. Common MathML 2 presentation and content structures—including operator-specific application/relation arity, qualifier ordering, generated and enumerated sets/lists/vectors/matrices and intervals, bound variables, lambdas, declarations, and piecewise values—have checked content models. E-notation numbers, `cn` base 2–36, boolean conditions and piece predicates, bound-variable vector-calculus forms, and nonempty rectangular enumerated matrices are checked. Recognized boolean, enumeration, integer, length, required-attribute, and content-number separator constraints are checked. `annotation-xml` payloads, free-text attributes, and foreign-namespace extensions remain inert. |
-| Checked authoring constructors | ✅ | N/A | ✅ | Presentation constructors cover the common token/layout corpus with typed display/math-variant values. The focused `authoring::content` module covers identifiers, declarations/functions, every accepted named symbol, typed numbers (including E-notation), endpoint and generated intervals, applications/relations, qualifiers, bound variables, lambdas, lists/sets/vectors/matrices, and piecewise values; fallible constructors validate their completed subtree before returning it. |
-| Compact XML serialization | ✅ | N/A | ✅ | Changed `content.xml` is emitted deterministically, including first-use foreign-namespace prefix assignment, without serializer-added indentation or formatting whitespace. Caller-supplied text nodes, including semantic whitespace, remain exact; this is not W3C XML Canonicalization. |
-| Semantic mutation and history | ✅ | ✅ | ✅ | `edit()` supports path-addressed insert/remove/replace, attribute, token-text, StarMath-source, and whole-root operations. Independent sub-edits have non-mutating dependency-transfer plans and atomic joins; patches from one exact base have non-mutating three-way plans. Publication fully reopens package bytes. Published packages retain commit-coupled ordered reversible evidence under fixed operation, entry, and retained-byte ceilings; source-checked patches and patch chains also have bounded durable sidecar envelopes. |
-| StarMath annotations | ✅ | ✅ | ✅ | Exact `StarMath 5.0` and `StarMath 6` annotation encodings are modeled. All recognized StarMath open, authoring, read, root-replacement, generic-edit, commit, patch, and full-reopen paths enforce the same `OpaqueStarMath` version, one-MiB ceiling, and XML-character boundary; no raw-string authoring/edit convenience bypass remains. StarMath grammar/evaluation remains outside ODF and MathML schemas. |
-| OpenFormula spreadsheet syntax | ❌ | ❌ | ❌ | Cell references, operators, function catalogs, array expressions, and spreadsheet formula grammar are not implemented by this crate. |
-| Permanent non-execution boundary | ✅ | N/A | N/A | MathML, StarMath annotations, entity references, and DTD declarations remain inert. No formula, entity/DTD, macro, VBA, control, action, DDE, or embedded-code evaluation or activation occurs. |
-| Configurable resource limits | ✅ | ✅ | ✅ | Public checked limits cover package/XML bytes, element depth/count, per-element attributes, single-attribute bytes, and aggregate text; edits retain the source limits for candidate reopen. ZIP decompression is still delegated to the shared ODF package layer. |
-| Evidence breadth | ✅ | ✅ | ✅ | Schema-derived malformed cases, the complete-constructor mutation corpus, 1,024 recursively generated Content MathML trees from an independent W3C schema/signature oracle, one-rule schema breakers, and 4,096 arbitrary byte streams cover presentation/content models, every named content symbol, operator arity and qualifiers, checked constructor families, value domains, parser/package repeatability, opaque StarMath bypass attempts, limits, merge/history, publication/full reopen, compact output, and raw test-only malformed/prettified ZIP ingress/refusal with exact provenance. A crate-local libFuzzer target drives raw XML, raw packages, generated-valid signatures, and generated-invalid breakers from one byte stream; a normal replayer and nine compact checked-in seeds make the same regression campaign reproducible without `cargo-fuzz`. The harness is ready for coverage guidance but was not executed in this environment because `cargo-fuzz` is unavailable. Ten checked-in LibreOffice MathML fixtures and two `.odf` fixtures cover real producer ingress; both producer packages are changed and fully reopened while every retained non-content payload is checked byte-exact (the manifest is regenerated). A pinned LibreOffice 26.2.5.2 `math8` changed-save/readback chain additionally preserves the edited MathML identifier and retained StarMath source; artifact hashes, filter route, isolated profile, and logs are recorded in `test-data/odf/native-resave/PROVENANCE.md`. |
+| Formula package open/create/save | ✅ | ✅ | ✅ | |
+| Exact unmodified preservation | ✅ | ✅ | N/A | Changed roots are reserialized |
+| MathML XML parsing | ✅ | ✅ | ✅ | |
+| MathML semantic model | ✅ | ✅ | ✅ | |
+| Checked authoring constructors | ✅ | N/A | ✅ | |
+| Compact XML serialization | ✅ | N/A | ✅ | |
+| Semantic mutation and history | ✅ | ✅ | ✅ | |
+| StarMath annotations | ✅ | ✅ | ✅ | StarMath grammar is not evaluated |
+| OpenFormula spreadsheet syntax | ❌ | ❌ | ❌ | |
+| Permanent non-execution boundary | ✅ | N/A | N/A | |
+| Configurable resource limits | ✅ | ✅ | ✅ | |
+| Evidence breadth | ✅ | ✅ | ✅ | |
