@@ -4317,6 +4317,10 @@ fn configure_source_open_options(options: &mut FsOpenOptions) -> bool {
 }
 
 #[cfg(windows)]
+#[expect(
+    unsafe_code,
+    reason = "GetFileType is the only way to tell a disk file from a device handle"
+)]
 fn ensure_windows_disk_handle(file: &std::fs::File) -> ReadResult<()> {
     use std::os::windows::io::AsRawHandle;
     use windows_sys::Win32::Storage::FileSystem::{FILE_TYPE_DISK, GetFileType};
@@ -5297,7 +5301,7 @@ mod tests {
             r"\\server\share\fixture.key"
         )));
 
-        let null_device = OpenOptions::new().read(true).open("NUL")?;
+        let null_device = std::fs::File::open("NUL")?;
         assert!(matches!(
             ensure_windows_disk_handle(&null_device),
             Err(ReadError::InvalidFormat(message))

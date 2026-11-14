@@ -469,7 +469,10 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
-#![forbid(unsafe_code)]
+// Windows needs one FFI call to tell disk files from devices; every other
+// target forbids unsafe code outright.
+#![cfg_attr(not(windows), forbid(unsafe_code))]
+#![cfg_attr(windows, deny(unsafe_code))]
 
 mod error;
 mod package;
