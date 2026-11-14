@@ -1004,9 +1004,7 @@ pub(crate) mod codec {
         reader.config_mut().check_end_names = true;
         reader.config_mut().check_comments = true;
         let mut buffer = Vec::new();
-        let mut root_seen = false;
-        let mut root_closed = false;
-        let mut value = None;
+        let mut phase = FragmentPhase::Prolog;
 
         loop {
             let event_start = position(&reader, origin, "SVG blip")?;
@@ -1016,15 +1014,15 @@ pub(crate) mod codec {
             let resolved = resolved_namespace(&resolved)?;
             let event = event.into_owned();
             let event_end = position(&reader, origin, "SVG blip")?;
+            let in_prolog = matches!(phase, FragmentPhase::Prolog);
             match event {
-                Event::Decl(_) if !root_seen => {},
-                Event::Start(element) if !root_seen => {
+                Event::Decl(_) if in_prolog => {},
+                Event::Start(element) if in_prolog => {
                     let (local, namespace) = resolved_name(&resolved, &element.name())?;
                     require_root(&local, &namespace, element.name().prefix())?;
-                    root_seen = true;
                     let root_start = event_start;
                     let child_end = capture_element(&mut reader, origin, &mut buffer)?;
-                    value = Some(parse_root(
+                    phase = FragmentPhase::Read(parse_root(
                         &element,
                         &reader,
                         xml,
@@ -1033,14 +1031,11 @@ pub(crate) mod codec {
                         local_prefix(&element.name())?,
                         false,
                     )?);
-                    root_closed = true;
                 },
-                Event::Empty(element) if !root_seen => {
+                Event::Empty(element) if in_prolog => {
                     let (local, namespace) = resolved_name(&resolved, &element.name())?;
                     require_root(&local, &namespace, element.name().prefix())?;
-                    root_seen = true;
-                    root_closed = true;
-                    value = Some(parse_root(
+                    phase = FragmentPhase::Read(parse_root(
                         &element,
                         &reader,
                         xml,
@@ -1050,19 +1045,13 @@ pub(crate) mod codec {
                         true,
                     )?);
                 },
-                Event::Start(_) | Event::Empty(_) if root_seen => {
+                Event::Start(_) | Event::Empty(_) => {
                     return Err(invalid("SVG blip fragment has more than one root element"));
                 },
-                Event::Start(_) | Event::Empty(_) => {
-                    return Err(invalid("SVG blip fragment root is invalid"));
-                },
-                Event::Text(text)
-                    if (!root_seen || root_closed)
-                        && !text.as_ref().iter().all(u8::is_ascii_whitespace) =>
-                {
+                Event::Text(text) if !text.as_ref().iter().all(u8::is_ascii_whitespace) => {
                     return Err(invalid("SVG blip fragment has text outside its root"));
                 },
-                Event::CData(_) | Event::GeneralRef(_) if !root_seen || root_closed => {
+                Event::CData(_) | Event::GeneralRef(_) => {
                     return Err(invalid("SVG blip fragment has markup outside its root"));
                 },
                 Event::DocType(_) | Event::PI(_) => {
@@ -1071,27 +1060,22 @@ pub(crate) mod codec {
                     ));
                 },
                 Event::Eof => break,
-                Event::End(_) | Event::Decl(_) if !root_seen || root_closed => {
+                // A declaration reaches this arm only after the root.
+                Event::End(_) | Event::Decl(_) => {
                     return Err(invalid("SVG blip fragment has markup outside its root"));
                 },
-                Event::End(_)
-                | Event::Text(_)
-                | Event::CData(_)
-                | Event::Comment(_)
-                | Event::GeneralRef(_) => {},
-                Event::Decl(_) => {
-                    return Err(invalid("SVG blip fragment has a late declaration"));
-                },
+                Event::Text(_) | Event::Comment(_) => {},
             }
             buffer.clear();
         }
 
-        let value = value.ok_or_else(|| invalid("SVG blip fragment has no root element"))?;
-        if !root_closed {
-            return Err(invalid("SVG blip fragment root is not closed"));
+        match phase {
+            FragmentPhase::Prolog => Err(invalid("SVG blip fragment has no root element")),
+            FragmentPhase::Read(value) => {
+                validate(&value)?;
+                Ok(value)
+            },
         }
-        validate(&value)?;
-        Ok(value)
     }
 
     /// Read one `svgBlip` element against an inherited namespace context.
@@ -1132,9 +1116,7 @@ pub(crate) mod codec {
         reader.config_mut().trim_text(false);
         reader.config_mut().check_end_names = true;
         let mut buffer = Vec::new();
-        let mut root_seen = false;
-        let mut root_closed = false;
-        let mut value = None;
+        let mut phase = FragmentPhase::Prolog;
 
         loop {
             let event_start = position(&reader, origin, "SVG blip")?;
@@ -1143,15 +1125,15 @@ pub(crate) mod codec {
                 .map_err(xml_error)?
                 .into_owned();
             let event_end = position(&reader, origin, "SVG blip")?;
+            let in_prolog = matches!(phase, FragmentPhase::Prolog);
             match event {
-                Event::Decl(_) if !root_seen => {},
-                Event::Start(element) if !root_seen => {
+                Event::Decl(_) if in_prolog => {},
+                Event::Start(element) if in_prolog => {
                     let resolver = ContextResolver::new(context, &element, reader.decoder())?;
                     let (local, namespace) = resolved_context_name(&resolver, &element.name())?;
                     require_root(&local, &namespace, element.name().prefix())?;
-                    root_seen = true;
                     let child_end = capture_plain_element(&mut reader, origin, &mut buffer)?;
-                    value = Some(parse_contextual_root(
+                    phase = FragmentPhase::Read(parse_contextual_root(
                         &element,
                         &reader,
                         xml,
@@ -1162,15 +1144,12 @@ pub(crate) mod codec {
                         context,
                         resolver,
                     )?);
-                    root_closed = true;
                 },
-                Event::Empty(element) if !root_seen => {
+                Event::Empty(element) if in_prolog => {
                     let resolver = ContextResolver::new(context, &element, reader.decoder())?;
                     let (local, namespace) = resolved_context_name(&resolver, &element.name())?;
                     require_root(&local, &namespace, element.name().prefix())?;
-                    root_seen = true;
-                    root_closed = true;
-                    value = Some(parse_contextual_root(
+                    phase = FragmentPhase::Read(parse_contextual_root(
                         &element,
                         &reader,
                         xml,
@@ -1182,19 +1161,13 @@ pub(crate) mod codec {
                         resolver,
                     )?);
                 },
-                Event::Start(_) | Event::Empty(_) if root_seen => {
+                Event::Start(_) | Event::Empty(_) => {
                     return Err(invalid("SVG blip fragment has more than one root element"));
                 },
-                Event::Start(_) | Event::Empty(_) => {
-                    return Err(invalid("SVG blip fragment root is invalid"));
-                },
-                Event::Text(text)
-                    if (!root_seen || root_closed)
-                        && !text.as_ref().iter().all(u8::is_ascii_whitespace) =>
-                {
+                Event::Text(text) if !text.as_ref().iter().all(u8::is_ascii_whitespace) => {
                     return Err(invalid("SVG blip fragment has text outside its root"));
                 },
-                Event::CData(_) | Event::GeneralRef(_) if !root_seen || root_closed => {
+                Event::CData(_) | Event::GeneralRef(_) => {
                     return Err(invalid("SVG blip fragment has markup outside its root"));
                 },
                 Event::DocType(_) | Event::PI(_) => {
@@ -1203,27 +1176,48 @@ pub(crate) mod codec {
                     ));
                 },
                 Event::Eof => break,
-                Event::End(_) | Event::Decl(_) if !root_seen || root_closed => {
+                // A declaration reaches this arm only after the root.
+                Event::End(_) | Event::Decl(_) => {
                     return Err(invalid("SVG blip fragment has markup outside its root"));
                 },
-                Event::End(_)
-                | Event::Text(_)
-                | Event::CData(_)
-                | Event::Comment(_)
-                | Event::GeneralRef(_) => {},
-                Event::Decl(_) => {
-                    return Err(invalid("SVG blip fragment has a late declaration"));
-                },
+                Event::Text(_) | Event::Comment(_) => {},
             }
             buffer.clear();
         }
 
-        let value = value.ok_or_else(|| invalid("SVG blip fragment has no root element"))?;
-        if !root_closed {
-            return Err(invalid("SVG blip fragment root is not closed"));
+        match phase {
+            FragmentPhase::Prolog => Err(invalid("SVG blip fragment has no root element")),
+            FragmentPhase::Read(value) => {
+                validate(&value)?;
+                Ok(value)
+            },
         }
-        validate(&value)?;
-        Ok(value)
+    }
+
+    /// Where the two `svgBlip` fragment readers (`read` and
+    /// `read_contextual`) are relative to the fragment's one element.
+    ///
+    /// The root start tag is followed at once by a walk that consumes the
+    /// element up to its matching end tag, so no event of the outer loop is
+    /// ever read while the root is open: the readers only see the prolog and
+    /// the epilog.
+    ///
+    /// ```text
+    /// Prolog --XML declaration-----------------------> Prolog (accepted, also repeated)
+    /// Prolog --svgBlip start tag (whole element)-----> Read
+    /// Prolog --svgBlip empty-element tag-------------> Read
+    /// Prolog | Read --comment or whitespace----------> unchanged
+    /// ```
+    ///
+    /// Refused: a second element after the root; an XML declaration or an end
+    /// tag after the root; a DOCTYPE or a processing instruction anywhere;
+    /// CDATA, an entity reference or text other than whitespace outside the
+    /// root; and the end of input in `Prolog`.
+    enum FragmentPhase {
+        /// No element has been read.
+        Prolog,
+        /// The one root element was read completely.
+        Read(SvgBlip),
     }
 
     /// Serialize one SVG blip fragment.

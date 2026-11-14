@@ -1001,8 +1001,7 @@ impl Snapshot {
             }
         }
         if state.depth != 0
-            || state.root.is_none()
-            || !state.root_closed
+            || state.phase != DdeRootPhase::Closed
             || !state.body_seen
             || !state.spreadsheet_seen
             || state.body_depth.is_some()
@@ -1087,10 +1086,7 @@ impl Snapshot {
 
 struct ParserState {
     depth: usize,
-    root: Option<DocumentRoot>,
-    root_closed: bool,
-    declaration_seen: bool,
-    prolog_markup_seen: bool,
+    phase: DdeRootPhase,
     body_seen: bool,
     body_depth: Option<usize>,
     spreadsheet_seen: bool,
@@ -1111,10 +1107,7 @@ impl ParserState {
     fn new() -> Self {
         Self {
             depth: 0,
-            root: None,
-            root_closed: false,
-            declaration_seen: false,
-            prolog_markup_seen: false,
+            phase: DdeRootPhase::Start,
             body_seen: false,
             body_depth: None,
             spreadsheet_seen: false,
@@ -1158,7 +1151,7 @@ impl ParserState {
                 let local = local.as_ref();
                 let is_spreadsheet = is(namespace, local, NamespaceKind::Office, b"spreadsheet");
                 if self.depth == 1 {
-                    if self.root.is_some() || self.root_closed {
+                    if matches!(self.phase, DdeRootPhase::Open(_) | DdeRootPhase::Closed) {
                         return Err(invalid("DDE XML has multiple document roots"));
                     }
                     let root = if is(namespace, local, NamespaceKind::Office, b"document-content") {
@@ -1181,9 +1174,9 @@ impl ParserState {
                             "DDE XML root must be office:document-content or flat office:document",
                         ));
                     };
-                    self.root = Some(root);
+                    self.phase = DdeRootPhase::Open(root);
                 } else {
-                    if self.root.is_none() || self.root_closed {
+                    if !matches!(self.phase, DdeRootPhase::Open(_)) {
                         return Err(invalid("DDE XML contains content outside its root"));
                     }
                     if is(namespace, local, NamespaceKind::Office, b"document-content")
@@ -1349,7 +1342,7 @@ impl ParserState {
                         "DDE document root must contain office:body and office:spreadsheet",
                     ));
                 }
-                if self.root.is_none() || self.root_closed {
+                if !matches!(self.phase, DdeRootPhase::Open(_)) {
                     return Err(invalid("DDE XML contains content outside its root"));
                 }
                 if is(namespace, local, NamespaceKind::Office, b"document-content")
@@ -1557,7 +1550,7 @@ impl ParserState {
                     if !self.root_matches(namespace, local) {
                         return Err(invalid("DDE XML root end tag is invalid"));
                     }
-                    self.root_closed = true;
+                    self.phase = DdeRootPhase::Closed;
                 }
                 self.depth = self
                     .depth
@@ -1598,7 +1591,8 @@ impl ParserState {
                 }
             },
             Event::GeneralRef(reference) => {
-                if self.root.is_none() || self.root_closed || !valid_general_ref(reference.as_ref())
+                if !matches!(self.phase, DdeRootPhase::Open(_))
+                    || !valid_general_ref(reference.as_ref())
                 {
                     return Err(invalid("DDE XML contains an unsupported entity reference"));
                 }
@@ -1607,47 +1601,83 @@ impl ParserState {
             Event::Eof => {},
             Event::Text(text) => {
                 let bytes: &[u8] = text.as_ref();
-                if (self.root.is_none() || self.root_closed)
+                if !matches!(self.phase, DdeRootPhase::Open(_))
                     && bytes.iter().any(|byte| !byte.is_ascii_whitespace())
                 {
                     return Err(invalid("DDE XML has text outside its root"));
                 }
             },
-            Event::CData(_) if self.root.is_none() || self.root_closed => {
+            Event::CData(_) if !matches!(self.phase, DdeRootPhase::Open(_)) => {
                 return Err(invalid("DDE XML has CDATA outside its root"));
             },
             Event::CData(_) => {},
             Event::Decl(_) => {
-                if self.root.is_some()
-                    || self.root_closed
-                    || self.declaration_seen
-                    || self.prolog_markup_seen
-                {
+                if self.phase != DdeRootPhase::Start {
                     return Err(invalid(
                         "DDE XML declaration must be the first document markup",
                     ));
                 }
-                self.declaration_seen = true;
+                self.phase = DdeRootPhase::Declared;
             },
-            Event::Comment(_) | Event::PI(_) if self.root.is_none() => {
-                if !self.declaration_seen {
-                    self.prolog_markup_seen = true;
-                }
+            Event::Comment(_) | Event::PI(_) => match self.phase {
+                DdeRootPhase::Start => self.phase = DdeRootPhase::PrologMarkup,
+                DdeRootPhase::Declared
+                | DdeRootPhase::PrologMarkup
+                | DdeRootPhase::Open(_)
+                | DdeRootPhase::Closed => {},
             },
-            Event::Comment(_) | Event::PI(_) => {},
         }
         Ok(())
     }
 
     fn root_matches(&self, namespace: NamespaceKind, local: &[u8]) -> bool {
-        match self.root {
-            Some(DocumentRoot::Content) => {
+        match self.phase {
+            DdeRootPhase::Open(DocumentRoot::Content) => {
                 is(namespace, local, NamespaceKind::Office, b"document-content")
             },
-            Some(DocumentRoot::Flat) => is(namespace, local, NamespaceKind::Office, b"document"),
-            None => false,
+            DdeRootPhase::Open(DocumentRoot::Flat) => {
+                is(namespace, local, NamespaceKind::Office, b"document")
+            },
+            DdeRootPhase::Start
+            | DdeRootPhase::Declared
+            | DdeRootPhase::PrologMarkup
+            | DdeRootPhase::Closed => false,
         }
     }
+}
+
+/// Where the DDE reader is relative to the document root. Nesting inside the
+/// root is not part of it: the depth counter holds that.
+///
+/// ```text
+/// Start        --XML declaration--------------------> Declared
+/// Start        --comment or PI----------------------> PrologMarkup
+/// Declared     --comment or PI----------------------> Declared
+/// PrologMarkup --comment or PI----------------------> PrologMarkup
+/// Start | Declared | PrologMarkup --root start tag--> Open(kind)
+/// Open         --nested content---------------------> Open
+/// Open         --matching root end tag--------------> Closed
+/// Open | Closed --comment or PI---------------------> unchanged
+/// any          --whitespace-------------------------> unchanged
+/// ```
+///
+/// Refused: an XML declaration anywhere but in `Start`; a second root; an
+/// empty-element root; any element, CDATA, entity reference or text other than
+/// whitespace outside `Open`; a DOCTYPE anywhere; and the end of input anywhere
+/// but `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum DdeRootPhase {
+    /// Nothing but whitespace has been read.
+    Start,
+    /// The XML declaration was the first markup.
+    Declared,
+    /// A comment or processing instruction came first, so a declaration can
+    /// no longer follow.
+    PrologMarkup,
+    /// The root start tag of this kind was read and its end tag was not.
+    Open(DocumentRoot),
+    /// The root element is complete.
+    Closed,
 }
 
 struct LinkBuilder {

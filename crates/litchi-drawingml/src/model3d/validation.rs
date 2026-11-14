@@ -426,15 +426,14 @@ pub(crate) fn validate_inert_fragment(value: &Inert) -> Result<(), Error> {
     let mut buffer = Vec::new();
     let mut depth = 0usize;
     let mut nodes = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = FragmentPhase::Prolog;
     loop {
         let event = reader
             .read_event_into(&mut buffer)
             .map_err(|error| Error::Inert(error.to_string()))?;
         match event {
             Event::Start(_) => {
-                if depth == 0 && (root_seen || root_closed) {
+                if depth == 0 && phase != FragmentPhase::Prolog {
                     return Err(Error::Inert("multiple roots".into()));
                 }
                 nodes = nodes.saturating_add(1);
@@ -453,10 +452,10 @@ pub(crate) fn validate_inert_fragment(value: &Inert) -> Result<(), Error> {
                         MAX_DEPTH,
                     ));
                 }
-                root_seen = true;
+                phase = FragmentPhase::Open;
             },
             Event::Empty(_) => {
-                if depth == 0 && (root_seen || root_closed) {
+                if depth == 0 && phase != FragmentPhase::Prolog {
                     return Err(Error::Inert("multiple roots".into()));
                 }
                 nodes = nodes.saturating_add(1);
@@ -468,8 +467,7 @@ pub(crate) fn validate_inert_fragment(value: &Inert) -> Result<(), Error> {
                     ));
                 }
                 if depth == 0 {
-                    root_seen = true;
-                    root_closed = true;
+                    phase = FragmentPhase::Closed;
                 }
             },
             Event::End(_) => {
@@ -477,7 +475,7 @@ pub(crate) fn validate_inert_fragment(value: &Inert) -> Result<(), Error> {
                     .checked_sub(1)
                     .ok_or_else(|| Error::Inert("unexpected closing element".into()))?;
                 if depth == 0 {
-                    root_closed = true;
+                    phase = FragmentPhase::Closed;
                 }
             },
             Event::Text(text)
@@ -500,13 +498,39 @@ pub(crate) fn validate_inert_fragment(value: &Inert) -> Result<(), Error> {
         }
         buffer.clear();
     }
-    if !root_seen || depth != 0 || !root_closed {
+    if phase != FragmentPhase::Closed || depth != 0 {
         return Err(Error::Inert("fragment is not one complete element".into()));
     }
     if value.local_name().is_empty() {
         return Err(Error::Inert("fragment has no local name".into()));
     }
     Ok(())
+}
+
+/// Where the opaque-fragment check is relative to the fragment's one element.
+/// Nesting inside that element is not part of it: the depth counter holds
+/// that.
+///
+/// ```text
+/// Prolog --start tag at depth 0-----------> Open
+/// Prolog --empty-element tag at depth 0---> Closed
+/// Open   --nested start, empty or end-----> Open
+/// Open   --end tag back to depth 0--------> Closed
+/// any    --comment, PI, whitespace--------> unchanged
+/// any    --entity reference---------------> unchanged (accepted outside the root too)
+/// ```
+///
+/// Refused: an element at depth 0 after `Prolog`; an XML declaration or a
+/// DOCTYPE anywhere; CDATA or text other than whitespace at depth 0; and the
+/// end of input anywhere but `Closed` at depth 0.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FragmentPhase {
+    /// No element has been read.
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open,
+    /// The root element is complete.
+    Closed,
 }
 
 #[cfg(test)]

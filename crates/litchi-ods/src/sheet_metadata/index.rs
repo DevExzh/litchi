@@ -478,8 +478,7 @@ pub(crate) fn scan(
     let mut depth_reservations = Vec::<Reservation>::new();
     let mut index_memory = None;
     let mut events = 0usize;
-    let mut root = None;
-    let mut root_closed = false;
+    let mut phase = MetadataRootPhase::Prolog;
     loop {
         context.check().map_err(map_execution)?;
         let start = usize::try_from(reader.buffer_position())
@@ -521,7 +520,7 @@ pub(crate) fn scan(
                 let depth_reservation =
                     context.reserve(Resource::Depth, 1).map_err(map_execution)?;
                 let parent = stack.last().copied();
-                if parent.is_none() && (root.is_some() || root_closed) {
+                if parent.is_none() && phase != MetadataRootPhase::Prolog {
                     return Err(invalid("ODS metadata XML contains multiple roots"));
                 }
                 let open_end = usize::try_from(reader.buffer_position())
@@ -559,7 +558,7 @@ pub(crate) fn scan(
                     )?;
                     parent_span.children.push(index);
                 } else {
-                    root = Some(index);
+                    phase = MetadataRootPhase::Open(index);
                 }
                 spans.push(span);
                 context
@@ -597,7 +596,7 @@ pub(crate) fn scan(
                 let _depth_reservation =
                     context.reserve(Resource::Depth, 1).map_err(map_execution)?;
                 let parent = stack.last().copied();
-                if parent.is_none() && (root.is_some() || root_closed) {
+                if parent.is_none() && phase != MetadataRootPhase::Prolog {
                     return Err(invalid("ODS metadata XML contains multiple roots"));
                 }
                 let end = usize::try_from(reader.buffer_position())
@@ -635,8 +634,7 @@ pub(crate) fn scan(
                     )?;
                     parent_span.children.push(index);
                 } else {
-                    root = Some(index);
-                    root_closed = true;
+                    phase = MetadataRootPhase::Closed(index);
                 }
                 spans.push(span);
                 context
@@ -658,7 +656,14 @@ pub(crate) fn scan(
                 span.close_start = start;
                 span.range.end = end;
                 if stack.is_empty() {
-                    root_closed = true;
+                    phase = match phase {
+                        MetadataRootPhase::Open(root) | MetadataRootPhase::Closed(root) => {
+                            MetadataRootPhase::Closed(root)
+                        },
+                        // The root start tag is at the bottom of the stack, so
+                        // the stack cannot empty before the root started.
+                        MetadataRootPhase::Prolog => MetadataRootPhase::Prolog,
+                    };
                 }
             },
             Event::Eof => break,
@@ -695,10 +700,15 @@ pub(crate) fn scan(
     if !depth_reservations.is_empty() {
         return Err(invalid("ODS metadata XML depth reservations remain active"));
     }
-    let root = root.ok_or_else(|| invalid("ODS metadata XML has no root element"))?;
-    if !root_closed {
-        return Err(invalid("ODS metadata XML has no complete root"));
-    }
+    let root = match phase {
+        MetadataRootPhase::Prolog => {
+            return Err(invalid("ODS metadata XML has no root element"));
+        },
+        MetadataRootPhase::Open(_) => {
+            return Err(invalid("ODS metadata XML has no complete root"));
+        },
+        MetadataRootPhase::Closed(root) => root,
+    };
     let spreadsheet = admitted_spreadsheet(&spans, root)?;
     build_catalog(
         source,
@@ -709,6 +719,32 @@ pub(crate) fn scan(
         input_reservation,
         index_memory,
     )
+}
+
+/// Where the metadata index scan is relative to the document root, with the
+/// root's index in the span list once it has one. Nesting inside the root is
+/// not part of it: the element stack holds that.
+///
+/// ```text
+/// Prolog --root start tag----------------> Open(root)
+/// Prolog --root empty-element tag--------> Closed(root)
+/// Open   --nested content----------------> Open
+/// Open   --end tag that empties the stack-> Closed(root)
+/// any    --declaration, DOCTYPE, comment or PI-> unchanged (accepted anywhere)
+/// any    --whitespace text, CDATA or reference-> unchanged
+/// ```
+///
+/// Refused: an element at the top level after `Prolog`; text, CDATA or an
+/// entity reference that is not whitespace outside the root; and the end of
+/// input anywhere but `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum MetadataRootPhase {
+    /// No element has been read.
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open(usize),
+    /// The root element is complete.
+    Closed(usize),
 }
 
 fn build_catalog(

@@ -84,7 +84,7 @@ impl DiagramDefinition {
         let mut scan = DefinitionScan {
             definition: DiagramDefinition::default(),
             root_name,
-            root_seen: false,
+            phase: DefinitionPhase::Prolog,
             nodes: 0,
             max_nodes: limits.xml_nodes_value().min(MAX_NODES),
             max_depth: limits.xml_depth_value().min(MAX_DEPTH),
@@ -92,15 +92,14 @@ impl DiagramDefinition {
         };
         let mut buffer = Vec::new();
         let mut depth = 0usize;
-        let mut root_closed = false;
 
         loop {
             match reader.read_event_into(&mut buffer).map_err(xml_error)? {
                 Event::Start(element) => {
-                    if root_closed {
+                    if scan.phase == DefinitionPhase::Closed {
                         return Err(invalid("trailing markup follows the diagram definition"));
                     }
-                    if depth == 0 && scan.root_seen {
+                    if depth == 0 && scan.phase != DefinitionPhase::Prolog {
                         return Err(invalid("the diagram definition has multiple roots"));
                     }
                     depth = depth
@@ -109,34 +108,34 @@ impl DiagramDefinition {
                     scan.visit(&reader, &element, depth)?;
                 },
                 Event::Empty(element) => {
-                    if root_closed {
+                    if scan.phase == DefinitionPhase::Closed {
                         return Err(invalid("trailing markup follows the diagram definition"));
                     }
                     let child_depth = depth
                         .checked_add(1)
                         .ok_or_else(|| invalid("definition XML depth overflows"))?;
-                    if depth == 0 && scan.root_seen {
+                    if depth == 0 && scan.phase != DefinitionPhase::Prolog {
                         return Err(invalid("the diagram definition has multiple roots"));
                     }
                     scan.visit(&reader, &element, child_depth)?;
                     if depth == 0 {
-                        root_closed = true;
+                        scan.phase = DefinitionPhase::Closed;
                     }
                 },
                 Event::End(_) => {
-                    if depth == 0 || !scan.root_seen {
+                    if depth == 0 || scan.phase == DefinitionPhase::Prolog {
                         return Err(invalid("unexpected definition closing element"));
                     }
                     depth -= 1;
                     if depth == 0 {
-                        root_closed = true;
+                        scan.phase = DefinitionPhase::Closed;
                     }
                 },
                 Event::DocType(_) => return Err(invalid("DTDs are rejected")),
                 Event::CData(_) => return Err(invalid("CDATA is rejected")),
                 Event::Eof => break,
                 Event::Text(text) => {
-                    if (!scan.root_seen || root_closed)
+                    if scan.phase != DefinitionPhase::Open
                         && text.as_ref().iter().any(|byte| !byte.is_ascii_whitespace())
                     {
                         return Err(invalid(
@@ -144,7 +143,7 @@ impl DiagramDefinition {
                         ));
                     }
                 },
-                Event::GeneralRef(_) if !scan.root_seen || root_closed => {
+                Event::GeneralRef(_) if scan.phase != DefinitionPhase::Open => {
                     return Err(invalid(
                         "entity reference is outside the diagram definition",
                     ));
@@ -153,7 +152,7 @@ impl DiagramDefinition {
             }
             buffer.clear();
         }
-        if !scan.root_seen || !root_closed || depth != 0 {
+        if scan.phase != DefinitionPhase::Closed || depth != 0 {
             return Err(invalid("missing or unterminated definition root"));
         }
         Ok(scan.definition)
@@ -163,11 +162,38 @@ impl DiagramDefinition {
 struct DefinitionScan<'a> {
     definition: DiagramDefinition,
     root_name: &'a str,
-    root_seen: bool,
+    phase: DefinitionPhase,
     nodes: usize,
     max_nodes: usize,
     max_depth: usize,
     max_categories: usize,
+}
+
+/// Where the definition header reader is relative to the part's one root.
+/// Nesting inside the root is not part of it: the depth counter holds that.
+///
+/// ```text
+/// Prolog --root start tag-------------------------> Open
+/// Prolog --root empty-element tag-----------------> Closed (through Open, inside one event)
+/// Open   --nested start, empty or end tag---------> Open
+/// Open   --end tag back to depth 0----------------> Closed
+/// any    --comment, declaration or PI-------------> unchanged (accepted anywhere)
+/// Prolog | Closed --whitespace--------------------> unchanged
+/// Open   --text, entity reference-----------------> Open
+/// ```
+///
+/// Refused: a root that is not the expected `dgm` element; any element after
+/// `Closed`; a second element at depth 0; an end tag in `Prolog`; text other
+/// than whitespace or an entity reference outside `Open`; a DOCTYPE or CDATA
+/// anywhere; and the end of input anywhere but `Closed` at depth 0.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum DefinitionPhase {
+    /// No element has been read.
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open,
+    /// The root element is complete.
+    Closed,
 }
 
 impl DefinitionScan<'_> {
@@ -189,11 +215,11 @@ impl DefinitionScan<'_> {
         }
         let namespace = element_namespace(reader, element)?;
         let local = local_name(element)?;
-        if !self.root_seen {
+        if self.phase == DefinitionPhase::Prolog {
             if !is_dgm(&namespace) || local != self.root_name {
                 return Err(invalid("invalid diagram definition root or namespace"));
             }
-            self.root_seen = true;
+            self.phase = DefinitionPhase::Open;
             self.definition.unique_id = attribute(element, "uniqueId")?;
             return Ok(());
         }
