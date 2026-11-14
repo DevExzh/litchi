@@ -2637,3 +2637,394 @@ fn try_hash_set_reserve<T: Eq + Hash>(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod external_presence_order_tests {
+    use super::{
+        CONTINUE_RECORD_TYPE, CRN_RECORD_TYPE, EXTERN_NAME_RECORD_TYPE, EXTERN_SHEET_RECORD_TYPE,
+        ExternalPresenceState, SUP_BOOK_RECORD_TYPE, XCT_RECORD_TYPE,
+    };
+
+    /// One record per letter:
+    /// - `W` an external-workbook SupBook with one sheet, `N` a name for it;
+    /// - `A` an add-in SupBook, `a` an add-in name;
+    /// - `D` a DDE SupBook, `M` a DDE name whose one matrix value follows in a
+    ///   Continue, `K` that Continue (one value);
+    /// - `S` a self-reference SupBook;
+    /// - `X` an XCT declaring one CRN for sheet 0, `Z` one declaring none, `C`
+    ///   a one-value CRN;
+    /// - `H` an empty ExternSheet, `R` one referencing book 0 with scope -2;
+    /// - `O` an unrelated record.
+    fn record(letter: char) -> (u16, &'static [u8]) {
+        match letter {
+            'W' => (
+                SUP_BOOK_RECORD_TYPE,
+                &[1, 0, 2, 0, 0, 1, b'A', 1, 0, 0, b'S'],
+            ),
+            'N' => (
+                EXTERN_NAME_RECORD_TYPE,
+                &[0, 0, 0, 0, 0, 0, 1, 0, b'F', 2, 0, 0x3a, 0],
+            ),
+            'A' => (SUP_BOOK_RECORD_TYPE, &[1, 0, 1, 0x3a]),
+            'a' => (
+                EXTERN_NAME_RECORD_TYPE,
+                &[0, 0, 0, 0, 0, 0, 1, 0, b'F', 2, 0, 0x1c, 0x17],
+            ),
+            'D' => (SUP_BOOK_RECORD_TYPE, &[0, 0, 1, 0, 0, b'D']),
+            'M' => (
+                EXTERN_NAME_RECORD_TYPE,
+                &[0, 0, 0, 0, 0, 0, 1, 0, b'X', 0, 0, 0],
+            ),
+            'K' => (CONTINUE_RECORD_TYPE, &[0; 9]),
+            'S' => (SUP_BOOK_RECORD_TYPE, &[1, 0, 1, 4]),
+            'X' => (XCT_RECORD_TYPE, &[1, 0, 0, 0]),
+            'Z' => (XCT_RECORD_TYPE, &[0, 0, 0, 0]),
+            'C' => (CRN_RECORD_TYPE, &[0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+            'H' => (EXTERN_SHEET_RECORD_TYPE, &[0, 0]),
+            'R' => (
+                EXTERN_SHEET_RECORD_TYPE,
+                &[1, 0, 0, 0, 0xfe, 0xff, 0xfe, 0xff],
+            ),
+            'O' => (0x0018, &[]),
+            other => panic!("unknown test record letter {other}"),
+        }
+    }
+
+    /// Feeds the records the way the workbook scan does (no record after the
+    /// first refusal) and reports each answer, then the end-of-stream verdict
+    /// for one internal sheet and the counters the report exposes.
+    fn outcome(letters: &str) -> String {
+        let mut state = ExternalPresenceState::default();
+        let mut answers = String::new();
+        for letter in letters.chars() {
+            let (record_type, data) = record(letter);
+            match state.feed(record_type, data) {
+                Ok(true) => answers.push('t'),
+                Ok(false) => {
+                    answers.push('f');
+                    break;
+                },
+                Err(error) => {
+                    answers.push_str(&format!("[{error}]"));
+                    break;
+                },
+            }
+        }
+        format!(
+            "{letters} => {answers} finish={} count={} present={}",
+            state.finish(1),
+            state.observed_count(),
+            state.external_present
+        )
+    }
+
+    fn sequences(alphabet: &str, length: usize) -> Vec<String> {
+        let mut all = vec![String::new()];
+        let mut previous = vec![String::new()];
+        for _ in 0..length {
+            let mut next = Vec::new();
+            for prefix in &previous {
+                for letter in alphabet.chars() {
+                    next.push(format!("{prefix}{letter}"));
+                }
+            }
+            all.extend(next.iter().cloned());
+            previous = next;
+        }
+        all
+    }
+
+    /// The external-link presence scan is fed every pair of its records and
+    /// longer orders that walk the name window, the CRN run after an XCT, the
+    /// DDE matrix continuation and the end of the block.
+    #[test]
+    fn external_presence_scan_accepts_and_rejects_record_orders() {
+        let mut cases = sequences("WNAaDMKSXZCHRO", 2);
+        cases.extend(
+            [
+                "WNN", "WNXC", "WXCN", "WXNC", "WXCC", "WXCXC", "WZC", "WZN", "WZXC", "WXOC",
+                "WXHC", "WHN", "WHW", "WHR", "WRW", "WOW", "WON", "WOX", "WOC", "WOH", "WOK",
+                "WOO", "WXCO", "WXCOW", "WXCH", "WXCHN", "WNWN", "WXCWN", "WXCWXC", "AaH", "AaaH",
+                "AHa", "AOa", "ARa", "DMK", "DMKK", "DMKM", "DMKMK", "DMO", "DMKO", "DMKH", "DMX",
+                "DMKW", "DMH", "SRO", "SRW", "SHS", "OSO", "OKO", "SKO", "SOK", "HOW", "HW", "WSa",
+                "AWN", "WAa", "WAN", "SWN", "WSN",
+            ]
+            .map(str::to_string),
+        );
+        let actual: Vec<String> = cases.iter().map(|case| outcome(case)).collect();
+        assert_eq!(actual, EXTERNAL_PRESENCE_EXPECTED);
+    }
+
+    const EXTERNAL_PRESENCE_EXPECTED: &[&str] = &[
+        " =>  finish=true count=0 present=false",
+        "W => t finish=true count=1 present=true",
+        "N => f finish=true count=0 present=false",
+        "A => t finish=true count=1 present=true",
+        "a => f finish=true count=0 present=false",
+        "D => t finish=true count=1 present=true",
+        "M => f finish=true count=0 present=false",
+        "K => t finish=true count=0 present=false",
+        "S => t finish=true count=1 present=false",
+        "X => f finish=true count=0 present=false",
+        "Z => f finish=true count=0 present=false",
+        "C => f finish=true count=0 present=false",
+        "H => t finish=true count=0 present=false",
+        "R => f finish=true count=0 present=false",
+        "O => t finish=true count=0 present=false",
+        "WW => tt finish=true count=2 present=true",
+        "WN => tt finish=true count=2 present=true",
+        "WA => tt finish=true count=2 present=true",
+        "Wa => tt finish=true count=2 present=true",
+        "WD => tt finish=true count=2 present=true",
+        "WM => tf finish=true count=1 present=true",
+        "WK => tf finish=true count=1 present=true",
+        "WS => tt finish=true count=2 present=true",
+        "WX => tt finish=false count=1 present=true",
+        "WZ => tt finish=true count=1 present=true",
+        "WC => tf finish=true count=1 present=true",
+        "WH => tt finish=true count=1 present=true",
+        "WR => tt finish=true count=2 present=true",
+        "WO => tt finish=true count=1 present=true",
+        "NW => f finish=true count=0 present=false",
+        "NN => f finish=true count=0 present=false",
+        "NA => f finish=true count=0 present=false",
+        "Na => f finish=true count=0 present=false",
+        "ND => f finish=true count=0 present=false",
+        "NM => f finish=true count=0 present=false",
+        "NK => f finish=true count=0 present=false",
+        "NS => f finish=true count=0 present=false",
+        "NX => f finish=true count=0 present=false",
+        "NZ => f finish=true count=0 present=false",
+        "NC => f finish=true count=0 present=false",
+        "NH => f finish=true count=0 present=false",
+        "NR => f finish=true count=0 present=false",
+        "NO => f finish=true count=0 present=false",
+        "AW => tt finish=true count=2 present=true",
+        "AN => tt finish=true count=2 present=true",
+        "AA => tt finish=true count=2 present=true",
+        "Aa => tt finish=true count=2 present=true",
+        "AD => tt finish=true count=2 present=true",
+        "AM => tf finish=true count=1 present=true",
+        "AK => tf finish=true count=1 present=true",
+        "AS => tt finish=true count=2 present=true",
+        "AX => tf finish=true count=1 present=true",
+        "AZ => tf finish=true count=1 present=true",
+        "AC => tf finish=true count=1 present=true",
+        "AH => tt finish=true count=1 present=true",
+        "AR => tt finish=true count=2 present=true",
+        "AO => tt finish=true count=1 present=true",
+        "aW => f finish=true count=0 present=false",
+        "aN => f finish=true count=0 present=false",
+        "aA => f finish=true count=0 present=false",
+        "aa => f finish=true count=0 present=false",
+        "aD => f finish=true count=0 present=false",
+        "aM => f finish=true count=0 present=false",
+        "aK => f finish=true count=0 present=false",
+        "aS => f finish=true count=0 present=false",
+        "aX => f finish=true count=0 present=false",
+        "aZ => f finish=true count=0 present=false",
+        "aC => f finish=true count=0 present=false",
+        "aH => f finish=true count=0 present=false",
+        "aR => f finish=true count=0 present=false",
+        "aO => f finish=true count=0 present=false",
+        "DW => tt finish=true count=2 present=true",
+        "DN => tf finish=true count=1 present=true",
+        "DA => tt finish=true count=2 present=true",
+        "Da => tf finish=true count=1 present=true",
+        "DD => tt finish=true count=2 present=true",
+        "DM => tt finish=false count=2 present=true",
+        "DK => tf finish=true count=1 present=true",
+        "DS => tt finish=true count=2 present=true",
+        "DX => tf finish=true count=1 present=true",
+        "DZ => tf finish=true count=1 present=true",
+        "DC => tf finish=true count=1 present=true",
+        "DH => tt finish=true count=1 present=true",
+        "DR => tt finish=true count=2 present=true",
+        "DO => tt finish=true count=1 present=true",
+        "MW => f finish=true count=0 present=false",
+        "MN => f finish=true count=0 present=false",
+        "MA => f finish=true count=0 present=false",
+        "Ma => f finish=true count=0 present=false",
+        "MD => f finish=true count=0 present=false",
+        "MM => f finish=true count=0 present=false",
+        "MK => f finish=true count=0 present=false",
+        "MS => f finish=true count=0 present=false",
+        "MX => f finish=true count=0 present=false",
+        "MZ => f finish=true count=0 present=false",
+        "MC => f finish=true count=0 present=false",
+        "MH => f finish=true count=0 present=false",
+        "MR => f finish=true count=0 present=false",
+        "MO => f finish=true count=0 present=false",
+        "KW => tt finish=true count=1 present=true",
+        "KN => tf finish=true count=0 present=false",
+        "KA => tt finish=true count=1 present=true",
+        "Ka => tf finish=true count=0 present=false",
+        "KD => tt finish=true count=1 present=true",
+        "KM => tf finish=true count=0 present=false",
+        "KK => tt finish=true count=0 present=false",
+        "KS => tt finish=true count=1 present=false",
+        "KX => tf finish=true count=0 present=false",
+        "KZ => tf finish=true count=0 present=false",
+        "KC => tf finish=true count=0 present=false",
+        "KH => tt finish=true count=0 present=false",
+        "KR => tf finish=true count=0 present=false",
+        "KO => tt finish=true count=0 present=false",
+        "SW => tt finish=true count=2 present=true",
+        "SN => tf finish=true count=1 present=false",
+        "SA => tt finish=true count=2 present=true",
+        "Sa => tf finish=true count=1 present=false",
+        "SD => tt finish=true count=2 present=true",
+        "SM => tf finish=true count=1 present=false",
+        "SK => tf finish=true count=1 present=false",
+        "SS => tt finish=true count=2 present=false",
+        "SX => tf finish=true count=1 present=false",
+        "SZ => tf finish=true count=1 present=false",
+        "SC => tf finish=true count=1 present=false",
+        "SH => tt finish=true count=1 present=false",
+        "SR => tt finish=true count=2 present=false",
+        "SO => tt finish=true count=1 present=false",
+        "XW => f finish=true count=0 present=false",
+        "XN => f finish=true count=0 present=false",
+        "XA => f finish=true count=0 present=false",
+        "Xa => f finish=true count=0 present=false",
+        "XD => f finish=true count=0 present=false",
+        "XM => f finish=true count=0 present=false",
+        "XK => f finish=true count=0 present=false",
+        "XS => f finish=true count=0 present=false",
+        "XX => f finish=true count=0 present=false",
+        "XZ => f finish=true count=0 present=false",
+        "XC => f finish=true count=0 present=false",
+        "XH => f finish=true count=0 present=false",
+        "XR => f finish=true count=0 present=false",
+        "XO => f finish=true count=0 present=false",
+        "ZW => f finish=true count=0 present=false",
+        "ZN => f finish=true count=0 present=false",
+        "ZA => f finish=true count=0 present=false",
+        "Za => f finish=true count=0 present=false",
+        "ZD => f finish=true count=0 present=false",
+        "ZM => f finish=true count=0 present=false",
+        "ZK => f finish=true count=0 present=false",
+        "ZS => f finish=true count=0 present=false",
+        "ZX => f finish=true count=0 present=false",
+        "ZZ => f finish=true count=0 present=false",
+        "ZC => f finish=true count=0 present=false",
+        "ZH => f finish=true count=0 present=false",
+        "ZR => f finish=true count=0 present=false",
+        "ZO => f finish=true count=0 present=false",
+        "CW => f finish=true count=0 present=false",
+        "CN => f finish=true count=0 present=false",
+        "CA => f finish=true count=0 present=false",
+        "Ca => f finish=true count=0 present=false",
+        "CD => f finish=true count=0 present=false",
+        "CM => f finish=true count=0 present=false",
+        "CK => f finish=true count=0 present=false",
+        "CS => f finish=true count=0 present=false",
+        "CX => f finish=true count=0 present=false",
+        "CZ => f finish=true count=0 present=false",
+        "CC => f finish=true count=0 present=false",
+        "CH => f finish=true count=0 present=false",
+        "CR => f finish=true count=0 present=false",
+        "CO => f finish=true count=0 present=false",
+        "HW => tf finish=true count=0 present=false",
+        "HN => tf finish=true count=0 present=false",
+        "HA => tf finish=true count=0 present=false",
+        "Ha => tf finish=true count=0 present=false",
+        "HD => tf finish=true count=0 present=false",
+        "HM => tf finish=true count=0 present=false",
+        "HK => tt finish=true count=0 present=false",
+        "HS => tf finish=true count=0 present=false",
+        "HX => tf finish=true count=0 present=false",
+        "HZ => tf finish=true count=0 present=false",
+        "HC => tf finish=true count=0 present=false",
+        "HH => tt finish=true count=0 present=false",
+        "HR => tf finish=true count=0 present=false",
+        "HO => tt finish=true count=0 present=false",
+        "RW => f finish=true count=0 present=false",
+        "RN => f finish=true count=0 present=false",
+        "RA => f finish=true count=0 present=false",
+        "Ra => f finish=true count=0 present=false",
+        "RD => f finish=true count=0 present=false",
+        "RM => f finish=true count=0 present=false",
+        "RK => f finish=true count=0 present=false",
+        "RS => f finish=true count=0 present=false",
+        "RX => f finish=true count=0 present=false",
+        "RZ => f finish=true count=0 present=false",
+        "RC => f finish=true count=0 present=false",
+        "RH => f finish=true count=0 present=false",
+        "RR => f finish=true count=0 present=false",
+        "RO => f finish=true count=0 present=false",
+        "OW => tt finish=true count=1 present=true",
+        "ON => tf finish=true count=0 present=false",
+        "OA => tt finish=true count=1 present=true",
+        "Oa => tf finish=true count=0 present=false",
+        "OD => tt finish=true count=1 present=true",
+        "OM => tf finish=true count=0 present=false",
+        "OK => tt finish=true count=0 present=false",
+        "OS => tt finish=true count=1 present=false",
+        "OX => tf finish=true count=0 present=false",
+        "OZ => tf finish=true count=0 present=false",
+        "OC => tf finish=true count=0 present=false",
+        "OH => tt finish=true count=0 present=false",
+        "OR => tf finish=true count=0 present=false",
+        "OO => tt finish=true count=0 present=false",
+        "WNN => ttt finish=true count=3 present=true",
+        "WNXC => tttt finish=true count=2 present=true",
+        "WXCN => tttf finish=true count=1 present=true",
+        "WXNC => ttf finish=false count=1 present=true",
+        "WXCC => tttf finish=true count=1 present=true",
+        "WXCXC => tttf finish=true count=1 present=true",
+        "WZC => ttf finish=true count=1 present=true",
+        "WZN => ttf finish=true count=1 present=true",
+        "WZXC => ttf finish=true count=1 present=true",
+        "WXOC => ttf finish=false count=1 present=true",
+        "WXHC => ttf finish=false count=1 present=true",
+        "WHN => ttf finish=true count=1 present=true",
+        "WHW => ttf finish=true count=1 present=true",
+        "WHR => ttt finish=true count=2 present=true",
+        "WRW => ttf finish=true count=2 present=true",
+        "WOW => ttf finish=true count=1 present=true",
+        "WON => ttf finish=true count=1 present=true",
+        "WOX => ttf finish=true count=1 present=true",
+        "WOC => ttf finish=true count=1 present=true",
+        "WOH => ttf finish=true count=1 present=true",
+        "WOK => ttt finish=true count=1 present=true",
+        "WOO => ttt finish=true count=1 present=true",
+        "WXCO => tttt finish=true count=1 present=true",
+        "WXCOW => ttttf finish=true count=1 present=true",
+        "WXCH => tttt finish=true count=1 present=true",
+        "WXCHN => ttttf finish=true count=1 present=true",
+        "WNWN => tttt finish=true count=4 present=true",
+        "WXCWN => ttttt finish=true count=3 present=true",
+        "WXCWXC => tttttt finish=true count=2 present=true",
+        "AaH => ttt finish=true count=2 present=true",
+        "AaaH => tttt finish=true count=3 present=true",
+        "AHa => ttf finish=true count=1 present=true",
+        "AOa => ttf finish=true count=1 present=true",
+        "ARa => ttf finish=true count=2 present=true",
+        "DMK => ttt finish=true count=2 present=true",
+        "DMKK => tttf finish=true count=2 present=true",
+        "DMKM => tttt finish=false count=3 present=true",
+        "DMKMK => ttttt finish=true count=3 present=true",
+        "DMO => ttf finish=false count=2 present=true",
+        "DMKO => tttt finish=true count=2 present=true",
+        "DMKH => tttt finish=true count=2 present=true",
+        "DMX => ttf finish=false count=2 present=true",
+        "DMKW => tttt finish=true count=3 present=true",
+        "DMH => ttf finish=false count=2 present=true",
+        "SRO => ttt finish=true count=2 present=false",
+        "SRW => ttf finish=true count=2 present=false",
+        "SHS => ttf finish=true count=1 present=false",
+        "OSO => ttt finish=true count=1 present=false",
+        "OKO => ttt finish=true count=0 present=false",
+        "SKO => tf finish=true count=1 present=false",
+        "SOK => ttt finish=true count=1 present=false",
+        "HOW => ttf finish=true count=0 present=false",
+        "HW => tf finish=true count=0 present=false",
+        "WSa => ttf finish=true count=2 present=true",
+        "AWN => ttt finish=true count=3 present=true",
+        "WAa => ttt finish=true count=3 present=true",
+        "WAN => ttt finish=true count=3 present=true",
+        "SWN => ttt finish=true count=3 present=true",
+        "WSN => ttf finish=true count=2 present=true",
+    ];
+}

@@ -1152,3 +1152,84 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod filepass_slot_tests {
+    use super::*;
+
+    /// Builds a generated Workbook stream from one record per letter: `B` the
+    /// globals BOF (`b` one of the wrong substream type), `W` WRITEPROTECT,
+    /// `C` CODEPAGE, `F` FILEPASS, `E` EOF and `O` an unrelated record. The
+    /// answer is the FILEPASS insertion offset the scan chose, or its error.
+    fn outcome(letters: &str) -> String {
+        let mut stream = Vec::new();
+        for letter in letters.chars() {
+            let (sid, data): (u16, &[u8]) = match letter {
+                'B' => (BOF_SID, &[0x00, 0x06, 0x05, 0x00]),
+                'b' => (BOF_SID, &[0x00, 0x06, 0x10, 0x00]),
+                'W' => (WRITEPROTECT_SID, &[]),
+                'C' => (CODEPAGE_SID, &[0xb0, 0x04]),
+                'F' => (FILEPASS_SID, &[0, 0]),
+                'E' => (EOF_SID, &[]),
+                'O' => (0x0018, &[1]),
+                other => panic!("unknown test record letter {other}"),
+            };
+            stream.extend_from_slice(&sid.to_le_bytes());
+            stream.extend_from_slice(&(data.len() as u16).to_le_bytes());
+            stream.extend_from_slice(data);
+        }
+        match inspect_clear_workbook(&stream) {
+            Ok(plan) => format!("{letters} => slot at {}", plan.filepass_offset),
+            Err(error) => format!("{letters} => {error}"),
+        }
+    }
+
+    /// The FILEPASS slot after the globals BOF and an optional WRITEPROTECT is
+    /// probed with every short globals order.
+    #[test]
+    fn filepass_slot_follows_bof_and_one_writeprotect() {
+        let actual: Vec<String> = [
+            "", "B", "BE", "BCE", "BWCE", "BCWE", "BWWCE", "BWCWE", "BOWCE", "BWOWCE", "BCEW",
+            "BCEWW", "BWCEW", "BWE", "BWEC", "BEC", "BCEC", "BCCE", "BFCE", "BCFE", "BCEF", "bCE",
+            "OBCE", "BOCE", "BWOCE", "BEBCE", "BCEBE", "BWCEBWE", "W", "BW", "BWC",
+        ]
+        .iter()
+        .map(|case| outcome(case))
+        .collect();
+        assert_eq!(actual, FILEPASS_SLOT_EXPECTED);
+    }
+
+    const FILEPASS_SLOT_EXPECTED: &[&str] = &[
+        " => Invalid data: generated Workbook stream is missing its BOF",
+        "B => Invalid data: generated workbook globals are missing EOF",
+        "BE => Invalid data: generated workbook globals are missing CODEPAGE",
+        "BCE => slot at 8",
+        "BWCE => slot at 12",
+        "BCWE => slot at 8",
+        "BWWCE => Invalid data: generated workbook globals contain duplicate WRITEPROTECT records",
+        "BWCWE => slot at 12",
+        "BOWCE => slot at 8",
+        "BWOWCE => slot at 12",
+        "BCEW => slot at 8",
+        "BCEWW => slot at 8",
+        "BWCEW => slot at 12",
+        "BWE => Invalid data: generated workbook globals are missing CODEPAGE",
+        "BWEC => Invalid data: generated workbook globals are missing CODEPAGE",
+        "BEC => Invalid data: generated workbook globals are missing CODEPAGE",
+        "BCEC => slot at 8",
+        "BCCE => Invalid data: generated workbook globals contain duplicate CODEPAGE records",
+        "BFCE => Malformed FILEPASS record: generated Workbook stream already contains FILEPASS",
+        "BCFE => Malformed FILEPASS record: generated Workbook stream already contains FILEPASS",
+        "BCEF => Malformed FILEPASS record: generated Workbook stream already contains FILEPASS",
+        "bCE => Invalid data: generated Workbook stream does not begin with a workbook-globals BOF",
+        "OBCE => Invalid data: generated Workbook stream does not begin with a workbook-globals BOF",
+        "BOCE => slot at 8",
+        "BWOCE => slot at 12",
+        "BEBCE => Invalid data: generated workbook globals are missing CODEPAGE",
+        "BCEBE => slot at 8",
+        "BWCEBWE => slot at 12",
+        "W => Invalid data: generated Workbook stream does not begin with a workbook-globals BOF",
+        "BW => Invalid data: generated workbook globals are missing EOF",
+        "BWC => Invalid data: generated workbook globals are missing EOF",
+    ];
+}

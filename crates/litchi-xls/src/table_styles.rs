@@ -1098,3 +1098,400 @@ mod tests {
         assert!(TableStyleElement::parse_payload(&bad_element).is_err());
     }
 }
+
+#[cfg(test)]
+mod collection_order_tests {
+    use super::*;
+
+    fn style_record(name: &str, count: u32) -> Vec<u8> {
+        let units = name.encode_utf16().collect::<Vec<_>>();
+        let mut data = Vec::new();
+        write_frt_header(&mut data, TABLE_STYLE_RECORD_TYPE);
+        data.extend_from_slice(&4u16.to_le_bytes());
+        data.extend_from_slice(&count.to_le_bytes());
+        data.extend_from_slice(&(units.len() as u16).to_le_bytes());
+        data.extend(units.into_iter().flat_map(u16::to_le_bytes));
+        data
+    }
+
+    /// Feeds one record per letter until the first error: `X` a DXF, `S` a
+    /// STYLE, `H` the TableStyles header, `T` a TableStyle declaring one
+    /// element, `U` a TableStyle declaring none, `E` a TableStyleElement and
+    /// `O` an unrelated record. The answer lists `.` per accepted record, then
+    /// the error text, or what `finish` makes of the records (with the DXF
+    /// count the stream declared).
+    fn outcome(letters: &str) -> String {
+        let header = TableStyles::try_new(145, "TableStyleMedium2", "PivotStyleLight16")
+            .unwrap()
+            .to_payload()
+            .unwrap();
+        let dxf = crate::differential_format::DifferentialFormat::try_new(false, vec![])
+            .unwrap()
+            .to_payload()
+            .unwrap();
+        let element =
+            TableStyleElement::try_new(TableStyleRegion::WholeTable, DifferentialFormatId::new(0))
+                .unwrap()
+                .to_payload()
+                .unwrap();
+        let mut collector = TableStylesCollector::new();
+        let mut differential_formats = 0;
+        let mut styles = 0;
+        let mut answers = String::new();
+        for letter in letters.chars() {
+            let (record_type, data) = match letter {
+                'X' => {
+                    differential_formats += 1;
+                    (DXF_RECORD_TYPE, dxf.clone())
+                },
+                'S' => (STYLE_RECORD_TYPE, Vec::new()),
+                'H' => (TABLE_STYLES_RECORD_TYPE, header.clone()),
+                'T' | 'U' => {
+                    styles += 1;
+                    let count = u32::from(letter == 'T');
+                    (
+                        TABLE_STYLE_RECORD_TYPE,
+                        style_record(&format!("Custom{styles}"), count),
+                    )
+                },
+                'E' => (TABLE_STYLE_ELEMENT_RECORD_TYPE, element.clone()),
+                'O' => (0x000A, Vec::new()),
+                other => panic!("unknown test record letter {other}"),
+            };
+            if let Err(error) = collector.feed_record(record_type, &data) {
+                return format!("{letters} => {answers} {error}");
+            }
+            answers.push('.');
+        }
+        let finished = match collector.finish(differential_formats) {
+            Ok(None) => "none".to_string(),
+            Ok(Some(catalog)) => format!("catalog custom={}", catalog.custom_styles().len()),
+            Err(error) => error.to_string(),
+        };
+        format!("{letters} => {answers} finish: {finished}")
+    }
+
+    /// The DXF, STYLES and TABLESTYLES collections are fed every order of up
+    /// to three of their records, and longer orders through a complete custom
+    /// catalog and past its end.
+    #[test]
+    fn table_style_collections_accept_and_reject_record_orders() {
+        let mut cases = vec![String::new()];
+        let mut previous = vec![String::new()];
+        for _ in 0..3 {
+            let mut next = Vec::new();
+            for prefix in &previous {
+                for letter in ['X', 'S', 'H', 'T', 'E', 'O'] {
+                    next.push(format!("{prefix}{letter}"));
+                }
+            }
+            cases.extend(next.iter().cloned());
+            previous = next;
+        }
+        cases.extend(
+            [
+                "XSH", "XSHO", "XSHTE", "XSHTEO", "XSHTEOS", "XSHTEOE", "XSHTEOT", "XSHTEOH",
+                "XSHTES", "XSHTESH", "XSHTET", "XSHTETE", "XSHTEE", "XSHTEU", "XSHTEUO", "XSHUTE",
+                "XSHUO", "XSHUE", "XSHTO", "XSHTS", "XSHTH", "XSHTU", "XSHOS", "XSHOSX", "XSHSX",
+                "XSHSH", "XSHST", "XSHSE", "XSOH", "XSSH", "SXH", "XSHOO",
+            ]
+            .map(str::to_string),
+        );
+        let actual: Vec<String> = cases.iter().map(|case| outcome(case)).collect();
+        assert_eq!(actual, TABLE_STYLE_ORDER_EXPECTED);
+    }
+
+    const TABLE_STYLE_ORDER_EXPECTED: &[&str] = &[
+        " =>  finish: none",
+        "X => . finish: none",
+        "S => . finish: none",
+        "H =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "T =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "E =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "O => . finish: none",
+        "XX => .. finish: none",
+        "XS => .. finish: none",
+        "XH => . Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "XT => . Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "XE => . Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "XO => .. finish: none",
+        "SX => . Invalid record 0x088D: DXF record appears after the STYLES or TABLESTYLES collection",
+        "SS => .. finish: none",
+        "SH => .. finish: Invalid record 0x088E: TableStyles declares 1 custom styles but contains 0",
+        "ST => . Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "SE => . Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "SO => .. finish: none",
+        "HX =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HS =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HH =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HT =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HE =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HO =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "TX =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TS =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TH =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TT =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TE =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TO =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "EX =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "ES =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "EH =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "ET =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "EE =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "EO =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "OX => .. finish: none",
+        "OS => .. finish: none",
+        "OH => . Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "OT => . Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "OE => . Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "OO => .. finish: none",
+        "XXX => ... finish: none",
+        "XXS => ... finish: none",
+        "XXH => .. Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "XXT => .. Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "XXE => .. Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "XXO => ... finish: none",
+        "XSX => .. Invalid record 0x088D: DXF record appears after the STYLES or TABLESTYLES collection",
+        "XSS => ... finish: none",
+        "XSH => ... finish: Invalid record 0x088E: TableStyles declares 1 custom styles but contains 0",
+        "XST => .. Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "XSE => .. Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "XSO => ... finish: none",
+        "XHX => . Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "XHS => . Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "XHH => . Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "XHT => . Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "XHE => . Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "XHO => . Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "XTX => . Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "XTS => . Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "XTH => . Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "XTT => . Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "XTE => . Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "XTO => . Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "XEX => . Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "XES => . Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "XEH => . Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "XET => . Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "XEE => . Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "XEO => . Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "XOX => ... finish: none",
+        "XOS => ... finish: none",
+        "XOH => .. Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "XOT => .. Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "XOE => .. Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "XOO => ... finish: none",
+        "SXX => . Invalid record 0x088D: DXF record appears after the STYLES or TABLESTYLES collection",
+        "SXS => . Invalid record 0x088D: DXF record appears after the STYLES or TABLESTYLES collection",
+        "SXH => . Invalid record 0x088D: DXF record appears after the STYLES or TABLESTYLES collection",
+        "SXT => . Invalid record 0x088D: DXF record appears after the STYLES or TABLESTYLES collection",
+        "SXE => . Invalid record 0x088D: DXF record appears after the STYLES or TABLESTYLES collection",
+        "SXO => . Invalid record 0x088D: DXF record appears after the STYLES or TABLESTYLES collection",
+        "SSX => .. Invalid record 0x088D: DXF record appears after the STYLES or TABLESTYLES collection",
+        "SSS => ... finish: none",
+        "SSH => ... finish: Invalid record 0x088E: TableStyles declares 1 custom styles but contains 0",
+        "SST => .. Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "SSE => .. Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "SSO => ... finish: none",
+        "SHX => .. Invalid record 0x088D: DXF record appears after the STYLES or TABLESTYLES collection",
+        "SHS => ... finish: Invalid record 0x088E: TableStyles declares 1 custom styles but contains 0",
+        "SHH => .. Invalid record 0x088E: duplicate or noncontiguous TableStyles",
+        "SHT => ... finish: Invalid record 0x0890: TABLESTYLES ended before the declared element count was satisfied",
+        "SHE => .. Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "SHO => ... finish: Invalid record 0x088E: TableStyles declares 1 custom styles but contains 0",
+        "STX => . Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "STS => . Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "STH => . Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "STT => . Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "STE => . Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "STO => . Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "SEX => . Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "SES => . Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "SEH => . Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "SET => . Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "SEE => . Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "SEO => . Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "SOX => .. Invalid record 0x088D: DXF record appears after the STYLES or TABLESTYLES collection",
+        "SOS => ... finish: none",
+        "SOH => ... finish: Invalid record 0x088E: TableStyles declares 1 custom styles but contains 0",
+        "SOT => .. Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "SOE => .. Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "SOO => ... finish: none",
+        "HXX =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HXS =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HXH =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HXT =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HXE =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HXO =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HSX =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HSS =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HSH =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HST =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HSE =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HSO =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HHX =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HHS =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HHH =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HHT =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HHE =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HHO =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HTX =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HTS =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HTH =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HTT =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HTE =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HTO =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HEX =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HES =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HEH =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HET =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HEE =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HEO =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HOX =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HOS =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HOH =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HOT =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HOE =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "HOO =>  Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "TXX =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TXS =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TXH =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TXT =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TXE =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TXO =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TSX =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TSS =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TSH =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TST =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TSE =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TSO =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "THX =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "THS =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "THH =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "THT =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "THE =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "THO =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TTX =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TTS =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TTH =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TTT =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TTE =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TTO =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TEX =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TES =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TEH =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TET =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TEE =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TEO =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TOX =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TOS =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TOH =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TOT =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TOE =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "TOO =>  Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "EXX =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "EXS =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "EXH =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "EXT =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "EXE =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "EXO =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "ESX =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "ESS =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "ESH =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "EST =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "ESE =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "ESO =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "EHX =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "EHS =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "EHH =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "EHT =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "EHE =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "EHO =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "ETX =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "ETS =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "ETH =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "ETT =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "ETE =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "ETO =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "EEX =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "EES =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "EEH =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "EET =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "EEE =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "EEO =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "EOX =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "EOS =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "EOH =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "EOT =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "EOE =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "EOO =>  Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "OXX => ... finish: none",
+        "OXS => ... finish: none",
+        "OXH => .. Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "OXT => .. Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "OXE => .. Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "OXO => ... finish: none",
+        "OSX => .. Invalid record 0x088D: DXF record appears after the STYLES or TABLESTYLES collection",
+        "OSS => ... finish: none",
+        "OSH => ... finish: Invalid record 0x088E: TableStyles declares 1 custom styles but contains 0",
+        "OST => .. Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "OSE => .. Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "OSO => ... finish: none",
+        "OHX => . Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "OHS => . Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "OHH => . Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "OHT => . Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "OHE => . Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "OHO => . Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "OTX => . Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "OTS => . Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "OTH => . Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "OTT => . Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "OTE => . Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "OTO => . Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "OEX => . Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "OES => . Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "OEH => . Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "OET => . Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "OEE => . Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "OEO => . Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "OOX => ... finish: none",
+        "OOS => ... finish: none",
+        "OOH => .. Invalid record 0x088E: TableStyles appears before the required STYLES collection",
+        "OOT => .. Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "OOE => .. Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "OOO => ... finish: none",
+        "XSH => ... finish: Invalid record 0x088E: TableStyles declares 1 custom styles but contains 0",
+        "XSHO => .... finish: Invalid record 0x088E: TableStyles declares 1 custom styles but contains 0",
+        "XSHTE => ..... finish: catalog custom=1",
+        "XSHTEO => ...... finish: catalog custom=1",
+        "XSHTEOS => ....... finish: catalog custom=1",
+        "XSHTEOE => ...... Invalid record 0x0890: TableStyleElement appears after TABLESTYLES ended",
+        "XSHTEOT => ...... Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "XSHTEOH => ...... Invalid record 0x088E: duplicate or noncontiguous TableStyles",
+        "XSHTES => ...... finish: catalog custom=1",
+        "XSHTESH => ...... Invalid record 0x088E: duplicate or noncontiguous TableStyles",
+        "XSHTET => ...... finish: Invalid record 0x0890: TABLESTYLES ended before the declared element count was satisfied",
+        "XSHTETE => ....... finish: Invalid record 0x088E: TableStyles declares 1 custom styles but contains 2",
+        "XSHTEE => ..... Invalid record 0x0890: TableStyleElement exceeds the preceding ctse count",
+        "XSHTEU => ...... finish: Invalid record 0x088E: TableStyles declares 1 custom styles but contains 2",
+        "XSHTEUO => ....... finish: Invalid record 0x088E: TableStyles declares 1 custom styles but contains 2",
+        "XSHUTE => ...... finish: Invalid record 0x088E: TableStyles declares 1 custom styles but contains 2",
+        "XSHUO => ..... finish: catalog custom=1",
+        "XSHUE => .... Invalid record 0x0890: TableStyleElement has no preceding TableStyle",
+        "XSHTO => .... Invalid record 0x0890: TABLESTYLES ended before the declared element count was satisfied",
+        "XSHTS => .... Invalid record 0x0890: TABLESTYLES ended before the declared element count was satisfied",
+        "XSHTH => .... Invalid record 0x088E: duplicate or noncontiguous TableStyles",
+        "XSHTU => .... Invalid record 0x088F: TableStyle appears before the prior element count is satisfied",
+        "XSHOS => ..... finish: Invalid record 0x088E: TableStyles declares 1 custom styles but contains 0",
+        "XSHOSX => ..... Invalid record 0x088D: DXF record appears after the STYLES or TABLESTYLES collection",
+        "XSHSX => .... Invalid record 0x088D: DXF record appears after the STYLES or TABLESTYLES collection",
+        "XSHSH => .... Invalid record 0x088E: duplicate or noncontiguous TableStyles",
+        "XSHST => .... Invalid record 0x088F: TableStyle appears outside TABLESTYLES",
+        "XSHSE => .... Invalid record 0x0890: TableStyleElement appears after TABLESTYLES ended",
+        "XSOH => .... finish: Invalid record 0x088E: TableStyles declares 1 custom styles but contains 0",
+        "XSSH => .... finish: Invalid record 0x088E: TableStyles declares 1 custom styles but contains 0",
+        "SXH => . Invalid record 0x088D: DXF record appears after the STYLES or TABLESTYLES collection",
+        "XSHOO => ..... finish: Invalid record 0x088E: TableStyles declares 1 custom styles but contains 0",
+    ];
+}

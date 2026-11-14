@@ -7587,3 +7587,277 @@ fn require(data: &[u8], expected: usize) -> Result<()> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod bundle_collection_order_tests {
+    use super::{
+        bundle_sheet_payload, collect_bundle_records, rewrite_workbook_insert,
+        rewrite_workbook_order, rewrite_workbook_remove,
+    };
+    use crate::package::formula::Context;
+    use crate::package::records::BundleSheetRecord;
+    use crate::raw::{Encoder, Limits, Records, kind};
+    use crate::sheet::State;
+
+    fn sheet_payload(index: usize) -> Vec<u8> {
+        let ordinal = u32::try_from(index + 1).unwrap();
+        bundle_sheet_payload(
+            State::Visible,
+            ordinal,
+            &format!("rId{ordinal}"),
+            &format!("S{ordinal}"),
+            Limits::DEFAULT,
+        )
+        .unwrap()
+    }
+
+    /// Builds a workbook part from one letter per record: `B`/`E` open and
+    /// close the sheet catalog (`b`/`e` carry a stray payload byte), `S` is the
+    /// next sheet, `X` is a workbook record the rewriters copy and `U` is one
+    /// they do not model.
+    fn stream(letters: &str) -> (Vec<u8>, Vec<Vec<u8>>) {
+        let mut data = Vec::new();
+        let mut sheets = Vec::new();
+        let mut writer = Encoder::new(&mut data, Limits::DEFAULT);
+        for letter in letters.chars() {
+            match letter {
+                'B' => writer.write_record(kind::BEGIN_BUNDLE_SHS, &[]).unwrap(),
+                'b' => writer.write_record(kind::BEGIN_BUNDLE_SHS, &[0]).unwrap(),
+                'E' => writer.write_record(kind::END_BUNDLE_SHS, &[]).unwrap(),
+                'e' => writer.write_record(kind::END_BUNDLE_SHS, &[0]).unwrap(),
+                'S' => {
+                    let payload = sheet_payload(sheets.len());
+                    writer.write_record(kind::BUNDLE_SH, &payload).unwrap();
+                    sheets.push(payload);
+                },
+                'X' => writer.write_record(kind::FILE_VERSION, &[]).unwrap(),
+                'U' => writer.write_record(kind::BEGIN_SHEET, &[]).unwrap(),
+                other => panic!("unknown test record letter {other}"),
+            }
+        }
+        (data, sheets)
+    }
+
+    /// Renders a rewritten part with the same letters; a sheet is its source
+    /// ordinal and `N` is the inserted sheet.
+    fn render(output: &[u8], sheets: &[Vec<u8>], inserted: &[u8]) -> String {
+        Records::new(output, Limits::DEFAULT)
+            .map(|record| {
+                let record = record.unwrap();
+                match record.kind() {
+                    kind::BEGIN_BUNDLE_SHS => "B".to_string(),
+                    kind::END_BUNDLE_SHS => "E".to_string(),
+                    kind::FILE_VERSION => "X".to_string(),
+                    kind::BEGIN_SHEET => "U".to_string(),
+                    kind::BUNDLE_SH if record.payload() == inserted => "N".to_string(),
+                    kind::BUNDLE_SH => sheets
+                        .iter()
+                        .position(|sheet| sheet == record.payload())
+                        .map_or_else(|| "?".to_string(), |index| (index + 1).to_string()),
+                    _ => "?".to_string(),
+                }
+            })
+            .collect()
+    }
+
+    fn outcomes(letters: &str, catalog_len: Option<usize>) -> String {
+        let (source, sheets) = stream(letters);
+        let catalog_len = catalog_len.unwrap_or(sheets.len());
+        let context = Context::default();
+        let inserted = sheet_payload(40);
+        let show = |result: crate::package::error::Result<Vec<u8>>| match result {
+            Ok(output) => format!("ok {}", render(&output, &sheets, &inserted)),
+            Err(error) => error.to_string(),
+        };
+
+        let collect = match collect_bundle_records(
+            &source,
+            catalog_len,
+            crate::leniency::Leniency::default(),
+            Limits::DEFAULT,
+        ) {
+            Ok(records) => format!("ok {}", records.len()),
+            Err(error) => error.to_string(),
+        };
+        let insert_first = show(rewrite_workbook_insert(
+            &source,
+            0,
+            catalog_len,
+            &context,
+            &inserted,
+            Limits::DEFAULT,
+        ));
+        let insert_last = show(rewrite_workbook_insert(
+            &source,
+            catalog_len,
+            catalog_len,
+            &context,
+            &inserted,
+            Limits::DEFAULT,
+        ));
+        let reversed: Vec<usize> = (0..catalog_len).rev().collect();
+        let order = show(rewrite_workbook_order(
+            &source,
+            &reversed,
+            &reversed,
+            catalog_len,
+            &context,
+            Limits::DEFAULT,
+        ));
+        // Removal drops the last sheet of the catalog, if there is one.
+        let records: Vec<BundleSheetRecord> = sheets
+            .iter()
+            .map(|sheet| BundleSheetRecord::parse(sheet, Limits::DEFAULT).unwrap())
+            .collect();
+        let mut removed = vec![false; catalog_len];
+        let mut remaining: Vec<usize> = (0..catalog_len).collect();
+        let mut positions = Vec::new();
+        if let Some(last) = catalog_len.checked_sub(1) {
+            removed[last] = true;
+            remaining[last] = usize::MAX;
+            positions.push(last);
+        }
+        let remove = show(rewrite_workbook_remove(
+            &source,
+            &positions,
+            &removed,
+            &remaining,
+            catalog_len,
+            &context,
+            &records,
+            Limits::DEFAULT,
+        ));
+
+        let all = [collect, insert_first, insert_last, order, remove];
+        if all.iter().all(|outcome| *outcome == all[0]) {
+            format!("{letters} => all: {}", all[0])
+        } else {
+            format!(
+                "{letters} => collect: {} | insert first: {} | insert last: {} | reverse: {} | remove last: {}",
+                all[0], all[1], all[2], all[3], all[4]
+            )
+        }
+    }
+
+    /// Every sequence of at most `length` letters from `alphabet`, shortest
+    /// first.
+    fn sequences(alphabet: &str, length: usize) -> Vec<String> {
+        let mut all = vec![String::new()];
+        let mut previous = vec![String::new()];
+        for _ in 0..length {
+            let mut next = Vec::new();
+            for prefix in &previous {
+                for letter in alphabet.chars() {
+                    next.push(format!("{prefix}{letter}"));
+                }
+            }
+            all.extend(next.iter().cloned());
+            previous = next;
+        }
+        all
+    }
+
+    /// The four workbook-part scans that walk the sheet catalog collection
+    /// are fed every short order of its records: each alone, every pair and
+    /// triple with duplicates, and other records before, inside and after.
+    #[test]
+    fn sheet_catalog_scans_accept_and_reject_record_orders() {
+        let mut cases = sequences("BSE", 3);
+        cases.extend(
+            [
+                "BSSE", "BSEB", "BSEE", "BSES", "BEBE", "BSEBSE", "X", "U", "XBSEX", "BXE", "BXSE",
+                "BSXE", "BSXSE", "BUE", "BSUE", "UBSE", "BSEU", "XSX", "bSE", "BSe", "Be", "bE",
+                "BSEb", "BSEe", "BSSEX",
+            ]
+            .map(str::to_string),
+        );
+        let actual: Vec<String> = cases.iter().map(|case| outcomes(case, None)).collect();
+        assert_eq!(actual, BUNDLE_ORDER_EXPECTED);
+    }
+
+    /// A complete collection whose sheet count differs from the catalog is
+    /// refused by every scan.
+    #[test]
+    fn sheet_catalog_scans_refuse_a_collection_of_the_wrong_size() {
+        let actual = [
+            outcomes("BSE", Some(2)),
+            outcomes("BSSE", Some(1)),
+            outcomes("BE", Some(1)),
+        ];
+        assert_eq!(actual, BUNDLE_SIZE_EXPECTED);
+    }
+
+    const BUNDLE_ORDER_EXPECTED: &[&str] = &[
+        " => collect: Invalid format: Workbook BrtBundleSh count differs from catalog size | insert first: Invalid format: Workbook BrtBundleSh count differs from catalog size | insert last: Invalid format: Workbook BrtBundleSh count differs from catalog size | reverse: Invalid format: Workbook sheet catalog has no complete BrtBundleSh collection | remove last: Invalid format: Workbook BrtBundleSh count differs from catalog size",
+        "B => collect: Invalid format: Workbook BrtBundleSh count differs from catalog size | insert first: Invalid format: Workbook BrtBundleSh count differs from catalog size | insert last: Invalid format: Workbook BrtBundleSh count differs from catalog size | reverse: Invalid format: Workbook sheet catalog has no complete BrtBundleSh collection | remove last: Invalid format: Workbook BrtBundleSh count differs from catalog size",
+        "S => all: Invalid format: BrtBundleSh appears outside its BrtBeginBundleShs collection",
+        "E => collect: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert first: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | reverse: Invalid format: BrtEndBundleShs has no matching collection | remove last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection",
+        "BB => collect: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | insert first: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | insert last: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | reverse: Invalid format: Workbook has duplicate or nested BrtBundleShs collections | remove last: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections",
+        "BS => collect: Invalid format: Workbook BrtBundleSh count differs from catalog size | insert first: Invalid format: Workbook BrtBundleSh count differs from catalog size | insert last: Invalid format: Workbook BrtBundleSh count differs from catalog size | reverse: Invalid format: Workbook sheet catalog has no complete BrtBundleSh collection | remove last: Invalid format: Workbook BrtBundleSh count differs from catalog size",
+        "BE => collect: ok 0 | insert first: ok BNE | insert last: ok BNE | reverse: Invalid format: Workbook sheet catalog records were not emitted | remove last: ok BE",
+        "SB => all: Invalid format: BrtBundleSh appears outside its BrtBeginBundleShs collection",
+        "SS => all: Invalid format: BrtBundleSh appears outside its BrtBeginBundleShs collection",
+        "SE => all: Invalid format: BrtBundleSh appears outside its BrtBeginBundleShs collection",
+        "EB => collect: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert first: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | reverse: Invalid format: BrtEndBundleShs has no matching collection | remove last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection",
+        "ES => collect: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert first: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | reverse: Invalid format: BrtEndBundleShs has no matching collection | remove last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection",
+        "EE => collect: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert first: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | reverse: Invalid format: BrtEndBundleShs has no matching collection | remove last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection",
+        "BBB => collect: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | insert first: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | insert last: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | reverse: Invalid format: Workbook has duplicate or nested BrtBundleShs collections | remove last: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections",
+        "BBS => collect: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | insert first: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | insert last: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | reverse: Invalid format: Workbook has duplicate or nested BrtBundleShs collections | remove last: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections",
+        "BBE => collect: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | insert first: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | insert last: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | reverse: Invalid format: Workbook has duplicate or nested BrtBundleShs collections | remove last: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections",
+        "BSB => collect: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | insert first: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | insert last: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | reverse: Invalid format: Workbook has duplicate or nested BrtBundleShs collections | remove last: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections",
+        "BSS => collect: Invalid format: Workbook BrtBundleSh count differs from catalog size | insert first: Invalid format: Workbook BrtBundleSh count differs from catalog size | insert last: Invalid format: Workbook BrtBundleSh count differs from catalog size | reverse: Invalid format: Workbook sheet catalog has no complete BrtBundleSh collection | remove last: Invalid format: Workbook BrtBundleSh count differs from catalog size",
+        "BSE => collect: ok 1 | insert first: ok BN1E | insert last: ok B1NE | reverse: ok B1E | remove last: ok BE",
+        "BEB => collect: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | insert first: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | insert last: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | reverse: Invalid format: Workbook has duplicate or nested BrtBundleShs collections | remove last: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections",
+        "BES => all: Invalid format: BrtBundleSh appears outside its BrtBeginBundleShs collection",
+        "BEE => collect: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert first: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | reverse: Invalid format: BrtEndBundleShs has no matching collection | remove last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection",
+        "SBB => all: Invalid format: BrtBundleSh appears outside its BrtBeginBundleShs collection",
+        "SBS => all: Invalid format: BrtBundleSh appears outside its BrtBeginBundleShs collection",
+        "SBE => all: Invalid format: BrtBundleSh appears outside its BrtBeginBundleShs collection",
+        "SSB => all: Invalid format: BrtBundleSh appears outside its BrtBeginBundleShs collection",
+        "SSS => all: Invalid format: BrtBundleSh appears outside its BrtBeginBundleShs collection",
+        "SSE => all: Invalid format: BrtBundleSh appears outside its BrtBeginBundleShs collection",
+        "SEB => all: Invalid format: BrtBundleSh appears outside its BrtBeginBundleShs collection",
+        "SES => all: Invalid format: BrtBundleSh appears outside its BrtBeginBundleShs collection",
+        "SEE => all: Invalid format: BrtBundleSh appears outside its BrtBeginBundleShs collection",
+        "EBB => collect: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert first: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | reverse: Invalid format: BrtEndBundleShs has no matching collection | remove last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection",
+        "EBS => collect: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert first: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | reverse: Invalid format: BrtEndBundleShs has no matching collection | remove last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection",
+        "EBE => collect: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert first: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | reverse: Invalid format: BrtEndBundleShs has no matching collection | remove last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection",
+        "ESB => collect: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert first: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | reverse: Invalid format: BrtEndBundleShs has no matching collection | remove last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection",
+        "ESS => collect: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert first: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | reverse: Invalid format: BrtEndBundleShs has no matching collection | remove last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection",
+        "ESE => collect: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert first: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | reverse: Invalid format: BrtEndBundleShs has no matching collection | remove last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection",
+        "EEB => collect: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert first: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | reverse: Invalid format: BrtEndBundleShs has no matching collection | remove last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection",
+        "EES => collect: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert first: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | reverse: Invalid format: BrtEndBundleShs has no matching collection | remove last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection",
+        "EEE => collect: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert first: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | reverse: Invalid format: BrtEndBundleShs has no matching collection | remove last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection",
+        "BSSE => collect: ok 2 | insert first: ok BN12E | insert last: ok B12NE | reverse: ok B21E | remove last: ok B1E",
+        "BSEB => collect: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | insert first: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | insert last: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | reverse: Invalid format: Workbook has duplicate or nested BrtBundleShs collections | remove last: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections",
+        "BSEE => collect: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert first: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | reverse: Invalid format: BrtEndBundleShs has no matching collection | remove last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection",
+        "BSES => all: Invalid format: BrtBundleSh appears outside its BrtBeginBundleShs collection",
+        "BEBE => collect: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | insert first: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | insert last: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | reverse: Invalid format: Workbook has duplicate or nested BrtBundleShs collections | remove last: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections",
+        "BSEBSE => collect: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | insert first: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | insert last: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | reverse: Invalid format: Workbook has duplicate or nested BrtBundleShs collections | remove last: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections",
+        "X => collect: Invalid format: Workbook BrtBundleSh count differs from catalog size | insert first: Invalid format: Workbook BrtBundleSh count differs from catalog size | insert last: Invalid format: Workbook BrtBundleSh count differs from catalog size | reverse: Invalid format: Workbook sheet catalog has no complete BrtBundleSh collection | remove last: Invalid format: Workbook BrtBundleSh count differs from catalog size",
+        "U => collect: Invalid format: Workbook BrtBundleSh count differs from catalog size | insert first: edit refused (unsupported_content): sheet insertion cannot preserve unmodeled workbook record at offset without a catalog dependency contract | insert last: edit refused (unsupported_content): sheet insertion cannot preserve unmodeled workbook record at offset without a catalog dependency contract | reverse: edit refused (unsupported_content): sheet reordering cannot preserve unmodeled workbook record at offset without a catalog dependency contract | remove last: edit refused (unsupported_content): sheet removal cannot preserve unmodeled workbook record at offset without a catalog dependency contract",
+        "XBSEX => collect: ok 1 | insert first: ok XBN1EX | insert last: ok XB1NEX | reverse: ok XB1EX | remove last: ok XBEX",
+        "BXE => collect: edit refused (unsupported_content): sheet insertion cannot detach an unknown record interspersed with BrtBundleSh records | insert first: edit refused (unsupported_content): sheet insertion cannot detach an unknown record interspersed with BrtBundleSh records | insert last: edit refused (unsupported_content): sheet insertion cannot detach an unknown record interspersed with BrtBundleSh records | reverse: edit refused (unsupported_content): sheet reordering cannot detach an unknown record interspersed with BrtBundleSh records | remove last: edit refused (unsupported_content): sheet removal cannot detach an unknown record interspersed with BrtBundleSh records",
+        "BXSE => collect: edit refused (unsupported_content): sheet insertion cannot detach an unknown record interspersed with BrtBundleSh records | insert first: edit refused (unsupported_content): sheet insertion cannot detach an unknown record interspersed with BrtBundleSh records | insert last: edit refused (unsupported_content): sheet insertion cannot detach an unknown record interspersed with BrtBundleSh records | reverse: edit refused (unsupported_content): sheet reordering cannot detach an unknown record interspersed with BrtBundleSh records | remove last: edit refused (unsupported_content): sheet removal cannot detach an unknown record interspersed with BrtBundleSh records",
+        "BSXE => collect: edit refused (unsupported_content): sheet insertion cannot detach an unknown record interspersed with BrtBundleSh records | insert first: edit refused (unsupported_content): sheet insertion cannot detach an unknown record interspersed with BrtBundleSh records | insert last: edit refused (unsupported_content): sheet insertion cannot detach an unknown record interspersed with BrtBundleSh records | reverse: edit refused (unsupported_content): sheet reordering cannot detach an unknown record interspersed with BrtBundleSh records | remove last: edit refused (unsupported_content): sheet removal cannot detach an unknown record interspersed with BrtBundleSh records",
+        "BSXSE => collect: edit refused (unsupported_content): sheet insertion cannot detach an unknown record interspersed with BrtBundleSh records | insert first: edit refused (unsupported_content): sheet insertion cannot detach an unknown record interspersed with BrtBundleSh records | insert last: edit refused (unsupported_content): sheet insertion cannot detach an unknown record interspersed with BrtBundleSh records | reverse: edit refused (unsupported_content): sheet reordering cannot detach an unknown record interspersed with BrtBundleSh records | remove last: edit refused (unsupported_content): sheet removal cannot detach an unknown record interspersed with BrtBundleSh records",
+        "BUE => collect: edit refused (unsupported_content): sheet insertion cannot detach an unknown record interspersed with BrtBundleSh records | insert first: edit refused (unsupported_content): sheet insertion cannot detach an unknown record interspersed with BrtBundleSh records | insert last: edit refused (unsupported_content): sheet insertion cannot detach an unknown record interspersed with BrtBundleSh records | reverse: edit refused (unsupported_content): sheet reordering cannot detach an unknown record interspersed with BrtBundleSh records | remove last: edit refused (unsupported_content): sheet removal cannot detach an unknown record interspersed with BrtBundleSh records",
+        "BSUE => collect: edit refused (unsupported_content): sheet insertion cannot detach an unknown record interspersed with BrtBundleSh records | insert first: edit refused (unsupported_content): sheet insertion cannot detach an unknown record interspersed with BrtBundleSh records | insert last: edit refused (unsupported_content): sheet insertion cannot detach an unknown record interspersed with BrtBundleSh records | reverse: edit refused (unsupported_content): sheet reordering cannot detach an unknown record interspersed with BrtBundleSh records | remove last: edit refused (unsupported_content): sheet removal cannot detach an unknown record interspersed with BrtBundleSh records",
+        "UBSE => collect: ok 1 | insert first: edit refused (unsupported_content): sheet insertion cannot preserve unmodeled workbook record at offset without a catalog dependency contract | insert last: edit refused (unsupported_content): sheet insertion cannot preserve unmodeled workbook record at offset without a catalog dependency contract | reverse: edit refused (unsupported_content): sheet reordering cannot preserve unmodeled workbook record at offset without a catalog dependency contract | remove last: edit refused (unsupported_content): sheet removal cannot preserve unmodeled workbook record at offset without a catalog dependency contract",
+        "BSEU => collect: ok 1 | insert first: edit refused (unsupported_content): sheet insertion cannot preserve unmodeled workbook record at offset without a catalog dependency contract | insert last: edit refused (unsupported_content): sheet insertion cannot preserve unmodeled workbook record at offset without a catalog dependency contract | reverse: edit refused (unsupported_content): sheet reordering cannot preserve unmodeled workbook record at offset without a catalog dependency contract | remove last: edit refused (unsupported_content): sheet removal cannot preserve unmodeled workbook record at offset without a catalog dependency contract",
+        "XSX => all: Invalid format: BrtBundleSh appears outside its BrtBeginBundleShs collection",
+        "bSE => collect: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | insert first: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | insert last: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | reverse: Invalid length: expected 0, found 1 | remove last: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections",
+        "BSe => collect: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert first: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | reverse: Invalid length: expected 0, found 1 | remove last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection",
+        "Be => collect: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert first: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | reverse: Invalid length: expected 0, found 1 | remove last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection",
+        "bE => collect: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | insert first: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | insert last: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | reverse: Invalid length: expected 0, found 1 | remove last: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections",
+        "BSEb => collect: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | insert first: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | insert last: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections | reverse: Invalid format: Workbook has duplicate or nested BrtBundleShs collections | remove last: Invalid format: Workbook has duplicate or malformed BrtBundleShs collections",
+        "BSEe => collect: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert first: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | insert last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection | reverse: Invalid format: BrtEndBundleShs has no matching collection | remove last: Invalid format: Workbook has an unbalanced BrtEndBundleShs collection",
+        "BSSEX => collect: ok 2 | insert first: ok BN12EX | insert last: ok B12NEX | reverse: ok B21EX | remove last: ok B1EX",
+    ];
+
+    const BUNDLE_SIZE_EXPECTED: &[&str] = &[
+        "BSE => all: Invalid format: Workbook BrtBundleSh count differs from catalog size",
+        "BSSE => all: Invalid format: Workbook BrtBundleSh count differs from catalog size",
+        "BE => all: Invalid format: Workbook BrtBundleSh count differs from catalog size",
+    ];
+}

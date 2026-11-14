@@ -238,3 +238,186 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod collection_order_tests {
+    use super::*;
+
+    /// Feeds one record per letter until the first error: `D` DefColWidth,
+    /// `C` the next COLINFO, `R` the next ROW, `O` an unrelated record. The
+    /// answer lists `.` per accepted record, then the error text or the
+    /// collected row and column counts.
+    fn outcome(letters: &str) -> String {
+        let formatting = Formatting::default();
+        let mut tolerance = ToleranceReport::default();
+        let mut collector = Collector::new();
+        let mut columns = 0u16;
+        let mut rows = 0u16;
+        let mut answers = String::new();
+        for letter in letters.chars() {
+            let (record_type, data) = match letter {
+                'D' => (DEF_COL_WIDTH_RECORD_TYPE, 8u16.to_le_bytes().to_vec()),
+                'C' => {
+                    let mut data = [0u8; 12];
+                    data[0..2].copy_from_slice(&columns.to_le_bytes());
+                    data[2..4].copy_from_slice(&columns.to_le_bytes());
+                    data[4..6].copy_from_slice(&2560u16.to_le_bytes());
+                    columns += 1;
+                    (COLINFO_RECORD_TYPE, data.to_vec())
+                },
+                'R' => {
+                    let mut data = [0u8; 16];
+                    data[0..2].copy_from_slice(&rows.to_le_bytes());
+                    data[4..6].copy_from_slice(&5u16.to_le_bytes());
+                    data[6..8].copy_from_slice(&300u16.to_le_bytes());
+                    data[12..14].copy_from_slice(&0x0100u16.to_le_bytes());
+                    rows += 1;
+                    (ROW_RECORD_TYPE, data.to_vec())
+                },
+                'O' => (0x0200, Vec::new()),
+                other => panic!("unknown test record letter {other}"),
+            };
+            if let Err(error) =
+                collector.feed_record(record_type, &data, &formatting, &mut tolerance)
+            {
+                return format!("{letters} => {answers} {error}");
+            }
+            answers.push('.');
+        }
+        let (rows, columns) = collector.finish();
+        format!(
+            "{letters} => {answers} ok rows={} columns={}",
+            rows.len(),
+            columns.len()
+        )
+    }
+
+    /// The COLUMNS and ROW collections are fed every order of up to three of
+    /// their records, and longer orders that reopen or interleave them.
+    #[test]
+    fn layout_collections_accept_and_reject_record_orders() {
+        let mut cases = vec![String::new()];
+        let mut previous = vec![String::new()];
+        for _ in 0..3 {
+            let mut next = Vec::new();
+            for prefix in &previous {
+                for letter in ['D', 'C', 'R', 'O'] {
+                    next.push(format!("{prefix}{letter}"));
+                }
+            }
+            cases.extend(next.iter().cloned());
+            previous = next;
+        }
+        cases.extend(
+            [
+                "DCCOR", "DCODC", "DODOC", "DODCR", "DDCC", "DCDC", "DCRR", "ODCOR", "RRD", "RRC",
+                "RORC", "DORRO", "DDOD", "DCOOD",
+            ]
+            .map(str::to_string),
+        );
+        let actual: Vec<String> = cases.iter().map(|case| outcome(case)).collect();
+        assert_eq!(actual, LAYOUT_ORDER_EXPECTED);
+    }
+
+    const LAYOUT_ORDER_EXPECTED: &[&str] = &[
+        " =>  ok rows=0 columns=0",
+        "D => . ok rows=0 columns=0",
+        "C =>  Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "R => . ok rows=1 columns=0",
+        "O => . ok rows=0 columns=0",
+        "DD => .. ok rows=0 columns=0",
+        "DC => .. ok rows=0 columns=1",
+        "DR => .. ok rows=1 columns=0",
+        "DO => .. ok rows=0 columns=0",
+        "CD =>  Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "CC =>  Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "CR =>  Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "CO =>  Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "RD => . Invalid record 0x0055: DefColWidth must begin the COLUMNS collection",
+        "RC => . Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "RR => .. ok rows=2 columns=0",
+        "RO => .. ok rows=1 columns=0",
+        "OD => .. ok rows=0 columns=0",
+        "OC => . Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "OR => .. ok rows=1 columns=0",
+        "OO => .. ok rows=0 columns=0",
+        "DDD => ... ok rows=0 columns=0",
+        "DDC => ... ok rows=0 columns=1",
+        "DDR => ... ok rows=1 columns=0",
+        "DDO => ... ok rows=0 columns=0",
+        "DCD => .. Invalid record 0x0055: DefColWidth must begin the COLUMNS collection",
+        "DCC => ... ok rows=0 columns=2",
+        "DCR => ... ok rows=1 columns=1",
+        "DCO => ... ok rows=0 columns=1",
+        "DRD => .. Invalid record 0x0055: DefColWidth must begin the COLUMNS collection",
+        "DRC => .. Invalid record 0x007D: COLINFO records must remain in the COLUMNS collection",
+        "DRR => ... ok rows=2 columns=0",
+        "DRO => ... ok rows=1 columns=0",
+        "DOD => ... ok rows=0 columns=0",
+        "DOC => .. Invalid record 0x007D: COLINFO records must remain in the COLUMNS collection",
+        "DOR => ... ok rows=1 columns=0",
+        "DOO => ... ok rows=0 columns=0",
+        "CDD =>  Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "CDC =>  Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "CDR =>  Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "CDO =>  Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "CCD =>  Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "CCC =>  Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "CCR =>  Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "CCO =>  Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "CRD =>  Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "CRC =>  Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "CRR =>  Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "CRO =>  Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "COD =>  Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "COC =>  Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "COR =>  Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "COO =>  Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "RDD => . Invalid record 0x0055: DefColWidth must begin the COLUMNS collection",
+        "RDC => . Invalid record 0x0055: DefColWidth must begin the COLUMNS collection",
+        "RDR => . Invalid record 0x0055: DefColWidth must begin the COLUMNS collection",
+        "RDO => . Invalid record 0x0055: DefColWidth must begin the COLUMNS collection",
+        "RCD => . Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "RCC => . Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "RCR => . Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "RCO => . Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "RRD => .. Invalid record 0x0055: DefColWidth must begin the COLUMNS collection",
+        "RRC => .. Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "RRR => ... ok rows=3 columns=0",
+        "RRO => ... ok rows=2 columns=0",
+        "ROD => .. Invalid record 0x0055: DefColWidth must begin the COLUMNS collection",
+        "ROC => .. Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "ROR => ... ok rows=2 columns=0",
+        "ROO => ... ok rows=1 columns=0",
+        "ODD => ... ok rows=0 columns=0",
+        "ODC => ... ok rows=0 columns=1",
+        "ODR => ... ok rows=1 columns=0",
+        "ODO => ... ok rows=0 columns=0",
+        "OCD => . Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "OCC => . Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "OCR => . Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "OCO => . Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "ORD => .. Invalid record 0x0055: DefColWidth must begin the COLUMNS collection",
+        "ORC => .. Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "ORR => ... ok rows=2 columns=0",
+        "ORO => ... ok rows=1 columns=0",
+        "OOD => ... ok rows=0 columns=0",
+        "OOC => .. Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "OOR => ... ok rows=1 columns=0",
+        "OOO => ... ok rows=0 columns=0",
+        "DCCOR => ..... ok rows=1 columns=2",
+        "DCODC => ... Invalid record 0x0055: DefColWidth must begin the COLUMNS collection",
+        "DODOC => .... Invalid record 0x007D: COLINFO records must remain in the COLUMNS collection",
+        "DODCR => ... Invalid record 0x007D: COLINFO records must remain in the COLUMNS collection",
+        "DDCC => .... ok rows=0 columns=2",
+        "DCDC => .. Invalid record 0x0055: DefColWidth must begin the COLUMNS collection",
+        "DCRR => .... ok rows=2 columns=1",
+        "ODCOR => ..... ok rows=1 columns=1",
+        "RRD => .. Invalid record 0x0055: DefColWidth must begin the COLUMNS collection",
+        "RRC => .. Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "RORC => ... Invalid record 0x007D: COLINFO records require a preceding DefColWidth",
+        "DORRO => ..... ok rows=2 columns=0",
+        "DDOD => .... ok rows=0 columns=0",
+        "DCOOD => .... Invalid record 0x0055: DefColWidth must begin the COLUMNS collection",
+    ];
+}
