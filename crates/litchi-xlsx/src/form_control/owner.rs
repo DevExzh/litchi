@@ -5632,6 +5632,50 @@ fn reject_mixed_dialect(
     }
 }
 
+/// Where [`validate_drawing_anchors`] is relative to the `xdr:wsDr` root:
+///
+/// ```text
+/// Prolog --xdr:wsDr start tag--> Open
+/// Prolog --any other start tag--> refused
+/// Open --end of an xdr:wsDr nested inside the root--> ClosedInsideNested
+/// Open | ClosedInsideNested --root end tag--> Closed
+/// ClosedInsideNested --start tag inside the root--> refused (content after the root)
+/// Closed --start tag--> refused (duplicate root)
+/// any phase --empty-element tag--> unchanged (not checked against the root)
+/// any phase --text, CDATA, comment, PI, declaration, DOCTYPE--> unchanged (ignored)
+/// ```
+///
+/// `ClosedInsideNested` is how the scan behaves today: the end of any
+/// `xdr:wsDr` marks the root closed, so one nested inside the root refuses
+/// every later start tag in the root while the root is still open. End of
+/// input is accepted in `ClosedInsideNested` and `Closed` only with an empty
+/// stack, which leaves `Closed`.
+#[derive(Clone, Copy)]
+enum AnchorRootPhase {
+    Prolog,
+    Open,
+    ClosedInsideNested,
+    Closed,
+}
+
+impl AnchorRootPhase {
+    fn is_prolog(self) -> bool {
+        match self {
+            Self::Prolog => true,
+            Self::Open | Self::ClosedInsideNested | Self::Closed => false,
+        }
+    }
+
+    /// Whether a root end tag has been read, including the end of a nested
+    /// `xdr:wsDr`.
+    fn is_closed(self) -> bool {
+        match self {
+            Self::ClosedInsideNested | Self::Closed => true,
+            Self::Prolog | Self::Open => false,
+        }
+    }
+}
+
 fn validate_drawing_anchors(
     xml: &[u8],
     limits: &OwnerLimits,
@@ -5642,8 +5686,7 @@ fn validate_drawing_anchors(
     reader.config_mut().check_end_names = true;
     let mut stack: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
     let mut anchors = Vec::<(Vec<u8>, usize, usize, usize, usize, usize)>::new();
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut root = AnchorRootPhase::Prolog;
     let mut events = 0usize;
     loop {
         if let Some(execution) = execution {
@@ -5671,13 +5714,16 @@ fn validate_drawing_anchors(
                 let namespace = namespace_bytes(namespace);
                 let local = local.as_ref().to_vec();
                 if stack.is_empty() {
-                    if root_seen || namespace.as_slice() != XDR || local.as_slice() != b"wsDr" {
+                    if !root.is_prolog()
+                        || namespace.as_slice() != XDR
+                        || local.as_slice() != b"wsDr"
+                    {
                         return Err(owner_invalid(
                             "DrawingML XML has an unexpected or duplicate root element",
                         ));
                     }
-                    root_seen = true;
-                } else if root_closed {
+                    root = AnchorRootPhase::Open;
+                } else if root.is_closed() {
                     return Err(owner_invalid("DrawingML XML has content after its root"));
                 }
                 if namespace.as_slice() == XDR
@@ -5831,7 +5877,11 @@ fn validate_drawing_anchors(
                         ));
                     }
                 } else if closed.0.as_slice() == XDR && closed.1.as_slice() == b"wsDr" {
-                    root_closed = true;
+                    root = if stack.is_empty() {
+                        AnchorRootPhase::Closed
+                    } else {
+                        AnchorRootPhase::ClosedInsideNested
+                    };
                 }
             },
             Event::Eof => break,
@@ -5844,7 +5894,7 @@ fn validate_drawing_anchors(
             | Event::GeneralRef(_) => {},
         }
     }
-    if !root_seen || !root_closed || !stack.is_empty() {
+    if !root.is_closed() || !stack.is_empty() {
         return Err(owner_invalid("DrawingML XML is unterminated"));
     }
     if !anchors.is_empty() {
@@ -5947,6 +5997,50 @@ fn stack_is_under_admitted_cnvpr(stack: &[(Vec<u8>, Vec<u8>)]) -> bool {
     )
 }
 
+/// Where [`parse_worksheet`] is relative to the `worksheet` root:
+///
+/// ```text
+/// Prolog --worksheet start tag--> Open
+/// Prolog --worksheet empty-element tag--> Closed
+/// Prolog --any other top-level element--> refused
+/// Open --end of a worksheet nested inside the root--> ClosedInsideNested
+/// Open | ClosedInsideNested --root end tag--> Closed
+/// ClosedInsideNested --start or empty-element tag inside the root--> refused (content after the root)
+/// Closed --top-level element--> refused (duplicate root)
+/// any phase --text, CDATA, comment, PI, declaration, DOCTYPE--> unchanged (ignored)
+/// ```
+///
+/// `ClosedInsideNested` is how the scan behaves today: the end of any
+/// SpreadsheetML `worksheet` marks the root closed, so one nested inside the
+/// root refuses every later element in the root while the root is still open.
+/// End of input is accepted in `ClosedInsideNested` and `Closed` only with an
+/// empty stack, which leaves `Closed`.
+#[derive(Clone, Copy)]
+enum WorksheetRootPhase {
+    Prolog,
+    Open,
+    ClosedInsideNested,
+    Closed,
+}
+
+impl WorksheetRootPhase {
+    fn is_prolog(self) -> bool {
+        match self {
+            Self::Prolog => true,
+            Self::Open | Self::ClosedInsideNested | Self::Closed => false,
+        }
+    }
+
+    /// Whether a root end tag has been read, including the end of a nested
+    /// `worksheet`.
+    fn is_closed(self) -> bool {
+        match self {
+            Self::ClosedInsideNested | Self::Closed => true,
+            Self::Prolog | Self::Open => false,
+        }
+    }
+}
+
 fn parse_worksheet(
     xml: &[u8],
     limits: &OwnerLimits,
@@ -5962,8 +6056,7 @@ fn parse_worksheet(
         .map_err(|source| owner_alloc("worksheet controls", source))?;
     let mut drawing = None;
     let mut vml = None;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut root = WorksheetRootPhase::Prolog;
     let mut controls_container_seen = false;
     let mut current_control: Option<(SourceControl, bool, bool, usize, usize)> = None;
     let mut events = 0usize;
@@ -5993,14 +6086,16 @@ fn parse_worksheet(
                 let namespace_bytes = namespace_bytes(namespace.clone());
                 let local_bytes = local.as_ref().to_vec();
                 if stack.is_empty() {
-                    if root_seen || namespace_bytes.as_slice() != SML || local_bytes != b"worksheet"
+                    if !root.is_prolog()
+                        || namespace_bytes.as_slice() != SML
+                        || local_bytes != b"worksheet"
                     {
                         return Err(owner_invalid(
                             "worksheet XML has an unexpected or duplicate root element",
                         ));
                     }
-                    root_seen = true;
-                } else if root_closed {
+                    root = WorksheetRootPhase::Open;
+                } else if root.is_closed() {
                     return Err(owner_invalid("worksheet XML has content after its root"));
                 }
                 if is_ns(&namespace, SML) {
@@ -6137,17 +6232,18 @@ fn parse_worksheet(
                 let namespace_bytes = namespace_bytes(namespace.clone());
                 let local_bytes = local.as_ref();
                 if stack.is_empty() {
-                    if root_seen || namespace_bytes.as_slice() != SML || local_bytes != b"worksheet"
+                    if !root.is_prolog()
+                        || namespace_bytes.as_slice() != SML
+                        || local_bytes != b"worksheet"
                     {
                         return Err(owner_invalid(
                             "worksheet XML has an unexpected or duplicate root element",
                         ));
                     }
-                    root_seen = true;
-                    root_closed = true;
+                    root = WorksheetRootPhase::Closed;
                     continue;
                 }
-                if root_closed {
+                if root.is_closed() {
                     return Err(owner_invalid("worksheet XML has content after its root"));
                 }
                 if is_ns(&namespace, SML) {
@@ -6271,7 +6367,11 @@ fn parse_worksheet(
             Event::End(end) => {
                 let closed = pop_checked_end(&mut stack, &end, &resolver)?;
                 if closed.0.as_slice() == SML && closed.1.as_slice() == b"worksheet" {
-                    root_closed = true;
+                    root = if stack.is_empty() {
+                        WorksheetRootPhase::Closed
+                    } else {
+                        WorksheetRootPhase::ClosedInsideNested
+                    };
                 }
                 if closed.0.as_slice() == SML && closed.1.as_slice() == b"control" {
                     let (mut control, _control_pr, anchor, from, to) = current_control
@@ -6311,7 +6411,7 @@ fn parse_worksheet(
     if current_control.is_some() {
         return Err(owner_invalid("worksheet control is unterminated"));
     }
-    if !root_seen || !root_closed || !stack.is_empty() {
+    if !root.is_closed() || !stack.is_empty() {
         return Err(owner_invalid(
             "worksheet XML is unterminated or has no root",
         ));
@@ -7014,6 +7114,50 @@ fn preflight_control_relationship_id(
     Ok(None)
 }
 
+/// Where [`parse_drawing`] is relative to the `xdr:wsDr` root:
+///
+/// ```text
+/// Prolog --xdr:wsDr start tag--> Open
+/// Prolog --any other start tag--> refused
+/// any phase --top-level empty-element tag--> refused (an empty root is not admitted)
+/// Open --end of an xdr:wsDr nested inside the root--> ClosedInsideNested
+/// Open | ClosedInsideNested --root end tag--> Closed
+/// ClosedInsideNested --start or empty-element tag inside the root--> refused (content after the root)
+/// Closed --start tag--> refused (duplicate root)
+/// any phase --text, CDATA, comment, PI, declaration, DOCTYPE--> unchanged (ignored)
+/// ```
+///
+/// `ClosedInsideNested` is how the scan behaves today: the end of any
+/// `xdr:wsDr` marks the root closed, so one nested inside the root refuses
+/// every later element in the root while the root is still open. End of input
+/// is accepted in `ClosedInsideNested` and `Closed` only with an empty stack,
+/// which leaves `Closed`.
+#[derive(Clone, Copy)]
+enum ShapeRootPhase {
+    Prolog,
+    Open,
+    ClosedInsideNested,
+    Closed,
+}
+
+impl ShapeRootPhase {
+    fn is_prolog(self) -> bool {
+        match self {
+            Self::Prolog => true,
+            Self::Open | Self::ClosedInsideNested | Self::Closed => false,
+        }
+    }
+
+    /// Whether a root end tag has been read, including the end of a nested
+    /// `xdr:wsDr`.
+    fn is_closed(self) -> bool {
+        match self {
+            Self::ClosedInsideNested | Self::Closed => true,
+            Self::Prolog | Self::Open => false,
+        }
+    }
+}
+
 fn parse_drawing(
     xml: &[u8],
     limits: &OwnerLimits,
@@ -7029,8 +7173,7 @@ fn parse_drawing(
         .map_err(|source| owner_alloc("drawing shape identities", source))?;
     let mut current_cnvpr = None;
     let mut shape_cnvpr_seen = false;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut root = ShapeRootPhase::Prolog;
     let mut events = 0usize;
     loop {
         if let Some(execution) = execution {
@@ -7058,13 +7201,16 @@ fn parse_drawing(
                 let namespace = namespace_bytes(namespace);
                 let local = local.as_ref().to_vec();
                 if stack.is_empty() {
-                    if root_seen || namespace.as_slice() != XDR || local.as_slice() != b"wsDr" {
+                    if !root.is_prolog()
+                        || namespace.as_slice() != XDR
+                        || local.as_slice() != b"wsDr"
+                    {
                         return Err(owner_invalid(
                             "DrawingML XML has an unexpected or duplicate root element",
                         ));
                     }
-                    root_seen = true;
-                } else if root_closed {
+                    root = ShapeRootPhase::Open;
+                } else if root.is_closed() {
                     return Err(owner_invalid("DrawingML XML has content after its root"));
                 }
                 if namespace.as_slice() == XDR
@@ -7180,7 +7326,7 @@ fn parse_drawing(
                 if stack.is_empty() {
                     return Err(owner_invalid("DrawingML empty root is not admitted"));
                 }
-                if root_closed {
+                if root.is_closed() {
                     return Err(owner_invalid("DrawingML XML has content after its root"));
                 }
                 if is_ns(&namespace, XDR) && local.as_ref() == b"sp" {
@@ -7263,7 +7409,11 @@ fn parse_drawing(
                 } else if closed.0.as_slice() == XDR && closed.1.as_slice() == b"sp" {
                     shape_cnvpr_seen = false;
                 } else if closed.0.as_slice() == XDR && closed.1.as_slice() == b"wsDr" {
-                    root_closed = true;
+                    root = if stack.is_empty() {
+                        ShapeRootPhase::Closed
+                    } else {
+                        ShapeRootPhase::ClosedInsideNested
+                    };
                 }
             },
             Event::Eof => break,
@@ -7276,7 +7426,7 @@ fn parse_drawing(
             | Event::GeneralRef(_) => {},
         }
     }
-    if !root_seen || !root_closed || !stack.is_empty() {
+    if !root.is_closed() || !stack.is_empty() {
         return Err(owner_invalid(
             "DrawingML XML is unterminated or has no root",
         ));
@@ -7452,6 +7602,52 @@ fn validate_unique_vml_attributes(
     Ok(())
 }
 
+/// Where [`parse_vml`] is relative to the unqualified `xml` root:
+///
+/// ```text
+/// Prolog --xml start tag--> Open
+/// Prolog --any other start tag--> refused
+/// Prolog --empty-element tag--> refused (outside the root)
+/// Open --end of an unqualified xml nested inside the root--> ClosedInsideNested
+/// Open | ClosedInsideNested --root end tag--> Closed
+/// ClosedInsideNested --start tag inside the root--> refused (content after the root)
+/// Closed --start or empty-element tag--> refused (more than one root; outside the root)
+/// Prolog | ClosedInsideNested | Closed --non-whitespace text or CDATA--> refused
+/// any phase --whitespace, comment, PI, declaration, DOCTYPE--> unchanged (ignored)
+/// ```
+///
+/// `ClosedInsideNested` is how the scan behaves today: the end of any
+/// unqualified `xml` element marks the root closed, so one nested inside the
+/// root refuses later start tags and text in the root while the root is still
+/// open. End of input in `Prolog` or `Open` reports a missing root; in
+/// `ClosedInsideNested` it reports an unterminated document, and `Closed` is
+/// accepted with an empty stack.
+#[derive(Clone, Copy)]
+enum VmlRootPhase {
+    Prolog,
+    Open,
+    ClosedInsideNested,
+    Closed,
+}
+
+impl VmlRootPhase {
+    fn is_prolog(self) -> bool {
+        match self {
+            Self::Prolog => true,
+            Self::Open | Self::ClosedInsideNested | Self::Closed => false,
+        }
+    }
+
+    /// Whether a root end tag has been read, including the end of a nested
+    /// unqualified `xml` element.
+    fn is_closed(self) -> bool {
+        match self {
+            Self::ClosedInsideNested | Self::Closed => true,
+            Self::Prolog | Self::Open => false,
+        }
+    }
+}
+
 fn parse_vml(
     xml: &[u8],
     limits: &OwnerLimits,
@@ -7466,8 +7662,7 @@ fn parse_vml(
         .try_reserve(8.min(limits.max_shapes))
         .map_err(|source| owner_alloc("VML shape identities", source))?;
     let mut current: Option<(VmlShape, usize)> = None;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut root = VmlRootPhase::Prolog;
     let mut events = 0usize;
     loop {
         if let Some(execution) = execution {
@@ -7495,16 +7690,16 @@ fn parse_vml(
                 let (namespace, local) = resolver.resolve_element(element.name());
                 let namespace = namespace_bytes(namespace);
                 let local = local.as_ref().to_vec();
-                if !root_seen {
+                if root.is_prolog() {
                     if !namespace.is_empty() || local.as_slice() != b"xml" {
                         return Err(owner_invalid(
                             "VML root must be the unqualified xml element",
                         ));
                     }
-                    root_seen = true;
+                    root = VmlRootPhase::Open;
                 } else if stack.is_empty() {
                     return Err(owner_invalid("VML XML has more than one root element"));
-                } else if root_closed {
+                } else if root.is_closed() {
                     return Err(owner_invalid("VML XML has content after its root"));
                 }
                 if namespace.as_slice() == VML && local.as_slice() == b"shape" {
@@ -7591,7 +7786,7 @@ fn parse_vml(
                 let (namespace, local) = resolver.resolve_element(element.name());
                 let namespace = namespace_bytes(namespace);
                 let local = local.as_ref();
-                if !root_seen || stack.is_empty() {
+                if root.is_prolog() || stack.is_empty() {
                     return Err(owner_invalid(
                         "VML empty element is outside the root element",
                     ));
@@ -7684,12 +7879,16 @@ fn parse_vml(
                     }
                 }
                 if closed.0.is_empty() && closed.1.as_slice() == b"xml" {
-                    root_closed = true;
+                    root = if stack.is_empty() {
+                        VmlRootPhase::Closed
+                    } else {
+                        VmlRootPhase::ClosedInsideNested
+                    };
                 }
             },
             Event::Eof => break,
             Event::Text(text)
-                if (!root_seen || root_closed)
+                if (root.is_prolog() || root.is_closed())
                     && !text.as_ref().iter().all(u8::is_ascii_whitespace) =>
             {
                 return Err(owner_invalid(
@@ -7697,7 +7896,7 @@ fn parse_vml(
                 ));
             },
             Event::CData(text)
-                if (!root_seen || root_closed)
+                if (root.is_prolog() || root.is_closed())
                     && !text.as_ref().iter().all(u8::is_ascii_whitespace) =>
             {
                 return Err(owner_invalid(
@@ -7721,7 +7920,7 @@ fn parse_vml(
             ));
         }
     }
-    if !root_seen || !root_closed {
+    if !root.is_closed() {
         return Err(owner_invalid("VML XML has no root element"));
     }
     if !stack.is_empty() || current.is_some() {
@@ -7737,6 +7936,52 @@ fn parse_vml(
         shape.client_fields = fields;
     }
     Ok(shapes)
+}
+
+/// Where [`parse_vml_client_fields`] is relative to the unqualified `xml`
+/// root:
+///
+/// ```text
+/// Prolog --xml start tag--> Open
+/// Prolog --any other start tag--> refused
+/// any phase --top-level empty-element tag--> refused (an empty root is not admitted)
+/// Open --end of an unqualified xml nested inside the root--> ClosedInsideNested
+/// Open | ClosedInsideNested --root end tag--> Closed
+/// ClosedInsideNested --start or empty-element tag inside the root--> refused (content after the root)
+/// Closed --start tag--> refused (duplicate root)
+/// Prolog | ClosedInsideNested | Closed --non-whitespace text or CDATA--> refused
+/// any phase --whitespace, comment, PI, declaration, DOCTYPE--> unchanged (ignored)
+/// ```
+///
+/// `ClosedInsideNested` is how the scan behaves today: the end of any
+/// unqualified `xml` element marks the root closed, so one nested inside the
+/// root refuses later elements and text in the root while the root is still
+/// open. End of input is accepted in `ClosedInsideNested` and `Closed` only
+/// with an empty stack, which leaves `Closed`.
+#[derive(Clone, Copy)]
+enum ClientDataRootPhase {
+    Prolog,
+    Open,
+    ClosedInsideNested,
+    Closed,
+}
+
+impl ClientDataRootPhase {
+    fn is_prolog(self) -> bool {
+        match self {
+            Self::Prolog => true,
+            Self::Open | Self::ClosedInsideNested | Self::Closed => false,
+        }
+    }
+
+    /// Whether a root end tag has been read, including the end of a nested
+    /// unqualified `xml` element.
+    fn is_closed(self) -> bool {
+        match self {
+            Self::ClosedInsideNested | Self::Closed => true,
+            Self::Prolog | Self::Open => false,
+        }
+    }
 }
 
 fn parse_vml_client_fields(
@@ -7755,8 +8000,7 @@ fn parse_vml_client_fields(
     let mut client_seen = false;
     let mut active_field: Option<(usize, usize, usize, Vec<u8>)> = None;
     let mut field_nodes = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut root = ClientDataRootPhase::Prolog;
     let mut events = 0usize;
     loop {
         if let Some(execution) = execution {
@@ -7784,13 +8028,13 @@ fn parse_vml_client_fields(
                 let namespace = namespace_bytes(namespace);
                 let local = local.as_ref().to_vec();
                 if stack.is_empty() {
-                    if root_seen || !namespace.is_empty() || local.as_slice() != b"xml" {
+                    if !root.is_prolog() || !namespace.is_empty() || local.as_slice() != b"xml" {
                         return Err(owner_invalid(
                             "VML ClientData XML has an unexpected or duplicate root",
                         ));
                     }
-                    root_seen = true;
-                } else if root_closed {
+                    root = ClientDataRootPhase::Open;
+                } else if root.is_closed() {
                     return Err(owner_invalid(
                         "VML ClientData XML has content after its root",
                     ));
@@ -7891,7 +8135,7 @@ fn parse_vml_client_fields(
                 if stack.is_empty() {
                     return Err(owner_invalid("VML ClientData empty root is not admitted"));
                 }
-                if root_closed {
+                if root.is_closed() {
                     return Err(owner_invalid(
                         "VML ClientData XML has content after its root",
                     ));
@@ -7961,7 +8205,8 @@ fn parse_vml_client_fields(
                 }
             },
             Event::Text(text) => {
-                if (!root_seen || root_closed) && !text.as_ref().iter().all(u8::is_ascii_whitespace)
+                if (root.is_prolog() || root.is_closed())
+                    && !text.as_ref().iter().all(u8::is_ascii_whitespace)
                 {
                     return Err(owner_invalid(
                         "VML ClientData XML has non-whitespace content outside its root",
@@ -7976,7 +8221,8 @@ fn parse_vml_client_fields(
                 )?;
             },
             Event::CData(text) => {
-                if (!root_seen || root_closed) && !text.as_ref().iter().all(u8::is_ascii_whitespace)
+                if (root.is_prolog() || root.is_closed())
+                    && !text.as_ref().iter().all(u8::is_ascii_whitespace)
                 {
                     return Err(owner_invalid(
                         "VML ClientData XML has non-whitespace content outside its root",
@@ -8013,7 +8259,11 @@ fn parse_vml_client_fields(
                     active_field = None;
                 }
                 if closed.0.is_empty() && closed.1.as_slice() == b"xml" {
-                    root_closed = true;
+                    root = if stack.is_empty() {
+                        ClientDataRootPhase::Closed
+                    } else {
+                        ClientDataRootPhase::ClosedInsideNested
+                    };
                 }
             },
             Event::Eof => break,
@@ -8024,12 +8274,7 @@ fn parse_vml_client_fields(
             | Event::GeneralRef(_) => {},
         }
     }
-    if !root_seen
-        || !root_closed
-        || !stack.is_empty()
-        || current_shape.is_some()
-        || active_field.is_some()
-    {
+    if !root.is_closed() || !stack.is_empty() || current_shape.is_some() || active_field.is_some() {
         return Err(owner_invalid("VML ClientData XML is unterminated"));
     }
     Ok(fields_by_shape)

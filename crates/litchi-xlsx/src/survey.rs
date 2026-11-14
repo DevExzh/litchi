@@ -1115,12 +1115,33 @@ enum ExtensionTarget {
     Question,
 }
 
+/// Where the survey parser is relative to the `survey` root:
+///
+/// ```text
+/// Prolog --survey start tag--> Open
+/// Prolog --survey empty-element tag--> Open, then refused (empty required container)
+/// Prolog --any other start or empty-element tag--> refused
+/// Open --root end tag--> Closed
+/// Closed --start or empty-element tag--> refused (one root only)
+/// any phase --declaration or comment--> unchanged (accepted)
+/// any phase --DOCTYPE or PI--> refused
+/// any phase --non-whitespace text or CDATA outside an extension--> refused
+/// ```
+///
+/// End of input is accepted only in `Closed` with no open element.
+#[derive(Clone, Copy, Default)]
+enum SurveyRootPhase {
+    #[default]
+    Prolog,
+    Open,
+    Closed,
+}
+
 #[derive(Default)]
 struct Parser {
     scopes: Vec<Scope>,
     survey: Option<SurveyBuilder>,
-    seen_root: bool,
-    closed_root: bool,
+    root: SurveyRootPhase,
     question_limit: usize,
 }
 
@@ -1370,7 +1391,7 @@ impl Parser {
             return Err(invalid("mismatched survey end element"));
         }
         if scope == Scope::Survey {
-            self.closed_root = true;
+            self.root = SurveyRootPhase::Closed;
         }
         Ok(())
     }
@@ -1458,12 +1479,16 @@ impl Parser {
             return Ok(Scope::Extension);
         }
         if self.scopes.is_empty() {
-            if self.seen_root || name != b"survey" || !is_survey_namespace(namespace) {
+            let prolog = match self.root {
+                SurveyRootPhase::Prolog => true,
+                SurveyRootPhase::Open | SurveyRootPhase::Closed => false,
+            };
+            if !prolog || name != b"survey" || !is_survey_namespace(namespace) {
                 return Err(invalid(
                     "survey part requires a Survey-namespace survey root",
                 ));
             }
-            self.seen_root = true;
+            self.root = SurveyRootPhase::Open;
             self.survey = Some(parse_survey(element)?);
             return Ok(Scope::Survey);
         }
@@ -1561,7 +1586,11 @@ impl Parser {
             .ok_or_else(|| invalid("survey root is missing"))
     }
     fn finish(self) -> Result<Survey> {
-        if !self.seen_root || !self.scopes.is_empty() || !self.closed_root {
+        let closed = match self.root {
+            SurveyRootPhase::Closed => true,
+            SurveyRootPhase::Prolog | SurveyRootPhase::Open => false,
+        };
+        if !closed || !self.scopes.is_empty() {
             return Err(invalid("unterminated survey XML"));
         }
         let mut value = self

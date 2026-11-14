@@ -2285,14 +2285,46 @@ pub(crate) fn validate_xml_text(value: &str, what: &'static str) -> Result<()> {
     validate_text_bytes(value.as_bytes(), what)
 }
 
+/// Where [`validate_opaque_fragment`] is relative to the fragment's single
+/// root element:
+///
+/// ```text
+/// Prolog --start tag--> Open
+/// Prolog --empty-element tag--> Closed
+/// Open --end tag back to depth zero--> Closed
+/// Closed --start or empty-element tag--> refused (multiple roots)
+/// any phase --XML declaration or DOCTYPE--> refused
+/// any phase --comment or PI--> unchanged (accepted)
+/// ```
+///
+/// Non-whitespace text, CDATA and entity references are refused at depth
+/// zero whatever the phase. End of input is accepted only in `Closed` at
+/// depth zero.
+#[derive(Clone, Copy)]
+enum FragmentPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
+impl FragmentPhase {
+    /// Whether an element starting at `depth` would be a second root.
+    fn second_root(self, depth: usize) -> bool {
+        match self {
+            Self::Prolog => false,
+            Self::Open => depth == 0,
+            Self::Closed => true,
+        }
+    }
+}
+
 fn validate_opaque_fragment(xml: &[u8]) -> Result<()> {
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
     let mut events = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut phase = FragmentPhase::Prolog;
     loop {
         events = events
             .checked_add(1)
@@ -2307,7 +2339,7 @@ fn validate_opaque_fragment(xml: &[u8]) -> Result<()> {
         let decoder = reader.decoder();
         match event {
             Event::Start(element) => {
-                if root_closed || (depth == 0 && root_seen) {
+                if phase.second_root(depth) {
                     return Err(invalid("opaque XML fragment has multiple roots"));
                 }
                 validate_opaque_attributes(&element, resolver, decoder)?;
@@ -2318,11 +2350,11 @@ fn validate_opaque_fragment(xml: &[u8]) -> Result<()> {
                     return Err(super::limit(LimitKind::XmlDepth, depth, MAX_XML_DEPTH));
                 }
                 if depth == 1 {
-                    root_seen = true;
+                    phase = FragmentPhase::Open;
                 }
             },
             Event::Empty(element) => {
-                if root_closed || (depth == 0 && root_seen) {
+                if phase.second_root(depth) {
                     return Err(invalid("opaque XML fragment has multiple roots"));
                 }
                 validate_opaque_attributes(&element, resolver, decoder)?;
@@ -2337,8 +2369,7 @@ fn validate_opaque_fragment(xml: &[u8]) -> Result<()> {
                     ));
                 }
                 if depth == 0 {
-                    root_seen = true;
-                    root_closed = true;
+                    phase = FragmentPhase::Closed;
                 }
             },
             Event::End(_) => {
@@ -2347,7 +2378,7 @@ fn validate_opaque_fragment(xml: &[u8]) -> Result<()> {
                 }
                 depth -= 1;
                 if depth == 0 {
-                    root_closed = true;
+                    phase = FragmentPhase::Closed;
                 }
             },
             Event::Text(text) => {
@@ -2372,7 +2403,11 @@ fn validate_opaque_fragment(xml: &[u8]) -> Result<()> {
             Event::Eof => break,
         }
     }
-    if !root_seen || !root_closed || depth != 0 {
+    let closed = match phase {
+        FragmentPhase::Closed => true,
+        FragmentPhase::Prolog | FragmentPhase::Open => false,
+    };
+    if !closed || depth != 0 {
         return Err(invalid("opaque XML fragment has no complete root"));
     }
     Ok(())

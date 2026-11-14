@@ -1397,6 +1397,38 @@ impl ItemListStage {
     }
 }
 
+/// Where [`inspect_with_limits_owned`] is relative to the
+/// `x14:formControlPr` root:
+///
+/// ```text
+/// Prolog --formControlPr start tag--> Open
+/// Prolog --formControlPr empty-element tag--> Closed
+/// Prolog --any other top-level element--> refused
+/// Open --root end tag--> Closed
+/// Open | Closed --top-level element--> refused (one root only)
+/// any phase --XML declaration--> unchanged (accepted anywhere, any number)
+/// any phase --comment or PI--> unchanged (accepted)
+/// any phase --non-whitespace text outside an item, CDATA, DOCTYPE, entity--> refused
+/// ```
+///
+/// End of input is accepted only in `Closed` at depth zero with no item or
+/// opaque extension list left open.
+#[derive(Clone, Copy)]
+enum RootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
+impl RootPhase {
+    fn is_prolog(self) -> bool {
+        match self {
+            Self::Prolog => true,
+            Self::Open | Self::Closed => false,
+        }
+    }
+}
+
 fn inspect_with_limits_owned(
     xml: &[u8],
     limits: Limits,
@@ -1441,8 +1473,7 @@ fn inspect_with_limits_owned(
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
     let mut events = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
+    let mut root = RootPhase::Prolog;
     let mut root_open = None::<Range<usize>>;
     let mut root_attribute_insertion = None;
     let mut root_close_opening = None;
@@ -1616,8 +1647,7 @@ fn inspect_with_limits_owned(
             Event::Start(element) => {
                 let (namespace, local) = resolve_element(resolver, element.name())?;
                 if depth == 0 {
-                    if root_seen
-                        || root_closed
+                    if !root.is_prolog()
                         || !namespace_uri_matches(namespace, FORM_CONTROL_NAMESPACE.as_bytes())
                         || local != ROOT
                     {
@@ -1625,7 +1655,7 @@ fn inspect_with_limits_owned(
                             "form-control part requires one x14:formControlPr root",
                         ));
                     }
-                    root_seen = true;
+                    root = RootPhase::Open;
                     root_open = Some(start..end);
                     root_attribute_insertion = Some(root_close_insertion(xml, start, end)?);
                     root_prefix = element_prefix(element.name(), &mut retained)?;
@@ -1824,8 +1854,7 @@ fn inspect_with_limits_owned(
             Event::Empty(element) => {
                 let (namespace, local) = resolve_element(resolver, element.name())?;
                 if depth == 0 {
-                    if root_seen
-                        || root_closed
+                    if !root.is_prolog()
                         || !namespace_uri_matches(namespace, FORM_CONTROL_NAMESPACE.as_bytes())
                         || local != ROOT
                     {
@@ -1833,8 +1862,7 @@ fn inspect_with_limits_owned(
                             "form-control part requires one x14:formControlPr root",
                         ));
                     }
-                    root_seen = true;
-                    root_closed = true;
+                    root = RootPhase::Closed;
                     root_open = Some(start..end);
                     root_attribute_insertion = Some(root_close_insertion(xml, start, end)?);
                     root_prefix = element_prefix(element.name(), &mut retained)?;
@@ -2124,7 +2152,7 @@ fn inspect_with_limits_owned(
                     }
                     depth = 1;
                 } else if depth == 1 {
-                    root_closed = true;
+                    root = RootPhase::Closed;
                     root_close_opening = Some(start);
                     if root_child_insertion.is_none() {
                         root_child_insertion = Some(start);
@@ -2165,7 +2193,11 @@ fn inspect_with_limits_owned(
             Event::Eof => break,
         }
     }
-    if !root_seen || !root_closed || depth != 0 || open_item.is_some() || open_opaque.is_some() {
+    let root_closed = match root {
+        RootPhase::Closed => true,
+        RootPhase::Prolog | RootPhase::Open => false,
+    };
+    if !root_closed || depth != 0 || open_item.is_some() || open_opaque.is_some() {
         return Err(invalid("form-control XML does not contain one closed root"));
     }
     if item_values.len() > limits.max_items() {

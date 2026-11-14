@@ -1235,6 +1235,39 @@ struct PendingContentPart {
     mce_ancestor: bool,
 }
 
+/// Where the scanner is relative to the `xdr:wsDr` root:
+///
+/// ```text
+/// Prolog { declared: false } --XML declaration--> Prolog { declared: true }
+/// Prolog --xdr:wsDr start tag--> Open
+/// Prolog --xdr:wsDr empty-element tag--> Closed
+/// Prolog --any other start or empty-element tag--> refused
+/// Open --root end tag--> Closed
+/// Closed --start or empty-element tag--> refused (second root)
+/// Prolog { declared: true } | Open | Closed --XML declaration--> refused
+/// Prolog | Closed --non-whitespace text--> refused
+/// any phase --top-level CDATA or entity reference--> refused
+/// any phase --whitespace, comment or PI--> unchanged (characters checked)
+/// ```
+///
+/// Whitespace, comments and PIs before the declaration are accepted. End of
+/// input is accepted only in `Closed` with no open element.
+#[derive(Clone, Copy)]
+enum RootPhase {
+    Prolog { declared: bool },
+    Open,
+    Closed,
+}
+
+impl RootPhase {
+    fn is_prolog(self) -> bool {
+        match self {
+            Self::Prolog { .. } => true,
+            Self::Open | Self::Closed => false,
+        }
+    }
+}
+
 struct Scanner<'a> {
     source: &'a [u8],
     drawing_ordinal: usize,
@@ -1246,10 +1279,7 @@ struct Scanner<'a> {
     pictures: Vec<PendingPicture>,
     content_parts: Vec<PendingContentPart>,
     global_relationship_references: Vec<RelationshipReference>,
-    root_seen: bool,
-    root_closed: bool,
-    declaration_seen: bool,
-    prolog: bool,
+    root: RootPhase,
     nodes: usize,
     dialect: Option<DrawingDialect>,
     relationship_dialect: Option<RelationshipDialect>,
@@ -1315,10 +1345,7 @@ impl<'a> Scanner<'a> {
             pictures,
             content_parts,
             global_relationship_references,
-            root_seen: false,
-            root_closed: false,
-            declaration_seen: false,
-            prolog: true,
+            root: RootPhase::Prolog { declared: false },
             nodes: 0,
             dialect: None,
             relationship_dialect: None,
@@ -1356,7 +1383,6 @@ impl<'a> Scanner<'a> {
                         .try_reserve(1)
                         .map_err(|source| allocation("drawing source XML stack", source))?;
                     self.frames.push(frame);
-                    self.prolog = false;
                 },
                 Event::Empty(element) => {
                     let frame =
@@ -1372,9 +1398,8 @@ impl<'a> Scanner<'a> {
                     self.namespaces.pop(depth, declarations);
                     self.namespaces.context = context_before;
                     if root {
-                        self.root_closed = true;
+                        self.root = RootPhase::Closed;
                     }
-                    self.prolog = false;
                 },
                 Event::End(element) => {
                     let depth = self.frames.len();
@@ -1399,26 +1424,35 @@ impl<'a> Scanner<'a> {
                         if !root_close_matches {
                             return Err(invalid("drawing root close does not match xdr:wsDr"));
                         }
-                        self.root_closed = true;
+                        self.root = RootPhase::Closed;
                     }
                     self.namespaces.pop(depth, frame.namespace_declarations);
                     self.namespaces.context = frame.context_before;
                 },
                 Event::Decl(declaration) => {
-                    if self.declaration_seen || !self.prolog || self.root_seen {
-                        return Err(invalid(
-                            "XML declaration is not at the beginning of drawing XML",
-                        ));
+                    match self.root {
+                        RootPhase::Prolog { declared: false } => {},
+                        RootPhase::Prolog { declared: true }
+                        | RootPhase::Open
+                        | RootPhase::Closed => {
+                            return Err(invalid(
+                                "XML declaration is not at the beginning of drawing XML",
+                            ));
+                        },
                     }
                     validate_declaration(&declaration)?;
-                    self.declaration_seen = true;
+                    self.root = RootPhase::Prolog { declared: true };
                 },
                 Event::DocType(_) => return Err(invalid("DOCTYPE is forbidden in drawing XML")),
                 Event::Text(text) => {
                     validate_xml_text(text.as_ref())?;
                     let outside = self.frames.is_empty();
                     let non_whitespace = !is_xml_whitespace(text.as_ref());
-                    if outside && (!self.root_seen || self.root_closed) && non_whitespace {
+                    let outside_root = match self.root {
+                        RootPhase::Prolog { .. } | RootPhase::Closed => true,
+                        RootPhase::Open => false,
+                    };
+                    if outside && outside_root && non_whitespace {
                         return Err(invalid("non-whitespace text appears outside xdr:wsDr"));
                     }
                     if matches!(
@@ -1468,7 +1502,11 @@ impl<'a> Scanner<'a> {
             buffer.clear();
         }
 
-        if !self.root_seen || !self.root_closed || !self.frames.is_empty() {
+        let root_closed = match self.root {
+            RootPhase::Closed => true,
+            RootPhase::Prolog { .. } | RootPhase::Open => false,
+        };
+        if !root_closed || !self.frames.is_empty() {
             return Err(invalid("drawing XML has an incomplete xdr:wsDr root"));
         }
         if self.anchor.is_some() || self.active_picture.is_some() {
@@ -1574,8 +1612,11 @@ impl<'a> Scanner<'a> {
                 self.limits.max_depth.min(MAX_XML_DEPTH),
             ));
         }
-        if self.root_closed {
-            return Err(invalid("drawing XML contains a second root element"));
+        match self.root {
+            RootPhase::Prolog { .. } | RootPhase::Open => {},
+            RootPhase::Closed => {
+                return Err(invalid("drawing XML contains a second root element"));
+            },
         }
         let declarations = self.namespaces.preflight(element, decoder)?;
         let context_before = Arc::clone(&self.namespaces.context);
@@ -1584,7 +1625,7 @@ impl<'a> Scanner<'a> {
         let resolved = self.namespaces.resolve_element(element.name())?;
         validate_start_attributes(element, &self.namespaces, decoder)?;
 
-        if !self.root_seen
+        if self.root.is_prolog()
             && self.frames.is_empty()
             && !is_name(
                 resolved,
@@ -1728,7 +1769,7 @@ impl<'a> Scanner<'a> {
         let mut extension_index = None;
         match kind {
             Kind::Root => {
-                if self.root_seen
+                if !self.root.is_prolog()
                     || !is_name(
                         resolved,
                         element.name(),
@@ -1741,7 +1782,7 @@ impl<'a> Scanner<'a> {
                         "drawing XML must contain exactly one xdr:wsDr root",
                     ));
                 }
-                self.root_seen = true;
+                self.root = RootPhase::Open;
                 self.dialect = Some(if resolved == Some(STRICT_SPREADSHEET_DRAWING) {
                     DrawingDialect::Strict
                 } else {

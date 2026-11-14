@@ -63,6 +63,34 @@ struct Capture {
     extension: IgnoredErrorsExtension,
 }
 
+/// Where the reader is relative to the `worksheet` root:
+///
+/// ```text
+/// Prolog { declared: false } --XML declaration--> Prolog { declared: true }
+/// Prolog --worksheet start tag--> Open
+/// Prolog --empty-element tag at the top level--> refused (the root cannot be empty)
+/// Open --end of a worksheet nested in an unmodelled child--> ClosedInsideNested
+/// ClosedInsideNested --end of another such worksheet--> ClosedInsideNested
+/// Open | ClosedInsideNested --root end tag--> Closed
+/// Prolog { declared: true } | Open | ClosedInsideNested | Closed --XML declaration--> refused
+/// Closed --start or empty-element tag--> refused (multiple roots)
+/// any phase --comment or whitespace--> unchanged
+/// ```
+///
+/// `ClosedInsideNested` is how the reader behaves today: a `worksheet` element
+/// inside an unmodelled child of the root is read as a worksheet, and its end
+/// marks the root closed while the real root is still open. Only the element
+/// stack tells it apart from `Closed`, and every check that reads the phase
+/// there also reads the stack, so it accepts and refuses what `Open` does.
+/// End of input is accepted only in `Closed` with an empty stack.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog { declared: bool },
+    Open,
+    ClosedInsideNested,
+    Closed,
+}
+
 struct Parser {
     stack: Vec<Context>,
     collection: Option<IgnoredErrors>,
@@ -70,8 +98,7 @@ struct Parser {
     extension_list_start: usize,
     collection_phase: CollectionPhase,
     retained_extension_bytes: usize,
-    root_seen: bool,
-    root_closed: bool,
+    root: RootPhase,
 }
 
 /// Parse the worksheet's direct `ignoredErrors` collection.
@@ -96,11 +123,9 @@ pub fn parse_worksheet_ignored_errors(xml: &[u8]) -> Result<Option<IgnoredErrors
         extension_list_start: 0,
         collection_phase: CollectionPhase::Absent,
         retained_extension_bytes: 0,
-        root_seen: false,
-        root_closed: false,
+        root: RootPhase::Prolog { declared: false },
     };
     let mut events = 0usize;
-    let mut declaration_seen = false;
     loop {
         events = events
             .checked_add(1)
@@ -159,11 +184,16 @@ pub fn parse_worksheet_ignored_errors(xml: &[u8]) -> Result<Option<IgnoredErrors
             Event::CData(_) if parser.stack.is_empty() => {
                 return Err(invalid("ignoredErrors XML CDATA is outside root"));
             },
-            Event::Decl(_) => {
-                if parser.root_seen || declaration_seen {
+            Event::Decl(_) => match parser.root {
+                RootPhase::Prolog { declared: false } => {
+                    parser.root = RootPhase::Prolog { declared: true };
+                },
+                RootPhase::Prolog { declared: true }
+                | RootPhase::Open
+                | RootPhase::ClosedInsideNested
+                | RootPhase::Closed => {
                     return Err(invalid("invalid ignoredErrors XML declaration position"));
-                }
-                declaration_seen = true;
+                },
             },
             Event::Eof => break,
             Event::Text(_)
@@ -174,11 +204,13 @@ pub fn parse_worksheet_ignored_errors(xml: &[u8]) -> Result<Option<IgnoredErrors
             | Event::GeneralRef(_) => {},
         }
     }
-    if parser.capture.is_some()
-        || !parser.stack.is_empty()
-        || !parser.root_seen
-        || !parser.root_closed
-    {
+    // `ClosedInsideNested` counts as closed here, as it always has; the open
+    // root keeps the stack non-empty, which refuses the document.
+    let root_closed = match parser.root {
+        RootPhase::ClosedInsideNested | RootPhase::Closed => true,
+        RootPhase::Prolog { .. } | RootPhase::Open => false,
+    };
+    if parser.capture.is_some() || !parser.stack.is_empty() || !root_closed {
         return Err(invalid("unterminated ignoredErrors XML"));
     }
     Ok(parser.collection)
@@ -199,13 +231,16 @@ impl Parser {
         let local = element.local_name();
         let core = is_spreadsheetml_name(namespace, element.name(), local.as_ref());
         if self.stack.is_empty() {
-            if self.root_closed || self.root_seen {
-                return Err(invalid("ignoredErrors XML contains multiple roots"));
+            match self.root {
+                RootPhase::Prolog { .. } => {},
+                RootPhase::Open | RootPhase::ClosedInsideNested | RootPhase::Closed => {
+                    return Err(invalid("ignoredErrors XML contains multiple roots"));
+                },
             }
             if !core || local.as_ref() != b"worksheet" {
                 return Err(invalid("ignoredErrors parser requires a worksheet root"));
             }
-            self.root_seen = true;
+            self.root = RootPhase::Open;
         }
         if self.stack.len() >= MAX_DEPTH {
             return Err(invalid("ignoredErrors XML nesting is too deep"));
@@ -259,10 +294,11 @@ impl Parser {
         let local = element.local_name();
         let core = is_spreadsheetml_name(namespace, element.name(), local.as_ref());
         if self.stack.is_empty() {
-            return Err(if self.root_seen || self.root_closed {
-                invalid("ignoredErrors XML contains multiple roots")
-            } else {
-                invalid("worksheet root cannot be empty")
+            return Err(match self.root {
+                RootPhase::Prolog { .. } => invalid("worksheet root cannot be empty"),
+                RootPhase::Open | RootPhase::ClosedInsideNested | RootPhase::Closed => {
+                    invalid("ignoredErrors XML contains multiple roots")
+                },
             });
         }
         match (self.parent(), core, local.as_ref()) {
@@ -308,7 +344,13 @@ impl Parser {
             Context::ExtensionList if local == b"extLst" => self.finish_extension_list(),
             Context::IgnoredError if local == b"ignoredError" => Ok(()),
             Context::Worksheet if local == b"worksheet" => {
-                self.root_closed = true;
+                // The stack is already popped: it is empty only when this is
+                // the end of the real root.
+                self.root = if self.stack.is_empty() {
+                    RootPhase::Closed
+                } else {
+                    RootPhase::ClosedInsideNested
+                };
                 Ok(())
             },
             Context::Outside => Ok(()),

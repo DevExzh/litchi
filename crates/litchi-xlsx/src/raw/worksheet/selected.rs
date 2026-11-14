@@ -1235,6 +1235,29 @@ fn append_bounded(
     Ok(())
 }
 
+/// Where [`Scanner`] is relative to the `worksheet` root:
+///
+/// ```text
+/// Prolog --worksheet start tag--> Open
+/// Prolog --worksheet empty-element tag--> Closed
+/// Prolog --any other top-level element--> refused
+/// Open --root end tag--> Closed
+/// Open | Closed --top-level element--> refused (multiple roots)
+/// ```
+///
+/// Text, comments, declarations and other top-level events are refused or
+/// accepted by the markup-compatibility stream before they reach the scanner.
+/// When the root's attributes record an ineligibility reason, the root frame
+/// is not pushed and the phase stays `Open`; the scan stops there and
+/// [`Scanner::finish`] reports the reason. Otherwise end of input is accepted
+/// only in `Closed` with no open element.
+#[derive(Clone, Copy, Debug)]
+enum RootPhase {
+    Prolog,
+    Open,
+    Closed,
+}
+
 #[derive(Debug)]
 struct Scanner<'a> {
     requested: Rect,
@@ -1245,8 +1268,7 @@ struct Scanner<'a> {
     stack: Vec<Frame>,
     row: Option<(u32, u32)>,
     previous_row: u32,
-    root_seen: bool,
-    root_closed: bool,
+    root: RootPhase,
     seen_dimension: bool,
     seen_sheet_format: bool,
     sheet_data: SheetDataStage,
@@ -1278,8 +1300,7 @@ impl<'a> Scanner<'a> {
             stack: Vec::new(),
             row: None,
             previous_row: 0,
-            root_seen: false,
-            root_closed: false,
+            root: RootPhase::Prolog,
             seen_dimension: false,
             seen_sheet_format: false,
             sheet_data: SheetDataStage::Before,
@@ -1299,7 +1320,11 @@ impl<'a> Scanner<'a> {
         if let Some(reason) = self.not_eligible {
             return Ok((RangeScanOutcome::NotEligible(reason), None));
         }
-        if !self.root_seen || !self.root_closed || !self.stack.is_empty() {
+        let root_closed = match self.root {
+            RootPhase::Closed => true,
+            RootPhase::Prolog | RootPhase::Open => false,
+        };
+        if !root_closed || !self.stack.is_empty() {
             return Err(invalid(
                 "worksheet XML has an incomplete SpreadsheetML worksheet root",
             ));
@@ -1409,18 +1434,21 @@ impl<'a> Scanner<'a> {
 
     fn start(&mut self, element: &SemanticElement<'_>, empty: bool) -> Result<()> {
         if self.stack.is_empty() {
-            if self.root_seen || self.root_closed {
-                return Err(invalid("worksheet XML has multiple worksheet roots"));
+            match self.root {
+                RootPhase::Prolog => {},
+                RootPhase::Open | RootPhase::Closed => {
+                    return Err(invalid("worksheet XML has multiple worksheet roots"));
+                },
             }
             if !is_spreadsheetml_element(element, "worksheet") {
                 return Err(invalid(
                     "worksheet XML must have one SpreadsheetML worksheet root",
                 ));
             }
-            self.root_seen = true;
+            self.root = RootPhase::Open;
             self.validate_attributes(element, &[], false)?;
             if empty {
-                self.root_closed = true;
+                self.root = RootPhase::Closed;
             } else if self.not_eligible.is_none() {
                 self.push(Frame::Worksheet)?;
             }
@@ -1911,7 +1939,7 @@ impl<'a> Scanner<'a> {
             return Err(invalid("worksheet XML has an unexpected semantic end"));
         }
         match frame {
-            Frame::Worksheet => self.root_closed = true,
+            Frame::Worksheet => self.root = RootPhase::Closed,
             Frame::Dimension => {},
             Frame::SheetData => {},
             Frame::MergeCells => self.finish_merge_cells(),
@@ -1930,7 +1958,7 @@ impl<'a> Scanner<'a> {
 
     fn finish_empty(&mut self, frame: Frame) -> Result<()> {
         match frame {
-            Frame::Worksheet => self.root_closed = true,
+            Frame::Worksheet => self.root = RootPhase::Closed,
             Frame::Dimension => {},
             Frame::SheetData => {},
             Frame::MergeCells => self.finish_merge_cells(),
