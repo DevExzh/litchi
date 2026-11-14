@@ -331,7 +331,14 @@ enum TempIdentity {
 }
 
 fn file_identity(file: &File) -> io::Result<TempIdentity> {
-    identity_from_metadata(&file.metadata()?)
+    #[cfg(windows)]
+    {
+        windows_file_identity(file)
+    }
+    #[cfg(not(windows))]
+    {
+        identity_from_metadata(&file.metadata()?)
+    }
 }
 
 fn path_identity(path: &Path) -> io::Result<TempIdentity> {
@@ -342,9 +349,29 @@ fn path_identity(path: &Path) -> io::Result<TempIdentity> {
             "atomic temporary path is not a regular file",
         ));
     }
-    identity_from_metadata(&metadata)
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        use windows_sys::Win32::Storage::FileSystem::{
+            FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT,
+        };
+
+        // Opening with no access right reads the identity without
+        // conflicting with the staged writer's handle, and the reparse-point
+        // flag reads the path itself rather than what it may point to.
+        let file = OpenOptions::new()
+            .access_mode(0)
+            .custom_flags(FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT)
+            .open(path)?;
+        windows_file_identity(&file)
+    }
+    #[cfg(not(windows))]
+    {
+        identity_from_metadata(&metadata)
+    }
 }
 
+#[cfg(not(windows))]
 fn identity_from_metadata(metadata: &fs::Metadata) -> io::Result<TempIdentity> {
     #[cfg(unix)]
     {
@@ -356,31 +383,39 @@ fn identity_from_metadata(metadata: &fs::Metadata) -> io::Result<TempIdentity> {
         })
     }
 
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::MetadataExt;
-
-        let volume = metadata.volume_serial_number().ok_or_else(|| {
-            io::Error::new(
-                ErrorKind::Unsupported,
-                "atomic temporary file has no volume identity",
-            )
-        })?;
-        let index = metadata.file_index().ok_or_else(|| {
-            io::Error::new(
-                ErrorKind::Unsupported,
-                "atomic temporary file has no file identity",
-            )
-        })?;
-        Ok(TempIdentity::Windows { volume, index })
-    }
-
-    #[cfg(not(any(unix, windows)))]
+    #[cfg(not(unix))]
     {
         Ok(TempIdentity::Fallback {
             length: metadata.len(),
         })
     }
+}
+
+/// The volume serial number and file index of an open file.
+///
+/// `std`'s `MetadataExt::volume_serial_number` and `file_index` are unstable,
+/// so the identity comes from `GetFileInformationByHandle` directly.
+#[cfg(windows)]
+fn windows_file_identity(file: &File) -> io::Result<TempIdentity> {
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::Storage::FileSystem::{
+        BY_HANDLE_FILE_INFORMATION, GetFileInformationByHandle,
+    };
+
+    let mut information = std::mem::MaybeUninit::<BY_HANDLE_FILE_INFORMATION>::uninit();
+    // SAFETY: the handle belongs to `file`, which stays open for the call,
+    // and `information` is a writable buffer of the type the call fills.
+    let succeeded =
+        unsafe { GetFileInformationByHandle(file.as_raw_handle(), information.as_mut_ptr()) };
+    if succeeded == 0 {
+        return Err(io::Error::last_os_error());
+    }
+    // SAFETY: a successful call initialized every field.
+    let information = unsafe { information.assume_init() };
+    Ok(TempIdentity::Windows {
+        volume: information.dwVolumeSerialNumber,
+        index: (u64::from(information.nFileIndexHigh) << 32) | u64::from(information.nFileIndexLow),
+    })
 }
 
 fn ensure_temp_identity(path: &Path, expected: TempIdentity) -> io::Result<()> {
@@ -448,6 +483,10 @@ fn cleanup_owned_temp(path: &Path, expected: TempIdentity) {
         };
         let mut permissions = metadata.permissions();
         if permissions.readonly() {
+            #[expect(
+                clippy::permissions_set_readonly_false,
+                reason = "Windows only: this clears the read-only attribute, not Unix mode bits"
+            )]
             permissions.set_readonly(false);
             if fs::set_permissions(path, permissions).is_err() {
                 return;
