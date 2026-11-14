@@ -1153,3 +1153,72 @@ fn notes_batch_changes_and_misses_are_the_items_own() {
         assert_eq!(error.item(), Some(1), "{path}");
     }
 }
+
+// A cell plan's change is known only when the run publishes it; a shape
+// plan's change is known when it is planned. Both kinds can share a run.
+
+#[test]
+fn a_lone_cell_item_reports_the_leafs_change() {
+    let bytes = table_deck(2);
+    for file in files(&bytes) {
+        let items: Plan = vec![(cell(1, 1), litchi_ops::Props::new().with("bold", true))];
+        let (after, changes, commits) = batch(&file, &items);
+        assert_eq!((changes, commits), (vec![true], 1));
+        assert_eq!(after.to_bytes().unwrap(), sequential(&file, &items));
+        let (_, again, again_commits) = batch(&after, &items);
+        assert_eq!((again, again_commits), (vec![false], 1));
+    }
+}
+
+#[test]
+fn shape_and_cell_formats_in_one_run_report_their_own_changes() {
+    let bytes = presentation::bytes();
+    for file in files(&bytes) {
+        let file = file
+            .add(
+                "/slide[1]",
+                NewNode::new("table")
+                    .prop("rows", 2)
+                    .prop("cols", 2)
+                    .prop("data", "a,b;c,d"),
+            )
+            .unwrap()
+            .file;
+        let shape = ["/slide[1]/shape[1]", "/slide[1]/shape[2]"];
+        let items: Plan = vec![
+            (
+                format!("{}/paragraph[1]", shape[0]),
+                litchi_ops::Props::new().with("align", "center"),
+            ),
+            (cell(1, 1), litchi_ops::Props::new().with("bold", true)),
+            (
+                format!("{}/paragraph[1]", shape[1]),
+                litchi_ops::Props::new().with("align", "right"),
+            ),
+            (cell(2, 2), litchi_ops::Props::new().with("italic", true)),
+        ];
+        let (after, changes, commits) = batch(&file, &items);
+        assert_eq!((changes, commits), (vec![true, true, true, true], 1));
+        assert_eq!(after.to_bytes().unwrap(), sequential(&file, &items));
+        let (_, again, again_commits) = batch(&after, &items);
+        assert_eq!(
+            (again, again_commits),
+            (vec![false, false, false, false], 1)
+        );
+        let mixed: Plan = vec![
+            items[0].clone(),
+            items[1].clone(),
+            (
+                format!("{}/paragraph[1]", shape[1]),
+                litchi_ops::Props::new().with("align", "left"),
+            ),
+            (cell(2, 1), litchi_ops::Props::new().with("bold", true)),
+        ];
+        let (mixed_after, mixed_changes, mixed_commits) = batch(&after, &mixed);
+        assert_eq!(
+            (mixed_changes, mixed_commits),
+            (vec![false, false, true, true], 1)
+        );
+        assert_eq!(mixed_after.to_bytes().unwrap(), sequential(&after, &mixed));
+    }
+}

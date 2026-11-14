@@ -1945,3 +1945,175 @@ fn the_disposition_follows_open_unsign_and_the_first_changed_commit() {
         }
     }
 }
+
+/// One step of a signed XLS cell edit.
+#[cfg(feature = "xls")]
+#[derive(Clone, Copy)]
+enum CellStep<'a> {
+    Set(&'a str),
+    Remove,
+}
+
+/// The outcome of one signed edit of `path`: whether it committed, changed
+/// anything and kept the signed bytes, or the error that refused it.
+#[cfg(feature = "xls")]
+fn signed_cell_outcome(file: &File, path: &str, steps: &[CellStep<'_>]) -> String {
+    let original = file.to_bytes().unwrap();
+    let result = file.edit(|edit| {
+        for step in steps {
+            match step {
+                CellStep::Set(value) => edit.set(path, crate::props! { "value" => *value })?,
+                CellStep::Remove => edit.remove(path)?,
+            }
+        }
+        Ok(())
+    });
+    match result {
+        Ok(commit) => format!(
+            "ok changed={} signed={} same_bytes={}",
+            commit.diagnostics().changed(),
+            commit.file().is_signed(),
+            commit.file().to_bytes().unwrap() == original
+        ),
+        Err(error) => format!("err {:?} {:?}: {error}", error.code(), error.format()),
+    }
+}
+
+/// A signed XLS edit is an exact no-op only when every cell it touches ends
+/// as it was in the original package. A coordinate absent from the original
+/// and a stored error, which has no comparable value, never prove a
+/// cancellation; a present scalar may be changed, removed and restored.
+#[cfg(feature = "xls")]
+#[test]
+fn signed_xls_cancellation_compares_each_cell_with_its_original() {
+    use litchi_xls::cell_values::{CellError, Reference, Selector, Value};
+
+    let plain = read("ole/xls/FormulaSheetRange.xls");
+    let unsigned = crate::open_bytes(plain.clone()).unwrap();
+    let (text_path, text) = signed_text_cell(&unsigned).expect("a plain text cell");
+    let missing = signed_missing_cell(&unsigned).expect("an absent cell");
+
+    // The same workbook with the text cell replaced by a stored `#DIV/0!`.
+    let error_bytes = {
+        let cell = text_path.rsplit('/').next().unwrap();
+        let (letters, digits) = cell.split_at(cell.find(|c: char| c.is_ascii_digit()).unwrap());
+        let column = letters
+            .bytes()
+            .fold(0u32, |value, byte| value * 26 + u32::from(byte - b'A' + 1))
+            - 1;
+        let row = digits.parse::<u32>().unwrap() - 1;
+        let package = litchi_xls::Package::from_bytes(&plain).unwrap();
+        let mut edit = package.edit().unwrap();
+        edit.set_value(
+            Selector::Position(Position::new(0)),
+            Reference::new(row, column).unwrap(),
+            Value::Error(CellError::new(0x07).unwrap()),
+        )
+        .unwrap();
+        edit.commit().unwrap().package().to_bytes().unwrap()
+    };
+
+    let signed = crate::open_bytes(signed_compound_file(plain)).unwrap();
+    let signed_error = crate::open_bytes(signed_compound_file(error_bytes)).unwrap();
+    assert!(signed.is_signed() && signed_error.is_signed());
+
+    let text = text.as_str();
+    let mut cases = Vec::new();
+    for (label, file, path, steps) in [
+        (
+            "text unchanged",
+            &signed,
+            &text_path,
+            vec![CellStep::Set(text)],
+        ),
+        (
+            "text changed and restored",
+            &signed,
+            &text_path,
+            vec![CellStep::Set("changed"), CellStep::Set(text)],
+        ),
+        (
+            "text removed and restored",
+            &signed,
+            &text_path,
+            vec![CellStep::Remove, CellStep::Set(text)],
+        ),
+        (
+            "text changed",
+            &signed,
+            &text_path,
+            vec![CellStep::Set("changed")],
+        ),
+        (
+            "text restored then changed",
+            &signed,
+            &text_path,
+            vec![
+                CellStep::Set("changed"),
+                CellStep::Set(text),
+                CellStep::Set("changed"),
+            ],
+        ),
+        ("absent removed", &signed, &missing, vec![CellStep::Remove]),
+        (
+            "absent inserted",
+            &signed,
+            &missing,
+            vec![CellStep::Set("new")],
+        ),
+        (
+            "absent inserted and removed",
+            &signed,
+            &missing,
+            vec![CellStep::Set("new"), CellStep::Remove],
+        ),
+        (
+            "error removed",
+            &signed_error,
+            &text_path,
+            vec![CellStep::Remove],
+        ),
+        (
+            "error changed and removed",
+            &signed_error,
+            &text_path,
+            vec![CellStep::Set("changed"), CellStep::Remove],
+        ),
+        (
+            "error removed and set",
+            &signed_error,
+            &text_path,
+            vec![CellStep::Remove, CellStep::Set("changed")],
+        ),
+    ] {
+        cases.push(format!(
+            "{label}: {}",
+            signed_cell_outcome(file, path, &steps)
+        ));
+    }
+    assert_eq!(
+        (text_path.as_str(), missing.as_str()),
+        ("/sheet[1]/A1", "/sheet[1]/B1")
+    );
+    let noop = "ok changed=false signed=true same_bytes=true";
+    let refused = "err DocumentProtected Some(Xls): document_protected: editing the signed Xls \
+                   document would invalidate its signature (suggestion: remove the signature \
+                   explicitly with `Signed::unsign()` before editing; the first write then \
+                   publishes the document without it)";
+    let expected = [
+        format!("text unchanged: {noop}"),
+        format!("text changed and restored: {noop}"),
+        format!("text removed and restored: {noop}"),
+        format!("text changed: {refused}"),
+        format!("text restored then changed: {refused}"),
+        format!("absent removed: {noop}"),
+        format!("absent inserted: {refused}"),
+        format!("absent inserted and removed: {noop}"),
+        format!("error removed: {refused}"),
+        "error changed and removed: err InvalidValue Some(Xls): invalid_value: a property value \
+         is invalid [Xls] (item: 1)"
+            .to_owned(),
+        format!("error removed and set: {refused}"),
+    ];
+    assert_eq!(cases, expected);
+}
