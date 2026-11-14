@@ -2300,10 +2300,10 @@ xls	dataValidation	edit	supported		ok tx.set
 xls	dataValidation	batch	supported		ok set item
 xls	dataValidation	create	supported		ok format
 xls	dataValidation	save	supported		ok format
-xls	conditionalFormatting	get	supported		ok 5 instances, first `ole/xls/WithConditionalFormatting.xls` /sheet[1]/cf[1]
-xls	conditionalFormatting	find	supported		ok 5 instances, first `ole/xls/WithConditionalFormatting.xls` /sheet[1]/cf[1]
-xls	conditionalFormatting	query	supported		ok matches in ole/xls/WithConditionalFormatting.xls
-xls	conditionalFormatting	view	supported		ok 5 instances, first `ole/xls/WithConditionalFormatting.xls` /sheet[1]/cf[1]
+xls	conditionalFormatting	get	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data/xls/formats.xls` /sheet[3]/cf[1]
+xls	conditionalFormatting	find	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data/xls/formats.xls` /sheet[3]/cf[1]
+xls	conditionalFormatting	query	supported		ok matches in libreoffice-core/sc/qa/unit/data/xls/formats.xls
+xls	conditionalFormatting	view	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data/xls/formats.xls` /sheet[3]/cf[1]
 xls	conditionalFormatting	set	supported		ok `create() + add conditionalFormatting` /sheet[1]/cf[1] {"stopIfTrue":"true"}
 xls	conditionalFormatting	add	supported		ok /sheet[1]/cf[1] on `create()` under /Sheet1 {"type":"cellIs","ref":"A1:A9","value":"5","fill":"FF0000"}
 xls	conditionalFormatting	remove	supported		ok `create() + add conditionalFormatting` /sheet[1]/cf[1]
@@ -2586,10 +2586,10 @@ ppt	smartart	edit	gap	PPT SmartArt and diagram groups	-
 ppt	smartart	batch	gap	PPT SmartArt and diagram groups	-
 ppt	smartart	create	gap	PPT SmartArt and diagram groups	ok format
 ppt	smartart	save	gap	PPT SmartArt and diagram groups	ok format
-ppt	ole	get	supported		ok 4 instances, first `unified-ops/0294/elements.ppt` /slide[1]/ole[1]
-ppt	ole	find	supported		ok 4 instances, first `unified-ops/0294/elements.ppt` /slide[1]/ole[1]
-ppt	ole	query	supported		ok matches in unified-ops/0294/elements.ppt
-ppt	ole	view	supported		ok 4 instances, first `unified-ops/0294/elements.ppt` /slide[1]/ole[1]
+ppt	ole	get	supported		ok 5 instances, first `poi/test-data/slideshow/bug61881.ppt` /slide[27]/ole[1]
+ppt	ole	find	supported		ok 5 instances, first `poi/test-data/slideshow/bug61881.ppt` /slide[27]/ole[1]
+ppt	ole	query	supported		ok matches in poi/test-data/slideshow/bug61881.ppt
+ppt	ole	view	supported		ok 5 instances, first `poi/test-data/slideshow/bug61881.ppt` /slide[27]/ole[1]
 ppt	ole	set	n/a	set not offered for this element	-
 ppt	ole	add	n/a	add not offered for this element	-
 ppt	ole	remove	n/a	remove not offered for this element	-
