@@ -90,6 +90,16 @@
 //! [`compat`] are retained for the facade's family views.
 #![forbid(unsafe_code)]
 
+// `iwork-adapter` is the shared umbrella of the iWork features; on its own it
+// selects no iWork format and the adapter has nothing to dispatch to.
+#[cfg(all(
+    feature = "iwork-adapter",
+    not(any(feature = "pages", feature = "keynote", feature = "numbers"))
+))]
+compile_error!(
+    "the `iwork-adapter` feature is internal: enable `pages`, `keynote` or `numbers` instead"
+);
+
 pub mod batch;
 #[cfg(all(
     feature = "eval",
