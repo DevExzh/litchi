@@ -9,8 +9,8 @@ mod validation;
 
 pub use codec::{master_xml, write_text, write_text_with};
 pub(crate) use codec::{
-    rewrite_text, root_conformance_from_processed, root_conformance_with_limits,
-    scan_xml_with_limits, validate_resource_xml_with_limits,
+    root_conformance_from_processed, root_conformance_with_limits, scan_xml_with_limits,
+    validate_resource_xml_with_limits,
 };
 pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 pub use model::{Conformance, Graph, Link, Master, Slide, Theme};

@@ -122,8 +122,8 @@ pub(crate) use slide_properties::{
     stage_slide_properties,
 };
 pub(crate) use transaction::{
-    next_shape_id, stage_text_box, text_box_fragment, text_box_output_bound,
-    validate_text_box_input,
+    next_shape_id, rewrite_notes_body, stage_text_box, text_box_fragment, text_box_output_bound,
+    validate_text_box_input, verify_notes_text,
 };
 pub(crate) use xml::{
     insert_slide_binding, reorder_slide_bindings, shape_text_skeleton_with_limits,

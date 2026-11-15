@@ -334,7 +334,7 @@ fn synthetic(conformance: Conformance) -> (OpcPackage, PackURI) {
     );
     package.add_part(Box::new(master));
     let notes_uri = PackURI::new("/ppt/notesSlides/notesSlide1.xml").unwrap();
-    let mut notes=BlobPart::new(notes_uri,ct::PML_NOTES_SLIDE.into(),format!("<p:notes xmlns:p=\"{p}\" xmlns:a=\"{a}\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" xmlns:u=\"urn:unsupported\"><mc:AlternateContent><mc:Choice Requires=\"u\"><u:active/></mc:Choice><mc:Fallback><p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>Strict note</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></mc:Fallback></mc:AlternateContent><p:clrMapOvr/></p:notes>").into_bytes());
+    let mut notes=BlobPart::new(notes_uri,ct::PML_NOTES_SLIDE.into(),format!("<p:notes xmlns:p=\"{p}\" xmlns:a=\"{a}\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" xmlns:u=\"urn:unsupported\"><mc:AlternateContent><mc:Choice Requires=\"u\"><u:active/></mc:Choice><mc:Fallback><p:cSld><p:spTree><p:sp><p:nvSpPr><p:cNvPr id=\"2\" name=\"Notes\"/><p:cNvSpPr/><p:nvPr><p:ph type=\"body\" idx=\"1\"/></p:nvPr></p:nvSpPr><p:spPr/><p:txBody><a:p><a:r><a:t>Strict note</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></mc:Fallback></mc:AlternateContent><p:clrMapOvr/></p:notes>").into_bytes());
     notes.rels_mut().add_relationship(
         conformance.slide_rel().into(),
         "../slides/slide1.xml".into(),
@@ -612,7 +612,15 @@ fn source_checked_text_edit_preserves_opaque_xml_and_relationships() {
             .any(|w| w == b"AlternateContent")
     );
     let mut edit = snapshot.edit();
-    assert!(edit.set_text(0, "Updated <speaker> & note").unwrap());
+    assert!(
+        edit.set_text(
+            0,
+            "Updated <speaker> & note",
+            "edit_notes",
+            crate::shape::Limits::DEFAULT
+        )
+        .unwrap()
+    );
     let commit = edit.commit().unwrap();
     commit.patch().apply(&mut package).unwrap();
 
@@ -639,7 +647,8 @@ fn source_checked_transaction_rejects_stale_source_atomically() {
     let (mut package, name) = synthetic(Conformance::Transitional);
     let snapshot = Snapshot::load(&package, &name).unwrap().unwrap();
     let mut edit = snapshot.edit();
-    edit.set_text(0, "Changed").unwrap();
+    edit.set_text(0, "Changed", "edit_notes", crate::shape::Limits::DEFAULT)
+        .unwrap();
     let commit = edit.commit().unwrap();
     let notes_name = PackURI::new("/ppt/notesSlides/notesSlide1.xml").unwrap();
     package

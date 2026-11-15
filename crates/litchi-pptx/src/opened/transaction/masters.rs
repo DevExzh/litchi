@@ -68,7 +68,8 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for a missing master or shape, a shape without a
-    /// text body, or text XML cannot carry.
+    /// text body, or text XML cannot carry, and a refusal for a shape that
+    /// holds an Office Math equation.
     pub fn set_master_shape_text<'k>(
         &mut self,
         master: Position,
@@ -77,7 +78,13 @@ impl Edit {
     ) -> Result<bool> {
         self.ensure_ready()?;
         let part = self.master_part(master)?;
-        self.set_part_shape_text(&part, ct::PML_SLIDE_MASTER, shape.into(), text)
+        self.set_part_shape_text(
+            &part,
+            ct::PML_SLIDE_MASTER,
+            shape.into(),
+            text,
+            "set_master_shape_text",
+        )
     }
 
     /// Replace the text of one shape of a slide layout, as
@@ -86,7 +93,8 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for a missing master, layout or shape, a shape
-    /// without a text body, or text XML cannot carry.
+    /// without a text body, or text XML cannot carry, and a refusal for a
+    /// shape that holds an Office Math equation.
     pub fn set_layout_shape_text<'k>(
         &mut self,
         master: Position,
@@ -96,7 +104,13 @@ impl Edit {
     ) -> Result<bool> {
         self.ensure_ready()?;
         let part = self.layout_part(master, layout)?;
-        self.set_part_shape_text(&part, ct::PML_SLIDE_LAYOUT, shape.into(), text)
+        self.set_part_shape_text(
+            &part,
+            ct::PML_SLIDE_LAYOUT,
+            shape.into(),
+            text,
+            "set_layout_shape_text",
+        )
     }
 
     fn master_part(&self, master: Position) -> Result<PackURI> {
@@ -157,6 +171,7 @@ impl Edit {
         content_type: &str,
         key: crate::shape::Key<'_>,
         text: &str,
+        operation: &'static str,
     ) -> Result<bool> {
         let owner = self.working.get_part(part)?;
         crate::parts::validate_content_type(owner, content_type)?;
@@ -170,12 +185,20 @@ impl Edit {
             return Err(invalid("the selected shape has no text body"));
         }
         let span = crate::tag::shape::selected_raw_span_for_shape(owner.blob(), &scene, selected)?;
+        super::refuse_equation_shape(
+            owner.blob(),
+            &scene,
+            &span,
+            operation,
+            super::EQUATION_SHAPE_REASON,
+        )?;
         let xml = super::super::xml::rewrite_shape_text_with_limits(
             owner.blob(),
             span,
             text,
             self.source_ref()?.limits.max_text_bytes(),
             shape_limits,
+            super::super::xml::TextRefusals::SHAPE,
         )?;
         let staged = crate::shape::Scene::read(&xml, shape_limits)?;
         if staged.shape(key)?.common().text() != Some(text) || staged.len() != scene.len() {
@@ -214,5 +237,60 @@ mod tests {
                 .as_deref(),
             Some("Opening")
         );
+    }
+
+    #[test]
+    fn master_equation_shape_text_is_refused_and_ordinary_shapes_still_edit() {
+        let source = crate::Package::new().unwrap();
+        let mut opc = litchi_opc::OpcPackage::from_bytes(
+            &source.to_bytes().unwrap(),
+            litchi_opc::SourceLimits::default(),
+        )
+        .unwrap();
+        let uri = litchi_opc::PackURI::new("/ppt/slideMasters/slideMaster1.xml").unwrap();
+        let part = opc.get_part_mut(&uri).unwrap();
+        let xml = std::str::from_utf8(part.blob()).unwrap().replacen(
+            "</p:spTree>",
+            concat!(
+                r#"<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:a14="http://schemas.microsoft.com/office/drawing/2010/main">"#,
+                r#"<mc:Choice Requires="a14"><p:sp><p:nvSpPr><p:cNvPr id="90" name="Equation"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr/>"#,
+                r#"<p:txBody><a:bodyPr/><a:p><a14:m><m:oMath xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:r><m:t>x</m:t></m:r></m:oMath></a14:m></a:p></p:txBody></p:sp></mc:Choice>"#,
+                r#"<mc:Fallback><p:sp><p:nvSpPr><p:cNvPr id="90" name="Equation"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr/>"#,
+                r#"<p:txBody><a:bodyPr/><a:p><a:r><a:t> </a:t></a:r></a:p></p:txBody></p:sp></mc:Fallback></mc:AlternateContent></p:spTree>"#,
+            ),
+            1,
+        );
+        part.set_blob(xml.into_bytes());
+        let package = crate::Package::from_opc_package(opc).unwrap();
+        let master_xml = |package: &crate::Package| {
+            package
+                .opc()
+                .unwrap()
+                .get_part(&uri)
+                .unwrap()
+                .blob()
+                .to_vec()
+        };
+        let original = master_xml(&package);
+        let mut edit = package.edit().unwrap();
+        let first = Position::new(0);
+        let error = edit
+            .set_master_shape_text(first, "Equation", "EDITED")
+            .unwrap_err();
+        let refusal = error.refusal().expect("a typed refusal");
+        assert_eq!(refusal.operation(), "set_master_shape_text");
+        assert_eq!(
+            refusal.reason(),
+            "the shape holds an Office Math equation, which text edits cannot change"
+        );
+        let unchanged = edit.commit().unwrap().into_package();
+        assert_eq!(master_xml(&unchanged), original);
+        let mut edit = unchanged.edit().unwrap();
+        assert!(
+            edit.set_master_shape_text(first, 0_usize, "EDITED")
+                .unwrap()
+        );
+        let edited = master_xml(&edit.commit().unwrap().into_package());
+        assert!(std::str::from_utf8(&edited).unwrap().contains("EDITED"));
     }
 }

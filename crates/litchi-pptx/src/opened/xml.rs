@@ -1204,12 +1204,41 @@ fn append_namespace_binding(output: &mut Vec<u8>, name: &[u8], namespace: &[u8])
     Ok(())
 }
 
+/// The operation a text rewrite runs for, and the wording of its refusals.
+#[derive(Clone, Copy)]
+pub(crate) struct TextRefusals {
+    operation: &'static str,
+    no_run: &'static str,
+    field: &'static str,
+}
+
+impl TextRefusals {
+    /// A shape text set.
+    pub(crate) const SHAPE: Self = Self {
+        operation: "set_shape_text",
+        no_run: "the selected shape has no DrawingML text run",
+        field: "the shape text holds a field (a:fld), which a shape text set would \
+                     overwrite; set the text of its runs instead",
+    };
+
+    /// A notes text set by `operation`.
+    pub(crate) const fn notes(operation: &'static str) -> Self {
+        Self {
+            operation,
+            no_run: "the notes body has no DrawingML text run",
+            field: "the notes text holds a field (a:fld), which a notes text set would \
+                     overwrite",
+        }
+    }
+}
+
 pub(crate) fn rewrite_shape_text_with_limits(
     xml: &[u8],
     shape: Range<usize>,
     text: &str,
     max_text_bytes: usize,
     shape_limits: crate::shape::Limits,
+    refusals: TextRefusals,
 ) -> Result<Vec<u8>> {
     let edits = [ShapeTextEdit {
         index: 0,
@@ -1217,8 +1246,200 @@ pub(crate) fn rewrite_shape_text_with_limits(
         text,
         changed: true,
     }];
-    rewrite_shape_texts(xml, &edits, max_text_bytes, shape_limits.output_bytes())?
-        .ok_or_else(|| invalid("opened-presentation shape text rewrite disappeared"))
+    rewrite_shape_texts(
+        xml,
+        &edits,
+        max_text_bytes,
+        shape_limits.output_bytes(),
+        refusals,
+    )?
+    .ok_or_else(|| invalid("opened-presentation shape text rewrite disappeared"))
+}
+
+/// Give a text owner without any `DrawingML` text element one empty run in
+/// its first paragraph, so a text set has a slot to fill. Returns the new XML
+/// and the owner's new range, or `None` when the owner already has a text
+/// element (a field's included) or no paragraph.
+///
+/// The run takes the paragraph's end-of-paragraph properties
+/// (`a:endParaRPr`, the properties for text inserted at the paragraph's end,
+/// ECMA-376 Part 1 §21.1.2.2.3) as its `a:rPr`, as `PowerPoint` does when
+/// text is typed into an empty paragraph.
+pub(crate) fn insert_run_into_empty_text(
+    xml: &[u8],
+    owner: Range<usize>,
+) -> Result<Option<(Vec<u8>, Range<usize>)>> {
+    if owner.start >= owner.end || owner.end > xml.len() {
+        return Err(invalid("opened-presentation shape range is invalid"));
+    }
+    let elements = drawing_text_elements_for_owners(xml, std::slice::from_ref(&owner))?;
+    if elements.iter().any(|group| !group.is_empty()) {
+        return Ok(None);
+    }
+    let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
+    reader.config_mut().trim_text(false);
+    // The open paragraph's name and depth, then the open `endParaRPr`'s
+    // start, name and depth.
+    let mut paragraph: Option<(Vec<u8>, usize)> = None;
+    let mut properties: Option<(usize, Vec<u8>, usize)> = None;
+    let mut depth = 0usize;
+    let mut nodes = 0usize;
+    loop {
+        let start = position(&reader, origin)?;
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        let drawing = is_drawing(&namespace);
+        drop(namespace);
+        let end = position(&reader, origin)?;
+        let inside = owner.contains(&start);
+        let empty = matches!(event, Event::Empty(_));
+        match &event {
+            Event::Start(element) | Event::Empty(element) => {
+                bump(&mut nodes)?;
+                let local = element.local_name();
+                let name = element.name().as_ref().to_vec();
+                match &paragraph {
+                    None if inside && drawing && local.as_ref() == b"p" => {
+                        if empty {
+                            let mut replacement = text_span_bytes(xml, start..end - 2)?.to_vec();
+                            replacement.push(b'>');
+                            replacement.extend_from_slice(&empty_run(&name, None)?);
+                            replacement.extend_from_slice(b"</");
+                            replacement.extend_from_slice(&name);
+                            replacement.push(b'>');
+                            return splice(xml, &owner, start..end, &replacement).map(Some);
+                        }
+                        paragraph = Some((name, depth + 1));
+                    },
+                    Some((paragraph_name, paragraph_depth))
+                        if depth == *paragraph_depth
+                            && properties.is_none()
+                            && drawing
+                            && local.as_ref() == b"endParaRPr" =>
+                    {
+                        if empty {
+                            let raw = text_span_bytes(xml, start..end)?;
+                            let run = empty_run(paragraph_name, Some(raw))?;
+                            return splice(xml, &owner, start..start, &run).map(Some);
+                        }
+                        properties = Some((start, name, depth + 1));
+                    },
+                    _ => {},
+                }
+                if !empty {
+                    depth += 1;
+                    if depth > MAX_XML_DEPTH {
+                        return Err(Error::Limit {
+                            kind: crate::opened::LimitKind::Codec(
+                                crate::opened::CodecLimitKind::XmlDepth,
+                            ),
+                            observed: depth,
+                            maximum: MAX_XML_DEPTH,
+                        });
+                    }
+                }
+            },
+            Event::End(_) => {
+                if let (Some((paragraph_name, _)), Some((properties_start, _, properties_depth))) =
+                    (&paragraph, &properties)
+                    && depth == *properties_depth
+                {
+                    let raw = text_span_bytes(xml, *properties_start..end)?;
+                    let run = empty_run(paragraph_name, Some(raw))?;
+                    return splice(xml, &owner, *properties_start..*properties_start, &run)
+                        .map(Some);
+                }
+                if let Some((paragraph_name, paragraph_depth)) = &paragraph
+                    && depth == *paragraph_depth
+                {
+                    let run = empty_run(paragraph_name, None)?;
+                    return splice(xml, &owner, start..start, &run).map(Some);
+                }
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("opened-presentation XML depth underflow"))?;
+            },
+            Event::Eof => return Ok(None),
+            _ => {},
+        }
+        if start >= owner.end {
+            return Ok(None);
+        }
+    }
+}
+
+/// `<a:r>[<a:rPr …/>]<a:t></a:t></a:r>` with the prefix of the paragraph
+/// name `paragraph`; `properties` is a raw `a:endParaRPr` element to copy as
+/// the run properties.
+fn empty_run(paragraph: &[u8], properties: Option<&[u8]>) -> Result<Vec<u8>> {
+    let prefix = match paragraph.iter().rposition(|byte| *byte == b':') {
+        Some(separator) => &paragraph[..=separator],
+        None => &[][..],
+    };
+    let tag = |output: &mut Vec<u8>, close: bool, local: &[u8]| {
+        output.extend_from_slice(if close { b"</" } else { b"<" });
+        output.extend_from_slice(prefix);
+        output.extend_from_slice(local);
+        output.push(b'>');
+    };
+    let mut run = Vec::new();
+    tag(&mut run, false, b"r");
+    if let Some(raw) = properties {
+        // Rename the start tag and, for an element with children, the end
+        // tag: `endParaRPr` and `rPr` share one schema type.
+        let old_name = raw
+            .get(1..)
+            .and_then(|rest| {
+                rest.iter()
+                    .position(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n' | b'/' | b'>'))
+                    .map(|length| &rest[..length])
+            })
+            .ok_or_else(|| invalid("opened-presentation paragraph properties are malformed"))?;
+        let mut new_name = prefix.to_vec();
+        new_name.extend_from_slice(b"rPr");
+        let mut end_tag = b"</".to_vec();
+        end_tag.extend_from_slice(old_name);
+        end_tag.push(b'>');
+        run.push(b'<');
+        run.extend_from_slice(&new_name);
+        let body = &raw[1 + old_name.len()..];
+        if let Some(body) = body.strip_suffix(end_tag.as_slice()) {
+            run.extend_from_slice(body);
+            run.extend_from_slice(b"</");
+            run.extend_from_slice(&new_name);
+            run.push(b'>');
+        } else {
+            run.extend_from_slice(body);
+        }
+    }
+    tag(&mut run, false, b"t");
+    tag(&mut run, true, b"t");
+    tag(&mut run, true, b"r");
+    Ok(run)
+}
+
+/// `xml` with `replaced` (inside `owner`) replaced by `replacement`, and the
+/// owner's new range.
+fn splice(
+    xml: &[u8],
+    owner: &Range<usize>,
+    replaced: Range<usize>,
+    replacement: &[u8],
+) -> Result<(Vec<u8>, Range<usize>)> {
+    let removed = replaced.len();
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(xml.len() - removed + replacement.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation inserted text run",
+            source,
+        })?;
+    output.extend_from_slice(text_span_bytes(xml, 0..replaced.start)?);
+    output.extend_from_slice(replacement);
+    output.extend_from_slice(text_span_bytes(xml, replaced.end..xml.len())?);
+    Ok((output, owner.start..owner.end - removed + replacement.len()))
 }
 
 pub(crate) fn shape_text_skeleton_with_limits(
@@ -1438,7 +1659,13 @@ pub(super) fn stage_shape_texts_admitted_with_limits(
         }
     }
     let changed = edits.iter().filter(|edit| edit.changed).count();
-    let staged = rewrite_shape_texts(xml, &edits, max_text_bytes, max_output_bytes)?;
+    let staged = rewrite_shape_texts(
+        xml,
+        &edits,
+        max_text_bytes,
+        max_output_bytes,
+        TextRefusals::SHAPE,
+    )?;
     let Some(candidate) = staged.as_deref() else {
         return Ok((None, 0));
     };
@@ -1463,6 +1690,7 @@ fn rewrite_shape_texts(
     edits: &[ShapeTextEdit<'_>],
     max_text_bytes: usize,
     max_output_bytes: usize,
+    refusals: TextRefusals,
 ) -> Result<Option<Vec<u8>>> {
     for edit in edits {
         if edit.text.len() > max_text_bytes {
@@ -1493,8 +1721,8 @@ fn rewrite_shape_texts(
     if elements.iter().any(Vec::is_empty) {
         return Err(Error::refused(
             litchi_core::edit::RefusalKind::UnsupportedTarget,
-            "set_shape_text",
-            "the selected shape has no DrawingML text run",
+            refusals.operation,
+            refusals.no_run,
         ));
     }
     if !edits.iter().any(|edit| edit.changed) {
@@ -1509,9 +1737,8 @@ fn rewrite_shape_texts(
     {
         return Err(Error::refused(
             litchi_core::edit::RefusalKind::UnsupportedContent,
-            "set_shape_text",
-            "the shape text holds a field (a:fld), which a shape text set would \
-                     overwrite; set the text of its runs instead",
+            refusals.operation,
+            refusals.field,
         ));
     }
     let mut escaped = Vec::new();

@@ -6,7 +6,7 @@ use std::sync::Arc;
 use litchi_opc::OpcPackage;
 use litchi_opc::{PackURI, Part, TargetMode};
 
-use super::codec::{self, validate_resource_xml_with_limits};
+use super::codec::validate_resource_xml_with_limits;
 use super::model::{Graph, Link};
 use super::validation;
 use super::{Limits, MAX_MASTER_XML, MAX_NOTES_XML, MAX_THEME_XML, invalid};
@@ -177,23 +177,35 @@ impl Draft {
         Ok(true)
     }
 
-    /// Replace one notes slide's inert text projection while preserving XML.
+    /// Replace the text of one notes slide's body placeholder, rewriting
+    /// only that placeholder's runs. `operation` names the refusals.
     ///
     /// # Errors
     ///
-    /// Returns an error if the operation fails.
-    pub(crate) fn set_text(&mut self, index: usize, text: impl AsRef<str>) -> Result<bool> {
-        let text = text.as_ref();
+    /// Returns an error for an out-of-range index and the refusals and errors
+    /// of [`crate::opened::rewrite_notes_body`].
+    pub(crate) fn set_text(
+        &mut self,
+        index: usize,
+        text: impl AsRef<str>,
+        operation: &'static str,
+        shape_limits: crate::shape::Limits,
+    ) -> Result<bool> {
         let slide = self
             .working
             .slides()
             .get(index)
             .ok_or_else(|| invalid("notes slide index is out of bounds"))?;
-        let current = slide.text(self.source.limits)?;
-        if current.as_deref() == (!text.is_empty()).then_some(text) {
+        let Some(xml) = crate::opened::rewrite_notes_body(
+            slide.xml(),
+            text.as_ref(),
+            operation,
+            shape_limits,
+            self.source.limits.max_text_bytes,
+        )?
+        else {
             return Ok(false);
-        }
-        let xml = codec::rewrite_text(slide.xml(), text, self.source.limits)?;
+        };
         self.working.slides_mut()[index].replace_xml(xml);
         Ok(true)
     }

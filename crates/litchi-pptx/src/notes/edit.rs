@@ -84,6 +84,16 @@ impl Edit<'_> {
     }
 
     fn stage(&mut self, change: impl FnOnce(&mut Draft) -> Result<bool>) -> Result<bool> {
+        self.stage_checked(change, |_| Ok(()))
+    }
+
+    /// Stage `change` and require `check` of the staged package; a failed
+    /// check leaves the edit as it was.
+    fn stage_checked(
+        &mut self,
+        change: impl FnOnce(&mut Draft) -> Result<bool>,
+        check: impl FnOnce(&litchi_opc::OpcPackage) -> Result<()>,
+    ) -> Result<bool> {
         let source = self
             .snapshot()?
             .ok_or_else(|| super::invalid("notes graph is absent"))?;
@@ -95,8 +105,10 @@ impl Edit<'_> {
         if !prepared.diagnostics().changed() {
             return Ok(false);
         }
-        self.staged
-            .update(|opc| super::apply_commit(opc, prepared).map(drop))?;
+        self.staged.update(|opc| {
+            super::apply_commit(opc, prepared)?;
+            check(opc)
+        })?;
         Ok(true)
     }
 
@@ -122,21 +134,57 @@ impl Edit<'_> {
         self.stage(|draft| draft.replace(graph))
     }
 
-    /// Replace the inert text of the selected slide's notes while preserving
-    /// their XML. Returns whether anything changed.
+    /// Replace the text of the selected slide's notes, which is the text of
+    /// the notes page's body placeholder as [`crate::Presentation`] reads it.
+    /// Only that placeholder's runs are rewritten; the slide number and other
+    /// placeholders keep their text. Returns whether anything changed.
     ///
     /// # Errors
     ///
     /// Returns an error for an absent graph, a missing, ambiguous or
-    /// out-of-range slide, a slide without notes, or a changed edit of a
-    /// signed package.
+    /// out-of-range slide, a slide without notes, a changed edit of a signed
+    /// package, or staged notes that do not read back as `text`, and a
+    /// refusal when the notes page has no body placeholder with a text body
+    /// or its text holds a field or an Office Math equation. A failure leaves
+    /// the edit unchanged.
     pub fn set_text<'s>(
         &mut self,
         slide: impl Into<Selector<'s>>,
         text: impl AsRef<str>,
     ) -> Result<bool> {
         let index = self.notes_index(slide.into())?;
-        self.stage(|draft| draft.set_text(index, text))
+        let owner = {
+            let graph = self
+                .graph()?
+                .ok_or_else(|| super::invalid("notes graph is absent"))?;
+            let owner = graph
+                .slides()
+                .get(index)
+                .ok_or_else(|| super::invalid("notes slide index is out of bounds"))?
+                .owner();
+            litchi_opc::PackURI::new(owner)
+                .map_err(|_error| super::invalid("notes owner part name is invalid"))?
+        };
+        let text = text.as_ref();
+        let shape_limits = self.staged.semantic_limits().shape();
+        let notes_limits = self.limits();
+        let presentation = PresentationPart::from_package(self.staged.opc())?
+            .part()
+            .partname()
+            .clone();
+        self.stage_checked(
+            |draft| draft.set_text(index, text, "edit_notes", shape_limits),
+            |opc| {
+                crate::opened::verify_notes_text(
+                    opc,
+                    &presentation,
+                    &owner,
+                    text,
+                    shape_limits,
+                    notes_limits,
+                )
+            },
+        )
     }
 
     /// Replace the XML of the selected slide's notes slide after bounded

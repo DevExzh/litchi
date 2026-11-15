@@ -15,6 +15,7 @@ use quick_xml::reader::NsReader;
 use crate::{Error, Result};
 
 const A14: &[u8] = b"http://schemas.microsoft.com/office/drawing/2010/main";
+const MCE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
 const MATH: &[u8] = b"http://schemas.openxmlformats.org/officeDocument/2006/math";
 const PML: &[u8] = b"http://schemas.openxmlformats.org/presentationml/2006/main";
 const STRICT_PML: &[u8] = b"http://purl.oclc.org/ooxml/presentationml/main";
@@ -363,9 +364,203 @@ pub fn equations(xml: &[u8]) -> Result<Vec<Equation>> {
     Ok(out)
 }
 
+/// Whether `span` of a slide-like owner's XML overlaps an
+/// `mc:AlternateContent` whose `mc:Choice` holds an Office Math equation
+/// (`a14:m`): the span lies inside such a block, contains one, or crosses
+/// its boundary.
+///
+/// Such a block pairs the equation with a fallback; the shape scene selects
+/// the fallback, so a text write there would leave the equation unchanged
+/// while the branches diverge. A block may sit around a whole shape or inside
+/// its text body, since markup compatibility is allowed anywhere. XML without
+/// the markup-compatibility and drawing-2010 namespaces cannot hold such a
+/// block and is not scanned.
+pub(crate) fn span_overlaps_equation_block(
+    xml: &[u8],
+    span: &std::ops::Range<usize>,
+) -> Result<bool> {
+    /// One open element: an `mc:AlternateContent` (its start offset and
+    /// whether its Choice holds `a14:m`), an `mc:Choice`, or anything else.
+    enum Open {
+        Block { start: usize, math: bool },
+        Choice,
+        Other,
+    }
+    if memchr::memmem::find(xml, MCE).is_none() || memchr::memmem::find(xml, A14).is_none() {
+        return Ok(false);
+    }
+    let mut reader = NsReader::from_reader(xml);
+    reader.config_mut().check_end_names = true;
+    // The caller's scene read already bounded the owner's size, and this
+    // pass is linear in it.
+    let mut open: Vec<Open> = Vec::new();
+    loop {
+        let start = usize::try_from(reader.buffer_position())
+            .map_err(|_error| invalid("the slide is too large"))?;
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        let mce = matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == MCE);
+        let a14 = matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == A14);
+        match event {
+            Event::Start(ref element) | Event::Empty(ref element) => {
+                let local = element.local_name();
+                if a14 && local.as_ref() == b"m" {
+                    // Mark every block whose Choice branch encloses this
+                    // equation: a Choice's parent is its block.
+                    let mut choice_above = false;
+                    for frame in open.iter_mut().rev() {
+                        match frame {
+                            Open::Choice => choice_above = true,
+                            Open::Block { math, .. } => {
+                                if choice_above {
+                                    *math = true;
+                                }
+                                choice_above = false;
+                            },
+                            Open::Other => choice_above = false,
+                        }
+                    }
+                }
+                if matches!(event, Event::Start(_)) {
+                    let frame = if mce && local.as_ref() == b"AlternateContent" {
+                        Open::Block { start, math: false }
+                    } else if mce && local.as_ref() == b"Choice" {
+                        Open::Choice
+                    } else {
+                        Open::Other
+                    };
+                    open.push(frame);
+                }
+            },
+            Event::End(_) => {
+                let frame = open.pop().ok_or_else(|| invalid("unbalanced slide XML"))?;
+                if let Open::Block { start, math: true } = frame {
+                    let end = usize::try_from(reader.buffer_position())
+                        .map_err(|_error| invalid("the slide is too large"))?;
+                    if start < span.end && span.start < end {
+                        return Ok(true);
+                    }
+                }
+            },
+            Event::Eof => return Ok(false),
+            _ => {},
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn span_of(xml: &str, needle: &str) -> std::ops::Range<usize> {
+        let start = xml.find(needle).unwrap();
+        start..start + needle.len()
+    }
+
+    /// A shape tree with the given namespace declarations on its root, the
+    /// `outside` shape and `body` after it.
+    fn tree(declarations: &str, body: &str) -> String {
+        format!(
+            r#"<p:spTree xmlns:p="{}" xmlns:a="a"{declarations}><p:sp><a:t>o</a:t></p:sp>{body}</p:spTree>"#,
+            std::str::from_utf8(PML).unwrap(),
+        )
+    }
+
+    fn declare(mc: &str, a14: &str) -> String {
+        format!(
+            r#" xmlns:{mc}="{}" xmlns:{a14}="{}""#,
+            std::str::from_utf8(MCE).unwrap(),
+            std::str::from_utf8(A14).unwrap(),
+        )
+    }
+
+    fn overlaps(xml: &str, needle: &str) -> bool {
+        span_overlaps_equation_block(xml.as_bytes(), &span_of(xml, needle)).unwrap()
+    }
+
+    const OUTSIDE: &str = "<p:sp><a:t>o</a:t></p:sp>";
+    const FALLBACK: &str = "<p:sp><a:t>f</a:t></p:sp>";
+
+    #[test]
+    fn finds_spans_overlapping_equation_blocks_only() {
+        let mc = declare("mc", "a14");
+        // A shape in the fallback of a block whose Choice holds `a14:m`.
+        let around = tree(
+            &mc,
+            &format!(
+                r#"<mc:AlternateContent><mc:Choice Requires="a14"><p:sp><a:p><a14:m/></a:p></p:sp></mc:Choice><mc:Fallback>{FALLBACK}</mc:Fallback></mc:AlternateContent>"#
+            ),
+        );
+        assert!(overlaps(&around, FALLBACK));
+        assert!(!overlaps(&around, OUTSIDE));
+
+        // A block inside the text body of the selected shape.
+        let inner = r#"<p:sp><a:p><mc:AlternateContent><mc:Choice Requires="a14"><a14:m><m:oMath xmlns:m="m"><m:r><m:t>y</m:t></m:r></m:oMath></a14:m></mc:Choice><mc:Fallback><a:r><a:t>y</a:t></a:r></mc:Fallback></mc:AlternateContent></a:p></p:sp>"#;
+        let inline = tree(&mc, inner);
+        assert!(overlaps(&inline, inner));
+        assert!(!overlaps(&inline, OUTSIDE));
+
+        // A block without math is not an equation block.
+        let plain = tree(
+            &mc,
+            &format!(
+                r#"<mc:AlternateContent><mc:Choice Requires="a14"><p:sp><a14:other/></p:sp></mc:Choice><mc:Fallback>{FALLBACK}</mc:Fallback></mc:AlternateContent>"#
+            ),
+        );
+        assert!(!overlaps(&plain, FALLBACK));
+
+        // `a14:m` only in the fallback branch does not make an equation block.
+        let fallback_only = r#"<p:sp><a:t>f</a:t><a14:m/></p:sp>"#;
+        let fallback_math = tree(
+            &mc,
+            &format!(
+                r#"<mc:AlternateContent><mc:Choice Requires="a14"><p:sp><a:p/></p:sp></mc:Choice><mc:Fallback>{fallback_only}</mc:Fallback></mc:AlternateContent>"#
+            ),
+        );
+        assert!(!overlaps(&fallback_math, fallback_only));
+
+        // XML without the markup-compatibility namespace is not scanned.
+        assert!(!span_overlaps_equation_block(b"<not-xml", &(0..1)).unwrap());
+    }
+
+    #[test]
+    fn equation_blocks_are_found_by_namespace_not_by_prefix() {
+        let block = |mc: &str, a14: &str, local: &str| {
+            format!(
+                r#"<{mc}:AlternateContent{local}><{mc}:Choice Requires="{a14}"><p:sp><a:p><{a14}:m/></a:p></p:sp></{mc}:Choice><{mc}:Fallback>{FALLBACK}</{mc}:Fallback></{mc}:AlternateContent>"#
+            )
+        };
+        // Renamed prefixes declared on the root.
+        let renamed = tree(&declare("zz", "q"), &block("zz", "q", ""));
+        assert!(overlaps(&renamed, FALLBACK));
+        // Default prefixes declared on the block, not the root.
+        let local = tree("", &block("mc", "a14", &declare("mc", "a14")));
+        assert!(overlaps(&local, FALLBACK));
+        // The familiar prefixes bound to other namespaces are not a block,
+        // even though the right namespaces occur elsewhere in the XML.
+        let decoy = tree(
+            &declare("real", "real14"),
+            &block(
+                "mc",
+                "a14",
+                r#" xmlns:mc="urn:other" xmlns:a14="urn:other14""#,
+            ),
+        );
+        assert!(!overlaps(&decoy, FALLBACK));
+    }
+
+    #[test]
+    fn math_in_comments_or_cdata_is_not_an_equation() {
+        let mc = declare("mc", "a14");
+        let hidden = tree(
+            &mc,
+            &format!(
+                r#"<mc:AlternateContent><mc:Choice Requires="a14"><p:sp><a:p><!--<a14:m/>--><![CDATA[<a14:m/>]]></a:p></p:sp></mc:Choice><mc:Fallback>{FALLBACK}</mc:Fallback></mc:AlternateContent>"#
+            ),
+        );
+        assert!(!overlaps(&hidden, FALLBACK));
+    }
 
     #[test]
     fn reads_the_choice_branch_equation_of_a_shape() {

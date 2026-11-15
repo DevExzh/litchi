@@ -484,6 +484,465 @@ fn sha256(bytes: &[u8]) -> String {
         .collect()
 }
 
+fn slide_xml(package: &Package, slide: usize) -> Vec<u8> {
+    package.presentation().unwrap().slides().unwrap()[slide]
+        .part()
+        .part()
+        .blob()
+        .to_vec()
+}
+
+/// The text between the first `mc:AlternateContent` start and its end tag.
+fn alternate_content(xml: &[u8]) -> String {
+    let text = std::str::from_utf8(xml).unwrap();
+    let start = text.find("<mc:AlternateContent").unwrap();
+    let end = text.find("</mc:AlternateContent>").unwrap();
+    text[start..end].to_owned()
+}
+
+/// The equation shape lives in an `mc:AlternateContent` whose Choice holds
+/// `a14:m` and whose Fallback holds a picture with one hidden run. A plain
+/// text write can only reach the Fallback, so it is refused rather than
+/// leaving the two branches disagreeing.
+#[test]
+fn native_equation_shape_text_edits_are_refused_without_changing_the_package() {
+    let package = native("powerpoint-fonts-math-handout.pptx");
+    let original_slide = slide_xml(&package, 1);
+    let original_bytes = package.to_bytes().unwrap();
+    let mut edit = package.edit().unwrap();
+    let result = edit.set_shape_text(1_usize, 1_usize, "EDITED");
+    let committed = edit.commit().unwrap().into_package();
+    let committed_slide = slide_xml(&committed, 1);
+    assert_eq!(
+        alternate_content(&committed_slide),
+        alternate_content(&original_slide),
+        "the equation's Choice and Fallback branches must stay together"
+    );
+    let error = result.unwrap_err();
+    let refusal = error.refusal().expect("a typed refusal");
+    assert_eq!(
+        refusal.kind(),
+        litchi_core::edit::RefusalKind::UnsupportedContent
+    );
+    assert_eq!(refusal.operation(), "set_shape_text");
+    assert_eq!(
+        refusal.reason(),
+        "the shape holds an Office Math equation, which text edits cannot change"
+    );
+    assert_eq!(committed_slide, original_slide);
+    assert!(committed.to_bytes().unwrap() == original_bytes);
+}
+
+#[test]
+fn native_shapes_beside_an_equation_still_edit_their_text() {
+    let package = native("powerpoint-fonts-math-handout.pptx");
+    let original = slide_xml(&package, 1);
+    let mut edit = package.edit().unwrap();
+    assert!(edit.set_shape_text(1_usize, 0_usize, "EDITED").unwrap());
+    let committed = edit.commit().unwrap().into_package();
+    let edited = slide_xml(&committed, 1);
+    let edited_text = std::str::from_utf8(&edited).unwrap();
+    assert!(edited_text.contains("<a:t>EDITED</a:t>"));
+    assert!(!edited_text.contains("NATIVE_EQUATIONS_009"));
+    assert_eq!(alternate_content(&edited), alternate_content(&original));
+}
+
+const MCE: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+const A14: &str = "http://schemas.microsoft.com/office/drawing/2010/main";
+const MATH: &str = "http://schemas.openxmlformats.org/officeDocument/2006/math";
+const SLIDE_2: &str = "/ppt/slides/slide2.xml";
+const NOTES_1: &str = "/ppt/notesSlides/notesSlide1.xml";
+
+fn fixture_bytes(name: &str) -> Vec<u8> {
+    std::fs::read(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/microsoft-office/powerpoint")
+            .join(name),
+    )
+    .unwrap()
+}
+
+/// The fixture `name` with part `part` rewritten by `change`.
+fn with_part(name: &str, part: &str, change: impl FnOnce(&str) -> String) -> Package {
+    let mut opc = litchi_opc::OpcPackage::from_bytes(
+        &fixture_bytes(name),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
+    let uri = litchi_opc::PackURI::new(part).unwrap();
+    let owner = opc.get_part_mut(&uri).unwrap();
+    let xml = change(std::str::from_utf8(owner.blob()).unwrap());
+    owner.set_blob(xml.into_bytes());
+    Package::from_opc_package(opc).unwrap()
+}
+
+fn part_xml(package: &Package, part: &str) -> String {
+    let uri = litchi_opc::PackURI::new(part).unwrap();
+    String::from_utf8(
+        package
+            .opc()
+            .unwrap()
+            .get_part(&uri)
+            .unwrap()
+            .blob()
+            .to_vec(),
+    )
+    .unwrap()
+}
+
+/// An inline equation block in a text paragraph, as `PowerPoint` writes one.
+fn inline_equation_block(value: &str) -> String {
+    format!(
+        r#"<mc:AlternateContent xmlns:mc="{MCE}" xmlns:a14="{A14}"><mc:Choice Requires="a14"><a14:m><m:oMath xmlns:m="{MATH}"><m:r><m:t>{value}</m:t></m:r></m:oMath></a14:m></mc:Choice><mc:Fallback><a:r><a:t>{value}</a:t></a:r></mc:Fallback></mc:AlternateContent>"#
+    )
+}
+
+/// Require `set_shape_text` on `shape` of the second slide to be refused as
+/// an equation edit and the committed package to keep the slide's bytes.
+fn assert_equation_text_edit_refused(package: Package, shape: usize) {
+    let original = part_xml(&package, SLIDE_2);
+    let mut edit = package.edit().unwrap();
+    let error = edit.set_shape_text(1_usize, shape, "EDITED").unwrap_err();
+    let refusal = error.refusal().expect("a typed refusal");
+    assert_eq!(
+        refusal.kind(),
+        litchi_core::edit::RefusalKind::UnsupportedContent
+    );
+    assert_eq!(refusal.operation(), "set_shape_text");
+    assert_eq!(
+        refusal.reason(),
+        "the shape holds an Office Math equation, which text edits cannot change"
+    );
+    let committed = edit.commit().unwrap().into_package();
+    assert_eq!(part_xml(&committed, SLIDE_2), original);
+}
+
+/// Markup compatibility may sit inside a text body, so an equation block in
+/// a paragraph of an ordinary shape is refused as well.
+#[test]
+fn native_equation_inside_a_shape_text_body_is_refused() {
+    let package = with_part("powerpoint-fonts-math-handout.pptx", SLIDE_2, |xml| {
+        let first = xml.find("<a:p>").unwrap() + "<a:p>".len();
+        format!(
+            "{}{}{}",
+            &xml[..first],
+            inline_equation_block("y"),
+            &xml[first..]
+        )
+    });
+    assert_equation_text_edit_refused(package, 0);
+}
+
+/// The equation block is found by namespace, wherever its namespaces are
+/// declared and whatever prefixes bind them, and whichever branch the scene
+/// selects.
+#[test]
+fn native_equation_shape_refusal_does_not_depend_on_prefixes_or_selected_branch() {
+    let renamed = with_part("powerpoint-fonts-math-handout.pptx", SLIDE_2, |xml| {
+        xml.replace("xmlns:mc=", "xmlns:zz=")
+            .replace("<mc:", "<zz:")
+            .replace("</mc:", "</zz:")
+            .replace("xmlns:a14=", "xmlns:q=")
+            .replace("<a14:", "<q:")
+            .replace("</a14:", "</q:")
+            .replace(r#"Requires="a14""#, r#"Requires="q""#)
+    });
+    assert_equation_text_edit_refused(renamed, 1);
+    let root_declared = with_part("powerpoint-fonts-math-handout.pptx", SLIDE_2, |xml| {
+        xml.replace(&format!(r#" xmlns:mc="{MCE}""#), "")
+            .replace(&format!(r#" xmlns:a14="{A14}""#), "")
+            .replacen(
+                "<p:sld ",
+                &format!(r#"<p:sld xmlns:mc="{MCE}" xmlns:a14="{A14}" "#),
+                1,
+            )
+    });
+    assert_equation_text_edit_refused(root_declared, 1);
+    // A Choice the scene understands is selected instead of the fallback.
+    let understood = with_part("powerpoint-fonts-math-handout.pptx", SLIDE_2, |xml| {
+        xml.replace(
+            r#"Requires="a14""#,
+            r#"Requires="p14" xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main""#,
+        )
+    });
+    assert_equation_text_edit_refused(understood, 1);
+}
+
+/// `a14:m` text inside a comment or CDATA is not an equation.
+#[test]
+fn native_math_markup_in_comments_does_not_refuse_a_text_edit() {
+    let package = with_part("powerpoint-fonts-math-handout.pptx", SLIDE_2, |xml| {
+        let start = xml.find("<a14:m>").unwrap();
+        let end = xml.find("</a14:m>").unwrap() + "</a14:m>".len();
+        format!(
+            "{}<!--<a14:m/>--><![CDATA[<a14:m/>]]>{}",
+            &xml[..start],
+            &xml[end..]
+        )
+    });
+    let mut edit = package.edit().unwrap();
+    assert!(edit.set_shape_text(1_usize, 1_usize, "EDITED").unwrap());
+}
+
+fn notes_text(package: &Package) -> Option<String> {
+    package
+        .presentation()
+        .unwrap()
+        .slide(0)
+        .unwrap()
+        .unwrap()
+        .notes()
+        .unwrap()
+        .unwrap()
+        .text()
+        .map(str::to_owned)
+}
+
+/// The two notes text editors: the presentation edit's `set_notes_text` and
+/// the notes graph edit's `set_text`.
+#[derive(Clone, Copy, Debug)]
+enum NotesEditor {
+    Presentation,
+    Graph,
+}
+
+impl NotesEditor {
+    const ALL: [Self; 2] = [Self::Presentation, Self::Graph];
+
+    /// The operation its refusals name.
+    const fn operation(self) -> &'static str {
+        match self {
+            Self::Presentation => "set_notes_text",
+            Self::Graph => "edit_notes",
+        }
+    }
+
+    /// Set the first slide's notes to each of `texts` in one edit; the
+    /// results and the committed package.
+    fn set(self, package: &Package, texts: &[&str]) -> (Vec<litchi_pptx::Result<bool>>, Package) {
+        match self {
+            Self::Presentation => {
+                let mut edit = package.edit().unwrap();
+                let results = texts
+                    .iter()
+                    .map(|text| edit.set_notes_text(0_usize, text))
+                    .collect();
+                (results, edit.commit().unwrap().into_package())
+            },
+            Self::Graph => {
+                let mut edit = package.edit_notes().unwrap();
+                let results = texts
+                    .iter()
+                    .map(|text| edit.set_text(0_usize, text))
+                    .collect();
+                (results, edit.commit().unwrap().into_package())
+            },
+        }
+    }
+
+    /// Set the first slide's notes to `text`.
+    fn set_one(self, package: &Package, text: &str) -> (litchi_pptx::Result<bool>, Package) {
+        let (mut results, committed) = self.set(package, &[text]);
+        (results.remove(0), committed)
+    }
+}
+
+/// Ordinary notes take a text edit: only the body placeholder's runs are
+/// rewritten and the slide number field keeps its text.
+#[test]
+fn native_notes_text_edit_rewrites_only_the_body_placeholder() {
+    let package = native("powerpoint-text-table.pptx");
+    let original = part_xml(&package, NOTES_1);
+    for editor in NotesEditor::ALL {
+        let (results, committed) = editor.set(
+            &package,
+            &[
+                "Speaker note for slide 1. Expected marker: PPT_NOTES_001.",
+                "CHANGED",
+                "first line\nsecond line",
+            ],
+        );
+        let results: Vec<_> = results.into_iter().map(Result::unwrap).collect();
+        assert_eq!(results, [false, true, true], "{editor:?}");
+        assert_eq!(
+            notes_text(&committed).as_deref(),
+            Some("first line\nsecond line"),
+            "{editor:?}"
+        );
+        let edited = part_xml(&committed, NOTES_1);
+        let slide_number =
+            |xml: &str| xml[xml.find("Slide Number Placeholder").unwrap()..].to_owned();
+        assert_eq!(slide_number(&edited), slide_number(&original), "{editor:?}");
+        assert!(
+            edited.contains(r#"type="slidenum"><a:rPr lang="en-US" smtClean="0"/><a:t>1</a:t>"#),
+            "{editor:?}"
+        );
+    }
+}
+
+/// Notes with an equation shape beside the body: the edit reaches the body
+/// only and leaves both branches of the equation block unchanged.
+#[test]
+fn native_notes_text_edit_leaves_an_equation_shape_unchanged() {
+    for after_body in [false, true] {
+        let package = with_part("powerpoint-text-table.pptx", NOTES_1, |xml| {
+            let note = xml.find("Speaker note").unwrap();
+            let start = xml[..note].rfind("<p:sp>").unwrap();
+            let end = note + xml[note..].find("</p:sp>").unwrap() + "</p:sp>".len();
+            let shape = |paragraph: &str| {
+                format!(
+                    r#"<p:sp><p:nvSpPr><p:cNvPr id="9" name="Eq"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:p>{paragraph}</a:p></p:txBody></p:sp>"#
+                )
+            };
+            let block = format!(
+                r#"<mc:AlternateContent xmlns:mc="{MCE}" xmlns:a14="{A14}"><mc:Choice Requires="a14">{}</mc:Choice><mc:Fallback>{}</mc:Fallback></mc:AlternateContent>"#,
+                shape(&format!(
+                    r#"<a14:m><m:oMath xmlns:m="{MATH}"><m:r><m:t>E</m:t></m:r><m:r><m:t>=mc2</m:t></m:r></m:oMath></a14:m>"#
+                )),
+                shape("<a:r><a:t>E=mc2</a:t></a:r>"),
+            );
+            let at = if after_body { end } else { start };
+            format!("{}{block}{}", &xml[..at], &xml[at..])
+        });
+        let block = |xml: &str| {
+            let start = xml.find("<mc:AlternateContent").unwrap();
+            let end = xml.find("</mc:AlternateContent>").unwrap();
+            xml[start..end].to_owned()
+        };
+        let original = block(&part_xml(&package, NOTES_1));
+        for editor in NotesEditor::ALL {
+            let (result, committed) = editor.set_one(&package, "CHANGED");
+            assert!(result.unwrap(), "{editor:?} {after_body}");
+            assert_eq!(
+                block(&part_xml(&committed, NOTES_1)),
+                original,
+                "{editor:?} {after_body}"
+            );
+            assert_eq!(notes_text(&committed).as_deref(), Some("CHANGED"));
+        }
+    }
+}
+
+/// Require each notes editor on `package` to be refused with `kind` and
+/// `reason` and the committed package to keep the notes bytes.
+fn assert_notes_edit_refused(
+    package: &Package,
+    kind: litchi_core::edit::RefusalKind,
+    reason: &str,
+) {
+    let original = part_xml(package, NOTES_1);
+    for editor in NotesEditor::ALL {
+        let (result, committed) = editor.set_one(package, "CHANGED");
+        let error = result.unwrap_err();
+        let refusal = error.refusal().expect("a typed refusal");
+        assert_eq!(refusal.kind(), kind, "{editor:?}");
+        assert_eq!(refusal.operation(), editor.operation(), "{editor:?}");
+        assert_eq!(refusal.reason(), reason, "{editor:?}");
+        assert_eq!(part_xml(&committed, NOTES_1), original, "{editor:?}");
+    }
+}
+
+/// An equation in the notes body cannot be rewritten as text, and a field's
+/// cached text is not overwritten.
+#[test]
+fn native_notes_with_an_equation_or_a_field_in_the_body_are_refused() {
+    let equation = with_part("powerpoint-text-table.pptx", NOTES_1, |xml| {
+        xml.replacen(
+            "<a:r><a:rPr lang=\"en-US\" dirty=\"0\"/>",
+            &format!(
+                "{}<a:r><a:rPr lang=\"en-US\" dirty=\"0\"/>",
+                inline_equation_block("x")
+            ),
+            1,
+        )
+    });
+    assert_notes_edit_refused(
+        &equation,
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "the notes hold an Office Math equation, which text edits cannot change",
+    );
+    let field = with_part("powerpoint-text-table.pptx", NOTES_1, |xml| {
+        xml.replacen(
+            "</a:r></a:p></p:txBody>",
+            r#"</a:r><a:fld id="{00000000-0000-0000-0000-000000000001}" type="datetime1"><a:rPr lang="en-US"/><a:t>1/1/2026</a:t></a:fld></a:p></p:txBody>"#,
+            1,
+        )
+    });
+    assert_notes_edit_refused(
+        &field,
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "the notes text holds a field (a:fld), which a notes text set would overwrite",
+    );
+}
+
+/// An empty notes body, as `PowerPoint` saves a slide without notes text,
+/// takes a run in its first paragraph with the paragraph's end properties.
+#[test]
+fn native_empty_notes_body_takes_a_run() {
+    let package = Package::open(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/ooxml/pptx/sample.pptx"),
+    )
+    .unwrap();
+    let original = part_xml(&package, NOTES_1);
+    assert!(original.contains(r#"<a:p><a:endParaRPr lang="en-US"/></a:p>"#));
+    for editor in NotesEditor::ALL {
+        let (result, committed) = editor.set_one(&package, "Fresh <notes>");
+        assert!(result.unwrap(), "{editor:?}");
+        assert_eq!(
+            notes_text(&committed).as_deref(),
+            Some("Fresh <notes>"),
+            "{editor:?}"
+        );
+        let edited = part_xml(&committed, NOTES_1);
+        assert_eq!(
+            edited,
+            original.replacen(
+                r#"<a:p><a:endParaRPr lang="en-US"/></a:p>"#,
+                r#"<a:p><a:r><a:rPr lang="en-US"/><a:t>Fresh &lt;notes&gt;</a:t></a:r><a:endParaRPr lang="en-US"/></a:p>"#,
+                1,
+            ),
+            "{editor:?}"
+        );
+        // Clearing an empty body again is a no-op.
+        let (result, _) = editor.set_one(&package, "");
+        assert!(!result.unwrap(), "{editor:?}");
+    }
+}
+
+/// A notes edit whose staged read-back disagrees with the request is rolled
+/// back: here the body placeholder sits in a markup-compatibility block whose
+/// Choice the shape scene understands but the notes reader does not, so the
+/// write reaches a copy the reader never shows.
+#[test]
+fn native_failed_notes_text_edit_leaves_the_edit_unchanged() {
+    let package = with_part("powerpoint-text-table.pptx", NOTES_1, |xml| {
+        let note = xml.find("Speaker note").unwrap();
+        let start = xml[..note].rfind("<p:sp>").unwrap();
+        let end = note + xml[note..].find("</p:sp>").unwrap() + "</p:sp>".len();
+        let body = &xml[start..end];
+        format!(
+            r#"{}<mc:AlternateContent xmlns:mc="{MCE}" xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main"><mc:Choice Requires="p14">{body}</mc:Choice><mc:Fallback>{body}</mc:Fallback></mc:AlternateContent>{}"#,
+            &xml[..start],
+            &xml[end..]
+        )
+    });
+    let original = package.to_bytes().unwrap();
+    let original_notes = part_xml(&package, NOTES_1);
+    for editor in NotesEditor::ALL {
+        let (result, committed) = editor.set_one(&package, "CHANGED");
+        let error = result.unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("notes text did not round-trip semantically"),
+            "{editor:?}: {error}"
+        );
+        assert_eq!(part_xml(&committed, NOTES_1), original_notes, "{editor:?}");
+        assert!(committed.to_bytes().unwrap() == original, "{editor:?}");
+    }
+}
+
 #[test]
 fn native_powerpoint_model3d_keeps_the_exact_glb_and_raster_preview() {
     let package = native("powerpoint-modern-media.pptx");

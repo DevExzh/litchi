@@ -15,6 +15,7 @@ mod theme;
 
 pub use media::MediaFile;
 pub use modern_comments::ModernCommentChange;
+pub(crate) use notes::{rewrite_notes_body, verify_notes_text};
 pub use smartart::SmartArtParts;
 
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
@@ -762,7 +763,10 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for missing or ambiguous selectors, shapes without a
-    /// text body, malformed raw XML, invalid characters, or exceeded bounds.
+    /// text body, malformed raw XML, invalid characters, or exceeded bounds,
+    /// and a refusal for a shape that holds an Office Math equation, in a
+    /// markup-compatibility block around the shape or in its text (only the
+    /// block's fallback is reachable).
     pub fn set_shape_text<'s, 'k>(
         &mut self,
         slide: impl Into<crate::slide::Selector<'s>>,
@@ -787,12 +791,20 @@ impl Edit {
         }
         let span =
             crate::tag::shape::selected_raw_span_for_shape(owner.blob(), &scene, selected_shape)?;
+        refuse_equation_shape(
+            owner.blob(),
+            &scene,
+            &span,
+            "set_shape_text",
+            EQUATION_SHAPE_REASON,
+        )?;
         let xml = super::xml::rewrite_shape_text_with_limits(
             owner.blob(),
             span,
             text,
             self.source_ref()?.limits.max_text_bytes(),
             shape_limits,
+            super::xml::TextRefusals::SHAPE,
         )?;
         let staged = crate::shape::Scene::read(&xml, shape_limits)?;
         let staged_shape = staged.shape(key)?;
@@ -1745,13 +1757,19 @@ impl Edit {
     /// slide's notes page from the presentation's notes master when it has
     /// none (an empty text on a slide without notes is a no-op).
     ///
+    /// The notes text is the text of the notes page's body placeholder, as
+    /// [`crate::Presentation`] reads it; only that placeholder's runs are
+    /// rewritten, and the slide number and other placeholders keep their
+    /// text.
+    ///
     /// # Errors
     ///
     /// Returns [`Error::Refused`] when a notes page must be created but
-    /// the presentation has no single notes master or is strict, and an
-    /// error when the notes graph has an unsupported dependency or the
-    /// replacement is malformed or unbounded. A failure leaves the edit
-    /// unchanged.
+    /// the presentation has no single notes master or is strict, when the
+    /// notes page has no body placeholder with a text run, when that text
+    /// holds a field or an Office Math equation, and an error when the notes
+    /// graph has an unsupported dependency or the replacement is malformed or
+    /// unbounded. A failure leaves the edit unchanged.
     pub fn set_notes_text<'s>(
         &mut self,
         slide: impl Into<crate::slide::Selector<'s>>,
@@ -1780,17 +1798,28 @@ impl Edit {
         });
         match note {
             Some(note) => {
-                let limits = self.notes_limits();
-                if note.text(limits)?.as_deref() == (!text.is_empty()).then_some(text) {
-                    return Ok(false);
-                }
                 let part_name = PackURI::new(note.part())
                     .map_err(|_error| invalid("opened-presentation notes part name is invalid"))?;
-                let xml = crate::notes::rewrite_text(note.xml(), text, limits)?;
+                let Some(xml) = rewrite_notes_body(
+                    self.working.get_part(&part_name)?.blob(),
+                    text,
+                    "set_notes_text",
+                    self.semantic_limits().shape(),
+                    self.source_ref()?.limits.max_text_bytes(),
+                )?
+                else {
+                    return Ok(false);
+                };
+                let before = self.working.clone();
                 self.working.get_part_mut(&part_name)?.set_blob(xml);
+                if let Err(error) = self.verify_notes_text(&selected_slide.part_name, text) {
+                    self.working = before;
+                    return Err(error);
+                }
+                Ok(true)
             },
             // A slide without notes and empty text is already as requested.
-            None if text.is_empty() => return Ok(false),
+            None if text.is_empty() => Ok(false),
             None => {
                 let slide_part = selected_slide.part_name.clone();
                 let before = self.working.clone();
@@ -1801,34 +1830,23 @@ impl Edit {
                     self.working = before;
                     return Err(error);
                 }
-                return Ok(true);
+                Ok(true)
             },
         }
-        self.verify_notes_text(&selected_slide.part_name, text)?;
-        Ok(true)
     }
 
-    /// Read the staged notes of `slide` back and require `text`.
+    /// Read the staged notes of `slide` back as the presentation reader does
+    /// and require `text`.
     fn verify_notes_text(&self, slide: &PackURI, text: &str) -> Result<()> {
         let presentation_name = self.source_ref()?.presentation_name.clone();
-        let staged = crate::notes::load_snapshot_with_limits(
+        verify_notes_text(
             &self.working,
             &presentation_name,
+            slide,
+            text,
+            self.semantic_limits().shape(),
             self.notes_limits(),
-        )?
-        .ok_or_else(|| invalid("opened-presentation staged notes graph disappeared"))?;
-        let staged_note = staged
-            .slides()
-            .iter()
-            .find(|note| note.owner() == slide.as_str())
-            .ok_or_else(|| invalid("opened-presentation staged notes owner disappeared"))?;
-        let actual = staged_note.text(self.notes_limits())?;
-        if actual.as_deref() != (!text.is_empty()).then_some(text) {
-            return Err(invalid(
-                "opened-presentation notes text did not round-trip semantically",
-            ));
-        }
-        Ok(())
+        )
     }
 
     /// Create or replace the validated table-style catalog in this transaction.
@@ -2937,6 +2955,31 @@ impl Edit {
                 .resolve(&self.slides, &name),
         }
     }
+}
+
+/// The refusal reason for a text write to a shape that holds an equation.
+pub(crate) const EQUATION_SHAPE_REASON: &str =
+    "the shape holds an Office Math equation, which text edits cannot change";
+
+/// Refuse a text write to a shape that overlaps an `mc:AlternateContent`
+/// whose Choice holds an Office Math equation, whether the block encloses the
+/// shape or sits in its text body: the scene selects the fallback, so the
+/// write would leave the equation unchanged and the branches disagreeing.
+pub(crate) fn refuse_equation_shape(
+    xml: &[u8],
+    scene: &crate::shape::Scene<'_>,
+    span: &std::ops::Range<usize>,
+    operation: &'static str,
+    reason: &'static str,
+) -> Result<()> {
+    if scene.is_rewritten() && crate::shape::math::span_overlaps_equation_block(xml, span)? {
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            operation,
+            reason,
+        ));
+    }
+    Ok(())
 }
 
 /// Refuse a changed commit over a signed package (ADR 0006).

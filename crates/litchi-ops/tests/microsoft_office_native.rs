@@ -1015,3 +1015,117 @@ fn native_word_smartart_outline_edits_preserve_extent_and_other_visuals() {
         assert!(file.to_bytes().unwrap() == bytes);
     }
 }
+
+#[cfg(feature = "pptx")]
+#[test]
+fn native_pptx_equation_shape_text_edits_are_refused_in_every_edit_form() {
+    use litchi_ops::{BatchItem, BatchMode, Code, Props};
+    // The kind of the typed PresentationML refusal under an operation error.
+    fn refusal(error: &litchi_ops::Error) -> litchi_core::edit::RefusalKind {
+        let mut cause: Option<&(dyn std::error::Error + 'static)> = Some(error);
+        while let Some(current) = cause {
+            if let Some(litchi_pptx::Error::Refused(refusal)) =
+                current.downcast_ref::<litchi_pptx::Error>()
+            {
+                return refusal.kind();
+            }
+            cause = current.source();
+        }
+        panic!("no PresentationML refusal under {error:?}")
+    }
+    let bytes = include_bytes!(
+        "../../../test-data/microsoft-office/powerpoint/powerpoint-fonts-math-handout.pptx"
+    );
+    for mode in [SourceMode::Auto, SourceMode::Eager] {
+        let file =
+            litchi_ops::open_bytes_with(bytes.to_vec(), &OpenOptions::new().source_mode(mode))
+                .unwrap();
+        let before = file.to_bytes().unwrap();
+        // The second shape of the second slide holds the equation.
+        let path = "/slide[2]/shape[2]";
+        let mut item = BatchItem::new("set");
+        item.path = Some(path.into());
+        item.props = Some(Props::new().with("text", "EDITED"));
+        for error in [
+            file.set(path, props! {"text"=>"EDITED"}).unwrap_err(),
+            file.batch([item], BatchMode::Atomic).unwrap_err(),
+            file.edit(|edit| edit.set(path, props! {"text"=>"EDITED"}))
+                .unwrap_err(),
+        ] {
+            assert_eq!(error.code(), Code::UnsupportedCapability, "{mode:?}");
+            assert_eq!(
+                refusal(&error),
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "{mode:?}"
+            );
+        }
+        assert!(file.to_bytes().unwrap() == before);
+    }
+}
+
+#[cfg(feature = "pptx")]
+#[test]
+fn native_pptx_notes_text_edits_reach_the_body_and_refuse_equations() {
+    use litchi_ops::Code;
+    const NOTES: &str = "/ppt/notesSlides/notesSlide1.xml";
+    let bytes =
+        include_bytes!("../../../test-data/microsoft-office/powerpoint/powerpoint-text-table.pptx");
+    let notes_xml = |bytes: &[u8]| {
+        let opc =
+            litchi_opc::OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
+        let uri = litchi_opc::PackURI::new(NOTES).unwrap();
+        String::from_utf8(opc.get_part(&uri).unwrap().blob().to_vec()).unwrap()
+    };
+    // An inline equation block before the first run of the notes body.
+    let equation = {
+        let mut opc =
+            litchi_opc::OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
+        let uri = litchi_opc::PackURI::new(NOTES).unwrap();
+        let part = opc.get_part_mut(&uri).unwrap();
+        let xml = std::str::from_utf8(part.blob()).unwrap().replacen(
+            "<a:r><a:rPr lang=\"en-US\" dirty=\"0\"/>",
+            concat!(
+                r#"<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:a14="http://schemas.microsoft.com/office/drawing/2010/main">"#,
+                r#"<mc:Choice Requires="a14"><a14:m><m:oMath xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:r><m:t>x</m:t></m:r></m:oMath></a14:m></mc:Choice>"#,
+                r#"<mc:Fallback><a:r><a:t>x</a:t></a:r></mc:Fallback></mc:AlternateContent>"#,
+                "<a:r><a:rPr lang=\"en-US\" dirty=\"0\"/>",
+            ),
+            1,
+        );
+        part.set_blob(xml.into_bytes());
+        litchi_pptx::Package::from_opc_package(opc)
+            .unwrap()
+            .to_bytes()
+            .unwrap()
+    };
+    for mode in [SourceMode::Auto, SourceMode::Eager] {
+        let options = OpenOptions::new().source_mode(mode);
+        let file = litchi_ops::open_bytes_with(bytes.to_vec(), &options).unwrap();
+        let edited = file
+            .set("/slide[1]/notes", props! {"text"=>"CHANGED"})
+            .unwrap();
+        let reopened = litchi_ops::open_bytes(edited.to_bytes().unwrap()).unwrap();
+        let text = reopened
+            .get("/slide[1]/notes")
+            .unwrap()
+            .view()
+            .text()
+            .unwrap()
+            .unwrap_or_default()
+            .into_owned();
+        assert_eq!(text, "CHANGED", "{mode:?}");
+        // The slide number field keeps its cached text.
+        assert!(
+            notes_xml(&edited.to_bytes().unwrap()).contains(r#"smtClean="0"/><a:t>1</a:t>"#),
+            "{mode:?}"
+        );
+
+        let file = litchi_ops::open_bytes_with(equation.clone(), &options).unwrap();
+        let before = file.to_bytes().unwrap();
+        let error = file
+            .set("/slide[1]/notes", props! {"text"=>"CHANGED"})
+            .unwrap_err();
+        assert_eq!(error.code(), Code::UnsupportedCapability, "{mode:?}");
+        assert!(file.to_bytes().unwrap() == before);
+    }
+}
