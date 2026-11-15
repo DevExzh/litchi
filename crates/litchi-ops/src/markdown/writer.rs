@@ -580,20 +580,20 @@ impl MarkdownWriter {
             return Ok(());
         }
 
-        // First check for paragraph-level formulas (display math)
+        // First check for paragraph-level equations (display math)
         #[cfg(feature = "docx")]
         {
             if let Paragraph::Docx(docx_para) = para {
-                let display_formulas = docx_para.paragraph_level_formulas()?;
-                if !display_formulas.is_empty() {
+                let display_equations = docx_para.paragraph_level_equations()?;
+                if !display_equations.is_empty() {
                     if projection.is_some_and(ParagraphProjection::has_non_text_content) {
                         return Err(unrepresentable(
-                            "Markdown export cannot combine DOCX inline semantics with a display formula paragraph",
+                            "Markdown export cannot combine DOCX inline semantics with a display equation paragraph",
                         ));
                     }
-                    // This paragraph contains display formulas
-                    // Process runs and formulas together in order
-                    self.write_paragraph_with_display_formulas(para, display_formulas)?;
+                    // This paragraph contains display equations
+                    // Process runs and equations together in order
+                    self.write_paragraph_with_display_equations(para, display_equations)?;
                     self.buffer.push_str("\n\n");
                     return Ok(());
                 }
@@ -821,18 +821,18 @@ impl MarkdownWriter {
         Ok(())
     }
 
-    /// Write a paragraph that contains display-level formulas.
+    /// Write a paragraph that contains display-level equations.
     ///
-    /// This handles paragraphs where formulas are direct children of the paragraph (not within runs).
-    #[cfg(all(feature = "docx", feature = "formula"))]
-    fn write_paragraph_with_display_formulas(
+    /// This handles paragraphs where equations are direct children of the paragraph (not within runs).
+    #[cfg(all(feature = "docx", feature = "equation"))]
+    fn write_paragraph_with_display_equations(
         &mut self,
         para: &Paragraph,
-        display_formulas: Vec<String>,
+        display_equations: Vec<String>,
     ) -> Result<()> {
-        use litchi_formula::omml_to_latex;
+        use litchi_equation::omml_to_latex;
 
-        // For display formulas, we'll write each formula on its own line
+        // For display equations, we'll write each equation on its own line
         // and interleave with any text content from runs
         let runs = para.runs()?;
 
@@ -844,35 +844,35 @@ impl MarkdownWriter {
             }
         }
 
-        // Add line break if there was text before formulas
+        // Add line break if there was text before equations
         if !self.buffer.ends_with("\n\n") && !self.buffer.ends_with('\n') {
             self.buffer.push('\n');
         }
 
-        // Write display formulas
-        for omml_xml in display_formulas {
-            let latex = omml_to_latex(&omml_xml, &litchi_formula::omml::Limits::DEFAULT)?;
+        // Write display equations
+        for omml_xml in display_equations {
+            let latex = omml_to_latex(&omml_xml, &litchi_equation::Limits::DEFAULT)?;
 
-            // Display formulas use display style (false = display mode)
-            let formula_md = self.format_formula(&latex, false);
-            self.buffer.push_str(&formula_md);
+            // Display equations use display style (false = display mode)
+            let equation_md = self.format_equation(&latex, false);
+            self.buffer.push_str(&equation_md);
             self.buffer.push('\n');
         }
 
         Ok(())
     }
 
-    /// Fallback for when formula feature is not enabled.
-    #[cfg(all(feature = "docx", not(feature = "formula")))]
-    fn write_paragraph_with_display_formulas(
+    /// Fallback for when equation feature is not enabled.
+    #[cfg(all(feature = "docx", not(feature = "equation")))]
+    fn write_paragraph_with_display_equations(
         &mut self,
         para: &Paragraph,
-        display_formulas: Vec<String>,
+        display_equations: Vec<String>,
     ) -> Result<()> {
-        if !display_formulas.is_empty() {
+        if !display_equations.is_empty() {
             return Err(super::feature_required(
-                "Markdown output of OMML formulas",
-                "formula",
+                "Markdown output of OMML equations",
+                "equation",
             ));
         }
         for run in para.runs()? {
@@ -993,10 +993,10 @@ impl MarkdownWriter {
             ));
         }
 
-        // First check if this run contains a formula
-        if let Some(formula_markdown) = self.extract_formula_from_run(run)? {
+        // First check if this run contains an equation
+        if let Some(equation_markdown) = self.extract_equation_from_run(run)? {
             self.close_formatting();
-            self.buffer.push_str(&formula_markdown);
+            self.buffer.push_str(&equation_markdown);
             return Ok(());
         }
 
@@ -1675,36 +1675,34 @@ impl MarkdownWriter {
         leading.checked_div(self.options.list_indent).unwrap_or(0)
     }
 
-    /// Extract formula content from a run and convert to markdown.
+    /// Extract equation content from a run and convert to markdown.
     ///
-    /// Returns the markdown representation of the formula if one is found, None otherwise.
-    fn extract_formula_from_run(&self, _run: &Run) -> Result<Option<String>> {
-        // Try OOXML OMML formulas first
+    /// Returns the markdown representation of the equation if one is found, None otherwise.
+    fn extract_equation_from_run(&self, _run: &Run) -> Result<Option<String>> {
+        // Try OOXML OMML equations first
         #[cfg(feature = "docx")]
         if let Run::Docx(docx_run) = _run
-            && let Some(omml_xml) = docx_run.omml_formula()?
+            && let Some(omml_xml) = docx_run.omml_equation()?
         {
             // Parse OMML and convert to LaTeX
-            #[cfg(feature = "formula")]
+            #[cfg(feature = "equation")]
             {
-                let latex = litchi_formula::omml_to_latex(
-                    &omml_xml,
-                    &litchi_formula::omml::Limits::DEFAULT,
-                )?;
-                return Ok(Some(self.format_formula(&latex, true))); // true = inline
+                let latex =
+                    litchi_equation::omml_to_latex(&omml_xml, &litchi_equation::Limits::DEFAULT)?;
+                return Ok(Some(self.format_equation(&latex, true))); // true = inline
             }
 
-            #[cfg(not(feature = "formula"))]
+            #[cfg(not(feature = "equation"))]
             {
                 let _ = omml_xml;
                 return Err(super::feature_required(
-                    "Markdown output of OMML formulas",
-                    "formula",
+                    "Markdown output of OMML equations",
+                    "equation",
                 ));
             }
         }
 
-        // Try OLE MTEF formulas
+        // Try OLE MTEF equations
         #[cfg(feature = "doc")]
         {
             // `Run` carries one variant per enabled format feature, so this
@@ -1712,34 +1710,31 @@ impl MarkdownWriter {
             // `doc`-only build; `if let` covers both without a wildcard arm that
             // would be unreachable in the latter.
             if let Run::Doc(ole_run) = _run
-                && ole_run.has_mtef_formula()
+                && let Some(latex) = ole_run.mtef_equation_latex()
             {
-                let latex = ole_run.mtef_formula_latex().ok_or_else(|| {
-                    unrepresentable("an MTEF formula has no semantic LaTeX representation")
-                })?;
-                return Ok(Some(self.format_formula(latex, true)));
+                return Ok(Some(self.format_equation(latex, true)));
             }
         }
 
         Ok(None)
     }
 
-    /// Format a formula with the appropriate delimiters.
+    /// Format an equation with the appropriate delimiters.
     ///
     /// # Arguments
-    /// * `formula` - The formula content (LaTeX)
-    /// * `inline` - Whether this is an inline formula (true) or display formula (false)
-    #[cfg(any(feature = "formula", feature = "doc"))]
-    fn format_formula(&self, formula: &str, inline: bool) -> String {
+    /// * `equation` - The equation content (LaTeX)
+    /// * `inline` - Whether this is an inline equation (true) or display equation (false)
+    #[cfg(any(feature = "equation", feature = "doc"))]
+    fn format_equation(&self, equation: &str, inline: bool) -> String {
         if inline {
-            match self.options.formula_style {
-                litchi_markdown::FormulaStyle::LaTeX => format!("\\({}\\)", formula),
-                litchi_markdown::FormulaStyle::Dollar => format!("${}$", formula),
+            match self.options.equation_style {
+                litchi_markdown::EquationStyle::LaTeX => format!("\\({}\\)", equation),
+                litchi_markdown::EquationStyle::Dollar => format!("${}$", equation),
             }
         } else {
-            match self.options.formula_style {
-                litchi_markdown::FormulaStyle::LaTeX => format!("\\[{}\\]", formula),
-                litchi_markdown::FormulaStyle::Dollar => format!("$${}$$", formula),
+            match self.options.equation_style {
+                litchi_markdown::EquationStyle::LaTeX => format!("\\[{}\\]", equation),
+                litchi_markdown::EquationStyle::Dollar => format!("$${}$$", equation),
             }
         }
     }
@@ -1910,11 +1905,11 @@ mod tests {
         assert!("\u{2003}• text".is_char_boundary(info.content_start));
     }
 
-    #[cfg(feature = "formula")]
+    #[cfg(feature = "equation")]
     #[test]
-    fn formula_conversion_failure_is_propagated() {
+    fn equation_conversion_failure_is_propagated() {
         let paragraph = Paragraph::Docx(litchi_docx::Paragraph::new(
-            br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMath/></w:p>"#.to_vec(),
+            br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMath><m:f><m:num/><m:bogus/></m:f></m:oMath></w:p>"#.to_vec(),
         ));
         assert!(paragraph.to_markdown().is_err());
     }

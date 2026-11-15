@@ -87,7 +87,7 @@ fn render<T: ToMarkdown>(value: &T) -> String {
 
 - `ToMarkdown` trait for converting types to Markdown; each implementor names
   the typed error its conversion reports.
-- `MarkdownOptions` plus `FormulaStyle`, `ScriptStyle`, `StrikethroughStyle`, `TableStyle` enums for tuning the output.
+- `MarkdownOptions` plus `EquationStyle`, `ScriptStyle`, `StrikethroughStyle`, `TableStyle` enums for tuning the output.
 - Unicode helpers for rendering super- and subscript characters.
 
 ## License

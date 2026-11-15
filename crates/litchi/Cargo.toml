@@ -144,11 +144,11 @@ vba-inspection = [
     "litchi-xlsb?/vba-inspection",
     "litchi-xlsx?/vba-inspection",
 ]
-formula = [
-    "dep:litchi-formula",
-    "litchi-doc?/formula",
-    "litchi-ops?/formula",
-    "litchi-ppt?/formula",
+equation = [
+    "dep:litchi-equation",
+    "litchi-doc?/equation",
+    "litchi-ops?/equation",
+    "litchi-pptx?/equation",
 ]
 fonts = [
     "dep:litchi-fonts",
@@ -218,7 +218,7 @@ all = [
     "sign",
     "encryption",
     "vba-inspection",
-    "formula",
+    "equation",
     "automatic-fonts",
     "images",
     "eval",
@@ -234,9 +234,9 @@ litchi-crypto = { workspace = true, features = ["ooxml"], optional = true } # Of
 litchi-doc = { workspace = true, optional = true } # Legacy Word binary support
 litchi-docx = { workspace = true, optional = true } # WordprocessingML support
 litchi-drawingml = { workspace = true, optional = true } # Shared DrawingML vocabulary
+litchi-equation = { workspace = true, optional = true } # Math equation conversion
 litchi-eval = { workspace = true, optional = true } # Formula evaluation
 litchi-fonts = { workspace = true, optional = true } # Font support
-litchi-formula = { workspace = true, optional = true } # Formula parsing and conversion
 litchi-imgconv = { workspace = true, optional = true } # Legacy image conversion
 litchi-iwa-detect = { workspace = true, optional = true } # Bounded iWork package detection
 litchi-keynote = { workspace = true, optional = true } # Apple Keynote support

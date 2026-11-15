@@ -878,10 +878,11 @@ props! {
 }
 
 props! {
-    /// An Office Math equation of slide text (`equation.json`):
-    /// its OMML as a LaTeX-like formula.
+    /// An Office Math equation of slide text (`equation.json`): its OMML
+    /// converted to LaTeX, and the OMML itself (raw).
     EQUATION_PROPS, EquationKey {
-        Formula = "formula": ValueType::Text,
+        Latex = "latex": ValueType::Text,
+        Omml = "omml": ValueType::Text; raw,
     }
 }
 
@@ -1368,7 +1369,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
         element(
             Equation,
             "equation",
-            &["equation", "formula", "math"],
+            &["equation", "math"],
             &[Slide, Shape],
             &[],
             &[],

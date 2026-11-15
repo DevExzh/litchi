@@ -136,7 +136,7 @@ impl ElementKind for Kind {
             "video" => Self::Video,
             "audio" => Self::Audio,
             "media" => Self::Media,
-            "equation" | "formula" | "math" => Self::Equation,
+            "equation" | "math" => Self::Equation,
             "slidezoom" | "zoom" => Self::Zoom,
             "3dmodel" | "model3d" => Self::Model3d,
             "layout" | "slidelayout" => Self::SlideLayout,
@@ -810,7 +810,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
         gap(
             Kind::Equation,
             "equation",
-            &["equation", "formula", "math"],
+            &["equation", "math"],
             &[Kind::Slide, Kind::Shape],
             &[],
             &["/slide[N]/shape[N]/equation[N]"],

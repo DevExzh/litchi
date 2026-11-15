@@ -166,32 +166,25 @@ mod lazy_auxiliary_tests {
     }
 }
 
-#[cfg(all(test, feature = "formula"))]
-mod owned_mtef_tests {
+#[cfg(all(test, feature = "equation"))]
+mod embedded_equation_tests {
     use crate::Document;
     use std::collections::HashMap;
-    use std::sync::Arc;
+
+    /// MTEF 3 holding the MathType math-font character `=`.
+    const EQUALS: [u8; 10] = [0x03, 0x01, 0x01, 0x03, 0x00, 0x02, 0x86, 0x3d, 0x00, 0x00];
 
     #[test]
-    fn malformed_multiple_formulas_are_independently_owned_and_dropped() {
+    fn undecodable_equations_get_no_latex_and_are_reported_by_storage_id() {
         let mut inputs = HashMap::new();
-        inputs.insert("equation-a".to_string(), vec![0xAA; 7]);
-        inputs.insert("equation-b".to_string(), vec![0xBB; 13]);
+        inputs.insert("_17".to_string(), vec![0xAA; 7]);
+        inputs.insert("_5".to_string(), vec![0xBB; 13]);
+        inputs.insert("_9".to_string(), EQUALS.to_vec());
 
-        let rendered = Document::parse_all_mtef_data(&inputs).expect("malformed formulas render");
-        assert_eq!(rendered.len(), 2);
-        assert!(rendered["equation-a"].contains("Invalid MTEF format"));
-        assert!(rendered["equation-b"].contains("Invalid MTEF format"));
-        assert!(!Arc::ptr_eq(
-            &rendered["equation-a"],
-            &rendered["equation-b"]
-        ));
-
-        let retained = Arc::clone(&rendered["equation-a"]);
-        let weak = Arc::downgrade(&retained);
-        drop(retained);
-        drop(rendered);
-        assert!(weak.upgrade().is_none());
+        let (equations, undecodable) = Document::decode_equations(&inputs);
+        assert_eq!(equations.len(), 1);
+        assert_eq!(&*equations["_9"], "=");
+        assert_eq!(undecodable, [5, 17]);
     }
 }
 

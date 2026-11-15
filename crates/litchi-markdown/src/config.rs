@@ -35,8 +35,8 @@ pub struct MarkdownOptions {
     pub table_style: TableStyle,
     /// Indentation for HTML tables (spaces)
     pub html_table_indent: usize,
-    /// How to render mathematical formulas
-    pub formula_style: FormulaStyle,
+    /// How to render math equations
+    pub equation_style: EquationStyle,
     /// Number of spaces for list indentation (default: 2)
     pub list_indent: usize,
     /// How to render superscript and subscript
@@ -58,7 +58,7 @@ impl Default for MarkdownOptions {
             include_metadata: false,
             table_style: TableStyle::Markdown,
             html_table_indent: 2,
-            formula_style: FormulaStyle::LaTeX,
+            equation_style: EquationStyle::LaTeX,
             list_indent: 2,
             script_style: ScriptStyle::Html,
             strikethrough_style: StrikethroughStyle::Markdown,
@@ -156,20 +156,20 @@ impl MarkdownOptions {
         self
     }
 
-    /// Set the formula rendering style.
+    /// Set the equation rendering style.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// use litchi_markdown::{MarkdownOptions, FormulaStyle};
+    /// use litchi_markdown::{MarkdownOptions, EquationStyle};
     ///
     /// let options = MarkdownOptions::new()
-    ///     .with_formula_style(FormulaStyle::Dollar);
+    ///     .with_equation_style(EquationStyle::Dollar);
     /// ```
     #[must_use]
     #[inline]
-    pub fn with_formula_style(mut self, style: FormulaStyle) -> Self {
-        self.formula_style = style;
+    pub fn with_equation_style(mut self, style: EquationStyle) -> Self {
+        self.equation_style = style;
         self
     }
 
@@ -299,11 +299,11 @@ pub enum TableStyle {
     StyledHtml,
 }
 
-/// Formula rendering styles for Markdown conversion.
+/// Equation rendering styles for Markdown conversion.
 ///
-/// Determines how mathematical formulas are rendered in the output.
+/// Determines how math equations are rendered in the output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FormulaStyle {
+pub enum EquationStyle {
     /// Use LaTeX delimiters: inline \(\) and display \[\].
     ///
     /// Examples:
@@ -368,7 +368,7 @@ mod tests {
             .with_metadata(false)
             .with_table_style(TableStyle::MinimalHtml)
             .with_html_table_indent(4)
-            .with_formula_style(FormulaStyle::Dollar)
+            .with_equation_style(EquationStyle::Dollar)
             .with_list_indent(4)
             .with_script_style(ScriptStyle::Unicode)
             .with_strikethrough_style(StrikethroughStyle::Html);
@@ -377,7 +377,7 @@ mod tests {
         assert!(!options.include_metadata);
         assert_eq!(options.table_style, TableStyle::MinimalHtml);
         assert_eq!(options.html_table_indent, 4);
-        assert_eq!(options.formula_style, FormulaStyle::Dollar);
+        assert_eq!(options.equation_style, EquationStyle::Dollar);
         assert_eq!(options.list_indent, 4);
         assert_eq!(options.script_style, ScriptStyle::Unicode);
         assert_eq!(options.strikethrough_style, StrikethroughStyle::Html);
@@ -390,7 +390,7 @@ mod tests {
         assert!(!options.include_metadata);
         assert_eq!(options.table_style, TableStyle::Markdown);
         assert_eq!(options.html_table_indent, 2);
-        assert_eq!(options.formula_style, FormulaStyle::LaTeX);
+        assert_eq!(options.equation_style, EquationStyle::LaTeX);
         assert_eq!(options.list_indent, 2);
         assert_eq!(options.script_style, ScriptStyle::Html);
         assert_eq!(options.strikethrough_style, StrikethroughStyle::Markdown);

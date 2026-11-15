@@ -356,7 +356,7 @@ fn rejects_unknown_entities_in_word_text() {
 }
 
 #[test]
-fn omml_formulas_preserve_inline_and_display_xml_exactly() {
+fn omml_equations_preserve_inline_and_display_xml_exactly() {
     let xml = br#"<wp:p xmlns:wp="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
             xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"
             xmlns:q="http://schemas.openxmlformats.org/officeDocument/2006/math"
@@ -371,18 +371,18 @@ fn omml_formulas_preserve_inline_and_display_xml_exactly() {
     let paragraph = Paragraph::new(xml.to_vec());
 
     assert_eq!(
-        paragraph.omml_formulas().unwrap(),
+        paragraph.omml_equations().unwrap(),
         vec![
             r#"<m:oMath data-id="1"><m:r><wp:rPr/><m:t><![CDATA[x < y]]></m:t></m:r></m:oMath>"#,
             r#"<q:oMath q:id="2"/>"#,
         ]
     );
     assert_eq!(
-        paragraph.paragraph_level_formulas().unwrap(),
+        paragraph.paragraph_level_equations().unwrap(),
         vec!["<q:oMath><q:r/></q:oMath>"]
     );
     assert_eq!(
-        paragraph.runs().unwrap()[0].omml_formula().unwrap(),
+        paragraph.runs().unwrap()[0].omml_equation().unwrap(),
         Some(
             r#"<m:oMath data-id="1"><m:r><wp:rPr/><m:t><![CDATA[x < y]]></m:t></m:r></m:oMath>"#
                 .to_string()
@@ -414,19 +414,19 @@ fn omml_formulas_preserve_inline_and_display_xml_exactly() {
 }
 
 #[test]
-fn omml_formulas_accept_strict_and_inherited_prefixes() {
+fn omml_equations_accept_strict_and_inherited_prefixes() {
     let strict = Paragraph::new(
         br#"<s:p xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main" xmlns:math="http://purl.oclc.org/ooxml/officeDocument/math"><s:r><math:oMath><math:r/></math:oMath></s:r></s:p>"#
             .to_vec(),
     );
     assert_eq!(
-        strict.omml_formulas().unwrap(),
+        strict.omml_equations().unwrap(),
         vec!["<math:oMath><math:r/></math:oMath>"]
     );
 
     let inherited = Run::new(br#"<w:r><m:oMath><m:r/></m:oMath></w:r>"#.to_vec());
     assert_eq!(
-        inherited.omml_formula().unwrap().as_deref(),
+        inherited.omml_equation().unwrap().as_deref(),
         Some("<m:oMath><m:r/></m:oMath>")
     );
 
@@ -449,17 +449,17 @@ fn omml_formulas_accept_strict_and_inherited_prefixes() {
 
     let foreign =
         Run::new(br#"<w:r xmlns:m="urn:not-omml"><m:oMath><m:r/></m:oMath></w:r>"#.to_vec());
-    assert_eq!(foreign.omml_formula().unwrap(), None);
+    assert_eq!(foreign.omml_equation().unwrap(), None);
 }
 
 #[test]
-fn omml_formulas_reject_malformed_xml() {
+fn omml_equations_reject_malformed_xml() {
     let paragraph = Paragraph::new(
         br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><w:r><m:oMath><m:r/></w:r></w:p>"#
             .to_vec(),
     );
-    assert!(paragraph.omml_formulas().is_err());
-    assert!(paragraph.paragraph_level_formulas().is_err());
+    assert!(paragraph.omml_equations().is_err());
+    assert!(paragraph.paragraph_level_equations().is_err());
 }
 
 #[test]
@@ -485,11 +485,11 @@ fn omml_uses_math_paragraph_ancestry_and_retains_source_namespace_context() {
         namespaces,
     );
     assert_eq!(
-        paragraph.omml_formulas().unwrap(),
+        paragraph.omml_equations().unwrap(),
         ["<q:oMath/>", "<q:oMath><q:r/></q:oMath>", "<q:oMath/>"]
     );
     assert_eq!(
-        paragraph.paragraph_level_formulas().unwrap(),
+        paragraph.paragraph_level_equations().unwrap(),
         ["<q:oMath/>", "<q:oMath/>"]
     );
     for equation in paragraph
@@ -512,9 +512,9 @@ fn omml_scan_handles_bom_and_bounds_nesting() {
     let paragraph = Paragraph::new(
         b"\xef\xbb\xbf<w:p><m:oMath/><m:oMathPara><m:oMath/></m:oMathPara></w:p>".to_vec(),
     );
-    assert_eq!(paragraph.omml_formulas().unwrap(), ["<m:oMath/>"]);
+    assert_eq!(paragraph.omml_equations().unwrap(), ["<m:oMath/>"]);
     assert_eq!(
-        paragraph.paragraph_level_formulas().unwrap(),
+        paragraph.paragraph_level_equations().unwrap(),
         ["<m:oMath/>"]
     );
     for xml in [

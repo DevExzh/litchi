@@ -18,7 +18,7 @@ litchi = { path = "../litchi", default-features = false, features = [
     "odf",
     "iwork",
     "rtf",
-    "formula",
+    "equation",
     "images",
     "eval",
 ] }

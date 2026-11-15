@@ -442,11 +442,11 @@ fn node_views_match_officecli_shapes() {
         &json(&get(docx, "/body/p[2]/hyperlink[1]").unwrap(), 0),
     );
     check_golden("sdt", &json(&get(docx, "/body/sdt[1]").unwrap(), 1));
-    // An equation's text is its LaTeX, which needs the `formula` feature.
-    let body = if cfg!(feature = "formula") {
+    // An equation's text is its LaTeX, which needs the `equation` feature.
+    let body = if cfg!(feature = "equation") {
         "body"
     } else {
-        "body_without_formula"
+        "body_without_equation"
     };
     check_golden(body, &json(&get(docx, "/body").unwrap(), 1));
 }
@@ -655,10 +655,10 @@ fn text_view_lists_body_elements_by_their_paths() {
     let file = report();
     let docx = docx(&file);
     let text = view(docx, Mode::Text, &Options::default());
-    // With the `formula` feature an equation shows its LaTeX, as OfficeCLI's
+    // With the `equation` feature an equation shows its LaTeX, as OfficeCLI's
     // equation node does.
-    let equation = if cfg!(feature = "formula") {
-        "[Equation] x=1"
+    let equation = if cfg!(feature = "equation") {
+        "[Equation] x= 1"
     } else {
         "[Equation]"
     };

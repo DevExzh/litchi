@@ -1430,36 +1430,41 @@ fn wildcard_rtf_errors_are_corrupt_file() {
     assert_eq!(error.format(), Some(FileFormat::Rtf));
 }
 
-#[cfg(feature = "formula")]
+#[cfg(feature = "equation")]
 #[test]
-fn formula_conversion_errors_keep_their_typed_source() {
-    use litchi_formula::omml::LimitKind;
-    use litchi_formula::{FormulaError, LatexError, OmmlError};
+fn equation_conversion_errors_keep_their_typed_source() {
+    use litchi_equation::{Error as EquationError, Format, LimitKind};
 
     let unsupported = assert_code(
-        FormulaError::Omml(OmmlError::UnsupportedFeature("m:groupChr".into())),
+        EquationError::Unsupported("m:groupChr".into()),
         Code::UnsupportedElement,
     );
-    assert!(matches!(unsupported.leaf(), Source::Formula(_)));
+    assert!(matches!(unsupported.leaf(), Source::Equation(_)));
     assert_code(
-        FormulaError::Omml(OmmlError::LimitExceeded {
+        EquationError::LimitExceeded {
             kind: LimitKind::Depth,
             limit: 64,
-            actual: 65,
-        }),
+        },
         Code::LimitExceeded,
     );
     assert_code(
-        FormulaError::Omml(OmmlError::ArenaAllocationError("full".into())),
+        EquationError::InputTooLarge {
+            size: 65,
+            limit: 64,
+        },
+        Code::LimitExceeded,
+    );
+    assert_code(EquationError::InvalidLimit("zero"), Code::InvalidArgument);
+    assert_code(
+        EquationError::Internal("render".into()),
         Code::InternalError,
     );
-    // The wildcard arm: every other conversion failure is malformed markup.
+    // The wildcard arm: malformed equation markup.
     assert_code(
-        FormulaError::Omml(OmmlError::MalformedElement("m:f".into())),
-        Code::CorruptFile,
-    );
-    assert_code(
-        FormulaError::Latex(LatexError::InvalidNode("bad".into())),
+        EquationError::Malformed {
+            format: Format::Omml,
+            message: "m:f".into(),
+        },
         Code::CorruptFile,
     );
 }

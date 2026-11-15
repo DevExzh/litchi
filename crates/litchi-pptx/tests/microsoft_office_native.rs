@@ -12,30 +12,33 @@ fn native(name: &str) -> Package {
 }
 
 #[test]
-fn native_equations_keep_shape_owners_formula_structure_and_fallback_parts() {
+fn native_equations_keep_shape_owners_latex_structure_and_fallback_parts() {
     let package = native("powerpoint-fonts-math-handout.pptx");
     let presentation = package.presentation().unwrap();
     let slides = presentation.slides().unwrap();
     assert_eq!(slides.len(), 4);
     assert!(slides[0].equations().unwrap().is_empty());
-    // Expected formulae follow the stored OMML; the inspection prose uses
+    // Expected LaTeX follows the stored OMML (whose mathematical italic
+    // letters are plain italic variables in LaTeX); the inspection prose uses
     // typographic superscripts, whereas m:t contains ordinary digits.
     let expected = [
-        (r"𝑥=\frac{−𝑏±\sqrt{𝑏^{2}−4𝑎𝑐}}{2𝑎}", "𝑥=−𝑏±𝑏2−4𝑎𝑐2𝑎"),
-        (r"\sum_{𝑘=1}^{4} 𝑘^{2}=30", "𝑘=14𝑘2=30"),
-        // The current formula projection documents text-only fallback for
-        // matrices; this assertion does not claim row/column semantics.
-        ("𝐴=1234", "𝐴=1234"),
+        (r"x= \frac{- b\pm \sqrt{b^{2}- 4ac}}{2a}", "𝑥=−𝑏±𝑏2−4𝑎𝑐2𝑎"),
+        (r"\sum\limits_{k= 1}^4 {k^2}= 30", "𝑘=14𝑘2=30"),
+        (r"A= \begin{array}{cc} 1 & 2 \\ 3 & 4 \end{array}", "𝐴=1234"),
     ];
     let reopened = Package::from_bytes(&package.to_bytes().unwrap()).unwrap();
     let reopened_presentation = reopened.presentation().unwrap();
     let reopened_slides = reopened_presentation.slides().unwrap();
-    for (index, (formula, text)) in expected.into_iter().enumerate() {
+    for (index, (latex, text)) in expected.into_iter().enumerate() {
         let slide = &slides[index + 1];
         let equations = slide.equations().unwrap();
         assert_eq!(equations.len(), 1);
         assert_eq!(equations[0].shape_id(), Some(3));
-        assert_eq!(equations[0].formula(), formula);
+        #[cfg(feature = "equation")]
+        assert_eq!(equations[0].latex().unwrap(), latex);
+        #[cfg(not(feature = "equation"))]
+        let _ = latex;
+        assert!(equations[0].omml().starts_with("<m:oMath "));
         assert_eq!(equations[0].text(), text);
         assert_eq!(reopened_slides[index + 1].equations().unwrap(), equations);
         assert_eq!(

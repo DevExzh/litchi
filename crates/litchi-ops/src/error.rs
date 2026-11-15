@@ -433,10 +433,10 @@ pub enum Source {
     /// the format-owned freshness progress and nested source diagnostics.
     #[cfg(feature = "odp")]
     OdpTailAppend(litchi_odp::tail_append::Error),
-    /// A formula conversion error: Markdown output renders OMML formulas as
-    /// LaTeX.
-    #[cfg(feature = "formula")]
-    Formula(litchi_formula::FormulaError),
+    /// An equation conversion error: Markdown output renders OMML equations
+    /// as LaTeX.
+    #[cfg(feature = "equation")]
+    Equation(litchi_equation::Error),
     /// A Pages, Keynote or Numbers leaf error.
     #[cfg(iwork_adapter)]
     Iwork(crate::format::iwork::LeafError),
@@ -537,8 +537,8 @@ impl Source {
             Self::Odf(error) => Some(error),
             #[cfg(feature = "odp")]
             Self::OdpTailAppend(error) => Some(error),
-            #[cfg(feature = "formula")]
-            Self::Formula(error) => Some(error),
+            #[cfg(feature = "equation")]
+            Self::Equation(error) => Some(error),
             #[cfg(iwork_adapter)]
             Self::Iwork(error) => Some(error),
         }
@@ -2469,19 +2469,17 @@ impl Classify for litchi_crypto::ooxml::Error {
     }
 }
 
-#[cfg(feature = "formula")]
-impl Classify for litchi_formula::FormulaError {
+#[cfg(feature = "equation")]
+impl Classify for litchi_equation::Error {
     fn classify(&self) -> Class {
-        use litchi_formula::{MtefError, MtefWriteError, OmmlError};
-
         match self {
-            Self::Omml(OmmlError::UnsupportedFeature(_)) => Class::of(Code::UnsupportedElement),
-            Self::Omml(OmmlError::LimitExceeded { .. }) => Class::of(Code::LimitExceeded),
-            Self::Mtef(MtefError::LimitExceeded { .. })
-            | Self::MtefWrite(MtefWriteError::LimitExceeded { .. }) => {
+            Self::Unsupported(_) => Class::of(Code::UnsupportedElement),
+            Self::InputTooLarge { .. } | Self::LimitExceeded { .. } => {
                 Class::of(Code::LimitExceeded)
             },
-            Self::Omml(OmmlError::ArenaAllocationError(_)) => Class::of(Code::InternalError),
+            Self::InvalidLimit(_) => Class::of(Code::InvalidArgument),
+            Self::Internal(_) => Class::of(Code::InternalError),
+            // Malformed equation markup, and variants added later.
             _ => Class::of(Code::CorruptFile),
         }
     }
@@ -2840,7 +2838,7 @@ from_leaf!(
     #[cfg(feature = "encryption")]
     litchi_crypto::ooxml::Error => Crypto, None
 );
-from_leaf!(#[cfg(feature = "formula")] litchi_formula::FormulaError => Formula, None);
+from_leaf!(#[cfg(feature = "equation")] litchi_equation::Error => Equation, None);
 from_leaf!(#[cfg(iwork_adapter)] crate::format::iwork::LeafError => Iwork, None);
 
 #[cfg(iwork_adapter)]

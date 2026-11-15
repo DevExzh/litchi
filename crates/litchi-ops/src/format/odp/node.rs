@@ -319,8 +319,8 @@ impl<'f> Node<'f> {
             Item::Object(reference, Kind::Equation) => self
                 .file
                 .parts()?
-                .formula(reference)
-                .map(|formula| Cow::Owned(formula.to_owned())),
+                .equation(reference)
+                .map(|equation| Cow::Owned(equation.text.clone())),
             Item::Axis(object, index) => self
                 .file
                 .parts()?
@@ -815,8 +815,8 @@ impl<'a> Props<'a> {
     }
 }
 
-/// A video, audio or formula object's value: the frame keys, then the
-/// media or the formula.
+/// A video, audio or equation object's value: the frame keys, then the
+/// media or the equation.
 fn special_value<'a>(
     file: &'a Odp,
     reference: &ObjectRef,
@@ -829,11 +829,13 @@ fn special_value<'a>(
     }
     if kind == Kind::Equation {
         return match key {
-            "formula" => file
+            "latex" => file
                 .parts()
                 .ok()?
-                .formula(reference)
-                .map(|formula| Value::Text(Cow::Owned(formula.to_owned()))),
+                .equation(reference)?
+                .latex
+                .clone()
+                .map(|latex| Value::Text(Cow::Owned(latex))),
             _ => None,
         };
     }

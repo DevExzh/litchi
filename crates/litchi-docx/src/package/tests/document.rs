@@ -28,11 +28,11 @@ fn saves_and_reopens_inline_and_display_office_math() {
     );
     let paragraphs = reopened.document().unwrap().paragraphs().unwrap();
     assert_eq!(
-        paragraphs[0].omml_formulas().unwrap(),
+        paragraphs[0].omml_equations().unwrap(),
         vec![inline.into_xml()]
     );
     assert_eq!(
-        paragraphs[1].paragraph_level_formulas().unwrap(),
+        paragraphs[1].paragraph_level_equations().unwrap(),
         vec![display.into_xml()]
     );
     assert_eq!(paragraphs[0].inline_office_math().unwrap().len(), 1);

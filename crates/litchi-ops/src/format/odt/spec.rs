@@ -625,10 +625,11 @@ pub(crate) const SHAPE_PROPS: &[PropSpec] = &[
     read("line.width", ValueType::Length(LengthSpec::EXTENT)),
 ];
 
-/// A formula object: its StarMath (or MathML token) text, how it sits in
-/// its paragraph, and its frame.
+/// An equation (a formula object): its MathML converted to LaTeX, how it
+/// sits in its paragraph, and its frame. Its text is the StarMath (or
+/// MathML token) text.
 pub(crate) const EQUATION_PROPS: &[PropSpec] = &[
-    read("formula", ValueType::Text),
+    read("latex", ValueType::Text),
     read("mode", ValueType::Token(&EQUATION_MODE)),
     read("name", ValueType::Text),
     read("width", ValueType::Length(LengthSpec::EXTENT)),
@@ -1081,7 +1082,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
         element(
             K::Equation,
             "equation",
-            &["equation", "formula", "math"],
+            &["equation", "math"],
             &[K::Body],
             &[],
             &["/body/equation[N]"],

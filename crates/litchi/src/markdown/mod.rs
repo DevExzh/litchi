@@ -34,5 +34,6 @@
 
 // Re-export public API (format-agnostic helpers live in litchi-markdown)
 pub use litchi_markdown::{
-    FormulaStyle, MarkdownOptions, ScriptStyle, StrikethroughStyle, TableStyle, ToMarkdown, unicode,
+    EquationStyle, MarkdownOptions, ScriptStyle, StrikethroughStyle, TableStyle, ToMarkdown,
+    unicode,
 };

@@ -76,9 +76,9 @@ FIXTURE_BULK_PACKAGES = frozenset(
         "litchi-doc",
         "litchi-docx",
         "litchi-drawingml",
+        "litchi-equation",
         "litchi-eval",
         "litchi-fonts",
-        "litchi-formula",
         "litchi-imgconv",
         "litchi-markdown",
         "litchi-odb",
@@ -129,9 +129,9 @@ FIXTURE_WORKSPACE_PACKAGES = frozenset(
         "litchi-doc",
         "litchi-docx",
         "litchi-drawingml",
+        "litchi-equation",
         "litchi-eval",
         "litchi-fonts",
-        "litchi-formula",
         "litchi-imgconv",
         "litchi-iwa-archive",
         "litchi-iwa-cache",
@@ -199,11 +199,11 @@ FIXTURE_SAFE_FACADE_FEATURES = frozenset(
         "docx",
         "drawingml",
         "encryption",
+        "equation",
         "eval",
         "font-discovery",
         "font-subset",
         "fonts",
-        "formula",
         "images",
         "legacy",
         "markdown",
@@ -320,7 +320,7 @@ def metadata_fixture() -> dict[str, object]:
                         "odf",
                         "iwork",
                         "rtf",
-                        "formula",
+                        "equation",
                         "images",
                     ],
                 }
@@ -1999,6 +1999,40 @@ class NonIworkGateTests(unittest.TestCase):
             gate.derive_plan(with_dependency("flate2", ROOT / "vendor" / "x" / "flate2"))
         with self.assertRaises(gate.GateError):
             gate.derive_plan(with_dependency("litchi-pages", ROOT / "vendor" / "litchi-pages"))
+
+    def test_only_the_pinned_mathema_revision_is_an_allowed_git_dependency(self) -> None:
+        pinned = gate.ALLOWED_GIT_DEPENDENCIES[("litchi-equation", "mathema")]
+
+        def with_dependency(package_name: str, name: str, source: str) -> dict:
+            metadata = copy.deepcopy(metadata_fixture())
+            package = next(p for p in metadata["packages"] if p["name"] == package_name)
+            package["dependencies"].append({
+                "name": name, "source": source, "req": "^0.1.0", "kind": None,
+                "rename": None, "optional": False, "uses_default_features": False,
+                "target": None, "registry": None, "features": [],
+            })
+            return metadata
+
+        self.assertEqual(list(gate.ALLOWED_GIT_DEPENDENCIES), [("litchi-equation", "mathema")])
+        gate.derive_plan(with_dependency("litchi-equation", "mathema", pinned))
+        repository = "git+https://github.com/DevExzh/mathema"
+        for package_name, name, source in (
+            ("litchi-doc", "mathema", pinned),
+            ("litchi-equation", "other", pinned),
+            ("litchi-equation", "mathema", repository),
+            ("litchi-equation", "mathema", repository + "?branch=main"),
+            ("litchi-equation", "mathema", repository + "?rev=0123456789abcdef"),
+        ):
+            with self.subTest(package=package_name, dependency=name, source=source):
+                with self.assertRaisesRegex(gate.GateError, "not a crates.io dependency"):
+                    gate.derive_plan(with_dependency(package_name, name, source))
+
+        # The allowance, the workspace pin and cargo-deny name the same source.
+        url, rev = pinned.removeprefix("git+").split("?rev=")
+        workspace = (ROOT / "Cargo.toml").read_text(encoding="utf-8")
+        self.assertIn(f'mathema       = {{ git = "{url}", rev = "{rev}"', workspace)
+        deny = (ROOT / "deny.toml").read_text(encoding="utf-8")
+        self.assertIn(f'"{url}"', deny.split("allow-git", 1)[1])
 
     def test_bulk_direct_excluded_dependency_is_rejected_regardless_of_edge_shape(self) -> None:
         metadata = copy.deepcopy(metadata_fixture())

@@ -346,8 +346,8 @@ fn project_run(
     }
 
     if unknown_count > 0 {
-        let one_formula = unknown_count == 1 && run.omml_formula()?.is_some();
-        if !one_formula {
+        let one_equation = unknown_count == 1 && run.omml_equation()?.is_some();
+        if !one_equation {
             return Err(unrepresentable(
                 "Markdown export cannot preserve an unmodeled DOCX run child",
             ));
@@ -430,7 +430,7 @@ pub(super) fn requires_package_context(paragraph: &litchi_docx::Paragraph) -> Re
                             | litchi_docx::RunContent::FootnoteReference(_)
                             | litchi_docx::RunContent::EndnoteReference(_)
                     )
-                }) || (unknowns > 0 && !(unknowns == 1 && run.omml_formula()?.is_some()))
+                }) || (unknowns > 0 && !(unknowns == 1 && run.omml_equation()?.is_some()))
                 {
                     return Ok(true);
                 }

@@ -19,7 +19,7 @@ A high-performance Rust library for reading and writing Microsoft Office file fo
 - **OpenDocument** - .odt, .ods, .odp, and the .oth, .odm, .odg, .odc, .odi, .odb and .odf formula formats
 - **Apple iWork** - .pages, .numbers, and .key packages and app-authored package directories
 - **Per-format modules** - each format crate is re-exported for format-specific reading and writing
-- **Formula Conversion** - Parse MathType and Office MathML equations and convert to LaTeX
+- **Equation Conversion** - Read MathType, Equation Editor and Office Math equations as LaTeX
 - **Markdown Conversion** - Convert documents and presentations to Markdown format
 - **Memory Efficient** - Direct byte buffer support with zero-copy parsing where possible
 - **High Performance** - SIMD optimizations, minimal allocations, efficient memory layout
@@ -276,13 +276,13 @@ builder.build()?.save("output.pptx")?;
     file.save()?; // a package directory is written back as a directory
 }
 
-// Formula conversion (requires the "formula" feature)
-#[cfg(feature = "formula")]
+// Equation conversion (requires the "equation" feature)
+#[cfg(feature = "equation")]
 {
-    use litchi::formula;
-    let latex = formula::omml_to_latex(
+    use litchi::equation;
+    let latex = equation::omml_to_latex(
         "<m:oMath><m:r><m:t>x</m:t></m:r></m:oMath>",
-        &formula::omml::Limits::DEFAULT,
+        &equation::Limits::DEFAULT,
     )?;
     println!("{latex}");
 }
@@ -345,7 +345,7 @@ IWA Protocol Buffer messages. Enabling any one of them requires a system
 
 - Format leaves: `doc`, `docx`, `ppt`, `pptx`, `xls`, `xlsx`, `xlsb`, `rtf`, `odt`, `ods`, `odp`, `pages`, `keynote`, `numbers`.
 - Infrastructure: `cfb`, `ole`, `opc`, `ooxml-common`, `drawingml`, `odf-common`, `sheet`.
-- Capabilities: `sign`, `encryption`, `formula`, `fonts`, `images`, `eval`, `web-functions`, `markdown`, `yaml`.
+- Capabilities: `sign`, `encryption`, `equation`, `fonts`, `images`, `eval`, `web-functions`, `markdown`, `yaml`.
 - Aggregates: `legacy`, `ooxml`, `odf`, `iwork`, `word`, `slides`, `spreadsheets`, `office`, `all-formats`, `all`.
 
 Use leaf features for lean applications; aggregates are convenience bundles.
@@ -381,7 +381,7 @@ Buffer values.
 - ✅ **Immutable edits** - `set`, `add`, `remove`, `move_to`, `swap`, transactions with exact inverse patches, and batches
 - ✅ **Text & Formatting** - Paragraphs, runs, tables, cells, styles, numbering, comments, hyperlinks, pictures, charts
 - ✅ **Engines** - find/replace, template merge, field refresh, CSV/TSV import and formula evaluation
-- ✅ **Formula Parsing** - MathType and Office MathML to LaTeX conversion
+- ✅ **Equations** - MathType, Equation Editor and Office Math equations as LaTeX
 - ✅ **Markdown Export** - Convert documents and presentations to Markdown
 
 **In Progress:**
@@ -420,8 +420,9 @@ This library is built upon the work of many open-source projects. We are gratefu
 - [rtf2latex2e](https://github.com/wilfriedh/rtf2latex2e) - RTF to LaTeX converter
 - [RtfDomParser](https://github.com/elistevens/RtfDomParser) - RTF parser
 
-**Formula Conversion:**
-- [plurimath](https://github.com/plurimath/plurimath) - Multi-format mathematical formula converter
+**Equation Conversion:**
+- [mathema](https://github.com/DevExzh/mathema) - Converts equations between LaTeX, MathML, OMML and MTEF
+- [plurimath](https://github.com/plurimath/plurimath) - Multi-format math converter
 
 **Image Conversion:**
 - [libemf2svg](https://github.com/kakwa/libemf2svg) - EMF/WMF to SVG conversion

@@ -213,9 +213,10 @@ fn tabs_shapes_equations_and_columns_read() {
 
     assert_eq!(count(&file, "equation"), 2);
     assert_eq!(
-        prop(&file, "/body/equation[1]", "formula").as_deref(),
-        Some("a^2 + b^2 = c^2")
+        prop(&file, "/body/equation[1]", "latex").as_deref(),
+        cfg!(feature = "equation").then_some("{a^{2}+ b^{2}= c^{2}}")
     );
+    assert_eq!(text(&file, "/body/equation[1]"), "a^2 + b^2 = c^2");
     assert_eq!(
         prop(&file, "/body/equation[1]", "mode").as_deref(),
         Some("inline")
@@ -234,9 +235,10 @@ fn tabs_shapes_equations_and_columns_read() {
 
     let flat = open("libreoffice-core/sw/qa/extras/uiwriter/data/text-with-formula.fodt");
     assert_eq!(
-        prop(&flat, "/body/equation[1]", "formula").as_deref(),
-        Some("{func e}^{i %pi} + 1 = 0")
+        prop(&flat, "/body/equation[1]", "latex").as_deref(),
+        cfg!(feature = "equation").then_some(r"{{{\mathrm{e}}^{i\pi}+ 1}= 0}")
     );
+    assert_eq!(text(&flat, "/body/equation[1]"), "{func e}^{i %pi} + 1 = 0");
 }
 
 #[test]
@@ -386,7 +388,7 @@ fn read_only_parts_refuse_writes() {
         ("/field[1]", "fieldType"),
         ("/toc[1]", "levels"),
         ("/body/shape[1]", "width"),
-        ("/body/equation[1]", "formula"),
+        ("/body/equation[1]", "latex"),
         ("/body/tbl[1]/col[1]", "width"),
     ] {
         let error = file.set(path, props! { key => "1" }).unwrap_err();

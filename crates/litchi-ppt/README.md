@@ -59,7 +59,6 @@ ownership move is intentionally breaking: there is no `litchi_ole::ppt` or
 - Typed `.ppt` reader, writer, and checked mutation APIs
 - Slides, masters, text, shapes, OfficeArt images, charts, media, and OLE objects
 - Inert encryption, signing, and VBA project handling
-- Optional `formula` feature for MathType (MTEF) extraction
 
 ## License
 

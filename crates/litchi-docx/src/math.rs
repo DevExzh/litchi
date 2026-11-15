@@ -28,7 +28,7 @@ use litchi_core::xml::ReaderOrigin;
 use litchi_core::xml::escape_xml;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::{
-    OMML_NAMESPACE_URI, decode_xml_reference, extract_omml_formulas, is_omml_name,
+    OMML_NAMESPACE_URI, decode_xml_reference, extract_omml_equations, is_omml_name,
 };
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -121,7 +121,7 @@ impl OfficeMathParagraph {
     /// Returns an error if the operation cannot be completed.
     pub fn from_xml(xml: impl Into<String>) -> Result<Self> {
         let xml = normalize_fragment(xml.into(), OfficeMathRoot::Paragraph)?;
-        if extract_omml_formulas(xml.as_bytes())?.is_empty() {
+        if extract_omml_equations(xml.as_bytes())?.is_empty() {
             return Err(invalid(
                 "Office Math paragraph must contain an oMath equation",
             ));
@@ -175,7 +175,7 @@ impl OfficeMathParagraph {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn equations(&self) -> Result<Vec<OfficeMath>> {
-        extract_omml_formulas(self.xml.as_bytes())?
+        extract_omml_equations(self.xml.as_bytes())?
             .into_iter()
             .map(OfficeMath::from_xml)
             .collect()
@@ -449,7 +449,7 @@ fn validate_element_attributes(
 /// namespace binding was inherited from an enclosing document, record the
 /// binding that must be made local before the fragment is written elsewhere.
 ///
-/// An isolated formula such as `<q:oMath>` or `<oMath>` cannot reveal whether
+/// An isolated equation such as `<q:oMath>` or `<oMath>` cannot reveal whether
 /// its original namespace was transitional or strict. The mutable DOCX writer
 /// emits transitional `WordprocessingML`, so inherited bindings are normalized
 /// to the transitional OMML URI. An explicit namespace declaration remains

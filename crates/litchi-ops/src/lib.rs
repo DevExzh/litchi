@@ -68,8 +68,8 @@
 //!
 //! | Condition | Code |
 //! |---|---|
-//! | Content Markdown cannot represent faithfully: unresolved list numbering, active `altChunk` blocks, inline images in DOC, hyperlinks or notes it cannot place, formulas without a LaTeX form | [`Code::UnsupportedElement`] |
-//! | Output that needs a cargo feature this build lacks (`formula` for formulas, `yaml` for front matter) | [`Code::UnsupportedCapability`], with a suggestion |
+//! | Content Markdown cannot represent faithfully: unresolved list numbering, active `altChunk` blocks, inline images in DOC, hyperlinks or notes it cannot place, equations without a LaTeX form | [`Code::UnsupportedElement`] |
+//! | Output that needs a cargo feature this build lacks (`equation` for equations, `yaml` for front matter) | [`Code::UnsupportedCapability`], with a suggestion |
 //! | Malformed content met while converting, such as a note the body references but the package lacks | [`Code::CorruptFile`] |
 //! | A failed internal invariant of the conversion | [`Code::InternalError`] |
 //! | A source-backed file that changed during or after the conversion | [`Code::IoError`] |

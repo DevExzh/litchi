@@ -1,6 +1,6 @@
 //! The ODT parts: master-page headers and footers, list styles as numbering
 //! definitions, instances and levels, body text fields, tables of contents,
-//! tab stops, drawing shapes, formula objects and table columns.
+//! tab stops, drawing shapes, equations (formula objects) and table columns.
 //!
 //! Every part reads through the leaf part index
 //! ([`litchi_odt::body::Parts`]), built once per handle on the first part
@@ -24,17 +24,19 @@ use crate::path::navigate::KindSet;
 use crate::value::{Length, LengthContext};
 
 /// The part index of one handle: the leaf index, the body's text fields
-/// (by their byte ranges) and its formula objects.
+/// (by their byte ranges) and its equations.
 pub(crate) struct Index {
     parts: Parts,
     fields: Vec<Range<usize>>,
     equations: Vec<Equation>,
 }
 
-/// One formula object: its index among the leaf objects and its text.
+/// One equation (a formula object): its index among the leaf objects, its
+/// text (the StarMath annotation, or the MathML token text) and its LaTeX.
 struct Equation {
     object: usize,
-    formula: String,
+    text: String,
+    latex: Option<String>,
 }
 
 impl Index {
@@ -50,18 +52,27 @@ impl Index {
             .collect();
         let mut equations = Vec::new();
         for (object, embedded) in parts.view(body).objects().enumerate() {
-            let formula = match embedded.inline_math() {
-                Some(math) => litchi_odt::body::parts::formula_text(math),
-                None => match embedded.href().as_deref().and_then(subdocument) {
-                    Some(path) => odt
-                        .member(&path)?
-                        .and_then(|bytes| String::from_utf8(bytes).ok())
-                        .and_then(|xml| litchi_odt::body::parts::formula_text(&xml)),
-                    None => None,
+            let subdocument_xml;
+            let mathml = match embedded.inline_math() {
+                Some(math) => Some(math),
+                None => {
+                    subdocument_xml = match embedded.href().as_deref().and_then(subdocument) {
+                        Some(path) => odt
+                            .member(&path)?
+                            .and_then(|bytes| String::from_utf8(bytes).ok()),
+                        None => None,
+                    };
+                    subdocument_xml.as_deref()
                 },
             };
-            if let Some(formula) = formula {
-                equations.push(Equation { object, formula });
+            if let Some(mathml) = mathml
+                && let Some(text) = litchi_odt::body::parts::formula_text(mathml)
+            {
+                equations.push(Equation {
+                    object,
+                    text,
+                    latex: crate::format::odf_math::latex(mathml),
+                });
             }
         }
         Ok(Self {
@@ -325,7 +336,7 @@ pub(super) fn has_part_children(kind: Kind, kinds: KindSet<Kind>) -> bool {
 }
 
 /// The text of a part node: a region's, a field's displayed text, a table
-/// of contents' index body, a shape's or an equation's formula.
+/// of contents' index body, a shape's or an equation's text.
 pub(super) fn text<'f>(odt: &'f Odt, part: Part) -> Result<Option<Cow<'f, str>>> {
     let (body, view, index) = view(odt)?;
     Ok(match part {
@@ -349,7 +360,7 @@ pub(super) fn text<'f>(odt: &'f Odt, part: Part) -> Result<Option<Cow<'f, str>>>
         Part::Equation(equation) => index
             .equations
             .get(equation as usize)
-            .map(|equation| Cow::Borrowed(equation.formula.as_str())),
+            .map(|equation| Cow::Borrowed(equation.text.as_str())),
         Part::Numbering | Part::List(_) | Part::Level(..) | Part::Tab(..) | Part::Column(..) => {
             None
         },
@@ -445,7 +456,10 @@ pub(super) fn value<'f>(odt: &'f Odt, kind: Kind, part: Part, index: usize) -> O
             let equation = parts.equations.get(equation as usize)?;
             let object = view.objects().nth(equation.object)?;
             match index {
-                0 => Some(Value::Text(Cow::Borrowed(equation.formula.as_str()))),
+                0 => equation
+                    .latex
+                    .as_deref()
+                    .map(|latex| Value::Text(Cow::Borrowed(latex))),
                 1 => Some(Value::Token(
                     if object.anchor_type().as_deref() == Some("as-char") {
                         "inline"

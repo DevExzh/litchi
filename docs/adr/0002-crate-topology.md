@@ -609,7 +609,9 @@ Additional focused crates are permitted where the responsibility is real:
   formats retain responsibility for terminators and other record-level text
   rules. Generic hexadecimal decoding remains `litchi-core::hex` and does not
   pull a legacy text codec into the neutral vocabulary crate.
-- `litchi-math` replaces the current equation-focused `litchi-formula` name.
+- `litchi-equation` owns math equations (OMML, MTEF, MathML and LaTeX
+  conversion over the `mathema` converter); "formula" names spreadsheet and
+  field formulas only.
 - `litchi-calc` owns spreadsheet formula parsing, dependency graphs, and pure
   calculation; it has no network or async-runtime dependency.
 - `litchi-crypto`, `litchi-sign`, and `litchi-vba` own shared inert security

@@ -153,13 +153,11 @@ ODraw traversal resources are named `LimitKind` and image resources
 `image::LimitKind`. The former root names `Limit` and `ImageLimit` are deleted
 and banned; error variants and their existing observations stay unchanged.
 
-The Formula raw codec profile is registered. `mtef::MtefParser`,
-`mtef::MtefWriter`, `omml::OmmlParser` and `omml::OmmlWriter` retain the
-caller-selected finite `mtef::Limits`/`omml::Limits` policy, and the public
-MTEF/OMML conversion helpers require those policies at every raw boundary.
-Input, depth, work, item, string and output ceilings are checked before
-retention, allocation or emission; the conversion and parser tests preserve
-wire and semantic round trips.
+The equation raw codec profile is registered. `litchi_equation`'s
+`omml_to_latex`, `mathml_to_latex`, `read_mtef`, `mtef_to_latex` and
+`latex_to_omml` take a caller-selected finite `Limits` (input bytes, parsed
+nodes and nesting depth) at every raw boundary; the input ceiling is checked
+before parsing. Parsing and writing are done by the `mathema` converter.
 
 ## 3. Open, create, save
 

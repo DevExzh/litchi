@@ -159,7 +159,7 @@ impl ElementKind for Kind {
             "hlink" | "hyperlink" => Self::Hyperlink,
             "notes" => Self::Notes,
             "comment" => Self::Comment,
-            "equation" | "formula" | "math" => Self::Equation,
+            "equation" | "math" => Self::Equation,
             "slideMaster" | "slidemaster" => Self::SlideMaster,
             "layout" | "slideLayout" | "slidelayout" => Self::SlideLayout,
             "notesMaster" | "notesmaster" => Self::NotesMaster,
@@ -378,10 +378,11 @@ pub(crate) const MEDIA_PROPS: &[PropSpec] = &[
     PropSpec::new("mute", ValueType::Bool),
 ];
 
-/// A formula object: its StarMath (or MathML token) text and its frame.
+/// An equation (a formula object): its MathML converted to LaTeX and its
+/// frame. Its text is the StarMath (or MathML token) text.
 pub(crate) const EQUATION_PROPS: &[PropSpec] = &[
     raw("id", ValueType::Text),
-    PropSpec::new("formula", ValueType::Text),
+    PropSpec::new("latex", ValueType::Text),
     PropSpec::new("name", ValueType::Text),
     length("x", LengthSpec::POSITION),
     length("y", LengthSpec::POSITION),
@@ -766,7 +767,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
         element(
             Kind::Equation,
             "equation",
-            &["equation", "formula", "math"],
+            &["equation", "math"],
             TREE_PARENTS,
             &[],
             SHAPE_IDS,

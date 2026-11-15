@@ -38,7 +38,7 @@
 use clap::{Parser, ValueEnum};
 use litchi::Family;
 use litchi::markdown::{
-    FormulaStyle, MarkdownOptions, ScriptStyle, StrikethroughStyle, TableStyle, ToMarkdown,
+    EquationStyle, MarkdownOptions, ScriptStyle, StrikethroughStyle, TableStyle, ToMarkdown,
 };
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -70,9 +70,9 @@ struct Args {
     #[arg(long, value_enum, default_value = "markdown")]
     table_style: TableStyleArg,
 
-    /// Formula conversion style
+    /// Equation rendering style
     #[arg(long, value_enum, default_value = "latex")]
-    formula_style: FormulaStyleArg,
+    equation_style: EquationStyleArg,
 
     /// Superscript/subscript style
     #[arg(long, value_enum, default_value = "html")]
@@ -120,20 +120,20 @@ impl From<TableStyleArg> for TableStyle {
     }
 }
 
-/// Formula style options for CLI
+/// Equation style options for CLI
 #[derive(Debug, Clone, Copy, ValueEnum)]
-enum FormulaStyleArg {
+enum EquationStyleArg {
     /// LaTeX math mode (\( \) and \[ \])
     Latex,
     /// Dollar signs ($ and $$) - GitHub flavored
     Dollar,
 }
 
-impl From<FormulaStyleArg> for FormulaStyle {
-    fn from(arg: FormulaStyleArg) -> Self {
+impl From<EquationStyleArg> for EquationStyle {
+    fn from(arg: EquationStyleArg) -> Self {
         match arg {
-            FormulaStyleArg::Latex => FormulaStyle::LaTeX,
-            FormulaStyleArg::Dollar => FormulaStyle::Dollar,
+            EquationStyleArg::Latex => EquationStyle::LaTeX,
+            EquationStyleArg::Dollar => EquationStyle::Dollar,
         }
     }
 }
@@ -211,7 +211,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Build markdown options
     let options = MarkdownOptions::new()
         .with_table_style(args.table_style.into())
-        .with_formula_style(args.formula_style.into())
+        .with_equation_style(args.equation_style.into())
         .with_script_style(args.script_style.into())
         .with_strikethrough_style(args.strikethrough_style.into())
         .with_styles(!args.no_styles)

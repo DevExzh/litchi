@@ -609,7 +609,7 @@ Format leaves: `doc`, `docx`, `ppt`, `pptx`, `xls`, `xlsx`, `xlsb`, `rtf`,
 Infrastructure: `cfb`, `ole`, `opc`, `ooxml-common`, `drawingml`,
 `odf-common`, and `sheet`.
 
-Capabilities: `sign`, `encryption`, `formula`, `fonts`, `images`, `eval`,
+Capabilities: `sign`, `encryption`, `equation`, `fonts`, `images`, `eval`,
 `web-functions`, `markdown`, and `yaml`.
 
 `fonts` enables automatic system-font discovery and the shared

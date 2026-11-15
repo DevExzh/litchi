@@ -10,7 +10,7 @@ use crate::image::{InlineImage, parse_inline_images};
 use crate::math::OfficeMath;
 use crate::revision::{Revision, parse_revisions_with_context};
 use litchi_core::xml::ReaderOrigin;
-use litchi_ooxml_common::xml::{is_omml_name, omml_formula_xml};
+use litchi_ooxml_common::xml::{is_omml_name, omml_equation_xml};
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, PrefixDeclaration};
 use quick_xml::reader::NsReader;
@@ -19,7 +19,7 @@ use smallvec::SmallVec;
 use super::super::model::Paragraph;
 
 impl Paragraph {
-    /// Extract all OMML formulas from this paragraph.
+    /// Extract all OMML equations from this paragraph.
     ///
     /// Inline equations are `<m:oMath>` elements outside an `<m:oMathPara>`.
     /// Word writes them beside ordinary runs; older run-nested equations are
@@ -28,14 +28,14 @@ impl Paragraph {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn omml_formulas(&self) -> Result<Vec<String>> {
+    pub fn omml_equations(&self) -> Result<Vec<String>> {
         self.raw_office_math(false)
     }
 
     /// Extract inline Office Math equations as validated typed fragments.
     ///
     /// Inline equations are `<m:oMath>` elements outside math paragraphs. Their
-    /// exact raw XML remains available through [`Self::omml_formulas`]; this
+    /// exact raw XML remains available through [`Self::omml_equations`]; this
     /// method turns each fragment into a validated [`OfficeMath`] value
     /// suitable for reuse with the mutable writer. Inherited namespaces are
     /// declared locally, preserving strict and aliased source bindings.
@@ -189,25 +189,25 @@ impl Paragraph {
         crate::revision::parse_revisions_with_limits(self.xml_bytes(), &namespaces, limits)
     }
 
-    /// Extract paragraph-level OMML formulas.
+    /// Extract paragraph-level OMML equations.
     ///
     /// Returns the original XML of equations enclosed by `<m:oMathPara>`
     /// containers, in document order. A bare paragraph-child `<m:oMath>` is
-    /// inline math and is available through [`Self::omml_formulas`].
+    /// inline math and is available through [`Self::omml_equations`].
     ///
     /// # Example
     /// ```ignore
     /// let para = document.paragraphs()?[0];
-    /// let display_formulas = para.paragraph_level_formulas()?;
-    /// for formula in display_formulas {
-    ///     println!("Display formula: {}", formula);
+    /// let display_equations = para.paragraph_level_equations()?;
+    /// for equation in display_equations {
+    ///     println!("Display equation: {equation}");
     /// }
     /// ```
     ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn paragraph_level_formulas(&self) -> Result<Vec<String>> {
+    pub fn paragraph_level_equations(&self) -> Result<Vec<String>> {
         self.raw_office_math(true)
     }
 
@@ -215,7 +215,7 @@ impl Paragraph {
     ///
     /// Display equations are `<m:oMath>` elements enclosed by an
     /// `<m:oMathPara>` math paragraph. The result is flattened
-    /// into document order; use [`Self::paragraph_level_formulas`] when the
+    /// into document order; use [`Self::paragraph_level_equations`] when the
     /// original XML strings are required. Typed fragments declare their
     /// inherited source namespaces locally.
     ///
@@ -229,7 +229,7 @@ impl Paragraph {
     fn raw_office_math(&self, display: bool) -> Result<Vec<String>> {
         self.office_math_ranges(display)?
             .into_iter()
-            .map(|(start, length)| Ok(omml_formula_xml(self.xml_bytes(), start, length)?))
+            .map(|(start, length)| Ok(omml_equation_xml(self.xml_bytes(), start, length)?))
             .collect()
     }
 

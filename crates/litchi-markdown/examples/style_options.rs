@@ -1,8 +1,8 @@
 //! Compare `MarkdownOptions` style variants on a single input.
 //!
 //! Renders a tiny `MathSnippet` (a subscript fragment + a superscript fragment +
-//! an inline formula) through every relevant variant of [`TableStyle`],
-//! [`FormulaStyle`], and [`ScriptStyle`] so you can eyeball the differences.
+//! an inline equation) through every relevant variant of [`TableStyle`],
+//! [`EquationStyle`], and [`ScriptStyle`] so you can eyeball the differences.
 //!
 //! Note on naming: the task brief mentioned `TableStyle::Pipe` and
 //! `ScriptStyle::Markdown`, but the real enum variants in `litchi-markdown` are
@@ -16,20 +16,20 @@
 //! ```
 use litchi_core::Result;
 use litchi_markdown::{
-    FormulaStyle, MarkdownOptions, ScriptStyle, StrikethroughStyle, TableStyle, ToMarkdown,
+    EquationStyle, MarkdownOptions, ScriptStyle, StrikethroughStyle, TableStyle, ToMarkdown,
     unicode::{convert_to_subscript, convert_to_superscript},
 };
 
 /// A tiny "math snippet" with a subscript label, a superscript exponent, and an
-/// inline formula. The struct itself stores raw text; rendering decisions are
+/// inline equation. The struct itself stores raw text; rendering decisions are
 /// driven entirely by [`MarkdownOptions`].
 struct MathSnippet {
     /// Raw text to render in subscript position, e.g. `"i+1"`.
     subscript: String,
     /// Raw text to render in superscript position, e.g. `"n2"`.
     superscript: String,
-    /// LaTeX source for an inline formula, without delimiters, e.g. `"a^2+b^2=c^2"`.
-    formula: String,
+    /// LaTeX source for an inline equation, without delimiters, e.g. `"a^2+b^2=c^2"`.
+    equation: String,
     /// One-row, one-cell table used purely to show `TableStyle` differences.
     cell: String,
 }
@@ -62,16 +62,16 @@ impl ToMarkdown for MathSnippet {
             },
         }
 
-        // --- Formula rendering ------------------------------------------------
-        match options.formula_style {
-            FormulaStyle::LaTeX => {
+        // --- Equation rendering -----------------------------------------------
+        match options.equation_style {
+            EquationStyle::LaTeX => {
                 out.push_str("Inline: \\(");
-                out.push_str(&self.formula);
+                out.push_str(&self.equation);
                 out.push_str(")\n");
             },
-            FormulaStyle::Dollar => {
+            EquationStyle::Dollar => {
                 out.push_str("Inline: $");
-                out.push_str(&self.formula);
+                out.push_str(&self.equation);
                 out.push_str("$\n");
             },
         }
@@ -131,7 +131,7 @@ fn main() -> Result<()> {
     let snippet = MathSnippet {
         subscript: "i+1".to_owned(),
         superscript: "n2".to_owned(),
-        formula: "a^2+b^2=c^2".to_owned(),
+        equation: "a^2+b^2=c^2".to_owned(),
         cell: "value".to_owned(),
     };
 
@@ -154,16 +154,16 @@ fn main() -> Result<()> {
             .with_html_table_indent(2),
     )?;
 
-    // FormulaStyle variants.
+    // EquationStyle variants.
     render(
-        "FormulaStyle::LaTeX (default)",
+        "EquationStyle::LaTeX (default)",
         &snippet,
-        &MarkdownOptions::new().with_formula_style(FormulaStyle::LaTeX),
+        &MarkdownOptions::new().with_equation_style(EquationStyle::LaTeX),
     )?;
     render(
-        "FormulaStyle::Dollar",
+        "EquationStyle::Dollar",
         &snippet,
-        &MarkdownOptions::new().with_formula_style(FormulaStyle::Dollar),
+        &MarkdownOptions::new().with_equation_style(EquationStyle::Dollar),
     )?;
 
     // ScriptStyle variants -- this exercises the `unicode` helpers.

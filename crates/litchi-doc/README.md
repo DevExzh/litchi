@@ -36,7 +36,7 @@ println!("paragraphs: {}", document.paragraph_count()?);
 ## Features
 
 - `.doc` (Word 97-2003) reader and writer with full PLCF/SPRM handling
-- Optional `formula` feature for MathType (MTEF) extraction
+- Optional `equation` feature for MathType and Equation Editor (MTEF) equations as LaTeX
 
 `Package::open` uses finite defaults (128 MiB package, 64 MiB stream, and
 96 MiB aggregate DOC streams). Use `Package::open_with_options` and

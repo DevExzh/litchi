@@ -122,9 +122,10 @@ fn line_breaks_columns_media_equations_and_charts_read() {
     assert_eq!(count(&file, "video"), 1);
     assert_eq!(count(&file, "equation"), 2);
     assert_eq!(
-        prop(&file, "/slide[1]/equation[1]", "formula").as_deref(),
-        Some("E = m c^2")
+        prop(&file, "/slide[1]/equation[1]", "latex").as_deref(),
+        cfg!(feature = "equation").then_some("{E= m{c}^{2}}")
     );
+    assert_eq!(text(&file, "/slide[1]/equation[1]"), "E = m c^2");
     assert_eq!(text(&file, "/slide[1]/equation[2]"), "y = 2");
     assert_eq!(
         prop(&file, "/slide[1]/equation[2]", "name").as_deref(),

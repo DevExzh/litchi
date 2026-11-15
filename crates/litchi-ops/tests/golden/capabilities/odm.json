@@ -2541,7 +2541,6 @@
       "element": "equation",
       "parent": "body",
       "elementAliases": [
-        "formula",
         "math"
       ],
       "operations": {
@@ -2557,7 +2556,7 @@
         ]
       },
       "properties": {
-        "formula": {
+        "latex": {
           "type": "string",
           "add": false,
           "set": false,

@@ -413,7 +413,7 @@ fn emit_drawingml_range(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use litchi_ooxml_common::xml::extract_omml_formulas;
+    use litchi_ooxml_common::xml::extract_omml_equations;
     use quick_xml::reader::NsReader;
 
     fn extract_nsreader_oracle(
@@ -915,7 +915,7 @@ mod tests {
     }
 
     #[test]
-    fn omml_formulas_preserve_exact_namespaced_elements() {
+    fn omml_equations_preserve_exact_namespaced_elements() {
         let xml = br#"<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
             xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
             xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"
@@ -928,7 +928,7 @@ mod tests {
             </a:p></a:txBody>
         </p:sp>"#;
         assert_eq!(
-            extract_omml_formulas(xml).unwrap(),
+            extract_omml_equations(xml).unwrap(),
             vec![
                 r#"<m:oMath data-id="1"><m:r><m:t><![CDATA[x < y]]></m:t></m:r></m:oMath>"#,
                 r#"<math:oMath math:id="2"/>"#,
@@ -937,22 +937,22 @@ mod tests {
     }
 
     #[test]
-    fn omml_formulas_accept_strict_and_inherited_conventional_prefixes() {
+    fn omml_equations_accept_strict_and_inherited_conventional_prefixes() {
         let strict = br#"<root xmlns:s="http://purl.oclc.org/ooxml/officeDocument/math"><s:oMath><s:r/></s:oMath></root>"#;
         assert_eq!(
-            extract_omml_formulas(strict).unwrap(),
+            extract_omml_equations(strict).unwrap(),
             vec!["<s:oMath><s:r/></s:oMath>"]
         );
 
         assert_eq!(
-            extract_omml_formulas(br"<a:p><m:oMath><m:r/></m:oMath></a:p>").unwrap(),
+            extract_omml_equations(br"<a:p><m:oMath><m:r/></m:oMath></a:p>").unwrap(),
             vec!["<m:oMath><m:r/></m:oMath>"]
         );
     }
 
     #[test]
-    fn omml_formulas_reject_malformed_xml() {
+    fn omml_equations_reject_malformed_xml() {
         let xml = br#"<a:p xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMath><m:r/></a:p>"#;
-        assert!(extract_omml_formulas(xml).is_err());
+        assert!(extract_omml_equations(xml).is_err());
     }
 }

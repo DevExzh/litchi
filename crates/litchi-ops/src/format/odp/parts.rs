@@ -1,9 +1,9 @@
 //! The ODP parts: shape and text hyperlinks, line breaks, table columns,
-//! media typing, formula objects and chart series and axes.
+//! media typing, equations (formula objects) and chart series and axes.
 //!
 //! Hyperlinks, line breaks, columns and media read the bytes of their
-//! indexed node through `litchi_odp::scene::parts` on demand. Formula
-//! objects and charts live in package subdocuments; they are read once per
+//! indexed node through `litchi_odp::scene::parts` on demand. Equations
+//! and charts live in package subdocuments; they are read once per
 //! handle, on the first read that needs them, into [`Index`].
 
 use litchi_odf_common::chart::{Dimension, Element, Kind as ChartKind};
@@ -12,10 +12,18 @@ use litchi_odp::scene::{FrameContent, Object, ObjectRef, Scene, Scope};
 use super::Odp;
 use crate::Result;
 
-/// The formula objects and charts of one handle.
+/// The equations and charts of one handle.
 pub(crate) struct Index {
-    equations: Vec<(ObjectRef, String)>,
+    equations: Vec<(ObjectRef, Equation)>,
     charts: Vec<(ObjectRef, Chart)>,
+}
+
+/// One equation (a formula object).
+pub(crate) struct Equation {
+    /// The StarMath annotation, or the MathML token text.
+    pub(crate) text: String,
+    /// The MathML converted to LaTeX.
+    pub(crate) latex: Option<String>,
 }
 
 /// The series and axes of one chart object.
@@ -102,7 +110,7 @@ fn object_frames(scene: &Scene) -> Vec<(ObjectRef, &Object)> {
 }
 
 impl Index {
-    /// Read the formula objects and charts of `file`.
+    /// Read the equations and charts of `file`.
     pub(super) fn build(file: &Odp) -> Result<Self> {
         let scene = file.scene()?;
         let xml = file.content_xml()?;
@@ -133,23 +141,30 @@ impl Index {
                 charts.push((reference, chart));
                 continue;
             }
-            let formula = match litchi_odp::scene::parts::inline_math(xml, object) {
-                Some(math) => litchi_odp::scene::parts::formula_text(math),
-                None => content()?.and_then(|xml| litchi_odp::scene::parts::formula_text(&xml)),
+            let subdocument_xml;
+            let mathml = match litchi_odp::scene::parts::inline_math(xml, object) {
+                Some(math) => Some(math),
+                None => {
+                    subdocument_xml = content()?;
+                    subdocument_xml.as_deref()
+                },
             };
-            if let Some(formula) = formula {
-                equations.push((reference, formula));
+            if let Some(mathml) = mathml
+                && let Some(text) = litchi_odp::scene::parts::formula_text(mathml)
+            {
+                let latex = crate::format::odf_math::latex(mathml);
+                equations.push((reference, Equation { text, latex }));
             }
         }
         Ok(Self { equations, charts })
     }
 
-    /// The formula text of an object, when the object is a formula.
-    pub(crate) fn formula(&self, object: &ObjectRef) -> Option<&str> {
+    /// The equation of an object, when the object is a formula object.
+    pub(crate) fn equation(&self, object: &ObjectRef) -> Option<&Equation> {
         self.equations
             .iter()
             .find(|(held, _)| held == object)
-            .map(|(_, formula)| formula.as_str())
+            .map(|(_, equation)| equation)
     }
 
     /// The series and axes of a chart object.
@@ -303,7 +318,7 @@ pub(crate) fn semantic_kind(
             }
         },
         FrameContent::Object if object.class() != Some("chart") => {
-            file.parts()?.formula(reference).map(|_| Kind::Equation)
+            file.parts()?.equation(reference).map(|_| Kind::Equation)
         },
         _ => None,
     })

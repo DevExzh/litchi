@@ -1,0 +1,16 @@
+[package]
+name        = "litchi-equation"
+description = "Math equation conversion (OMML, MTEF, MathML and LaTeX) for the Litchi office-formats library."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[dependencies]
+mathema   = { workspace = true }
+thiserror = { workspace = true }
+
+[lints]
+workspace = true

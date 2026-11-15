@@ -79,7 +79,6 @@ fn the_plans_aliases_are_present() {
         ("img", "picture"),
         ("equation", "equation"),
         ("math", "equation"),
-        ("formula", "equation"),
         ("oMath", "equation"),
         ("oMathPara", "equation"),
         ("toc", "toc"),

@@ -2,8 +2,9 @@
 //!
 //! `/slide[N]/shape[M]/equation[K]` is the K-th equation in the text of a
 //! shape; `/slide[N]/equation[K]` the K-th of the slide. Each reads
-//! `formula`, its OMML rendered LaTeX-like, and its text. Equations are
-//! read from the slide's own XML (PowerPoint writes them in a
+//! `latex`, its OMML converted to LaTeX (absent without the `equation`
+//! feature or when the OMML does not convert), the raw `omml`, and its
+//! text. Equations are read from the slide's own XML (PowerPoint writes them in a
 //! markup-compatibility choice whose fallback, a picture, is what the
 //! shape scene reads). Writing them needs an OMML writer the leaf does not
 //! have: `set`, `add` and `remove` are gaps.
@@ -33,7 +34,22 @@ pub(super) struct EquationItem {
 /// The value of the equation property at `index`.
 pub(super) fn value(item: &EquationItem, index: usize) -> Option<Value<'_>> {
     match EquationKey::at(index)? {
-        EquationKey::Formula => Some(Value::Text(Cow::Borrowed(item.equation.formula()))),
+        EquationKey::Latex => latex(&item.equation).map(|latex| Value::Text(Cow::Owned(latex))),
+        EquationKey::Omml => Some(Value::Text(Cow::Borrowed(item.equation.omml()))),
+    }
+}
+
+/// The LaTeX of an equation; `None` without the `equation` feature and for
+/// OMML that does not convert.
+fn latex(equation: &Equation) -> Option<String> {
+    #[cfg(feature = "equation")]
+    {
+        equation.latex().ok()
+    }
+    #[cfg(not(feature = "equation"))]
+    {
+        let _ = equation;
+        None
     }
 }
 

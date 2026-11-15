@@ -2,7 +2,7 @@
 //!
 //! The writer accepts an already encoded MTEF payload, validates its bounded
 //! envelope, and creates the complete Equation.3 compound object plus the DOC
-//! EMBED field and bitmap presentation. Formula-AST-to-MTEF conversion is a
+//! EMBED field and bitmap presentation. Converting an equation to MTEF is a
 //! separate concern and is intentionally not approximated here.
 
 use super::embedded_object::{Editor, Reference, WriteOptions};
@@ -49,11 +49,11 @@ const EQUATION_OBJ_INFO: &[u8] = &[0x00, 0x82, 0x03, 0x00, 0x00, 0x00];
 
 /// A bounded, envelope-validated Equation Native stream.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct MtefEquation {
+pub struct MtefEquationObject {
     equation_native: Vec<u8>,
 }
 
-impl MtefEquation {
+impl MtefEquationObject {
     /// Construct an Equation Native stream from a headerless MTEF payload.
     pub fn from_mtef_payload(payload: Vec<u8>) -> Result<Self> {
         validate_mtef_payload(&payload)?;
@@ -129,13 +129,13 @@ impl MtefEquation {
 #[derive(Clone, Debug)]
 pub struct MtefEquationWriteOptions {
     pub storage_id: u32,
-    pub equation: MtefEquation,
+    pub equation: MtefEquationObject,
     pub preview: Picture,
 }
 
 impl MtefEquationWriteOptions {
     #[must_use]
-    pub fn new(storage_id: u32, equation: MtefEquation, preview: Picture) -> Self {
+    pub fn new(storage_id: u32, equation: MtefEquationObject, preview: Picture) -> Self {
         Self {
             storage_id,
             equation,
@@ -168,7 +168,7 @@ impl Editor {
     }
 }
 
-fn equation_compound_file(equation: MtefEquation) -> Result<Vec<u8>> {
+fn equation_compound_file(equation: MtefEquationObject) -> Result<Vec<u8>> {
     let mut writer = OleWriter::new();
     writer.set_root_clsid(EQUATION_3_CLSID);
     writer.create_stream(&[COMP_OBJ_STREAM], EQUATION_COMP_OBJ)?;

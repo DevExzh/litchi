@@ -44,7 +44,7 @@ IDs. Content controls are typed and keep custom-XML bindings atomic. Tables
 distinguish actual empty cells, covered spans, and omitted slots; lossless span
 updates are automatic and ambiguous content disposition is explicit. Drawings
 retain identity across typed inline/floating placement. Equations combine a
-semantic `litchi-math` tree with lossless Office representation.
+semantic `litchi-equation` tree with lossless Office representation.
 
 Generated TOCs, indexes, authorities, and bibliographies retain rules, sources,
 displayed cache, and freshness. Cross-references target semantic handles;

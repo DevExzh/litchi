@@ -81,7 +81,7 @@
     {
       "path": "/body/oMathPara[1]",
       "type": "equation",
-      "text": "x=1",
+      "text": "x= 1",
       "childCount": 0,
       "format": {
         "mode": "display"

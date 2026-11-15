@@ -180,9 +180,9 @@ fn native_word_equations_reuse_the_word_paragraph_envelope() {
         matches!(&inlines[3], litchi_docx::Inline::Unknown(value) if value.kind() == litchi_docx::InlineKind::MathParagraph)
     );
     assert_eq!(paragraph.text().unwrap(), "before  after");
-    assert_eq!(paragraph.omml_formulas().unwrap(), [inline[0].xml()]);
+    assert_eq!(paragraph.omml_equations().unwrap(), [inline[0].xml()]);
     assert_eq!(
-        paragraph.paragraph_level_formulas().unwrap(),
+        paragraph.paragraph_level_equations().unwrap(),
         [display[0].xml()]
     );
 }

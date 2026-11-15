@@ -2,7 +2,9 @@ use litchi_cfb::OleFile;
 use litchi_doc::builder::Builder;
 use litchi_doc::embedded_object::Info;
 use litchi_doc::writer::Picture;
-use litchi_doc::{EQUATION_3_CLSID, MtefEquation, MtefEquationWriteOptions, Package, raw::Reader};
+use litchi_doc::{
+    EQUATION_3_CLSID, MtefEquationObject, MtefEquationWriteOptions, Package, raw::Reader,
+};
 use litchi_ole_common::object::{
     Edit as ObjectEditor, Limits as ObjectLimits, OpenOptions as ObjectOpenOptions,
     Package as ObjectPackage, Target, Targets,
@@ -58,7 +60,7 @@ fn base_doc() -> Vec<u8> {
 #[test]
 fn authors_native_equation_object_and_preserves_storage_clsid() {
     let payload = decode_hex_fixture();
-    let equation = MtefEquation::from_mtef_payload(payload.clone()).unwrap();
+    let equation = MtefEquationObject::from_mtef_payload(payload.clone()).unwrap();
     assert_eq!(equation.mtef_payload(), payload);
     let preview = Picture::new(preview_png()).unwrap();
     let source = Package::from_bytes(&base_doc()).unwrap();
@@ -120,7 +122,7 @@ fn authors_native_equation_object_and_preserves_storage_clsid() {
     );
     assert_eq!(
         nested.open_stream(&["Equation Native"]).unwrap(),
-        MtefEquation::from_mtef_payload(payload)
+        MtefEquationObject::from_mtef_payload(payload)
             .unwrap()
             .equation_native()
     );
@@ -141,13 +143,13 @@ fn authors_native_equation_object_and_preserves_storage_clsid() {
     let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
     let document = package.document().unwrap();
     assert!(document.text().unwrap().contains("native equation follows"));
-    #[cfg(feature = "formula")]
+    #[cfg(feature = "equation")]
     assert!(
         document
             .paragraphs()
             .unwrap()
             .iter()
-            .any(|paragraph| paragraph.has_formulas())
+            .any(|paragraph| paragraph.has_equations())
     );
 }
 
@@ -159,19 +161,19 @@ fn rejects_malformed_or_oversized_equation_native_envelopes() {
         vec![6, 1, 1, 3, 0, 0],
         vec![5, 1, 1, 3, 0, b'x', 1, 0],
     ] {
-        assert!(MtefEquation::from_mtef_payload(payload).is_err());
+        assert!(MtefEquationObject::from_mtef_payload(payload).is_err());
     }
 
-    let valid = MtefEquation::from_mtef_payload(decode_hex_fixture()).unwrap();
+    let valid = MtefEquationObject::from_mtef_payload(decode_hex_fixture()).unwrap();
     let mut trailing = valid.equation_native().to_vec();
     trailing.push(0);
-    assert!(MtefEquation::from_equation_native(trailing).is_err());
+    assert!(MtefEquationObject::from_equation_native(trailing).is_err());
     let mut wrong_format = valid.equation_native().to_vec();
     wrong_format[6..8].copy_from_slice(&0x0100u16.to_le_bytes());
-    assert!(MtefEquation::from_equation_native(wrong_format).is_err());
+    assert!(MtefEquationObject::from_equation_native(wrong_format).is_err());
     let mut oversized = valid.equation_native().to_vec();
     oversized[8..12].copy_from_slice(&(16 * 1024 * 1024 + 1u32).to_le_bytes());
-    assert!(MtefEquation::from_equation_native(oversized).is_err());
+    assert!(MtefEquationObject::from_equation_native(oversized).is_err());
 
     assert_ne!(EQUATION_3_CLSID, [0; 16]);
 }

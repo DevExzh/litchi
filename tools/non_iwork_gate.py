@@ -136,9 +136,9 @@ EXPECTED_BULK_PACKAGE_NAMES = frozenset(
         "litchi-doc",
         "litchi-docx",
         "litchi-drawingml",
+        "litchi-equation",
         "litchi-eval",
         "litchi-fonts",
-        "litchi-formula",
         "litchi-imgconv",
         "litchi-markdown",
         "litchi-odb",
@@ -189,9 +189,9 @@ EXPECTED_WORKSPACE_PACKAGE_NAMES = frozenset(
         "litchi-doc",
         "litchi-docx",
         "litchi-drawingml",
+        "litchi-equation",
         "litchi-eval",
         "litchi-fonts",
-        "litchi-formula",
         "litchi-imgconv",
         "litchi-iwa-archive",
         "litchi-iwa-cache",
@@ -264,6 +264,15 @@ WINDOWS_UNC_PATH_RE = re.compile(r"^(?:\\\\|//)[^\\/]+[\\/].+")
 DEPENDENCY_ALIAS_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
 PACKAGE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
 REGISTRY_SOURCE = "registry+https://github.com/rust-lang/crates.io-index"
+# The only non-registry external dependencies a workspace package may declare:
+# (package, dependency) -> the exact Cargo source, pinned to one revision. Each
+# repository must also be listed in deny.toml `sources.allow-git`.
+ALLOWED_GIT_DEPENDENCIES: Mapping[tuple[str, str], str] = {
+    ("litchi-equation", "mathema"): (
+        "git+https://github.com/DevExzh/mathema"
+        "?rev=d415909a1188ce8571165dfd73ffd728a568b4c4"
+    ),
+}
 TARGET_KINDS = frozenset(
     {
         "lib",
@@ -785,7 +794,8 @@ def _metadata_dependency(
                 f"package {package_name!r} local dependency {dependency_name!r} has a registry"
             )
     else:
-        if dependency_source != REGISTRY_SOURCE:
+        pinned_git = ALLOWED_GIT_DEPENDENCIES.get((package_name, dependency_name))
+        if dependency_source != REGISTRY_SOURCE and dependency_source != pinned_git:
             raise GateError(
                 f"package {package_name!r} dependency {dependency_name!r} is not a "
                 f"crates.io dependency: {dependency_source!r}"

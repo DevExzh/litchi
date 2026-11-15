@@ -248,14 +248,8 @@ pub(in crate::document) struct DocumentState {
     /// the degraded optional auxiliary tables first, then the stylesheet's
     /// report, then the PAPX bin-table's report, in discovery order.
     pub(in crate::document) tolerance: crate::leniency::ToleranceReport,
-    /// Extracted MTEF data from OLE streams (`stream_name` -> `mtef_data`)
-    #[allow(
-        dead_code,
-        reason = "reserved DOC structure retained for format completeness or future round-trip support"
-    )]
-    pub(in crate::document) mtef_data: HashMap<String, Vec<u8>>,
-    /// Parsed MTEF formulas rendered while their temporary parser arena is alive.
-    /// Owned strings avoid a self-referential document and remain cheap to share.
+    /// The LaTeX of each decoded embedded MTEF equation, keyed by its
+    /// `ObjectPool` storage name (`_<picture location>`).
     pub(in crate::document) parsed_mtef: HashMap<String, Arc<str>>,
     /// Bounded raw source for the deferred font-table (`SttbfFfn`) parse, or
     /// its deferred range/allocation diagnostic.

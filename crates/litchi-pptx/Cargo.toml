@@ -16,6 +16,8 @@ font-discovery = ["fonts", "litchi-fonts/discovery"]
 automatic-fonts = ["font-subset", "font-discovery", "litchi-fonts/automatic"]
 vba-inspection = ["litchi-ooxml-common/vba-inspection"]
 encryption = ["dep:litchi-crypto", "litchi-ooxml-common/encryption"]
+# Converts slide equations (OMML) to LaTeX through `litchi-equation`.
+equation = ["dep:litchi-equation"]
 
 [dependencies]
 base64 = { workspace = true }
@@ -25,6 +27,7 @@ chrono = { workspace = true }
 litchi-core = { workspace = true }
 litchi-crypto = { workspace = true, optional = true, features = ["ooxml"] }
 litchi-drawingml = { workspace = true }
+litchi-equation = { workspace = true, optional = true }
 litchi-fonts = { workspace = true, optional = true }
 litchi-ooxml-common = { workspace = true }
 litchi-opc = { workspace = true }

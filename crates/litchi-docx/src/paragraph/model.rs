@@ -915,9 +915,9 @@ impl RunXmlData {
 /// println!("Bold: {:?}", run.bold()?);
 /// println!("Italic: {:?}", run.italic()?);
 ///
-/// // Check for embedded formulas
-/// if let Some(omml) = run.omml_formula()? {
-///     println!("OMML formula: {}", omml);
+/// // Check for embedded equations
+/// if let Some(omml) = run.omml_equation()? {
+///     println!("OMML equation: {omml}");
 /// }
 /// ```
 #[derive(Clone)]

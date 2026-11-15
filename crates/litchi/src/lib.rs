@@ -406,14 +406,12 @@ pub mod sign {
     pub use litchi_sign::*;
 }
 
-/// Formula module
+/// Math equations: conversion between OMML, MTEF, MathML and LaTeX.
 ///
-/// This module provides functionality to parse and convert mathematical formulas between different formats.
-///
-/// **Note**: This requires the `formula` feature to be enabled.
-#[cfg(feature = "formula")]
-pub mod formula {
-    pub use litchi_formula::*;
+/// **Note**: This requires the `equation` feature to be enabled.
+#[cfg(feature = "equation")]
+pub mod equation {
+    pub use litchi_equation::*;
 }
 
 /// Apple Pages package and semantic APIs.

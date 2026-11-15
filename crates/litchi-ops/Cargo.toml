@@ -131,11 +131,11 @@ opc = ["dep:litchi-opc"]
 # `markdown` implements `litchi_markdown::ToMarkdown` for `File`, its
 # family views and the `compat` element wrappers: the facade's Markdown
 # adapter moved here, because the trait and `File` are both foreign to the
-# facade. `formula` renders OMML and MTEF formulas as LaTeX in that output,
+# facade. `equation` renders OMML and MTEF equations as LaTeX in that output,
 # and `yaml` writes document properties as YAML front matter; each mirrors
 # the facade feature of the same name, which turns it on.
 markdown = ["dep:base64", "dep:litchi-markdown"]
-formula = ["dep:litchi-formula", "litchi-doc?/formula"]
+equation = ["dep:litchi-equation", "litchi-doc?/equation", "litchi-pptx?/equation"]
 yaml = ["dep:serde-saphyr"]
 
 # `eval` evaluates spreadsheet formulas through the `litchi-eval`
@@ -159,8 +159,8 @@ litchi-crypto       = { workspace = true, optional = true, features = ["ooxml"] 
 litchi-doc          = { workspace = true, optional = true }
 litchi-docx         = { workspace = true, optional = true }
 litchi-drawingml    = { workspace = true, optional = true }
+litchi-equation     = { workspace = true, optional = true }
 litchi-eval         = { workspace = true, optional = true } # Formula evaluation
-litchi-formula      = { workspace = true, optional = true }
 litchi-iwa-archive  = { workspace = true, optional = true } # iWork physical error classification
 litchi-iwa-detect   = { workspace = true, optional = true } # iWork detection
 litchi-keynote      = { workspace = true, optional = true } # Keynote owner

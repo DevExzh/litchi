@@ -92,10 +92,6 @@ class DispositionValidationTests(unittest.TestCase):
         self.assertTrue(any("requires a redaction row" in error for error in errors))
 
     def test_accepts_only_the_reviewed_semantic_rows(self) -> None:
-        ast_rows = [
-            ("litchi-formula", "mut_owner", "litchi_formula::Formula::set_root"),
-            ("litchi-formula", "mut_owner", "litchi_formula::Formula::set_display_style"),
-        ]
         request_rows = [
             ("litchi-iwa-protos", "edit_type", path)
             for path in (
@@ -129,8 +125,6 @@ class DispositionValidationTests(unittest.TestCase):
             for path in schema_paths
         ]
         semantic_rows = [
-            (row, "AST_VALUE") for row in ast_rows
-        ] + [
             (row, "WIRE_REQUEST") for row in request_rows
         ] + [
             (row, "WIRE_SCHEMA") for row in schema_rows
@@ -151,14 +145,6 @@ class DispositionValidationTests(unittest.TestCase):
 
     def test_semantic_categories_reject_unknown_or_mismatched_rows(self) -> None:
         cases = [
-            (
-                "AST_VALUE", "litchi-formula", "mut_owner",
-                "litchi_formula::Formula::set_root::nested",
-            ),
-            (
-                "AST_VALUE", "other-crate", "mut_owner",
-                "litchi_formula::Formula::set_root",
-            ),
             (
                 "WIRE_REQUEST", "litchi-iwa-protos", "transaction_type",
                 "litchi_iwa_protos::keynote_media_lifecycle_codec::SlideLifecycleEdit",

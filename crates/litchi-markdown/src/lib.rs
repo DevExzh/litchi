@@ -26,6 +26,6 @@ pub mod reader;
 pub mod traits;
 pub mod unicode;
 
-pub use config::{FormulaStyle, MarkdownOptions, ScriptStyle, StrikethroughStyle, TableStyle};
+pub use config::{EquationStyle, MarkdownOptions, ScriptStyle, StrikethroughStyle, TableStyle};
 pub use reader::OpenOptions;
 pub use traits::ToMarkdown;

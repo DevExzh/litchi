@@ -66,45 +66,34 @@ pub(super) fn text<'n>(node: &'n Node<'_>) -> Result<Option<Cow<'n, str>>> {
 }
 
 /// The LaTeX of a display equation, which OfficeCLI's equation node holds
-/// as its text (`FormulaParser.ToLatex`). `None` without the `formula`
+/// as its text (`FormulaParser.ToLatex`). `None` without the `equation`
 /// feature, and for an equation that does not convert: the read does not
 /// fail for it.
 pub(super) fn equation_latex(block: &super::node::Block) -> Result<Option<String>> {
-    #[cfg(feature = "formula")]
+    #[cfg(feature = "equation")]
     {
         let indexed = block.indexed()?;
-        let formulas = match indexed.paragraph() {
-            Some(paragraph) => paragraph.paragraph_level_formulas()?,
+        let equations = match indexed.paragraph() {
+            Some(paragraph) => paragraph.paragraph_level_equations()?,
             None => vec![String::from_utf8_lossy(&indexed.self_contained_xml()?).into_owned()],
         };
         let mut latex = String::new();
-        for formula in formulas {
+        for equation in equations {
             let Ok(converted) =
-                litchi_formula::omml_to_latex(&formula, &litchi_formula::omml::Limits::DEFAULT)
+                litchi_equation::omml_to_latex(&equation, &litchi_equation::Limits::DEFAULT)
             else {
                 return Ok(None);
             };
-            // The converter wraps a math paragraph in display delimiters;
-            // OfficeCLI's node text is the bare expression.
-            let trimmed = converted.trim();
-            let bare = trimmed
-                .strip_prefix("\\[")
-                .and_then(|inner| inner.strip_suffix("\\]"))
-                .or_else(|| {
-                    trimmed
-                        .strip_prefix("$$")
-                        .and_then(|inner| inner.strip_suffix("$$"))
-                })
-                .unwrap_or(trimmed)
-                .trim();
+            // The converter writes the bare expression, without display
+            // delimiters, as OfficeCLI's node text holds it.
             if !latex.is_empty() {
                 latex.push(' ');
             }
-            latex.push_str(bare);
+            latex.push_str(converted.trim());
         }
         Ok((!latex.is_empty()).then_some(latex))
     }
-    #[cfg(not(feature = "formula"))]
+    #[cfg(not(feature = "equation"))]
     {
         let _ = block;
         Ok(None)

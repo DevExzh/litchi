@@ -103,7 +103,7 @@ impl Document {
     /// Convert extracted paragraph data to Paragraph objects.
     ///
     /// This is a helper method used by `paragraphs()` to convert the raw extracted
-    /// paragraph data into high-level Paragraph objects with formula and image support.
+    /// paragraph data into high-level Paragraph objects with equation and image support.
     pub(super) fn convert_to_paragraphs(
         &self,
         extracted_paras: Vec<ExtractedParagraph>,
@@ -123,7 +123,7 @@ impl Document {
             // Pre-allocate run storage
             let mut run_objects = Vec::with_capacity(runs.len());
 
-            // Create runs for the paragraph, checking for MTEF formulas, images, and OLE2 objects
+            // Create runs for the paragraph, checking for MTEF equations, images, and OLE2 objects
             for run in runs {
                 let mut converted = self.convert_run(
                     run.text,
@@ -152,7 +152,7 @@ impl Document {
         Ok(())
     }
 
-    /// Build one run, checking for MTEF formulas, images, and OLE2 objects.
+    /// Build one run, checking for MTEF equations, images, and OLE2 objects.
     fn convert_run(
         &self,
         text: String,
@@ -162,28 +162,18 @@ impl Document {
     ) -> Result<Run> {
         use crate::image::extract_image;
 
-        // Primary matching: Use pic_offset to find MTEF data (most reliable)
-        if let Some(pic_offset) = props.pic_offset {
-            // Skip zero offsets as they're likely invalid
-            if pic_offset > 0 {
-                // Reuse buffer to avoid repeated allocations
-                object_name_buffer.clear();
-                object_name_buffer.push('_');
-                object_name_buffer.push_str(&pic_offset.to_string());
-
-                if let Some(mtef_ast) = self.0.parsed_mtef.get(object_name_buffer.as_str()) {
-                    // Found matching formula - create run with MTEF AST (Arc::clone is cheap)
-                    return Ok(Run::with_mtef_formula(text, props, Arc::clone(mtef_ast)));
-                }
-            }
-        }
-
-        // Secondary matching: Check if this is an OLE2 object without pic_offset
-        if props.is_ole2
-            && Self::is_potential_mtef_formula(&text)
-            && let Some(mtef_ast) = self.parse_mtef_for_text(&text)
+        // An embedded equation is the `ObjectPool/_<id>` object named by the
+        // run's picture location; a run without a matching object shows no
+        // equation.
+        if let Some(pic_offset) = props.pic_offset
+            && pic_offset > 0
         {
-            return Ok(Run::with_mtef_formula(text, props, mtef_ast));
+            use std::fmt::Write as _;
+            object_name_buffer.clear();
+            let _ = write!(object_name_buffer, "_{pic_offset}");
+            if let Some(latex) = self.0.parsed_mtef.get(object_name_buffer.as_str()) {
+                return Ok(Run::with_mtef_equation(text, props, Arc::clone(latex)));
+            }
         }
 
         if props.is_spec && matches!(text.as_str(), "\u{0008}" | "\u{0008}\u{0015}") {
@@ -206,7 +196,7 @@ impl Document {
             return Ok(Run::with_image(text, props, image));
         }
 
-        // Regular run without formula or image
+        // Regular run without equation or image
         Ok(Run::new(text, props))
     }
 

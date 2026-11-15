@@ -1306,7 +1306,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
             element(
                 K::Equation,
                 "equation",
-                &["equation", "formula", "math", "omath", "omathpara"],
+                &["equation", "math", "omath", "omathpara"],
                 CONTAINERS,
                 &[],
                 &["/body/oMathPara[N]"],

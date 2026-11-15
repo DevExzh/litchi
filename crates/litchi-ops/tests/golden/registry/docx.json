@@ -2285,7 +2285,6 @@
         "sdt"
       ],
       "elementAliases": [
-        "formula",
         "math",
         "omath",
         "omathpara"

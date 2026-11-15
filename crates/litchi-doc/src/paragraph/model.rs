@@ -285,34 +285,35 @@ impl Paragraph {
         Ok(())
     }
 
-    /// Extract all MTEF formulas from this paragraph as LaTeX.
+    /// The LaTeX of every embedded MTEF equation in this paragraph, in run
+    /// order.
     ///
-    /// Returns a vector of LaTeX formula strings found in any run within this paragraph.
+    /// Equations are read with the `equation` feature; without it the list
+    /// is empty.
     ///
     /// # Example
     ///
     /// ```rust,ignore
     /// for para in document.paragraphs()? {
-    ///     let formulas = para.formulas_as_latex()?;
-    ///     for formula in formulas {
-    ///         println!("Formula: {}", formula);
+    ///     for latex in para.equations_as_latex()? {
+    ///         println!("Equation: {latex}");
     ///     }
     /// }
     /// ```
-    pub fn formulas_as_latex(&self) -> Result<Vec<String>> {
-        let mut formulas = Vec::new();
+    pub fn equations_as_latex(&self) -> Result<Vec<String>> {
+        let mut equations = Vec::new();
         for run in &self.runs {
-            if let Some(latex) = run.formula_as_latex()? {
-                formulas.push(latex);
+            if let Some(latex) = run.equation_as_latex()? {
+                equations.push(latex);
             }
         }
-        Ok(formulas)
+        Ok(equations)
     }
 
-    /// Check if this paragraph contains any formulas.
+    /// Whether any run of this paragraph shows an embedded MTEF equation.
     #[must_use]
-    pub fn has_formulas(&self) -> bool {
-        self.runs.iter().any(Run::has_mtef_formula)
+    pub fn has_equations(&self) -> bool {
+        self.runs.iter().any(Run::has_mtef_equation)
     }
 }
 
@@ -328,9 +329,9 @@ impl Paragraph {
 ///     println!("Run text: {}", run.text()?);
 ///     println!("Bold: {:?}", run.bold());
 ///
-///     // Check for embedded MTEF formulas
-///     if let Some(formula_ast) = run.mtef_formula_ast()? {
-///         println!("MTEF formula AST with {} nodes", formula_ast.len());
+///     // Check for embedded MTEF equations
+///     if let Some(latex) = run.mtef_equation_latex() {
+///         println!("Equation: {latex}");
 ///     }
 ///
 ///     // Check for embedded images
@@ -345,8 +346,8 @@ pub struct Run {
     text: String,
     /// Character formatting properties
     properties: CharacterProperties,
-    /// Owned LaTeX rendered from MTEF while its scoped parser arena is alive.
-    mtef_formula_latex: Option<Arc<str>>,
+    /// The LaTeX of the embedded MTEF equation this run shows.
+    mtef_equation_latex: Option<Arc<str>>,
     /// Embedded image (metadata only, data loaded lazily via `Document::image_data`)
     image: Option<crate::image::Image>,
     /// Resolved insertion revision metadata.
@@ -367,7 +368,7 @@ impl Run {
         Self {
             text,
             properties,
-            mtef_formula_latex: None,
+            mtef_equation_latex: None,
             image: None,
             insertion_revision: None,
             deletion_revision: None,
@@ -377,37 +378,16 @@ impl Run {
         }
     }
 
-    /// Create a new Run with MTEF formula AST.
-    #[cfg(feature = "formula")]
-    pub(crate) fn with_mtef_formula(
+    /// Create a new Run that shows an embedded MTEF equation.
+    pub(crate) fn with_mtef_equation(
         text: String,
         properties: CharacterProperties,
-        mtef_latex: Arc<str>,
+        latex: Arc<str>,
     ) -> Self {
         Self {
             text,
             properties,
-            mtef_formula_latex: Some(mtef_latex),
-            image: None,
-            insertion_revision: None,
-            deletion_revision: None,
-            formatting_revision: None,
-            display_field_revision: None,
-            cp_range: None,
-        }
-    }
-
-    /// Create a new Run with MTEF formula AST fallback (when formula feature is disabled).
-    #[cfg(not(feature = "formula"))]
-    pub(crate) fn with_mtef_formula(
-        text: String,
-        properties: CharacterProperties,
-        _mtef_latex: Arc<str>,
-    ) -> Self {
-        Self {
-            text,
-            properties,
-            mtef_formula_latex: None,
+            mtef_equation_latex: Some(latex),
             image: None,
             insertion_revision: None,
             deletion_revision: None,
@@ -426,7 +406,7 @@ impl Run {
         Self {
             text,
             properties,
-            mtef_formula_latex: None,
+            mtef_equation_latex: None,
             image: Some(image),
             insertion_revision: None,
             deletion_revision: None,
@@ -656,56 +636,40 @@ impl Run {
         })
     }
 
-    /// Check if this run contains an MTEF formula.
+    /// Whether this run shows an embedded MTEF equation.
     ///
-    /// Returns true if this run contains a parsed MTEF formula AST.
+    /// A run shows an equation when its picture location names an
+    /// `ObjectPool` equation object whose MTEF data decoded. Equations are
+    /// read with the `equation` feature; without it no run shows one.
     #[must_use]
-    pub fn has_mtef_formula(&self) -> bool {
-        self.mtef_formula_latex.is_some()
+    pub fn has_mtef_equation(&self) -> bool {
+        self.mtef_equation_latex.is_some()
     }
 
-    /// Get the owned LaTeX rendering for this MTEF formula.
-    ///
-    /// This replaces the former `'static` AST accessor, whose nodes depended on
-    /// allocations owned elsewhere in the document.
+    /// The LaTeX of the embedded MTEF equation this run shows.
     #[must_use]
-    pub fn mtef_formula_latex(&self) -> Option<&str> {
-        self.mtef_formula_latex.as_deref()
+    pub fn mtef_equation_latex(&self) -> Option<&str> {
+        self.mtef_equation_latex.as_deref()
     }
 
-    /// Replace or remove the owned MTEF rendering.
-    pub fn mtef_formula_latex_mut(&mut self) -> &mut Option<Arc<str>> {
-        &mut self.mtef_formula_latex
+    /// Replace or remove the LaTeX of the equation this run shows.
+    pub fn mtef_equation_latex_mut(&mut self) -> &mut Option<Arc<str>> {
+        &mut self.mtef_equation_latex
     }
 
-    /// Get the MTEF formula as LaTeX string if this run contains a formula.
-    ///
-    /// Converts the formula AST to LaTeX format for easy display and processing.
+    /// The LaTeX of the embedded MTEF equation this run shows, owned.
     ///
     /// # Example
     ///
     /// ```rust,ignore
     /// for run in paragraph.runs()? {
-    ///     if let Some(latex) = run.formula_as_latex()? {
-    ///         println!("Formula: {}", latex);
+    ///     if let Some(latex) = run.equation_as_latex()? {
+    ///         println!("Equation: {latex}");
     ///     }
     /// }
     /// ```
-    #[cfg(feature = "formula")]
-    pub fn formula_as_latex(&self) -> Result<Option<String>> {
-        Ok(self.mtef_formula_latex.as_deref().map(str::to_owned))
-    }
-
-    /// Convert formula to LaTeX (fallback when formula feature is disabled).
-    #[cfg(not(feature = "formula"))]
-    pub fn formula_as_latex(&self) -> Result<Option<String>> {
-        if self.mtef_formula_latex.is_some() {
-            Ok(Some(
-                "[Formula support disabled - enable 'formula' feature]".to_string(),
-            ))
-        } else {
-            Ok(None)
-        }
+    pub fn equation_as_latex(&self) -> Result<Option<String>> {
+        Ok(self.mtef_equation_latex.as_deref().map(str::to_owned))
     }
 
     /// Check if this run is an OLE2 embedded object (like an equation or image).

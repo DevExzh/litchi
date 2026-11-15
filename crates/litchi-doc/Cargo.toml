@@ -10,7 +10,7 @@ rust-version.workspace = true
 
 [features]
 default = []
-formula = ["dep:litchi-formula"]
+equation = ["dep:litchi-equation"]
 # Runtime-neutral phase callbacks for reproducible open/commit profiling.
 performance-diagnostics = ["litchi-ole-common/performance-diagnostics"]
 
@@ -22,7 +22,7 @@ litchi-cfb        = { workspace = true }
 litchi-codepage   = { workspace = true }
 litchi-core       = { workspace = true }
 litchi-crypto     = { workspace = true }
-litchi-formula    = { workspace = true, optional = true }
+litchi-equation   = { workspace = true, optional = true }
 litchi-odraw      = { workspace = true }
 litchi-ole-common = { workspace = true }
 litchi-sign       = { workspace = true }

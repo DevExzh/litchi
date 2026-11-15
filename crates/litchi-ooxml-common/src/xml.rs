@@ -185,7 +185,7 @@ pub fn is_omml_name(namespace: &ResolveResult<'_>, name: QName<'_>, local_name: 
 ///
 /// Returns an error when input violates OOXML constraints, exceeds a configured
 /// bound, or an underlying XML or package operation fails.
-pub fn scan_omml_formula_ranges<E>(
+pub fn scan_omml_equation_ranges<E>(
     xml_bytes: &[u8],
     mut emit: impl FnMut(u32, u32) -> std::result::Result<(), E>,
 ) -> std::result::Result<(), E>
@@ -311,7 +311,7 @@ where
             ScanEvent::NestedStart => {
                 let Some((_, depth)) = capture.as_mut() else {
                     return Err(
-                        XmlError::Invalid("missing captured OMML formula".to_string()).into(),
+                        XmlError::Invalid("missing captured OMML equation".to_string()).into(),
                     );
                 };
                 *depth = depth
@@ -322,7 +322,7 @@ where
             ScanEvent::End => {
                 let Some((_, depth)) = capture.as_mut() else {
                     return Err(
-                        XmlError::Invalid("missing captured OMML formula".to_string()).into(),
+                        XmlError::Invalid("missing captured OMML equation".to_string()).into(),
                     );
                 };
                 *depth = depth
@@ -331,14 +331,14 @@ where
                 if *depth == 0 {
                     let Some((start, _)) = capture.take() else {
                         return Err(
-                            XmlError::Invalid("missing OMML formula range".to_string()).into()
+                            XmlError::Invalid("missing OMML equation range".to_string()).into()
                         );
                     };
                     emit_omml_range(start, event_end, &mut emit)?;
                 }
             },
             ScanEvent::Eof if capture.is_some() || depth != 0 => {
-                return Err(XmlError::Invalid("unterminated OMML formula".to_string()).into());
+                return Err(XmlError::Invalid("unterminated OMML equation".to_string()).into());
             },
             ScanEvent::Eof => break,
             ScanEvent::Other => {},
@@ -357,7 +357,7 @@ where
 {
     let length = end
         .checked_sub(start)
-        .ok_or_else(|| XmlError::Invalid("invalid OMML formula range".to_string()))?;
+        .ok_or_else(|| XmlError::Invalid("invalid OMML equation range".to_string()))?;
     emit(
         u32::try_from(start)
             .map_err(|error| XmlError::Invalid(format!("OMML offset exceeds u32: {error}")))?,
@@ -366,25 +366,25 @@ where
     )
 }
 
-/// Copy exact OMML formula XML into the string-based public API representation.
+/// Copy exact OMML equation XML into the string-based public API representation.
 /// # Errors
 ///
 /// Returns an error when input violates OOXML constraints, exceeds a configured
 /// bound, or an underlying XML or package operation fails.
-pub fn extract_omml_formulas(xml_bytes: &[u8]) -> Result<Vec<String>> {
-    let mut formulas = Vec::new();
-    scan_omml_formula_ranges(xml_bytes, |start, length| {
-        formulas.push(omml_formula_xml(xml_bytes, start, length)?);
+pub fn extract_omml_equations(xml_bytes: &[u8]) -> Result<Vec<String>> {
+    let mut equations = Vec::new();
+    scan_omml_equation_ranges(xml_bytes, |start, length| {
+        equations.push(omml_equation_xml(xml_bytes, start, length)?);
         Ok(())
     })?;
-    Ok(formulas)
+    Ok(equations)
 }
 
 /// # Errors
 ///
 /// Returns an error when input violates OOXML constraints, exceeds a configured
 /// bound, or an underlying XML or package operation fails.
-pub fn omml_formula_xml(xml_bytes: &[u8], start: u32, length: u32) -> Result<String> {
+pub fn omml_equation_xml(xml_bytes: &[u8], start: u32, length: u32) -> Result<String> {
     let start = usize::try_from(start)
         .map_err(|error| XmlError::Invalid(format!("OMML offset exceeds usize: {error}")))?;
     let end =
@@ -392,12 +392,12 @@ pub fn omml_formula_xml(xml_bytes: &[u8], start: u32, length: u32) -> Result<Str
             .checked_add(usize::try_from(length).map_err(|error| {
                 XmlError::Invalid(format!("OMML length exceeds usize: {error}"))
             })?)
-            .ok_or_else(|| XmlError::Invalid("OMML formula range overflows".to_string()))?;
-    let formula = xml_bytes
+            .ok_or_else(|| XmlError::Invalid("OMML equation range overflows".to_string()))?;
+    let equation = xml_bytes
         .get(start..end)
-        .ok_or_else(|| XmlError::Invalid("invalid OMML formula range".to_string()))?;
-    Ok(std::str::from_utf8(formula)
-        .map_err(|error| XmlError::Invalid(format!("OMML formula is not UTF-8: {error}")))?
+        .ok_or_else(|| XmlError::Invalid("invalid OMML equation range".to_string()))?;
+    Ok(std::str::from_utf8(equation)
+        .map_err(|error| XmlError::Invalid(format!("OMML equation is not UTF-8: {error}")))?
         .to_owned())
 }
 
@@ -449,29 +449,29 @@ mod tests {
             r#"<m:oMath><m:r/></m:oMath><s:oMath/></root>"#
         );
         let mut ranges = Vec::new();
-        scan_omml_formula_ranges::<XmlError>(xml.as_bytes(), |start, length| {
+        scan_omml_equation_ranges::<XmlError>(xml.as_bytes(), |start, length| {
             ranges.push((start, length));
             Ok(())
         })
-        .expect("valid formulas");
+        .expect("valid equations");
 
-        let formulas = ranges
+        let equations = ranges
             .into_iter()
-            .map(|(start, length)| omml_formula_xml(xml.as_bytes(), start, length))
+            .map(|(start, length)| omml_equation_xml(xml.as_bytes(), start, length))
             .collect::<Result<Vec<_>>>()
             .expect("valid ranges");
-        assert_eq!(formulas, ["<m:oMath><m:r/></m:oMath>", "<s:oMath/>"]);
+        assert_eq!(equations, ["<m:oMath><m:r/></m:oMath>", "<s:oMath/>"]);
     }
 
     #[test]
     fn rejects_unterminated_omml_without_emitting_partial_content() {
         let xml = br#"<m:oMath xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:r>"#;
         let mut emitted = 0usize;
-        let error = scan_omml_formula_ranges::<XmlError>(xml, |_, _| {
+        let error = scan_omml_equation_ranges::<XmlError>(xml, |_, _| {
             emitted += 1;
             Ok(())
         })
-        .expect_err("unterminated formula");
+        .expect_err("unterminated equation");
         assert!(matches!(
             error,
             XmlError::Malformed(_) | XmlError::Invalid(_)
@@ -479,7 +479,7 @@ mod tests {
         assert_eq!(emitted, 0);
     }
 
-    fn scan_omml_formula_ranges_nsreader_oracle(
+    fn scan_omml_equation_ranges_nsreader_oracle(
         xml_bytes: &[u8],
     ) -> std::result::Result<Vec<(u32, u32)>, XmlError> {
         enum ScanEvent {
@@ -565,7 +565,7 @@ mod tests {
                 ScanEvent::NestedStart => {
                     let Some((_, depth)) = capture.as_mut() else {
                         return Err(XmlError::Invalid(
-                            "missing captured OMML formula".to_string(),
+                            "missing captured OMML equation".to_string(),
                         ));
                     };
                     *depth = depth
@@ -583,7 +583,7 @@ mod tests {
                 ScanEvent::End => {
                     let Some((_, depth)) = capture.as_mut() else {
                         return Err(XmlError::Invalid(
-                            "missing captured OMML formula".to_string(),
+                            "missing captured OMML equation".to_string(),
                         ));
                     };
                     *depth = depth
@@ -592,7 +592,7 @@ mod tests {
                     if *depth == 0 {
                         let Some((start, _)) = capture.take() else {
                             return Err(XmlError::Invalid(
-                                "missing OMML formula range".to_string(),
+                                "missing OMML equation range".to_string(),
                             ));
                         };
                         ranges.push((
@@ -606,7 +606,7 @@ mod tests {
                     }
                 },
                 ScanEvent::Eof if capture.is_some() || depth != 0 => {
-                    return Err(XmlError::Invalid("unterminated OMML formula".to_string()));
+                    return Err(XmlError::Invalid("unterminated OMML equation".to_string()));
                 },
                 ScanEvent::Eof => break,
                 ScanEvent::Other => {},
@@ -615,11 +615,11 @@ mod tests {
         Ok(ranges)
     }
 
-    fn scan_omml_formula_ranges_tracked(
+    fn scan_omml_equation_ranges_tracked(
         xml: &[u8],
     ) -> std::result::Result<Vec<(u32, u32)>, XmlError> {
         let mut ranges = Vec::new();
-        scan_omml_formula_ranges::<XmlError>(xml, |start, length| {
+        scan_omml_equation_ranges::<XmlError>(xml, |start, length| {
             ranges.push((start, length));
             Ok(())
         })?;
@@ -627,8 +627,8 @@ mod tests {
     }
 
     fn assert_omml_tracker_parity(xml: &[u8]) {
-        let tracked_ranges = scan_omml_formula_ranges_tracked(xml);
-        let oracle = scan_omml_formula_ranges_nsreader_oracle(xml);
+        let tracked_ranges = scan_omml_equation_ranges_tracked(xml);
+        let oracle = scan_omml_equation_ranges_nsreader_oracle(xml);
         match (tracked_ranges, oracle) {
             (Ok(tracked), Ok(oracle)) => assert_eq!(tracked, oracle),
             (Err(tracked), Err(oracle)) => assert_eq!(tracked.to_string(), oracle.to_string()),
@@ -645,7 +645,7 @@ mod tests {
         xml.push_str(&"</node>".repeat(MAX_OMML_SCAN_DEPTH));
         xml.push_str("</root>");
         assert!(matches!(
-            scan_omml_formula_ranges::<XmlError>(xml.as_bytes(), |_, _| Ok(())),
+            scan_omml_equation_ranges::<XmlError>(xml.as_bytes(), |_, _| Ok(())),
             Err(XmlError::Invalid(message)) if message.contains("depth limit")
         ));
     }
@@ -693,7 +693,7 @@ mod tests {
                 declaration_attributes(255)
             ),
             // The declaration limit is checked in declaration order, even
-            // though none of these prefixes are used by the formula.
+            // though none of these prefixes are used by the equation.
             format!(
                 r#"<root xmlns:m="{OMML_NAMESPACE_URI}" {}><m:oMath/></root>"#,
                 declaration_attributes(256)

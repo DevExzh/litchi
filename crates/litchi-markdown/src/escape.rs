@@ -5,7 +5,7 @@ use std::borrow::Cow;
 /// Escape literal inline or block text for the CommonMark/GFM-compatible
 /// dialect emitted by Litchi.
 ///
-/// Renderer-owned delimiters, HTML tags, and formula delimiters must be added
+/// Renderer-owned delimiters, HTML tags, and equation delimiters must be added
 /// after this function is called. The input is borrowed when no escaping is
 /// required.
 #[must_use]

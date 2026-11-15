@@ -208,7 +208,7 @@ fn allocation(resource: &'static str, source: std::collections::TryReserveError)
 
 /// Output that needs a cargo feature this build lacks.
 #[cfg(any(
-    all(feature = "docx", not(feature = "formula")),
+    all(feature = "docx", not(feature = "equation")),
     all(
         not(feature = "yaml"),
         any(

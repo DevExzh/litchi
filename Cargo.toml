@@ -99,9 +99,9 @@ litchi-crypto       = { version = "0.0.1", path = "crates/litchi-crypto" }
 litchi-doc          = { version = "0.0.1", path = "crates/litchi-doc" }
 litchi-docx         = { version = "0.0.1", path = "crates/litchi-docx" }
 litchi-drawingml    = { version = "0.0.1", path = "crates/litchi-drawingml" }
+litchi-equation     = { version = "0.0.1", path = "crates/litchi-equation" }
 litchi-eval         = { version = "0.0.1", path = "crates/litchi-eval" }
 litchi-fonts        = { version = "0.0.1", path = "crates/litchi-fonts" }
-litchi-formula      = { version = "0.0.1", path = "crates/litchi-formula" }
 litchi-imgconv      = { version = "0.0.1", path = "crates/litchi-imgconv" }
 litchi-iwa-archive  = { version = "0.0.1", path = "crates/litchi-iwa-archive" }
 litchi-iwa-cache    = { version = "0.0.1", path = "crates/litchi-iwa-cache" }
@@ -149,6 +149,7 @@ litchi-xldm         = { version = "0.0.1", path = "crates/litchi-xldm" }
 litchi-xls          = { version = "0.0.1", path = "crates/litchi-xls" }
 litchi-xlsb         = { version = "0.0.1", path = "crates/litchi-xlsb" }
 litchi-xlsx         = { version = "0.0.1", path = "crates/litchi-xlsx" }
+mathema       = { git = "https://github.com/DevExzh/mathema", rev = "d415909a1188ce8571165dfd73ffd728a568b4c4", version = "0.1.0", default-features = false }
 md-5          = { version = "0.11.0", features = ["zeroize"] }
 memchr        = "2.8.3"
 num-complex   = "0.4.6"

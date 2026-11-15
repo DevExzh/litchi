@@ -377,7 +377,7 @@ class InventoryOwnerCoverageTests(unittest.TestCase):
         )
         expected = frozenset({
             "litchi_cfb", "litchi_core", "litchi_crypto", "litchi_doc",
-            "litchi_docx", "litchi_drawingml", "litchi_eval", "litchi_formula",
+            "litchi_docx", "litchi_drawingml", "litchi_equation", "litchi_eval",
             "litchi_fonts", "litchi_imgconv", "litchi_keynote", "litchi_odf_common",
             "litchi_odp", "litchi_ods", "litchi_odraw", "litchi_odt",
             "litchi_ole_common", "litchi_opc", "litchi_pages", "litchi_ppt",

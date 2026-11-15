@@ -23,6 +23,8 @@ pub mod docx;
 pub mod iwork;
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 pub(crate) mod metadata;
+#[cfg(any(feature = "odt", feature = "odp"))]
+pub(crate) mod odf_math;
 #[cfg(any(feature = "ods", feature = "odp", odf_objects))]
 pub(crate) mod odf_metadata;
 #[cfg(feature = "odp")]

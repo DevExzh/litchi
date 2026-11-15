@@ -66,8 +66,8 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
-/// MTEF extractor for OLE documents (internal use only)
-#[cfg(feature = "formula")]
+/// The MTEF equations embedded in `ObjectPool` (internal use only).
+#[cfg(feature = "equation")]
 mod mtef_extractor;
 
 /// Shared SPRM (Single Property Modifier) parsing.
@@ -161,15 +161,15 @@ pub use document::{
 };
 pub use embedded_object::WriteOptions;
 pub use encryption::EncryptionProfile;
-pub use equation::{EQUATION_3_CLSID, MtefEquation, MtefEquationWriteOptions};
+pub use equation::{EQUATION_3_CLSID, MtefEquationObject, MtefEquationWriteOptions};
 pub use footnote::{Endnote, Footnote};
 pub use header_footer::HeaderFooter;
 pub use hyperlink::Hyperlink;
 pub use image::{Image, ImageError};
 pub use leniency::{
-    AuxiliaryTableDefect, BookmarkDefect, ChpDefect, CommentDefect, Defect, Leniency, PapxDefect,
-    PieceDefect, RsidDefect, SectionDefect, SprmDefect, StshifDefect, StyleDefect,
-    StylesheetDefect, TableDefinitionDefect, ToleranceReport, ToleratedDefect,
+    AuxiliaryTableDefect, BookmarkDefect, ChpDefect, CommentDefect, Defect, EquationDefect,
+    Leniency, PapxDefect, PieceDefect, RsidDefect, SectionDefect, SprmDefect, StshifDefect,
+    StyleDefect, StylesheetDefect, TableDefinitionDefect, ToleranceReport, ToleratedDefect,
 };
 pub use package::{
     Commit, Diagnostics, Edit, EditOptions, EncryptionKind, Error, LimitKind, OpenOptions, Package,

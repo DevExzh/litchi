@@ -12,7 +12,6 @@ Accepted decisions are:
 * ``FIXED`` — a source repair is evidenced;
 * ``BUILDER_DRAFT`` — a proven authoring builder is intentionally mutable;
 * ``SUBSTRATE_TRANSPORT`` — only a transport-only CFB/ZIP substrate row;
-* ``AST_VALUE`` — only the two reviewed Formula AST value methods;
 * ``WIRE_REQUEST`` — only the seven reviewed IWA codec request values;
 * ``WIRE_SCHEMA`` — only the reviewed generated IWA protobuf schema values;
 * ``RAW_READER_METHOD`` — only the 38 current raw DOC/PPT/XLS Reader methods;
@@ -54,10 +53,6 @@ SCAFFOLD_DECISIONS = frozenset({
 # inventory as both the edit_type and transaction_type rows, so both categories
 # are listed for each exact public path.
 SEMANTIC_ROWS = {
-    "AST_VALUE": frozenset({
-        ("litchi-formula", "mut_owner", "litchi_formula::Formula::set_root"),
-        ("litchi-formula", "mut_owner", "litchi_formula::Formula::set_display_style"),
-    }),
     "WIRE_REQUEST": frozenset({
         ("litchi-iwa-protos", "edit_type",
          "litchi_iwa_protos::keynote_media_lifecycle_codec::SlideLifecycleEdit"),

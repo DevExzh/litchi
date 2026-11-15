@@ -495,13 +495,12 @@ fn equations_read_from_the_choice_branch() {
     for file in owners(&file) {
         let path = "/slide[1]/shape[1]/equation[1]";
         assert_eq!(file.get(path).unwrap().view().kind(), "equation");
+        // The OMML's mathematical italic letters are plain variables.
+        let latex = cfg!(feature = "equation").then_some(r"a= \frac{b}{c}");
+        assert_eq!(prop(&file, path, "latex").as_deref(), latex);
         assert_eq!(
-            prop(&file, path, "formula").as_deref(),
-            Some("𝑎=\\frac{𝑏}{𝑐}")
-        );
-        assert_eq!(
-            prop(&file, "/slide[1]/equation[1]", "formula").as_deref(),
-            Some("𝑎=\\frac{𝑏}{𝑐}")
+            prop(&file, "/slide[1]/equation[1]", "latex").as_deref(),
+            latex
         );
         let found: Vec<String> = file
             .query("equation")
@@ -510,7 +509,7 @@ fn equations_read_from_the_choice_branch() {
             .collect();
         assert_eq!(found, vec![path.to_owned()]);
         assert!(file.get("/slide[1]/shape[1]/equation[2]").is_err());
-        assert!(file.set(path, props! { "formula" => "x" }).is_err());
+        assert!(file.set(path, props! { "latex" => "x" }).is_err());
     }
 }
 

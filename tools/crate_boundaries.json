@@ -8,9 +8,9 @@
       "litchi-doc",
       "litchi-docx",
       "litchi-drawingml",
+      "litchi-equation",
       "litchi-eval",
       "litchi-fonts",
-      "litchi-formula",
       "litchi-imgconv",
       "litchi-iwa-detect",
       "litchi-keynote",
@@ -56,7 +56,7 @@
       "litchi-codepage",
       "litchi-core",
       "litchi-crypto",
-      "litchi-formula",
+      "litchi-equation",
       "litchi-odraw",
       "litchi-ole-common",
       "litchi-sign",
@@ -79,13 +79,13 @@
       "litchi-core",
       "litchi-ooxml-common"
     ],
+    "litchi-equation": [],
     "litchi-eval": [
       "litchi-core"
     ],
     "litchi-fonts": [
       "litchi-core"
     ],
-    "litchi-formula": [],
     "litchi-imgconv": [
       "litchi-core",
       "litchi-odraw",
@@ -277,8 +277,8 @@
       "litchi-doc",
       "litchi-docx",
       "litchi-drawingml",
+      "litchi-equation",
       "litchi-eval",
-      "litchi-formula",
       "litchi-iwa-archive",
       "litchi-iwa-detect",
       "litchi-keynote",
@@ -335,7 +335,6 @@
       "litchi-core",
       "litchi-crypto",
       "litchi-fonts",
-      "litchi-formula",
       "litchi-odraw",
       "litchi-ograph",
       "litchi-ole-common",
@@ -348,6 +347,7 @@
       "litchi-core",
       "litchi-crypto",
       "litchi-drawingml",
+      "litchi-equation",
       "litchi-fonts",
       "litchi-ooxml-common",
       "litchi-opc",

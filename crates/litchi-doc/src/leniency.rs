@@ -754,6 +754,33 @@ impl RsidDefect {
     }
 }
 
+/// The class of embedded-equation defect the reader repairs.
+///
+/// This enumeration is closed by design: it is the exhaustive contract of the
+/// equation repairs a read applies under every [`Leniency`] variant,
+/// including [`Leniency::Strict`]. It is recorded only when the `equation`
+/// feature decodes embedded equations; the recorded
+/// [`ToleratedDefect::context`] is the equation object's `ObjectPool`
+/// storage id, which is also the picture location of the run that shows it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum EquationDefect {
+    /// The object's `Equation Native` stream could not be decoded as MTEF
+    /// (malformed, unsupported or over the decoding limits). The run that
+    /// shows the object keeps its text and carries no equation.
+    Undecodable,
+}
+
+impl EquationDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::Undecodable => "left the run without an equation; its MTEF data was undecodable",
+        }
+    }
+}
+
 /// The class of character-property (`CHP`) operand defect the reader repairs
 /// the way Word repairs it.
 ///
@@ -851,6 +878,8 @@ pub enum Defect {
     /// [`litchi_ole_common::leniency::Defect`] for the closed set of
     /// property-set repairs and their substitutions.
     PropertySet(litchi_ole_common::leniency::Defect),
+    /// An embedded equation that could not be decoded.
+    Equation(EquationDefect),
 }
 
 impl Defect {
@@ -873,7 +902,14 @@ impl Defect {
             Self::Rsid(defect) => defect.repair(),
             Self::Chp(defect) => defect.repair(),
             Self::PropertySet(defect) => defect.repair(),
+            Self::Equation(defect) => defect.repair(),
         }
+    }
+}
+
+impl From<EquationDefect> for Defect {
+    fn from(defect: EquationDefect) -> Self {
+        Self::Equation(defect)
     }
 }
 
@@ -991,10 +1027,12 @@ pub struct ToleratedDefect {
     /// [`Defect::Chp`], and the property-set context (a property identifier,
     /// stored field value, or section index — see
     /// [`litchi_ole_common::leniency::ToleratedDefect::context`]) for a
-    /// [`Defect::PropertySet`].
+    /// [`Defect::PropertySet`], and the `ObjectPool` storage id for a
+    /// [`Defect::Equation`].
     ///
-    /// The field is 32 bits wide so container and property-set contexts are
-    /// carried exactly; every DOC-level context fits in 16 bits.
+    /// The field is 32 bits wide so container, property-set and equation
+    /// contexts are carried exactly; every other DOC-level context fits in
+    /// 16 bits.
     pub context: u32,
 }
 

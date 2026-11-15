@@ -362,14 +362,9 @@ impl Document {
             stylesheet.resolve_revision_authors(&revision_authors);
         }
 
-        // Extract MTEF data from OLE streams
-        let mtef_data = Self::extract_mtef_data(ole)?;
-
-        // Parse MTEF data into AST nodes
-        #[cfg(feature = "formula")]
-        let parsed_mtef = Self::parse_all_mtef_data(&mtef_data)?;
-        #[cfg(not(feature = "formula"))]
-        let parsed_mtef = Self::parse_all_mtef_data(&mtef_data)?;
+        // Decode the embedded MTEF equations; the ones that cannot be
+        // decoded are recorded in the tolerance report below.
+        let (parsed_mtef, undecodable_equations) = Self::read_equations(ole)?;
 
         // Reconstruct both property bin tables from one shared piece-table parse.
         let piece_table = Self::parse_piece_table(&fib, &table_stream);
@@ -397,6 +392,7 @@ impl Document {
         // above first, then the stylesheet's repairs, then the piece-table,
         // CHPX, and PAPX bin-table repairs, then the
         // attached glossary's own stylesheet and PAPX repairs, then the
+        // embedded equations that could not be decoded, then the
         // property-set repairs of the document metadata streams.
         if let Some(parsed) = &stylesheet {
             tolerance.append(parsed.tolerance_report());
@@ -412,6 +408,9 @@ impl Document {
         }
         if let Ok(Some(glossary)) = &attached_glossary {
             glossary.append_tolerance_to(&mut tolerance);
+        }
+        for storage_id in undecodable_equations {
+            tolerance.record_wide(crate::leniency::EquationDefect::Undecodable, storage_id);
         }
         // The document metadata streams come last: their repairs are read
         // from the same container once the document itself has parsed.
@@ -539,7 +538,6 @@ impl Document {
             list_tables,
             stylesheet,
             tolerance,
-            mtef_data,
             parsed_mtef,
             font_table_source,
             font_table: std::sync::OnceLock::new(),

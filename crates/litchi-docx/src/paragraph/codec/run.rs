@@ -14,7 +14,7 @@ use crate::font::{OpenType, Snapshot as OpenTypeSnapshot};
 use crate::run_effects::Effects;
 use litchi_core::VerticalPosition;
 use litchi_ooxml_common::xml::attributes::first_wins;
-use litchi_ooxml_common::xml::{decode_xml_reference, extract_omml_formulas};
+use litchi_ooxml_common::xml::{decode_xml_reference, extract_omml_equations};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::{Reader, XmlVersion};
 use smallvec::SmallVec;
@@ -606,19 +606,19 @@ impl Run {
         Ok(None)
     }
 
-    /// Check if this run contains an OMML formula.
+    /// Check if this run contains an OMML equation.
     ///
-    /// Returns the OMML XML content if this run contains a mathematical formula,
+    /// Returns the OMML XML content if this run contains a math equation,
     /// None otherwise. This method looks for `<m:oMath>` elements embedded in the run.
     ///
-    /// The returned string preserves the exact source XML for the first formula in the run.
+    /// The returned string preserves the exact source XML for the first equation in the run.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn omml_formula(&self) -> Result<Option<String>> {
+    pub fn omml_equation(&self) -> Result<Option<String>> {
         let _parser_admission = self.parser_admission()?;
-        Ok(extract_omml_formulas(self.xml_bytes())?.into_iter().next())
+        Ok(extract_omml_equations(self.xml_bytes())?.into_iter().next())
     }
     /// Helper to extract boolean properties from run properties.
     ///
