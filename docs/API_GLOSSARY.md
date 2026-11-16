@@ -3105,6 +3105,8 @@ ElementNotFound, InvalidElementValue}` name the element refusals.
 | `text_edit::{TextRuns, CharacterRun, TextLink, RunFormat}`; `Slide::shape_text_runs`; `Presentation::resolve_click` | a body's character runs (`TextCFException` over UTF-16 units, covering the final paragraph mark) and text hyperlinks; outline-backed placeholders read their slide-list body | ✅ |
 | `Edit::{set_run_format, set_text_hyperlink}` (and on `slide_order::Transaction`) | split the body's `StyleTextPropAtom` character runs (a body without one gains it) / write an `InteractiveInfo` + `TextInteractiveInfoAtom` pair; outline bodies are edited in the live document | ✅ |
 | `litchi_ppt::theme::{Theme, Fonts, COLOR_SLOTS, parse, from_package}`; `Presentation::theme` | the `RoundTripThemeAtom` theme part's color and font schemes, read only | ✅ |
+| `litchi_ppt::equation::{Equation, Bounds}`; `Presentation::{equations, slide_equations}` | slide equation objects (`Equation.3`, `Equation.DSMT4`): frame shape id, object id, storage persist id, ProgID, anchor and the stored `Equation Native` stream; `Equation::latex` with the `equation` feature | ✅ |
+| `Package::{edit_equations, apply_equations}`; `equation::{Edit, Source, Written, Commit, Patch, Error, Result, Diagnostics}` (feature `equation`) | a scoped family: `Edit::{equations, add, set, remove, commit}` addressed by slide position and frame shape id; `Error::Equation` carries the conversion or rendering error. Listing reads no storage; `Equation::equation_native` reads each object once and returns `Unreadable` for a storage that cannot be read. Edits are append-only: a replaced or removed equation's old storage stays in the file | ✅ |
 
 ## XLS worksheet feature family
 

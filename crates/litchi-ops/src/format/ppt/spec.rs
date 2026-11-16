@@ -358,6 +358,25 @@ const CHART_PROPS: &[PropSpec] = &[
     PropSpec::new("title", ValueType::Text),
 ];
 
+/// An equation: an Equation Editor 3.0 (`Equation.3`) or MathType
+/// (`Equation.DSMT4`) OLE object shown in a picture frame. `latex` is its
+/// MTEF converted to LaTeX (absent without the `equation` feature or when
+/// the MTEF does not convert), `mtef` its `Equation Native` stream as
+/// stored (base64), `progId` the object's ProgID, the frame's shape id and
+/// anchor, and `error`, why the object's storage cannot be read (when it
+/// cannot; `latex` and `mtef` are then absent).
+pub(crate) const EQUATION_PROPS: &[PropSpec] = &[
+    raw("id", ValueType::Int),
+    PropSpec::new("latex", ValueType::Text),
+    PropSpec::new("mtef", ValueType::Text),
+    PropSpec::new("progId", ValueType::Text),
+    length("x", LengthSpec::POSITION),
+    length("y", LengthSpec::POSITION),
+    length("width", LengthSpec::EXTENT),
+    length("height", LengthSpec::EXTENT),
+    PropSpec::new("error", ValueType::Text),
+];
+
 /// The presentation theme: the `PowerPoint` 2007 theme part a
 /// `RoundTripThemeAtom` carries, read with the PPTX theme vocabulary.
 pub(crate) const THEME_PROPS: &[PropSpec] = &[
@@ -482,11 +501,6 @@ static SMARTART_GAP: GapSpec = element_gap(
     "smartart",
     "PPT SmartArt and diagram groups",
     "a legacy PPT file keeps SmartArt and PowerPoint 97 diagrams as drawn OfficeArt groups, which read as group and shape nodes; no semantic diagram model is projected",
-);
-static EQUATION_GAP: GapSpec = element_gap(
-    "equation",
-    "PPT Equation Editor objects",
-    "legacy PPT equations are Equation Editor OLE objects (Equation.3) whose MTEF payload the unified layer does not read as an equation element",
 );
 static ZOOM_GAP: GapSpec = element_gap(
     "zoom",
@@ -618,12 +632,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             "shape",
             &["shape", "textbox", "title"],
             TREE_PARENTS,
-            &[
-                Kind::Paragraph,
-                Kind::Equation,
-                Kind::Hyperlink,
-                Kind::Animation,
-            ],
+            &[Kind::Paragraph, Kind::Hyperlink, Kind::Animation],
             SHAPE_IDS,
             &["/slide[N]/shape[N]"],
             SHAPE_PROPS,
@@ -807,14 +816,15 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["/slide[N]/media[N]"],
             MEDIA_PROPS,
         ),
-        gap(
+        element(
             Kind::Equation,
             "equation",
             &["equation", "math"],
-            &[Kind::Slide, Kind::Shape],
+            &[Kind::Slide],
             &[],
-            &["/slide[N]/shape[N]/equation[N]"],
-            &EQUATION_GAP,
+            &[],
+            &["/slide[N]/equation[N]"],
+            EQUATION_PROPS,
         ),
         gap(
             Kind::Zoom,
@@ -1276,3 +1286,77 @@ const fn run_write_entries() -> [crate::registry::Entry<RunSetter>; RUN_WRITE_CO
 pub(super) const RUN_WRITE_TABLE: crate::registry::Table<RunSetter, RUN_WRITE_COUNT, 0> =
     crate::registry::Table::new(run_write_entries(), []);
 pub(crate) const RUN_CAPABILITY_PROPS: &[PropSpec] = &RUN_WRITE_TABLE.readable();
+
+/// Equation assignments: `latex`, `omml` (write-only) or `mtef` (one of
+/// them) on `add` and `set`; `add` also takes the frame's `x` and `y` and
+/// the write-only text `size` the frame is sized for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum EquationSetter {
+    Latex,
+    Omml,
+    Mtef,
+    X,
+    Y,
+    Size,
+}
+
+const EQUATION_WRITE_COUNT: usize = EQUATION_PROPS.len() + 2;
+const fn equation_write_entries() -> [crate::registry::Entry<EquationSetter>; EQUATION_WRITE_COUNT]
+{
+    use crate::registry::{Access as WriteAccess, Constraint, Entry};
+
+    let mut entries = [Entry::read(EQUATION_PROPS[0]); EQUATION_WRITE_COUNT];
+    let mut index = 0;
+    while index < EQUATION_PROPS.len() {
+        let spec = EQUATION_PROPS[index];
+        let access = if same_name(spec.name, "latex") {
+            Some(WriteAccess::SetAndAdd(EquationSetter::Latex))
+        } else if same_name(spec.name, "mtef") {
+            Some(WriteAccess::SetAndAdd(EquationSetter::Mtef))
+        } else if same_name(spec.name, "x") {
+            Some(WriteAccess::Add(EquationSetter::X))
+        } else if same_name(spec.name, "y") {
+            Some(WriteAccess::Add(EquationSetter::Y))
+        } else {
+            None
+        };
+        entries[index] = match access {
+            Some(access) => Entry {
+                spec,
+                access,
+                constraint: if same_name(spec.name, "latex") || same_name(spec.name, "mtef") {
+                    Constraint::NotEmpty
+                } else {
+                    Constraint::None
+                },
+                clear: false,
+            },
+            None => Entry::read(spec),
+        };
+        index += 1;
+    }
+    let mut omml = PropSpec::new("omml", ValueType::Text);
+    omml.access.get = false;
+    entries[EQUATION_PROPS.len()] = Entry {
+        spec: omml,
+        access: WriteAccess::SetAndAdd(EquationSetter::Omml),
+        constraint: Constraint::NotEmpty,
+        clear: false,
+    };
+    let mut size = PropSpec::new("size", ValueType::Length(LengthSpec::FONT_SIZE));
+    size.access.get = false;
+    entries[EQUATION_PROPS.len() + 1] = Entry {
+        spec: size,
+        access: WriteAccess::Add(EquationSetter::Size),
+        constraint: Constraint::None,
+        clear: false,
+    };
+    entries
+}
+
+pub(super) const EQUATION_WRITE_TABLE: crate::registry::Table<
+    EquationSetter,
+    EQUATION_WRITE_COUNT,
+    0,
+> = crate::registry::Table::new(equation_write_entries(), []);
+pub(crate) const EQUATION_CAPABILITY_PROPS: &[PropSpec] = &EQUATION_WRITE_TABLE.readable();

@@ -58,3 +58,25 @@ pub(crate) fn insert_persisted_record(
     *editor = candidate;
     Ok(())
 }
+
+/// Stage the removal of a live persisted record, or drop a staged insertion.
+#[cfg(feature = "equation")]
+pub(crate) fn remove_persisted_record(editor: &mut Editor, persist_id: u32) -> Result<()> {
+    if persist_id == editor.document_persist_id {
+        return Err(Error::Corrupted(
+            "the live document record cannot be removed".into(),
+        ));
+    }
+    let live = editor.mappings.contains_key(&persist_id);
+    if !live && !editor.staged_storage.contains_key(&persist_id) {
+        return Err(Error::Corrupted(format!("unknown persist ID {persist_id}")));
+    }
+    let mut candidate = editor.clone();
+    candidate.staged_storage.remove(&persist_id);
+    if live {
+        candidate.removed_persist_ids.insert(persist_id);
+    }
+    candidate.state = candidate.state.with_staged_change();
+    *editor = candidate;
+    Ok(())
+}

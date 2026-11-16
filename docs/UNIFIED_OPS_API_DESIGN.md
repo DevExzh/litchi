@@ -266,7 +266,11 @@ reuses the existing investment in 60+ crates, and complies with ADR 0007.
   objects with a PNG preview, and updates keep the object's kind; a DOC
   equation is a MathType or Equation Editor object whose node reads and
   writes `latex` and its `Equation Native` stream as base64 `mtef`, and DOC
-  writes render the preview picture Word shows), tables (word-processing tables, spreadsheet ListObjects,
+  writes render the preview picture Word shows; a PPT
+  equation is an OLE object too, whose node reads and writes `latex` and
+  `mtef` the same way, takes `omml` on writes, and gets a PNG preview; PPT
+  edits are append-only saves, so a replaced or removed equation's old
+  storage stays in the file, reachable through earlier persist directories), tables (word-processing tables, spreadsheet ListObjects,
   slide tables), pictures, comments/notes (including threaded comments),
   hyperlinks, text boxes — and the structural plane where the workspace
   already has typed models: styles, numbering/lists, sections and page setup,

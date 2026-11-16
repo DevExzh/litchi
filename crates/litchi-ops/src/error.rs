@@ -410,6 +410,9 @@ pub enum Source {
     /// A source-backed legacy PowerPoint text-edit error.
     #[cfg(feature = "ppt")]
     PptTextEdit(litchi_ppt::text_edit::Error),
+    /// A legacy PowerPoint equation edit error.
+    #[cfg(all(feature = "ppt", feature = "equation"))]
+    PptEquation(litchi_ppt::equation::Error),
     /// A compound-file signature error, raised while a legacy binary
     /// document's signature is removed after `Signed::unsign`.
     #[cfg(any(feature = "doc", feature = "ppt", feature = "xls"))]
@@ -523,6 +526,8 @@ impl Source {
             Self::PptEdit(error) => Some(error),
             #[cfg(feature = "ppt")]
             Self::PptTextEdit(error) => Some(error),
+            #[cfg(all(feature = "ppt", feature = "equation"))]
+            Self::PptEquation(error) => Some(error),
             #[cfg(any(feature = "doc", feature = "ppt", feature = "xls"))]
             Self::Sign(error) => Some(error),
             #[cfg(feature = "rtf")]
@@ -2089,6 +2094,29 @@ impl Classify for litchi_ppt::package::edit::Error {
     }
 }
 
+#[cfg(all(feature = "ppt", feature = "equation"))]
+impl Classify for litchi_ppt::equation::Error {
+    fn classify(&self) -> Class {
+        match self {
+            Self::Package(error) => error.classify(),
+            Self::Refused(refusal) => refusal.kind().classify(),
+            // The caller's equation does not convert or render.
+            Self::Equation(error) => match error {
+                litchi_equation::Error::Malformed { .. }
+                | litchi_equation::Error::Unsupported(_) => Class::of(Code::InvalidValue),
+                litchi_equation::Error::InputTooLarge { .. }
+                | litchi_equation::Error::LimitExceeded { .. }
+                | litchi_equation::Error::Render(_) => Class::of(Code::LimitExceeded),
+                litchi_equation::Error::InvalidLimit(_) => Class::of(Code::InvalidArgument),
+                _ => Class::of(Code::InternalError),
+            },
+            Self::PatchConflict => Class::of(Code::InvalidInput),
+            Self::Signed => Class::suggest(Code::DocumentProtected, SIGNED_SUGGESTION),
+            _ => Class::of(Code::InternalError),
+        }
+    }
+}
+
 #[cfg(feature = "ppt")]
 impl From<litchi_ppt::package::edit::Error> for Error {
     fn from(error: litchi_ppt::package::edit::Error) -> Self {
@@ -2841,6 +2869,10 @@ from_leaf!(
 from_leaf!(
     #[cfg(feature = "ppt")]
     litchi_ppt::text_edit::Error => PptTextEdit, Some(FileFormat::Ppt)
+);
+from_leaf!(
+    #[cfg(all(feature = "ppt", feature = "equation"))]
+    litchi_ppt::equation::Error => PptEquation, Some(FileFormat::Ppt)
 );
 from_leaf!(
     #[cfg(any(feature = "doc", feature = "ppt", feature = "xls"))]

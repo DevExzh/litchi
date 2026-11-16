@@ -479,7 +479,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Refused`](super::Error::Refused) for a kind other than MathType or
+    /// Returns [`Refused`](super::Error::Refused) for a kind other than MathType or
     /// Equation Editor, an `Equation Native` stream that is malformed or of
     /// another MTEF version, a preview that is not PNG or JPEG, a size that
     /// is not positive, or a cell outside the grid.
@@ -535,7 +535,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Refused`](super::Error::Refused) when there is no such equation, the
+    /// Returns [`Refused`](super::Error::Refused) when there is no such equation, the
     /// object has no `Equation Native` stream, or the content is invalid.
     pub fn set_equation(
         &mut self,
@@ -612,7 +612,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Refused`](super::Error::Refused) when there is no such equation.
+    /// Returns [`Refused`](super::Error::Refused) when there is no such equation.
     pub fn remove_equation(&mut self, sheet: usize, index: usize) -> Result<()> {
         self.ensure_ready()?;
         self.step()?;
@@ -794,7 +794,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Equation`](super::Error::Equation) when the source does not convert or
+    /// Returns [`Equation`](super::Error::Equation) error when the source does not convert or
     /// render, and the errors of [`Edit::add_equation`].
     pub fn add_equation_from(
         &mut self,
@@ -835,7 +835,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Equation`](super::Error::Equation) when the source does not convert or
+    /// Returns [`Equation`](super::Error::Equation) error when the source does not convert or
     /// render, and the errors of [`Edit::set_equation`].
     pub fn set_equation_from(
         &mut self,

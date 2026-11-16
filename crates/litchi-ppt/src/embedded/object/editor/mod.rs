@@ -98,6 +98,18 @@ pub(crate) struct Editor {
     pub(super) signed: bool,
 }
 
+/// Replace the `ExObjListContainer` of the `DocumentContainer` `document`
+/// with `list`, or insert `list` where `PowerPoint` writes a new one.
+///
+/// # Errors
+///
+/// Returns an error when `document` is not a `DocumentContainer` that starts
+/// with its `DocumentAtom`.
+#[cfg(feature = "equation")]
+pub(crate) fn replace_or_insert_object_list(document: &[u8], list: &[u8]) -> Result<Vec<u8>> {
+    rewrite::replace_or_insert_object_list(document, list)
+}
+
 impl Editor {
     /// Resolve the exact live clear-text document through the current
     /// UserEdit/PersistDirectory chain without applying a mutation gate.
@@ -282,6 +294,55 @@ impl Editor {
         record: Vec<u8>,
     ) -> Result<()> {
         mutation::insert_persisted_record(self, persist_id, record)
+    }
+
+    /// The persist identifier of the live `DocumentContainer`.
+    #[cfg(feature = "equation")]
+    pub(crate) const fn document_persist_id(&self) -> u32 {
+        self.document_persist_id
+    }
+
+    /// The lowest persist identifier above every live and staged one.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the persist identifier space is exhausted.
+    #[cfg(feature = "equation")]
+    pub(crate) fn next_persist_id(&self) -> Result<u32> {
+        mutation::next_persist_id(self)
+    }
+
+    /// Stages the removal of the live record `persist_id` from the persist
+    /// directory, or drops a record this edit inserted.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `persist_id` names neither a live nor a staged
+    /// record, or names the live document.
+    #[cfg(feature = "equation")]
+    pub(crate) fn remove_persisted_record(&mut self, persist_id: u32) -> Result<()> {
+        mutation::remove_persisted_record(self, persist_id)
+    }
+
+    /// The contents of the unique stream named `name`, or `None` when the
+    /// package has none.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package holds several streams of that name.
+    #[cfg(feature = "equation")]
+    pub(crate) fn stream_by_name(&self, name: &str) -> Result<Option<&[u8]>> {
+        let mut matches = self
+            .streams
+            .iter()
+            .filter(|(path, _data)| path.last().is_some_and(|component| component == name));
+        let found = matches.next().map(|(_path, data)| data.as_slice());
+        if matches.next().is_some() {
+            return Err(Error::Corrupted(format!(
+                "PPT package contains multiple {name} streams"
+            )));
+        }
+        Ok(found)
     }
 
     /// Replaces the unique stream with `name`, or creates it at the package

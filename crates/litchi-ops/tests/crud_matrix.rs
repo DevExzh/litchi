@@ -503,6 +503,15 @@ const RECIPES: &[Recipe] = &[
         props: &[("link", "https://example.test/added")],
         start: false,
     },
+    // A PPT equation names its content as one of `latex`, `omml` and `mtef`.
+    Recipe {
+        format: "ppt",
+        element: "equation",
+        fixture: "unified-ops/acceptance-fixtures/elements.ppt",
+        parent: "/slide[1]",
+        props: &[("latex", r"\frac{a}{b}")],
+        start: false,
+    },
     // A Numbers merged range needs an A1 `ref` of two cells or
     // more inside the table's grid.
     Recipe {

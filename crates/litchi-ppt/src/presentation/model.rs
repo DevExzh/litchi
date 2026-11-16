@@ -172,6 +172,8 @@ pub(crate) struct PresentationData {
     pub(crate) encryption: Option<EncryptionProfile>,
     /// The most recently parsed slide's shapes.
     pub(crate) shape_memo: crate::slide::ShapeMemo,
+    /// The `Equation Native` streams read so far, by persist identifier.
+    pub(crate) equation_memo: crate::equation::Memo,
 }
 
 impl Presentation {
@@ -986,6 +988,27 @@ impl Presentation {
 
     pub(crate) fn document_stream(&self) -> &[u8] {
         &self.inner.powerpoint_document
+    }
+
+    /// The exact bytes of the live record `persist_id` maps to.
+    pub(crate) fn persisted_record_bytes(&self, persist_id: u32) -> Result<&[u8]> {
+        self.check_source()?;
+        let offset = self
+            .inner
+            .persist_mapping
+            .get_offset(persist_id)
+            .ok_or_else(|| Error::Corrupted(format!("persist ID {persist_id} has no mapping")))?;
+        let offset = usize::try_from(offset)
+            .map_err(|_err| Error::Corrupted("persist offset exceeds usize".to_string()))?;
+        let (_, consumed) = Record::parse(
+            &self.inner.powerpoint_document,
+            offset,
+            &self.inner.source_limits,
+        )?;
+        offset
+            .checked_add(consumed)
+            .and_then(|end| self.inner.powerpoint_document.get(offset..end))
+            .ok_or_else(|| Error::Corrupted("a persisted record exceeds its stream".into()))
     }
 
     /// Return a payload-free descriptor for the document's VBA project storage.

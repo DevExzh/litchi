@@ -56,6 +56,7 @@ fn presentation_with_vba_storage() -> Presentation {
         #[cfg(feature = "encryption")]
         encryption,
         shape_memo: crate::slide::ShapeMemo::default(),
+        equation_memo: crate::equation::Memo::default(),
     })
 }
 
@@ -84,6 +85,7 @@ fn lazy_live_document_reuses_presentation_source_limits() {
         #[cfg(feature = "encryption")]
         encryption,
         shape_memo: crate::slide::ShapeMemo::default(),
+        equation_memo: crate::equation::Memo::default(),
     });
 
     assert!(matches!(
@@ -579,6 +581,7 @@ fn presentation_with_view_history(live_children: Vec<Vec<u8>>) -> Presentation {
         #[cfg(feature = "encryption")]
         encryption: None,
         shape_memo: crate::slide::ShapeMemo::default(),
+        equation_memo: crate::equation::Memo::default(),
     })
 }
 

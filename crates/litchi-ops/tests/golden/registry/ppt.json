@@ -190,10 +190,6 @@
           "pathSegment": "paragraph"
         },
         {
-          "element": "equation",
-          "pathSegment": "equation"
-        },
-        {
           "element": "hyperlink",
           "pathSegment": "hyperlink"
         },
@@ -1526,30 +1522,104 @@
     {
       "format": "ppt",
       "element": "equation",
-      "parent": [
-        "slide",
-        "shape"
-      ],
+      "parent": "slide",
       "elementAliases": [
         "math"
       ],
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
-          "/slide[N]/shape[N]/equation[N]"
+          "/slide[N]/equation[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "PPT Equation Editor objects",
-        "reason": "legacy PPT equations are Equation Editor OLE objects (Equation.3) whose MTEF payload the unified layer does not read as an equation element"
+      "properties": {
+        "latex": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "mtef": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "progId": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "unit": "emu",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "unit": "emu",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "error": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "omml": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "size": {
+          "type": "font-size",
+          "unit": "pt",
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {

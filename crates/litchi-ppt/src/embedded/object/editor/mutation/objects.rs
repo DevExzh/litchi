@@ -74,7 +74,7 @@ pub(crate) fn reorder(editor: &mut Editor, ids: &[u32]) -> Result<()> {
     Ok(())
 }
 
-fn next_persist_id(editor: &Editor) -> Result<u32> {
+pub(crate) fn next_persist_id(editor: &Editor) -> Result<u32> {
     editor
         .mappings
         .keys()

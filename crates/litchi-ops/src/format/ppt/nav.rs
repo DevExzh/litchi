@@ -88,6 +88,22 @@ impl<'f> Nav<'f> {
                     None => Lookup::NotApplicable,
                 })
             },
+            (Item::Slide(slide), Kind::Equation) => {
+                let equations = super::elements::slide_equations(self.file, slide.position)?;
+                Ok(match ordinal(step.select, equations.len()) {
+                    Some(Some(index)) => Lookup::Found(equation_node(
+                        parent,
+                        slide.position,
+                        index,
+                        equations
+                            .into_iter()
+                            .nth(index)
+                            .ok_or_else(|| missing_slide(slide.position))?,
+                    )),
+                    Some(None) => Lookup::Missing,
+                    None => Lookup::NotApplicable,
+                })
+            },
             (Item::Shape(shape), Kind::Paragraph) => self.paragraph(parent, shape, step.select),
             (Item::Shape(shape), Kind::Row | Kind::Col) if shape.kind == Kind::Table => {
                 self.table_band(parent, shape, kind, step.select)
@@ -448,6 +464,9 @@ impl<'f> Nav<'f> {
                     let comments =
                         super::elements::slide_comments(self.file, slide.position)?.len();
                     out.kind(Kind::Comment.name(), comments);
+                    let equations =
+                        super::elements::slide_equations(self.file, slide.position)?.len();
+                    out.kind(Kind::Equation.name(), equations);
                 }
                 if let Some(source) = source_for(parent)? {
                     let Some(direct) = source.direct() else {
@@ -702,6 +721,24 @@ pub(crate) fn chart_node<'f>(
         super::elements::Element::Chart {
             slide,
             chart: std::sync::Arc::new(chart),
+        },
+    )
+}
+
+/// The node of the equation at `index` on `slide`.
+pub(crate) fn equation_node<'f>(
+    slide_node: &Node<'f>,
+    slide: usize,
+    index: usize,
+    equation: litchi_ppt::equation::Equation,
+) -> Node<'f> {
+    Node::element_node(
+        slide_node.file(),
+        slide_node.steps(),
+        PathStep::at(Kind::Equation.name(), Position::new(index)),
+        super::elements::Element::Equation {
+            slide,
+            equation: std::sync::Arc::new(equation),
         },
     )
 }

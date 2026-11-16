@@ -99,6 +99,7 @@ pub mod text_edit;
 
 /// Semantic owners for content embedded in a legacy presentation.
 pub mod embedded;
+pub mod equation;
 
 // PowerPoint projections over the format-neutral OfficeArt substrate.
 pub mod odraw;

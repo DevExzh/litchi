@@ -34,7 +34,10 @@ fn replace_nested_record_at_depth(
         return Ok(Some(replacement.to_vec()));
     }
     let version = u16::from_le_bytes([record[0], record[1]]) & 0xF;
-    if version != 0xF {
+    // Some atoms carry recVer 0xF (PowerPoint 2007's
+    // `RoundTripCustomTableStyles12Atom`, whose payload is an OPC part):
+    // only a payload that is a complete record sequence is a container.
+    if version != 0xF || !record::is_sequence(&record[8..]) {
         return Ok(None);
     }
 

@@ -5,7 +5,7 @@ use litchi_ppt::Package;
 use std::mem::size_of;
 
 use super::Ppt;
-use super::write::{StepPatch, WriteCommit};
+use super::write::{SidePatch, StepPatch, WriteCommit};
 use crate::Props;
 use crate::error::{Error, Result};
 use crate::format::ole_metadata;
@@ -86,7 +86,11 @@ impl Ppt {
                     staged_snapshot_bytes.max(canonical_snapshot_bytes),
                 )
             } else {
-                (package, StepPatch::Metadata(patch), staged_snapshot_bytes)
+                (
+                    package,
+                    StepPatch::Metadata(SidePatch::Metadata(patch)),
+                    staged_snapshot_bytes,
+                )
             };
         if snapshot_bytes > limits.max_snapshot_bytes() {
             return Err(TransactionError::Limit {

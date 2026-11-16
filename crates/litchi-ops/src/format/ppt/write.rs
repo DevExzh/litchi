@@ -9,6 +9,7 @@
 
 pub(crate) mod coalesce;
 mod elements;
+mod equations;
 pub(crate) mod find;
 
 use std::collections::HashSet;
@@ -35,9 +36,36 @@ use crate::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
 use crate::value::Scalar;
 
 /// The native proof and immutable endpoints of one unified PPT write.
-/// The patch a PPT write step retains: a primary edit or a metadata edit.
-pub(crate) type StepPatch =
-    crate::format::ole_metadata::StepPatch<litchi_ppt::Patch, litchi_ppt::package::metadata::Patch>;
+/// The patch a PPT write step retains: a primary edit, or a metadata or
+/// equation edit.
+pub(crate) type StepPatch = crate::format::ole_metadata::StepPatch<litchi_ppt::Patch, SidePatch>;
+
+/// A PPT write step outside the primary edit.
+pub(crate) enum SidePatch {
+    /// A document-property transaction.
+    Metadata(litchi_ppt::package::metadata::Patch),
+    /// An equation edit, with both package images.
+    #[cfg(feature = "equation")]
+    Equation { before: Vec<u8>, after: Vec<u8> },
+}
+
+impl crate::format::ole_metadata::Endpoints for SidePatch {
+    fn before_image(&self) -> &[u8] {
+        match self {
+            Self::Metadata(patch) => patch.before_bytes(),
+            #[cfg(feature = "equation")]
+            Self::Equation { before, .. } => before,
+        }
+    }
+
+    fn after_image(&self) -> &[u8] {
+        match self {
+            Self::Metadata(patch) => patch.after_bytes(),
+            #[cfg(feature = "equation")]
+            Self::Equation { after, .. } => after,
+        }
+    }
+}
 
 pub(crate) struct WriteCommit {
     pub(crate) before: Ppt,
@@ -113,6 +141,10 @@ enum TargetIdentity {
     Comment {
         slide: usize,
         index: usize,
+    },
+    Equation {
+        slide: usize,
+        shape: u32,
     },
     Cell {
         slide: usize,
@@ -226,6 +258,17 @@ pub(crate) fn remove_with_limits(
         return elements::remove_hyperlinks(file, &nodes, limits);
     }
     if nodes
+        .first()
+        .is_some_and(|node| node.element() == Kind::Equation)
+    {
+        if nodes.iter().any(|node| node.element() != Kind::Equation) {
+            return Err(unsupported_target(
+                "one PPT removal cannot mix equations with other targets",
+            ));
+        }
+        return equations::remove_equations(file, &nodes, limits);
+    }
+    if nodes
         .iter()
         .any(|node| matches!(node.element(), Kind::Row | Kind::Col | Kind::Cell))
     {
@@ -268,6 +311,12 @@ pub(crate) fn add_with_limits(
         Some(Kind::Hyperlink)
     ) {
         return elements::add_hyperlink(file, &parent, &node, limits);
+    }
+    if matches!(
+        Kind::from_name(&node.kind().to_ascii_lowercase()),
+        Some(Kind::Equation)
+    ) {
+        return equations::add_equation(file, &parent, &node, limits);
     }
     if matches!(
         Kind::from_name(&node.kind().to_ascii_lowercase()),
@@ -662,6 +711,15 @@ fn append_node<'f>(
                 }
             },
             _ => return Err(unsupported_target("comment target has no comment")),
+        },
+        Kind::Equation => match node.element_item() {
+            Some(super::elements::Element::Equation { slide, equation }) => {
+                TargetIdentity::Equation {
+                    slide: *slide,
+                    shape: equation.shape_id(),
+                }
+            },
+            _ => return Err(unsupported_target("equation target has no equation")),
         },
         Kind::Hyperlink => match (node.native_shape_target(), node.element_item()) {
             (Some(target), Some(super::elements::Element::Hyperlink { run, .. })) => {

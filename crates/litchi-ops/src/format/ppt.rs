@@ -41,9 +41,10 @@ pub use node::Node;
 pub(crate) use node::Props;
 pub(crate) use spec::SPEC;
 use spec::{
-    CELL_CAPABILITY_PROPS, COMMENT_CAPABILITY_PROPS, HYPERLINK_CAPABILITY_PROPS,
-    NOTES_CAPABILITY_PROPS, PARAGRAPH_CAPABILITY_PROPS, PLACEHOLDER_CAPABILITY_PROPS,
-    RUN_CAPABILITY_PROPS, SHAPE_CAPABILITY_PROPS, SLIDE_CAPABILITY_PROPS,
+    CELL_CAPABILITY_PROPS, COMMENT_CAPABILITY_PROPS, EQUATION_CAPABILITY_PROPS,
+    HYPERLINK_CAPABILITY_PROPS, NOTES_CAPABILITY_PROPS, PARAGRAPH_CAPABILITY_PROPS,
+    PLACEHOLDER_CAPABILITY_PROPS, RUN_CAPABILITY_PROPS, SHAPE_CAPABILITY_PROPS,
+    SLIDE_CAPABILITY_PROPS,
 };
 
 /// PPT elements the unified `set` verb writes.
@@ -57,13 +58,15 @@ pub(crate) const SETTABLE: &[&str] = &[
     "tc",
     "hyperlink",
     "run",
+    // Equation content, with its preview picture.
+    "equation",
 ];
 
 /// PPT elements the unified `add` verb creates.
-pub(crate) const ADDABLE: &[&str] = &["slide", "comment", "hyperlink"];
+pub(crate) const ADDABLE: &[&str] = &["slide", "comment", "hyperlink", "equation"];
 
 /// PPT elements the unified `remove` verb deletes.
-pub(crate) const REMOVABLE: &[&str] = &["slide", "comment", "hyperlink"];
+pub(crate) const REMOVABLE: &[&str] = &["slide", "comment", "hyperlink", "equation"];
 
 /// The capability property table of one PPT element, where its write
 /// registry differs from its read table.
@@ -78,6 +81,7 @@ pub(crate) fn capability_props(name: &str) -> Option<&'static [PropSpec]> {
         "tc" => CELL_CAPABILITY_PROPS,
         "hyperlink" => HYPERLINK_CAPABILITY_PROPS,
         "run" => RUN_CAPABILITY_PROPS,
+        "equation" => EQUATION_CAPABILITY_PROPS,
         _ => return None,
     })
 }

@@ -102,11 +102,19 @@ impl<'data> Props<'data> {
         let mut complex_offset = header_size;
         for descriptor in descriptors {
             let value = if descriptor.complex {
-                let complex_len = usize::try_from(descriptor.raw_value).map_err(|_err| {
+                let mut complex_len = usize::try_from(descriptor.raw_value).map_err(|_err| {
                     Error::MalformedProperties {
                         reason: "negative complex-property length",
                     }
                 })?;
+                if descriptor.id.is_array()
+                    && let Some(extent) = header_excluded_array_extent(
+                        data.get(complex_offset..).unwrap_or_default(),
+                        complex_len,
+                    )
+                {
+                    complex_len = extent;
+                }
                 let complex_end =
                     complex_offset
                         .checked_add(complex_len)
@@ -145,6 +153,27 @@ impl<'data> Props<'data> {
         }
         Ok(Self { properties, by_id })
     }
+}
+
+/// The extent of an array property whose `op` counts only its elements.
+///
+/// [MS-ODRAW] 2.2.9 counts the six-byte `IMsoArray` header in a complex
+/// property's `op`, but PowerPoint writes some arrays (for example
+/// `pVertices` with the 0xFFF0 element size) with `op` equal to the element
+/// bytes alone, the header following it unaccounted for. When `op` is
+/// exactly the elements the header at `rest` declares and the header and
+/// elements fit in `rest`, the array's extent is `op + 6`; otherwise `None`
+/// (the declared `op` stands).
+fn header_excluded_array_extent(rest: &[u8], op: usize) -> Option<usize> {
+    let header = rest.get(..6)?;
+    let count = usize::from(u16::from_le_bytes([header[0], header[1]]));
+    let size = match u16::from_le_bytes([header[4], header[5]]) {
+        0xFFF0 => 4,
+        size => usize::from(size),
+    };
+    let elements = count.checked_mul(size)?;
+    let extent = elements.checked_add(6)?;
+    (elements > 0 && op == elements && extent <= rest.len()).then_some(extent)
 }
 
 impl Anchor {

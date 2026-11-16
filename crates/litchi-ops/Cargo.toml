@@ -51,6 +51,7 @@ docx    = [
     "opc",
 ]
 ppt     = [
+    "dep:base64",
     "dep:litchi-biff",
     "dep:litchi-cfb",
     "dep:litchi-ograph",
@@ -140,6 +141,7 @@ equation = [
     "dep:litchi-equation",
     "litchi-doc?/equation",
     "litchi-docx?/equation",
+    "litchi-ppt?/equation",
     "litchi-pptx?/equation",
     "litchi-xls?/equation",
 ]
@@ -156,7 +158,7 @@ eval = ["dep:litchi-eval"]
 test-support = []
 
 [dependencies]
-base64              = { workspace = true, optional = true } # Markdown, DOCX, PPTX, XLSX, XLSB, XLS, ODS and Keynote picture image data URIs
+base64              = { workspace = true, optional = true } # Markdown, DOCX, PPTX, XLSX, XLSB, XLS, ODS and Keynote picture image data URIs; PPT equation MTEF
 caseless = { workspace = true }
 chrono              = { workspace = true, optional = true } # RTF metadata timestamps; PPTX comment dates
 litchi-biff         = { workspace = true, optional = true } # Typed Graph framing errors

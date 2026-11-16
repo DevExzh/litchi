@@ -19,6 +19,11 @@ fonts = ["dep:litchi-fonts"]
 font-subset = ["fonts", "litchi-fonts/subset"]
 font-discovery = ["fonts", "litchi-fonts/discovery"]
 automatic-fonts = ["font-subset", "font-discovery", "litchi-fonts/automatic"]
+# Reads slide equations as LaTeX and writes them (`Package::edit_equations`)
+# through `litchi-equation`. Writing renders the PNG preview PowerPoint
+# shows for every equation object, so this feature also turns on the
+# renderer (`litchi-equation/render`, which embeds about 1.9 MB of fonts).
+equation = ["dep:litchi-equation", "litchi-equation/render"]
 
 [dependencies]
 bitflags           = { workspace = true }
@@ -28,6 +33,7 @@ litchi-cfb         = { workspace = true }
 litchi-codepage    = { workspace = true }
 litchi-core        = { workspace = true }
 litchi-crypto      = { workspace = true, optional = true }
+litchi-equation    = { workspace = true, optional = true }
 litchi-fonts       = { workspace = true, optional = true }
 litchi-odraw       = { workspace = true }
 litchi-ograph      = { workspace = true }

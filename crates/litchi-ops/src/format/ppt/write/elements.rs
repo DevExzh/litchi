@@ -693,7 +693,7 @@ pub(super) fn set(
     let kind = nodes.first()?.element();
     if !matches!(
         kind,
-        Kind::Comment | Kind::Cell | Kind::Hyperlink | Kind::Run
+        Kind::Comment | Kind::Cell | Kind::Hyperlink | Kind::Run | Kind::Equation
     ) {
         return None;
     }
@@ -706,6 +706,7 @@ pub(super) fn set(
         Kind::Comment => set_comments(file, nodes, props, limits),
         Kind::Cell => set_cells(file, nodes, props, limits),
         Kind::Hyperlink => set_hyperlinks(file, nodes, props, limits),
+        Kind::Equation => super::equations::set_equations(file, nodes, props, limits),
         _ => set_runs(file, nodes, props, limits),
     })
 }

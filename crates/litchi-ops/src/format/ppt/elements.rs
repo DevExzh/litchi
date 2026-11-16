@@ -1,6 +1,6 @@
 //! The element surface of legacy PowerPoint: slide comments,
 //! table rows, cells and columns, hyperlinks, text runs, line breaks, the
-//! theme and charts.
+//! theme, charts and equations.
 //!
 //! Each element is a value read from the native presentation projection when
 //! the node is resolved; the node keeps it so `format` and `text` answer
@@ -60,6 +60,11 @@ pub(crate) enum Element {
     Chart {
         slide: usize,
         chart: Arc<ChartSummary>,
+    },
+    /// An equation object of a slide.
+    Equation {
+        slide: usize,
+        equation: Arc<litchi_ppt::equation::Equation>,
     },
     /// An OLE object or media picture frame read as its element kind
     /// (`ole`, `video`, `audio` or `media`), with an OLE object's `ProgID`
@@ -153,6 +158,33 @@ pub(crate) fn frames(
         }
     }
     Ok(out)
+}
+
+/// The equations of the slide at `slide`, in drawing order.
+pub(crate) fn slide_equations(
+    file: &super::Ppt,
+    slide: usize,
+) -> Result<Vec<litchi_ppt::equation::Equation>> {
+    Ok(file.reader().slide_equations(slide)?)
+}
+
+/// An equation's MTEF as LaTeX; `None` without the `equation` feature and
+/// for MTEF that does not convert.
+fn equation_latex(equation: &litchi_ppt::equation::Equation) -> Option<String> {
+    #[cfg(feature = "equation")]
+    {
+        equation.latex(&litchi_equation::Limits::DEFAULT).ok()
+    }
+    #[cfg(not(feature = "equation"))]
+    {
+        let _ = equation;
+        None
+    }
+}
+
+fn base64_encode(bytes: &[u8]) -> String {
+    use base64::Engine as _;
+    base64::engine::general_purpose::STANDARD.encode(bytes)
 }
 
 /// What a chart node reads: its frame and its first chart substream.
@@ -330,6 +362,7 @@ impl Element {
             Self::LineBreak { .. } => Kind::LineBreak,
             Self::Theme(_) => Kind::Theme,
             Self::Chart { .. } => Kind::Chart,
+            Self::Equation { .. } => Kind::Equation,
             Self::Frame { kind, .. } => *kind,
         }
     }
@@ -344,7 +377,7 @@ impl Element {
             | Self::Run { shape, .. }
             | Self::LineBreak { shape, .. }
             | Self::Frame { shape, .. } => Some(shape.slide),
-            Self::Chart { slide, .. } => Some(*slide),
+            Self::Chart { slide, .. } | Self::Equation { slide, .. } => Some(*slide),
             Self::Theme(_) => None,
         }
     }
@@ -359,7 +392,7 @@ impl Element {
             | Self::Run { shape, .. }
             | Self::LineBreak { shape, .. }
             | Self::Frame { shape, .. } => Some(shape),
-            Self::Theme(_) | Self::Chart { .. } => None,
+            Self::Theme(_) | Self::Chart { .. } | Self::Equation { .. } => None,
         }
     }
 
@@ -379,6 +412,7 @@ impl Element {
             | Self::Frame { .. }
             | Self::Theme(_) => None,
             Self::Chart { chart, .. } => chart.title.as_deref().map(Cow::Borrowed),
+            Self::Equation { equation, .. } => equation_latex(equation).map(Cow::Owned),
         })
     }
 
@@ -396,7 +430,8 @@ impl Element {
             | Self::LineBreak { .. }
             | Self::Theme(_)
             | Self::Frame { .. }
-            | Self::Chart { .. } => 0,
+            | Self::Chart { .. }
+            | Self::Equation { .. } => 0,
             Self::Run { .. } => usize::from(run_click(node)?.is_some()),
         })
     }
@@ -478,6 +513,38 @@ impl Element {
                 .iter()
                 .map(|prop| theme_value(theme, prop.name))
                 .collect(),
+            Self::Equation { equation, .. } => {
+                let bounds = equation.bounds();
+                props
+                    .iter()
+                    .map(|prop| match prop.name {
+                        "id" => Some(Value::Int(i64::from(equation.shape_id()))),
+                        "latex" => {
+                            equation_latex(equation).map(|latex| Value::Text(Cow::Owned(latex)))
+                        },
+                        "mtef" => equation
+                            .equation_native()
+                            .ok()
+                            .map(|native| Value::Text(Cow::Owned(base64_encode(&native)))),
+                        "error" => equation
+                            .equation_native()
+                            .err()
+                            .map(|error| Value::Text(Cow::Owned(error.reason().to_owned()))),
+                        "progId" => equation
+                            .program_id()
+                            .map(|program| Value::Text(Cow::Borrowed(program))),
+                        "x" => bounds.map(|bounds| length(bounds.left)),
+                        "y" => bounds.map(|bounds| length(bounds.top)),
+                        "width" => bounds
+                            .and_then(|bounds| i32::try_from(bounds.width()).ok())
+                            .map(length),
+                        "height" => bounds
+                            .and_then(|bounds| i32::try_from(bounds.height()).ok())
+                            .map(length),
+                        _ => None,
+                    })
+                    .collect()
+            },
             Self::Run { body, piece, .. } => {
                 let format = &body.runs()[piece.format].format;
                 let font = match format.font_ref() {

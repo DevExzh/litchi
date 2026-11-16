@@ -13,6 +13,25 @@ pub(crate) fn slice(data: &[u8], offset: usize) -> Result<&[u8]> {
         .ok_or_else(|| Error::Corrupted("truncated record".into()))
 }
 
+/// Whether `payload` is a complete sequence of records, each within it.
+pub(crate) fn is_sequence(payload: &[u8]) -> bool {
+    let mut offset = 0usize;
+    while offset < payload.len() {
+        let Some(header) = payload.get(offset..offset + 8) else {
+            return false;
+        };
+        let len = u32::from_le_bytes([header[4], header[5], header[6], header[7]]) as usize;
+        match offset
+            .checked_add(8)
+            .and_then(|start| start.checked_add(len))
+        {
+            Some(end) if end <= payload.len() => offset = end,
+            _ => return false,
+        }
+    }
+    true
+}
+
 pub(crate) fn type_of(record: &[u8]) -> Result<u16> {
     record
         .get(2..4)

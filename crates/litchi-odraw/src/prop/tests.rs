@@ -222,6 +222,39 @@ fn classifies_arrays_by_property_id_instead_of_payload_shape() {
 }
 
 #[test]
+fn reads_arrays_whose_length_excludes_their_header_as_powerpoint_writes_them() {
+    // `pVertices` of a PowerPoint 2003 freeform (Apache POI
+    // `slideshow/42520.ppt`): six 4-byte elements with `op` = 24, the
+    // six-byte header not counted, followed by a regular complex property.
+    let mut vertices = Vec::new();
+    vertices.extend_from_slice(&6u16.to_le_bytes());
+    vertices.extend_from_slice(&6u16.to_le_bytes());
+    vertices.extend_from_slice(&0xFFF0u16.to_le_bytes());
+    vertices.extend_from_slice(&[7; 24]);
+    let mut data = Vec::new();
+    push_property(&mut data, IS_COMPLEX | Id::Vertices.raw(), 24);
+    push_property(&mut data, IS_COMPLEX | Id::GroupName.raw(), 2);
+    data.extend_from_slice(&vertices);
+    data.extend_from_slice(b"a\0");
+    let props = Props::parse(&opt_record(&data, 2), crate::Limits::default())
+        .expect("PowerPoint's header-excluded array length");
+    let Some(Value::Array(array)) = props.get(Id::Vertices) else {
+        panic!("vertices are an array");
+    };
+    assert_eq!(array.elements().count(), 6);
+    assert!(matches!(
+        props.get(Id::GroupName),
+        Some(Value::Complex(b"a\0"))
+    ));
+
+    // An `op` that is neither form is still refused.
+    let mut wrong = Vec::new();
+    push_property(&mut wrong, IS_COMPLEX | Id::Vertices.raw(), 20);
+    wrong.extend_from_slice(&vertices);
+    assert!(Props::parse(&opt_record(&wrong, 1), crate::Limits::default()).is_err());
+}
+
+#[test]
 fn validates_imsoarray_header_and_exact_extent() {
     let mut special = Vec::new();
     special.extend_from_slice(&2u16.to_le_bytes());

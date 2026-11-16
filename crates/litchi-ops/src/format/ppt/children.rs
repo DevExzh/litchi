@@ -265,6 +265,23 @@ impl<'f> Children<'f> {
                 Err(error) => failed = Some(error),
             }
         }
+        if let Item::Slide(slide) = parent.item()
+            && kinds.contains(Kind::Equation)
+        {
+            match super::elements::slide_equations(parent.file(), slide.position) {
+                Ok(equations) => {
+                    for (index, equation) in equations.into_iter().enumerate() {
+                        extra.push(super::nav::equation_node(
+                            parent,
+                            slide.position,
+                            index,
+                            equation,
+                        ));
+                    }
+                },
+                Err(error) => failed = Some(error),
+            }
+        }
         if let Item::Shape(shape) = parent.item()
             && kinds.contains(Kind::Hyperlink)
         {
