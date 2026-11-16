@@ -434,16 +434,19 @@ impl Edit<Package> {
     }
 
     /// Remove the chart at `chart` among the paragraph's charts: its
-    /// drawing, and its run when the run holds nothing else. The chart part
-    /// and its relationship stay in the package, unreferenced (the same
-    /// policy as a removed picture).
+    /// drawing, and its run when the run holds nothing else. The chart
+    /// relationship goes too once the main document no longer names it,
+    /// with the chart part and its embedded workbook unless another
+    /// relationship still reaches them (the same policy as a removed
+    /// picture).
     ///
     /// # Errors
     ///
     /// Returns [`Refusal::RunNotFound`] for a missing chart.
     pub fn remove_chart_at(&mut self, paragraph: &ElementPath, chart: Position) -> Result<()> {
+        let before = self.referenced_main_relationships()?;
         self.inner_mut()?.rewrite_chart_at(paragraph, chart, None)?;
-        Ok(())
+        self.drop_released_relationships(&before)
     }
 
     /// The chart part a main relationship names, and its embedded workbook

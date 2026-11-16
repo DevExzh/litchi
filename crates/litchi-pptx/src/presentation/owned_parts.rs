@@ -222,6 +222,105 @@ impl Graph {
         Ok(Owned { parts, folded })
     }
 
+    /// The Parts that only `owner`'s edges to `targets` reach: the edges a
+    /// shape removal released. Each target, and each Part reached from one,
+    /// stays when anything else targets it, the owner's other edges
+    /// included; the caller passes only targets no kept edge of the owner
+    /// names.
+    pub(crate) fn released_by(&self, owner: &PackURI, targets: &[PackURI]) -> Result<Owned> {
+        let Some(&owner) = self.index.get(&fold(owner.as_str())) else {
+            return Err(Error::PatchConflict);
+        };
+        let mut released = vec![false; self.nodes.len()];
+        let mut kept = vec![false; self.nodes.len()];
+        let mut stack = Vec::new();
+        for target in targets {
+            let Some(&node) = self.index.get(&fold(target.as_str())) else {
+                continue;
+            };
+            if node == owner || self.is_structural(node) {
+                continue;
+            }
+            released[node] = true;
+            if !kept[node] {
+                kept[node] = true;
+                stack.push(node);
+            }
+        }
+        while let Some(current) = stack.pop() {
+            for edge in &self.nodes[current].edges {
+                let Some(target) = edge.target else {
+                    continue;
+                };
+                if target == owner || self.is_structural(target) {
+                    continue;
+                }
+                if edge.ambiguous {
+                    return refusal("a relationship of the removed shape has a query or fragment");
+                }
+                if !kept[target] {
+                    kept[target] = true;
+                    stack.push(target);
+                }
+            }
+        }
+        // Greatest subset whose incoming edges all come from the subset or,
+        // for a released target, from the owner.
+        loop {
+            let mut changed = false;
+            for node in 0..self.nodes.len() {
+                if !kept[node] {
+                    continue;
+                }
+                let outside = self.nodes[node]
+                    .incoming
+                    .iter()
+                    .any(|incoming| match incoming {
+                        None => true,
+                        Some(source) if *source == owner => !released[node],
+                        Some(source) => !kept[*source],
+                    });
+                if outside {
+                    kept[node] = false;
+                    changed = true;
+                }
+            }
+            if !changed {
+                break;
+            }
+        }
+        let mut parts: Vec<PackURI> = kept
+            .iter()
+            .enumerate()
+            .filter(|(_, kept)| **kept)
+            .map(|(node, _)| self.nodes[node].name.clone())
+            .collect();
+        parts.sort_unstable_by_key(|name| fold(name.as_str()));
+        let folded = parts.iter().map(|name| fold(name.as_str())).collect();
+        Ok(Owned { parts, folded })
+    }
+
+    /// Refuse to remove Parts whose edges a durable inverse could not
+    /// restore after reopening, as [`Self::require_restorable`] does for a
+    /// slide's.
+    pub(crate) fn require_restorable_parts(&self, owned: &Owned) -> Result<()> {
+        for name in owned.parts() {
+            let node = self
+                .index
+                .get(&fold(name.as_str()))
+                .ok_or(Error::PatchConflict)?;
+            for edge in &self.nodes[*node].edges {
+                if edge.target.is_none() || !edge.canonical {
+                    return refusal(
+                        "a Part the removed shape owns has a relationship a durable inverse \
+                         cannot restore",
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Refuse a removal that a durable inverse could not reproduce after
     /// reopening: every internal edge of `slide` and of the Parts it owns is
     /// restored as a typed owner-relative edge, so each must be spelled that

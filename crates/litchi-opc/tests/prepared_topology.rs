@@ -2160,6 +2160,55 @@ fn prepared_materialization_keeps_authored_xml_separate_from_source_provenance()
 }
 
 #[test]
+fn source_preserving_materialization_publishes_replaced_parts() {
+    let package = open(Arc::new(VersionedSource::new(source_bytes())));
+    let mut plan = SourceTopologyPlan::new();
+    plan.try_replace_part(pack(DOCUMENT), b"<after/>".to_vec())
+        .unwrap();
+    let candidate = package.prepare_topology(plan).unwrap();
+    let owned = candidate.to_opc_package_preserving_source().unwrap();
+    assert_eq!(owned.get_part(&pack(DOCUMENT)).unwrap().blob(), b"<after/>");
+    // The replacement is published, and the untouched part is still copied
+    // from the source.
+    let reopened = OpcPackage::from_bytes(
+        &PackageWriter::to_bytes(&owned).unwrap(),
+        SourceLimits::default(),
+    )
+    .unwrap();
+    assert_eq!(
+        reopened.get_part(&pack(DOCUMENT)).unwrap().blob(),
+        b"<after/>"
+    );
+    assert_eq!(
+        reopened.get_part(&pack(UNTOUCHED)).unwrap().blob(),
+        b"<untouched source='yes'/>"
+    );
+}
+
+#[test]
+fn source_preserving_materialization_drops_removed_parts() {
+    let package = open(Arc::new(VersionedSource::new(source_bytes())));
+    let mut plan = SourceTopologyPlan::new();
+    plan.try_remove_relationship(pack(DOCUMENT), "rId1")
+        .unwrap();
+    plan.try_remove_part(pack(UNTOUCHED)).unwrap();
+    let candidate = package.prepare_topology(plan).unwrap();
+    let owned = candidate.to_opc_package_preserving_source().unwrap();
+    assert!(owned.get_part(&pack(UNTOUCHED)).is_err());
+    let bytes = PackageWriter::to_bytes(&owned).unwrap();
+    // ZIP stores member names uncompressed; the removed member's name must
+    // not appear in any local or central header.
+    let member = UNTOUCHED.trim_start_matches('/').as_bytes();
+    assert!(
+        !bytes.windows(member.len()).any(|window| window == member),
+        "the removed part survived as an archive member"
+    );
+    let reopened = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
+    assert!(reopened.non_part_members().is_empty());
+    assert!(reopened.get_part(&pack(DOCUMENT)).is_ok());
+}
+
+#[test]
 fn materialization_uses_effective_graph_and_outlives_candidate() {
     let package = open(Arc::new(VersionedSource::new(source_bytes())));
     let mut plan = mutation_plan();

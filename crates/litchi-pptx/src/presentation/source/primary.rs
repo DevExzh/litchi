@@ -1949,8 +1949,18 @@ impl Edit {
     /// Remove one top-level slide shape, composing with earlier changes.
     ///
     /// Removing a group removes its entire subtree. Grouped descendants and
-    /// removals leaving connector or animation references are refused. Unused
-    /// relationships and parts are retained for exact source replay.
+    /// removals leaving connector or animation references are refused. The
+    /// slide relationships the slide no longer names leave with the shape,
+    /// with the Parts only they reach (its image, chart or embedded object);
+    /// the slide's relationships image loses just those elements. Two edges
+    /// the slide XML never names go too: a SmartArt's cached drawing (named
+    /// by its data part) and a legacy VML drawing whose every shape belonged
+    /// to the removed OLE object, with its fallback preview. A VML drawing
+    /// that still holds another object's shape is kept as it is, so the
+    /// removed object's VML shape and its preview image stay; the embedded
+    /// object itself still leaves. A Part whose own relationships a durable
+    /// inverse could not restore refuses the removal, as a slide removal
+    /// does.
     ///
     /// ```no_run
     /// # fn example() -> litchi_pptx::Result<()> {
@@ -1967,14 +1977,50 @@ impl Edit {
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<bool> {
         let shape = shape.into();
+        let slide = slide.into();
+        let before = self.working.snapshot_logical(slide.get())?;
+        let saved = (self.working.clone(), self.changes.clone());
         let changed = self.stage_slide_edit_with_marker(
-            slide.into(),
+            slide,
             |_package, _snapshot| Ok(None),
             |edit| edit.remove_shape(shape).map(usize::from),
             true,
         )? != 0;
+        if changed && let Err(error) = self.release_removed_relationships(slide, &before) {
+            (self.working, self.changes) = saved;
+            return Err(error);
+        }
         self.shape_removals |= changed;
         Ok(changed)
+    }
+
+    /// After a shape removal on the slide at `slide`, drop the slide
+    /// relationships `before` named that the slide no longer names, with the
+    /// Parts only they reach.
+    fn release_removed_relationships(
+        &mut self,
+        slide: Position,
+        before: &SourceBackedSlideSnapshot,
+    ) -> Result<()> {
+        let key = self
+            .working
+            .order
+            .get(slide.get())
+            .cloned()
+            .ok_or(Error::PatchConflict)?;
+        let after = self.working.snapshot_logical(slide.get())?;
+        let released = topology::released_relationships(
+            &self.working,
+            &key,
+            before.xml.as_bytes(),
+            after.xml.as_bytes(),
+        )?;
+        if released.is_empty() {
+            return Ok(());
+        }
+        let budget = topology::topology_patch_budget(self.max_patch_bytes, true)?;
+        self.working = topology::release(&self.working, &key, &released, budget)?;
+        Ok(())
     }
 
     /// Replace text in one shape, composing with earlier staged changes.

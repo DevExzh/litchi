@@ -24,8 +24,14 @@ def target_bytes(path: Path) -> int:
 
 def main() -> int:
     path = Path(sys.argv[1]).resolve()
-    if path.name != 'target' or not path.is_dir():
-        raise SystemExit(f'expected existing target directory, got {path}')
+    if path.name != 'target':
+        raise SystemExit(f'expected a target directory, got {path}')
+    if not path.exists():
+        # A clean checkout has no target yet: there is nothing to prune.
+        print(f'target_bytes=0 (no {path} yet)', flush=True)
+        return 0
+    if not path.is_dir():
+        raise SystemExit(f'expected a target directory, got {path}')
     limit = int(os.environ.get('GATE_TARGET_MAX_GB', '200')) * 1024**3
     size = target_bytes(path)
     if size > limit:

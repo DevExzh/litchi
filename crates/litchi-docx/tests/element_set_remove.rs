@@ -195,6 +195,29 @@ fn a_removed_picture_takes_its_run_and_inverts_exactly() {
     assert_eq!(images.len(), 1);
     assert_eq!(images[0].name(), "Second");
     assert_eq!(changed.document().unwrap().text().unwrap(), "See Second");
+    // The removed picture's image part and relationship leave with it; the
+    // other picture keeps its own.
+    let image_relationships = |package: &Package| {
+        package
+            .opc_package()
+            .main_document_part()
+            .unwrap()
+            .rels()
+            .iter()
+            .filter(|relationship| relationship.reltype().ends_with("/image"))
+            .count()
+    };
+    assert_eq!(image_relationships(&base), 2);
+    assert_eq!(image_relationships(&changed), 1);
+    assert_eq!(
+        changed.opc_package().iter_parts().count(),
+        base.opc_package().iter_parts().count() - 1
+    );
+    let reopened = Package::from_bytes(&changed.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened.opc_package().iter_parts().count(),
+        base.opc_package().iter_parts().count() - 1
+    );
     let restored = changed.apply(&patch.inverse()).unwrap().into_package();
     assert_eq!(restored.to_bytes().unwrap(), base.to_bytes().unwrap());
     let mut edit = changed.edit().unwrap();

@@ -294,15 +294,32 @@ fn native_excel_ole_source_frame_removal_has_durable_forward_and_inverse() {
     assert!(edit.remove_shape(3, "Content Placeholder 3").unwrap());
     let (changed, patch) = edit.commit().unwrap().into_parts();
     let after = changed.to_bytes().unwrap();
-    assert_changed(&bytes, &after, &["ppt/slides/slide4.xml"]);
     let a = members(&bytes);
     let b = members(&after);
+    // The frame's embedding and its fallback preview, which only its two
+    // markup-compatibility branches named, leave with it; besides the slide,
+    // only its relationships lose their two elements.
+    assert_eq!(
+        a.keys()
+            .filter(|name| !b.contains_key(*name))
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
+        [
+            "ppt/embeddings/Microsoft_Excel_Worksheet.xlsx",
+            "ppt/media/image3.emf"
+        ]
+    );
+    assert_eq!(
+        b.iter()
+            .filter(|(name, value)| a[*name] != **value)
+            .map(|(name, _)| name.as_str())
+            .collect::<Vec<_>>(),
+        ["ppt/slides/_rels/slide4.xml.rels", "ppt/slides/slide4.xml"]
+    );
     let xml = std::str::from_utf8(&a["ppt/slides/slide4.xml"]).unwrap();
     let start = xml.find("<p:graphicFrame>").unwrap();
     let end = xml.find("</p:graphicFrame>").unwrap() + "</p:graphicFrame>".len();
     assert!(b["ppt/slides/slide4.xml"] == format!("{}{}", &xml[..start], &xml[end..]).as_bytes());
-    // Source shape removal retains relationships/resources by contract; the
-    // graph-owning remove/detach API above performs payload collection.
     let forward = Patch::from_bytes(&patch.to_bytes().unwrap()).unwrap();
     let replay = open(bytes.clone())
         .apply(&forward)

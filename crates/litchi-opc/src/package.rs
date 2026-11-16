@@ -4330,6 +4330,7 @@ impl OpcPackage {
             source_content_types,
             limits,
             true,
+            &[],
         );
     }
 
@@ -4342,6 +4343,12 @@ impl OpcPackage {
     /// true only for a graph that is still the physical source; changed
     /// candidates retain the same archive and provenance for targeted
     /// publication while forcing the writer through its changed-package path.
+    ///
+    /// `removed` names the source parts a changed candidate removed. Their
+    /// archive members, and their relationship members, are recorded as
+    /// parts that no longer exist, so the writer omits them as it omits a
+    /// part removed from an owning package; otherwise they would read as
+    /// opaque members and be copied into the output.
     pub(crate) fn attach_owned_source_preservation(
         &mut self,
         source: Arc<Vec<u8>>,
@@ -4349,13 +4356,14 @@ impl OpcPackage {
         source_content_types: Option<Arc<ContentTypeMap>>,
         limits: SourceLimits,
         exact: bool,
+        removed: &[PackURI],
     ) -> Result<()> {
         if let (Some(xml), Some(binding)) = (source_content_types_xml, source_content_types) {
             self.source_content_types_xml = Some(xml);
             self.source_content_types = Some(binding);
             self.content_types_source_state.reset();
         }
-        let preservation = PreservationProvenance::from_package(source.as_slice(), self);
+        let preservation = PreservationProvenance::from_package(source.as_slice(), self, removed);
         if !exact && preservation.is_none() {
             return Err(OpcError::PreservationUnavailable {
                 reason: "owned source preservation provenance could not be established".to_owned(),
@@ -4369,6 +4377,37 @@ impl OpcPackage {
         self.source_limits = limits;
         self.transfer_index = Some(Arc::new(OnceLock::new()));
         self.exact_source_authorized = exact;
+        Ok(())
+    }
+
+    /// Record `originals` as the source payloads of their parts.
+    ///
+    /// Preservation provenance captures every part's current payload as the
+    /// payload its source member carries. A package materialized from an
+    /// edited candidate holds replacement payloads instead, so the provenance
+    /// of those parts must hold the source member's bytes; otherwise the
+    /// preserving writer would judge a replacement untouched and copy the
+    /// stale source member in its place.
+    pub(crate) fn rebind_source_payloads(
+        &mut self,
+        originals: Vec<(PackURI, Arc<Vec<u8>>)>,
+    ) -> Result<()> {
+        if originals.is_empty() {
+            return Ok(());
+        }
+        let Some(preservation) = self.preservation.as_mut() else {
+            return Ok(());
+        };
+        let Some(preservation) = Arc::get_mut(preservation) else {
+            return Err(OpcError::PreservationUnavailable {
+                reason: "source preservation provenance is shared".to_owned(),
+            });
+        };
+        for (partname, bytes) in originals {
+            if let Some(part) = preservation.parts.get_mut(&partname) {
+                part.blob = PartPayload::ready(bytes);
+            }
+        }
         Ok(())
     }
 
@@ -4474,7 +4513,7 @@ impl Default for OpcPackage {
 }
 
 impl PreservationProvenance {
-    fn from_package(source: &[u8], package: &OpcPackage) -> Option<Self> {
+    fn from_package(source: &[u8], package: &OpcPackage, removed: &[PackURI]) -> Option<Self> {
         let content_types_xml = package.source_content_types_xml.as_ref()?.clone();
         let archive = soapberry_zip::ZipArchive::from_slice(source).ok()?;
         let entry_count = usize::try_from(archive.entries_hint()).ok()?;
@@ -4528,6 +4567,24 @@ impl PreservationProvenance {
             );
         }
 
+        // Members of removed parts are classified as those parts, which the
+        // package no longer holds, so publication omits them.
+        let mut removed_members = HashMap::new();
+        removed_members.try_reserve(removed.len()).ok()?;
+        let mut removed_relationships = HashMap::new();
+        removed_relationships.try_reserve(removed.len()).ok()?;
+        for partname in removed {
+            if package.parts.contains_key(partname) {
+                continue;
+            }
+            removed_members.insert(try_owned_string(partname.membername())?, partname.clone());
+            let relationships_uri = partname.rels_uri().ok()?;
+            removed_relationships.insert(
+                try_owned_string(relationships_uri.membername())?,
+                partname.clone(),
+            );
+        }
+
         let package_uri = PackURI::new(PACKAGE_URI).ok()?;
         let package_relationships_name = package_uri.rels_uri().ok()?.membername().to_owned();
         let mut content_types_present = false;
@@ -4575,6 +4632,10 @@ impl PreservationProvenance {
                     return None;
                 }
                 part.relationships_member_present = true;
+                SourceMemberKind::PartRelationships(partname.clone())
+            } else if let Some(partname) = removed_members.get(name) {
+                SourceMemberKind::Part(partname.clone())
+            } else if let Some(partname) = removed_relationships.get(name) {
                 SourceMemberKind::PartRelationships(partname.clone())
             } else {
                 SourceMemberKind::Unknown

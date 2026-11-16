@@ -72,10 +72,35 @@ impl PreparedTopology {
             })?;
         self.check_source()?;
         let mut session = self.package.archive.read_session();
+        // The source member bytes of every replaced Part the source archive
+        // still carries under the same name. Preservation provenance is
+        // captured from the materialized parts, so without these it would
+        // record a replacement as the source member's own payload and the
+        // preserving writer would copy the stale member over the edit.
+        let mut originals = Vec::new();
         for effective in &self.state.effective_data().parts {
             self.check_source()?;
             let bytes = match &effective.replacement {
-                Some(bytes) => Arc::clone(bytes),
+                Some(bytes) => {
+                    let partname = effective.partname(&self.package);
+                    if source.is_some()
+                        && let Some(index) = effective
+                            .source_index
+                            .or_else(|| self.package.part_index(partname))
+                    {
+                        // When the source member cannot be read, record a
+                        // payload the replacement cannot equal, so the member
+                        // is regenerated rather than the promotion failing.
+                        // A changed source still fails the fences around it.
+                        let original = self
+                            .package
+                            .read_part_with_session(index, &mut session, None)
+                            .and_then(|data| data.into_arc())
+                            .unwrap_or_else(|_| unequal_to(bytes));
+                        originals.push((partname.clone(), original));
+                    }
+                    Arc::clone(bytes)
+                },
                 None => {
                     let index = effective.source_index.ok_or_else(|| {
                         overlay_unavailable("effective Part has neither source nor payload")
@@ -102,10 +127,59 @@ impl PreparedTopology {
         package.set_non_part_members(non_part_members);
         package.set_tolerance_report(self.package.catalog.tolerance_report.clone());
         if let Some(source) = source {
-            self.package
-                .attach_owned_source_preservation(&mut package, false, source, None)?;
+            let removed = self.removed_source_parts()?;
+            self.package.attach_owned_source_preservation(
+                &mut package,
+                false,
+                source,
+                &removed,
+                None,
+            )?;
+            package.rebind_source_payloads(originals)?;
         }
         package.mark_source_ingress_signature_policy();
         Ok(package)
     }
+
+    /// The source parts this candidate no longer holds: neither an effective
+    /// Part's source nor an effective Part's name.
+    fn removed_source_parts(&self) -> Result<Vec<PackURI>> {
+        let parts = &self.state.effective_data().parts;
+        let mut kept = HashSet::new();
+        let mut kept_names = HashSet::new();
+        kept.try_reserve(parts.len())
+            .and_then(|()| kept_names.try_reserve(parts.len()))
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC prepared retained source parts",
+                source,
+            })?;
+        for effective in parts {
+            if let Some(index) = effective.source_index {
+                kept.insert(index);
+            }
+            kept_names.insert(effective.partname(&self.package));
+        }
+        let mut removed = Vec::new();
+        for (index, source_part) in self.package.catalog.parts.iter().enumerate() {
+            if kept.contains(&index) || kept_names.contains(&source_part.partname) {
+                continue;
+            }
+            removed
+                .try_reserve(1)
+                .map_err(|source| OpcError::Allocation {
+                    resource: "OPC prepared removed source parts",
+                    source,
+                })?;
+            removed.push(source_part.partname.clone());
+        }
+        Ok(removed)
+    }
+}
+
+/// Bytes that differ from `bytes`: one byte longer.
+fn unequal_to(bytes: &[u8]) -> Arc<Vec<u8>> {
+    let mut different = Vec::with_capacity(bytes.len() + 1);
+    different.extend_from_slice(bytes);
+    different.push(0);
+    Arc::new(different)
 }

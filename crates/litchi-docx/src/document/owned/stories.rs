@@ -443,6 +443,14 @@ impl Edit<Package> {
             blob: part.blob_arc(),
             relationships: part_relationships.into(),
         };
+        // The parts only the story reaches (its images) leave with it.
+        let dropped = std::collections::BTreeSet::from([relationship_id.clone()]);
+        let mut parts = vec![transfer_part];
+        parts.extend(
+            self.unreachable_parts(std::slice::from_ref(&uri), &dropped, true)?
+                .into_iter()
+                .filter(|part| part.name != name),
+        );
         let total = count_references(self.inner_mut()?.main_xml(), &relationship_id)?;
         let section = self.inner_mut()?.body_section()?;
         let in_section = match &section {
@@ -465,7 +473,7 @@ impl Edit<Package> {
         self.inner_mut()?.stage_graph_change(
             Arc::new(GraphChange {
                 relationships: Arc::new([transfer_relationship]),
-                parts: Arc::new([transfer_part]),
+                parts: parts.into(),
                 replaced: Arc::new([]),
             }),
             false,

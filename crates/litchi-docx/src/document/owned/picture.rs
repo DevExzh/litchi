@@ -366,16 +366,18 @@ impl Edit<Package> {
 
     /// Remove the picture at `picture` among the paragraph's inline
     /// pictures: its drawing, and its run when the run holds nothing else.
-    /// The image part and its relationship stay in the package,
-    /// unreferenced (the policy of a removed chart).
+    /// The image relationship goes too once the main document no longer
+    /// names it, with the image part unless another relationship still
+    /// reaches it.
     ///
     /// # Errors
     ///
     /// Returns [`Refusal::RunNotFound`] for a missing picture.
     pub fn remove_picture_at(&mut self, paragraph: &ElementPath, picture: Position) -> Result<()> {
+        let before = self.referenced_main_relationships()?;
         self.inner_mut()?
             .rewrite_picture_at(paragraph, picture, None)?;
-        Ok(())
+        self.drop_released_relationships(&before)
     }
 }
 

@@ -9091,7 +9091,7 @@ impl SourceBackedPackage {
         package.set_non_part_members(non_part_members);
         package.set_tolerance_report(self.catalog.tolerance_report.clone());
         if let Some(source) = source {
-            self.attach_owned_source_preservation(&mut package, true, source, accounting)?;
+            self.attach_owned_source_preservation(&mut package, true, source, &[], accounting)?;
         }
         package.mark_source_ingress_signature_policy();
         self.source.ensure_current()?;
@@ -9114,6 +9114,7 @@ impl SourceBackedPackage {
         package: &mut OpcPackage,
         exact: bool,
         source: Arc<Vec<u8>>,
+        removed: &[PackURI],
         mut accounting: Option<&mut OpcOperationAccounting>,
     ) -> Result<()> {
         let content_types = self
@@ -9169,6 +9170,7 @@ impl SourceBackedPackage {
             Some(Arc::clone(&self.catalog.content_types)),
             self.limits,
             exact,
+            removed,
         )?;
         Ok(())
     }
@@ -15916,8 +15918,13 @@ fn validate_raw_content_types_candidate(
         }
     }
 
-    for (partname, _) in raw.overrides() {
-        if !active_keys.contains(&folded_part_name(partname)?) {
+    for (partname, content_type) in raw.overrides() {
+        // An override the source manifest itself carries for a Part the
+        // source never had (a producer's stale entry, as LibreOffice leaves
+        // for an unwritten SmartArt drawing) stays as the source has it.
+        let stale_in_source = package.part_index(partname).is_none()
+            && package.catalog.content_types.override_for(partname) == Some(content_type);
+        if !active_keys.contains(&folded_part_name(partname)?) && !stale_in_source {
             return Err(overlay_unavailable(format!(
                 "raw content-types override '{}' has no effective member",
                 partname

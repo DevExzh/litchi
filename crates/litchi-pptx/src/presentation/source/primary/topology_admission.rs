@@ -234,6 +234,58 @@ fn stage_edges(
     xml: &[u8],
     slide: bool,
 ) -> Result<()> {
+    for (id, kind, part, target) in parse_edges(package, owner, xml, slide)? {
+        match part {
+            Some(part) => plan.try_add_internal_relationship(owner.clone(), id, kind, part)?,
+            None => plan.try_add_external_relationship(owner.clone(), id, kind, target)?,
+        }
+    }
+    Ok(())
+}
+
+/// Stage, as typed edges, how a kept Part's relationships image differs from
+/// its physical one: an identifier only the physical image has is removed,
+/// one only the new image has is added. An identifier both images carry must
+/// name the same edge.
+pub(super) fn stage_edge_delta(
+    package: &Package,
+    plan: &mut litchi_opc::SourceTopologyPlan,
+    owner: &PackURI,
+    physical: &[u8],
+    image: &[u8],
+) -> Result<()> {
+    let physical = parse_edges(package, owner, physical, false)?;
+    let image = parse_edges(package, owner, image, false)?;
+    for edge in &physical {
+        match image.iter().find(|candidate| candidate.0 == edge.0) {
+            Some(candidate) if candidate == edge => {},
+            Some(_) => return Err(Error::PatchConflict),
+            None if edge.2.is_some() => {
+                plan.try_remove_relationship(owner.clone(), edge.0.clone())?
+            },
+            None => plan.try_remove_external_relationship(owner.clone(), edge.0.clone())?,
+        }
+    }
+    for (id, kind, part, target) in image {
+        if physical.iter().any(|edge| edge.0 == id) {
+            continue;
+        }
+        match part {
+            Some(part) => plan.try_add_internal_relationship(owner.clone(), id, kind, part)?,
+            None => plan.try_add_external_relationship(owner.clone(), id, kind, target)?,
+        }
+    }
+    Ok(())
+}
+
+/// The edges of a relationships image: identifier, type, the resolved target
+/// Part of an internal edge, and the stored target.
+pub(super) fn parse_edges(
+    package: &Package,
+    owner: &PackURI,
+    xml: &[u8],
+    slide: bool,
+) -> Result<Vec<(String, String, Option<PackURI>, String)>> {
     use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
     use quick_xml::events::Event;
     use quick_xml::name::{Namespace, ResolveResult};
@@ -330,13 +382,7 @@ fn stage_edges(
     if slide && !layout {
         return Err(Error::PatchConflict);
     }
-    for (id, kind, part, target) in edges {
-        match part {
-            Some(part) => plan.try_add_internal_relationship(owner.clone(), id, kind, part)?,
-            None => plan.try_add_external_relationship(owner.clone(), id, kind, target)?,
-        }
-    }
-    Ok(())
+    Ok(edges)
 }
 
 /// Typed OPC additions use owner-relative references. Until their raw-image

@@ -576,6 +576,384 @@ pub(super) fn remove(
     package_from_revision(package, revision)
 }
 
+/// The relationships of the slide at `key` that `before` names and `after`
+/// no longer does: what a shape removal released. An attribute anywhere in the
+/// slide (both branches of markup compatibility included) that holds an
+/// identifier counts as naming it. See [`released_ids`] for the edges the
+/// slide XML never names.
+pub(super) fn released_relationships(
+    package: &Package,
+    key: &StableSlideKey,
+    before: &[u8],
+    after: &[u8],
+) -> Result<Vec<String>> {
+    let mut retained = Retention::default();
+    let Some(image) = effective_image(package, key, &mut retained)? else {
+        return Err(Error::PatchConflict);
+    };
+    let Some(relationships) = image.relationships else {
+        return Ok(Vec::new());
+    };
+    released_ids(
+        package,
+        &key.part_uri,
+        &relationships,
+        before,
+        after,
+        &|part| effective_part_bytes(package, part),
+        &|part| effective_part_exists(package, part),
+    )
+}
+
+/// The identifiers of `relationships` (a slide's relationships image) that a
+/// shape removal turning slide XML `before` into `after` releases: those
+/// `before` names and `after` does not, plus two kinds of edge the slide XML
+/// never names but a removed object owns. A SmartArt's cached drawing is
+/// named by its data part's `dataModelExt relId`; a legacy VML drawing is
+/// released when every shape it holds belonged to a removed OLE object
+/// (`spid`). A VML drawing that still holds another object's shape keeps
+/// the removed object's shape and preview. `read` supplies a Part's payload.
+fn released_ids(
+    package: &Package,
+    slide: &PackURI,
+    relationships: &[u8],
+    before: &[u8],
+    after: &[u8],
+    read: &dyn Fn(&PackURI) -> Result<Option<Vec<u8>>>,
+    exists: &dyn Fn(&PackURI) -> Result<bool>,
+) -> Result<Vec<String>> {
+    let edges = super::topology_admission::parse_edges(package, slide, relationships, false)?;
+    let ids: HashSet<&str> = edges.iter().map(|edge| edge.0.as_str()).collect();
+    let named_before = named_identifiers(before, &ids)?;
+    let named_after = named_identifiers(after, &ids)?;
+    let mut released: Vec<String> = named_before
+        .difference(&named_after)
+        .map(|id| (*id).to_owned())
+        .collect();
+    for (id, kind, part, _) in &edges {
+        let Some(part) = part else { continue };
+        if !kind.ends_with("/diagramData") || !released.contains(id) {
+            continue;
+        }
+        let Some(data) = read(part)? else {
+            continue;
+        };
+        for named in attribute_values(&data, b"dataModelExt", b"relId")? {
+            if ids.contains(named.as_str())
+                && !named_after.contains(named.as_str())
+                && !released.contains(&named)
+            {
+                released.push(named);
+            }
+        }
+    }
+    let spids_before = attribute_values(before, b"oleObj", b"spid")?;
+    let spids_after = attribute_values(after, b"oleObj", b"spid")?;
+    let removed_spids: Vec<&String> = spids_before
+        .iter()
+        .filter(|spid| !spids_after.contains(spid))
+        .collect();
+    if !removed_spids.is_empty() {
+        for (id, kind, part, _) in &edges {
+            let Some(part) = part else { continue };
+            if !kind.ends_with("/vmlDrawing")
+                || named_after.contains(id.as_str())
+                || released.contains(id)
+            {
+                continue;
+            }
+            let Some(vml) = read(part)? else {
+                continue;
+            };
+            let shapes = attribute_values(&vml, b"shape", b"id")?;
+            if !shapes.is_empty() && shapes.iter().all(|shape| removed_spids.contains(&shape)) {
+                released.push(id.clone());
+            }
+        }
+    }
+    // A dangling edge (its target is missing from the package, as some
+    // producers leave a SmartArt drawing) owns nothing; it stays, so the
+    // content types and every other member stay consistent.
+    let mut kept = Vec::new();
+    for id in released {
+        let dangling = match edges.iter().find(|edge| edge.0 == id) {
+            Some((_, _, Some(part), _)) => !exists(part)?,
+            _ => false,
+        };
+        if !dangling {
+            kept.push(id);
+        }
+    }
+    let mut released = kept;
+    released.sort_unstable();
+    Ok(released)
+}
+
+/// The values of the attribute `attribute` on every element named `local`
+/// (any prefix) in `xml`.
+fn attribute_values(xml: &[u8], local: &[u8], attribute: &[u8]) -> Result<Vec<String>> {
+    use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+    use quick_xml::events::Event;
+    let mut reader = quick_xml::Reader::from_reader(xml);
+    let mut values = Vec::new();
+    loop {
+        match reader.read_event().map_err(|e| Error::Xml(e.to_string()))? {
+            Event::Start(element) | Event::Empty(element)
+                if element.local_name().as_ref() == local =>
+            {
+                for candidate in element.unchecked_attributes() {
+                    let candidate = candidate.map_err(|e| Error::Xml(e.to_string()))?;
+                    if candidate.key.local_name().as_ref() == attribute {
+                        values.push(String::from_utf8_lossy(candidate.value.as_ref()).into_owned());
+                    }
+                }
+            },
+            Event::Eof => return Ok(values),
+            _ => {},
+        }
+    }
+}
+
+/// Whether the effective package has the Part `part`.
+fn effective_part_exists(package: &Package, part: &PackURI) -> Result<bool> {
+    let found = |result: std::result::Result<(), litchi_opc::OpcError>| match result {
+        Ok(()) => Ok(true),
+        Err(litchi_opc::OpcError::PartNotFound(_)) => Ok(false),
+        Err(error) => Err(Error::Opc(error)),
+    };
+    if let Some(revision) = &package.topology {
+        return found(revision.prepared.part(part).map(|_| ()));
+    }
+    found(package.owner.package.part(part).map(|_| ()))
+}
+
+/// The effective payload of `part`, or `None` when the package has no such
+/// Part.
+fn effective_part_bytes(package: &Package, part: &PackURI) -> Result<Option<Vec<u8>>> {
+    let read = |result: std::result::Result<Vec<u8>, litchi_opc::OpcError>| match result {
+        Ok(bytes) => Ok(Some(bytes)),
+        Err(litchi_opc::OpcError::PartNotFound(_)) => Ok(None),
+        Err(error) => Err(Error::Opc(error)),
+    };
+    if let Some(revision) = &package.topology {
+        return read(
+            revision
+                .prepared
+                .part(part)
+                .and_then(|view| view.data().map(|data| data.as_bytes().to_vec())),
+        );
+    }
+    read(
+        package
+            .owner
+            .package
+            .part(part)
+            .and_then(|view| view.data().map(|data| data.as_bytes().to_vec())),
+    )
+}
+
+/// The identifiers in `ids` that an attribute of `xml` holds.
+fn named_identifiers<'a>(xml: &[u8], ids: &HashSet<&'a str>) -> Result<HashSet<&'a str>> {
+    use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+    use quick_xml::events::Event;
+    let mut found = HashSet::new();
+    if ids.is_empty() {
+        return Ok(found);
+    }
+    let mut reader = quick_xml::Reader::from_reader(xml);
+    loop {
+        match reader.read_event().map_err(|e| Error::Xml(e.to_string()))? {
+            Event::Start(element) | Event::Empty(element) => {
+                for attribute in element.unchecked_attributes() {
+                    let attribute = attribute.map_err(|e| Error::Xml(e.to_string()))?;
+                    if let Ok(value) = std::str::from_utf8(attribute.value.as_ref())
+                        && let Some(id) = ids.get(value)
+                    {
+                        found.insert(*id);
+                    }
+                }
+            },
+            Event::Eof => return Ok(found),
+            _ => {},
+        }
+    }
+}
+
+/// Drop the relationships `released` of the slide at `key`, which its staged
+/// XML no longer names, with the Parts only they reach. The relationships
+/// image loses exactly those elements; every other byte stays. A released
+/// Part that something else still targets stays.
+///
+/// # Errors
+///
+/// Refuses, as a slide removal does, an owned Part whose edges a durable
+/// inverse could not restore.
+pub(super) fn release(
+    package: &Package,
+    key: &StableSlideKey,
+    released: &[String],
+    max_patch_bytes: usize,
+) -> Result<Package> {
+    package.check()?;
+    let mut retained = Retention::default();
+    let mut changes = current_changes(package, &mut retained)?;
+    let mut change = changes
+        .iter()
+        .find(|change| &change.key == key)
+        .cloned()
+        .ok_or(Error::PatchConflict)?;
+    let after = change.after.clone().ok_or(Error::PatchConflict)?;
+    let relationships = after.relationships.clone().ok_or(Error::PatchConflict)?;
+    let edges =
+        super::topology_admission::parse_edges(package, &key.part_uri, &relationships, false)?;
+    let mut targets = Vec::new();
+    for (id, _, part, _) in &edges {
+        if !released.contains(id) {
+            continue;
+        }
+        let Some(part) = part else { continue };
+        // A Part the slide still targets through a kept edge stays.
+        let kept = edges
+            .iter()
+            .any(|edge| !released.contains(&edge.0) && edge.2.as_ref() == Some(part));
+        if !kept && !targets.contains(part) {
+            targets.push(part.clone());
+        }
+    }
+    let reduced = without_relationships(&relationships, released)?;
+    let owned = released_parts(package, &key.part_uri, &targets)?;
+    change.after = Some(PartImage {
+        xml: after.xml,
+        relationships: Some(Arc::new(reduced)),
+    });
+    upsert_change(&mut changes, change);
+    let mut dependents = current_dependents(package);
+    for part_uri in owned.parts() {
+        let (before, content_type) = match physical_dependent(package, part_uri, &mut retained)? {
+            Some((image, content_type)) => (Some(image), content_type),
+            None => {
+                let existing = dependents
+                    .iter()
+                    .find(|dependent| dependent.part_uri.is_equivalent_to(part_uri))
+                    .ok_or(Error::PatchConflict)?;
+                (None, existing.content_type.clone())
+            },
+        };
+        upsert_dependent(
+            &mut dependents,
+            Dependent {
+                part_uri: part_uri.clone(),
+                content_type,
+                before,
+                after: None,
+            },
+        );
+    }
+    let root = match package.root.edited_bytes() {
+        Some(bytes) => bytes,
+        None => copy_state_bytes(package, package.root.as_bytes(), &mut retained)?,
+    };
+    let revision = build_revision_with_retention(
+        package,
+        root,
+        Arc::clone(&package.order),
+        changes.into(),
+        dependents.into(),
+        None,
+        retained,
+    )?;
+    let encoded = Data::encoded_len_from_data(&revision.data)?;
+    if encoded > max_patch_bytes {
+        return Err(limit(
+            crate::error::CodecLimitKind::PatchBytes,
+            encoded,
+            max_patch_bytes,
+        ));
+    }
+    package_from_revision(package, revision)
+}
+
+/// The Parts that only the released edges of `owner` to `targets` reach,
+/// proven restorable by a durable inverse.
+fn released_parts(
+    package: &Package,
+    owner: &PackURI,
+    targets: &[PackURI],
+) -> Result<crate::presentation::owned_parts::Owned> {
+    use crate::presentation::owned_parts::{Graph, Owned};
+    if targets.is_empty() {
+        return Ok(Owned::none());
+    }
+    let maximum =
+        crate::presentation::source_removal::relationship_scan_limit(package.owner.limits)?;
+    let graph = match &package.topology {
+        Some(revision) => Graph::from_prepared(&revision.prepared, maximum)?,
+        None => Graph::from_source(&package.owner.package, maximum)?,
+    };
+    let owned = graph.released_by(owner, targets)?;
+    graph.require_restorable_parts(&owned)?;
+    Ok(owned)
+}
+
+/// `xml` without the `Relationship` elements whose identifier is in `ids`;
+/// every other byte is kept.
+fn without_relationships(xml: &[u8], ids: &[String]) -> Result<Vec<u8>> {
+    use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+    use quick_xml::events::Event;
+    let mut reader = quick_xml::Reader::from_reader(xml);
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(xml.len())
+        .map_err(|_| Error::Invalid("relationship image allocation failed".into()))?;
+    let mut copied = 0usize;
+    let mut removing: Option<usize> = None;
+    loop {
+        let start = usize::try_from(reader.buffer_position())
+            .map_err(|_| Error::Invalid("relationship image offset overflow".into()))?;
+        let event = reader.read_event().map_err(|e| Error::Xml(e.to_string()))?;
+        let end = usize::try_from(reader.buffer_position())
+            .map_err(|_| Error::Invalid("relationship image offset overflow".into()))?;
+        let (element, empty) = match &event {
+            Event::Start(element) => (Some(element), false),
+            Event::Empty(element) => (Some(element), true),
+            _ => (None, false),
+        };
+        if let Some(element) = element
+            && element.local_name().as_ref() == b"Relationship"
+            && removing.is_none()
+        {
+            let named = element.unchecked_attributes().any(|attribute| {
+                attribute.is_ok_and(|attribute| {
+                    attribute.key.as_ref() == b"Id"
+                        && std::str::from_utf8(attribute.value.as_ref())
+                            .is_ok_and(|value| ids.iter().any(|id| id == value))
+                })
+            });
+            if named {
+                output.extend_from_slice(&xml[copied..start]);
+                if empty {
+                    copied = end;
+                } else {
+                    removing = Some(start);
+                }
+            }
+            continue;
+        }
+        match event {
+            Event::End(element)
+                if element.local_name().as_ref() == b"Relationship" && removing.is_some() =>
+            {
+                removing = None;
+                copied = end;
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    output.extend_from_slice(&xml[copied..]);
+    Ok(output)
+}
+
 /// Insert one newly authored dependency-free slide into the current effective
 /// catalog. The authoring helper has already performed eager-compatible layout,
 /// root, source-policy, and identity admission; this function composes its
@@ -1825,6 +2203,7 @@ pub(super) fn apply(package: &Package, data: &Data, shape_removals: bool) -> Res
     validate_changes_against_effective(
         package,
         &data.changes,
+        &data.dependents,
         &mut retained,
         allows_empty_result,
         true,
@@ -2093,6 +2472,19 @@ fn build_plan(
                         .map(|data| copy_state_bytes(package, data.as_bytes(), retained))
                         .transpose()?;
                     if physical_rels_arc != image.relationships {
+                        // A kept slide whose relationships changed (a shape
+                        // removal released some) stages the typed edges
+                        // first; the exact image then preserves the rest.
+                        super::topology_admission::stage_edge_delta(
+                            package,
+                            &mut plan,
+                            view.partname(),
+                            physical_rels_arc.as_deref().map_or(&[][..], Vec::as_slice),
+                            image
+                                .relationships
+                                .as_deref()
+                                .map_or(&[][..], Vec::as_slice),
+                        )?;
                         plan.try_restore_relationships_xml(
                             view.partname().clone(),
                             physical_rels_arc,
@@ -2390,15 +2782,21 @@ fn validate_dependents_against_effective(
         .filter(|dependent| dependent.before.is_some())
         .map(|dependent| &dependent.part_uri)
         .collect();
-    if removed.is_empty() {
-        return if expected.is_empty() {
-            Ok(())
-        } else {
-            Err(Error::PatchConflict)
-        };
+    let mut owned: Vec<PackURI> = Vec::new();
+    if !removed.is_empty() {
+        owned.extend(owned_parts(package, &removed)?.parts().iter().cloned());
     }
-    let owned = owned_parts(package, &removed)?;
-    if !same_parts(owned.parts(), &expected) {
+    for change in data.changes.iter() {
+        let (Some(before), Some(after)) = (&change.before, &change.after) else {
+            continue;
+        };
+        let (released, _) = relationship_delta(&change.key.part_uri, before, after)?;
+        if !released.is_empty() {
+            let released = released_parts(package, &change.key.part_uri, &released)?;
+            owned.extend(released.parts().iter().cloned());
+        }
+    }
+    if !same_parts(&owned, &expected) {
         return Err(Error::PatchConflict);
     }
     Ok(())
@@ -2422,18 +2820,233 @@ fn validate_restored_dependents(revision: &Revision, data: &Data) -> Result<()> 
     if expected.is_empty() {
         return Ok(());
     }
-    if restored.is_empty() {
-        return Err(Error::PatchConflict);
-    }
     let maximum = revision
         .prepared
         .read_limits()
         .max_parts()
         .saturating_mul(16);
-    let owned =
-        crate::presentation::owned_parts::Graph::from_prepared(&revision.prepared, maximum)?
-            .owned_by_all(&restored)?;
-    if !same_parts(owned.parts(), &expected) {
+    let graph =
+        crate::presentation::owned_parts::Graph::from_prepared(&revision.prepared, maximum)?;
+    let mut owned: Vec<PackURI> = Vec::new();
+    if !restored.is_empty() {
+        owned.extend(graph.owned_by_all(&restored)?.parts().iter().cloned());
+    }
+    // A kept slide whose relationships a patch restores (the inverse of a
+    // shape removal) owns the Parts only those edges reach.
+    for change in data.changes.iter() {
+        let (Some(before), Some(after)) = (&change.before, &change.after) else {
+            continue;
+        };
+        if before.relationships == after.relationships {
+            continue;
+        }
+        let added = edges_only_in(after, before)?;
+        let targets = released_targets(&change.key.part_uri, after, &added)?;
+        if !targets.is_empty() {
+            owned.extend(
+                graph
+                    .released_by(&change.key.part_uri, &targets)?
+                    .parts()
+                    .iter()
+                    .cloned(),
+            );
+        }
+    }
+    if !same_parts(&owned, &expected) {
+        return Err(Error::PatchConflict);
+    }
+    Ok(())
+}
+
+/// The identifiers of `image`'s relationship elements that `other` lacks.
+fn edges_only_in(image: &PartImage, other: &PartImage) -> Result<Vec<String>> {
+    let ids = |image: &PartImage| -> Result<Vec<String>> {
+        Ok(match &image.relationships {
+            Some(xml) => relationship_ids(xml)?,
+            None => Vec::new(),
+        })
+    };
+    let theirs = ids(other)?;
+    Ok(ids(image)?
+        .into_iter()
+        .filter(|id| !theirs.contains(id))
+        .collect())
+}
+
+/// The `Id` of every `Relationship` element of a relationships image.
+fn relationship_ids(xml: &[u8]) -> Result<Vec<String>> {
+    use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+    use quick_xml::events::Event;
+    let mut reader = quick_xml::Reader::from_reader(xml);
+    let mut ids = Vec::new();
+    loop {
+        match reader.read_event().map_err(|e| Error::Xml(e.to_string()))? {
+            Event::Start(element) | Event::Empty(element)
+                if element.local_name().as_ref() == b"Relationship" =>
+            {
+                for attribute in element.unchecked_attributes() {
+                    let attribute = attribute.map_err(|e| Error::Xml(e.to_string()))?;
+                    if attribute.key.as_ref() == b"Id" {
+                        ids.push(String::from_utf8_lossy(attribute.value.as_ref()).into_owned());
+                    }
+                }
+            },
+            Event::Eof => return Ok(ids),
+            _ => {},
+        }
+    }
+}
+
+/// The internal targets of `image`'s edges `ids` that none of its other
+/// edges names.
+fn released_targets(slide: &PackURI, image: &PartImage, ids: &[String]) -> Result<Vec<PackURI>> {
+    let Some(xml) = &image.relationships else {
+        return Ok(Vec::new());
+    };
+    let edges = parse_relationship_edges(slide, xml)?;
+    let mut targets = Vec::new();
+    for (id, target) in &edges {
+        let Some(target) = target else { continue };
+        if !ids.contains(id) || targets.contains(target) {
+            continue;
+        }
+        let kept = edges
+            .iter()
+            .any(|(other, part)| !ids.contains(other) && part.as_ref() == Some(target));
+        if !kept {
+            targets.push(target.clone());
+        }
+    }
+    Ok(targets)
+}
+
+/// The identifier and resolved internal target of every edge of a slide's
+/// relationships image.
+fn parse_relationship_edges(slide: &PackURI, xml: &[u8]) -> Result<Vec<(String, Option<PackURI>)>> {
+    use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+    use quick_xml::events::Event;
+    let base = slide.base_uri();
+    let mut reader = quick_xml::Reader::from_reader(xml);
+    let mut edges = Vec::new();
+    loop {
+        match reader.read_event().map_err(|e| Error::Xml(e.to_string()))? {
+            Event::Start(element) | Event::Empty(element)
+                if element.local_name().as_ref() == b"Relationship" =>
+            {
+                let (mut id, mut target, mut external) = (None, None, false);
+                for attribute in element.unchecked_attributes() {
+                    let attribute = attribute.map_err(|e| Error::Xml(e.to_string()))?;
+                    let value = String::from_utf8_lossy(attribute.value.as_ref()).into_owned();
+                    match attribute.key.as_ref() {
+                        b"Id" => id = Some(value),
+                        b"Target" => target = Some(value),
+                        b"TargetMode" => external = value == "External",
+                        _ => {},
+                    }
+                }
+                let id = id.ok_or(Error::PatchConflict)?;
+                let target = match (target, external) {
+                    (Some(target), false) => {
+                        Some(PackURI::from_rel_ref(base, &target).map_err(Error::Invalid)?)
+                    },
+                    _ => None,
+                };
+                edges.push((id, target));
+            },
+            Event::Eof => return Ok(edges),
+            _ => {},
+        }
+    }
+}
+
+/// The edges a kept slide's change releases (internal targets no remaining
+/// edge names) and the identifiers it adds.
+fn relationship_delta(
+    slide: &PackURI,
+    before: &PartImage,
+    after: &PartImage,
+) -> Result<(Vec<PackURI>, Vec<String>)> {
+    if before.relationships == after.relationships {
+        return Ok((Vec::new(), Vec::new()));
+    }
+    let removed = edges_only_in(before, after)?;
+    let added = edges_only_in(after, before)?;
+    Ok((released_targets(slide, before, &removed)?, added))
+}
+
+/// A kept slide's relationships may change only as a shape removal changes
+/// them, or as its inverse restores them: exactly the elements
+/// [`released_ids`] computes for the slide's XML change leave (or, for the
+/// inverse, come back), and every other byte of the image stays. Parts the
+/// patch removes or restores are read from its own images.
+fn validate_relationship_delta(
+    package: &Package,
+    slide: &PackURI,
+    before: &PartImage,
+    after: &PartImage,
+    dependents: &[Dependent],
+) -> Result<()> {
+    let (Some(before_rels), Some(after_rels)) = (&before.relationships, &after.relationships)
+    else {
+        return Err(Error::PatchConflict);
+    };
+    let removed = edges_only_in(before, after)?;
+    let added = edges_only_in(after, before)?;
+    // `full` is the image with the edges, `with` the slide XML that still
+    // has the removed object.
+    let (full, reduced, ids, with, without, forward) = match (removed.is_empty(), added.is_empty())
+    {
+        (false, true) => (
+            before_rels,
+            after_rels,
+            removed,
+            &before.xml,
+            &after.xml,
+            true,
+        ),
+        (true, false) => (
+            after_rels,
+            before_rels,
+            added,
+            &after.xml,
+            &before.xml,
+            false,
+        ),
+        _ => return Err(Error::PatchConflict),
+    };
+    if without_relationships(full, &ids)? != reduced.as_slice() {
+        return Err(Error::PatchConflict);
+    }
+    let read = |part: &PackURI| -> Result<Option<Vec<u8>>> {
+        let image = dependents
+            .iter()
+            .find(|dependent| dependent.part_uri.is_equivalent_to(part))
+            .and_then(|dependent| {
+                if forward {
+                    dependent.before.as_ref()
+                } else {
+                    dependent.after.as_ref()
+                }
+            });
+        match image {
+            Some(image) => Ok(Some(image.xml.to_vec())),
+            None => effective_part_bytes(package, part),
+        }
+    };
+    let exists = |part: &PackURI| -> Result<bool> {
+        if dependents
+            .iter()
+            .any(|dependent| dependent.part_uri.is_equivalent_to(part))
+        {
+            return Ok(true);
+        }
+        effective_part_exists(package, part)
+    };
+    let mut expected = released_ids(package, slide, full, with, without, &read, &exists)?;
+    let mut ids = ids;
+    expected.sort_unstable();
+    ids.sort_unstable();
+    if ids != expected {
         return Err(Error::PatchConflict);
     }
     Ok(())
@@ -2607,6 +3220,7 @@ fn package_as_physical(package: &Package) -> Result<Package> {
 fn validate_changes_against_effective(
     package: &Package,
     changes: &[Change],
+    dependents: &[Dependent],
     retained: &mut Retention,
     allows_empty_result: bool,
     allows_unrelated_opaque_targets: bool,
@@ -2635,7 +3249,13 @@ fn validate_changes_against_effective(
         match (&change.before, &change.after) {
             (Some(before), Some(after)) => {
                 if before.relationships != after.relationships {
-                    return Err(Error::PatchConflict);
+                    validate_relationship_delta(
+                        package,
+                        &change.key.part_uri,
+                        before,
+                        after,
+                        dependents,
+                    )?;
                 }
                 let semantic =
                     crate::open_options::selected(package.owner.semantic_limits.as_ref());
@@ -3131,4 +3751,162 @@ fn merge_retention(destination: &mut Retention, mut source: Retention) {
         .append(&mut source.prepared_metadata);
     destination.reservations.append(&mut source.reservations);
     destination.source_xml.append(&mut source.source_xml);
+}
+
+#[cfg(test)]
+mod release_tests {
+    //! Replay accepts a kept slide's relationship change only when it is
+    //! exactly what the slide's own XML change releases.
+
+    use super::*;
+
+    const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+    const LAYOUT: &str = r#"<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>"#;
+    const PICTURE: &str = r#"<p:pic><p:blipFill><a:blip r:embed="rId2"/></p:blipFill></p:pic>"#;
+
+    fn package() -> Package {
+        let bytes = std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../test-data/libreoffice-core/sd/qa/unit/data/pptx/ole.pptx"),
+        )
+        .unwrap();
+        Package::from_read_at(Arc::new(litchi_core::OwnedSource::new(bytes))).unwrap()
+    }
+
+    fn rels(extra: &[&str]) -> Arc<Vec<u8>> {
+        Arc::new(
+            format!(
+                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">{LAYOUT}{}</Relationships>"#,
+                extra.concat()
+            )
+            .into_bytes(),
+        )
+    }
+
+    fn relationship(id: &str, kind: &str, target: &str) -> String {
+        format!(r#"<Relationship Id="{id}" Type="{REL}/{kind}" Target="{target}"/>"#)
+    }
+
+    fn slide(shapes: &str) -> Arc<Vec<u8>> {
+        Arc::new(
+            format!(
+                r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="{REL}"><p:cSld><p:spTree>{shapes}</p:spTree></p:cSld></p:sld>"#
+            )
+            .into_bytes(),
+        )
+    }
+
+    fn image(xml: Arc<Vec<u8>>, relationships: Arc<Vec<u8>>) -> PartImage {
+        PartImage {
+            xml,
+            relationships: Some(relationships),
+        }
+    }
+
+    fn removed(part: &str, xml: &str) -> Dependent {
+        Dependent {
+            part_uri: PackURI::new(part).unwrap(),
+            content_type: "application/xml".to_owned(),
+            before: Some(PartImage {
+                xml: Arc::new(xml.as_bytes().to_vec()),
+                relationships: None,
+            }),
+            after: None,
+        }
+    }
+
+    fn validate(before: &PartImage, after: &PartImage, dependents: &[Dependent]) -> Result<()> {
+        let slide = PackURI::new("/ppt/slides/slide1.xml").unwrap();
+        validate_relationship_delta(&package(), &slide, before, after, dependents)
+    }
+
+    #[test]
+    fn a_released_picture_edge_replays_and_its_inverse_too() {
+        let image_edge = relationship("rId2", "image", "../media/image1.png");
+        let before = image(slide(PICTURE), rels(&[&image_edge]));
+        let after = image(slide(""), rels(&[]));
+        let dependents = [removed("/ppt/media/image1.png", "")];
+        validate(&before, &after, &dependents).unwrap();
+        let restored = [Dependent {
+            part_uri: dependents[0].part_uri.clone(),
+            content_type: dependents[0].content_type.clone(),
+            before: None,
+            after: dependents[0].before.clone(),
+        }];
+        validate(&after, &before, &restored).unwrap();
+    }
+
+    #[test]
+    fn forged_drops_of_unnamed_edges_are_refused() {
+        for (kind, target, part) in [
+            (
+                "notesSlide",
+                "../notesSlides/notesSlide1.xml",
+                "/ppt/notesSlides/notesSlide1.xml",
+            ),
+            (
+                "comments",
+                "../comments/comment1.xml",
+                "/ppt/comments/comment1.xml",
+            ),
+            ("image", "../media/image9.png", "/ppt/media/image9.png"),
+        ] {
+            let edge = relationship("rId7", kind, target);
+            // No shape leaves; the patch still drops the edge and its Part.
+            let before = image(slide(""), rels(&[&edge]));
+            let after = image(slide(""), rels(&[]));
+            let dependents = [removed(part, "")];
+            assert!(
+                matches!(
+                    validate(&before, &after, &dependents),
+                    Err(Error::PatchConflict)
+                ),
+                "{kind}"
+            );
+        }
+        // A real removal cannot carry an extra unnamed drop either.
+        let image_edge = relationship("rId2", "image", "../media/image1.png");
+        let notes = relationship("rId7", "notesSlide", "../notesSlides/notesSlide1.xml");
+        let before = image(slide(PICTURE), rels(&[&image_edge, &notes]));
+        let after = image(slide(""), rels(&[]));
+        let dependents = [
+            removed("/ppt/media/image1.png", ""),
+            removed("/ppt/notesSlides/notesSlide1.xml", ""),
+        ];
+        assert!(matches!(
+            validate(&before, &after, &dependents),
+            Err(Error::PatchConflict)
+        ));
+    }
+
+    #[test]
+    fn a_smartart_drawing_replays_only_with_its_data_part() {
+        let frame = r#"<p:graphicFrame><a:graphic><a:graphicData><dgm:relIds xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram" r:dm="rId2" r:lo="rId3" r:qs="rId4" r:cs="rId5"/></a:graphicData></a:graphic></p:graphicFrame>"#;
+        let edges = [
+            relationship("rId2", "diagramData", "../diagrams/data1.xml"),
+            relationship("rId3", "diagramLayout", "../diagrams/layout1.xml"),
+            relationship("rId4", "diagramQuickStyle", "../diagrams/quickStyle1.xml"),
+            relationship("rId5", "diagramColors", "../diagrams/colors1.xml"),
+            relationship("rId6", "diagramDrawing", "../diagrams/drawing1.xml"),
+        ];
+        let edges: Vec<&str> = edges.iter().map(String::as_str).collect();
+        let data = r#"<dgm:dataModel xmlns:dgm="d"><dgm:extLst><a:ext xmlns:a="a"><dsp:dataModelExt xmlns:dsp="s" relId="rId6"/></a:ext></dgm:extLst></dgm:dataModel>"#;
+        let before = image(slide(frame), rels(&edges));
+        let after = image(slide(""), rels(&[]));
+        // Every diagram Part leaves with the frame.
+        let others: Vec<Dependent> = ["layout1", "quickStyle1", "colors1", "drawing1"]
+            .iter()
+            .map(|name| removed(&format!("/ppt/diagrams/{name}.xml"), ""))
+            .collect();
+        let mut dependents = vec![removed("/ppt/diagrams/data1.xml", data)];
+        dependents.extend(others.iter().cloned());
+        validate(&before, &after, &dependents).unwrap();
+        // Without the data part's name for it, the drawing edge is forged.
+        let mut dependents = vec![removed("/ppt/diagrams/data1.xml", "<dgm:dataModel/>")];
+        dependents.extend(others);
+        assert!(matches!(
+            validate(&before, &after, &dependents),
+            Err(Error::PatchConflict)
+        ));
+    }
 }
