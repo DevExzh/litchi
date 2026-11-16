@@ -155,8 +155,10 @@ and banned; error variants and their existing observations stay unchanged.
 
 The equation raw codec profile is registered. `litchi_equation`'s
 `omml_to_latex`, `omml_to_unicode_math`, `mathml_to_latex`, `read_mtef`,
-`mtef_to_latex`, `latex_to_omml` and `latex_to_omml_paragraph`, and with the
-`render` feature `latex_to_png`, `omml_to_png` and `omml_size_pt`, take a caller-selected finite `Limits`
+`mtef_to_latex`, `latex_to_omml`, `latex_to_omml_paragraph`,
+`latex_to_equation_native` and `omml_to_equation_native` (an OLE `Equation
+Native` stream for an `MtefTarget`), and with the `render` feature
+`latex_to_png`, `omml_to_png`, `omml_size_pt` and `mtef_to_png`, take a caller-selected finite `Limits`
 (input bytes, parsed nodes and nesting depth) at every raw boundary; the input
 ceiling is checked before parsing. Pictures also take `PngOptions` (text size,
 scale and a pixel ceiling checked before any pixel buffer is allocated).
@@ -3096,8 +3098,9 @@ are complete-catalog sheet positions.
 | Canonical name | Notes | Status |
 | --- | --- | --- |
 | `litchi_xls::sheet_features::{Features, FeatureSet, Area, PageBreak, Note, Drawing, DrawingKind, Fill, Line, ConditionalFormat, Rule, RuleType, Style, Threshold, ColorScale, DataBar, IconSet, Validation, AutoFilter}`, `Package::sheet_features` | reads one worksheet without decoding its cells; `FeatureSet` selects the kinds (only formats and validations render formulas) | ✅ |
-| `sheet_features::edit::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`, `Package::{edit_sheet_features, apply_sheet_features}` | `Edit::{features, set_row_breaks, set_column_breaks, add_hyperlink, set_hyperlink, remove_hyperlink, add_validation, set_validation, remove_validation, add_format, set_format, set_format_ranges, remove_format, set_auto_filter, add_note, set_note, remove_note, add_picture, add_shape, set_drawing, remove_drawing, commit}` | ✅ family registered in the gate |
-| `sheet_features::edit::{Hyperlink, Validation, Style, Format, FormatRule, Threshold, Picture, Shape, ShapeGeometry, Anchor, DrawingChange}` | the authored values; formulas are BIFF8 token streams, colors palette indexes (styles) or RGB (drawings, CF12 visuals) | ✅ |
+| `litchi_xls::sheet_features::{Equation, EquationKind, MAX_EQUATION_NATIVE_BYTES}`, `Package::equations`; `Equation::latex` (feature `equation`) | the OLE equations of a worksheet drawing (`Equation.*` objects), each with its `Equation Native` stream; they are not listed among the drawings | ✅ |
+| `sheet_features::edit::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`, `Package::{edit_sheet_features, apply_sheet_features}` | `Edit::{features, set_row_breaks, set_column_breaks, add_hyperlink, set_hyperlink, remove_hyperlink, add_validation, set_validation, remove_validation, add_format, set_format, set_format_ranges, remove_format, set_auto_filter, add_note, set_note, remove_note, add_picture, add_shape, set_drawing, remove_drawing, equations, add_equation, set_equation, remove_equation, commit}`; `add_equation_from` and `set_equation_from` with `EquationSource` (feature `equation`) | ✅ family registered in the gate |
+| `sheet_features::edit::{Hyperlink, Validation, Style, Format, FormatRule, Threshold, Picture, Shape, ShapeGeometry, Anchor, DrawingChange, EquationSpec, EquationContent}` | the authored values; formulas are BIFF8 token streams, colors palette indexes (styles) or RGB (drawings, CF12 visuals) | ✅ |
 | `sheet_features::edit::compile_formula`, `Package::palette` | formula text to BIFF8 tokens with every built-in worksheet function (not `CALL`, `REGISTER.ID`, `EXEC`); the workbook palette a style's indexes name | ✅ |
 
 ## XLS raw record boundaries

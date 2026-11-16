@@ -10,6 +10,7 @@ use std::fmt;
 use std::sync::Arc;
 
 use super::encode::{self, HyperlinkSpec, Rule12, StyleSpec, ValidationSpec};
+use super::equation::StagedStorage;
 use super::read::{self, Features};
 use super::stream::{
     self, AUTO_FILTER, AUTO_FILTER_INFO, AUTO_FILTER12, CF, CF_EX, CF12, COND_FMT, COND_FMT12,
@@ -20,13 +21,17 @@ use super::{Area, FeatureSet};
 use crate::Package;
 use litchi_core::edit::RefusalKind;
 use litchi_ole_common::object::{
-    Limits as ObjectLimits, OpenOptions as ObjectOpenOptions, Package as ObjectPackage, Targets,
+    Limits as ObjectLimits, OpenOptions as ObjectOpenOptions, Package as ObjectPackage, Target,
+    Targets,
 };
 
 pub use super::PageBreak;
 pub use encode::{HyperlinkSpec as Hyperlink, StyleSpec as Style, ValidationSpec as Validation};
+#[cfg(feature = "equation")]
+pub use objects::EquationSource;
 pub use objects::{
-    Anchor, DrawingChange, PictureSpec as Picture, ShapeGeometry, ShapeSpec as Shape,
+    Anchor, DrawingChange, EquationContent, EquationSpec, PictureSpec as Picture, ShapeGeometry,
+    ShapeSpec as Shape,
 };
 
 #[path = "objects.rs"]
@@ -66,6 +71,9 @@ pub enum Error {
     PatchConflict,
     /// A changed write of a signed workbook; remove the signature explicitly.
     Signed,
+    /// An equation did not convert or render.
+    #[cfg(feature = "equation")]
+    Equation(litchi_equation::Error),
 }
 
 impl fmt::Display for Error {
@@ -88,6 +96,8 @@ impl fmt::Display for Error {
             Self::Signed => {
                 formatter.write_str("changed worksheet features require explicit signature removal")
             },
+            #[cfg(feature = "equation")]
+            Self::Equation(error) => error.fmt(formatter),
         }
     }
 }
@@ -99,6 +109,8 @@ impl std::error::Error for Error {
             Self::Records(error) => Some(error),
             Self::Refused(_) | Self::Limit { .. } => None,
             Self::Signed | Self::PatchConflict => None,
+            #[cfg(feature = "equation")]
+            Self::Equation(error) => Some(error),
         }
     }
 }
@@ -255,6 +267,9 @@ pub struct Edit {
     source: Option<Arc<[u8]>>,
     stream: Vec<u8>,
     operations: usize,
+    /// Embedded-object storages published with the Workbook stream, by
+    /// storage name.
+    storages: Vec<(String, StagedStorage)>,
 }
 
 impl fmt::Debug for Edit {
@@ -282,6 +297,7 @@ impl Edit {
             source: None,
             stream: Vec::new(),
             operations: 0,
+            storages: Vec::new(),
         })
     }
 
@@ -1080,7 +1096,7 @@ impl Edit {
         if current_stream.as_ref() != source.as_ref() {
             return Err(Error::PatchConflict);
         }
-        if this.stream.as_slice() == &*source {
+        if this.stream.as_slice() == &*source && this.storages.is_empty() {
             let bytes: Arc<[u8]> = Arc::from(this.base.to_bytes()?);
             return Ok(Commit {
                 package: this.base,
@@ -1100,19 +1116,62 @@ impl Edit {
         let result = (|| -> Result<(Arc<[u8]>, Vec<u8>)> {
             let before: Arc<[u8]> = Arc::from(this.base.to_bytes()?);
             let name = workbook_stream_name(&before)?;
+            let records = |error: litchi_ole_common::Error| Error::Records(error.into());
+            let target = |name: &str| {
+                Target::new(name.to_owned(), [name.to_owned()])
+                    .map_err(|error| Error::Records(error.into()))
+            };
+            // A removed storage is opened as a target so the editor can
+            // drop its whole subtree.
+            let removed = this
+                .storages
+                .iter()
+                .filter(|(_, change)| matches!(change, StagedStorage::Removed))
+                .map(|(name, _)| target(name))
+                .collect::<Result<Vec<_>>>()?;
+            let targets = if removed.is_empty() {
+                Targets::default()
+            } else {
+                Targets::new(removed).map_err(records)?
+            };
             let package = ObjectPackage::open_with_options(
                 before.to_vec(),
                 ObjectOpenOptions::new()
-                    .targets(Targets::default())
+                    .targets(targets)
                     .limits(ObjectLimits::default()),
             )
-            .map_err(|error| Error::Records(error.into()))?;
-            let mut editor = package
-                .edit()
-                .map_err(|error| Error::Records(error.into()))?;
+            .map_err(records)?;
+            let mut editor = package.edit().map_err(records)?;
+            let mut streams = vec![(vec![name.to_owned()], Arc::<[u8]>::from(this.stream))];
+            for (storage, change) in &this.storages {
+                if let StagedStorage::Native(native) = change {
+                    streams.push((
+                        vec![storage.clone(), super::equation::EQUATION_NATIVE.to_owned()],
+                        Arc::from(native.as_slice()),
+                    ));
+                }
+            }
             editor
-                .put_stream_shared(&[name.to_owned()], Arc::from(this.stream))
-                .map_err(|error| Error::Records(error.into()))?;
+                .put_streams_shared(
+                    streams
+                        .iter()
+                        .map(|(path, data)| (path.as_slice(), Arc::clone(data))),
+                )
+                .map_err(records)?;
+            for (storage, change) in &this.storages {
+                match change {
+                    StagedStorage::New { kind, native } => {
+                        let file = objects::storage_file(*kind, native)?;
+                        editor
+                            .add_storage(target(storage)?, file)
+                            .map_err(records)?;
+                    },
+                    StagedStorage::Removed => {
+                        editor.remove_storage(storage).map_err(records)?;
+                    },
+                    StagedStorage::Native(_) => {},
+                }
+            }
             let committed = editor
                 .commit()
                 .map_err(|error| Error::Records(error.into()))?;

@@ -367,6 +367,10 @@
         {
           "element": "colbreak",
           "pathSegment": "colbreak"
+        },
+        {
+          "element": "equation",
+          "pathSegment": "equation"
         }
       ],
       "properties": {
@@ -4047,6 +4051,32 @@
           "type"
         ]
       }
+    },
+    {
+      "format": "xlsx",
+      "element": "equation",
+      "parent": "sheet",
+      "elementAliases": [
+        "math"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/equation[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "not supported yet",
+        "reason": "equations are not projected into nodes yet"
+      }
     }
   ],
   "gaps": [
@@ -4084,6 +4114,13 @@
       "code": "unsupported_capability",
       "followUp": "not supported yet",
       "reason": "OLE objects are not projected into nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "equation",
+      "code": "unsupported_capability",
+      "followUp": "not supported yet",
+      "reason": "equations are not projected into nodes yet"
     },
     {
       "subject": "property",

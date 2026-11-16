@@ -527,7 +527,7 @@ const fn with_gap(element: &'static ElementSpec<Kind>, gap: &'static GapSpec) ->
     }
 }
 
-static ELEMENTS: [ElementSpec<Kind>; 26] = [
+static ELEMENTS: [ElementSpec<Kind>; 27] = [
     with_props(&workbook::SPEC.elements[0], WORKBOOK_PROPS),
     with_props(&workbook::SPEC.elements[1], SHEET_PROPS),
     with_props(&workbook::SPEC.elements[2], CELL_PROPS),
@@ -569,6 +569,9 @@ static ELEMENTS: [ElementSpec<Kind>; 26] = [
         super::features::COL_BREAK_PROPS,
     ),
     with_gap(&workbook::SPEC.elements[25], &RUN_GAP),
+    ElementSpec {
+        ..workbook::SPEC.elements[26]
+    },
 ];
 
 pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {

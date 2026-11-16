@@ -573,11 +573,36 @@ pub(super) fn drawing_store(stream_bytes: &[u8], globals: &Globals) -> Result<Ve
         .unwrap_or_default())
 }
 
+/// The cell anchor of an `OfficeArtClientAnchorSheet` payload.
+pub(super) fn sheet_anchor(bytes: &[u8; 18]) -> Option<crate::SheetAnchor> {
+    let point = |at: usize| {
+        crate::AnchorPoint::new(
+            u16_at(bytes, at),
+            u16_at(bytes, at + 4),
+            i16::from_le_bytes([bytes[at + 2], bytes[at + 3]]),
+            i16::from_le_bytes([bytes[at + 6], bytes[at + 7]]),
+        )
+        .ok()
+    };
+    let behavior = match u16_at(bytes, 0) & 3 {
+        0 => crate::AnchorBehavior::MoveAndResize,
+        2 => crate::AnchorBehavior::MoveWithoutResize,
+        _ => crate::AnchorBehavior::Absolute,
+    };
+    crate::SheetAnchor::new(point(2)?, point(10)?, behavior).ok()
+}
+
 /// The drawing an object projects: a picture or a plain shape; comments,
-/// form controls, charts and groups are not drawings here.
+/// form controls, charts, groups and OLE equations are not drawings here.
 pub(super) fn drawing_of(object: &Object, store: &[(u8, u32)]) -> Option<Drawing> {
     let (ot, object_id) = object.obj?;
-    if object.group {
+    // An OLE equation is listed as an equation, not as a picture.
+    if object.group
+        || object
+            .ole
+            .as_ref()
+            .is_some_and(drawing::OleLink::is_equation)
+    {
         return None;
     }
     let kind = match ot {
@@ -585,23 +610,7 @@ pub(super) fn drawing_of(object: &Object, store: &[(u8, u32)]) -> Option<Drawing
         1 | 2 | 3 | 4 | 6 | 9 | 0x1e => DrawingKind::Shape,
         _ => return None,
     };
-    let anchor = object.anchor.and_then(|bytes| {
-        let point = |at: usize| {
-            crate::AnchorPoint::new(
-                u16_at(&bytes, at),
-                u16_at(&bytes, at + 4),
-                i16::from_le_bytes([bytes[at + 2], bytes[at + 3]]),
-                i16::from_le_bytes([bytes[at + 6], bytes[at + 7]]),
-            )
-            .ok()
-        };
-        let behavior = match u16_at(&bytes, 0) & 3 {
-            0 => crate::AnchorBehavior::MoveAndResize,
-            2 => crate::AnchorBehavior::MoveWithoutResize,
-            _ => crate::AnchorBehavior::Absolute,
-        };
-        crate::SheetAnchor::new(point(2)?, point(10)?, behavior).ok()
-    });
+    let anchor = object.anchor.as_ref().and_then(sheet_anchor);
     let rotation = object
         .prop(0x0004)
         .map_or(0.0, |prop| f64::from(prop.value as i32) / 65_536.0);

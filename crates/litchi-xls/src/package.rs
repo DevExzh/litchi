@@ -716,6 +716,77 @@ impl Package {
         ))
     }
 
+    /// The bytes of the compound-file stream at `path`, or `None` when the
+    /// package has no such stream; a stream longer than `max_bytes` is
+    /// refused before it is read.
+    pub(crate) fn package_stream(&self, path: &[&str], max_bytes: u64) -> Result<Option<Vec<u8>>> {
+        ensure_source_fence(&self.inner)?;
+        let result = (|| -> Result<Option<Vec<u8>>> {
+            match &self.inner.state {
+                PackageState::Eager { reader, .. } => {
+                    let data = reader.get_ref().get_ref();
+                    let mut ole = OleFile::open(
+                        Cursor::new(data.as_slice()),
+                        litchi_cfb::OleFileLimits::default(),
+                    )?;
+                    if !ole.exists(path) {
+                        return Ok(None);
+                    }
+                    if ole.stream_len(path)? > max_bytes {
+                        return Err(Error::InvalidData(
+                            "a package stream exceeds its size limit",
+                        ));
+                    }
+                    Ok(Some(ole.open_stream(path)?))
+                },
+                PackageState::Source { cfb, .. } => {
+                    let expected = cfb
+                        .source_version()
+                        .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
+                    if !cfb.exists(path) {
+                        return Ok(None);
+                    }
+                    if cfb.stream_len(path)? > max_bytes {
+                        return Err(Error::InvalidData(
+                            "a package stream exceeds its size limit",
+                        ));
+                    }
+                    let bytes = cfb.open_stream(path)?;
+                    let observed = cfb
+                        .source_version()
+                        .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
+                    if observed != expected {
+                        return Err(Error::Source(SourceBackedError::SourceChanged {
+                            expected,
+                            observed,
+                        }));
+                    }
+                    Ok(Some(bytes))
+                },
+            }
+        })();
+        finish_source_fence(&self.inner, result)
+    }
+
+    /// Whether the compound file has an entry (stream or storage) at `path`.
+    pub(crate) fn package_entry_exists(&self, path: &[&str]) -> Result<bool> {
+        ensure_source_fence(&self.inner)?;
+        let result = (|| -> Result<bool> {
+            match &self.inner.state {
+                PackageState::Eager { reader, .. } => {
+                    let data = reader.get_ref().get_ref();
+                    let ole = OleFile::open(
+                        Cursor::new(data.as_slice()),
+                        litchi_cfb::OleFileLimits::default(),
+                    )?;
+                    Ok(ole.exists(path))
+                },
+                PackageState::Source { cfb, .. } => Ok(cfb.exists(path)),
+            }
+        })();
+        finish_source_fence(&self.inner, result)
+    }
+
     /// Return the exact source bytes, including password-to-open encryption.
     ///
     /// This method is deliberately named as a source escape.  Ordinary

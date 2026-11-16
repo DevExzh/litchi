@@ -1375,7 +1375,7 @@ const fn feature(index: usize, props: &'static [PropSpec]) -> ElementSpec<Kind> 
 // Keep the shared workbook topology and all non-XLSX-specific gaps, replacing
 // only the range property table and its former capability gap.  XLSB retains
 // the shared range gap in its own local SPEC.
-static XLSX_ELEMENTS: [ElementSpec<Kind>; 26] = [
+static XLSX_ELEMENTS: [ElementSpec<Kind>; 27] = [
     with_props(
         &workbook::SPEC.elements[0],
         workbook::SPEC.elements[0].props,
@@ -1443,6 +1443,10 @@ static XLSX_ELEMENTS: [ElementSpec<Kind>; 26] = [
         gap: None,
         paths: &["/<sheet>/<A1>/run[N]"],
         ..workbook::SPEC.elements[25]
+    },
+    // Equations: the shared gap.
+    ElementSpec {
+        ..workbook::SPEC.elements[26]
     },
 ];
 

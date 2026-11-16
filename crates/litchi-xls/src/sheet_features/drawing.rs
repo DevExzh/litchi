@@ -128,6 +128,102 @@ pub(super) struct Object {
     pub(super) obj: Option<(u16, u16)>,
     /// The text of the shape's `TXO`.
     pub(super) text: Option<String>,
+    /// The embedded OLE object the shape's `Obj` names.
+    pub(super) ole: Option<OleLink>,
+}
+
+/// The embedded OLE object of a picture `Obj` (`ot` 8): the class its
+/// `FtPictFmla` names and the `MBD` storage that holds it ([MS-XLS]
+/// 2.4.181 Obj, 2.5.150 FtPictFmla, 2.5.187 ObjFmla, 2.5.202
+/// PictFmlaEmbedInfo).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct OleLink {
+    /// `PictFmlaEmbedInfo.strClass`, the object's ProgID; empty when the
+    /// formula names none.
+    pub(super) class: String,
+    /// `lPosInCtlStm`: the storage is `MBD` and these eight hex digits.
+    pub(super) storage: u32,
+    /// The `Obj` record's index in the worksheet substream.
+    pub(super) record: usize,
+}
+
+impl OleLink {
+    /// The storage name.
+    pub(super) fn storage_name(&self) -> String {
+        format!("MBD{:08X}", self.storage)
+    }
+
+    /// Whether the object is a MathType or Equation Editor equation.
+    pub(super) fn is_equation(&self) -> bool {
+        self.class
+            .get(..9)
+            .is_some_and(|prefix| prefix.eq_ignore_ascii_case("Equation."))
+    }
+}
+
+/// The embedded object an `Obj` payload names: an `ot` 8 object whose
+/// `FtPioGrbit` marks neither a link, a control nor a control-stream
+/// object, with an `FtPictFmla` holding a `PtgTbl` formula.
+pub(super) fn ole_link(payload: &[u8], record: usize) -> Option<OleLink> {
+    if u16_at(payload, 0) != 0x0015 || u16_at(payload, 4) != 8 {
+        return None;
+    }
+    let mut at = 0;
+    let mut flags = None;
+    while at + 4 <= payload.len() {
+        let kind = u16_at(payload, at);
+        let length = usize::from(u16_at(payload, at + 2));
+        let body = at + 4;
+        match kind {
+            0x0000 => return None,
+            0x0008 => flags = Some(u16_at(payload, body)),
+            0x0009 => {
+                // fDde, fCtl and fPrstm objects do not own an MBD storage.
+                if flags? & 0x0032 != 0 {
+                    return None;
+                }
+                let formula_length = usize::from(u16_at(payload, body));
+                let formula = payload.get(body + 2..body + 2 + formula_length)?;
+                let storage = u32::from_le_bytes(
+                    payload
+                        .get(body + 2 + formula_length..body + 6 + formula_length)?
+                        .try_into()
+                        .ok()?,
+                );
+                let cce = usize::from(u16_at(formula, 0) & 0x7fff);
+                if cce != 5 || formula.get(6) != Some(&0x02) {
+                    return None;
+                }
+                let class = match formula.get(6 + cce..) {
+                    Some([0x03, count, 0, high, rest @ ..]) => {
+                        let count = usize::from(*count);
+                        if high & 1 == 1 {
+                            let units: Vec<u16> = rest
+                                .get(..count * 2)?
+                                .chunks_exact(2)
+                                .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+                                .collect();
+                            String::from_utf16_lossy(&units)
+                        } else {
+                            rest.get(..count)?
+                                .iter()
+                                .map(|byte| char::from(*byte))
+                                .collect()
+                        }
+                    },
+                    _ => String::new(),
+                };
+                return Some(OleLink {
+                    class,
+                    storage,
+                    record,
+                });
+            },
+            _ => {},
+        }
+        at = body + length;
+    }
+    None
 }
 
 impl Object {
@@ -368,6 +464,7 @@ impl Block {
                 fsp_at: None,
                 obj: None,
                 text: None,
+                ole: None,
             };
             // The shape's atoms (a group's own shape is its first child).
             let mut at = start + 8;
@@ -411,6 +508,7 @@ impl Block {
                     let payload = record.payload(stream_bytes);
                     if u16_at(payload, 0) == 0x0015 {
                         object.obj = Some((u16_at(payload, 4), u16_at(payload, 6)));
+                        object.ole = ole_link(payload, index);
                     }
                 } else if record.kind == TXO && object.text.is_none() {
                     object.text = txo_text(stream_bytes, &sheet.records, index);

@@ -261,7 +261,9 @@ reuses the existing investment in 60+ crates, and complies with ADR 0007.
   escape hatch: charts, SmartArt/diagrams, equations (LaTeX through
   `litchi-equation`; an equation node reads and writes `latex` and its
   native `omml`, and PPTX writes keep PowerPoint's PNG picture fallback for
-  readers without Office Math), tables (word-processing tables, spreadsheet ListObjects,
+  readers without Office Math; an XLS equation is an OLE object whose
+  native `mtef` is its base64 `Equation Native` stream, new ones are MathType
+  objects with a PNG preview, and updates keep the object's kind), tables (word-processing tables, spreadsheet ListObjects,
   slide tables), pictures, comments/notes (including threaded comments),
   hyperlinks, text boxes — and the structural plane where the workspace
   already has typed models: styles, numbering/lists, sections and page setup,

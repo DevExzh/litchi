@@ -8,6 +8,13 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+default = []
+# Converts OLE equations (MTEF) to and from LaTeX and OMML through
+# `litchi-equation`, and draws their preview pictures with its renderer
+# (`litchi-equation/render`, which embeds about 1.9 MB of fonts).
+equation = ["dep:litchi-equation", "litchi-equation/render"]
+
 [dependencies]
 bitflags           = { workspace = true }
 caseless           = { workspace = true }
@@ -17,6 +24,7 @@ litchi-cfb         = { workspace = true }
 litchi-codepage    = { workspace = true }
 litchi-core        = { workspace = true }
 litchi-crypto      = { workspace = true }
+litchi-equation    = { workspace = true, optional = true }
 litchi-odraw       = { workspace = true }
 litchi-ograph      = { workspace = true }
 litchi-ole-common = { workspace = true }

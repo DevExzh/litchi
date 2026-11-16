@@ -94,7 +94,7 @@ dependencies = [
 [[package]]
 name = "mathema"
 version = "0.1.0"
-source = "git+https://github.com/DevExzh/mathema?rev=d415909a1188ce8571165dfd73ffd728a568b4c4#d415909a1188ce8571165dfd73ffd728a568b4c4"
+source = "git+https://github.com/DevExzh/mathema?rev=68ff6c5b44e6b65389442b6fc406f11c2e97b3ab#68ff6c5b44e6b65389442b6fc406f11c2e97b3ab"
 dependencies = [
  "nom",
  "phf",

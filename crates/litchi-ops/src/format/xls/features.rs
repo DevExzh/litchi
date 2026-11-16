@@ -36,7 +36,7 @@ use crate::registry::{Access, Alias, Constraint, Entry, Table};
 use crate::value::{Color, ColorContext, Length, LengthSpec, ValueType};
 
 /// The feature kinds of a worksheet, in listing order.
-pub(super) const KINDS: [Kind; 9] = [
+pub(super) const KINDS: [Kind; 10] = [
     Kind::Comment,
     Kind::Hyperlink,
     Kind::Picture,
@@ -46,6 +46,7 @@ pub(super) const KINDS: [Kind; 9] = [
     Kind::Autofilter,
     Kind::RowBreak,
     Kind::ColBreak,
+    Kind::Equation,
 ];
 
 /// Whether `kind` is a worksheet feature this module lists.
@@ -72,6 +73,7 @@ pub(crate) enum Data {
     Validation(Box<Validation>),
     Autofilter(AutoFilter),
     Break(PageBreak),
+    Equation(Box<sf::Equation>),
 }
 
 /// A legacy note.
@@ -147,6 +149,7 @@ impl Feature {
             Data::Validation(validation) => Cow::Owned(ranges(&validation.ranges)),
             Data::Autofilter(filter) => Cow::Owned(area_label(filter.area?)),
             Data::Break(_) => return None,
+            Data::Equation(equation) => Cow::Owned(equation_latex(equation)?),
         })
     }
 
@@ -162,6 +165,7 @@ impl Feature {
             Data::Validation(validation) => Cow::Owned(ranges(&validation.ranges)),
             Data::Autofilter(filter) => Cow::Owned(area_label(filter.area?)),
             Data::Break(item) => Cow::Owned(item.index.to_string()),
+            Data::Equation(equation) => Cow::Borrowed(equation.prog_id.as_str()),
         }))
     }
 
@@ -194,6 +198,7 @@ impl Feature {
                 AutofilterKey::Criteria => None,
             },
             Data::Break(item) => break_value(self.kind, *item, *BREAK_KEYS.get(index)?),
+            Data::Equation(equation) => equation_value(equation, *EQUATION_KEYS.get(index)?),
         }
     }
 }
@@ -209,6 +214,7 @@ pub(super) const fn step_name(kind: Kind) -> &'static str {
         Kind::DataValidation => "dataValidation",
         Kind::Autofilter => "autofilter",
         Kind::RowBreak => "rowbreak",
+        Kind::Equation => "equation",
         _ => "colbreak",
     }
 }
@@ -224,6 +230,7 @@ pub(super) fn props(kind: Kind) -> &'static [PropSpec] {
         Kind::DataValidation => VALIDATION_PROPS,
         Kind::Autofilter => AUTOFILTER_PROPS,
         Kind::RowBreak => ROW_BREAK_PROPS,
+        Kind::Equation => EQUATION_PROPS,
         _ => COL_BREAK_PROPS,
     }
 }
@@ -298,6 +305,18 @@ pub(super) fn list_handle(
 ) -> Result<Vec<Feature>> {
     if !handle.is_grid() {
         return Ok(Vec::new());
+    }
+    if kind == Kind::Equation {
+        let equations = file.owner().equations(handle.position())?;
+        return Ok(equations
+            .into_iter()
+            .enumerate()
+            .map(|(index, equation)| Feature {
+                kind,
+                index: u32::try_from(index).unwrap_or(u32::MAX),
+                data: Data::Equation(Box::new(equation)),
+            })
+            .collect());
     }
     let features = file
         .owner()
@@ -1295,5 +1314,73 @@ fn break_value(kind: Kind, item: PageBreak, key: BreakKey) -> Option<Value<'stat
         BreakKey::Manual => Some(Value::Bool(true)),
         BreakKey::Min => partial.then(|| int(item.min)),
         BreakKey::Max => partial.then(|| int(item.max)),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Equations
+
+/// Equation keys.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum EquationKey {
+    Latex,
+    Omml,
+    Mtef,
+    ProgId,
+    Anchor,
+}
+
+// Writing an equation converts and renders it, which needs the `equation`
+// feature; without it the content keys are read-only.
+#[cfg(feature = "equation")]
+keyed!(EquationKey, EquationKey, EQUATION_TABLE, EQUATION_PROPS, EQUATION_KEYS, [
+    entry(read("latex", TEXT), Access::SetAndAdd(EquationKey::Latex)) => Latex,
+    entry(write_only("omml", TEXT), Access::SetAndAdd(EquationKey::Omml)) => Omml,
+    entry(read("mtef", TEXT), Access::SetAndAdd(EquationKey::Mtef)) => Mtef,
+    entry(read("progId", TEXT), Access::ReadOnly) => ProgId,
+    entry(read("anchor", TEXT), Access::Add(EquationKey::Anchor)) => Anchor,
+], []);
+#[cfg(not(feature = "equation"))]
+keyed!(EquationKey, EquationKey, EQUATION_TABLE, EQUATION_PROPS, EQUATION_KEYS, [
+    entry(read("latex", TEXT), Access::ReadOnly) => Latex,
+    entry(write_only("omml", TEXT), Access::ReadOnly) => Omml,
+    entry(read("mtef", TEXT), Access::ReadOnly) => Mtef,
+    entry(read("progId", TEXT), Access::ReadOnly) => ProgId,
+    entry(read("anchor", TEXT), Access::ReadOnly) => Anchor,
+], []);
+
+/// The LaTeX of an OLE equation; `None` without the `equation` feature and
+/// for MTEF that does not convert.
+pub(super) fn equation_latex(equation: &sf::Equation) -> Option<String> {
+    #[cfg(feature = "equation")]
+    {
+        equation.latex(&litchi_equation::Limits::DEFAULT).ok()
+    }
+    #[cfg(not(feature = "equation"))]
+    {
+        let _ = equation;
+        None
+    }
+}
+
+fn equation_value(equation: &sf::Equation, key: EquationKey) -> Option<Value<'_>> {
+    match key {
+        EquationKey::Latex => equation_latex(equation).map(owned),
+        EquationKey::Mtef => equation.native.as_deref().map(|native| {
+            use base64::Engine as _;
+            owned(base64::engine::general_purpose::STANDARD.encode(native))
+        }),
+        EquationKey::ProgId => Some(text(&equation.prog_id)),
+        EquationKey::Anchor => equation.anchor.map(|anchor| {
+            owned(
+                crate::format::workbook::Label::cell(
+                    u32::from(anchor.top_left().column()),
+                    u32::from(anchor.top_left().row()),
+                )
+                .as_str()
+                .to_owned(),
+            )
+        }),
+        EquationKey::Omml => None,
     }
 }

@@ -865,7 +865,7 @@ const fn with_gap(
 // `Kind` is shared with the workbook resolver and its discriminants are the
 // indices of the common table.  Rebuild the array in that order so the XLSB
 // resolver can use the local `SPEC` without duplicating the vocabulary.
-static ELEMENTS: [ElementSpec<Kind>; 26] = [
+static ELEMENTS: [ElementSpec<Kind>; 27] = [
     with_gap(&workbook::SPEC.elements[0], None),
     with_props(&workbook::SPEC.elements[1], SHEET_PROPS, None),
     with_props(&workbook::SPEC.elements[2], CELL_CAPABILITY_PROPS, None),
@@ -932,6 +932,9 @@ static ELEMENTS: [ElementSpec<Kind>; 26] = [
         None,
     ),
     with_gap(&workbook::SPEC.elements[25], Some(&RUN_GAP)),
+    ElementSpec {
+        ..workbook::SPEC.elements[26]
+    },
 ];
 
 // These are the workbook properties whose shared baseline deliberately does

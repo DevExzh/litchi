@@ -26671,6 +26671,24 @@
           "inputs": ["omml", "limits"],
           "limits_argument": "limits",
           "limits_type": "litchi_equation::Limits"
+        },
+        {
+          "method": "litchi_equation::latex_to_equation_native",
+          "inputs": ["latex", "target", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_equation::Limits"
+        },
+        {
+          "method": "litchi_equation::omml_to_equation_native",
+          "inputs": ["omml", "target", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_equation::Limits"
+        },
+        {
+          "method": "litchi_equation::mtef_to_png",
+          "inputs": ["equation_native_or_mtef", "options", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_equation::Limits"
         }
       ],
       "families": []

@@ -322,6 +322,10 @@
         {
           "element": "colbreak",
           "pathSegment": "colbreak"
+        },
+        {
+          "element": "equation",
+          "pathSegment": "equation"
         }
       ],
       "properties": {
@@ -2178,6 +2182,65 @@
         "code": "unsupported_capability",
         "followUp": "not supported yet",
         "reason": "legacy XLS rich-text runs are flattened by the native cell projection"
+      }
+    },
+    {
+      "format": "xls",
+      "element": "equation",
+      "parent": "sheet",
+      "elementAliases": [
+        "math"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/equation[N]"
+        ]
+      },
+      "properties": {
+        "latex": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "omml": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "mtef": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "progId": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "anchor": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     }
   ],

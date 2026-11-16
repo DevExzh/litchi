@@ -300,7 +300,7 @@ fn layout_size(
     Ok(((width - margin).max(0.0), (height - margin).max(0.0)))
 }
 
-fn render(parsed: &mathema::ConvertResult, options: &PngOptions) -> Result<Png> {
+pub(crate) fn render(parsed: &mathema::ConvertResult, options: &PngOptions) -> Result<Png> {
     let raster = options.raster();
     let (width, height) = layout_size(parsed, &raster)?;
     let padded = |extent: f64| ((extent + PADDING) * options.scale).ceil();

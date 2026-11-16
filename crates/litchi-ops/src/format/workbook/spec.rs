@@ -83,11 +83,13 @@ pub(crate) enum Kind {
     ColBreak,
     /// A rich-text run of a cell (gap).
     Run,
+    /// An OLE equation object of a worksheet drawing (gap).
+    Equation,
 }
 
 impl Kind {
     /// Every kind, by ordinal.
-    const ALL: [Self; 26] = [
+    const ALL: [Self; 27] = [
         Self::Workbook,
         Self::Sheet,
         Self::Cell,
@@ -114,6 +116,7 @@ impl Kind {
         Self::RowBreak,
         Self::ColBreak,
         Self::Run,
+        Self::Equation,
     ];
 
     /// The kind's spec entry.
@@ -151,6 +154,7 @@ impl Kind {
             Self::RowBreak => "rowbreak",
             Self::ColBreak => "colbreak",
             Self::Run => "run",
+            Self::Equation => "equation",
         }
     }
 }
@@ -577,6 +581,11 @@ static COL_BREAK_GAP: GapSpec = leaf_gap(
     "not supported yet",
     "page breaks are not readable on the source-backed owner yet",
 );
+static EQUATION_GAP: GapSpec = leaf_gap(
+    "equation",
+    "not supported yet",
+    "equations are not projected into nodes yet",
+);
 static RUN_GAP: GapSpec = leaf_gap(
     "run",
     "not supported yet",
@@ -640,9 +649,9 @@ const fn gap(
 /// (`node::Project`), independently of this table.
 pub(crate) static SPEC: FormatSpec<Kind> = {
     use Kind::{
-        Autofilter, Axis, Cell, Cf, Chart, ColBreak, Column, Comment, DataValidation, Hyperlink,
-        MergeCell, NamedRange, Ole, Picture, PivotTable, Range, Row, RowBreak, Run, Series, Shape,
-        Sheet, Slicer, Sparkline, Table, Workbook,
+        Autofilter, Axis, Cell, Cf, Chart, ColBreak, Column, Comment, DataValidation, Equation,
+        Hyperlink, MergeCell, NamedRange, Ole, Picture, PivotTable, Range, Row, RowBreak, Run,
+        Series, Shape, Sheet, Slicer, Sparkline, Table, Workbook,
     };
     const SHEET: &[Kind] = &[Sheet];
     FormatSpec {
@@ -683,6 +692,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                     Ole,
                     RowBreak,
                     ColBreak,
+                    Equation,
                 ],
                 &[],
                 &["/<sheet>", "/sheet[N]", "<sheet>!<A1>"],
@@ -917,6 +927,15 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 &[],
                 &["/<sheet>/<A1>/run[N]"],
                 &RUN_GAP,
+            ),
+            gap(
+                Equation,
+                "equation",
+                &["equation", "math"],
+                SHEET,
+                &[],
+                &["/<sheet>/equation[N]"],
+                &EQUATION_GAP,
             ),
         ],
         gaps: &[

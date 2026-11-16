@@ -197,6 +197,10 @@
         {
           "element": "colbreak",
           "pathSegment": "colbreak"
+        },
+        {
+          "element": "equation",
+          "pathSegment": "equation"
         }
       ],
       "properties": {
@@ -2116,6 +2120,32 @@
         "code": "unsupported_capability",
         "followUp": "ODS adapter follow-up",
         "reason": "ODS rich cell text is flattened into the cell's displayed text"
+      }
+    },
+    {
+      "format": "ods",
+      "element": "equation",
+      "parent": "sheet",
+      "elementAliases": [
+        "math"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/equation[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "not supported yet",
+        "reason": "equations are not projected into nodes yet"
       }
     }
   ],

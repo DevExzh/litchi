@@ -270,7 +270,7 @@ REGISTRY_SOURCE = "registry+https://github.com/rust-lang/crates.io-index"
 ALLOWED_GIT_DEPENDENCIES: Mapping[tuple[str, str], str] = {
     ("litchi-equation", "mathema"): (
         "git+https://github.com/DevExzh/mathema"
-        "?rev=d415909a1188ce8571165dfd73ffd728a568b4c4"
+        "?rev=68ff6c5b44e6b65389442b6fc406f11c2e97b3ab"
     ),
 }
 TARGET_KINDS = frozenset(

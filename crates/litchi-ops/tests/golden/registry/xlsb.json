@@ -257,6 +257,10 @@
         {
           "element": "colbreak",
           "pathSegment": "colbreak"
+        },
+        {
+          "element": "equation",
+          "pathSegment": "equation"
         }
       ],
       "properties": {
@@ -3157,6 +3161,32 @@
         "code": "unsupported_capability",
         "followUp": "not supported yet",
         "reason": "the XLSB cell model exposes a cell value, not a unified rich-text run node"
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "equation",
+      "parent": "sheet",
+      "elementAliases": [
+        "math"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/equation[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "not supported yet",
+        "reason": "equations are not projected into nodes yet"
       }
     }
   ],

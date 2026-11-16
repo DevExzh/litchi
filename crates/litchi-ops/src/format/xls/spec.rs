@@ -548,7 +548,7 @@ const fn with_gap(element: &'static ElementSpec<Kind>, gap: &'static GapSpec) ->
     }
 }
 
-static ELEMENTS: [ElementSpec<Kind>; 26] = [
+static ELEMENTS: [ElementSpec<Kind>; 27] = [
     with_props(&workbook::SPEC.elements[0], WORKBOOK_PROPS),
     with_props(&workbook::SPEC.elements[1], SHEET_PROPS),
     with_props(&workbook::SPEC.elements[2], CELL_PROPS),
@@ -590,6 +590,10 @@ static ELEMENTS: [ElementSpec<Kind>; 26] = [
         super::features::COL_BREAK_PROPS,
     ),
     with_gap(&workbook::SPEC.elements[25], &RUN_GAP),
+    with_props(
+        &workbook::SPEC.elements[26],
+        super::features::EQUATION_PROPS,
+    ),
 ];
 
 pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
@@ -657,6 +661,8 @@ pub(crate) const SETTABLE: &[&str] = &[
     "autofilter",
     "rowbreak",
     "colbreak",
+    #[cfg(feature = "equation")]
+    "equation",
 ];
 /// Elements the unified XLS writer adds: worksheet tabs, and empty rows and
 /// columns inserted under a sheet.
@@ -673,6 +679,8 @@ pub(crate) const ADDABLE: &[&str] = &[
     "autofilter",
     "rowbreak",
     "colbreak",
+    #[cfg(feature = "equation")]
+    "equation",
 ];
 /// Elements the unified XLS writer removes.
 pub(crate) const REMOVABLE: &[&str] = &[
@@ -689,6 +697,7 @@ pub(crate) const REMOVABLE: &[&str] = &[
     "autofilter",
     "rowbreak",
     "colbreak",
+    "equation",
 ];
 
 const fn operation_gap(

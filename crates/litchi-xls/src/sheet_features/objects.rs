@@ -19,6 +19,14 @@ use super::super::stream::{
 use super::{Edit, Error, LimitKind, Result, refused};
 use litchi_core::edit::RefusalKind;
 
+#[path = "equations.rs"]
+mod equations;
+
+#[cfg(feature = "equation")]
+pub use equations::EquationSource;
+pub(in crate::sheet_features) use equations::storage_file;
+pub use equations::{EquationContent, EquationSpec};
+
 /// A cell anchor: the top-left and bottom-right cells (the shape ends at the
 /// top-left corner of `last`) and the move/resize behavior.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -255,8 +263,30 @@ fn shape_container(
     anchor: [u8; 18],
     textbox: bool,
 ) -> Result<Vec<u8>> {
+    shape_container_with(
+        spt,
+        shape_id,
+        litchi_odraw::shape::Flags::empty(),
+        flip,
+        properties,
+        anchor,
+        textbox,
+    )
+}
+
+/// [`shape_container`] with `extra` FSP flags.
+fn shape_container_with(
+    spt: u16,
+    shape_id: u32,
+    extra: litchi_odraw::shape::Flags,
+    flip: (bool, bool),
+    properties: &PropertyBuilder<'_>,
+    anchor: [u8; 18],
+    textbox: bool,
+) -> Result<Vec<u8>> {
     let mut body = Vec::with_capacity(128);
-    let mut flags = litchi_odraw::shape::Flags::HAVE_ANCHOR | litchi_odraw::shape::Flags::HAVE_SPT;
+    let mut flags =
+        litchi_odraw::shape::Flags::HAVE_ANCHOR | litchi_odraw::shape::Flags::HAVE_SPT | extra;
     if flip.0 {
         flags |= litchi_odraw::shape::Flags::FLIP_H;
     }

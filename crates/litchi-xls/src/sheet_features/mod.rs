@@ -25,10 +25,13 @@
 mod drawing;
 pub mod edit;
 mod encode;
+mod equation;
 mod read;
 mod stream;
 
 use crate::Package;
+
+pub use equation::{Equation, EquationKind, MAX_EQUATION_NATIVE_BYTES};
 
 pub use read::{
     AutoFilter, ColorScale, ConditionalFormat, DataBar, Drawing, DrawingKind, Features, Fill,

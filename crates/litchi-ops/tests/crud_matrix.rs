@@ -830,6 +830,15 @@ const RECIPES: &[Recipe] = &[
         props: &[("ref", "B2"), ("text", "note"), ("author", "Ann")],
         start: false,
     },
+    // An equation takes exactly one of its content properties.
+    Recipe {
+        format: "xls",
+        element: "equation",
+        fixture: "create()",
+        parent: "/Sheet1",
+        props: &[("latex", "x^2")],
+        start: false,
+    },
     Recipe {
         format: "xls",
         element: "hyperlink",

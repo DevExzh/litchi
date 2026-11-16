@@ -26,8 +26,8 @@ use sf::edit::{
 use std::mem::size_of;
 
 use super::features::{
-    self, AutofilterKey, BreakKey, CfKey, CommentKey, Data, Feature, HyperlinkKey, PictureKey,
-    ShapeKey, ValidationKey,
+    self, AutofilterKey, BreakKey, CfKey, CommentKey, Data, EquationKey, Feature, HyperlinkKey,
+    PictureKey, ShapeKey, ValidationKey,
 };
 use super::node::{Item, Node};
 use super::spec::Kind;
@@ -68,6 +68,20 @@ fn native(leaf: sf::edit::Error) -> Error {
         Leaf::Signed => super::signature::refusal(FileFormat::Xls),
         Leaf::Package(error) => Error::from(error).with_format(FileFormat::Xls),
         Leaf::Records(error) => Error::from(error).with_format(FileFormat::Xls),
+        // The caller's equation does not convert or render.
+        #[cfg(feature = "equation")]
+        Leaf::Equation(leaf) => {
+            use litchi_equation::Error as Equation;
+            let code = match &leaf {
+                Equation::Malformed { .. } | Equation::Unsupported(_) => Code::InvalidValue,
+                Equation::InputTooLarge { .. }
+                | Equation::LimitExceeded { .. }
+                | Equation::Render(_) => Code::LimitExceeded,
+                Equation::InvalidLimit(_) => Code::InvalidArgument,
+                _ => Code::InternalError,
+            };
+            error(code, format!("the equation does not convert: {leaf}"))
+        },
         _ => error(Code::InternalError, "the worksheet-feature edit failed"),
     }
 }
@@ -422,6 +436,7 @@ impl Xls {
             Kind::DataValidation => self.add_validation(&parent, props, limits),
             Kind::Autofilter => self.add_autofilter(&parent, props, limits),
             Kind::RowBreak | Kind::ColBreak => self.add_break(&parent, kind, props, limits),
+            Kind::Equation => self.add_equation(&parent, props, limits),
             _ => Err(error(
                 Code::UnsupportedElement,
                 "this element kind cannot be added to an XLS worksheet",
@@ -471,6 +486,7 @@ impl Xls {
             Kind::Cf => self.set_cf(sheet, feature, props, limits)?,
             Kind::DataValidation => self.set_validation(sheet, feature, props, limits)?,
             Kind::Autofilter => self.set_autofilter(sheet, props, limits)?,
+            Kind::Equation => self.set_equation(sheet, feature, props, limits)?,
             _ => self.set_break(sheet, feature, props, limits)?,
         }))
     }
@@ -520,6 +536,11 @@ impl Xls {
             Data::Autofilter(_) => {
                 publish!(self, limits, |edit| edit
                     .set_auto_filter(sheet, None)
+                    .map_err(native)?)
+            },
+            Data::Equation(_) => {
+                publish!(self, limits, |edit| edit
+                    .remove_equation(sheet, index)
                     .map_err(native)?)
             },
             Data::Break(_) => {
@@ -2890,6 +2911,201 @@ pub(super) fn feature_kind(name: &str, props: &Props<'_>) -> Option<(Kind, Optio
     };
     let kind = <Kind as crate::path::navigate::ElementKind>::from_name(canonical)?;
     features::is_feature(kind).then_some((kind, None))
+}
+
+// ---------------------------------------------------------------------------
+// Equations
+
+/// The content an equation `add` or `set` assigns.
+#[cfg_attr(
+    not(feature = "equation"),
+    allow(
+        dead_code,
+        reason = "the content is converted with the equation feature"
+    )
+)]
+enum EquationContent {
+    Latex(String),
+    Omml(String),
+    Mtef(Vec<u8>),
+}
+
+impl EquationContent {
+    #[cfg_attr(
+        not(feature = "equation"),
+        allow(
+            dead_code,
+            reason = "the content is converted with the equation feature"
+        )
+    )]
+    const fn key(&self) -> &'static str {
+        match self {
+            Self::Latex(_) => "latex",
+            Self::Omml(_) => "omml",
+            Self::Mtef(_) => "mtef",
+        }
+    }
+
+    #[cfg(feature = "equation")]
+    fn source(&self) -> sf::edit::EquationSource<'_> {
+        match self {
+            Self::Latex(latex) => sf::edit::EquationSource::Latex(latex),
+            Self::Omml(omml) => sf::edit::EquationSource::Omml(omml),
+            Self::Mtef(bytes) => sf::edit::EquationSource::Mtef(bytes),
+        }
+    }
+}
+
+/// The admitted content and anchor of an equation request.
+fn equation_input(
+    props: &Props<'_>,
+    operation: Operation,
+    limits: &SemanticLimits,
+) -> Result<(Option<EquationContent>, Option<String>)> {
+    let mut content = None;
+    let mut anchor = None;
+    for (key, name_key, arg) in admit(&features::EQUATION_TABLE, operation, props)? {
+        let value = arg.text().unwrap_or_default();
+        if value.len() > limits.max_staged_bytes() {
+            return Err(error(
+                Code::LimitExceeded,
+                "the equation exceeds the staged-bytes budget",
+            )
+            .with_property(name_key));
+        }
+        let next = match key {
+            EquationKey::Latex => EquationContent::Latex(value),
+            EquationKey::Omml => EquationContent::Omml(value),
+            EquationKey::Mtef => {
+                use base64::Engine as _;
+                EquationContent::Mtef(
+                    base64::engine::general_purpose::STANDARD
+                        .decode(value.trim())
+                        .map_err(|_| invalid(name_key, "the MTEF data is not base64"))?,
+                )
+            },
+            EquationKey::Anchor => {
+                anchor = Some(value);
+                continue;
+            },
+            EquationKey::ProgId => continue,
+        };
+        if content.replace(next).is_some() {
+            return Err(error(
+                Code::InvalidArgument,
+                "an equation takes one of latex, omml and mtef",
+            )
+            .with_property(name_key));
+        }
+    }
+    Ok((content, anchor))
+}
+
+/// Refuse a conversion that lost formatting: the caller decides whether to
+/// write MTEF instead.
+#[cfg(feature = "equation")]
+fn refuse_losses(losses: &[String], key: &'static str) -> Result<()> {
+    match losses.first() {
+        None => Ok(()),
+        Some(loss) => Err(error(
+            Code::InvalidValue,
+            format!("the equation does not convert to MTEF without loss: {loss}"),
+        )
+        .with_property(key)
+        .with_suggestion("write the equation as mtef")),
+    }
+}
+
+#[cfg(not(feature = "equation"))]
+fn equation_unavailable() -> Error {
+    error(
+        Code::UnsupportedCapability,
+        "writing equations needs the equation feature",
+    )
+    .with_suggestion("enable the litchi equation feature")
+}
+
+impl Xls {
+    /// `add(/Sheet1, equation, {latex | omml | mtef, anchor})`: a MathType
+    /// OLE object (MTEF data keeps its own kind) with a rendered preview,
+    /// its top-left corner at `anchor` (or the parent cell, else A1).
+    fn add_equation(
+        &self,
+        parent: &Parent,
+        props: &Props<'_>,
+        limits: &SemanticLimits,
+    ) -> Result<(WriteCommit, Path<'static>)> {
+        let (content, anchor) = equation_input(props, Operation::Add, limits)?;
+        let content =
+            content.ok_or_else(|| missing("latex", "an equation needs latex, omml or mtef"))?;
+        let (row, column) = match anchor.as_deref().or(parent.reference.as_deref()) {
+            Some(reference) => {
+                let first = reference.split(':').next().unwrap_or(reference);
+                check_cell("anchor", first)?
+            },
+            None => (0, 0),
+        };
+        #[cfg(not(feature = "equation"))]
+        {
+            let _ = (content, row, column, limits);
+            Err(equation_unavailable())
+        }
+        #[cfg(feature = "equation")]
+        {
+            let key = content.key();
+            let mut edit = self.feature_edit(limits.max_snapshot_bytes())?;
+            let (index, losses) = edit
+                .add_equation_from(
+                    parent.sheet,
+                    content.source(),
+                    row,
+                    column,
+                    &litchi_equation::Limits::DEFAULT,
+                )
+                .map_err(|leaf| native(leaf).with_property(key))?;
+            refuse_losses(&losses, key)?;
+            let commit = edit.commit().map_err(native)?;
+            Ok((
+                self.publish_features(commit, limits)?,
+                feature_path(parent.sheet, "equation", Some(index)),
+            ))
+        }
+    }
+
+    /// A `set` of an equation's `latex`, `omml` or `mtef`: the object keeps
+    /// its kind and its top-left corner; the preview is redrawn.
+    fn set_equation(
+        &self,
+        sheet: usize,
+        feature: &Feature,
+        props: &Props<'_>,
+        limits: &SemanticLimits,
+    ) -> Result<WriteCommit> {
+        let (content, _) = equation_input(props, Operation::Set, limits)?;
+        let content = content
+            .ok_or_else(|| error(Code::InvalidArgument, "no equation property was assigned"))?;
+        #[cfg(not(feature = "equation"))]
+        {
+            let _ = (content, sheet, feature, limits);
+            Err(equation_unavailable())
+        }
+        #[cfg(feature = "equation")]
+        {
+            let key = content.key();
+            let mut edit = self.feature_edit(limits.max_snapshot_bytes())?;
+            let losses = edit
+                .set_equation_from(
+                    sheet,
+                    feature.index as usize,
+                    content.source(),
+                    &litchi_equation::Limits::DEFAULT,
+                )
+                .map_err(|leaf| native(leaf).with_property(key))?;
+            refuse_losses(&losses, key)?;
+            let commit = edit.commit().map_err(native)?;
+            self.publish_features(commit, limits)
+        }
+    }
 }
 
 #[cfg(test)]

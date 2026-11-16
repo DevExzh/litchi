@@ -32,6 +32,13 @@ mod render;
 #[cfg(feature = "render")]
 pub use render::{Png, PngOptions, latex_to_png, omml_size_pt, omml_to_png};
 
+mod mtef_write;
+#[cfg(feature = "render")]
+pub use mtef_write::mtef_to_png;
+pub use mtef_write::{
+    EquationNative, MtefTarget, latex_to_equation_native, omml_to_equation_native,
+};
+
 /// Result type of every conversion in this crate.
 pub type Result<T> = std::result::Result<T, Error>;
 
