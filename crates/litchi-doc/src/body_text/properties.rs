@@ -188,6 +188,61 @@ pub(super) enum MarkChange {
         before: Vec<u8>,
         after: Vec<u8>,
     },
+    /// An equation object field that begins at `start_cp`.
+    Equation {
+        start_cp: u32,
+        change: EquationChange,
+    },
+}
+
+/// What happened to an equation object. The content of an update and of an
+/// insertion is kept so that a plan can stage it again; the reverse of an
+/// update or a removal cannot be staged from the description alone, as a
+/// field's removal cannot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) enum EquationChange {
+    Inserted {
+        position: Position,
+        offset: u32,
+        kind: crate::equation::EquationKind,
+        content: Box<crate::equation::EquationContent>,
+    },
+    Updated {
+        content: Box<crate::equation::EquationContent>,
+    },
+    Removed,
+    /// The reverse of an update or a removal, whose content the description
+    /// does not hold.
+    Unrecorded {
+        before_present: bool,
+        after_present: bool,
+    },
+}
+
+impl EquationChange {
+    fn inverse(&self) -> Self {
+        let (before_present, after_present) = self.presence();
+        match self {
+            Self::Inserted { .. } => Self::Removed,
+            Self::Updated { .. } | Self::Removed | Self::Unrecorded { .. } => Self::Unrecorded {
+                before_present: after_present,
+                after_present: before_present,
+            },
+        }
+    }
+
+    /// Whether an equation object field is present (before, after).
+    const fn presence(&self) -> (bool, bool) {
+        match self {
+            Self::Inserted { .. } => (false, true),
+            Self::Updated { .. } => (true, true),
+            Self::Removed => (true, false),
+            Self::Unrecorded {
+                before_present,
+                after_present,
+            } => (*before_present, *after_present),
+        }
+    }
 }
 
 impl MarkChange {
@@ -202,6 +257,7 @@ impl MarkChange {
             Self::Field { .. } => "story/main/structure".to_string(),
             Self::Bookmark { name, .. } => format!("resource/bookmark:{name}"),
             Self::Section { section, .. } => format!("section:{}", section.get()),
+            Self::Equation { .. } => "story/main/structure".to_string(),
         }
     }
 
@@ -252,6 +308,10 @@ impl MarkChange {
                 before: after.clone(),
                 after: before.clone(),
             },
+            Self::Equation { start_cp, change } => Self::Equation {
+                start_cp: *start_cp,
+                change: change.inverse(),
+            },
         }
     }
 
@@ -300,6 +360,14 @@ impl MarkChange {
                 before,
                 after,
             },
+            Self::Equation { start_cp, change } => {
+                let (before_present, after_present) = change.presence();
+                super::ChangeRef::Equation {
+                    start_cp: *start_cp,
+                    before_present,
+                    after_present,
+                }
+            },
         }
     }
 
@@ -328,6 +396,19 @@ impl MarkChange {
                 None => edit.remove_bookmark(name),
             },
             Self::Section { section, after, .. } => edit.set_section_grpprl(*section, after),
+            Self::Equation { start_cp, change } => match change {
+                EquationChange::Inserted {
+                    position,
+                    offset,
+                    kind,
+                    content,
+                } => edit
+                    .insert_equation(*position, *offset, *kind, content)
+                    .map(|_storage_id| ()),
+                EquationChange::Updated { content } => edit.set_equation(*start_cp, content),
+                EquationChange::Removed => edit.remove_equation(*start_cp),
+                EquationChange::Unrecorded { .. } => Err(Error::Refused(Refusal::EquationNotFound)),
+            },
         }
     }
 }
@@ -366,7 +447,7 @@ fn papx_body_without(body: &[u8], remove: &[u16]) -> Result<Vec<u8>> {
     Ok(output)
 }
 
-fn grpprl_without(grpprl: &[u8], remove: &[u16]) -> Result<Vec<u8>> {
+pub(super) fn grpprl_without(grpprl: &[u8], remove: &[u16]) -> Result<Vec<u8>> {
     let mut output = Vec::with_capacity(grpprl.len());
     for sprm in crate::sprm::parse_sprms(grpprl).map_err(|_error| invalid("malformed grpprl"))? {
         if !remove.contains(&sprm.opcode) {
@@ -579,7 +660,7 @@ impl Edit {
     }
 
     /// The main-story fields as (begin, separator, end) CPs, in begin order.
-    fn main_fields(&self) -> Result<Vec<(u32, Option<u32>, u32)>> {
+    pub(super) fn main_fields(&self) -> Result<Vec<(u32, Option<u32>, u32)>> {
         let mut fields = Vec::new();
         let mut stack: Vec<(u32, Option<u32>)> = Vec::new();
         for (cp, record) in self.editor.main_field_markers() {
@@ -728,7 +809,7 @@ impl Edit {
 
     /// Refuse a main-story length change that an unmodeled CP-indexed table
     /// or an ambiguous saved selection depends on, as text replacement does.
-    fn length_change_admitted(&self, start: u32, end: u32, added: usize) -> Result<()> {
+    pub(super) fn length_change_admitted(&self, start: u32, end: u32, added: usize) -> Result<()> {
         if let Some(&fib_index) = self.editor.unmodeled_length_dependencies().first() {
             return Err(Error::Refused(Refusal::PositionDependency { fib_index }));
         }

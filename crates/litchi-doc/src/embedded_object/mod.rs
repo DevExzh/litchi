@@ -8,6 +8,7 @@ mod codec;
 mod family;
 mod model;
 mod storage;
+pub(crate) use storage::wrap_object_storage;
 mod transaction;
 
 #[cfg(test)]
@@ -18,6 +19,7 @@ pub use litchi_ole_common::object::Limits;
 pub use litchi_ole_common::object::link::{Link, Moniker, Times};
 pub use litchi_ole_common::object::{Object as Storage, Objects as Storages};
 pub use litchi_ole_common::ole_streams::{Limits as OleStreamLimits, native, presentation};
+#[cfg(test)]
 pub(crate) use model::Editor;
 pub use model::{
     Clipboard, CompObj, Entry, Info, Inventory, Kind, Metadata, Ole, Reference, Unknown,

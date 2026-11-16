@@ -120,6 +120,16 @@ impl Document {
         &self.0.tolerance
     }
 
+    /// The `Equation Native` stream of the embedded equation object in the
+    /// storage `ObjectPool/_<storage_id>`: its 28-byte header and its MTEF.
+    /// The storage number is a run's picture location
+    /// (`pic_offset` of the run that shows it). `None` without the
+    /// `equation` feature, which reads embedded equations.
+    #[must_use]
+    pub fn equation_native(&self, storage_id: u32) -> Option<&[u8]> {
+        self.0.equation_natives.get(&storage_id).map(AsRef::as_ref)
+    }
+
     /// Get the document's fixed associated-string metadata table.
     ///
     /// Template and mail-merge paths are inert strings and are never opened.

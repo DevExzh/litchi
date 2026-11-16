@@ -12,7 +12,7 @@ use litchi_odraw::image::Kind as BlipKind;
 ///
 /// Encoded bytes are stored as-is except that a 14-byte BMP file header is
 /// removed to obtain the DIB payload required by `OfficeArt`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Picture {
     /// Raw BLIP file data.
     pub(super) data: Vec<u8>,

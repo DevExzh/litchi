@@ -15,7 +15,6 @@
 
 use super::model::{Info, Inventory, Reference, WriteOptions};
 use super::transaction::{Snapshot, Transaction, TransactionError};
-use crate::equation::MtefEquationWriteOptions;
 use litchi_core::edit::{Refusal, RefusalKind};
 use litchi_ole_common::ole_streams::{self, native, presentation};
 
@@ -306,17 +305,6 @@ impl Edit {
         patch: &native::Patch,
     ) -> Result<()> {
         Ok(self.inner_mut()?.apply_native_patch_for(reference, patch)?)
-    }
-
-    /// Appends a native Equation.3 EMBED field with a real PICF bitmap
-    /// preview.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the equation, preview or candidate package
-    /// cannot be validated; the staged state is unchanged.
-    pub fn add_mtef_equation(&mut self, options: MtefEquationWriteOptions) -> Result<Reference> {
-        Ok(self.inner_mut()?.add_mtef_equation(options)?)
     }
 
     /// Validate the staged edits and publish them as a new package.

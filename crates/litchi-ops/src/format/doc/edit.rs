@@ -583,6 +583,9 @@ impl Doc {
             if crate::format::ole_metadata::is_target(&target) {
                 return self.set_metadata(&props, limits);
             }
+            if let Some(commit) = self.set_equation(&target, &props, limits)? {
+                return Ok(commit);
+            }
             if let Some(commit) = self.set_mark(&target, &props, limits)? {
                 return Ok(commit);
             }
@@ -704,6 +707,9 @@ impl Doc {
         let result = (|| {
             let nav = Nav::new(self);
             let parent = crate::path::resolve::get(&nav, &parent)?;
+            if let Some(added) = self.add_equation(&parent, &node, limits)? {
+                return Ok(added);
+            }
             if let Some(added) = self.add_mark(&parent, &node, limits)? {
                 return Ok(added);
             }
@@ -747,6 +753,9 @@ impl Doc {
     ) -> Result<WriteCommit> {
         self.check_source()?;
         let result = (|| {
+            if let Some(commit) = self.remove_equation(&target, limits)? {
+                return Ok(commit);
+            }
             if let Some(commit) = self.remove_mark(&target, limits)? {
                 return Ok(commit);
             }

@@ -25,6 +25,7 @@ use crate::{IntoProps, OpenOptions, Result, TargetArg};
 // knows how to answer.
 pub(crate) mod children;
 mod edit;
+mod equations;
 mod find;
 mod marks;
 mod marks_write;

@@ -11,28 +11,39 @@ use std::collections::HashMap;
 use std::io::{Read, Seek};
 use std::sync::Arc;
 
+/// The LaTeX of each decoded equation by storage name, the storage ids of
+/// the undecodable ones, and every `Equation Native` stream by storage id.
+type ReadEquations = (HashMap<String, Arc<str>>, Vec<u32>, HashMap<u32, Arc<[u8]>>);
+
 impl Document {
     /// Decode the MTEF equations embedded in `ObjectPool`.
     ///
     /// Returns the LaTeX of each decoded equation keyed by its storage name
-    /// (`_<id>`), and the storage ids of the equations whose data could not
-    /// be decoded, in ascending order.
+    /// (`_<id>`), the storage ids of the equations whose data could not be
+    /// decoded, in ascending order, and every `Equation Native` stream keyed
+    /// by its storage id.
     #[cfg(feature = "equation")]
-    pub(super) fn read_equations<R: Read + Seek>(
-        ole: &mut OleFile<R>,
-    ) -> Result<(HashMap<String, Arc<str>>, Vec<u32>)> {
+    pub(super) fn read_equations<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<ReadEquations> {
         let streams = crate::mtef_extractor::equation_native_streams(ole).map_err(|e| {
             PackageError::InvalidFormat(format!("Failed to list embedded equations: {e}"))
         })?;
-        Ok(Self::decode_equations(&streams))
+        let (equations, undecodable) = Self::decode_equations(&streams);
+        let natives = streams
+            .into_iter()
+            .map(|(storage, data)| {
+                (
+                    crate::mtef_extractor::storage_id(&storage),
+                    Arc::<[u8]>::from(data),
+                )
+            })
+            .collect();
+        Ok((equations, undecodable, natives))
     }
 
     /// Without the `equation` feature, embedded equations are not read.
     #[cfg(not(feature = "equation"))]
-    pub(super) fn read_equations<R: Read + Seek>(
-        _ole: &mut OleFile<R>,
-    ) -> Result<(HashMap<String, Arc<str>>, Vec<u32>)> {
-        Ok((HashMap::new(), Vec::new()))
+    pub(super) fn read_equations<R: Read + Seek>(_ole: &mut OleFile<R>) -> Result<ReadEquations> {
+        Ok((HashMap::new(), Vec::new(), HashMap::new()))
     }
 
     /// Decode each `Equation Native` stream to LaTeX; see

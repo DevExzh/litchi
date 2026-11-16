@@ -719,6 +719,61 @@ impl<'a, S: DeferredOpenState> Edit<'a, S> {
             .map_err(Error::from)
     }
 
+    /// Insert an equation object of `kind` holding `content` into one
+    /// ordinary main-story paragraph, before UTF-16 offset `offset` of its
+    /// text, as Word writes one: an `EMBED` field, an `ObjectPool` storage
+    /// and a preview picture. Returns the object's storage number.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed refusal when the paragraph is absent, the offset is
+    /// past its text or inside another field, the text there is tracked, or
+    /// `content` holds MTEF of another kind than `kind`.
+    pub fn insert_equation(
+        &mut self,
+        position: Position,
+        offset: u32,
+        kind: crate::equation::EquationKind,
+        content: &crate::equation::EquationContent,
+    ) -> Result<u32> {
+        self.inner_mut()?
+            .insert_equation(position, offset, kind, content)
+            .map_err(Error::from)
+    }
+
+    /// Replace the `Equation Native` stream and the preview picture of the
+    /// equation object whose field begins at `start_cp`, keeping its field,
+    /// class and other streams.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`body_text::Refusal::EquationNotFound`] when no equation
+    /// object field begins there, and [`body_text::Refusal::InvalidProperty`]
+    /// when `content` holds MTEF of another kind than the object.
+    pub fn set_equation(
+        &mut self,
+        start_cp: u32,
+        content: &crate::equation::EquationContent,
+    ) -> Result<()> {
+        self.inner_mut()?
+            .set_equation(start_cp, content)
+            .map_err(Error::from)
+    }
+
+    /// Remove the equation object whose field begins at `start_cp`, with
+    /// its `ObjectPool` storage and its preview picture.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`body_text::Refusal::EquationNotFound`] when no equation
+    /// object field begins there, and a typed refusal when the field holds
+    /// tracked text or another anchored range.
+    pub fn remove_equation(&mut self, start_cp: u32) -> Result<()> {
+        self.inner_mut()?
+            .remove_equation(start_cp)
+            .map_err(Error::from)
+    }
+
     /// The standard bookmarks, as (name, start CP, end CP) in start order.
     pub fn bookmarks(&mut self) -> Result<Vec<(String, u32, u32)>> {
         self.inner_mut()?.bookmarks().map_err(Error::from)

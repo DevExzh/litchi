@@ -476,6 +476,16 @@ const RECIPES: &[Recipe] = &[
         props: &[("latex", r"\frac{a}{b}")],
         start: false,
     },
+    // A DOC equation names its content as one of `latex`, `omml` and
+    // `mtef`.
+    Recipe {
+        format: "doc",
+        element: "equation",
+        fixture: "ole/doc/Lists.doc",
+        parent: "/body/p[2]",
+        props: &[("latex", r"\frac{a}{b}")],
+        start: false,
+    },
     // A PPT comment needs its author; a hyperlink its target.
     Recipe {
         format: "ppt",

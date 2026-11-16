@@ -120,6 +120,9 @@ pub struct Png {
     height: u32,
     scale: f64,
     max_pixels: u64,
+    /// The distance from the picture's bottom edge up to the equation's
+    /// baseline, in CSS pixels (1x scale).
+    depth: f64,
 }
 
 impl std::fmt::Debug for Png {
@@ -130,6 +133,7 @@ impl std::fmt::Debug for Png {
             .field("width", &self.width)
             .field("height", &self.height)
             .field("scale", &self.scale)
+            .field("depth", &self.depth)
             .finish()
     }
 }
@@ -168,6 +172,15 @@ impl Png {
             f64::from(self.width) / factor,
             f64::from(self.height) / factor,
         )
+    }
+
+    /// How far the picture reaches below the equation's baseline, in
+    /// points: the depth of what is drawn below the baseline plus the
+    /// picture's bottom margin. A document lowers the picture by this much
+    /// to put the equation's baseline on the text line.
+    #[must_use]
+    pub fn depth_pt(&self) -> f64 {
+        self.depth / PIXELS_PER_POINT
     }
 
     /// This picture on a transparent canvas of `width` × `height` pixels,
@@ -226,12 +239,16 @@ impl Png {
         let bytes = canvas
             .encode_png()
             .map_err(|error| Error::Render(format!("the canvas does not encode: {error}")))?;
+        // The baseline moves with the picture: `zoom` and `y` place it on
+        // the canvas.
+        let baseline = y + zoom * (f64::from(self.height) - self.depth * self.scale);
         Ok(Self {
             bytes,
             width,
             height,
             scale: self.scale,
             max_pixels: self.max_pixels,
+            depth: ((f64::from(height) - baseline) / self.scale).max(0.0),
         })
     }
 }
@@ -273,7 +290,7 @@ pub fn omml_to_png(omml: &str, options: &PngOptions, limits: &Limits) -> Result<
 pub fn omml_size_pt(omml: &str, options: &PngOptions, limits: &Limits) -> Result<(f64, f64)> {
     let parsed = mathema::from_omml_with(omml, &limits.config())
         .map_err(|error| Error::from_mathema(error, Format::Omml))?;
-    let (width, height) = layout_size(&parsed, &options.raster())?;
+    let (width, height, _) = layout_size(&parsed, &options.raster())?;
     Ok((
         (width + PADDING) / PIXELS_PER_POINT,
         (height + PADDING) / PIXELS_PER_POINT,
@@ -283,26 +300,32 @@ pub fn omml_size_pt(omml: &str, options: &PngOptions, limits: &Limits) -> Result
 /// The rasterizer pads each side by two pixels at 1× scale.
 const PADDING: f64 = 4.0;
 
-/// The layout's size in pixels at 1× scale, read from a text-only SVG
-/// before any pixel buffer is allocated: the rasterizer allocates the whole
-/// picture at once.
+/// The layout's width, height and depth below the baseline in pixels at
+/// 1× scale, read from a text-only SVG before any pixel buffer is
+/// allocated: the rasterizer allocates the whole picture at once.
 fn layout_size(
     parsed: &mathema::ConvertResult,
     raster: &mathema::RasterOptions,
-) -> Result<(f64, f64)> {
+) -> Result<(f64, f64, f64)> {
     let svg = parsed
         .to_svg_text_with(&raster.render)
         .map_err(|error| Error::from_mathema(error, Format::Omml))?;
     let (width, height) = svg_size(&svg)
         .ok_or_else(|| Error::Render("the equation layout has no size".to_owned()))?;
-    // The SVG adds 0.08 em on every side, which the raster does not.
-    let margin = 0.16 * raster.render.font_size_px;
-    Ok(((width - margin).max(0.0), (height - margin).max(0.0)))
+    // The SVG adds 0.08 em on every side, which the raster does not; its
+    // `vertical-align` is minus the depth and that margin.
+    let pad = 0.08 * raster.render.font_size_px;
+    let depth = svg_vertical_align(&svg).map_or(0.0, |align| (-align - pad).max(0.0));
+    Ok((
+        (width - 2.0 * pad).max(0.0),
+        (height - 2.0 * pad).max(0.0),
+        depth,
+    ))
 }
 
 pub(crate) fn render(parsed: &mathema::ConvertResult, options: &PngOptions) -> Result<Png> {
     let raster = options.raster();
-    let (width, height) = layout_size(parsed, &raster)?;
+    let (width, height, depth) = layout_size(parsed, &raster)?;
     let padded = |extent: f64| ((extent + PADDING) * options.scale).ceil();
     let pixels = padded(width) * padded(height);
     if !pixels.is_finite() || pixels > options.max_pixels as f64 {
@@ -328,7 +351,16 @@ pub(crate) fn render(parsed: &mathema::ConvertResult, options: &PngOptions) -> R
         height,
         scale: options.scale,
         max_pixels: options.max_pixels,
+        depth: depth + PADDING / 2.0,
     })
+}
+
+/// The `vertical-align` of an SVG root's style, in pixels.
+fn svg_vertical_align(svg: &str) -> Option<f64> {
+    let header = &svg[..svg.find('>')?];
+    let start = header.find("vertical-align:")? + "vertical-align:".len();
+    let rest = header[start..].trim_start();
+    rest[..rest.find("px")?].trim().parse().ok()
 }
 
 /// The `width` and `height` attributes of an SVG root, in pixels.
@@ -364,6 +396,10 @@ mod tests {
             Some((12.5, 3.0))
         );
         assert_eq!(svg_size("<svg>"), None);
+        assert_eq!(
+            svg_vertical_align(r#"<svg width="1" style="vertical-align: -3.5px">"#),
+            Some(-3.5)
+        );
         assert_eq!(png_size(b"GIF89a"), None);
     }
 }

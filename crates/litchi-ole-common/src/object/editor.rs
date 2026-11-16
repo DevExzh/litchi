@@ -896,6 +896,75 @@ impl Edit {
         Ok(removed)
     }
 
+    /// The paths of the storages directly below the storage at `parent`
+    /// (the root for an empty path), whether or not they were opened as
+    /// targets.
+    pub fn child_storage_paths<'a>(
+        &'a self,
+        parent: &'a [String],
+    ) -> impl Iterator<Item = &'a [String]> + 'a {
+        self.state.package.child_storage_paths(parent)
+    }
+
+    /// Adds a standalone compound file as the storage at `path`, whose
+    /// parent must exist, without making it an opened target: the host
+    /// owns its references, as for [`Self::remove_storage_at`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the path is invalid or taken, the parent is
+    /// missing, the compound file is invalid or oversized, or the rendered
+    /// package fails validation. Failure leaves this editor unchanged.
+    pub fn add_storage_at(&mut self, path: &[String], compound_file: Vec<u8>) -> Result<(), Error> {
+        let key = path.last().cloned().unwrap_or_default();
+        let target = Target::new(key, path.iter().cloned())?;
+        if compound_file.len() as u64 > self.state.limits.max_object_size {
+            return Err(Error::Limit {
+                kind: LimitKind::ObjectBytes,
+                observed: compound_file.len() as u64,
+                maximum: self.state.limits.max_object_size,
+            });
+        }
+        let mut nested_ole = OleFile::open(Cursor::new(compound_file), self.state.cfb_limits)?;
+        codec::open(
+            &nested_ole,
+            self.state
+                .limits
+                .max_object_storages()
+                .saturating_add(self.state.limits.max_object_streams()),
+        )?;
+        let nested = CapturedPackage::capture_object(&mut nested_ole, self.state.limits)?;
+        let mut candidate = self.clone();
+        Arc::make_mut(candidate.package_mut()).add_object(&target, &nested, self.state.limits)?;
+        *self = candidate.commit_candidate()?;
+        Ok(())
+    }
+
+    /// Removes the storage at `path` with every storage and stream below
+    /// it, after the host has removed its references. Unlike
+    /// [`Self::remove_storage`], the storage need not be an opened target;
+    /// a target at that path is dropped from the catalog.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no storage has that path or the rendered
+    /// package fails validation. Failure leaves this editor unchanged.
+    pub fn remove_storage_at(&mut self, path: &[String]) -> Result<(), Error> {
+        if let Some(key) = self
+            .state
+            .targets
+            .iter()
+            .find(|target| target.path() == path)
+            .map(|target| target.key().to_owned())
+        {
+            return self.remove_storage(&key).map(|_removed| ());
+        }
+        let mut candidate = self.clone();
+        Arc::make_mut(candidate.package_mut()).remove_object(path, self.state.limits)?;
+        *self = candidate.commit_candidate()?;
+        Ok(())
+    }
+
     /// Selects where a rendered package places its sectors.
     ///
     /// The default is [`SectorLayoutPolicy::Reuse`]: a render keeps the opened

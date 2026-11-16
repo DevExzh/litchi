@@ -58,7 +58,7 @@ pub(in crate::embedded_object) fn is_object_storage_name(name: &str) -> bool {
     !digits.is_empty() && digits.as_bytes().iter().all(u8::is_ascii_digit)
 }
 
-fn wrap_object_storage(
+pub(crate) fn wrap_object_storage(
     storage_name: &str,
     compound_file: Vec<u8>,
     limits: Limits,

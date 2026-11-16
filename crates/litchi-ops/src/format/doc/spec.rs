@@ -68,6 +68,9 @@ pub enum Kind {
     TextBox,
     /// A main-story floating shape anchor (`/body/shape[N]`).
     Shape,
+    /// A MathType or Equation Editor object shown inline in a paragraph
+    /// (`/body/p[N]/equation[M]`).
+    Equation,
 }
 
 impl Kind {
@@ -102,6 +105,7 @@ impl Kind {
             Self::Tab => "tab",
             Self::TextBox => "textbox",
             Self::Shape => "shape",
+            Self::Equation => "equation",
         }
     }
 
@@ -147,6 +151,7 @@ impl ElementKind for Kind {
             "tab" => Some(Self::Tab),
             "textbox" => Some(Self::TextBox),
             "shape" => Some(Self::Shape),
+            "equation" | "math" | "omath" | "oMath" => Some(Self::Equation),
             _ => None,
         }
     }
@@ -180,6 +185,7 @@ impl ElementKind for Kind {
             Self::Tab => "tab",
             Self::TextBox => "textbox",
             Self::Shape => "shape",
+            Self::Equation => "equation",
         }
     }
 
@@ -257,6 +263,12 @@ const READ_SET_ADD: Access = Access {
 const READ_ADD: Access = Access {
     get: true,
     set: false,
+    add: true,
+};
+
+const SET_ADD_ONLY: Access = Access {
+    get: false,
+    set: true,
     add: true,
 };
 
@@ -617,6 +629,21 @@ pub(crate) const HYPERLINK_PROPS: &[PropSpec] = &[
     prop("text", ValueType::Text, READ_SET_ADD),
 ];
 
+/// How an equation object is shown: always inline, as Word shows an
+/// `EMBED` field.
+pub(crate) static EQUATION_MODE: Tokens = Tokens::new("equation mode", &["inline"], &[]);
+
+/// An equation object: how it is shown, its MTEF converted to LaTeX, and
+/// its `Equation Native` stream (the 28-byte header and the MTEF) in
+/// base64. `latex`, `omml` or `mtef` writes a new equation's content or
+/// replaces an existing one's.
+pub(crate) const EQUATION_PROPS: &[PropSpec] = &[
+    prop("mode", ValueType::Token(&EQUATION_MODE), Access::READ),
+    prop("latex", ValueType::Text, READ_SET_ADD),
+    prop("mtef", ValueType::Text, READ_SET_ADD),
+    prop("omml", ValueType::Text, SET_ADD_ONLY),
+];
+
 /// A bookmark: its name; `text` seeds a new bookmark's covered text.
 pub(crate) const BOOKMARK_PROPS: &[PropSpec] = &[
     prop("name", ValueType::Text, READ_SET_ADD),
@@ -743,7 +770,7 @@ const PARAGRAPH: ElementSpec<Kind> = ElementSpec {
         Kind::Endnote,
         Kind::Comment,
     ],
-    children: &[Kind::Run, Kind::Hyperlink, Kind::Tab],
+    children: &[Kind::Run, Kind::Hyperlink, Kind::Tab, Kind::Equation],
     identities: &[],
     paths: &[
         "/body/p[N]",
@@ -978,6 +1005,17 @@ const HYPERLINK: ElementSpec<Kind> = element(
     HYPERLINK_PROPS,
 );
 
+const EQUATION: ElementSpec<Kind> = element(
+    Kind::Equation,
+    "equation",
+    &["equation", "math", "omath"],
+    &[Kind::Paragraph],
+    &[],
+    &[],
+    &["/body/p[N]/equation[M]"],
+    EQUATION_PROPS,
+);
+
 const BOOKMARK: ElementSpec<Kind> = element(
     Kind::Bookmark,
     "bookmark",
@@ -1087,14 +1125,22 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
         TAB,
         TEXT_BOX,
         SHAPE,
+        EQUATION,
     ],
     // Concepts the native `litchi-doc` reader models but the unified adapter
     // does not yet project, under their OfficeCLI DOCX type names.
     gaps: &[
-        element_gap(
-            "equation",
-            "DOC EQ fields and MTEF equation objects as `equation` nodes",
-        ),
+        // Equation objects are `equation` nodes; the legacy `EQ` field
+        // equations are not.
+        GapSpec {
+            subject: Subject::Property {
+                element: "equation",
+                key: "eqField",
+            },
+            code: crate::Code::UnsupportedCapability,
+            follow_up: "DOC EQ fields as `equation` nodes",
+            reason: "legacy EQ field equations are read as fields, not projected as equation nodes",
+        },
         element_gap(
             "formfield",
             "DOC FORMTEXT, FORMCHECKBOX and FORMDROPDOWN nodes and writes",
@@ -1176,11 +1222,19 @@ const _: () = assert!(
 
 /// Elements the unified DOC writer sets (including hyperlinks,
 /// bookmarks, tab stops and sections).
-pub(crate) const SETTABLE: &[&str] = &["p", "r", "hyperlink", "bookmark", "tab", "section"];
+pub(crate) const SETTABLE: &[&str] = &[
+    "p",
+    "r",
+    "hyperlink",
+    "bookmark",
+    "tab",
+    "section",
+    "equation",
+];
 /// Elements the unified DOC writer creates.
-pub(crate) const ADDABLE: &[&str] = &["p", "hyperlink", "bookmark", "tab"];
+pub(crate) const ADDABLE: &[&str] = &["p", "hyperlink", "bookmark", "tab", "equation"];
 /// Elements the unified DOC writer removes.
-pub(crate) const REMOVABLE: &[&str] = &["p", "r", "hyperlink", "bookmark", "tab"];
+pub(crate) const REMOVABLE: &[&str] = &["p", "r", "hyperlink", "bookmark", "tab", "equation"];
 
 /// A gap for an OfficeCLI Word element the table has no kind for:
 /// naming it is `unsupported_capability`.

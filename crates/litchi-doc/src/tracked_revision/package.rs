@@ -45,8 +45,10 @@ use std::collections::HashSet;
 use std::io::Cursor;
 use std::sync::Arc;
 
+mod equation;
 mod properties;
 
+pub(crate) use equation::ObjectFieldInsert;
 pub(crate) use properties::BookmarkRange;
 
 /// Exact, deliberately narrow picture dependency closure shared with the

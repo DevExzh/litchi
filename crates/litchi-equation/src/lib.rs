@@ -156,6 +156,11 @@ impl Error {
             E::Xml { message } | E::UnicodeMathParse { message } => malformed(format, message),
             E::Unsupported(message) => Self::Unsupported(message),
             E::Render { message } => Self::Render(message),
+            // The writer refused its own output; a converter defect, not
+            // a property of the input.
+            E::MtefWrite { message } => Self::Internal(format!(
+                "the MTEF writer produced unreadable data: {message}"
+            )),
             E::InputTooLarge { size, limit } => Self::InputTooLarge { size, limit },
             E::LimitExceeded { kind, limit } => Self::LimitExceeded {
                 kind: LimitKind::from_mathema(kind),

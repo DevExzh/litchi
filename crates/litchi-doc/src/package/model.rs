@@ -376,6 +376,9 @@ pub enum Error {
     UnsupportedEncryption(EncryptionKind),
     /// The clear encryption header is malformed.
     MalformedEncryptionHeader(String),
+    /// An equation could not be converted or rendered.
+    #[cfg(feature = "equation")]
+    Equation(litchi_equation::Error),
     /// The file predates the Word 97 binary format this reader implements.
     ///
     /// Word 6.0 and Word 95 documents keep the structures that MS-DOC places
@@ -403,6 +406,11 @@ impl std::fmt::Debug for Error {
             Self::Vba(_) => formatter.write_str("Error::Vba(..)"),
             Self::Signature(_) => formatter.write_str("Error::Signature(..)"),
             Self::Crypto(_) => formatter.write_str("Error::Crypto(..)"),
+            #[cfg(feature = "equation")]
+            Self::Equation(error) => formatter
+                .debug_tuple("Error::Equation")
+                .field(error)
+                .finish(),
             Self::InvalidFormat(value) => formatter
                 .debug_tuple("Error::InvalidFormat")
                 .field(value)
@@ -492,6 +500,8 @@ impl std::fmt::Display for Error {
             Error::Vba(_) => f.write_str("DOC VBA operation failed"),
             Error::Signature(_) => f.write_str("DOC signature operation failed"),
             Error::Crypto(_) => f.write_str("DOC DataSpaces operation failed"),
+            #[cfg(feature = "equation")]
+            Error::Equation(e) => write!(f, "equation error: {e}"),
             Error::InvalidFormat(s) => write!(f, "Invalid format: {s}"),
             Error::StreamNotFound(s) => write!(f, "Stream not found: {s}"),
             Error::Corrupted(s) => write!(f, "Corrupted file: {s}"),
@@ -548,6 +558,8 @@ impl std::error::Error for Error {
             Self::Vba(error) => Some(error),
             Self::Signature(error) => Some(error),
             Self::Crypto(error) => Some(error),
+            #[cfg(feature = "equation")]
+            Self::Equation(error) => Some(error),
             Self::Allocation { source, .. } => Some(source),
             Self::InvalidFormat(_)
             | Self::StreamNotFound(_)
@@ -837,6 +849,8 @@ impl From<Error> for litchi_core::Error {
             Error::Vba(error) => core_vba_error(error),
             Error::Signature(error) => core_signature_error(error),
             Error::Crypto(error) => core_crypto_error(error),
+            #[cfg(feature = "equation")]
+            Error::Equation(error) => litchi_core::Error::InvalidFormat(error.to_string()),
             Error::InvalidFormat(s) => litchi_core::Error::InvalidFormat(s),
             Error::StreamNotFound(s) => litchi_core::Error::ComponentNotFound(s),
             Error::Corrupted(s) => litchi_core::Error::CorruptedFile(s),

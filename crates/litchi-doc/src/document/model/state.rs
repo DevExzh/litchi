@@ -251,6 +251,9 @@ pub(in crate::document) struct DocumentState {
     /// The LaTeX of each decoded embedded MTEF equation, keyed by its
     /// `ObjectPool` storage name (`_<picture location>`).
     pub(in crate::document) parsed_mtef: HashMap<String, Arc<str>>,
+    /// The `Equation Native` stream of each embedded equation object, keyed
+    /// by its `ObjectPool` storage number.
+    pub(in crate::document) equation_natives: HashMap<u32, Arc<[u8]>>,
     /// Bounded raw source for the deferred font-table (`SttbfFfn`) parse, or
     /// its deferred range/allocation diagnostic.
     pub(in crate::document) font_table_source: std::result::Result<Option<Vec<u8>>, String>,

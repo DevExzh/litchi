@@ -293,6 +293,10 @@
         {
           "element": "tab",
           "pathSegment": "tab"
+        },
+        {
+          "element": "equation",
+          "pathSegment": "equation"
         }
       ],
       "properties": {
@@ -2325,15 +2329,73 @@
           "type"
         ]
       }
+    },
+    {
+      "format": "doc",
+      "element": "equation",
+      "parent": "paragraph",
+      "elementAliases": [
+        "math",
+        "omath"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/equation[M]"
+        ]
+      },
+      "properties": {
+        "mode": {
+          "type": "enum",
+          "values": [
+            "inline"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "latex": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "mtef": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "omml": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
     }
   ],
   "gaps": [
     {
-      "subject": "element",
+      "subject": "property",
       "element": "equation",
+      "key": "eqField",
       "code": "unsupported_capability",
-      "followUp": "DOC EQ fields and MTEF equation objects as `equation` nodes",
-      "reason": "this native DOC concept is not yet projected into generic paths and queries"
+      "followUp": "DOC EQ fields as `equation` nodes",
+      "reason": "legacy EQ field equations are read as fields, not projected as equation nodes"
     },
     {
       "subject": "element",

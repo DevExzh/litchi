@@ -4,43 +4,48 @@
 
 use crate::{Error, Format, Limits, MtefInfo, MtefProduct, Result};
 
+/// `{0002CE03-0000-0000-C000-000000000046}`, MathType's `Equation.DSMT4`, in
+/// on-disk (little-endian GUID) byte order.
+const MATH_TYPE_CLSID: [u8; 16] = [
+    0x03, 0xCE, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46,
+];
+/// `{0002CE02-0000-0000-C000-000000000046}`, Equation Editor 3.0's
+/// `Equation.3`, in on-disk byte order.
+const EQUATION_EDITOR_3_CLSID: [u8; 16] = [
+    0x02, 0xCE, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46,
+];
+
 /// Which kind of OLE equation object to write.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum MtefTarget {
     /// MathType: ProgID `Equation.DSMT4`, CLSID
-    /// `{0002CE03-0000-0000-C000-000000000046}`, MTEF 5.
+    /// `{0002CE03-0000-0000-C000-000000000046}`, MTEF 5 as MathType 6
+    /// (`DSMT6`) writes it.
     MathType,
     /// Equation Editor 3.0: ProgID `Equation.3`, CLSID
     /// `{0002CE02-0000-0000-C000-000000000046}`, MTEF 3.
     EquationEditor3,
-    /// The MTEF version and product of an existing equation, so that an
-    /// updated object keeps its kind.
+    /// The MTEF version, product and application key of an existing
+    /// equation, so that an updated object keeps its kind. An MTEF 3
+    /// equation is an `Equation.3` object, any other an `Equation.DSMT4`
+    /// one. A product code other than MathType and Equation Editor is
+    /// written as the version's usual product.
     SameAs(MtefInfo),
 }
 
-/// `{0002CE02-0000-0000-C000-000000000046}` in on-disk byte order.
-const EQUATION_3_CLSID: [u8; 16] = [
-    0x02, 0xCE, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46,
-];
-/// `{0002CE03-0000-0000-C000-000000000046}` in on-disk byte order.
-const MATHTYPE_CLSID: [u8; 16] = [
-    0x03, 0xCE, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46,
-];
-
 impl MtefTarget {
-    /// Whether the target writes MTEF 3 (Equation Editor 3.0).
-    fn is_equation_editor(&self) -> bool {
+    fn is_mtef_3(&self) -> bool {
         match self {
             Self::MathType => false,
             Self::EquationEditor3 => true,
-            Self::SameAs(info) => info.version < 5,
+            Self::SameAs(info) => info.version == 3,
         }
     }
 
     /// The OLE ProgID of the object: `Equation.DSMT4` or `Equation.3`.
     #[must_use]
     pub fn prog_id(&self) -> &'static str {
-        if self.is_equation_editor() {
+        if self.is_mtef_3() {
             "Equation.3"
         } else {
             "Equation.DSMT4"
@@ -50,55 +55,62 @@ impl MtefTarget {
     /// The object's CLSID in on-disk (little-endian GUID) byte order.
     #[must_use]
     pub fn clsid(&self) -> [u8; 16] {
-        if self.is_equation_editor() {
-            EQUATION_3_CLSID
+        if self.is_mtef_3() {
+            EQUATION_EDITOR_3_CLSID
         } else {
-            MATHTYPE_CLSID
+            MATH_TYPE_CLSID
         }
     }
 
-    /// The user type an application records in the object's `CompObj`
-    /// stream.
+    /// The user type the applications record in the object's `CompObj`
+    /// stream: `Microsoft Equation 3.0` or `MathType 6.0 Equation`.
     #[must_use]
     pub fn user_type(&self) -> &'static str {
-        if self.is_equation_editor() {
+        if self.is_mtef_3() {
             "Microsoft Equation 3.0"
         } else {
             "MathType 6.0 Equation"
         }
     }
 
-    fn write_options(&self) -> mathema::MtefWriteOptions {
-        let version = if self.is_equation_editor() {
-            mathema::MtefVersion::V3
-        } else {
-            mathema::MtefVersion::V5
+    fn options(&self) -> mathema::MtefWriteOptions {
+        let options = match self {
+            Self::MathType => mathema::MtefWriteOptions::new(mathema::MtefVersion::V5),
+            Self::EquationEditor3 => mathema::MtefWriteOptions::new(mathema::MtefVersion::V3),
+            Self::SameAs(info) => {
+                let version = if info.version == 3 {
+                    mathema::MtefVersion::V3
+                } else {
+                    mathema::MtefVersion::V5
+                };
+                let mut options = mathema::MtefWriteOptions::new(version);
+                match info.product {
+                    MtefProduct::MathType => {
+                        options.product = mathema::MtefProduct::MathType;
+                    },
+                    MtefProduct::EquationEditor => {
+                        options.product = mathema::MtefProduct::EquationEditor;
+                    },
+                    MtefProduct::Other => {},
+                }
+                if info.product != MtefProduct::Other {
+                    options.product_version = info.product_version;
+                    options.product_subversion = info.product_subversion;
+                }
+                if version == mathema::MtefVersion::V5
+                    && let Some(key) = &info.application_key
+                {
+                    options.application_key.clone_from(key);
+                }
+                options
+            },
         };
-        let mut options = mathema::MtefWriteOptions::new(version).with_ole_header(true);
-        if let Self::SameAs(info) = self {
-            match info.product {
-                MtefProduct::MathType => options.product = mathema::MtefProduct::MathType,
-                MtefProduct::EquationEditor => {
-                    options.product = mathema::MtefProduct::EquationEditor;
-                },
-                MtefProduct::Other => {},
-            }
-            options.product_version = info.product_version;
-            options.product_subversion = info.product_subversion;
-            if let Some(key) = info
-                .application_key
-                .as_ref()
-                .filter(|_| version == mathema::MtefVersion::V5)
-            {
-                options.application_key.clone_from(key);
-            }
-        }
-        options
+        options.with_ole_header(true)
     }
 }
 
-/// A complete `Equation Native` stream: the 28-byte `EQNOLEFILEHDR`
-/// followed by MTEF data, with what the conversion could not carry over.
+/// A complete `Equation Native` stream: the 28-byte `EQNOLEFILEHDR` and
+/// the MTEF data, ready to store in an OLE equation object.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EquationNative {
     bytes: Vec<u8>,
@@ -107,40 +119,43 @@ pub struct EquationNative {
 }
 
 impl EquationNative {
-    /// The stream bytes.
+    /// The stream's bytes.
     #[must_use]
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 
-    /// The stream bytes, by value.
+    /// The stream's bytes, by value.
     #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
         self.bytes
     }
 
-    /// What the written data declares about itself.
+    /// What the written stream declares about itself: its MTEF version,
+    /// product and OLE header.
     #[must_use]
     pub fn info(&self) -> &MtefInfo {
         &self.info
     }
 
     /// One message per piece of the input MTEF does not represent (for
-    /// example a colour); empty when nothing was lost.
+    /// example colour); empty when nothing was lost.
     #[must_use]
     pub fn losses(&self) -> &[String] {
         &self.losses
     }
 }
 
-/// Convert LaTeX math to the `Equation Native` stream of a `target`
-/// object.
+/// Convert LaTeX math to the `Equation Native` stream of an equation object
+/// of `target`'s kind.
 ///
 /// # Errors
 ///
 /// Returns [`Error::Malformed`] for LaTeX that does not parse,
-/// [`Error::Unsupported`] for a construct the writer refuses, and the limit
-/// errors when the input exceeds `limits`.
+/// [`Error::Unsupported`] for a construct MTEF cannot hold (an array of more
+/// than 255 rows or columns), the limit errors when the input or the written
+/// equation exceeds `limits`, and [`Error::Internal`] when the writer
+/// produces data its reader rejects.
 pub fn latex_to_equation_native(
     latex: &str,
     target: &MtefTarget,
@@ -152,13 +167,13 @@ pub fn latex_to_equation_native(
 }
 
 /// Convert an OMML equation (`m:oMath`, `m:oMathPara` or a fragment of
-/// them) to the `Equation Native` stream of a `target` object.
+/// them) to the `Equation Native` stream of an equation object of
+/// `target`'s kind.
 ///
 /// # Errors
 ///
-/// Returns [`Error::Malformed`] for malformed XML or OMML,
-/// [`Error::Unsupported`] for a construct the writer refuses, and the limit
-/// errors when the input exceeds `limits`.
+/// As [`latex_to_equation_native`], with [`Error::Malformed`] for malformed
+/// XML or OMML.
 pub fn omml_to_equation_native(
     omml: &str,
     target: &MtefTarget,
@@ -175,22 +190,18 @@ fn write(
     limits: &Limits,
 ) -> Result<EquationNative> {
     let (bytes, diagnostics) = parsed
-        .to_mtef_bytes_with_diagnostics(&target.write_options())
+        .to_mtef_bytes_with_diagnostics(&target.options())
         .map_err(|error| Error::from_mathema(error, Format::Mtef))?;
+    let info = mathema::from_mtef_bytes_with(&bytes, &limits.config())
+        .map_err(|error| Error::from_mathema(error, Format::Mtef))?
+        .mtef_info()
+        .map(MtefInfo::from_mathema)
+        .ok_or_else(|| Error::Internal("the written MTEF declares no header".to_owned()))?;
     let losses = diagnostics
         .into_iter()
         .filter(|diagnostic| diagnostic.kind == mathema::DiagnosticKind::Warning)
         .map(|diagnostic| diagnostic.message)
         .collect();
-    // Read the written stream back: it proves the output is MTEF the reader
-    // accepts and yields the header facts the caller keeps.
-    let written = mathema::from_mtef_bytes_with(&bytes, &limits.config()).map_err(|error| {
-        Error::Internal(format!("the written MTEF does not read back: {error}"))
-    })?;
-    let info = written
-        .mtef_info()
-        .map(MtefInfo::from_mathema)
-        .ok_or_else(|| Error::Internal("the written MTEF has no header".to_owned()))?;
     Ok(EquationNative {
         bytes,
         info,
@@ -198,9 +209,9 @@ fn write(
     })
 }
 
-/// Render an equation stored as MTEF (an `Equation Native` stream or bare
-/// MTEF data) as a PNG picture with a transparent background: the preview
-/// an office file keeps beside an OLE equation.
+/// Render binary MTEF (an `Equation Native` stream or bare MTEF data) as a
+/// PNG picture with a transparent background, for the preview an OLE
+/// equation object shows.
 ///
 /// # Errors
 ///
@@ -217,4 +228,47 @@ pub fn mtef_to_png(
     let parsed = mathema::from_mtef_bytes_with(equation_native_or_mtef, &limits.config())
         .map_err(|error| Error::from_mathema(error, Format::Mtef))?;
     crate::render::render(&parsed, options)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn targets_name_their_object_kind() {
+        assert_eq!(MtefTarget::MathType.prog_id(), "Equation.DSMT4");
+        assert_eq!(MtefTarget::EquationEditor3.prog_id(), "Equation.3");
+        assert_eq!(MtefTarget::MathType.clsid()[0], 0x03);
+        assert_eq!(MtefTarget::EquationEditor3.clsid()[0], 0x02);
+    }
+
+    #[test]
+    fn writes_equation_native_streams_of_both_kinds() {
+        let limits = Limits::DEFAULT;
+        let v5 = latex_to_equation_native(r"\frac{1}{2}", &MtefTarget::MathType, &limits).unwrap();
+        assert_eq!(&v5.bytes()[..2], &[28, 0]);
+        assert_eq!(v5.bytes()[28], 5);
+        assert_eq!(v5.info().version, 5);
+        assert!(v5.info().ole_header.is_some());
+        assert_eq!(
+            crate::mtef_to_latex(v5.bytes(), &limits).unwrap(),
+            r"\frac{1}{2}"
+        );
+
+        let v3 = latex_to_equation_native("x^2", &MtefTarget::EquationEditor3, &limits).unwrap();
+        assert_eq!(v3.bytes()[28], 3);
+        let same = MtefTarget::SameAs(v3.info().clone());
+        assert_eq!(same.prog_id(), "Equation.3");
+        let again = latex_to_equation_native("y", &same, &limits).unwrap();
+        assert_eq!(&again.bytes()[28..33], &v3.bytes()[28..33]);
+
+        let omml = omml_to_equation_native(
+            "<m:oMath><m:r><m:t>a</m:t></m:r></m:oMath>",
+            &MtefTarget::MathType,
+            &limits,
+        )
+        .unwrap();
+        assert_eq!(crate::mtef_to_latex(omml.bytes(), &limits).unwrap(), "a");
+        assert!(latex_to_equation_native(r"\frac{", &MtefTarget::MathType, &limits).is_err());
+    }
 }

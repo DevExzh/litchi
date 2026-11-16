@@ -727,8 +727,8 @@ fn gap_subjects_are_unique() {
 fn doc_enumerates_its_unprojected_element_gaps() {
     let capabilities = Capabilities::of(FileFormat::Doc);
     // DOC projects styles, numbering, hyperlinks, bookmarks, fields,
-    // sections, tab stops, text boxes and shapes.
-    for element in ["equation", "formfield", "picture", "ole", "revision"] {
+    // sections, tab stops, text boxes, shapes and equations.
+    for element in ["formfield", "picture", "ole", "revision"] {
         assert!(
             capabilities
                 .gaps()

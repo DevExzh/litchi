@@ -364,7 +364,7 @@ impl Document {
 
         // Decode the embedded MTEF equations; the ones that cannot be
         // decoded are recorded in the tolerance report below.
-        let (parsed_mtef, undecodable_equations) = Self::read_equations(ole)?;
+        let (parsed_mtef, undecodable_equations, equation_natives) = Self::read_equations(ole)?;
 
         // Reconstruct both property bin tables from one shared piece-table parse.
         let piece_table = Self::parse_piece_table(&fib, &table_stream);
@@ -539,6 +539,7 @@ impl Document {
             stylesheet,
             tolerance,
             parsed_mtef,
+            equation_natives,
             font_table_source,
             font_table: std::sync::OnceLock::new(),
             story_indexes: super::model::StoryIndexCache::new(),

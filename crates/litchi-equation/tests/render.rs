@@ -152,3 +152,46 @@ fn the_size_is_measured_without_drawing_and_matches_the_picture() {
     );
     assert_eq!(omml_to_unicode_math(omml, &Limits::DEFAULT).unwrap(), "a/b");
 }
+
+#[test]
+fn the_depth_below_the_baseline_follows_the_equation() {
+    let options = PngOptions::new(12.0).unwrap().with_scale(2.0).unwrap();
+    let depth = |latex| {
+        latex_to_png(latex, &options, &Limits::DEFAULT)
+            .unwrap()
+            .depth_pt()
+    };
+    // Every picture has its 2-pixel bottom margin below the baseline; a
+    // descender, and more so a fraction's denominator, add to it.
+    let margin = 2.0 * 72.0 / 96.0;
+    assert!(
+        depth("x") >= margin && depth("x") < margin + 1.0,
+        "{}",
+        depth("x")
+    );
+    assert!(depth("y") > depth("x"));
+    assert!(depth(r"\frac{a}{b}") > depth("y"));
+    // The depth is a fraction of the height, in the same unit.
+    let picture = latex_to_png(r"\frac{a}{b}", &options, &Limits::DEFAULT).unwrap();
+    assert!(picture.depth_pt() < picture.size_pt().1);
+}
+
+#[test]
+fn mtef_renders_as_the_picture_of_the_same_latex() {
+    use litchi_equation::{MtefTarget, latex_to_equation_native, mtef_to_png};
+    let options = PngOptions::new(12.0).unwrap();
+    for target in [MtefTarget::MathType, MtefTarget::EquationEditor3] {
+        let native = latex_to_equation_native(r"\frac{a}{b}", &target, &Limits::DEFAULT).unwrap();
+        let from_mtef = mtef_to_png(native.bytes(), &options, &Limits::DEFAULT).unwrap();
+        let from_latex = latex_to_png(r"\frac{a}{b}", &options, &Limits::DEFAULT).unwrap();
+        assert!(is_png(from_mtef.bytes()));
+        assert_eq!(from_mtef.size_pt(), from_latex.size_pt());
+        // Bare MTEF, without the Equation Native header, renders too.
+        let bare = mtef_to_png(&native.bytes()[28..], &options, &Limits::DEFAULT).unwrap();
+        assert_eq!(bare.size_pt(), from_mtef.size_pt());
+    }
+    assert!(matches!(
+        mtef_to_png(b"not mtef", &options, &Limits::DEFAULT),
+        Err(Error::Malformed { .. })
+    ));
+}

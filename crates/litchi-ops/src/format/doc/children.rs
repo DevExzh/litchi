@@ -134,6 +134,9 @@ impl<'f> Children<'f> {
                 if wants(Kind::Tab) {
                     nodes.extend(super::nav::tab_nodes(parent, paragraph));
                 }
+                if wants(Kind::Equation) {
+                    nodes.extend(super::equations::equation_nodes(parent, paragraph)?);
+                }
                 State::List(nodes.into_iter())
             },
             (Item::Bare, Kind::Styles) => State::List(super::nav::style_nodes(parent)?.into_iter()),

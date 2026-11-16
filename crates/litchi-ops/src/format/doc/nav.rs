@@ -257,14 +257,14 @@ impl<'f> Navigate<'f> for Nav<'f> {
                 };
                 Ok(found(index.and_then(|index| runs.into_iter().nth(index))))
             },
-            (Kind::Paragraph, _, kind @ (Kind::Hyperlink | Kind::Tab)) => {
+            (Kind::Paragraph, _, kind @ (Kind::Hyperlink | Kind::Tab | Kind::Equation)) => {
                 let Some(paragraph) = parent.native_paragraph()? else {
                     return Ok(Lookup::Missing);
                 };
-                let nodes = if kind == Kind::Hyperlink {
-                    link_nodes(parent, paragraph)?
-                } else {
-                    tab_nodes(parent, paragraph)
+                let nodes = match kind {
+                    Kind::Hyperlink => link_nodes(parent, paragraph)?,
+                    Kind::Equation => super::equations::equation_nodes(parent, paragraph)?,
+                    _ => tab_nodes(parent, paragraph),
                 };
                 let Some(index) = pick(select, nodes.len()) else {
                     return Ok(Lookup::NotApplicable);

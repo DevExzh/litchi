@@ -1,13 +1,15 @@
-//! MathType/Equation Editor object authoring for legacy Word documents.
+//! MathType and Equation Editor objects of legacy Word documents.
 //!
-//! The writer accepts an already encoded MTEF payload, validates its bounded
-//! envelope, and creates the complete Equation.3 compound object plus the DOC
-//! EMBED field and bitmap presentation. Converting an equation to MTEF is a
-//! separate concern and is intentionally not approximated here.
+//! An equation is an OLE object: a storage `ObjectPool/_<id>` holding its
+//! MTEF in an `Equation Native` stream, shown by an `EMBED` field whose
+//! picture character carries a preview picture. [`EquationContent`] is the
+//! content one object holds (its `Equation Native` stream and preview), and
+//! [`EquationKind`] the class of a new object. With the `equation` feature,
+//! [`EquationContent`] is made from LaTeX, OMML or MTEF through
+//! `litchi-equation`, which also renders the preview.
 
-use super::embedded_object::{Editor, Reference, WriteOptions};
 use super::package::{Error as PackageError, Result};
-use super::writer::images::{Picture, write_picture_block};
+use super::writer::images::Picture;
 use litchi_cfb::OleWriter;
 use std::io::Cursor;
 
@@ -28,24 +30,6 @@ const OBJ_INFO_STREAM: &str = "\u{3}ObjInfo";
 pub const EQUATION_3_CLSID: [u8; 16] = [
     0x02, 0xCE, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46,
 ];
-
-// Canonical Equation.3 registration streams emitted by LibreOffice.
-const EQUATION_COMP_OBJ: &[u8] = &[
-    0x01, 0x00, 0xFE, 0xFF, 0x03, 0x0A, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0x02, 0xCE, 0x02, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46, 0x17, 0x00, 0x00, 0x00,
-    b'M', b'i', b'c', b'r', b'o', b's', b'o', b'f', b't', b' ', b'E', b'q', b'u', b'a', b't', b'i',
-    b'o', b'n', b' ', b'3', b'.', b'0', 0x00, 0x0C, 0x00, 0x00, 0x00, b'D', b'S', b' ', b'E', b'q',
-    b'u', b'a', b't', b'i', b'o', b'n', 0x00, 0x0B, 0x00, 0x00, 0x00, b'E', b'q', b'u', b'a', b't',
-    b'i', b'o', b'n', b'.', b'3', 0x00, 0xF4, 0x39, 0xB2, 0x71, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-];
-const EQUATION_OLE: &[u8] = &[
-    0x01, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00,
-];
-// ODTPersist1: fRecomposeOnResize | fViewObject; clipboard format 3
-// (metafile); ODTPersist2: no EMF flags.
-const EQUATION_OBJ_INFO: &[u8] = &[0x00, 0x82, 0x03, 0x00, 0x00, 0x00];
 
 /// A bounded, envelope-validated Equation Native stream.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -125,60 +109,287 @@ impl MtefEquationObject {
     }
 }
 
-/// Inputs for adding one native MathType/Equation Editor object to a DOC.
-#[derive(Clone, Debug)]
-pub struct MtefEquationWriteOptions {
-    pub storage_id: u32,
-    pub equation: MtefEquationObject,
-    pub preview: Picture,
+/// The class of an OLE equation object.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum EquationKind {
+    /// MathType (`Equation.DSMT4`), holding MTEF 5.
+    MathType,
+    /// Microsoft Equation Editor 3.0 (`Equation.3`), holding MTEF 3.
+    EquationEditor3,
 }
 
-impl MtefEquationWriteOptions {
+impl EquationKind {
+    /// The kind whose objects hold MTEF of `version`: 3 for Equation Editor
+    /// 3.0, anything else for MathType.
     #[must_use]
-    pub fn new(storage_id: u32, equation: MtefEquationObject, preview: Picture) -> Self {
-        Self {
-            storage_id,
-            equation,
-            preview,
+    pub const fn for_mtef_version(version: u8) -> Self {
+        if version == 3 {
+            Self::EquationEditor3
+        } else {
+            Self::MathType
+        }
+    }
+
+    /// The OLE ProgID, which the `EMBED` field instruction names.
+    #[must_use]
+    pub const fn prog_id(self) -> &'static str {
+        match self {
+            Self::MathType => "Equation.DSMT4",
+            Self::EquationEditor3 => "Equation.3",
+        }
+    }
+
+    /// The CLSID of the object storage, in CFB byte order.
+    #[must_use]
+    pub const fn clsid(self) -> [u8; 16] {
+        match self {
+            Self::MathType => MATH_TYPE_CLSID,
+            Self::EquationEditor3 => EQUATION_3_CLSID,
+        }
+    }
+
+    /// The user type the application records in the `CompObj` stream.
+    const fn user_type(self) -> &'static str {
+        match self {
+            Self::MathType => "MathType 6.0 Equation",
+            Self::EquationEditor3 => "Microsoft Equation 3.0",
+        }
+    }
+
+    /// The clipboard format name recorded in the `CompObj` stream.
+    const fn clipboard_format(self) -> &'static str {
+        match self {
+            Self::MathType => "MathType EF",
+            Self::EquationEditor3 => "DS Equation",
         }
     }
 }
 
-impl Editor {
-    /// Append a native Equation.3 EMBED field with a real PICF bitmap preview.
-    pub(crate) fn add_mtef_equation(
-        &mut self,
-        options: MtefEquationWriteOptions,
-    ) -> Result<Reference> {
-        let mut picture_data = Vec::new();
-        write_picture_block(
-            &options.preview,
-            options.storage_id,
-            &mut picture_data,
-            litchi_odraw::image::Limits::default(),
-        )
-        .map_err(|error| PackageError::Corrupted(error.to_string()))?;
-        let compound_file = equation_compound_file(options.equation)?;
-        self.add(WriteOptions {
-            storage_id: options.storage_id,
-            instruction: format!(" EMBED Equation.3 _{} ", options.storage_id),
-            picture_data,
-            compound_file,
-        })
+/// MathType `Equation.DSMT4` CLSID `{0002CE03-0000-0000-C000-000000000046}`
+/// in CFB byte order.
+pub const MATH_TYPE_CLSID: [u8; 16] = [
+    0x03, 0xCE, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46,
+];
+
+/// The content of one equation object: its `Equation Native` stream and the
+/// picture Word shows for it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EquationContent {
+    equation: MtefEquationObject,
+    preview: Picture,
+    lowering: u16,
+}
+
+impl EquationContent {
+    /// Content from a validated `Equation Native` stream, its preview, and
+    /// how far the preview reaches below the equation's baseline in
+    /// half-points. The preview is lowered by that much
+    /// (`sprmCPicLocation`'s character gets `sprmCHpsPos`), as Word lowers
+    /// each equation so that its baseline sits on the text line.
+    #[must_use]
+    pub fn new(equation: MtefEquationObject, preview: Picture, lowering: u16) -> Self {
+        Self {
+            equation,
+            preview,
+            lowering,
+        }
+    }
+
+    /// The `Equation Native` stream.
+    #[must_use]
+    pub fn equation(&self) -> &MtefEquationObject {
+        &self.equation
+    }
+
+    /// The preview picture.
+    #[must_use]
+    pub fn preview(&self) -> &Picture {
+        &self.preview
+    }
+
+    /// How far the preview is lowered below the baseline, in half-points.
+    #[must_use]
+    pub fn lowering(&self) -> u16 {
+        self.lowering
+    }
+
+    /// The MTEF version of the stream: 3 or 5.
+    #[must_use]
+    pub fn mtef_version(&self) -> u8 {
+        self.equation
+            .mtef_payload()
+            .first()
+            .copied()
+            .unwrap_or_default()
     }
 }
 
-fn equation_compound_file(equation: MtefEquationObject) -> Result<Vec<u8>> {
+#[cfg(feature = "equation")]
+impl EquationContent {
+    /// Content from an `Equation Native` stream (or bare MTEF, which gets
+    /// the stream header), with its preview rendered from the MTEF at
+    /// `font_size_pt`, the size of the text the equation stands in (Word
+    /// draws an equation at its text's size).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PackageError::Equation`] when the MTEF does not read or
+    /// render within `limits` or the font size is out of range, and
+    /// [`PackageError::InvalidFormat`] for a stream whose envelope is
+    /// invalid.
+    pub fn from_mtef(
+        bytes: Vec<u8>,
+        font_size_pt: f64,
+        limits: &litchi_equation::Limits,
+    ) -> Result<Self> {
+        litchi_equation::read_mtef(&bytes, limits).map_err(PackageError::Equation)?;
+        let header = (EQNOLE_HEADER_SIZE as u16).to_le_bytes();
+        let equation = if bytes.len() >= EQNOLE_HEADER_SIZE && bytes[..2] == header {
+            MtefEquationObject::from_equation_native(bytes)?
+        } else {
+            MtefEquationObject::from_mtef_payload(bytes)?
+        };
+        let (preview, lowering) = render_preview(equation.equation_native(), font_size_pt, limits)?;
+        Ok(Self {
+            equation,
+            preview,
+            lowering,
+        })
+    }
+
+    /// Content converted from LaTeX math into an object of `target`'s
+    /// kind, its preview drawn at `font_size_pt`, and the messages of what
+    /// the conversion lost.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PackageError::Equation`] when the LaTeX does not convert
+    /// or render within `limits` or the font size is out of range.
+    pub fn from_latex(
+        latex: &str,
+        target: &litchi_equation::MtefTarget,
+        font_size_pt: f64,
+        limits: &litchi_equation::Limits,
+    ) -> Result<(Self, Vec<String>)> {
+        let native = litchi_equation::latex_to_equation_native(latex, target, limits)
+            .map_err(PackageError::Equation)?;
+        Self::from_written(native, font_size_pt, limits)
+    }
+
+    /// Content converted from an OMML equation into an object of
+    /// `target`'s kind, and the messages of what the conversion lost.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_latex`].
+    pub fn from_omml(
+        omml: &str,
+        target: &litchi_equation::MtefTarget,
+        font_size_pt: f64,
+        limits: &litchi_equation::Limits,
+    ) -> Result<(Self, Vec<String>)> {
+        let native = litchi_equation::omml_to_equation_native(omml, target, limits)
+            .map_err(PackageError::Equation)?;
+        Self::from_written(native, font_size_pt, limits)
+    }
+
+    fn from_written(
+        native: litchi_equation::EquationNative,
+        font_size_pt: f64,
+        limits: &litchi_equation::Limits,
+    ) -> Result<(Self, Vec<String>)> {
+        let losses = native.losses().to_vec();
+        let equation = MtefEquationObject::from_equation_native(native.into_bytes())?;
+        let (preview, lowering) = render_preview(equation.equation_native(), font_size_pt, limits)?;
+        Ok((
+            Self {
+                equation,
+                preview,
+                lowering,
+            },
+            losses,
+        ))
+    }
+}
+
+/// Render the preview of an equation at `font_size_pt`, drawn at twice the
+/// screen resolution and shown at its size in points, and how far the same
+/// picture reaches below the baseline in half-points.
+#[cfg(feature = "equation")]
+fn render_preview(
+    equation_native: &[u8],
+    font_size_pt: f64,
+    limits: &litchi_equation::Limits,
+) -> Result<(Picture, u16)> {
+    let options = litchi_equation::PngOptions::new(font_size_pt)
+        .and_then(|options| options.with_scale(2.0))
+        .map_err(PackageError::Equation)?;
+    let png = litchi_equation::mtef_to_png(equation_native, &options, limits)
+        .map_err(PackageError::Equation)?;
+    let (width, height) = png.size_pt();
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "the value is clamped to the PICF goal range 1..=32767"
+    )]
+    let twips = |points: f64| (points * 20.0).round().clamp(1.0, f64::from(i16::MAX)) as u32;
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "the value is clamped to the sprmCHpsPos range 0..=3168"
+    )]
+    let lowering = (png.depth_pt() * 2.0).round().clamp(0.0, 3168.0) as u16;
+    let picture = Picture::from_parts(png.into_bytes(), twips(width), twips(height))
+        .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
+    Ok((picture, lowering))
+}
+
+/// The compound file of a new equation object of `kind` holding
+/// `equation_native`, with the streams Word writes for one: `CompObj`,
+/// `Ole`, `ObjInfo` and `Equation Native`.
+pub(crate) fn equation_object_compound_file(
+    kind: EquationKind,
+    equation_native: &[u8],
+) -> Result<Vec<u8>> {
     let mut writer = OleWriter::new();
-    writer.set_root_clsid(EQUATION_3_CLSID);
-    writer.create_stream(&[COMP_OBJ_STREAM], EQUATION_COMP_OBJ)?;
-    writer.create_stream(&[OLE_STREAM], EQUATION_OLE)?;
-    writer.create_stream(&[OBJ_INFO_STREAM], EQUATION_OBJ_INFO)?;
-    writer.create_stream(&[EQUATION_NATIVE_STREAM], equation.equation_native())?;
+    writer.set_root_clsid(kind.clsid());
+    writer.create_stream(&[COMP_OBJ_STREAM], &comp_obj(kind))?;
+    writer.create_stream(&[OLE_STREAM], WORD_OLE)?;
+    writer.create_stream(&[OBJ_INFO_STREAM], WORD_OBJ_INFO)?;
+    writer.create_stream(&[EQUATION_NATIVE_STREAM], equation_native)?;
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output)?;
     Ok(output.into_inner())
 }
+
+/// `CompObjStream` ([MS-OLEDS] 2.3.8) for `kind`, as Word writes it: the
+/// header, the class, and the user type, clipboard format and ProgID as
+/// ANSI strings, then the Unicode marker without Unicode strings.
+fn comp_obj(kind: EquationKind) -> Vec<u8> {
+    let mut bytes = vec![0x01, 0x00, 0xFE, 0xFF, 0x03, 0x0A, 0x00, 0x00];
+    bytes.extend_from_slice(&[0xFF; 4]);
+    bytes.extend_from_slice(&kind.clsid());
+    for text in [kind.user_type(), kind.clipboard_format(), kind.prog_id()] {
+        let length = u32::try_from(text.len() + 1).unwrap_or(u32::MAX);
+        bytes.extend_from_slice(&length.to_le_bytes());
+        bytes.extend_from_slice(text.as_bytes());
+        bytes.push(0);
+    }
+    bytes.extend_from_slice(&0x71B2_39F4u32.to_le_bytes());
+    bytes.extend_from_slice(&[0; 12]);
+    bytes
+}
+
+/// The `Ole` stream Word writes for an embedded equation ([MS-OLEDS]
+/// 2.3.3).
+const WORD_OLE: &[u8] = &[
+    0x01, 0x00, 0x00, 0x02, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+];
+/// The `ObjInfo` stream Word writes for an embedded equation (an `ODT`,
+/// [MS-DOC] 2.9): clipboard format 3 (metafile picture).
+const WORD_OBJ_INFO: &[u8] = &[0x00, 0x00, 0x03, 0x00, 0x04, 0x00];
 
 fn validate_mtef_payload(payload: &[u8]) -> Result<()> {
     if payload.len() > MAX_MTEF_PAYLOAD_SIZE {

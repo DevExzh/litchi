@@ -10,7 +10,12 @@ rust-version.workspace = true
 
 [features]
 default = []
-equation = ["dep:litchi-equation"]
+# Converts equations to LaTeX through `litchi-equation`, and makes the
+# content of new or replaced equations from LaTeX, OMML or MTEF
+# (`EquationContent::from_latex`, `from_omml`, `from_mtef`). That renders the
+# preview picture Word shows for each equation, so this feature also turns on
+# the renderer (`litchi-equation/render`, which embeds about 1.9 MB of fonts).
+equation = ["dep:litchi-equation", "litchi-equation/render"]
 # Runtime-neutral phase callbacks for reproducible open/commit profiling.
 performance-diagnostics = ["litchi-ole-common/performance-diagnostics"]
 

@@ -161,7 +161,9 @@ pub use document::{
 };
 pub use embedded_object::WriteOptions;
 pub use encryption::EncryptionProfile;
-pub use equation::{EQUATION_3_CLSID, MtefEquationObject, MtefEquationWriteOptions};
+pub use equation::{
+    EQUATION_3_CLSID, EquationContent, EquationKind, MATH_TYPE_CLSID, MtefEquationObject,
+};
 pub use footnote::{Endnote, Footnote};
 pub use header_footer::HeaderFooter;
 pub use hyperlink::Hyperlink;

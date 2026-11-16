@@ -201,6 +201,17 @@ impl Package {
         self.check(limits)
     }
 
+    /// The paths of the storages directly below `parent`.
+    pub(crate) fn child_storage_paths<'a>(
+        &'a self,
+        parent: &'a [String],
+    ) -> impl Iterator<Item = &'a [String]> + 'a {
+        self.storages
+            .iter()
+            .map(Storage::path)
+            .filter(move |path| path.len() == parent.len() + 1 && path.starts_with(parent))
+    }
+
     pub(crate) fn stream(&self, path: &[String]) -> Option<&[u8]> {
         self.streams
             .iter()

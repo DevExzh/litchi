@@ -155,6 +155,8 @@ pub(crate) enum Item<'f> {
     Tab(litchi_doc::parts::pap::TabStop),
     TextBox(Arc<super::marks::TextBox>),
     Shape(&'f litchi_doc::parts::spa::ShapeAnchor),
+    /// An equation object of a paragraph.
+    Equation(Arc<super::equations::Equation>),
 }
 
 // Nodes move through every query; keep this one no larger
@@ -549,6 +551,9 @@ impl<'f> Node<'f> {
             Item::Tab(stop) => (spec::TAB_PROPS, NodeProps::Tab(stop)),
             Item::TextBox(text_box) => (spec::TEXT_BOX_PROPS, NodeProps::TextBox(text_box)),
             Item::Shape(anchor) => (spec::SHAPE_PROPS, NodeProps::Shape(anchor)),
+            Item::Equation(equation) => {
+                (spec::EQUATION_PROPS, NodeProps::Equation { doc, equation })
+            },
         };
         Ok(Format::new(props, Source::Doc(source)).without(&["text"]))
     }
@@ -584,6 +589,7 @@ const fn kind_step(kind: Kind) -> &'static str {
         Kind::Tab => "tab",
         Kind::TextBox => "textbox",
         Kind::Shape => "shape",
+        Kind::Equation => "equation",
     }
 }
 
@@ -655,6 +661,10 @@ pub(crate) enum NodeProps<'a> {
     Tab(&'a litchi_doc::parts::pap::TabStop),
     TextBox(&'a super::marks::TextBox),
     Shape(&'a litchi_doc::parts::spa::ShapeAnchor),
+    Equation {
+        doc: &'a Doc,
+        equation: &'a super::equations::Equation,
+    },
 }
 
 impl<'a> NodeProps<'a> {
@@ -780,6 +790,9 @@ impl<'a> NodeProps<'a> {
             Self::Tab(stop) => super::marks::tab_value(stop, index),
             Self::TextBox(text_box) => super::marks::text_box_value(text_box, index),
             Self::Shape(anchor) => super::marks::shape_value(anchor, index),
+            Self::Equation { doc, equation } => {
+                super::equations::equation_value(doc, equation, index)
+            },
         }
     }
 }
@@ -852,7 +865,8 @@ impl<'f> Project<'f> for Node<'f> {
             | Item::Section(_)
             | Item::Tab(_)
             | Item::TextBox(_)
-            | Item::Shape(_) => 0,
+            | Item::Shape(_)
+            | Item::Equation(_) => 0,
             Item::AbstractNum(_) => Children::of(self).count(),
         };
         Ok(Some(u32::try_from(count).unwrap_or(u32::MAX)))

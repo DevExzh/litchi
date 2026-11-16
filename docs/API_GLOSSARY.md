@@ -163,6 +163,11 @@ Native` stream for an `MtefTarget`), and with the `render` feature
 ceiling is checked before parsing. Pictures also take `PngOptions` (text size,
 scale and a pixel ceiling checked before any pixel buffer is allocated).
 Parsing, writing and rendering are done by the `mathema` converter.
+`latex_to_equation_native` and `omml_to_equation_native` write the whole
+`Equation Native` stream of an OLE equation object for an `MtefTarget`:
+`MathType` (`Equation.DSMT4`, MTEF 5), `EquationEditor3` (`Equation.3`,
+MTEF 3) or `SameAs(MtefInfo)`, which keeps an existing object's kind. No
+`mathema` type appears in the public API.
 
 ## 3. Open, create, save
 
@@ -1971,6 +1976,25 @@ bounded `Snapshot::parse_with_options_and_policy` result through
 `Editor::from_snapshot`. `open_with_limits`, `open_with_limits_and_policy`
 and every `rollback` are removed and banned in both DOC profiles (dropping a
 transaction is the rollback).
+
+DOC equations: the primary `doc::Edit` gains `insert_equation(Position,
+offset, EquationKind, &EquationContent) -> u32` (the new object's storage
+number), `set_equation(start_cp, &EquationContent)` and
+`remove_equation(start_cp)`; an equation is addressed by the CP of its
+`EMBED` field begin, as `remove_field` addresses a field.
+`EquationContent::new(equation, preview, lowering)` is an `Equation Native`
+stream with its preview picture and the preview's depth below the baseline in
+half-points (written as `sprmCHpsPos`, as Word lowers every equation);
+with the `equation` feature `EquationContent::{from_latex, from_omml,
+from_mtef}` build it through `litchi-equation`, drawing the preview at a caller-given font size (the size of the text the equation stands in). `EquationKind::{MathType,
+EquationEditor3}` names the object class, and
+`Document::equation_native(storage_id)` reads an object's stream.
+`body_text::Refusal::EquationNotFound` and `ChangeRef::Equation` are added.
+The append-only `embedded_object::Edit::add_mtef_equation` and
+`MtefEquationWriteOptions` are removed. `litchi_equation::Png::depth_pt`
+gives a picture's depth below the equation's baseline. `litchi_ole_common::object::Edit` gains
+`child_storage_paths`, `add_storage_at` and `remove_storage_at`, which address
+storages by path without opening them as targets.
 
 ## Registry schema export
 

@@ -1,9 +1,14 @@
+//! Equation objects written from raw MTEF through the primary DOC
+//! transaction, without the `equation` feature: the object storage and its
+//! streams, the field, and the `Equation Native` envelope checks.
+
 use litchi_cfb::OleFile;
+use litchi_core::Position;
 use litchi_doc::builder::Builder;
 use litchi_doc::embedded_object::Info;
 use litchi_doc::writer::Picture;
 use litchi_doc::{
-    EQUATION_3_CLSID, MtefEquationObject, MtefEquationWriteOptions, Package, raw::Reader,
+    EQUATION_3_CLSID, EquationContent, EquationKind, MtefEquationObject, Package, raw::Reader,
 };
 use litchi_ole_common::object::{
     Edit as ObjectEditor, Limits as ObjectLimits, OpenOptions as ObjectOpenOptions,
@@ -58,27 +63,23 @@ fn base_doc() -> Vec<u8> {
 }
 
 #[test]
-fn authors_native_equation_object_and_preserves_storage_clsid() {
+fn writes_a_native_equation_object_with_its_class_and_streams() {
     let payload = decode_hex_fixture();
     let equation = MtefEquationObject::from_mtef_payload(payload.clone()).unwrap();
     assert_eq!(equation.mtef_payload(), payload);
-    let preview = Picture::new(preview_png()).unwrap();
+    let content = EquationContent::new(equation, Picture::new(preview_png()).unwrap(), 4);
     let source = Package::from_bytes(&base_doc()).unwrap();
-    let mut editor = source.edit_embedded_objects().unwrap();
-    let reference = editor
-        .add_mtef_equation(MtefEquationWriteOptions::new(314_159, equation, preview))
-        .unwrap();
-    assert_eq!(reference.storage_name, "_314159");
-    assert_eq!(
-        editor
-            .objects()
-            .unwrap()
-            .iter()
-            .map(|object| object.storage_id)
-            .collect::<Vec<_>>(),
-        vec![reference.storage_id]
+    let mut edit = source.edit().unwrap();
+    // MTEF 3 is an Equation Editor 3.0 object, never a MathType one.
+    assert!(
+        edit.insert_equation(Position::new(0), 6, EquationKind::MathType, &content)
+            .is_err()
     );
-    let bytes = editor.commit().unwrap().patch().after_bytes().to_vec();
+    let storage_id = edit
+        .insert_equation(Position::new(0), 6, EquationKind::EquationEditor3, &content)
+        .unwrap();
+    let bytes = edit.commit().unwrap().package().to_bytes().unwrap();
+    let name = format!("_{storage_id}");
 
     let ole = OleFile::open(
         Cursor::new(bytes.clone()),
@@ -89,28 +90,35 @@ fn authors_native_equation_object_and_preserves_storage_clsid() {
         .list_directory_entries(&["ObjectPool"])
         .unwrap()
         .into_iter()
-        .find(|entry| entry.name == "_314159")
+        .find(|entry| entry.name == name)
         .unwrap();
     assert_eq!(storage.clsid, "0002CE02-0000-0000-C000-000000000046");
-    assert!(ole.exists(&["ObjectPool", "_314159", "Equation Native"]));
-    assert!(ole.exists(&["ObjectPool", "_314159", "\u{1}CompObj"]));
-    assert!(ole.exists(&["ObjectPool", "_314159", "\u{1}Ole"]));
-    assert!(ole.exists(&["ObjectPool", "_314159", "\u{3}ObjInfo"]));
+    for stream in [
+        "Equation Native",
+        "\u{1}CompObj",
+        "\u{1}Ole",
+        "\u{3}ObjInfo",
+    ] {
+        assert!(ole.exists(&["ObjectPool", &name, stream]), "{stream}");
+    }
 
-    let target = Target::new("_314159", ["ObjectPool", "_314159"]).unwrap();
+    let target = Target::new(name.clone(), ["ObjectPool", name.as_str()]).unwrap();
     let objects =
         open_object(bytes.clone(), Targets::one(target), ObjectLimits::default()).unwrap();
-    let object = objects.objects().get("_314159").unwrap();
-    assert_eq!(object.path(), ["ObjectPool", "_314159"]);
+    let object = objects.objects().get(&name).unwrap();
     assert_eq!(object.storage().clsid(), Some(storage.clsid.as_str()));
+    // The ObjInfo Word writes for an equation: a metafile presentation.
     assert_eq!(
         object.stream(&["\u{3}ObjInfo"]),
-        Some(&[0x00, 0x82, 0x03, 0x00, 0x00, 0x00][..])
+        Some(&[0x00, 0x00, 0x03, 0x00, 0x04, 0x00][..])
     );
-    let descriptor = Info::of(object).unwrap().unwrap();
-    assert!(descriptor.recompose_on_resize);
-    assert!(descriptor.view_object);
-    assert_eq!(descriptor.clipboard_format, 3);
+    assert_eq!(Info::of(object).unwrap().unwrap().clipboard_format, 3);
+    let comp_obj = object.stream(&["\u{1}CompObj"]).unwrap();
+    assert!(
+        comp_obj
+            .windows(b"Equation.3\0".len())
+            .any(|window| window == b"Equation.3\0")
+    );
     let mut nested = OleFile::open(
         Cursor::new(object.compound()),
         litchi_cfb::OleFileLimits::default(),
@@ -127,29 +135,13 @@ fn authors_native_equation_object_and_preserves_storage_clsid() {
             .equation_native()
     );
 
-    let reopened = Package::from_bytes(&bytes)
-        .unwrap()
-        .embedded_objects()
-        .unwrap();
-    assert_eq!(
-        reopened
-            .objects()
-            .unwrap()
-            .iter()
-            .map(|object| object.storage_id)
-            .collect::<Vec<_>>(),
-        vec![reference.storage_id]
-    );
     let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
     let document = package.document().unwrap();
-    assert!(document.text().unwrap().contains("native equation follows"));
-    #[cfg(feature = "equation")]
     assert!(
         document
-            .paragraphs()
+            .text()
             .unwrap()
-            .iter()
-            .any(|paragraph| paragraph.has_equations())
+            .contains("native\u{13} EMBED Equation.3  \u{14}\u{1}\u{15} equation follows")
     );
 }
 

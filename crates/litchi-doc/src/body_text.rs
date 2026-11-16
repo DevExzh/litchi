@@ -20,6 +20,7 @@
     reason = "the ordinary immutable DOC root uses checked conversions and propagated typed errors"
 )]
 
+mod equations;
 mod properties;
 
 use properties::MarkChange;
@@ -614,6 +615,8 @@ pub enum Refusal {
     BookmarkNotFound,
     /// The requested section is past the document's last section.
     SectionNotFound,
+    /// No equation object field begins at the requested position.
+    EquationNotFound,
 }
 
 /// What the CP-indexed FIB table `index` positions, for refusal messages
@@ -651,7 +654,8 @@ impl Refusal {
             | Self::StyleNotFound
             | Self::FieldNotFound
             | Self::BookmarkNotFound
-            | Self::SectionNotFound => RefusalKind::NotFound,
+            | Self::SectionNotFound
+            | Self::EquationNotFound => RefusalKind::NotFound,
             Self::SignedSource | Self::Protected | Self::UnknownProtection | Self::Encrypted => {
                 RefusalKind::Protected
             },
@@ -815,6 +819,9 @@ impl std::fmt::Display for Refusal {
             },
             Self::SectionNotFound => {
                 formatter.write_str("the DOC section position is out of range")
+            },
+            Self::EquationNotFound => {
+                formatter.write_str("no DOC equation object field begins at the requested position")
             },
         }
     }
@@ -3586,6 +3593,13 @@ pub enum ChangeRef<'a> {
         before: &'a [u8],
         after: &'a [u8],
     },
+    /// One equation object insertion, content replacement or removal, at
+    /// its field begin mark.
+    Equation {
+        start_cp: u32,
+        before_present: bool,
+        after_present: bool,
+    },
 }
 
 impl std::fmt::Debug for ChangeRef<'_> {
@@ -3728,6 +3742,16 @@ impl std::fmt::Debug for ChangeRef<'_> {
                 .field("section", section)
                 .field("before_bytes", &before.len())
                 .field("after_bytes", &after.len())
+                .finish(),
+            Self::Equation {
+                start_cp,
+                before_present,
+                after_present,
+            } => formatter
+                .debug_struct("Equation")
+                .field("start_cp", start_cp)
+                .field("before_present", before_present)
+                .field("after_present", after_present)
                 .finish(),
         }
     }
