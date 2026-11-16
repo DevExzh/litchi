@@ -942,6 +942,11 @@ pub enum Error {
     /// Writing into the requested text sink failed.
     #[error("could not encode PresentationML text")]
     Write,
+
+    /// An equation could not be converted or rendered.
+    #[cfg(feature = "equation")]
+    #[error("PPTX equation error: {0}")]
+    Equation(#[from] litchi_equation::Error),
 }
 
 impl Error {

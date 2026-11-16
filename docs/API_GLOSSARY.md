@@ -154,10 +154,13 @@ ODraw traversal resources are named `LimitKind` and image resources
 and banned; error variants and their existing observations stay unchanged.
 
 The equation raw codec profile is registered. `litchi_equation`'s
-`omml_to_latex`, `mathml_to_latex`, `read_mtef`, `mtef_to_latex` and
-`latex_to_omml` take a caller-selected finite `Limits` (input bytes, parsed
-nodes and nesting depth) at every raw boundary; the input ceiling is checked
-before parsing. Parsing and writing are done by the `mathema` converter.
+`omml_to_latex`, `omml_to_unicode_math`, `mathml_to_latex`, `read_mtef`,
+`mtef_to_latex`, `latex_to_omml` and `latex_to_omml_paragraph`, and with the
+`render` feature `latex_to_png`, `omml_to_png` and `omml_size_pt`, take a caller-selected finite `Limits`
+(input bytes, parsed nodes and nesting depth) at every raw boundary; the input
+ceiling is checked before parsing. Pictures also take `PngOptions` (text size,
+scale and a pixel ceiling checked before any pixel buffer is allocated).
+Parsing, writing and rendering are done by the `mathema` converter.
 
 ## 3. Open, create, save
 
@@ -2989,6 +2992,7 @@ Action}`); the authored relationship ID of a `Click` stays crate-private.
 | `litchi_pptx::opened::Edit::{set_shape_hyperlink, set_run_hyperlink}` | adopted; `set_shape_hyperlink` also writes a picture's or a group's `p:cNvPr` click; `hyperlinks::mentions_click` is the cheap no-click pre-check of `Click::of_shape` |
 | `litchi_pptx::media_parts::{Summary, summary}`; `opened::{Edit::add_media, MediaFile}` | adopted |
 | `litchi_pptx::shape::math::{Equation, equations}`; `Slide::equations`, `SourceSlide::equations`, `source::Slide::equations` | adopted |
+| `litchi_pptx::opened::Edit::{add_equation, add_equation_to_shape, set_equation, remove_equation}`; `shape::math::{EquationSource, EquationWrite}` (feature `equation`); equations are addressed by their position among `Slide::equations` | adopted |
 
 ## PPTX P0 residue: text structure, rows, cell properties, comments, pictures
 

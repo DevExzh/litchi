@@ -31,6 +31,11 @@ pub(crate) struct CompactedSlide {
 
 /// Re-emit a changed slide without inter-element formatting.
 ///
+/// Whitespace between elements is formatting and is dropped; the whole
+/// content of an element without child elements (the text of `a:t`, `m:t`
+/// and every other text-bearing element) is data and is kept, even when it
+/// is only whitespace.
+///
 /// A leading UTF-8 byte-order mark, which the reader consumes before its
 /// first event, is carried to the output unchanged: it is a byte the producer
 /// wrote, not formatting.
@@ -55,6 +60,9 @@ pub(crate) fn compact_changed_slide_xml(source: &[u8]) -> Result<CompactedSlide>
     let mut output_root_start = None;
     let mut output_root_end = None;
     let mut outside_non_text_exact = true;
+    // Whether the innermost open element has no child so far, so that its
+    // whitespace-only content is its text, not formatting.
+    let mut leaf_open = false;
     loop {
         let source_event_start = origin.offset(reader.buffer_position());
         let event = reader
@@ -79,8 +87,10 @@ pub(crate) fn compact_changed_slide_xml(source: &[u8]) -> Result<CompactedSlide>
                     inherited,
                 )?);
                 write_compact_start(&mut output, &element, reader.decoder(), false)?;
+                leaf_open = true;
             },
             Event::Empty(element) => {
+                leaf_open = false;
                 finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
                 let is_root = preserve_space.is_empty();
                 if is_root {
@@ -99,6 +109,9 @@ pub(crate) fn compact_changed_slide_xml(source: &[u8]) -> Result<CompactedSlide>
                 }
             },
             Event::End(element) => {
+                if std::mem::take(&mut leaf_open) {
+                    output.extend_from_slice(&pending_whitespace);
+                }
                 finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
                 let is_root = preserve_space.len() == 1;
                 preserve_space.pop().ok_or_else(|| {
@@ -181,6 +194,7 @@ pub(crate) fn compact_changed_slide_xml(source: &[u8]) -> Result<CompactedSlide>
                 }
             },
             Event::PI(instruction) => {
+                leaf_open = false;
                 finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
                 let output_event_start = output.len();
                 output.extend_from_slice(b"<?");
@@ -198,6 +212,7 @@ pub(crate) fn compact_changed_slide_xml(source: &[u8]) -> Result<CompactedSlide>
                 }
             },
             Event::Comment(comment) => {
+                leaf_open = false;
                 finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
                 let output_event_start = output.len();
                 output.extend_from_slice(b"<!--");
@@ -3287,6 +3302,22 @@ mod compaction_tests {
         assert!(compact_changed_slide_xml(b"<p:sld xmlns:p=\"urn:p\"/>text").is_err());
         assert!(compact_changed_slide_xml(b"<!DOCTYPE p:sld><p:sld/>").is_err());
         Ok(())
+    }
+
+    #[test]
+    fn whitespace_only_text_of_a_leaf_element_is_kept() -> Result<()> {
+        // The space of a text run and of a math run is data; the formatting
+        // around them is not.
+        let source = b"<p:sld xmlns:p=\"urn:p\">\n <a:r><a:t> </a:t></a:r>\n <m:r><m:t> </m:t></m:r><a:t></a:t>\n</p:sld>";
+        let expected = b"<p:sld xmlns:p=\"urn:p\"><a:r><a:t> </a:t></a:r><m:r><m:t> </m:t></m:r><a:t></a:t></p:sld>";
+        assert_compacted(source, expected, false)?;
+        // A comment inside makes the content mixed again.
+        let commented = b"<p:sld xmlns:p=\"urn:p\"><a:t> <!--c--> </a:t></p:sld>";
+        assert_compacted(
+            commented,
+            b"<p:sld xmlns:p=\"urn:p\"><a:t><!--c--></a:t></p:sld>",
+            false,
+        )
     }
 
     #[test]

@@ -145,6 +145,8 @@ pub(crate) const SETTABLE: &[&str] = &[
     "table",
     // Document properties on the root, through the metadata writer.
     "presentation",
+    // Equation content, with its picture fallback.
+    "equation",
 ];
 
 /// The root's capability table: its document-property keys are settable on
@@ -178,6 +180,8 @@ pub(crate) const SHAPE_ADDABLE: &[&str] = &[
     "run",
     "tr",
     "table",
+    // Equation text boxes with their picture fallback.
+    "equation",
 ];
 
 /// The non-slide elements `remove` deletes when the owner admits shape
@@ -207,6 +211,8 @@ pub(crate) const REMOVABLE: &[&str] = &[
     "comment",
     "modernComment",
     "reply",
+    // Equations with their shape and picture.
+    "equation",
 ];
 
 /// The capability property table of an element whose writable keys extend
@@ -240,6 +246,7 @@ pub(crate) fn capability_props(element: &str) -> Option<&'static [crate::node::s
         "table" => TABLE_CAPABILITY_PROPS,
         "hyperlink" => HYPERLINK_CAPABILITY_PROPS,
         "video" | "audio" | "media" => MEDIA_CAPABILITY_PROPS,
+        "equation" => spec::EQUATION_CAPABILITY_PROPS,
         _ => return None,
     })
 }

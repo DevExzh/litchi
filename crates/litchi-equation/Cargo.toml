@@ -8,9 +8,17 @@ license.workspace      = true
 repository.workspace   = true
 rust-version.workspace = true
 
+[features]
+default = []
+# Renders equations as PNG pictures (`latex_to_png`, `omml_to_png`) through
+# mathema's rasterizer, which embeds the Latin Modern fonts (about 1.9 MB).
+render = ["mathema/raster", "dep:tiny-skia"]
+
 [dependencies]
 mathema   = { workspace = true }
 thiserror = { workspace = true }
+# Composes rendered pictures (`Png::placed`); the rasterizer already uses it.
+tiny-skia = { workspace = true, optional = true }
 
 [lints]
 workspace = true

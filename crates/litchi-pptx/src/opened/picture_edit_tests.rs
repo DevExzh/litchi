@@ -125,3 +125,39 @@ fn shapes_are_renamed() -> Result<()> {
     );
     Ok(())
 }
+
+/// An edit of one shape keeps the space-only text run of another: the
+/// commit's compaction drops formatting between elements, never the text of
+/// a run.
+#[test]
+fn an_edit_keeps_space_only_runs_of_other_shapes() -> Result<()> {
+    let package = deck()?;
+    let mut edit = package.edit()?;
+    edit.add_text_box(0usize, "ab", (0, 0, 914_400, 914_400))?;
+    let mut package = edit.commit()?.into_package();
+    let part = {
+        let mut edit = package.edit()?;
+        edit.slides()?[0].part_name().clone()
+    };
+    let xml = String::from_utf8(package.opc()?.get_part(&part)?.blob().to_vec()).unwrap();
+    let spaced = xml.replacen(
+        r#"<a:r><a:t xml:space="preserve">ab</a:t></a:r>"#,
+        "<a:r><a:t>a</a:t></a:r><a:r><a:t> </a:t></a:r><a:r><a:t>b</a:t></a:r>",
+        1,
+    );
+    assert_ne!(spaced, xml);
+    std::sync::Arc::make_mut(&mut package.opc)
+        .get_part_mut(&part)?
+        .set_blob(spaced.into_bytes());
+    let package = Package::from_bytes(&package.to_bytes()?)?;
+    let mut edit = package.edit()?;
+    assert!(edit.set_shape_description(0usize, 0usize, Some("Logo"))?);
+    let after = edit.commit()?.into_package();
+    let xml = slide_xml(&after)?;
+    let text = std::str::from_utf8(&xml).unwrap();
+    assert!(
+        text.contains("<a:r><a:t>a</a:t></a:r><a:r><a:t> </a:t></a:r><a:r><a:t>b</a:t></a:r>"),
+        "{text}"
+    );
+    Ok(())
+}

@@ -1,8 +1,8 @@
 //! The conversions Litchi's document crates rely on.
 
 use litchi_equation::{
-    Error, Format, LimitKind, Limits, MtefProduct, OmmlHost, latex_to_omml, mathml_to_latex,
-    mtef_to_latex, omml_to_latex, read_mtef,
+    Error, Format, Justification, LimitKind, Limits, MtefProduct, OmmlHost, latex_to_omml,
+    latex_to_omml_paragraph, mathml_to_latex, mtef_to_latex, omml_to_latex, read_mtef,
 };
 
 const MATH_NS: &str = "http://schemas.openxmlformats.org/officeDocument/2006/math";
@@ -184,4 +184,24 @@ fn mtef_5_equations_convert() {
 fn mathml_converts() {
     let mathml = r#"<math xmlns="http://www.w3.org/1998/Math/MathML"><msup><mi>x</mi><mn>2</mn></msup></math>"#;
     assert_eq!(mathml_to_latex(mathml, &Limits::DEFAULT).unwrap(), "x^{2}");
+}
+
+#[test]
+fn display_paragraphs_carry_their_justification() {
+    let omml = latex_to_omml_paragraph(
+        "a=b",
+        OmmlHost::DrawingMl,
+        Some(Justification::CenterGroup),
+        &Limits::DEFAULT,
+    )
+    .unwrap()
+    .into_xml();
+    assert!(omml.starts_with("<m:oMathPara "), "{omml}");
+    assert!(omml.contains(r#"<m:jc m:val="centerGroup"/>"#), "{omml}");
+    assert_eq!(
+        omml_to_latex(&omml, &Limits::DEFAULT)
+            .unwrap()
+            .replace(' ', ""),
+        "a=b"
+    );
 }

@@ -26602,7 +26602,7 @@
       "id": "equation-raw",
       "package": "litchi-equation",
       "default_features": true,
-      "features": [],
+      "features": ["render"],
       "banned_names": [
         {
           "name": "_with_limits",
@@ -26639,6 +26639,36 @@
         {
           "method": "litchi_equation::latex_to_omml",
           "inputs": ["latex", "host", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_equation::Limits"
+        },
+        {
+          "method": "litchi_equation::latex_to_omml_paragraph",
+          "inputs": ["latex", "host", "justification", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_equation::Limits"
+        },
+        {
+          "method": "litchi_equation::latex_to_png",
+          "inputs": ["latex", "options", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_equation::Limits"
+        },
+        {
+          "method": "litchi_equation::omml_to_png",
+          "inputs": ["omml", "options", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_equation::Limits"
+        },
+        {
+          "method": "litchi_equation::omml_size_pt",
+          "inputs": ["omml", "options", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_equation::Limits"
+        },
+        {
+          "method": "litchi_equation::omml_to_unicode_math",
+          "inputs": ["omml", "limits"],
           "limits_argument": "limits",
           "limits_type": "litchi_equation::Limits"
         }

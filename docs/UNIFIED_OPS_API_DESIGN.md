@@ -259,7 +259,9 @@ reuses the existing investment in 60+ crates, and complies with ADR 0007.
 - **Semantic coverage breadth is a first-class goal.** High-frequency special
   objects get typed representations and CRUD verbs so agents rarely need the
   escape hatch: charts, SmartArt/diagrams, equations (LaTeX through
-  `litchi-equation`), tables (word-processing tables, spreadsheet ListObjects,
+  `litchi-equation`; an equation node reads and writes `latex` and its
+  native `omml`, and PPTX writes keep PowerPoint's PNG picture fallback for
+  readers without Office Math), tables (word-processing tables, spreadsheet ListObjects,
   slide tables), pictures, comments/notes (including threaded comments),
   hyperlinks, text boxes — and the structural plane where the workspace
   already has typed models: styles, numbering/lists, sections and page setup,

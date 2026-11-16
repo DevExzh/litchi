@@ -964,6 +964,8 @@ fn pptx_reports_selection_and_structural_writes() {
                 | "video"
                 | "audio"
                 | "media"
+                // Equation writes have their own test (`tests/pptx_equations.rs`).
+                | "equation"
         ) {
             continue;
         }
@@ -1460,6 +1462,7 @@ fn pptx_structural_capabilities_follow_owner_and_retention_policy() {
                     | "comment"
                     | "modernComment"
                     | "reply"
+                    | "equation"
             ),
             "{}",
             element.name()
@@ -1506,6 +1509,7 @@ fn pptx_structural_capabilities_follow_owner_and_retention_policy() {
                     | "comment"
                     | "modernComment"
                     | "reply"
+                    | "equation"
             ),
             "{}",
             element.name()

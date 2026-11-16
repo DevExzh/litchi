@@ -3859,11 +3859,11 @@
         "math"
       ],
       "operations": {
-        "add": false,
-        "set": false,
+        "add": true,
+        "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -3874,9 +3874,33 @@
       "properties": {
         "latex": {
           "type": "string",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
+        },
+        "omml": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "y": {
+          "type": "length",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "size": {
+          "type": "font-size",
+          "add": true,
+          "set": false,
+          "get": false
         }
       },
       "predicates": {

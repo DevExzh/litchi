@@ -6,7 +6,9 @@
 //! the fallback, so [`equations`] scans the slide's own XML: every `a14:m`,
 //! in document order, with the `cNvPr` ID of the shape that holds it, its
 //! OMML and its text. With the `equation` feature, `Equation::latex`
-//! converts the OMML to LaTeX through `litchi-equation`.
+//! converts the OMML to LaTeX through `litchi-equation`, and the edit
+//! verbs `opened::Edit::{add_equation, add_equation_to_shape, set_equation,
+//! remove_equation}` of the same feature write them.
 
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::events::Event;
@@ -23,6 +25,37 @@ const STRICT_PML: &[u8] = b"http://purl.oclc.org/ooxml/presentationml/main";
 const MAX_DEPTH: usize = 256;
 const MAX_EQUATIONS: usize = 4096;
 const MAX_NODES: usize = 1_000_000;
+
+#[cfg(feature = "equation")]
+pub(crate) mod sites;
+
+/// What an equation is written from.
+#[cfg(feature = "equation")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum EquationSource<'a> {
+    /// LaTeX math, converted to OMML through `litchi-equation`.
+    Latex(&'a str),
+    /// An OMML `m:oMath` or `m:oMathPara` element, written as given. The
+    /// conventional `m` (math) and `a` (DrawingML) prefixes may be left
+    /// undeclared.
+    Omml(&'a str),
+}
+
+/// The outcome of an equation write.
+#[cfg(feature = "equation")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct EquationWrite {
+    /// The `cNvPr` ID of the shape that holds the equation.
+    pub shape_id: u32,
+    /// The equation's position among the slide's equations
+    /// ([`equations`]).
+    pub index: usize,
+    /// What the LaTeX conversion could not carry into OMML, one message per
+    /// loss; empty for OMML input and lossless conversions.
+    pub losses: Vec<String>,
+}
 
 /// One equation of a slide.
 #[derive(Clone, PartialEq, Eq)]

@@ -509,7 +509,13 @@ fn equations_read_from_the_choice_branch() {
             .collect();
         assert_eq!(found, vec![path.to_owned()]);
         assert!(file.get("/slide[1]/shape[1]/equation[2]").is_err());
-        assert!(file.set(path, props! { "latex" => "x" }).is_err());
+        // Writes need the renderer behind the `equation` feature.
+        let written = file.set(path, props! { "latex" => "x" });
+        if cfg!(feature = "equation") {
+            assert_eq!(prop(&written.unwrap(), path, "latex").as_deref(), Some("x"));
+        } else {
+            assert_eq!(written.unwrap_err().code(), Code::UnsupportedCapability);
+        }
     }
 }
 

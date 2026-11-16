@@ -26,6 +26,8 @@ mod text_format;
 mod transaction;
 mod xml;
 
+#[cfg(all(test, feature = "equation"))]
+mod equation_edit_tests;
 #[cfg(test)]
 mod mce_retention_tests;
 #[cfg(test)]

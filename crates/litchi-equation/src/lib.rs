@@ -27,6 +27,11 @@
 
 use std::fmt;
 
+#[cfg(feature = "render")]
+mod render;
+#[cfg(feature = "render")]
+pub use render::{Png, PngOptions, latex_to_png, omml_size_pt, omml_to_png};
+
 /// Result type of every conversion in this crate.
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -89,6 +94,10 @@ pub enum Error {
     /// A [`Limits`] value is out of range.
     #[error("invalid equation limit: {0}")]
     InvalidLimit(&'static str),
+    /// The equation could not be rendered as a picture, for example because
+    /// the picture would exceed [`PngOptions::max_pixels`].
+    #[error("equation rendering failed: {0}")]
+    Render(String),
     /// The converter failed for a reason unrelated to the input.
     #[error("equation conversion failed: {0}")]
     Internal(String),
@@ -139,6 +148,7 @@ impl Error {
             E::MtefParse { message } => malformed(Format::Mtef, message),
             E::Xml { message } | E::UnicodeMathParse { message } => malformed(format, message),
             E::Unsupported(message) => Self::Unsupported(message),
+            E::Render { message } => Self::Render(message),
             E::InputTooLarge { size, limit } => Self::InputTooLarge { size, limit },
             E::LimitExceeded { kind, limit } => Self::LimitExceeded {
                 kind: LimitKind::from_mathema(kind),
@@ -373,6 +383,20 @@ pub fn omml_to_latex(omml: &str, limits: &Limits) -> Result<String> {
         .map_err(|error| Error::from_mathema(error, Format::Latex))
 }
 
+/// Convert an OMML equation to UnicodeMath, the linear form Office types
+/// and shows for an equation in plain text (Unicode Technical Note 28).
+///
+/// # Errors
+///
+/// As [`omml_to_latex`].
+pub fn omml_to_unicode_math(omml: &str, limits: &Limits) -> Result<String> {
+    let parsed = mathema::from_omml_with(omml, &limits.config())
+        .map_err(|error| Error::from_mathema(error, Format::Omml))?;
+    parsed
+        .to_unicode_math()
+        .map_err(|error| Error::Internal(error.to_string()))
+}
+
 /// Convert a MathML equation (`math`) to LaTeX.
 ///
 /// # Errors
@@ -458,9 +482,65 @@ impl Omml {
 /// [`Error::Unsupported`] for a construct the writer refuses, and the limit
 /// errors when the input exceeds `limits`.
 pub fn latex_to_omml(latex: &str, host: OmmlHost, limits: &Limits) -> Result<Omml> {
+    latex_to_omml_with(
+        latex,
+        mathema::OmmlOptions::default().with_run_properties(host.run_properties()),
+        limits,
+    )
+}
+
+/// How the equations of a display-math paragraph line up.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[non_exhaustive]
+pub enum Justification {
+    /// Left-aligned.
+    Left,
+    /// Right-aligned.
+    Right,
+    /// Each equation centred on its own.
+    Center,
+    /// Left-aligned to each other and centred as a group; what Office
+    /// assumes when the paragraph names none.
+    #[default]
+    CenterGroup,
+}
+
+impl Justification {
+    const fn to_mathema(self) -> mathema::OmmlJustification {
+        match self {
+            Self::Left => mathema::OmmlJustification::Left,
+            Self::Right => mathema::OmmlJustification::Right,
+            Self::Center => mathema::OmmlJustification::Center,
+            Self::CenterGroup => mathema::OmmlJustification::CenterGroup,
+        }
+    }
+}
+
+/// Convert LaTeX math to a display-math paragraph (`m:oMathPara` around one
+/// `m:oMath`) for `host`, with `justification` written as its `m:jc` when
+/// given; otherwise as [`latex_to_omml`].
+///
+/// # Errors
+///
+/// As [`latex_to_omml`].
+pub fn latex_to_omml_paragraph(
+    latex: &str,
+    host: OmmlHost,
+    justification: Option<Justification>,
+    limits: &Limits,
+) -> Result<Omml> {
+    latex_to_omml_with(
+        latex,
+        mathema::OmmlOptions::default()
+            .with_run_properties(host.run_properties())
+            .with_display_block(justification.map(Justification::to_mathema)),
+        limits,
+    )
+}
+
+fn latex_to_omml_with(latex: &str, options: mathema::OmmlOptions, limits: &Limits) -> Result<Omml> {
     let parsed = mathema::from_latex_with(latex, &limits.config())
         .map_err(|error| Error::from_mathema(error, Format::Latex))?;
-    let options = mathema::OmmlOptions::default().with_run_properties(host.run_properties());
     let (xml, diagnostics) = parsed
         .to_omml_with_options(&options)
         .map_err(|error| Error::from_mathema(error, Format::Omml))?;

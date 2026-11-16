@@ -4596,11 +4596,11 @@
         "math"
       ],
       "operations": {
-        "add": false,
-        "set": false,
+        "add": true,
+        "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -4611,9 +4611,42 @@
       "properties": {
         "latex": {
           "type": "string",
-          "add": false,
-          "set": false,
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
           "get": true
+        },
+        "omml": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "unit": "emu",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "y": {
+          "type": "length",
+          "unit": "emu",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "size": {
+          "type": "font-size",
+          "unit": "pt",
+          "add": true,
+          "set": false,
+          "get": false
         }
       },
       "predicates": {

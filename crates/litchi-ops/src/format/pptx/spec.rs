@@ -66,7 +66,7 @@ pub(crate) enum Kind {
     Audio,
     /// A media element (gap).
     Media,
-    /// An equation (gap).
+    /// An Office Math equation.
     Equation,
     /// A slide or section zoom (gap).
     Zoom,
@@ -879,10 +879,10 @@ props! {
 
 props! {
     /// An Office Math equation of slide text (`equation.json`): its OMML
-    /// converted to LaTeX, and the OMML itself (raw).
+    /// converted to LaTeX, and the OMML itself.
     EQUATION_PROPS, EquationKey {
         Latex = "latex": ValueType::Text,
-        Omml = "omml": ValueType::Text; raw,
+        Omml = "omml": ValueType::Text,
     }
 }
 
@@ -2459,6 +2459,57 @@ pub(super) const PICTURE_WRITE_TABLE: crate::registry::Table<
     ],
 );
 pub(crate) const PICTURE_CAPABILITY_PROPS: &[PropSpec] = &PICTURE_WRITE_TABLE.readable();
+
+/// Equation assignments: `latex` or `omml` (one of them) on `add` and
+/// `set`; `add` also takes the new text box's position and text size.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum EquationSetter {
+    Latex,
+    Omml,
+    X,
+    Y,
+    Size,
+}
+const EQUATION_WRITE_COUNT: usize = EQUATION_PROPS.len() + 3;
+const fn equation_write_entries() -> [crate::registry::Entry<EquationSetter>; EQUATION_WRITE_COUNT]
+{
+    use crate::registry::{Access, Constraint, Entry};
+    const fn content(spec: PropSpec, setter: EquationSetter) -> Entry<EquationSetter> {
+        Entry {
+            spec,
+            access: Access::SetAndAdd(setter),
+            constraint: Constraint::NotEmpty,
+            clear: false,
+        }
+    }
+    const fn creation(spec: PropSpec, setter: EquationSetter) -> Entry<EquationSetter> {
+        Entry {
+            spec,
+            access: Access::Add(setter),
+            constraint: Constraint::None,
+            clear: false,
+        }
+    }
+    [
+        content(
+            EQUATION_PROPS[EquationKey::Latex as usize],
+            EquationSetter::Latex,
+        ),
+        content(
+            EQUATION_PROPS[EquationKey::Omml as usize],
+            EquationSetter::Omml,
+        ),
+        creation(write_only("x", POSITION), EquationSetter::X),
+        creation(write_only("y", POSITION), EquationSetter::Y),
+        creation(write_only("size", FONT_SIZE), EquationSetter::Size),
+    ]
+}
+pub(super) const EQUATION_WRITE_TABLE: crate::registry::Table<
+    EquationSetter,
+    EQUATION_WRITE_COUNT,
+    0,
+> = crate::registry::Table::new(equation_write_entries(), []);
+pub(crate) const EQUATION_CAPABILITY_PROPS: &[PropSpec] = &EQUATION_WRITE_TABLE.readable();
 
 /// Group assignments: its click action.
 const fn group_write_entries() -> [crate::registry::Entry<ClickKey>; LINKED_FRAME_PROPS.len()] {

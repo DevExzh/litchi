@@ -1,6 +1,8 @@
 //! Detached composition of ordinary presentation-domain edits.
 
 mod comments;
+#[cfg(feature = "equation")]
+mod equation;
 mod links;
 mod masters;
 mod media;

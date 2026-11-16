@@ -1481,6 +1481,18 @@ impl Classify for litchi_pptx::Error {
             Self::Allocation { .. }
             | Self::CapacityOverflow { .. }
             | Self::Internal { .. } => Class::of(Code::InternalError),
+            // The caller's equation does not convert or render.
+            #[cfg(feature = "equation")]
+            Self::Equation(error) => match error {
+                litchi_equation::Error::Malformed { .. } | litchi_equation::Error::Unsupported(_) => {
+                    Class::of(Code::InvalidValue)
+                },
+                litchi_equation::Error::InputTooLarge { .. }
+                | litchi_equation::Error::LimitExceeded { .. }
+                | litchi_equation::Error::Render(_) => Class::of(Code::LimitExceeded),
+                litchi_equation::Error::InvalidLimit(_) => Class::of(Code::InvalidArgument),
+                _ => Class::of(Code::InternalError),
+            },
             _ => Class::of(Code::CorruptFile),
         }
     }

@@ -17,8 +17,8 @@
 //!
 //! OfficeCLI also prints the file name in the outline; the handle knows no
 //! file name, so the first line counts the slides only. Equation shapes are
-//! listed as text boxes, because the leaf does not detect Office math yet
-//! (spec gap `equation`), and line breaks read as line feeds, the leaf's
+//! listed as text boxes, because the views read the shape scene, which
+//! selects their picture fallbacks, and line breaks read as line feeds, the leaf's
 //! shape text, where OfficeCLI writes vertical tabs. OLE objects are the
 //! OLE frames of the shape trees; OfficeCLI also counts embedded parts that
 //! no frame references.
