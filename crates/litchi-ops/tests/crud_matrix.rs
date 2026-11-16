@@ -467,6 +467,15 @@ const RECIPES: &[Recipe] = &[
         props: &[("url", "http://example.com/"), ("text", "Litchi")],
         start: false,
     },
+    // A PPTX equation names its content as one of `latex` and `omml`.
+    Recipe {
+        format: "pptx",
+        element: "equation",
+        fixture: "ooxml/pptx/shapes.pptx",
+        parent: "/slide[1]",
+        props: &[("latex", r"\frac{a}{b}")],
+        start: false,
+    },
     // A PPT comment needs its author; a hyperlink its target.
     Recipe {
         format: "ppt",
