@@ -423,6 +423,10 @@
           "pathSegment": "chart"
         },
         {
+          "element": "equation",
+          "pathSegment": "oMath"
+        },
+        {
           "element": "tab",
           "pathSegment": "tab"
         },
@@ -2110,7 +2114,8 @@
       "parent": [
         "body",
         "cell",
-        "sdt"
+        "sdt",
+        "paragraph"
       ],
       "elementAliases": [
         "math",
@@ -2118,15 +2123,17 @@
         "omathpara"
       ],
       "operations": {
-        "add": false,
-        "set": false,
+        "add": true,
+        "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
-          "/body/oMathPara[N]"
+          "/body/oMathPara[N]",
+          "/body/p[N]/oMath[M]",
+          "/body/p[N]/oMathPara[M]"
         ]
       },
       "properties": {
@@ -2136,8 +2143,20 @@
             "display",
             "inline"
           ],
-          "add": false,
+          "add": true,
           "set": false,
+          "get": true
+        },
+        "latex": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "omml": {
+          "type": "string",
+          "add": true,
+          "set": true,
           "get": true
         }
       },

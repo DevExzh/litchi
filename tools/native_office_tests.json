@@ -11653,6 +11653,38 @@
     },
     {
       "crate": "litchi-docx",
+      "target": "equation_edit",
+      "name": "replacing_an_inline_equation_changes_only_its_markup",
+      "fixtures": [
+        "word/word-math-navigation.docx"
+      ],
+      "feature_rows": [],
+      "current_features": [
+        "docx-current-equation-editing"
+      ],
+      "assertions": [
+        "Replacing the native inline equation changes only its m:oMath bytes in the main part; every other part is byte-identical after a save, the patch replays and inverts exactly, and an identical replacement is a no-op."
+      ],
+      "scope_limit": "Main-story inline math; rendering and Word reopen are not checked."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "equation_edit",
+      "name": "removing_equations_takes_only_their_markup",
+      "fixtures": [
+        "word/word-math-navigation.docx"
+      ],
+      "feature_rows": [],
+      "current_features": [
+        "docx-current-equation-editing"
+      ],
+      "assertions": [
+        "Removing the native inline equation removes only its m:oMath; removing the only display equation removes its m:oMathPara; removing the display paragraph leaves the inline equation."
+      ],
+      "scope_limit": "Main-story equations; rendering and Word reopen are not checked."
+    },
+    {
+      "crate": "litchi-docx",
       "target": "microsoft_office_native_direct_properties",
       "name": "native_macro_word_direct_run_and_paragraph_mark_properties_retain_explicit_zeroes",
       "fixtures": [

@@ -274,6 +274,22 @@ reuses the existing investment in 60+ crates, and complies with ADR 0007.
   `numbering`/`section`/`header_footer`/`footnote`/`content_control`, xlsx
   workbook edit model/`sheet_view`, pptx `master_layout`, `litchi-ooxml-common`
   properties). Coverage gaps are closed driven by real agent usage feedback.
+- **Equations are nodes with `latex` and `omml` properties** (`mtef` for OLE
+  equations). In DOCX, display math is `…/oMathPara[N]` of the body, a cell,
+  a content control, a header, a footer or a note, inline math is
+  `…/p[N]/oMath[M]` of a paragraph in any of them, and the display math of a
+  paragraph with other content (a bookmark, text) is `…/p[N]/oMathPara[M]`;
+  `mode` (`display` or `inline`) reads back which, and an `add` under a
+  paragraph inserts inline math while one under a block container inserts a
+  display-equation paragraph. `set` replaces only the equation's own markup,
+  keeping the paragraph's and the math paragraph's properties; `remove`
+  takes an inline equation's `m:oMath`, a paragraph's `m:oMathPara`, or a
+  display equation's paragraph (a cell, content control or story keeps its
+  last paragraph). New markup is admitted only when it holds Office Math
+  and Word run content, as an invalid value otherwise. LaTeX goes through
+  `litchi-equation` (the `equation` feature); a conversion the converter
+  reports as dropping formatting is refused, but it reports nothing for a
+  LaTeX command it does not know, which it writes as text.
 
 ## 13. Feature tiers and v1 boundary
 

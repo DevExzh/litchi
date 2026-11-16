@@ -224,6 +224,84 @@ mod docx {
         assert!(markdown.ends_with("Hello World\\!\n\n"), "{markdown}");
     }
 
+    /// Word writes inline math as an `m:oMath` beside the paragraph's runs;
+    /// it renders in place, between the runs around it.
+    #[cfg(feature = "equation")]
+    #[test]
+    fn inline_math_beside_runs_renders_in_place() {
+        let bytes = styled_docx(
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><w:body><w:p><w:r><w:t xml:space="preserve">Area: </w:t></w:r><m:oMath><m:sSup><m:e><m:r><m:t>r</m:t></m:r></m:e><m:sup><m:r><m:t>2</m:t></m:r></m:sup></m:sSup></m:oMath><w:r><w:t xml:space="preserve"> units</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let (files, _guard) = routes(bytes);
+        for (route, file) in files {
+            for options in [
+                MarkdownOptions::new(),
+                MarkdownOptions::new().with_styles(false),
+            ] {
+                assert_eq!(
+                    file.to_markdown_with_options(&options).unwrap(),
+                    "Area: \\(r^{2}\\) units\n\n",
+                    "{route}"
+                );
+            }
+        }
+    }
+
+    /// Word writes a display equation as a paragraph holding one
+    /// `m:oMathPara`, and may put inline math inside a hyperlink.
+    #[cfg(feature = "equation")]
+    #[test]
+    fn display_math_and_math_inside_a_hyperlink_render() {
+        let bytes = styled_docx(
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><w:body><w:p><m:oMathPara><m:oMath><m:r><m:t>x=1</m:t></m:r></m:oMath></m:oMathPara></w:p><w:p><w:r><w:t xml:space="preserve">See </w:t></w:r><w:hyperlink w:anchor="eq"><w:r><w:t xml:space="preserve">value </w:t></w:r><m:oMath><m:r><m:t>y</m:t></m:r></m:oMath></w:hyperlink></w:p></w:body></w:document>"#,
+        );
+        let (files, _guard) = routes(bytes);
+        for (route, file) in files {
+            assert_eq!(
+                file.to_markdown().unwrap(),
+                "\n\\[x= 1\\]\n\n\nSee [value \\(y\\)](<#eq>)\n\n",
+                "{route}"
+            );
+        }
+    }
+
+    /// A display equation in a table cell renders as inline math in the
+    /// cell; an equation the converter cannot read is refused as
+    /// unrepresentable, not as a corrupt file.
+    #[cfg(feature = "equation")]
+    #[test]
+    fn cell_equations_render_and_unreadable_equations_are_refused() {
+        let bytes = styled_docx(
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><w:body><w:tbl><w:tr><w:tc><w:p><w:r><w:t>Law</w:t></w:r></w:p></w:tc><w:tc><w:p><m:oMathPara><m:oMath><m:r><m:t>|x|</m:t></m:r></m:oMath></m:oMathPara></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let (files, _guard) = routes(bytes);
+        for (route, file) in files {
+            let markdown = file.to_markdown().unwrap();
+            assert!(markdown.contains(r"| Law | \("), "{route}: {markdown}");
+            assert!(markdown.contains(r"\vert"), "{route}: {markdown}");
+        }
+        // Inline math, alone or beside text and display math, keeps its
+        // place in the cell.
+        let bytes = styled_docx(
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><w:body><w:tbl><w:tr><w:tc><w:p><m:oMath><m:r><m:t>a|b</m:t></m:r></m:oMath></w:p></w:tc><w:tc><w:p><w:r><w:t xml:space="preserve">x </w:t></w:r><m:oMath><m:r><m:t>c</m:t></m:r></m:oMath><w:r><w:t xml:space="preserve"> y</w:t></w:r></w:p><w:p><m:oMathPara><m:oMath><m:r><m:t>d</m:t></m:r></m:oMath></m:oMathPara></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let (files, _guard) = routes(bytes);
+        for (route, file) in files {
+            let markdown = file.to_markdown().unwrap();
+            assert!(markdown.contains(r"\(c\) y \(d\) |"), "{route}: {markdown}");
+            assert!(markdown.contains(r"| \(a"), "{route}: {markdown}");
+            assert!(markdown.contains(r"\vert"), "{route}: {markdown}");
+        }
+        let bytes = styled_docx(
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><w:body><w:p><w:r><w:t xml:space="preserve">Sym </w:t></w:r><m:oMath><m:r><w:sym w:font="Symbol" w:char="F061"/></m:r></m:oMath></w:p></w:body></w:document>"#,
+        );
+        let (files, _guard) = routes(bytes);
+        for (route, file) in files {
+            let error = file.to_markdown().expect_err("no LaTeX for the equation");
+            assert_eq!(error.code(), Code::UnsupportedElement, "{route}: {error:?}");
+        }
+    }
+
     #[cfg(not(feature = "yaml"))]
     #[test]
     fn front_matter_needs_the_yaml_feature() {

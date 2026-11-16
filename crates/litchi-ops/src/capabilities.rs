@@ -2803,6 +2803,27 @@ impl Element {
         self.paths().find_map(|(path, _)| path_segment(&[path]))
     }
 
+    /// The path segment `parent`'s path names this element by: the last
+    /// step of its first rooted template whose step before it names
+    /// `parent` (a DOCX paragraph's inline equation is `oMath`, a block
+    /// container's display equation `oMathPara`), else
+    /// [`Self::path_segment`].
+    pub(crate) fn path_segment_under(&self, parent: &Self) -> Option<&'static str> {
+        let wanted = parent.path_segment();
+        self.paths()
+            .find_map(|(template, _)| {
+                let template: &'static str = template;
+                let (head, last) = template.rsplit_once('/')?;
+                let before = head.rsplit('/').next()?;
+                let before = before.split('[').next().unwrap_or(before);
+                (Some(before) == wanted && template.starts_with('/'))
+                    .then(|| path_segment(&[template]))
+                    .flatten()
+                    .filter(|_| !last.is_empty())
+            })
+            .or_else(|| self.path_segment())
+    }
+
     /// The declared properties, in the order the node view emits them;
     /// write-only entries remain visible with `get == false`.
     pub fn properties(&self) -> Properties {
@@ -2857,6 +2878,7 @@ impl Element {
                             | "document"
                             // Table grid columns.
                             | "col"
+                            | "equation"
                     )
                     && readable)
                     || (self.adapter == Adapter::Docx
@@ -2999,8 +3021,8 @@ impl Element {
                 && self.retains_source != Some(false)
                 && self.data().canonical == "cell"
                 && readable);
-        // DOCX pictures, charts and SmartArt graphics and nodes are
-        // addable and removable.
+        // DOCX pictures, charts, equations and SmartArt graphics and nodes
+        // are addable and removable.
         #[cfg(feature = "docx")]
         let add = add
             || (self.adapter == Adapter::Docx
@@ -3009,6 +3031,7 @@ impl Element {
                     self.data().canonical,
                     "picture"
                         | "chart"
+                        | "equation"
                         | "smartart"
                         | "node"
                         | "tab"
@@ -3098,6 +3121,7 @@ impl Element {
                     "tc" | "sdt"
                         | "col"
                         | "chart"
+                        | "equation"
                         | "picture"
                         | "smartart"
                         | "node"
@@ -4133,19 +4157,19 @@ impl Serialize for ChildrenJson {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut seq = serializer.serialize_seq(None)?;
         for child in self.0.children() {
-            seq.serialize_element(&ChildJson(child))?;
+            seq.serialize_element(&ChildJson(child, self.0))?;
         }
         seq.end()
     }
 }
 
-struct ChildJson(Element);
+struct ChildJson(Element, Element);
 
 impl Serialize for ChildJson {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut map = serializer.serialize_map(Some(2))?;
         map.serialize_entry("element", self.0.name())?;
-        if let Some(segment) = self.0.path_segment() {
+        if let Some(segment) = self.0.path_segment_under(&self.1) {
             map.serialize_entry("pathSegment", segment)?;
         }
         map.end()

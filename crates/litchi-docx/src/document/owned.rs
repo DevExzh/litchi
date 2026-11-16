@@ -12,6 +12,7 @@ use std::sync::{Mutex, TryLockError};
 
 mod chart;
 mod comments;
+mod equation;
 mod fields;
 mod graph;
 mod notes;

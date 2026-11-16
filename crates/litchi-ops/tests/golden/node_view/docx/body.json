@@ -84,7 +84,9 @@
       "text": "x= 1",
       "childCount": 0,
       "format": {
-        "mode": "display"
+        "mode": "display",
+        "latex": "x= 1",
+        "omml": "<m:oMathPara><m:oMath><m:r><m:t>x=1</m:t></m:r></m:oMath></m:oMathPara>"
       },
       "children": []
     },

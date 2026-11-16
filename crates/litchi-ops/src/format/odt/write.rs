@@ -1310,6 +1310,7 @@ fn parent_of<'f>(file: &'f Odt, node: &Node<'f>) -> Result<Node<'f>> {
         let resolved = Resolved {
             kind: step.kind,
             select: Select::Ordinal(Position::new(step.ordinal as usize)),
+            named: "",
         };
         current = match nav.child(&current, &resolved)? {
             Lookup::Found(node) => node,

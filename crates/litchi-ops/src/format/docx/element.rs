@@ -145,7 +145,7 @@ fn walk(
     for (index, step) in rest.iter().enumerate() {
         let ordinal = step.ordinal as usize;
         state = match (state, step.kind) {
-            (state, Kind::Paragraph | Kind::Table | Kind::Sdt)
+            (state, Kind::Paragraph | Kind::Table | Kind::Sdt | Kind::Equation)
                 if matches!(state, State::Blocks(_) | State::Cell(..)) =>
             {
                 // The final block's own index entry is already on the node.
@@ -172,6 +172,17 @@ fn walk(
                     raw_position(node.docx, &indexed)?
                 };
                 match step.kind {
+                    // A display equation held in a `w:p` is that paragraph;
+                    // a bare `m:oMathPara` has no element path.
+                    Kind::Equation => {
+                        if indexed.paragraph().is_none() {
+                            return Err(refusal(
+                                "a math paragraph outside a w:p has no element path",
+                            ));
+                        }
+                        path.push(ElementStep::Paragraph(position));
+                        State::Done
+                    },
                     Kind::Paragraph => {
                         path.push(ElementStep::Paragraph(position));
                         if index == last {
@@ -306,23 +317,36 @@ fn hyperlinks_proven(docx: &Docx, paragraph: &Paragraph) -> Result<()> {
 
 /// The canonical positional path of `node`, with `child` appended.
 pub(super) fn path_with(node: &Node<'_>, child: Option<(Kind, Position)>) -> Path<'static> {
-    let mut steps: Vec<PathStep<'static>> = node
-        .address
-        .steps()
+    let address = node.address.steps();
+    let mut steps: Vec<PathStep<'static>> = address
         .iter()
-        .map(|step| step_of(step.kind, Position::new(step.ordinal as usize)))
+        .enumerate()
+        .map(|(index, step)| {
+            let parent = index.checked_sub(1).map(|parent| address[parent].kind);
+            if step.math_paragraph {
+                let name = "oMathPara";
+                PathStep::new(name).with(Predicate::Index(Position::new(step.ordinal as usize)))
+            } else {
+                step_of(step.kind, parent, Position::new(step.ordinal as usize))
+            }
+        })
         .collect();
     if let Some((kind, position)) = child {
-        steps.push(step_of(kind, position));
+        steps.push(step_of(
+            kind,
+            address.last().map(|step| step.kind),
+            position,
+        ));
     }
     Path::from_steps(steps)
 }
 
-fn step_of(kind: Kind, position: Position) -> PathStep<'static> {
+fn step_of(kind: Kind, parent: Option<Kind>, position: Position) -> PathStep<'static> {
+    let name = kind.step_name_under(parent);
     if kind.is_singleton() {
-        PathStep::new(kind.step_name())
+        PathStep::new(name)
     } else {
-        PathStep::new(kind.step_name()).with(Predicate::Index(position))
+        PathStep::new(name).with(Predicate::Index(position))
     }
 }
 

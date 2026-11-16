@@ -171,6 +171,7 @@ impl Docx {
             ) => {
                 return self.add_nested(editor, &parent, kind, &node);
             },
+            (NewKind::Equation, _) => return self.add_equation(editor, &parent, &node),
             // Styles, numbering, headers, footers and notes.
             (NewKind::Part(part), _) => return self.add_part(editor, &parent, part, &node),
             // Tab stops and breaks.
@@ -233,6 +234,14 @@ impl Docx {
     fn remove_inner<'p>(&self, target: TargetArg<'p>, snapshot_budget: usize) -> Result<Commit> {
         let editor = self.edit_with_snapshot_budget(snapshot_budget)?;
         let nodes = self.resolve_targets(&target)?;
+        // Equations, in every story.
+        if !nodes.is_empty()
+            && nodes
+                .iter()
+                .all(|node| node.element_kind() == Kind::Equation)
+        {
+            return self.remove_equations(editor, &nodes);
+        }
         // Header, footer and note paragraphs and runs.
         let editor = match self.try_remove_story(editor, &nodes)? {
             Ok(commit) => return Ok(commit),
@@ -427,6 +436,9 @@ pub(super) enum NewKind {
     SmartArt,
     /// A SmartArt content node.
     Node,
+    /// An equation: inline under a paragraph, display under a block
+    /// container.
+    Equation,
     Part(super::parts::write::NewPart),
     Mark(super::marks::write::NewMark),
 }
@@ -480,6 +492,11 @@ fn new_kind(name: &str) -> Result<NewKind> {
         Ok(NewKind::SmartArt)
     } else if name.eq_ignore_ascii_case("node") {
         Ok(NewKind::Node)
+    } else if ["equation", "math", "omath", "omathpara"]
+        .iter()
+        .any(|kind| name.eq_ignore_ascii_case(kind))
+    {
+        Ok(NewKind::Equation)
     } else if let Some(part) = super::parts::write::NewPart::of(name) {
         Ok(NewKind::Part(part))
     } else if let Some(mark) = super::marks::write::NewMark::of(name) {

@@ -50,6 +50,7 @@ pub(super) fn text<'n>(node: &'n Node<'_>) -> Result<Option<Cow<'n, str>>> {
             None => None,
         },
         Value::Equation(block) => equation_latex(block)?.map(Cow::Owned),
+        Value::Math(math) => super::equation::latex(math.omml()).map(Cow::Owned),
         Value::Comment(comment) => Some(Cow::Owned(comment_text(comment)?)),
         Value::SmartArt(smartart) => Some(Cow::Owned(super::smartart::smartart_text(smartart))),
         Value::Part(value) => super::parts::text(node.docx, *value)?.map(Cow::Owned),
@@ -79,9 +80,7 @@ pub(super) fn equation_latex(block: &super::node::Block) -> Result<Option<String
         };
         let mut latex = String::new();
         for equation in equations {
-            let Ok(converted) =
-                litchi_equation::omml_to_latex(&equation, &litchi_equation::Limits::DEFAULT)
-            else {
+            let Some(converted) = super::equation::latex(&equation) else {
                 return Ok(None);
             };
             // The converter writes the bare expression, without display
@@ -154,6 +153,7 @@ pub(super) fn child_count(node: &Node<'_>) -> Result<Option<u32>> {
         Value::Run(_)
         | Value::Hyperlink(_)
         | Value::Equation(_)
+        | Value::Math(_)
         | Value::Section(_)
         | Value::Comment(_)
         | Value::Picture(_)
@@ -232,7 +232,16 @@ pub(super) fn format<'n>(node: &'n Node<'_>) -> Result<Format<'n>> {
             })),
             None => Props::None,
         },
-        Value::Equation(_) => Props::Equation,
+        Value::Equation(block) => Props::Equation(Box::new(super::equation::EquationProps {
+            mode: "display",
+            latex: equation_latex(block)?,
+            omml: super::equation::display_omml(block)?,
+        })),
+        Value::Math(math) => Props::Equation(Box::new(super::equation::EquationProps {
+            mode: if math.display { "display" } else { "inline" },
+            latex: super::equation::latex(math.omml()),
+            omml: Some(math.omml().to_owned()),
+        })),
         Value::Comment(comment) => {
             let (done, parent) = comment_thread(node.docx, comment)?;
             Props::Comment(
@@ -350,8 +359,8 @@ pub(crate) struct SdtProps {
 pub(crate) enum Props<'a> {
     /// No readable properties.
     None,
-    /// A display equation: `mode` is `display`.
-    Equation,
+    /// An equation: its mode, its LaTeX and its OMML.
+    Equation(Box<super::equation::EquationProps>),
     /// The core properties and, when the part is present and valid, the
     /// application properties.
     Document(
@@ -401,7 +410,7 @@ impl<'a> Props<'a> {
     pub(crate) fn get(&self, index: usize) -> Option<NodeValue<'a>> {
         match self {
             Self::None => None,
-            Self::Equation => (index == 0).then_some(NodeValue::Token("display")),
+            Self::Equation(equation) => super::equation::value(equation, index),
             Self::Document(metadata, app) => {
                 document(metadata, index).or_else(|| extended(app.as_deref()?, index))
             },
@@ -439,7 +448,7 @@ impl std::fmt::Debug for Props<'_> {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(match self {
             Self::None => "Props::None",
-            Self::Equation => "Props::Equation",
+            Self::Equation(_) => "Props::Equation",
             Self::Document(..) => "Props::Document",
             Self::Paragraph { .. } => "Props::Paragraph",
             Self::Run(_) => "Props::Run",

@@ -205,7 +205,7 @@ pub use package::Package;
 pub use paragraph::{
     Collapsed, Inline, InlineHyperlink, InlineKind, OpaqueInline, OpaqueRunContent, Paragraph, Run,
     RunBreak, RunBreakClear, RunBreakType, RunContent, RunProperties, RunUnderline,
-    RunUnderlineColor,
+    RunUnderlineColor, TextPiece,
 };
 pub use run_effects::{Effect, Effects, OpaqueExtension};
 pub use section::{Emu, Margins, PageSize, Section, Sections};

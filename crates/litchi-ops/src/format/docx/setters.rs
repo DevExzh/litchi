@@ -79,6 +79,12 @@ pub(crate) enum Setter {
     ParagraphListStyle,
     /// A paragraph list's restart value.
     ParagraphListStart,
+    /// A new equation's mode: `display` or `inline`.
+    EquationMode,
+    /// An equation's content, from LaTeX.
+    EquationLatex,
+    /// An equation's content, from OMML.
+    EquationOmml,
     /// A new picture's image source.
     PictureSrc,
     /// A new picture's width.

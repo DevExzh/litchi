@@ -190,6 +190,9 @@ pub(crate) struct Resolved<'s, K> {
     pub(crate) kind: K,
     /// How to pick it among the parent's children.
     pub(crate) select: Select<'s>,
+    /// The element name the step was written with (`oMathPara`, an alias of
+    /// `equation`), or empty for a step a walker built from a kind.
+    pub(crate) named: &'s str,
 }
 
 /// How a step picks one child of its kind.

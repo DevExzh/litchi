@@ -67,6 +67,7 @@
       "litchi-core",
       "litchi-crypto",
       "litchi-drawingml",
+      "litchi-equation",
       "litchi-fonts",
       "litchi-ooxml-common",
       "litchi-opc",

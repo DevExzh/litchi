@@ -135,7 +135,7 @@ opc = ["dep:litchi-opc"]
 # and `yaml` writes document properties as YAML front matter; each mirrors
 # the facade feature of the same name, which turns it on.
 markdown = ["dep:base64", "dep:litchi-markdown"]
-equation = ["dep:litchi-equation", "litchi-doc?/equation", "litchi-pptx?/equation", "litchi-xls?/equation"]
+equation = ["dep:litchi-equation", "litchi-doc?/equation", "litchi-docx?/equation", "litchi-pptx?/equation", "litchi-xls?/equation"]
 yaml = ["dep:serde-saphyr"]
 
 # `eval` evaluates spreadsheet formulas through the `litchi-eval`

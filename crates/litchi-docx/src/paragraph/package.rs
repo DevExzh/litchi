@@ -85,6 +85,11 @@ fn parse_hyperlink(source: &XmlRef, rels: &Relationships) -> Result<InlineHyperl
     let mut target_frame = None;
     let mut document_location = None;
     let mut has_unmodeled_content = false;
+    // Direct `m:oMath` children: unmodeled, but kept with their place
+    // among the runs.
+    let mut equations = Vec::new();
+    let mut equation = None::<(usize, usize)>;
+    let mut other_content = false;
     let mut saw_root = false;
 
     loop {
@@ -128,8 +133,12 @@ fn parse_hyperlink(source: &XmlRef, rels: &Relationships) -> Result<InlineHyperl
                 } else if depth == 2 {
                     if element.local_name().as_ref() == b"r" {
                         capture = Some((start, depth));
+                    } else if element.local_name().as_ref() == b"oMath" {
+                        has_unmodeled_content = true;
+                        equation = Some((start, depth));
                     } else {
                         has_unmodeled_content = true;
+                        other_content = true;
                     }
                 }
             },
@@ -140,8 +149,12 @@ fn parse_hyperlink(source: &XmlRef, rels: &Relationships) -> Result<InlineHyperl
                 if child_depth == 2 {
                     if element.local_name().as_ref() == b"r" {
                         runs.push(retained_run(source, start, end)?);
+                    } else if element.local_name().as_ref() == b"oMath" {
+                        has_unmodeled_content = true;
+                        equations.push((runs.len(), retained_xml(source, start, end)?));
                     } else {
                         has_unmodeled_content = true;
+                        other_content = true;
                     }
                 }
             },
@@ -152,6 +165,12 @@ fn parse_hyperlink(source: &XmlRef, rels: &Relationships) -> Result<InlineHyperl
                     runs.push(retained_run(source, run_start, end)?);
                     capture = None;
                 }
+                if let Some((math_start, math_depth)) = equation
+                    && depth == math_depth
+                {
+                    equations.push((runs.len(), retained_xml(source, math_start, end)?));
+                    equation = None;
+                }
                 depth = depth.checked_sub(1).ok_or_else(|| {
                     crate::Error::InvalidFormat("invalid hyperlink nesting".into())
                 })?;
@@ -159,11 +178,13 @@ fn parse_hyperlink(source: &XmlRef, rels: &Relationships) -> Result<InlineHyperl
             Event::Text(text) if depth == 1 => {
                 if text.as_ref().iter().any(|byte| !byte.is_ascii_whitespace()) {
                     has_unmodeled_content = true;
+                    other_content = true;
                 }
             },
             Event::CData(text) if depth == 1 => {
                 if text.as_ref().iter().any(|byte| !byte.is_ascii_whitespace()) {
                     has_unmodeled_content = true;
+                    other_content = true;
                 }
             },
             Event::Eof if depth != 0 || capture.is_some() => {
@@ -192,7 +213,19 @@ fn parse_hyperlink(source: &XmlRef, rels: &Relationships) -> Result<InlineHyperl
         target_frame,
         document_location,
         has_unmodeled_content,
-    ))
+    )
+    .with_equations(equations, other_content))
+}
+
+/// The self-contained XML of `source[start..end]`.
+fn retained_xml(source: &XmlRef, start: usize, end: usize) -> Result<String> {
+    let invalid = || crate::Error::InvalidFormat("hyperlink equation range is invalid".into());
+    let length = end.checked_sub(start).ok_or_else(invalid)?;
+    let start = u32::try_from(start).map_err(|_| invalid())?;
+    let length = u32::try_from(length).map_err(|_| invalid())?;
+    let range = source.subrange(start, length).ok_or_else(invalid)?;
+    let bytes = range.self_contained_bytes()?;
+    String::from_utf8(bytes.into_owned()).map_err(|error| crate::Error::Xml(error.to_string()))
 }
 
 fn retained_run(source: &XmlRef, start: usize, end: usize) -> Result<Run> {

@@ -318,6 +318,7 @@ fn cached_steps<'f>(nav: Nav<'f>, position: usize, at: CellRef) -> Result<Option
     let sheet = Resolved {
         kind: Kind::Sheet,
         select: Select::Ordinal(Position::new(position)),
+        named: "",
     };
     let Lookup::Found(sheet) = nav.child(&root, &sheet)? else {
         return Ok(None);
@@ -325,6 +326,7 @@ fn cached_steps<'f>(nav: Nav<'f>, position: usize, at: CellRef) -> Result<Option
     let cell = Resolved {
         kind: Kind::Cell,
         select: Select::Cell(at),
+        named: "",
     };
     Ok(match nav.child(&sheet, &cell)? {
         Lookup::Found(cell) => Some(cell),

@@ -33,6 +33,18 @@
       "scope_limit": "Native paragraph/run properties, absence and explicit zeroes; no style cascade or computed formatting claim."
     },
     {
+      "id": "docx-current-equation-editing",
+      "format": "docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "feature": "Office Math equation editing in opened documents (OMML and LaTeX)",
+      "current_status": {
+        "status": "🟡",
+        "read": "✅",
+        "write": "✅"
+      },
+      "scope_limit": "Inline and display equations of paragraphs in the body, cells, content controls, headers, footers and notes; equations in text boxes, comments or alternate content are not edited."
+    },
+    {
       "id": "xlsb-current-fresh-creation",
       "format": "xlsb",
       "source_matrix": "crates/litchi-xlsb/docs/FEATURE_MATRIX.md",

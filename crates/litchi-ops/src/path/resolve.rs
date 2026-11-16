@@ -167,6 +167,7 @@ fn walk<'s, 'f, N: Navigate<'f>>(
                         name: step.name(),
                         case,
                     },
+                    named: step.name(),
                 };
                 match nav.child(&node, &wanted)? {
                     Lookup::Found(next) => {
@@ -191,6 +192,7 @@ fn walk<'s, 'f, N: Navigate<'f>>(
                             name: step.name(),
                             case,
                         },
+                        named: step.name(),
                     };
                     match nav.child(&node, &wanted)? {
                         Lookup::Found(next) => {
@@ -276,7 +278,14 @@ fn classify<'s, 'f, N: Navigate<'f>>(
             } else {
                 Select::Range(range)
             };
-            return Ok(Some((Resolved { kind, select }, rule(spot, kind)?)));
+            return Ok(Some((
+                Resolved {
+                    kind,
+                    select,
+                    named: name,
+                },
+                rule(spot, kind)?,
+            )));
         }
     }
     let Some((canonical, rule)) = vocabulary.canonical_rule(name) else {
@@ -299,7 +308,14 @@ fn classify<'s, 'f, N: Navigate<'f>>(
         self::rule(spot, kind)?
     };
     let select = select(spot, step, rule, parent_is_root, path.raw)?;
-    Ok(Some((Resolved { kind, select }, rule)))
+    Ok(Some((
+        Resolved {
+            kind,
+            select,
+            named: name,
+        },
+        rule,
+    )))
 }
 
 /// Classifies a step's predicates for its element.

@@ -40,7 +40,9 @@ use super::{
 };
 use crate::properties;
 
+mod equation;
 mod grid;
+pub use equation::ParagraphEquation;
 pub use grid::NewCell;
 
 /// One step of an [`ElementPath`]: the position of a direct

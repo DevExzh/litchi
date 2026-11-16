@@ -571,6 +571,15 @@ const RECIPES: &[Recipe] = &[
         props: &[("src", PNG), ("alt", "Logo")],
         start: false,
     },
+    // An equation takes its content from one of `latex` and `omml`.
+    Recipe {
+        format: "docx",
+        element: "equation",
+        fixture: "seed",
+        parent: "/body/p[1]",
+        props: &[("omml", "<m:oMath><m:r><m:t>x</m:t></m:r></m:oMath>")],
+        start: false,
+    },
     Recipe {
         format: "docx",
         element: "chart",

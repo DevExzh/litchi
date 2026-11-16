@@ -147,6 +147,7 @@ vba-inspection = [
 equation = [
     "dep:litchi-equation",
     "litchi-doc?/equation",
+    "litchi-docx?/equation",
     "litchi-ops?/equation",
     "litchi-pptx?/equation",
     "litchi-xls?/equation",

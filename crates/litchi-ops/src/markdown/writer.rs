@@ -257,10 +257,17 @@ fn analyze_table_spans(table: &Table) -> Result<Vec<Vec<CellSpan>>> {
     Ok(spans)
 }
 
+/// One piece of a table cell's content: text, or an equation's LaTeX.
+enum CellPart {
+    Text(String),
+    #[cfg(feature = "docx")]
+    Math(String),
+}
+
 /// Extract all cell data from a table in a single optimized pass.
 ///
 /// **Performance**: Extracts cell text once before rendering, avoiding repeated XML parsing.
-fn extract_table_cell_data(table: &Table) -> Result<Vec<Vec<String>>> {
+fn extract_table_cell_data(table: &Table) -> Result<Vec<Vec<Vec<CellPart>>>> {
     let rows = table.rows()?;
     if rows.is_empty() {
         return Ok(Vec::new());
@@ -269,9 +276,73 @@ fn extract_table_cell_data(table: &Table) -> Result<Vec<Vec<String>>> {
     rows.iter()
         .map(|row| {
             let cells = row.cells()?;
-            cells.iter().map(|cell| cell.text()).collect()
+            cells.iter().map(cell_parts).collect()
         })
         .collect()
+}
+
+/// A cell's content: its text, with the equations of a DOCX cell (inline
+/// ones and math paragraphs) as inline math in their places.
+#[allow(
+    irrefutable_let_patterns,
+    reason = "DOCX is the only cell variant in a docx-only feature build"
+)]
+fn cell_parts(cell: &crate::compat::word::Cell) -> Result<Vec<CellPart>> {
+    #[cfg(feature = "docx")]
+    if let crate::compat::word::Cell::Docx(cell) = cell {
+        let paragraphs = cell.paragraphs()?;
+        let mut pieces = Vec::with_capacity(paragraphs.len());
+        for paragraph in &paragraphs {
+            pieces.push(paragraph.text_and_equations()?);
+        }
+        let math = pieces.iter().flatten().any(|piece| {
+            matches!(
+                piece,
+                litchi_docx::TextPiece::Equation(_) | litchi_docx::TextPiece::MathParagraph(_)
+            )
+        });
+        if math {
+            let mut parts = Vec::new();
+            for (index, paragraph) in pieces.into_iter().enumerate() {
+                if index > 0 {
+                    parts.push(CellPart::Text("\n".to_owned()));
+                }
+                for piece in paragraph {
+                    parts.push(match piece {
+                        litchi_docx::TextPiece::Text(text) => CellPart::Text(text),
+                        litchi_docx::TextPiece::Equation(omml)
+                        | litchi_docx::TextPiece::MathParagraph(omml) => {
+                            CellPart::Math(equation_latex(&omml)?)
+                        },
+                        _ => continue,
+                    });
+                }
+            }
+            return Ok(parts);
+        }
+    }
+    Ok(vec![CellPart::Text(cell.text()?)])
+}
+
+/// The LaTeX of an OMML equation; an equation the converter cannot read is
+/// refused as unrepresentable rather than dropped.
+#[cfg(all(feature = "docx", feature = "equation"))]
+fn equation_latex(omml: &str) -> Result<String> {
+    litchi_equation::omml_to_latex(omml, &litchi_equation::Limits::DEFAULT).map_err(|error| {
+        unrepresentable(format!(
+            "Markdown export cannot write a DOCX equation as LaTeX: {error}"
+        ))
+    })
+}
+
+/// Without the `equation` feature, an equation is refused rather than
+/// dropped.
+#[cfg(all(feature = "docx", not(feature = "equation")))]
+fn equation_latex(_omml: &str) -> Result<String> {
+    Err(super::feature_required(
+        "Markdown output of OMML equations",
+        "equation",
+    ))
 }
 
 impl MarkdownWriter {
@@ -756,12 +827,23 @@ impl MarkdownWriter {
             ));
         }
         let mut link_index = 0usize;
+        let mut equations = projection.equations.iter().peekable();
         for (run_index, (run, projected)) in runs.iter().zip(&projection.runs).enumerate() {
+            while let Some(equation) =
+                equations.next_if(|equation| equation.before == run_index && !equation.in_link)
+            {
+                self.write_inline_equation(&equation.omml)?;
+            }
             if let Some(link) = projection.links.get(link_index)
                 && link.start_run == run_index
             {
                 self.close_formatting();
                 self.buffer.push('[');
+            }
+            while let Some(equation) =
+                equations.next_if(|equation| equation.before == run_index && equation.in_link)
+            {
+                self.write_inline_equation(&equation.omml)?;
             }
 
             match projected {
@@ -800,6 +882,12 @@ impl MarkdownWriter {
             if let Some(link) = projection.links.get(link_index)
                 && link.end_run == run_index.saturating_add(1)
             {
+                // A link's equations after its last run stay inside it.
+                while let Some(equation) = equations
+                    .next_if(|equation| equation.before == link.end_run && equation.in_link)
+                {
+                    self.write_inline_equation(&equation.omml)?;
+                }
                 self.close_formatting();
                 self.buffer.push_str("](<");
                 self.buffer.push_str(&link.destination);
@@ -818,7 +906,30 @@ impl MarkdownWriter {
                 "the DOCX Markdown hyperlink projection is not aligned with the paragraph runs",
             ));
         }
+        for equation in equations {
+            self.write_inline_equation(&equation.omml)?;
+        }
         Ok(())
+    }
+
+    /// Write an inline equation of a paragraph as inline LaTeX math.
+    #[cfg(all(feature = "docx", feature = "equation"))]
+    fn write_inline_equation(&mut self, omml: &str) -> Result<()> {
+        let latex = equation_latex(omml)?;
+        self.close_formatting();
+        let equation = self.format_equation(&latex, true);
+        self.buffer.push_str(&equation);
+        Ok(())
+    }
+
+    /// Without the `equation` feature, an inline equation is refused rather
+    /// than dropped.
+    #[cfg(all(feature = "docx", not(feature = "equation")))]
+    fn write_inline_equation(&mut self, _omml: &str) -> Result<()> {
+        Err(super::feature_required(
+            "Markdown output of OMML equations",
+            "equation",
+        ))
     }
 
     /// Write a paragraph that contains display-level equations.
@@ -830,8 +941,6 @@ impl MarkdownWriter {
         para: &Paragraph,
         display_equations: Vec<String>,
     ) -> Result<()> {
-        use litchi_equation::omml_to_latex;
-
         // For display equations, we'll write each equation on its own line
         // and interleave with any text content from runs
         let runs = para.runs()?;
@@ -851,7 +960,7 @@ impl MarkdownWriter {
 
         // Write display equations
         for omml_xml in display_equations {
-            let latex = omml_to_latex(&omml_xml, &litchi_equation::Limits::DEFAULT)?;
+            let latex = equation_latex(&omml_xml)?;
 
             // Display equations use display style (false = display mode)
             let equation_md = self.format_equation(&latex, false);
@@ -1290,10 +1399,10 @@ impl MarkdownWriter {
         let cell_count = cell_data[0].len();
 
         self.buffer.push('|');
-        for text in &cell_data[0] {
+        for parts in &cell_data[0] {
             self.buffer.push(' ');
             // Escape pipe and newline in a single pass
-            self.write_markdown_escaped(text);
+            self.write_markdown_cell(parts);
             self.buffer.push_str(" |");
         }
         self.buffer.push('\n');
@@ -1307,15 +1416,44 @@ impl MarkdownWriter {
 
         for row_texts in &cell_data[1..] {
             self.buffer.push('|');
-            for text in row_texts {
+            for parts in row_texts {
                 self.buffer.push(' ');
-                self.write_markdown_escaped(text);
+                self.write_markdown_cell(parts);
                 self.buffer.push_str(" |");
             }
             self.buffer.push('\n');
         }
 
         Ok(())
+    }
+
+    /// Write a table cell's content: escaped text, and equations as inline
+    /// math whose `|` is written `\vert` so that it does not end the cell.
+    fn write_markdown_cell(&mut self, parts: &[CellPart]) {
+        for part in parts {
+            match part {
+                CellPart::Text(text) => self.write_markdown_escaped(text),
+                #[cfg(feature = "docx")]
+                CellPart::Math(latex) => {
+                    let latex = latex.replace('|', "\\vert ");
+                    let equation = self.format_equation(&latex, true);
+                    self.buffer.push_str(&equation);
+                },
+            }
+        }
+    }
+
+    /// A table cell's content as plain text, equations as inline math.
+    fn cell_text(&self, parts: &[CellPart]) -> String {
+        let mut text = String::new();
+        for part in parts {
+            match part {
+                CellPart::Text(part) => text.push_str(part),
+                #[cfg(feature = "docx")]
+                CellPart::Math(latex) => text.push_str(&self.format_equation(latex, true)),
+            }
+        }
+        text
     }
 
     /// Write markdown-escaped text (escape | and convert \n to space) directly to buffer.
@@ -1362,7 +1500,10 @@ impl MarkdownWriter {
     /// - Minimal tables (`styled = false`): No indentation, no line feeds for compact output
     fn write_html_table(&mut self, table: &Table, styled: bool) -> Result<()> {
         // Extract all cell data once before rendering.
-        let cell_data = extract_table_cell_data(table)?;
+        let cell_data: Vec<Vec<String>> = extract_table_cell_data(table)?
+            .iter()
+            .map(|row| row.iter().map(|parts| self.cell_text(parts)).collect())
+            .collect();
         if cell_data.is_empty() {
             return Ok(());
         }
@@ -1687,8 +1828,7 @@ impl MarkdownWriter {
             // Parse OMML and convert to LaTeX
             #[cfg(feature = "equation")]
             {
-                let latex =
-                    litchi_equation::omml_to_latex(&omml_xml, &litchi_equation::Limits::DEFAULT)?;
+                let latex = equation_latex(&omml_xml)?;
                 return Ok(Some(self.format_equation(&latex, true))); // true = inline
             }
 
@@ -1724,7 +1864,7 @@ impl MarkdownWriter {
     /// # Arguments
     /// * `equation` - The equation content (LaTeX)
     /// * `inline` - Whether this is an inline equation (true) or display equation (false)
-    #[cfg(any(feature = "equation", feature = "doc"))]
+    #[cfg(any(feature = "equation", feature = "doc", feature = "docx"))]
     fn format_equation(&self, equation: &str, inline: bool) -> String {
         if inline {
             match self.options.equation_style {

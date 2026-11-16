@@ -12,6 +12,7 @@ mod runs;
 mod text;
 mod xml;
 
+pub use content::TextPiece;
 pub(crate) use paragraph_properties::DirectNumbering;
 pub(crate) use text::{
     extract_word_paragraph_text, extract_word_text, extract_word_text_with_bindings,

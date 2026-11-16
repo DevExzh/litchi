@@ -43,7 +43,7 @@ const fn is_story(kind: Kind) -> bool {
 }
 
 /// The story key of a story node itself (`/header[N]`, `/footnote[N]`).
-fn story_key(node: &Node<'_>) -> Result<StoryKey> {
+pub(super) fn story_key(node: &Node<'_>) -> Result<StoryKey> {
     let step = node
         .address
         .steps()
@@ -114,7 +114,7 @@ impl Docx {
     }
 
     /// Where a new story paragraph goes among the story's blocks.
-    fn story_anchor(
+    pub(super) fn story_anchor(
         &self,
         parent: &Node<'_>,
         placement: Option<&Placement<'_>>,

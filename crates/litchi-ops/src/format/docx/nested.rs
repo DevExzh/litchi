@@ -441,7 +441,7 @@ impl Docx {
 }
 
 /// The element path of a block container node; the body is the empty path.
-fn container_path(node: &Node<'_>) -> Result<ElementPath> {
+pub(super) fn container_path(node: &Node<'_>) -> Result<ElementPath> {
     if node.element_kind() == Kind::Body {
         Ok(ElementPath::body())
     } else {
@@ -461,7 +461,7 @@ pub(super) fn parent_node<'f>(docx: &'f Docx, node: &Node<'_>) -> Result<Node<'f
 /// `parent` takes: the number of visible blocks of `kind` before it, read
 /// from the container's index before the insertion. When a visible block of
 /// `kind` has no proven raw position the committed handle is read instead.
-fn visible_child(
+pub(super) fn visible_child(
     docx: &Docx,
     file: &Docx,
     parent: &Node<'_>,
@@ -503,7 +503,7 @@ fn visible_child(
 }
 
 /// The leaf anchor of a block placement in a block container.
-fn block_anchor(
+pub(super) fn block_anchor(
     docx: &Docx,
     parent: &Node<'_>,
     container: &ElementPath,

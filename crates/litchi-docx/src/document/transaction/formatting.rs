@@ -46,6 +46,7 @@ mod element;
 pub(crate) use element::{ChartMarkup, PictureMarkup, PictureRewrite, SmartArtMarkup};
 pub use element::{
     ElementAnchor, ElementPath, ElementStep, MAX_NEW_TABLE_DIMENSION, NewCell, NewTable,
+    ParagraphEquation,
 };
 pub(in crate::document::transaction) use element::{body_children, locate_element};
 

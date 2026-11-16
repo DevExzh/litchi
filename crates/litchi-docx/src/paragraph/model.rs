@@ -485,6 +485,10 @@ pub struct InlineHyperlink {
     target_frame: Option<String>,
     document_location: Option<String>,
     has_unmodeled_content: bool,
+    /// Direct `m:oMath` children, each with the number of runs before it.
+    equations: Vec<(usize, String)>,
+    /// Whether unmodeled children other than equations are present.
+    other_content: bool,
 }
 
 impl InlineHyperlink {
@@ -501,7 +505,30 @@ impl InlineHyperlink {
             target_frame,
             document_location,
             has_unmodeled_content,
+            equations: Vec::new(),
+            other_content: has_unmodeled_content,
         }
+    }
+
+    pub(crate) fn with_equations(mut self, equations: Vec<(usize, String)>, other: bool) -> Self {
+        self.equations = equations;
+        self.other_content = other;
+        self
+    }
+
+    /// The hyperlink's direct inline equations (`m:oMath`), each with the
+    /// number of its runs before it, as self-contained XML. They are among
+    /// the content [`Self::has_unmodeled_content`] reports.
+    #[must_use]
+    pub fn equations(&self) -> &[(usize, String)] {
+        &self.equations
+    }
+
+    /// Whether the hyperlink holds direct children other than runs and
+    /// inline equations.
+    #[must_use]
+    pub const fn has_unmodeled_content_besides_equations(&self) -> bool {
+        self.other_content
     }
 
     /// Borrow the resolved hyperlink value.

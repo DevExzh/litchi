@@ -167,6 +167,8 @@ fn ordinary_reports_hide_native_selection_fields() {
             "series" | "axis" => (true, false, false),
             // Charts are added, set and removed.
             "chart" => (true, true, true),
+            // Equations are added, set and removed.
+            "equation" => (true, true, true),
             "sdt" => (false, false, true),
             // The root sets the core document properties.
             "document" => (true, false, false),
@@ -369,6 +371,18 @@ fn ordinary_reports_hide_native_selection_fields() {
                     property.set() || property.add() || property.get(),
                     "{} {}",
                     element.name(),
+                    property.name()
+                );
+            } else if element.name() == "equation" {
+                // An equation's content is read, set and seeded as
+                // LaTeX or OMML; its mode is read and chooses where a new
+                // one goes.
+                assert!(property.get(), "equation {}", property.name());
+                assert!(property.add(), "equation {}", property.name());
+                assert_eq!(
+                    property.set(),
+                    property.name() != "mode",
+                    "equation {}",
                     property.name()
                 );
             } else if element.name() == "document" {

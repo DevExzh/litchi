@@ -57,8 +57,9 @@ pub enum Kind {
     Cell,
     /// A block content control, `sdt[N]`.
     Sdt,
-    /// Display math, `oMathPara[N]`: an `m:oMathPara`, bare or held in a
-    /// `w:p`.
+    /// An equation: display math of a block container, `oMathPara[N]` (an
+    /// `m:oMathPara`, bare or held in a `w:p`), or inline math of a
+    /// paragraph, `oMath[N]` (an `m:oMath` outside a math paragraph).
     Equation,
     /// A body-level section break (`w:sectPr`), `section[N]`.
     Section,
@@ -185,6 +186,16 @@ impl Kind {
         match self {
             Self::Equation => "oMathPara",
             _ => self.name(),
+        }
+    }
+
+    /// The name a path step uses for the kind under a parent of kind
+    /// `parent`: an equation of a paragraph is inline math, which OfficeCLI
+    /// writes `oMath`.
+    pub(crate) fn step_name_under(self, parent: Option<Self>) -> &'static str {
+        match (self, parent) {
+            (Self::Equation, Some(Self::Paragraph)) => "oMath",
+            _ => self.step_name(),
         }
     }
 
@@ -1052,10 +1063,31 @@ crate::registry::registry! {
 /// An equation's `mode`: OfficeCLI writes `display` for block equations.
 pub(crate) static EQUATION_MODE: Tokens = Tokens::new("equation mode", &["display", "inline"], &[]);
 
-// `ElementToNode` for `oMathPara`: the equation's mode.
+// `ElementToNode` for `oMathPara` and `oMath`: the equation's mode, its
+// LaTeX and its OMML. `latex` or `omml` seeds a new equation and replaces an
+// existing one's content; `mode` chooses where a new one goes.
 crate::registry::registry! {
-    pub(crate) EQUATION_PROPS, EQUATION_REGISTRY: () {
-    crate::registry::Entry::read(PropSpec::new("mode", ValueType::Token(&EQUATION_MODE))),
+    pub(crate) EQUATION_PROPS, EQUATION_REGISTRY: Setter {
+    read_add(
+        "mode",
+        ValueType::Token(&EQUATION_MODE),
+        Setter::EquationMode,
+        Constraint::None,
+    ),
+    writable(
+        "latex",
+        ValueType::Text,
+        Setter::EquationLatex,
+        Constraint::NotEmpty,
+        false,
+    ),
+    writable(
+        "omml",
+        ValueType::Text,
+        Setter::EquationOmml,
+        Constraint::NotEmpty,
+        false,
+    ),
     }
 }
 
@@ -1178,6 +1210,10 @@ const fn identities(
 /// content controls and equations.
 const CONTAINERS: &[Kind] = &[Kind::Body, Kind::Cell, Kind::Sdt];
 
+/// The parents of an equation: a block container holds display math, a
+/// paragraph inline math.
+const EQUATION_PARENTS: &[Kind] = &[Kind::Body, Kind::Cell, Kind::Sdt, Kind::Paragraph];
+
 /// The block children of a cell or content control (a section break occurs
 /// only in the body).
 const BLOCKS: &[Kind] = &[Kind::Paragraph, Kind::Table, Kind::Sdt, Kind::Equation];
@@ -1233,7 +1269,15 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                     "paragraph",
                     &["p", "paragraph"],
                     CONTAINERS,
-                    &[K::Run, K::Hyperlink, K::Picture, K::Chart, K::Tab, K::Break],
+                    &[
+                        K::Run,
+                        K::Hyperlink,
+                        K::Picture,
+                        K::Chart,
+                        K::Equation,
+                        K::Tab,
+                        K::Break,
+                    ],
                     &[
                         "/body/p[N]",
                         "/body/p[@paraId=X]",
@@ -1307,9 +1351,13 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 K::Equation,
                 "equation",
                 &["equation", "math", "omath", "omathpara"],
-                CONTAINERS,
+                EQUATION_PARENTS,
                 &[],
-                &["/body/oMathPara[N]"],
+                &[
+                    "/body/oMathPara[N]",
+                    "/body/p[N]/oMath[M]",
+                    "/body/p[N]/oMathPara[M]",
+                ],
                 EQUATION_PROPS,
             ),
             element(

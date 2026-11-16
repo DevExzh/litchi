@@ -1055,6 +1055,16 @@ fn capabilities_match_live_paths_queries_and_views() {
         )
         .expect("add a picture")
         .into_file();
+    // Inline math beside the first paragraph's runs.
+    // Display math, inline math and the display math of a paragraph that
+    // also holds a bookmark.
+    let equated = crate::open_bytes(package(
+        &format!(
+            r#"<w:document {NAMESPACES}><w:body><w:p><m:oMathPara><m:oMath><m:r><m:t>a</m:t></m:r></m:oMath></m:oMathPara></w:p><w:p><w:bookmarkStart w:id="0" w:name="eq"/><m:oMathPara><m:oMath><m:r><m:t>b</m:t></m:r></m:oMath></m:oMathPara><w:bookmarkEnd w:id="0"/><m:oMath><m:r><m:t>c</m:t></m:r></m:oMath></w:p></w:body></w:document>"#
+        ),
+        None,
+    ))
+    .expect("open the equations");
     // And charts.
     let charted = file
         .add(
@@ -1156,6 +1166,8 @@ fn capabilities_match_live_paths_queries_and_views() {
             &commented
         } else if name == "picture" {
             &pictured
+        } else if name == "equation" {
+            &equated
         } else if matches!(name, "chart" | "series" | "axis") {
             &charted
         } else if matches!(name, "smartart" | "node") {

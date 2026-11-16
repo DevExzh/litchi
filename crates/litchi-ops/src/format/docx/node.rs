@@ -70,6 +70,8 @@ pub(super) enum Value {
     Sdt(Block),
     /// Display math, as a container entry.
     Equation(Block),
+    /// Inline math of a paragraph.
+    Math(Arc<super::equation::InlineMath>),
     /// A body-level section break, as a container entry.
     Section(Block),
     /// A table row, shared: the leaf value carries an inline cell cache.
@@ -128,19 +130,42 @@ impl Block {
 pub(super) struct Step {
     pub(super) kind: Kind,
     pub(super) ordinal: u32,
+    /// For an equation of a paragraph: whether it is one of the
+    /// paragraph's math paragraphs (`oMathPara[N]`) rather than its inline
+    /// math (`oMath[N]`), which are counted apart.
+    pub(super) math_paragraph: bool,
 }
 
 impl Step {
     pub(super) const fn new(kind: Kind, ordinal: u32) -> Self {
-        Self { kind, ordinal }
+        Self {
+            kind,
+            ordinal,
+            math_paragraph: false,
+        }
     }
 
-    /// The positional path step: `p[3]`, `oMathPara[1]`, or `body`.
-    fn positional(self) -> PathStep<'static> {
-        if self.kind.is_singleton() {
-            PathStep::new(self.kind.step_name())
+    /// The step of the math paragraph at `ordinal` of a paragraph.
+    pub(super) const fn math_paragraph(ordinal: u32) -> Self {
+        Self {
+            kind: Kind::Equation,
+            ordinal,
+            math_paragraph: true,
+        }
+    }
+
+    /// The positional path step under a parent of kind `parent`: `p[3]`,
+    /// `oMathPara[1]`, `oMath[1]`, or `body`.
+    pub(super) fn positional(self, parent: Option<Kind>) -> PathStep<'static> {
+        let name = if self.math_paragraph {
+            "oMathPara"
         } else {
-            PathStep::at(self.kind.step_name(), Position::new(self.ordinal as usize))
+            self.kind.step_name_under(parent)
+        };
+        if self.kind.is_singleton() {
+            PathStep::new(name)
+        } else {
+            PathStep::at(name, Position::new(self.ordinal as usize))
         }
     }
 }
@@ -515,7 +540,9 @@ impl<'f> Node<'f> {
 
     /// The last positional step, without allocating a complete path.
     pub(super) fn last_step(&self) -> Option<PathStep<'f>> {
-        self.address.steps().last().map(|step| self.step(*step))
+        let steps = self.address.steps();
+        let (last, parents) = steps.split_last()?;
+        Some(self.step(*last, parents.last().map(|step| step.kind)))
     }
 
     fn paths(&self) -> &[PathStep<'f>] {
@@ -525,18 +552,22 @@ impl<'f> Node<'f> {
     /// Canonical semantic paths use positions; native identities require
     /// raw input. A style is addressed by its identifier (`/styles/Normal`).
     fn build_paths(&self) -> Box<[PathStep<'f>]> {
-        self.address
-            .steps()
+        let steps = self.address.steps();
+        steps
             .iter()
-            .map(|step| self.step(*step))
+            .enumerate()
+            .map(|(index, step)| {
+                let parent = index.checked_sub(1).map(|parent| steps[parent].kind);
+                self.step(*step, parent)
+            })
             .collect()
     }
 
-    fn step(&self, step: Step) -> PathStep<'f> {
+    fn step(&self, step: Step, parent: Option<Kind>) -> PathStep<'f> {
         match step.kind {
             Kind::Style => super::parts::style_step(self.docx, step.ordinal)
-                .unwrap_or_else(|| step.positional()),
-            _ => step.positional(),
+                .unwrap_or_else(|| step.positional(parent)),
+            _ => step.positional(parent),
         }
     }
 }

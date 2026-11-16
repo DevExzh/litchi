@@ -62,6 +62,7 @@ Feature checklist. ✅ Supported · 🟡 Partial · ❌ Unsupported · N/A Not a
 | Revision application and accept/reject | 🟡 | ✅ | 🟡 |
 | Fields and cached field results | 🟡 | ✅ | ✅ |
 | Office Math (OMML) fragments | 🟡 | ✅ | ✅ |
+| Office Math equation editing in opened documents (OMML and LaTeX) | 🟡 | ✅ | ✅ |
 | Bibliography source stores | 🟡 | ✅ | ✅ |
 | Smart tags | 🟡 | ✅ | ✅ |
 | Bookmarks and bookmark anchors | 🟡 | ✅ | ✅ |

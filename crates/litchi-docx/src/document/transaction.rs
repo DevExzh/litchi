@@ -44,7 +44,7 @@ pub(crate) use durable::durable_transfer_operations;
 pub use durable::{Composition, History, JoinError, Prepared, ThreeWayError, ThreeWayPlan};
 pub use formatting::{
     BodyAnchor, BodyBlock, ElementAnchor, ElementPath, ElementStep, MAX_NEW_TABLE_DIMENSION,
-    NewCell, NewParagraph, NewRun, NewTable, RunAnchor,
+    NewCell, NewParagraph, NewRun, NewTable, ParagraphEquation, RunAnchor,
 };
 use litchi_core::patch::{CompositionLimits, HistoryLimits};
 #[cfg(test)]
@@ -193,6 +193,13 @@ pub enum Refusal {
     /// edit writes its style and borders, a row edit its
     /// height and flags).
     UnmodelledProperty,
+    /// The selected Office Math equation of a paragraph does not exist.
+    EquationNotFound,
+    /// New equation markup holds content an equation does not own: an
+    /// element other than Office Math and Word run content (a drawing, VML,
+    /// a reference, a range, a field, alternate content, an unknown
+    /// namespace), or an attribute of another namespace.
+    EquationContent,
 }
 
 impl Refusal {
@@ -209,8 +216,10 @@ impl Refusal {
             | Self::RevisionNotFound
             | Self::ContentControlNotFound
             | Self::CellNotFound
+            | Self::EquationNotFound
             | Self::BlockNotFound => RefusalKind::NotFound,
             Self::AmbiguousCompositeSelector
+            | Self::EquationContent
             | Self::InvalidPropertyValue
             | Self::TransitionalValue => RefusalKind::InvalidValue,
             // The selected element is not an editable target of this route.
@@ -272,6 +281,10 @@ impl std::fmt::Display for Refusal {
                 "content holds markup-compatibility alternate content (a text box) with its own text"
             },
             Self::UnmodelledProperty => "the operation does not write the requested property",
+            Self::EquationNotFound => "paragraph equation was not found",
+            Self::EquationContent => {
+                "equation markup holds content other than Office Math and Word run content"
+            },
         })
     }
 }

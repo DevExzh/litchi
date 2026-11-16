@@ -312,6 +312,11 @@ impl Docx {
             Ok(commit) => return Ok(O::from_commit(commit)),
             Err(editor) => editor,
         };
+        // Equations, in every story.
+        let editor = match self.try_set_equation(editor, &nodes, &props)? {
+            Ok(commit) => return Ok(O::from_commit(commit)),
+            Err(editor) => editor,
+        };
         // Pictures, comments, SmartArt graphics and their nodes.
         let editor = match self.try_set_picture(editor, &nodes, &props)? {
             Ok(commit) => return Ok(O::from_commit(commit)),

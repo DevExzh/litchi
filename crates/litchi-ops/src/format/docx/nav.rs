@@ -548,6 +548,29 @@ impl<'f> Navigate<'f> for Nav<'f> {
                     None => Lookup::NotApplicable,
                 })
             },
+            // Inline math, `oMath[N]`, and math paragraphs, `oMathPara[N]`.
+            (Value::Paragraph { paragraph, .. }, Kind::Equation) => {
+                let display = step.named.eq_ignore_ascii_case("oMathPara");
+                let equations = if display {
+                    paragraph.math_paragraphs()?
+                } else {
+                    paragraph.omml_equations()?
+                };
+                Ok(match pick_index(equations.len(), &step.select) {
+                    Some(Some(index)) => {
+                        let omml = equations.into_iter().nth(index).ok_or_else(missing_child)?;
+                        Lookup::Found(super::equation::inline_node(
+                            self.docx,
+                            &address,
+                            ordinal(index),
+                            omml,
+                            display,
+                        ))
+                    },
+                    Some(None) => Lookup::Missing,
+                    None => Lookup::NotApplicable,
+                })
+            },
             (Value::Paragraph { paragraph, .. }, Kind::Chart) => {
                 let charts = paragraph.charts()?;
                 Ok(match pick_index(charts.len(), &step.select) {
@@ -643,6 +666,8 @@ impl<'f> Navigate<'f> for Nav<'f> {
                 out.kind("r", paragraph.addressable_runs()?.len());
                 out.kind("hyperlink", hyperlinks(self.docx, paragraph)?.len());
                 out.kind("picture", paragraph.images()?.len());
+                out.kind("oMath", paragraph.omml_equations()?.len());
+                out.kind("oMathPara", paragraph.math_paragraphs()?.len());
             },
             _ => {},
         }

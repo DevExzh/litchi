@@ -100,6 +100,56 @@ impl OfficeMath {
     pub fn into_xml(self) -> String {
         self.xml
     }
+
+    /// Convert LaTeX math to an equation for a Word paragraph, with run
+    /// formatting written as `w:rPr` run properties, and return it with one
+    /// message per piece of the input the OMML does not represent.
+    ///
+    /// Requires the `equation` feature.
+    ///
+    /// ```
+    /// use litchi_docx::OfficeMath;
+    /// use litchi_equation::Limits;
+    ///
+    /// let (math, losses) = OfficeMath::from_latex(r"\frac{a}{b}", &Limits::DEFAULT)?;
+    /// assert!(math.xml().contains("<m:f>"));
+    /// assert!(losses.is_empty());
+    /// assert_eq!(math.latex(&Limits::DEFAULT)?, r"\frac{a}{b}");
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns the conversion error for LaTeX that does not parse, a
+    /// construct OMML cannot hold, or input beyond `limits`.
+    #[cfg(feature = "equation")]
+    pub fn from_latex(
+        latex: &str,
+        limits: &litchi_equation::Limits,
+    ) -> litchi_equation::Result<(Self, Vec<String>)> {
+        let omml = litchi_equation::latex_to_omml(
+            latex,
+            litchi_equation::OmmlHost::WordprocessingMl,
+            limits,
+        )?;
+        let losses = omml.losses().to_vec();
+        let math = Self::from_xml(omml.into_xml())
+            .map_err(|error| litchi_equation::Error::Internal(error.to_string()))?;
+        Ok((math, losses))
+    }
+
+    /// The equation as LaTeX.
+    ///
+    /// Requires the `equation` feature.
+    ///
+    /// # Errors
+    ///
+    /// Returns the conversion error for OMML the converter cannot read or
+    /// input beyond `limits`.
+    #[cfg(feature = "equation")]
+    pub fn latex(&self, limits: &litchi_equation::Limits) -> litchi_equation::Result<String> {
+        litchi_equation::omml_to_latex(&self.xml, limits)
+    }
 }
 
 /// A validated display-math `<m:oMathPara>` element.

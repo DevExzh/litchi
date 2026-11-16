@@ -133,7 +133,8 @@ impl EditOptions {
 pub use transaction::{
     BodyAnchor, BodyBlock, CompactionPolicy, Diagnostics, ElementAnchor, ElementPath, ElementStep,
     Error, GraphChange, HyperlinkTextReplacement, MAX_NEW_TABLE_DIMENSION, NewCell, NewParagraph,
-    NewRun, NewTable, Operation, ParagraphHyperlinkAddress, ParagraphTextReplacement,
-    ParagraphTransfer, Patch, Refusal, Result, RevisionAction, RevisionKind, RevisionSelector,
-    RunAnchor, Snapshot, TableCellAddress, TransferGraph, TransferRefusal,
+    NewRun, NewTable, Operation, ParagraphEquation, ParagraphHyperlinkAddress,
+    ParagraphTextReplacement, ParagraphTransfer, Patch, Refusal, Result, RevisionAction,
+    RevisionKind, RevisionSelector, RunAnchor, Snapshot, TableCellAddress, TransferGraph,
+    TransferRefusal,
 };

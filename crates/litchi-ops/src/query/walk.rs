@@ -813,6 +813,7 @@ where
             &Resolved {
                 kind: sheet_kind,
                 select: Select::Ordinal(sheet_position),
+                named: "",
             },
         )?;
         let Lookup::Found(sheet) = lookup else {
@@ -1005,6 +1006,7 @@ where
                     let wanted = Resolved {
                         kind: *kind,
                         select: Select::Number(number),
+                        named: "",
                     };
                     if *next == *end {
                         frame.source = Source::Done;

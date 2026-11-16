@@ -1182,6 +1182,7 @@ fn lookups_and_resolved_steps_describe_themselves() {
     let resolved = Resolved {
         kind: kind::<Word>("p"),
         select: Select::Ordinal(Position::new(1)),
+        named: "p",
     };
     let copy = resolved;
     assert_eq!(copy, resolved);

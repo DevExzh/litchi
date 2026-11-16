@@ -82,6 +82,7 @@ mod children;
 mod column;
 pub(crate) mod create;
 mod element;
+mod equation;
 mod few;
 mod lists;
 mod marks;

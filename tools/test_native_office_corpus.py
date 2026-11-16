@@ -149,13 +149,14 @@ class NativeOfficeCorpus(unittest.TestCase):
     def test_current_checklists_are_reconciled_without_rewriting_historical_evidence(self) -> None:
         coverage = report()
         current = coverage["current_matrix"]
-        self.assertEqual(len(current["rows"]), 495)
+        self.assertEqual(len(current["rows"]), 496)
         self.assertEqual(len(current["renamed_rows"]), 2)
         self.assertEqual(len(current["consolidated_rows"]), 1)
         self.assertEqual(len(current["status_changes"]), 13)
         additions = [row for row in current["rows"] if row["historical_feature_row"] is None]
         self.assertEqual({row["id"] for row in additions}, {
-            "docx-current-direct-properties", "xlsb-current-fresh-creation",
+            "docx-current-direct-properties", "docx-current-equation-editing",
+            "xlsb-current-fresh-creation",
         })
         for row in additions:
             self.assertTrue(row["tests"])

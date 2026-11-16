@@ -53,11 +53,25 @@ pub(super) enum RunProjection {
 pub(super) struct ParagraphProjection {
     pub(super) runs: Vec<RunProjection>,
     pub(super) links: Vec<Link>,
+    /// The paragraph's inline equations (`m:oMath` children beside its
+    /// runs or inside a hyperlink).
+    pub(super) equations: Vec<Equation>,
+}
+
+/// An inline equation of a projected paragraph.
+#[derive(Clone, Debug)]
+pub(super) struct Equation {
+    /// The number of the paragraph's projected runs before it.
+    pub(super) before: usize,
+    /// Whether it sits inside the hyperlink whose runs surround it.
+    pub(super) in_link: bool,
+    pub(super) omml: String,
 }
 
 impl ParagraphProjection {
     pub(super) fn has_non_text_content(&self) -> bool {
         !self.links.is_empty()
+            || !self.equations.is_empty()
             || self
                 .runs
                 .iter()
@@ -177,6 +191,7 @@ fn project_paragraph(
     let inlines = paragraph.inlines_with_relationships(relationships)?;
     let mut runs = Vec::new();
     let mut links = Vec::new();
+    let mut equations = Vec::new();
 
     for inline in inlines {
         match inline {
@@ -184,7 +199,7 @@ fn project_paragraph(
                 runs.push(project_run(&run, relationships, opc)?);
             },
             litchi_docx::Inline::Hyperlink(hyperlink) => {
-                if hyperlink.has_unmodeled_content() {
+                if hyperlink.has_unmodeled_content_besides_equations() {
                     return Err(unrepresentable(
                         "Markdown export cannot preserve unmodeled DOCX hyperlink children",
                     ));
@@ -200,6 +215,13 @@ fn project_paragraph(
                     ));
                 }
                 let start_run = runs.len();
+                for (before, omml) in hyperlink.equations() {
+                    equations.push(Equation {
+                        before: start_run + before,
+                        in_link: true,
+                        omml: omml.clone(),
+                    });
+                }
                 for run in hyperlink.runs() {
                     let projected = project_run(run, relationships, opc)?;
                     if matches!(projected, RunProjection::Note(_)) {
@@ -224,6 +246,22 @@ fn project_paragraph(
                 // Bookmark boundaries are invisible anchors with no Markdown
                 // representation; dropping them loses no content.
             },
+            // Display math is written by the display-equation paragraph
+            // writer, which reads the paragraph's math paragraphs itself.
+            litchi_docx::Inline::Unknown(child)
+                if child.kind() == litchi_docx::InlineKind::MathParagraph => {},
+            // Inline math beside the runs, as Word writes it.
+            litchi_docx::Inline::Unknown(child)
+                if child.kind() == litchi_docx::InlineKind::Math =>
+            {
+                let omml = String::from_utf8(child.self_contained_xml()?.into_owned())
+                    .map_err(|_| invariant("a DOCX equation is not UTF-8"))?;
+                equations.push(Equation {
+                    before: runs.len(),
+                    in_link: false,
+                    omml,
+                });
+            },
             litchi_docx::Inline::Unknown(_) => {
                 return Err(unrepresentable(
                     "Markdown export cannot preserve an unmodeled DOCX paragraph child",
@@ -243,7 +281,11 @@ fn project_paragraph(
             "the DOCX typed inline projection is not aligned with the paragraph runs",
         ));
     }
-    Ok(ParagraphProjection { runs, links })
+    Ok(ParagraphProjection {
+        runs,
+        links,
+        equations,
+    })
 }
 
 fn project_run(

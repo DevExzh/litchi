@@ -482,7 +482,7 @@ impl Serialize for ChildrenJson {
         let mut seq = serializer.serialize_seq(None)?;
         for child in self.0.children() {
             let mut entry = vec![("element", child.name())];
-            if let Some(segment) = child.path_segment() {
+            if let Some(segment) = child.path_segment_under(&self.0) {
                 entry.push(("pathSegment", segment));
             }
             seq.serialize_element(&Pairs(entry))?;

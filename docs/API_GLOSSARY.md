@@ -3531,3 +3531,27 @@ mutable state.
 | `litchi_ppt::RecordParser::find_records_owned()` | adopted (corrected); preserves the complete owned-clone traversal without a misleading unused filter argument, while `find_records_ref` remains the borrowed zero-copy view; the deprecated `find_records` spelling is deleted |
 | `litchi_iwa_graph::ReferenceGraph::{add_object_reference, incoming, outgoing, all_object_ids, has_cycle, reachable, statistics}` | adopted; all public identities are `ObjectId`, `ObjectId::try_from(0)` is rejected, and the former raw-`u64` wrappers are deleted |
 | `litchi_iwa_index::ObjectIndex::reference_snapshot` | adopted; borrows the complete immutable `ReferenceGraphSnapshot`, retaining its typed `Clone` capability; the deprecated `reference_graph` spelling is deleted |
+
+## DOCX equation edits
+
+Equation verbs live on the main-document transaction (`document::raw::Tree`,
+which `Edit::edit_story` runs on headers, footers and notes) and on the
+package-bound `document::Edit`; no new transaction family is introduced.
+A paragraph's equations are addressed as its readers count them: the
+position among `Paragraph::omml_equations` (inline) or
+`Paragraph::paragraph_level_equations` (display), and a paragraph's math
+paragraphs in the order of `Paragraph::math_paragraphs`. New markup repeats
+no namespace declaration already in scope, takes the namespaces of the
+document's conformance, and is admitted by an allowlist: Office Math
+elements, the Word run content of a math run, anything inside `w:rPr`, and
+attributes of those namespaces.
+
+| Name | Notes | Status |
+|---|---|---|
+| `litchi_docx::document::ParagraphEquation::{Inline, Display}`, `position` | the selected equation of a paragraph | ✅ |
+| `Edit::{insert_equation_at, insert_display_equation_at, replace_equation_at, replace_math_paragraph_at, replace_math_paragraph_equations_at, remove_equation_at, remove_math_paragraph_at}` | inline math before a direct run; a display-equation `w:p` at an `ElementAnchor`; replacement and removal of one equation's or math paragraph's own markup, a removed display equation taking a math paragraph it empties | ✅ |
+| `litchi_docx::Paragraph::{math_paragraphs, text_and_equations}`, `TextPiece`; `InlineHyperlink::{equations, has_unmodeled_content_besides_equations}` | a paragraph's `m:oMathPara` elements; a hyperlink's inline equations with their place among its runs | ✅ |
+| `Refusal::EquationNotFound` | a missing paragraph equation (`NotFound`) | ✅ |
+| `Refusal::EquationContent` | new equation markup holding anything but Office Math and Word run content (`InvalidValue`) | ✅ |
+| `litchi_docx::OfficeMath::{from_latex, latex}` (`equation` feature) | through `litchi_equation` with the WordprocessingML host and caller `Limits`; `from_latex` returns the conversion losses | ✅ |
+| DOCX `equation` add, set, remove (`mode`, `latex`, `omml`); `/…/oMathPara[N]` display, `/…/p[N]/oMath[M]` inline and `/…/p[N]/oMathPara[M]` display math of a paragraph | the `latex` and `omml` keys of the PPTX equation | ✅ |

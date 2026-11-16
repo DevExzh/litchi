@@ -226,6 +226,99 @@ impl Paragraph {
         self.typed_office_math(true)
     }
 
+    /// The paragraph's math paragraphs (`m:oMathPara`), each with the
+    /// equations it holds, as their original XML in document order.
+    ///
+    /// A display-equation paragraph holds one; a paragraph that also holds
+    /// text, a bookmark or inline math may hold several.
+    ///
+    /// ```
+    /// use litchi_docx::Package;
+    ///
+    /// let mut builder = litchi_docx::Builder::new()?;
+    /// builder.document()?.add_paragraph_with_text("No math here");
+    /// let package = builder.build()?;
+    /// assert!(package.document()?.paragraphs()?[0].math_paragraphs()?.is_empty());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed paragraph XML or a scan beyond the
+    /// Office Math bounds.
+    pub fn math_paragraphs(&self) -> Result<Vec<String>> {
+        const MAX_DEPTH: usize = 128;
+        const MAX_NODES: usize = 1_000_000;
+
+        let _parser_admission = self.parser_admission()?;
+        let xml = self.xml_bytes();
+        let mut reader = NsReader::from_reader(xml);
+        for (prefix, namespace) in self.xml_data.inherited_namespaces()?.iter() {
+            let prefix = prefix
+                .as_deref()
+                .map_or(PrefixDeclaration::Default, PrefixDeclaration::Named);
+            reader
+                .resolver_mut()
+                .add(prefix, Namespace(namespace))
+                .map_err(|_| Error::Xml("invalid inherited Office Math namespace".into()))?;
+        }
+        let origin = ReaderOrigin::of(xml);
+        let mut depth = 0usize;
+        let mut capture = None::<(usize, usize)>;
+        let mut found = Vec::new();
+        let mut nodes = 0usize;
+        loop {
+            let start = origin
+                .offset(reader.buffer_position())
+                .ok_or_else(|| Error::InvalidFormat("Office Math offset exceeds usize".into()))?;
+            let event = reader
+                .read_event()
+                .map_err(|error| Error::Xml(error.to_string()))?;
+            let end = origin
+                .offset(reader.buffer_position())
+                .ok_or_else(|| Error::InvalidFormat("Office Math offset exceeds usize".into()))?;
+            let (namespace, event) = reader.resolver().resolve_event(event);
+            match event {
+                Event::Start(element) => {
+                    nodes += 1;
+                    if nodes > MAX_NODES || depth >= MAX_DEPTH {
+                        return Err(Error::InvalidFormat(
+                            "Office Math scan limit exceeded".into(),
+                        ));
+                    }
+                    depth += 1;
+                    if capture.is_none() && is_omml_name(&namespace, element.name(), b"oMathPara") {
+                        capture = Some((start, depth));
+                    }
+                },
+                Event::Empty(element) => {
+                    nodes += 1;
+                    if capture.is_none() && is_omml_name(&namespace, element.name(), b"oMathPara") {
+                        found.push(omml_equation_xml_range(xml, start, end)?);
+                    }
+                },
+                Event::End(_) => {
+                    if let Some((from, at)) = capture
+                        && at == depth
+                    {
+                        found.push(omml_equation_xml_range(xml, from, end)?);
+                        capture = None;
+                    }
+                    depth = depth
+                        .checked_sub(1)
+                        .ok_or_else(|| Error::Xml("invalid Office Math nesting".into()))?;
+                },
+                Event::Eof => {
+                    if depth != 0 || capture.is_some() {
+                        return Err(Error::Xml("unterminated Office Math XML".into()));
+                    }
+                    return Ok(found);
+                },
+                _ => {},
+            }
+        }
+    }
+
     fn raw_office_math(&self, display: bool) -> Result<Vec<String>> {
         self.office_math_ranges(display)?
             .into_iter()
@@ -340,5 +433,182 @@ impl Paragraph {
             }
         }
         Ok(ranges)
+    }
+}
+
+/// The UTF-8 text of `xml[start..end]`.
+fn omml_equation_xml_range(xml: &[u8], start: usize, end: usize) -> Result<String> {
+    let bytes = xml
+        .get(start..end)
+        .ok_or_else(|| Error::InvalidFormat("Office Math range exceeds its paragraph".into()))?;
+    Ok(std::str::from_utf8(bytes)
+        .map_err(|error| Error::Xml(error.to_string()))?
+        .to_owned())
+}
+
+/// A piece of a paragraph's content in document order: text, an inline
+/// equation or a math paragraph (their original OMML).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum TextPiece {
+    /// Text of the paragraph's `w:t`, `w:tab` (`\t`), `w:br` and `w:cr`
+    /// (`\n`) elements.
+    Text(String),
+    /// An inline equation (`m:oMath`).
+    Equation(String),
+    /// A math paragraph (`m:oMathPara`).
+    MathParagraph(String),
+}
+
+impl Paragraph {
+    /// The paragraph's text and equations in document order: what a
+    /// consumer that renders equations in place reads. Deleted text and
+    /// field instructions are not text; text inside an equation is part of
+    /// the equation.
+    ///
+    /// ```
+    /// use litchi_docx::{Package, TextPiece};
+    ///
+    /// let mut builder = litchi_docx::Builder::new()?;
+    /// builder.document()?.add_paragraph_with_text("Plain");
+    /// let package = builder.build()?;
+    /// let pieces = package.document()?.paragraphs()?[0].text_and_equations()?;
+    /// assert_eq!(pieces, [TextPiece::Text("Plain".into())]);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed paragraph XML or a scan beyond the
+    /// Office Math bounds.
+    pub fn text_and_equations(&self) -> Result<Vec<TextPiece>> {
+        const MAX_DEPTH: usize = 128;
+        const MAX_NODES: usize = 1_000_000;
+
+        let _parser_admission = self.parser_admission()?;
+        let xml = self.xml_bytes();
+        let mut reader = NsReader::from_reader(xml);
+        reader.config_mut().trim_text(false);
+        for (prefix, namespace) in self.xml_data.inherited_namespaces()?.iter() {
+            let prefix = prefix
+                .as_deref()
+                .map_or(PrefixDeclaration::Default, PrefixDeclaration::Named);
+            reader
+                .resolver_mut()
+                .add(prefix, Namespace(namespace))
+                .map_err(|_| Error::Xml("invalid inherited Office Math namespace".into()))?;
+        }
+        let origin = ReaderOrigin::of(xml);
+        let mut depth = 0usize;
+        // The open equation: its start, its depth and whether it is a math
+        // paragraph.
+        let mut capture = None::<(usize, usize, bool)>;
+        // The depth of an open `w:t`.
+        let mut text_at = None::<usize>;
+        let mut pieces: Vec<TextPiece> = Vec::new();
+        let push_text = |pieces: &mut Vec<TextPiece>, text: &str| {
+            if let Some(TextPiece::Text(last)) = pieces.last_mut() {
+                last.push_str(text);
+            } else if !text.is_empty() {
+                pieces.push(TextPiece::Text(text.to_owned()));
+            }
+        };
+        let mut nodes = 0usize;
+        loop {
+            let start = origin
+                .offset(reader.buffer_position())
+                .ok_or_else(|| Error::InvalidFormat("Office Math offset exceeds usize".into()))?;
+            let event = reader
+                .read_event()
+                .map_err(|error| Error::Xml(error.to_string()))?;
+            let end = origin
+                .offset(reader.buffer_position())
+                .ok_or_else(|| Error::InvalidFormat("Office Math offset exceeds usize".into()))?;
+            let (namespace, event) = reader.resolver().resolve_event(event);
+            let word = matches!(
+                namespace,
+                quick_xml::name::ResolveResult::Bound(Namespace(
+                    b"http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+                        | b"http://purl.oclc.org/ooxml/wordprocessingml/main"
+                ))
+            );
+            match event {
+                Event::Start(element) => {
+                    nodes += 1;
+                    if nodes > MAX_NODES || depth >= MAX_DEPTH {
+                        return Err(Error::InvalidFormat(
+                            "Office Math scan limit exceeded".into(),
+                        ));
+                    }
+                    depth += 1;
+                    if capture.is_none() {
+                        if is_omml_name(&namespace, element.name(), b"oMath") {
+                            capture = Some((start, depth, false));
+                        } else if is_omml_name(&namespace, element.name(), b"oMathPara") {
+                            capture = Some((start, depth, true));
+                        } else if word && element.local_name().as_ref() == b"t" {
+                            text_at = Some(depth);
+                        }
+                    }
+                },
+                Event::Empty(element) => {
+                    nodes += 1;
+                    if capture.is_some() {
+                        continue;
+                    }
+                    if is_omml_name(&namespace, element.name(), b"oMath") {
+                        pieces.push(TextPiece::Equation(omml_equation_xml_range(
+                            xml, start, end,
+                        )?));
+                    } else if is_omml_name(&namespace, element.name(), b"oMathPara") {
+                        pieces.push(TextPiece::MathParagraph(omml_equation_xml_range(
+                            xml, start, end,
+                        )?));
+                    } else if word {
+                        match element.local_name().as_ref() {
+                            b"tab" => push_text(&mut pieces, "\t"),
+                            b"br" | b"cr" => push_text(&mut pieces, "\n"),
+                            _ => {},
+                        }
+                    }
+                },
+                Event::Text(text) if text_at == Some(depth) && capture.is_none() => {
+                    let text = text
+                        .decode()
+                        .map_err(|error| Error::Xml(error.to_string()))?;
+                    push_text(&mut pieces, &text);
+                },
+                Event::GeneralRef(reference) if text_at == Some(depth) && capture.is_none() => {
+                    let character = litchi_ooxml_common::xml::decode_xml_reference(&reference)?;
+                    push_text(&mut pieces, &character);
+                },
+                Event::End(_) => {
+                    if let Some((from, at, display)) = capture
+                        && at == depth
+                    {
+                        let omml = omml_equation_xml_range(xml, from, end)?;
+                        pieces.push(if display {
+                            TextPiece::MathParagraph(omml)
+                        } else {
+                            TextPiece::Equation(omml)
+                        });
+                        capture = None;
+                    }
+                    if text_at == Some(depth) {
+                        text_at = None;
+                    }
+                    depth = depth
+                        .checked_sub(1)
+                        .ok_or_else(|| Error::Xml("invalid Office Math nesting".into()))?;
+                },
+                Event::Eof => {
+                    if depth != 0 || capture.is_some() {
+                        return Err(Error::Xml("unterminated Office Math XML".into()));
+                    }
+                    return Ok(pieces);
+                },
+                _ => {},
+            }
+        }
     }
 }

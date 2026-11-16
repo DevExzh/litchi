@@ -22,6 +22,7 @@ mod tests;
 pub use crate::run_effects;
 pub use crate::run_effects::Effects;
 pub use crate::run_symbols::{Symbol, Symbols};
+pub use codec::TextPiece;
 pub use collapsed::{Collapsed, Snapshot};
 pub use extensions::{Extensions, Id, Ids};
 pub use kind::InlineKind;
