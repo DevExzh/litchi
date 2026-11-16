@@ -19,8 +19,12 @@ use super::super::stream::{
 use super::{Edit, Error, LimitKind, Result, refused};
 use litchi_core::edit::RefusalKind;
 
+#[path = "embedded.rs"]
+mod embedded;
 #[path = "equations.rs"]
 mod equations;
+
+pub use embedded::EmbeddedObjectSpec;
 
 #[cfg(feature = "equation")]
 pub use equations::EquationSource;
@@ -352,12 +356,31 @@ const DROPDOWN_OBJ: [u8; 70] = [
     0x6c, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
 
+/// The drawing-group arithmetic overflowed: a count or length the group
+/// holds is at its limit.
+fn group_overflow() -> Error {
+    refused(
+        RefusalKind::InvalidValue,
+        "a drawing-group count or length is at its limit",
+    )
+}
+
 impl Edit {
     fn drawing(&self, sheet: usize) -> Result<(Globals, Sheet, Option<Block>, Option<Group>)> {
         let (globals, layout) = self.sheet(sheet)?;
         let block = Block::parse(&self.stream, &layout)?;
-        let group = Group::parse(&self.stream, &globals)?;
+        let group = Self::group(&self.stream, &globals)?;
         Ok((globals, layout, block, group))
+    }
+
+    /// The workbook's drawing group, checked for the structure the edits
+    /// rewrite.
+    pub(super) fn group(stream_bytes: &[u8], globals: &Globals) -> Result<Option<Group>> {
+        let group = Group::parse(stream_bytes, globals)?;
+        if let Some(group) = &group {
+            group.check()?;
+        }
+        Ok(group)
     }
 
     /// A free `Obj` id on the worksheet.
@@ -385,7 +408,10 @@ impl Edit {
         };
         if let Some(block) = block {
             let drawing_id = u32::from(block.drawing_id);
-            let shape_id = block.max_shape_id() + 1;
+            let shape_id = block
+                .max_shape_id()
+                .checked_add(1)
+                .ok_or_else(group_overflow)?;
             let cluster = (shape_id / 1024).checked_sub(1).map(|index| index as usize);
             let owned = cluster
                 .and_then(|index| clusters.get(index))
@@ -408,15 +434,20 @@ impl Edit {
             .map(|cluster| cluster.drawing)
             .max()
             .unwrap_or(0)
-            + 1;
+            .checked_add(1)
+            .ok_or_else(group_overflow)?;
         let index = u32::try_from(clusters.len()).unwrap_or(u32::MAX);
-        let patriarch = (index + 1).checked_mul(1024).ok_or(refused(
-            RefusalKind::UnsupportedOperation,
-            "the drawing group has too many clusters",
-        ))?;
+        let shape_id = index
+            .checked_add(1)
+            .and_then(|clusters| clusters.checked_mul(1024))
+            .and_then(|patriarch| patriarch.checked_add(1))
+            .ok_or(refused(
+                RefusalKind::UnsupportedOperation,
+                "the drawing group has too many clusters",
+            ))?;
         Ok(Placement {
             drawing_id,
-            shape_id: patriarch + 1,
+            shape_id,
             new_drawing: true,
         })
     }
@@ -496,12 +527,17 @@ impl Edit {
                 // header record, then append the object's records.
                 let header = layout.records[block.first];
                 let base = header.start + 4;
-                let dg_length = u32_at(&block.ds, 4) + span;
+                let dg_length = u32_at(&block.ds, 4)
+                    .checked_add(span)
+                    .ok_or_else(group_overflow)?;
                 let spgr_at = block.children_start_of_spgr();
-                let spgr_length = u32_at(&block.ds, spgr_at + 4) + span;
+                let spgr_length = u32_at(&block.ds, spgr_at + 4)
+                    .checked_add(span)
+                    .ok_or_else(group_overflow)?;
                 let mut patches = vec![(base + 4, dg_length), (base + spgr_at + 4, spgr_length)];
                 if let Some(fdg) = block.fdg_at() {
-                    patches.push((base + fdg + 8, block.csp + 1));
+                    let csp = block.csp.checked_add(1).ok_or_else(group_overflow)?;
+                    patches.push((base + fdg + 8, csp));
                     patches.push((base + fdg + 12, placement.shape_id.max(block.spid_cur)));
                 }
                 for (at, value) in patches {
@@ -531,17 +567,17 @@ impl Edit {
                     drawing: placement.drawing_id,
                     used: 2,
                 });
-                fdgg.drawings_saved += 1;
-                fdgg.shapes_saved += 2;
+                fdgg.drawings_saved = fdgg.drawings_saved.saturating_add(1);
+                fdgg.shapes_saved = fdgg.shapes_saved.saturating_add(2);
             } else {
                 let entry = fdgg.clusters.get_mut(cluster).ok_or(refused(
                     RefusalKind::UnsupportedOperation,
                     "the drawing group lost its cluster",
                 ))?;
                 entry.used = entry.used.max(placement.shape_id % 1024 + 1);
-                fdgg.shapes_saved += 1;
+                fdgg.shapes_saved = fdgg.shapes_saved.saturating_add(1);
             }
-            fdgg.spid_max = fdgg.spid_max.max(placement.shape_id + 1);
+            fdgg.spid_max = fdgg.spid_max.max(placement.shape_id.saturating_add(1));
             Ok(())
         })?;
         Ok((object_id, placement.shape_id))
@@ -554,7 +590,7 @@ impl Edit {
         change: impl FnOnce(&mut drawing::Fdgg) -> Result<()>,
     ) -> Result<()> {
         let globals = Globals::parse(&self.stream)?;
-        let group = Group::parse(&self.stream, &globals)?;
+        let group = Self::group(&self.stream, &globals)?;
         let (mut bytes, range, continuation) = match &group {
             Some(group) => (
                 group.bytes.clone(),
@@ -577,9 +613,10 @@ impl Edit {
         change(&mut fdgg)?;
         let after = fdgg.clusters.len();
         // Rewrite the FDGG block.
+        let cidcl = u32::try_from(after + 1).map_err(|_| group_overflow())?;
         let mut block = Vec::with_capacity(16 + after * 8);
         block.extend_from_slice(&fdgg.spid_max.to_le_bytes());
-        block.extend_from_slice(&u32::try_from(after + 1).unwrap_or(0).to_le_bytes());
+        block.extend_from_slice(&cidcl.to_le_bytes());
         block.extend_from_slice(&fdgg.shapes_saved.to_le_bytes());
         block.extend_from_slice(&fdgg.drawings_saved.to_le_bytes());
         for cluster in &fdgg.clusters {
@@ -588,11 +625,13 @@ impl Edit {
         }
         let old_length = 16 + before * 8;
         bytes.splice(16..16 + old_length, block.iter().copied());
-        let delta = i64::try_from(after).unwrap_or(0) - i64::try_from(before).unwrap_or(0);
-        let block_length = u32::try_from(16 + after * 8).unwrap_or(0);
+        let block_length = u32::try_from(16 + after * 8).map_err(|_| group_overflow())?;
         bytes[12..16].copy_from_slice(&block_length.to_le_bytes());
-        let container = i64::from(u32_at(&bytes, 4)) + delta * 8;
-        bytes[4..8].copy_from_slice(&u32::try_from(container).unwrap_or(0).to_le_bytes());
+        let container = (i64::from(u32_at(&bytes, 4)) + i64::from(block_length))
+            .checked_sub(16 + 8 * i64::try_from(before).map_err(|_| group_overflow())?)
+            .and_then(|container| u32::try_from(container).ok())
+            .ok_or_else(group_overflow)?;
+        bytes[4..8].copy_from_slice(&container.to_le_bytes());
         self.put_group(bytes, range, continuation)
     }
 
@@ -647,7 +686,7 @@ impl Edit {
     /// Remove the drawing group when it holds no cluster and no blip.
     fn drop_empty_group(&mut self) -> Result<()> {
         let globals = Globals::parse(&self.stream)?;
-        let Some(group) = Group::parse(&self.stream, &globals)? else {
+        let Some(group) = Self::group(&self.stream, &globals)? else {
             return Ok(());
         };
         let fdgg = group.fdgg()?;
@@ -703,13 +742,17 @@ impl Edit {
             })?;
             return Ok(object);
         }
-        let span = u32::try_from(object.span.1 - object.span.0).unwrap_or(0);
+        let span = u32::try_from(object.span.1 - object.span.0).map_err(|_| group_overflow())?;
         // Shrink the containers and the shape count in the header record.
         let header = layout.records[block.first];
         let mut payload = header.payload(&self.stream).to_vec();
         let spgr_at = block.children_start_of_spgr();
-        let dg_length = u32_at(&block.ds, 4) - span;
-        let spgr_length = u32_at(&block.ds, spgr_at + 4) - span;
+        let dg_length = u32_at(&block.ds, 4)
+            .checked_sub(span)
+            .ok_or_else(group_overflow)?;
+        let spgr_length = u32_at(&block.ds, spgr_at + 4)
+            .checked_sub(span)
+            .ok_or_else(group_overflow)?;
         payload[4..8].copy_from_slice(&dg_length.to_le_bytes());
         payload[spgr_at + 4..spgr_at + 8].copy_from_slice(&spgr_length.to_le_bytes());
         if let Some(fdg) = block.fdg_at() {
@@ -762,13 +805,18 @@ impl Edit {
         ))?;
         let delta =
             i64::try_from(bytes.len()).unwrap_or(0) - i64::try_from(end - start).unwrap_or(0);
-        let grow = |value: u32| u32::try_from(i64::from(value) + delta).unwrap_or(value);
+        let grow = |value: u32| {
+            i64::from(value)
+                .checked_add(delta)
+                .and_then(|value| u32::try_from(value).ok())
+                .ok_or_else(group_overflow)
+        };
         let mut ds = block.ds.clone();
         let spgr_at = block.children_start_of_spgr();
         let patches = [
-            (4, grow(u32_at(&ds, 4))),
-            (spgr_at + 4, grow(u32_at(&ds, spgr_at + 4))),
-            (object.span.0 + 4, grow(u32_at(&ds, object.span.0 + 4))),
+            (4, grow(u32_at(&ds, 4))?),
+            (spgr_at + 4, grow(u32_at(&ds, spgr_at + 4))?),
+            (object.span.0 + 4, grow(u32_at(&ds, object.span.0 + 4))?),
         ];
         for (at, value) in patches {
             ds[at..at + 4].copy_from_slice(&value.to_le_bytes());
@@ -1220,11 +1268,11 @@ impl Edit {
             ))?;
         // Ensure a drawing group exists.
         let globals = Globals::parse(&self.stream)?;
-        if Group::parse(&self.stream, &globals)?.is_none() {
+        if Self::group(&self.stream, &globals)?.is_none() {
             self.put_group(empty_group(), None, stream::CONTINUE)?;
         }
         let globals = Globals::parse(&self.stream)?;
-        let group = Group::parse(&self.stream, &globals)?.ok_or(refused(
+        let group = Self::group(&self.stream, &globals)?.ok_or(refused(
             RefusalKind::UnsupportedOperation,
             "the drawing group is missing",
         ))?;
@@ -1237,20 +1285,30 @@ impl Edit {
             Some((store_at, entries)) => {
                 if let Some(index) = entries
                     .iter()
-                    .position(|bse| bse.uid == uid && bse.win != 0)
+                    .position(|bse| bse.fbse && bse.uid == uid && bse.win != 0)
                 {
                     let refs_at = entries[index].at + 8 + 24;
-                    let refs = u32_at(&bytes, refs_at) + 1;
+                    let refs = u32_at(&bytes, refs_at)
+                        .checked_add(1)
+                        .ok_or_else(group_overflow)?;
                     bytes[refs_at..refs_at + 4].copy_from_slice(&refs.to_le_bytes());
                     (index + 1, 0)
                 } else {
-                    let end = store_at + 8 + u32_at(&bytes, store_at + 4) as usize;
-                    bytes.splice(end..end, entry.iter().copied());
+                    // `check` keeps the store inside the group's bytes.
+                    let store_length = u32_at(&bytes, store_at + 4);
+                    let end = store_at + 8 + store_length as usize;
                     let count = entries.len() + 1;
-                    let options = 0x000f | (u16::try_from(count).unwrap_or(0) << 4);
+                    let options = u16::try_from(count)
+                        .ok()
+                        .filter(|count| *count <= 0x0fff)
+                        .map(|count| 0x000f | (count << 4))
+                        .ok_or_else(group_overflow)?;
+                    let length = u32::try_from(entry.len())
+                        .ok()
+                        .and_then(|grown| store_length.checked_add(grown))
+                        .ok_or_else(group_overflow)?;
+                    bytes.splice(end..end, entry.iter().copied());
                     bytes[store_at..store_at + 2].copy_from_slice(&options.to_le_bytes());
-                    let length =
-                        u32_at(&bytes, store_at + 4) + u32::try_from(entry.len()).unwrap_or(0);
                     bytes[store_at + 4..store_at + 8].copy_from_slice(&length.to_le_bytes());
                     (count, entry.len())
                 }
@@ -1272,17 +1330,20 @@ impl Edit {
                 (1, grown)
             },
         };
-        let container = u32_at(&bytes, 4) + u32::try_from(grown).unwrap_or(0);
+        let container = u32::try_from(grown)
+            .ok()
+            .and_then(|grown| u32_at(&bytes, 4).checked_add(grown))
+            .ok_or_else(group_overflow)?;
         bytes[4..8].copy_from_slice(&container.to_le_bytes());
         self.put_group(bytes, Some(range), group.continuation)?;
-        Ok(u32::try_from(pib).unwrap_or(u32::MAX))
+        u32::try_from(pib).map_err(|_| group_overflow())
     }
 
     /// Release one reference to blip `pib`; the last blip of the store goes
     /// when nothing references it.
     fn release_blip(&mut self, pib: u32) -> Result<()> {
         let globals = Globals::parse(&self.stream)?;
-        let Some(group) = Group::parse(&self.stream, &globals)? else {
+        let Some(group) = Self::group(&self.stream, &globals)? else {
             return Ok(());
         };
         let Some((store_at, entries)) = group.store()? else {
@@ -1300,22 +1361,41 @@ impl Edit {
         );
         let mut bytes = group.bytes.clone();
         let entry: &Bse = &entries[index];
+        if !entry.fbse {
+            return Err(refused(
+                RefusalKind::UnsupportedContent,
+                "the picture's blip store entry is not an OfficeArtFBSE",
+            ));
+        }
         let refs_at = entry.at + 8 + 24;
         let refs = u32_at(&bytes, refs_at).saturating_sub(1);
         if refs == 0 && index + 1 == entries.len() {
+            // `check` keeps the entry inside the store and the store inside
+            // the container, so these lengths cover what is removed.
             let removed = 8 + entry.length;
-            bytes.drain(entry.at..entry.at + removed);
-            let removed_u32 = u32::try_from(removed).unwrap_or(0);
+            let removed_u32 = u32::try_from(removed).map_err(|_| group_overflow())?;
             if entries.len() == 1 {
+                let container = u32_at(&bytes, 4)
+                    .checked_sub(removed_u32 + 8)
+                    .ok_or_else(group_overflow)?;
+                bytes.drain(entry.at..entry.at + removed);
                 bytes.drain(store_at..store_at + 8);
-                let container = u32_at(&bytes, 4) - removed_u32 - 8;
                 bytes[4..8].copy_from_slice(&container.to_le_bytes());
             } else {
-                let options = 0x000f | (u16::try_from(entries.len() - 1).unwrap_or(0) << 4);
+                let options = u16::try_from(entries.len() - 1)
+                    .ok()
+                    .filter(|count| *count <= 0x0fff)
+                    .map(|count| 0x000f | (count << 4))
+                    .ok_or_else(group_overflow)?;
+                let length = u32_at(&bytes, store_at + 4)
+                    .checked_sub(removed_u32)
+                    .ok_or_else(group_overflow)?;
+                let container = u32_at(&bytes, 4)
+                    .checked_sub(removed_u32)
+                    .ok_or_else(group_overflow)?;
+                bytes.drain(entry.at..entry.at + removed);
                 bytes[store_at..store_at + 2].copy_from_slice(&options.to_le_bytes());
-                let length = u32_at(&bytes, store_at + 4) - removed_u32;
                 bytes[store_at + 4..store_at + 8].copy_from_slice(&length.to_le_bytes());
-                let container = u32_at(&bytes, 4) - removed_u32;
                 bytes[4..8].copy_from_slice(&container.to_le_bytes());
             }
         } else {

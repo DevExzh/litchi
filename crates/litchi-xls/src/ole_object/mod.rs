@@ -15,13 +15,13 @@ mod tests;
 pub use crate::error::Error;
 pub use edit::{Commit, Diagnostics, Edit, EditOptions, LimitKind, Patch, Snapshot};
 pub use litchi_ole_common::object::Limits;
+pub(crate) use semantic::validate_compound_file_for_publication;
 pub use semantic::*;
 
 const OBJ: u16 = 0x005D;
 const TXO: u16 = 0x01B6;
 const CONTINUE: u16 = 0x003C;
 const BOUNDSHEET: u16 = 0x0085;
-const EOF: u16 = 0x000A;
 const FT_CMO: u16 = 0x0015;
 const FT_CF: u16 = 0x0007;
 const FT_PIO: u16 = 0x0008;

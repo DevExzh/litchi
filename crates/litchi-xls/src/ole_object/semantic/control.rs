@@ -554,6 +554,16 @@ impl FormControl {
         self.common().map_or(0, |value| value.object_id)
     }
 
+    /// This control with `FtCmo.id` set to `object_id`.
+    pub(crate) fn with_object_id(mut self, object_id: u16) -> Self {
+        for subrecord in &mut self.subrecords {
+            if let super::obj::ObjSubrecord::Common(common) = subrecord {
+                common.object_id = object_id;
+            }
+        }
+        self
+    }
+
     pub fn control_type(&self) -> Option<super::obj::ObjectType> {
         self.common().and_then(super::obj::FtCmo::object_kind)
     }

@@ -7,7 +7,7 @@ use super::super::semantic::{
     validate_compound_file_for_publication,
 };
 use super::super::validation::validate_picture_formula;
-use super::super::{BOUNDSHEET, CFB_STREAM, CONTINUE, EOF, Limits, OBJ, TXO, invalid};
+use super::super::{BOUNDSHEET, CFB_STREAM, CONTINUE, Limits, OBJ, TXO, invalid};
 use crate::error::{Error, Result};
 use crate::protection::{
     FILESHARING_TYPE, OBJECTPROTECT_TYPE, PASSWORD_TYPE, PROT4REV_TYPE, PROT4REVPASS_TYPE,
@@ -28,9 +28,13 @@ use std::io::Cursor;
 /// byte-for-byte.  Their recoverable IDs/storage references still participate
 /// in admission checks; an unparseable identity blocks operations that would
 /// otherwise change object topology.
+///
+/// An `Obj` identifier is unique within its sheet ([MS-XLS] 2.5.143 FtCmo),
+/// so identifiers are kept per worksheet; storages are workbook-wide.
 #[derive(Clone, Default)]
 struct OpaqueObjectIdentity {
-    ids: HashSet<u16>,
+    /// `(worksheet, Obj identifier)`; a single sheet's parse uses 0.
+    ids: HashSet<(usize, u16)>,
     storages: HashSet<String>,
     present: bool,
     ambiguous: bool,
@@ -45,7 +49,7 @@ impl OpaqueObjectIdentity {
         self.ids
             .try_reserve(1)
             .map_err(|_error| Error::Allocation("opaque Obj identity index"))?;
-        if !self.ids.insert(object_id) {
+        if !self.ids.insert((0, object_id)) {
             self.ambiguous = true;
         }
         Ok(())
@@ -72,20 +76,6 @@ impl OpaqueObjectIdentity {
         Ok(())
     }
 
-    fn check_new_identity(&self, object_id: u16, storage: &str) -> Result<()> {
-        self.require_topology_proof()?;
-        if self.ids.contains(&object_id) {
-            return Err(invalid(OBJ, "duplicate workbook object ID in opaque Obj"));
-        }
-        if self.storages.contains(storage) {
-            return Err(invalid(
-                OBJ,
-                "duplicate workbook storage identity in opaque Obj",
-            ));
-        }
-        Ok(())
-    }
-
     fn check_storage_rewrite(&self, storage: &str) -> Result<()> {
         if self.ambiguous || self.storages.contains(storage) {
             return Err(Error::refused(
@@ -107,10 +97,6 @@ pub(crate) struct Editor {
     sheets: Vec<Vec<OleObjectRecord>>,
     form_controls: Vec<Vec<FormControl>>,
     opaque_identity: OpaqueObjectIdentity,
-    /// Number of form-control Obj records already present in each source
-    /// worksheet. Newly authored controls are appended at the worksheet EOF;
-    /// existing controls remain in their original byte representation.
-    preserved_control_counts: Vec<usize>,
 }
 
 impl Editor {
@@ -129,7 +115,6 @@ impl Editor {
             OpenOptions::new().targets(targets).limits(limits),
         )?
         .edit()?;
-        let preserved_control_counts = form_controls.iter().map(Vec::len).collect();
         Ok(Self {
             package,
             limits,
@@ -138,7 +123,6 @@ impl Editor {
             sheets,
             form_controls,
             opaque_identity,
-            preserved_control_counts,
         })
     }
 
@@ -168,229 +152,126 @@ impl Editor {
         self.sheets.len()
     }
 
-    /// Adds a typed worksheet form-control Obj record transactionally.
+    /// Checks that a form control can be added to `worksheet`: it is
+    /// valid, carries no text object, and the workbook's object identities
+    /// are proven. The drawing-aware worksheet-feature edit then writes the
+    /// control with a fresh identifier.
     ///
-    /// The operation authors only the BIFF `Obj` metadata. It does not load,
-    /// instantiate, or execute any external control/runtime content. Unknown
-    /// subrecords supplied by the caller are serialized unchanged, and all
-    /// controls already present in the source worksheet remain byte-identical.
     /// # Errors
     ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub(crate) fn add_form_control(
-        &mut self,
+    /// Returns an error if the worksheet is absent, the control is invalid
+    /// or has a text object, or an opaque `Obj` has an unproven identity.
+    pub(crate) fn check_add_form_control(
+        &self,
         worksheet: usize,
-        control: FormControl,
+        control: &FormControl,
     ) -> Result<()> {
+        self.sheets
+            .get(worksheet)
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet index {worksheet}")))?;
         control.validate()?;
-        let object_id = control.object_id();
-        self.opaque_identity.require_topology_proof()?;
-        if self.opaque_identity.ids.contains(&object_id) {
-            return Err(invalid(OBJ, "duplicate workbook object ID in opaque Obj"));
+        if control.text_object.is_some() {
+            return Err(Error::refused(
+                RefusalKind::UnsupportedContent,
+                "edit OLE objects",
+                "a new form control's label is not written; add it without a text object",
+            ));
         }
-        if self
-            .sheets
-            .iter()
-            .flatten()
-            .any(|value| value.object_id() == object_id)
-            || self
-                .form_controls
-                .iter()
-                .flatten()
-                .any(|value| value.object_id() == object_id)
-        {
-            return Err(invalid(OBJ, "duplicate workbook object ID"));
-        }
-        let mut candidate = self.clone();
-        candidate
-            .form_controls
-            .get_mut(worksheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet index {worksheet}")))?
-            .push(control);
-        candidate.commit()?;
-        *self = candidate;
-        Ok(())
+        self.opaque_identity.require_topology_proof()
     }
 
-    /// # Errors
-    ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub(crate) fn add(
-        &mut self,
-        worksheet: usize,
-        object: OleObjectRecord,
-        compound_file: Vec<u8>,
-    ) -> Result<()> {
-        object.validate()?;
-        let storage = object
-            .storage_name()
-            .ok_or_else(|| invalid(OBJ, "new Obj has no MBD/LNK reference"))?;
-        self.opaque_identity
-            .check_new_identity(object.object_id(), &storage)?;
-        validate_compound_file_for_publication(&compound_file, self.limits)?;
-        if self
-            .sheets
+    /// The catalog position (`BoundSheet` order) of the worksheet at
+    /// `worksheet` among the worksheets in substream order.
+    pub(crate) fn sheet_position(&self, worksheet: usize) -> Result<usize> {
+        let (refs, starts) = bindings(&self.workbook)?;
+        let offset = starts
             .iter()
-            .flatten()
-            .any(|value| value.object_id() == object.object_id())
-            || self
-                .form_controls
-                .iter()
-                .flatten()
-                .any(|value| value.object_id() == object.object_id())
-        {
-            return Err(invalid(OBJ, "duplicate workbook object ID"));
-        }
-        self.sheets
-            .get(worksheet)
+            .filter(|(_, is_worksheet)| *is_worksheet)
+            .nth(worksheet)
+            .map(|(offset, _)| *offset)
             .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet index {worksheet}")))?;
-        self.ensure_storage_capacity(&storage)?;
-        let mut candidate = self.clone();
-        candidate
-            .sheets
-            .get_mut(worksheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet index {worksheet}")))?
-            .push(object);
-        let target = target_for_storage(storage)?;
-        candidate.package.add_storage(target, compound_file)?;
-        candidate.commit()?;
-        *self = candidate;
-        Ok(())
+        refs.iter()
+            .position(|(_, start)| *start == offset)
+            .ok_or_else(|| invalid(BOUNDSHEET, "sheet target missing"))
     }
 
-    /// Adds a storage-backed, inert embedded payload with its complete XLS
-    /// identity closure.
-    ///
-    /// The draft authors one picture `Obj` (`cmo.ot=8`, `fDde=0`, and
-    /// `fPrstm=0`) together with the matching `MBDxxxxxxxx` storage.  The
-    /// supplied CFB remains opaque; common CFB validation bounds and retains
-    /// all of its streams, while no OLE server, macro, control, link, or
-    /// native payload is activated.
+    /// Checks that a storage-backed embedded payload can be added to
+    /// `worksheet`: the workbook's object identities are proven, one more
+    /// storage target fits the limits, and the payload passes the bounded
+    /// publication checks. The drawing-aware worksheet-feature edit then
+    /// writes the object.
     ///
     /// # Errors
     ///
-    /// Returns an error if the worksheet or object identity is invalid, the
-    /// identity is already present, or the payload cannot be admitted by the
-    /// bounded common CFB editor.
-    pub(crate) fn add_embedded_payload(
-        &mut self,
+    /// Returns an error if the worksheet is absent, an opaque `Obj` has an
+    /// unproven identity, the target count or a payload limit is exceeded,
+    /// or the payload is protected.
+    pub(crate) fn check_add_embedded_payload(
+        &self,
         worksheet: usize,
-        draft: EmbeddedObjectDraft,
+        draft: &EmbeddedObjectDraft,
     ) -> Result<()> {
         self.sheets
             .get(worksheet)
             .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet index {worksheet}")))?;
-        self.opaque_identity
-            .check_new_identity(draft.object_id(), &draft.storage_name())?;
-        // Check the target cardinality before parsing/capturing the supplied
-        // CFB.  The neutral add_storage API receives the target only after it
-        // has captured the candidate, so the XLS owner must perform this
-        // host-level preflight to keep max_objects an ingress bound.
-        self.ensure_storage_capacity(&draft.storage_name())?;
-        draft.payload().validate_for_publication(self.limits)?;
-        self.add(worksheet, draft.object_record(), draft.payload().to_vec())
+        self.opaque_identity.require_topology_proof()?;
+        // Check the target cardinality before parsing the supplied CFB so
+        // max_objects stays an ingress bound.
+        let count = targets_for_sheets(&self.sheets)?.len();
+        if count >= self.limits.max_objects {
+            return Err(LimitKind::Objects.exceeded(
+                count.saturating_add(1) as u64,
+                self.limits.max_objects as u64,
+            ));
+        }
+        draft.payload().validate_for_publication(self.limits)
     }
 
+    /// Checks that the object `object_id` of `worksheet` can be removed and
+    /// returns its typed record: the workbook's object identities are
+    /// proven and no opaque `Obj` shares a storage the removal would drop.
+    ///
     /// # Errors
     ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub(crate) fn remove(&mut self, worksheet: usize, object_id: u16) -> Result<OleObjectRecord> {
+    /// Returns an error if the object is absent, an opaque `Obj` has an
+    /// unproven identity, or removing the storage would orphan an opaque
+    /// reference.
+    pub(crate) fn check_remove(&self, worksheet: usize, object_id: u16) -> Result<OleObjectRecord> {
         self.opaque_identity.require_topology_proof()?;
-        let mut candidate = self.clone();
-        let sheet = candidate
+        let sheet = self
             .sheets
-            .get_mut(worksheet)
+            .get(worksheet)
             .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet index {worksheet}")))?;
-        let index = sheet
+        let object = sheet
             .iter()
-            .position(|value| value.object_id() == object_id)
+            .find(|value| value.object_id() == object_id)
             .ok_or_else(|| invalid(OBJ, "OLE object ID not found"))?;
-        let removed = sheet.remove(index);
-        if let Some(storage) = removed.storage_name()
-            && !candidate
+        if let Some(storage) = object.storage_name() {
+            let owners = self
                 .sheets
                 .iter()
                 .flatten()
-                .any(|value| value.storage_name().as_deref() == Some(&storage))
-        {
-            if candidate.opaque_identity.storages.contains(&storage) {
+                .filter(|value| value.storage_name().as_deref() == Some(&storage))
+                .count();
+            if owners == 1 && self.opaque_identity.storages.contains(&storage) {
                 return Err(Error::refused(
                     RefusalKind::UnsupportedContent,
                     "edit OLE objects",
                     "removing the selected Obj would orphan an opaque MBD/LNK reference",
                 ));
             }
-            let target = target_for_storage(storage)?;
-            candidate.package.remove_storage(target.key())?;
         }
-        candidate.commit()?;
-        *self = candidate;
-        Ok(removed)
+        Ok(object.clone())
     }
 
-    /// Removes one storage-backed embedded payload and its unreferenced MBD
-    /// storage.
-    ///
-    /// The selected `Obj` and its selected storage are removed as one
-    /// identity-checked operation.  Unknown streams and unrelated object
-    /// storages remain untouched.  A linked/DDE or controls-stream object is
-    /// refused because it is outside this inert embedded-payload API.
+    /// Checks that the object is a storage-backed embedded object.
     ///
     /// # Errors
     ///
     /// Returns an error if the selected object is absent or is not a valid
     /// storage-backed embedded object.
-    pub(crate) fn remove_embedded_payload(
-        &mut self,
-        worksheet: usize,
-        object_id: u16,
-    ) -> Result<()> {
-        self.embedded_storage(worksheet, object_id)?;
-        self.remove(worksheet, object_id).map(|_| ())
-    }
-
-    /// # Errors
-    ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub(crate) fn reorder(&mut self, worksheet: usize, ids: &[u16]) -> Result<()> {
-        let mut candidate = self.clone();
-        let sheet = candidate
-            .sheets
-            .get_mut(worksheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet index {worksheet}")))?;
-        if ids.len() != sheet.len() {
-            return Err(invalid(
-                OBJ,
-                "reorder must contain every worksheet OLE object",
-            ));
-        }
-        if sheet
-            .iter()
-            .map(OleObjectRecord::object_id)
-            .eq(ids.iter().copied())
-        {
-            return Ok(());
-        }
-        if candidate.opaque_identity.present {
-            return Err(Error::refused(
-                RefusalKind::UnsupportedContent,
-                "edit OLE objects",
-                "reordering typed Obj records with opaque Obj records is not source-complete",
-            ));
-        }
-        let mut remaining = sheet.clone();
-        let mut reordered = Vec::with_capacity(ids.len());
-        for id in ids {
-            let index = remaining
-                .iter()
-                .position(|value| value.object_id() == *id)
-                .ok_or_else(|| invalid(OBJ, "unknown or repeated OLE object ID"))?;
-            reordered.push(remaining.remove(index));
-        }
-        *sheet = reordered;
-        candidate.commit()?;
-        *self = candidate;
-        Ok(())
+    pub(crate) fn check_embedded(&self, worksheet: usize, object_id: u16) -> Result<()> {
+        self.embedded_storage(worksheet, object_id).map(|_| ())
     }
 
     /// # Errors
@@ -430,8 +311,12 @@ impl Editor {
             .find(|value| value.object_id() == object_id)
             .ok_or_else(|| invalid(OBJ, "OLE object ID not found"))?;
         edit.apply(object)?;
-        if candidate.opaque_identity.ids.contains(&object.object_id()) {
-            return Err(invalid(OBJ, "duplicate workbook object ID in opaque Obj"));
+        if candidate
+            .opaque_identity
+            .ids
+            .contains(&(worksheet, object.object_id()))
+        {
+            return Err(invalid(OBJ, "duplicate worksheet object ID in opaque Obj"));
         }
         candidate.commit()?;
         *self = candidate;
@@ -508,16 +393,10 @@ impl Editor {
 
     fn commit(&mut self) -> Result<()> {
         validate_entries(&self.sheets, &self.form_controls)?;
-        let workbook = rewrite_workbook(
-            &self.workbook,
-            &self.sheets,
-            &self.form_controls,
-            &self.preserved_control_counts,
-        )?;
+        let workbook = rewrite_workbook(&self.workbook, &self.sheets)?;
         self.package
             .put_stream(&self.workbook_path, workbook.clone())?;
         self.workbook = workbook;
-        self.preserved_control_counts = self.form_controls.iter().map(Vec::len).collect();
         Ok(())
     }
 
@@ -554,25 +433,6 @@ impl Editor {
             ));
         }
         Ok(storage)
-    }
-
-    fn ensure_storage_capacity(&self, storage: &str) -> Result<()> {
-        if self
-            .sheets
-            .iter()
-            .flatten()
-            .any(|value| value.storage_name().as_deref() == Some(storage))
-        {
-            return Ok(());
-        }
-        let count = targets_for_sheets(&self.sheets)?.len();
-        if count >= self.limits.max_objects {
-            return Err(LimitKind::Objects.exceeded(
-                count.saturating_add(1) as u64,
-                self.limits.max_objects as u64,
-            ));
-        }
-        Ok(())
     }
 }
 
@@ -813,18 +673,24 @@ fn parse_workbook(
         }
         let end = starts.get(index + 1).map_or(input.len(), |value| value.0);
         let (objects, controls, sheet_opaque) = parse_sheet(&input[*start..end])?;
-        merge_opaque_identity(&mut opaque_identity, sheet_opaque)?;
+        merge_opaque_identity(&mut opaque_identity, sheet_opaque, sheets.len())?;
         sheets.push(objects);
         form_controls.push(controls);
     }
     validate_entries(&sheets, &form_controls)?;
-    for object in sheets.iter().flatten() {
-        if opaque_identity.ids.contains(&object.object_id()) {
+    for (sheet, objects) in sheets.iter().enumerate() {
+        if objects
+            .iter()
+            .any(|object| opaque_identity.ids.contains(&(sheet, object.object_id())))
+        {
             opaque_identity.ambiguous = true;
         }
     }
-    for control in form_controls.iter().flatten() {
-        if opaque_identity.ids.contains(&control.object_id()) {
+    for (sheet, controls) in form_controls.iter().enumerate() {
+        if controls
+            .iter()
+            .any(|control| opaque_identity.ids.contains(&(sheet, control.object_id())))
+        {
             opaque_identity.ambiguous = true;
         }
     }
@@ -877,9 +743,12 @@ fn parse_sheet(
     Ok((objects, controls, opaque_identity))
 }
 
+/// Merge one worksheet's opaque identity (parsed as sheet 0) into the
+/// workbook's, as worksheet `sheet`.
 fn merge_opaque_identity(
     destination: &mut OpaqueObjectIdentity,
     source: OpaqueObjectIdentity,
+    sheet: usize,
 ) -> Result<()> {
     destination.present |= source.present;
     destination.ambiguous |= source.ambiguous;
@@ -887,8 +756,8 @@ fn merge_opaque_identity(
         .ids
         .try_reserve(source.ids.len())
         .map_err(|_error| Error::Allocation("opaque Obj identity index"))?;
-    for object_id in source.ids {
-        if !destination.ids.insert(object_id) {
+    for (_, object_id) in source.ids {
+        if !destination.ids.insert((sheet, object_id)) {
             destination.ambiguous = true;
         }
     }
@@ -1012,40 +881,46 @@ fn inspect_opaque_obj(body: &[u8], identity: &mut OpaqueObjectIdentity) -> Resul
     Ok(())
 }
 
+/// Validate every typed object, bound the workbook's object count, and
+/// require each `Obj` identifier to be unique within its worksheet
+/// ([MS-XLS] 2.5.143 FtCmo).
 fn validate_entries(
     sheets: &[Vec<OleObjectRecord>],
     form_controls: &[Vec<FormControl>],
 ) -> Result<()> {
-    let mut ids = HashSet::new();
     let mut count = 0usize;
-    for object in sheets.iter().flatten() {
-        count += 1;
-        if count > 4_096 {
-            return Err(invalid(OBJ, "workbook object count exceeds limit"));
+    let empty = Vec::new();
+    for (sheet, objects) in sheets.iter().enumerate() {
+        let controls = form_controls.get(sheet).unwrap_or(&empty);
+        let mut ids = HashSet::new();
+        for object in objects {
+            count += 1;
+            if count > 4_096 {
+                return Err(invalid(OBJ, "workbook object count exceeds limit"));
+            }
+            object.validate()?;
+            if !ids.insert(object.object_id()) {
+                return Err(invalid(OBJ, "duplicate worksheet object ID"));
+            }
         }
-        object.validate()?;
-        if !ids.insert(object.object_id()) {
-            return Err(invalid(OBJ, "duplicate workbook object ID"));
-        }
-    }
-    for control in form_controls.iter().flatten() {
-        count += 1;
-        if count > 4_096 {
-            return Err(invalid(OBJ, "workbook object count exceeds limit"));
-        }
-        if !ids.insert(control.object_id()) {
-            return Err(invalid(OBJ, "duplicate workbook object ID"));
+        for control in controls {
+            count += 1;
+            if count > 4_096 {
+                return Err(invalid(OBJ, "workbook object count exceeds limit"));
+            }
+            if !ids.insert(control.object_id()) {
+                return Err(invalid(OBJ, "duplicate worksheet object ID"));
+            }
         }
     }
     Ok(())
 }
 
-fn rewrite_workbook(
-    input: &[u8],
-    sheets: &[Vec<OleObjectRecord>],
-    form_controls: &[Vec<FormControl>],
-    preserved_control_counts: &[usize],
-) -> Result<Vec<u8>> {
+/// The workbook with every typed OLE `Obj` of its worksheets re-rendered in
+/// place. Objects are only re-rendered here (their metadata may change);
+/// adding or removing one goes through the drawing-aware worksheet-feature
+/// edit, which keeps each `Obj` paired with its drawing shape.
+fn rewrite_workbook(input: &[u8], sheets: &[Vec<OleObjectRecord>]) -> Result<Vec<u8>> {
     let (refs, starts) = bindings(input)?;
     let first = starts.first().map_or(input.len(), |value| value.0);
     let mut output = input[..first].to_vec();
@@ -1060,12 +935,6 @@ fn rewrite_workbook(
                 sheets
                     .get(worksheet)
                     .ok_or_else(|| invalid(BOUNDSHEET, "worksheet list missing"))?,
-                form_controls
-                    .get(worksheet)
-                    .ok_or_else(|| invalid(BOUNDSHEET, "form-control list missing"))?,
-                *preserved_control_counts
-                    .get(worksheet)
-                    .ok_or_else(|| invalid(BOUNDSHEET, "form-control baseline missing"))?,
             )?);
             worksheet += 1;
         } else {
@@ -1088,12 +957,7 @@ fn rewrite_workbook(
     Ok(output)
 }
 
-fn rewrite_sheet(
-    input: &[u8],
-    objects: &[OleObjectRecord],
-    form_controls: &[FormControl],
-    preserved_control_count: usize,
-) -> Result<Vec<u8>> {
+fn rewrite_sheet(input: &[u8], objects: &[OleObjectRecord]) -> Result<Vec<u8>> {
     let records = ranges(input)?;
     let mut output = Vec::new();
     let mut next = 0usize;
@@ -1104,42 +968,23 @@ fn rewrite_sheet(
             continue;
         }
         if value.2 == OBJ && OleObjectRecord::parse(&input[value.3..value.4], None).is_ok() {
-            if let Some(object) = objects.get(next) {
-                output.extend_from_slice(&object.to_record_bytes()?);
-                if let Some(txo) = &object.text_object {
-                    output.extend_from_slice(txo);
-                }
-                next += 1;
+            let object = objects
+                .get(next)
+                .ok_or_else(|| invalid(OBJ, "worksheet OLE object list is short"))?;
+            output.extend_from_slice(&object.to_record_bytes()?);
+            if let Some(txo) = &object.text_object {
+                output.extend_from_slice(txo);
             }
+            next += 1;
             skip_txo = records
                 .get(index + 1)
                 .is_some_and(|following| following.2 == TXO);
             continue;
         }
-        if value.2 == EOF {
-            for object in &objects[next..] {
-                output.extend_from_slice(&object.to_record_bytes()?);
-                if let Some(txo) = &object.text_object {
-                    output.extend_from_slice(txo);
-                }
-            }
-            next = objects.len();
-            for control in form_controls
-                .get(preserved_control_count..)
-                .ok_or_else(|| {
-                    invalid(OBJ, "form-control baseline exceeds current control count")
-                })?
-            {
-                output.extend_from_slice(&control.to_record_bytes()?);
-                if let Some(txo) = &control.text_object {
-                    output.extend_from_slice(txo);
-                }
-            }
-        }
         output.extend_from_slice(&input[value.0..value.1]);
     }
     if next != objects.len() {
-        return Err(invalid(EOF, "worksheet has no EOF"));
+        return Err(invalid(OBJ, "worksheet OLE object list is long"));
     }
     Ok(output)
 }
@@ -1217,10 +1062,9 @@ mod native_note_identity_tests {
             let mut identities = OpaqueObjectIdentity::default();
             inspect_opaque_obj(&note(shared), &mut identities).unwrap();
             assert!(!identities.ambiguous);
-            assert_eq!(identities.ids, HashSet::from([1]));
+            assert_eq!(identities.ids, HashSet::from([(0, 1)]));
             assert!(identities.storages.is_empty());
             identities.check_storage_rewrite("MBD00DD3649").unwrap();
-            assert!(identities.check_new_identity(1, "MBD00000001").is_err());
             inspect_opaque_obj(&note(shared), &mut identities).unwrap();
             assert!(identities.require_topology_proof().is_err());
         }

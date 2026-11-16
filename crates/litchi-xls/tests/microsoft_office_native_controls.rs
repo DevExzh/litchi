@@ -128,20 +128,30 @@ fn native_control_metadata_append_preserves_all_original_obj_bytes() {
     let original = obj_records(&bytes);
     let package = litchi_xls::Package::from_bytes(&bytes).unwrap();
     let mut edit = package.edit_ole_objects().unwrap();
-    edit.add_form_control(
-        0,
-        FormControl::new(
-            ObjectType::CheckBox,
-            13,
-            [ObjSubrecord::CheckBoxData(FtCblsData {
-                state: CheckState::Unchecked,
-                accelerator: 0,
-                reserved: 0,
-                flags: 0,
-            })],
-        ),
-    )
-    .unwrap();
+    let id = edit
+        .add_form_control(
+            0,
+            FormControl::new(
+                ObjectType::CheckBox,
+                1,
+                [ObjSubrecord::CheckBoxData(FtCblsData {
+                    state: CheckState::Unchecked,
+                    accelerator: 0,
+                    reserved: 0,
+                    flags: 0,
+                })],
+            ),
+            litchi_xls::sheet_features::edit::Anchor {
+                first_row: 30,
+                first_column: 2,
+                last_row: 31,
+                last_column: 4,
+                behavior: litchi_xls::AnchorBehavior::MoveAndResize,
+            },
+        )
+        .unwrap();
+    // The identifier is allocated after the drawing's highest one.
+    assert_eq!(id, 13);
     let commit = edit.commit().unwrap();
     let directory = tempfile::tempdir().unwrap();
     let destination = directory.path().join("control-metadata.xls");

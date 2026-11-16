@@ -1,7 +1,6 @@
 //! Inert, bounded embedded-payload authoring for MS-XLS.
 
 use super::super::LimitKind;
-use super::{FtCf, FtCmo, FtPictFmla, FtPioGrbit, ObjSubrecord, OleObjectRecord};
 use crate::error::{Error, Result};
 use litchi_cfb::{
     OleFile,
@@ -253,57 +252,46 @@ fn inspect_publication_directory<R: std::io::Read + std::io::Seek>(
 
 /// A constrained new XLS embedded-object request.
 ///
-/// The request binds one nonzero BIFF object identity, one `MBDxxxxxxxx`
-/// storage identity, and one inert payload. It cannot describe a DDE link,
+/// The request binds one inert payload to the drawing frame Excel shows it
+/// in: a cell anchor and a preview picture. Adding it writes the frame
+/// shape, its `Obj` (`cmo.ot=8`, `fDde=0`, `fPrstm=0`, a normative `FtCf`
+/// unspecified clipboard format) and a new `MBDxxxxxxxx` storage
+/// ([MS-XLS] 2.4.181 Obj, 2.5.150 FtPictFmla). The identities are
+/// allocated when the object is added: the `Obj` identifier is unique
+/// within its worksheet (as [MS-XLS] 2.5.143 requires) and the storage name
+/// within the compound file. The request cannot describe a DDE link,
 /// controls-stream object, or arbitrary Obj subrecord graph.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EmbeddedObjectDraft {
-    object_id: u16,
-    storage_position: u32,
     payload: EmbeddedPayload,
+    anchor: crate::sheet_features::edit::Anchor,
+    preview: Vec<u8>,
+    prog_id: String,
 }
 
 impl EmbeddedObjectDraft {
-    /// Creates a storage-backed embedded-object request.
-    ///
-    /// `storage_position` is rendered as the eight hexadecimal digits in the
-    /// normative `MBDxxxxxxxx` CFB storage name from [MS-XLS] 2.1.7.5 and
-    /// 2.5.150. The generated `Obj` uses `cmo.ot=8`, `fDde=0`, and
-    /// `fPrstm=0`, and a normative `FtCf` unspecified clipboard format.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when `object_id` is zero.
-    pub fn new(object_id: u16, storage_position: u32, payload: EmbeddedPayload) -> Result<Self> {
-        if object_id == 0 {
-            return Err(Error::InvalidRecord {
-                record_type: super::super::OBJ,
-                message: "embedded object ID must be nonzero".into(),
-            });
-        }
-        Ok(Self {
-            object_id,
-            storage_position,
+    /// Creates a storage-backed embedded-object request shown at `anchor`
+    /// with `preview` (PNG or JPEG) as its picture.
+    #[must_use]
+    pub fn new(
+        payload: EmbeddedPayload,
+        anchor: crate::sheet_features::edit::Anchor,
+        preview: Vec<u8>,
+    ) -> Self {
+        Self {
             payload,
-        })
+            anchor,
+            preview,
+            prog_id: String::new(),
+        }
     }
 
-    /// Returns the BIFF `FtCmo.id` to be authored.
+    /// Names the object's ProgID (for example `Word.Document.8`) in its
+    /// `Obj`; ASCII, at most 255 bytes.
     #[must_use]
-    pub const fn object_id(&self) -> u16 {
-        self.object_id
-    }
-
-    /// Returns the `FtPictFmla.lPosInCtlStm` value used for the MBD name.
-    #[must_use]
-    pub const fn storage_position(&self) -> u32 {
-        self.storage_position
-    }
-
-    /// Returns the normative embedding-storage name.
-    #[must_use]
-    pub fn storage_name(&self) -> String {
-        format!("MBD{:08X}", self.storage_position)
+    pub fn with_prog_id(mut self, prog_id: impl Into<String>) -> Self {
+        self.prog_id = prog_id.into();
+        self
     }
 
     /// Returns the inert payload selected for publication.
@@ -312,44 +300,30 @@ impl EmbeddedObjectDraft {
         &self.payload
     }
 
-    pub(crate) fn object_record(&self) -> OleObjectRecord {
-        OleObjectRecord {
-            subrecords: vec![
-                ObjSubrecord::Common(FtCmo {
-                    object_type: 8,
-                    object_id: self.object_id,
-                    flags: 0,
-                    reserved: [0; 12],
-                }),
-                // MS-XLS 2.4.181 requires pictFormat for an OLE object
-                // (`cmo.ot=8`).  `0xFFFF` is the normative unspecified
-                // clipboard-format selector when the payload has no chosen
-                // presentation format.
-                ObjSubrecord::PictureFormat(
-                    FtCf::new(FtCf::UNSPECIFIED).expect("normative FtCf selector"),
-                ),
-                ObjSubrecord::PictureFlags(FtPioGrbit { raw: 0 }),
-                ObjSubrecord::PictureFormula(FtPictFmla {
-                    // MS-XLS 2.5.150/2.5.187 require an even cbFmla for this
-                    // storage form. The ObjFmla is an ObjectParsedFormula
-                    // (cce=5 plus four unused bytes), one five-byte PtgTbl,
-                    // and the minimal three-byte PictFmlaEmbedInfo.
-                    formula: vec![
-                        0x05, 0x00, // cce = 5
-                        0x00, 0x00, 0x00, 0x00, // ObjectParsedFormula unused
-                        0x02, 0x00, 0x00, 0x00, 0x00, // PtgTbl
-                        0x03, 0x00, 0x00, // PictFmlaEmbedInfo (no class name)
-                    ],
-                    storage_position: Some(self.storage_position),
-                    // cbBufInCtlStm is absent for fPrstm=0.  The codec also
-                    // retains the legacy eight-byte form when reading older
-                    // source objects, but new embedding authoring emits the
-                    // normative four-byte lPosInCtlStm tail.
-                    control_buffer_size: None,
-                }),
-                ObjSubrecord::End,
-            ],
-            text_object: None,
+    /// Returns the cell anchor of the object's frame.
+    #[must_use]
+    pub const fn anchor(&self) -> crate::sheet_features::edit::Anchor {
+        self.anchor
+    }
+
+    /// Returns the preview picture.
+    #[must_use]
+    pub fn preview(&self) -> &[u8] {
+        &self.preview
+    }
+
+    /// Returns the ProgID the `Obj` names; empty when it names none.
+    #[must_use]
+    pub fn prog_id(&self) -> &str {
+        &self.prog_id
+    }
+
+    pub(crate) fn spec(&self) -> crate::sheet_features::edit::EmbeddedObject {
+        crate::sheet_features::edit::EmbeddedObject {
+            compound_file: self.payload.to_vec(),
+            prog_id: self.prog_id.clone(),
+            preview: self.preview.clone(),
+            anchor: self.anchor,
         }
     }
 }

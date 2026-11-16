@@ -30,8 +30,8 @@ pub use encode::{HyperlinkSpec as Hyperlink, StyleSpec as Style, ValidationSpec 
 #[cfg(feature = "equation")]
 pub use objects::EquationSource;
 pub use objects::{
-    Anchor, DrawingChange, EquationContent, EquationSpec, PictureSpec as Picture, ShapeGeometry,
-    ShapeSpec as Shape,
+    Anchor, DrawingChange, EmbeddedObjectSpec as EmbeddedObject, EquationContent, EquationSpec,
+    PictureSpec as Picture, ShapeGeometry, ShapeSpec as Shape,
 };
 
 #[path = "objects.rs"]
@@ -1164,6 +1164,11 @@ impl Edit {
                         let file = objects::storage_file(*kind, native)?;
                         editor
                             .add_storage(target(storage)?, file)
+                            .map_err(records)?;
+                    },
+                    StagedStorage::File(file) => {
+                        editor
+                            .add_storage(target(storage)?, file.clone())
                             .map_err(records)?;
                     },
                     StagedStorage::Removed => {

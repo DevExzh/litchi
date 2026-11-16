@@ -1,11 +1,13 @@
-//! OLE equations of worksheet drawings: create, read, update and delete,
-//! on a fresh workbook and on an Excel-authored workbook with embedded
-//! objects, read back through this reader, the OLE-object view and the
-//! compound file.
+//! OLE equations and embedded objects of worksheet drawings: create, read,
+//! update and delete, on a fresh workbook and on an Excel-authored workbook
+//! with embedded objects, read back through this reader, the OLE-object
+//! view and the compound file.
 
 use litchi_cfb::OleFile;
 use litchi_xls::Package;
-use litchi_xls::sheet_features::edit::{EquationContent, EquationSpec, Error};
+use litchi_xls::sheet_features::edit::{
+    Anchor, EmbeddedObject, EquationContent, EquationSpec, Error,
+};
 use litchi_xls::sheet_features::{EquationKind, FeatureSet};
 use std::collections::BTreeMap;
 use std::io::Cursor;
@@ -315,6 +317,104 @@ fn excel_embedded_objects_stay_intact_beside_a_new_equation() {
         package.ole_objects().unwrap().objects(0).unwrap(),
         before_objects.as_slice()
     );
+}
+
+fn embedded(marker: &[u8]) -> EmbeddedObject {
+    let mut writer = litchi_cfb::OleWriter::new();
+    writer.create_stream(&["CONTENTS"], marker).unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    EmbeddedObject {
+        compound_file: output.into_inner(),
+        prog_id: "Package".to_owned(),
+        preview: PNG.to_vec(),
+        anchor: Anchor {
+            first_row: 1,
+            first_column: 1,
+            last_row: 5,
+            last_column: 4,
+            behavior: litchi_xls::AnchorBehavior::MoveWithoutResize,
+        },
+    }
+}
+
+#[test]
+fn embedded_objects_are_added_and_removed_with_their_shapes() {
+    let source = Package::new().unwrap();
+    let source_streams = streams(&source);
+    let mut edit = source.edit_sheet_features().unwrap();
+    let first = edit.add_embedded_object(0, &embedded(b"first")).unwrap();
+    let second = edit.add_embedded_object(0, &embedded(b"second")).unwrap();
+    assert_ne!(first, second);
+    let package = reopen(&edit.commit().unwrap().into_package());
+    assert!(package.equations(0).unwrap().is_empty());
+    let objects = package.ole_objects().unwrap().objects(0).unwrap().to_vec();
+    assert_eq!(
+        objects
+            .iter()
+            .map(|object| object.object_id())
+            .collect::<Vec<_>>(),
+        [first, second]
+    );
+    let all = streams(&package);
+    for (object, marker) in objects.iter().zip([&b"first"[..], b"second"]) {
+        let storage = object.storage_name().unwrap();
+        assert_eq!(
+            all.get(&vec![storage, "CONTENTS".to_owned()])
+                .map(Vec::as_slice),
+            Some(marker)
+        );
+    }
+
+    // Removing one keeps the other; removing both restores the workbook.
+    let mut edit = package.edit_sheet_features().unwrap();
+    edit.remove_embedded_object(0, first).unwrap();
+    assert!(matches!(
+        edit.remove_embedded_object(0, first),
+        Err(Error::Refused(_))
+    ));
+    let package = reopen(&edit.commit().unwrap().into_package());
+    let objects = package.ole_objects().unwrap().objects(0).unwrap().to_vec();
+    assert_eq!(objects.len(), 1);
+    assert_eq!(objects[0].object_id(), second);
+    let mut edit = package.edit_sheet_features().unwrap();
+    edit.remove_embedded_object(0, second).unwrap();
+    let package = reopen(&edit.commit().unwrap().into_package());
+    assert_eq!(streams(&package), source_streams);
+}
+
+#[test]
+fn embedded_object_requests_are_checked() {
+    let package = fixture("WithEmbeddedObjects.xls");
+    let mut edit = package.edit_sheet_features().unwrap();
+    let mut not_a_file = embedded(b"x");
+    not_a_file.compound_file = b"not a compound file".to_vec();
+    assert!(edit.add_embedded_object(0, &not_a_file).is_err());
+    let mut not_a_picture = embedded(b"x");
+    not_a_picture.preview = b"GIF89a".to_vec();
+    assert!(matches!(
+        edit.add_embedded_object(0, &not_a_picture),
+        Err(Error::Refused(_))
+    ));
+    let mut long_prog_id = embedded(b"x");
+    long_prog_id.prog_id = "P".repeat(256);
+    assert!(matches!(
+        edit.add_embedded_object(0, &long_prog_id),
+        Err(Error::Refused(_))
+    ));
+    let mut outside = embedded(b"x");
+    outside.anchor.last_column = 256;
+    assert!(matches!(
+        edit.add_embedded_object(0, &outside),
+        Err(Error::Refused(_))
+    ));
+    // A note or picture identifier is not an embedded object.
+    assert!(matches!(
+        edit.remove_embedded_object(0, 0x7777),
+        Err(Error::Refused(_))
+    ));
+    let commit = edit.commit().unwrap();
+    assert!(!commit.diagnostics().changed());
 }
 
 #[cfg(feature = "equation")]

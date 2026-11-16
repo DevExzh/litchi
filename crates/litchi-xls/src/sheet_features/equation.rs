@@ -32,6 +32,8 @@ pub(super) enum StagedStorage {
         /// Its `Equation Native` stream.
         native: Vec<u8>,
     },
+    /// A new embedded-object storage: the root of this compound file.
+    File(Vec<u8>),
     /// A new `Equation Native` stream for an existing storage.
     Native(Vec<u8>),
     /// The storage is removed with its whole subtree.

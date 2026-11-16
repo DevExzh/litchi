@@ -568,7 +568,13 @@ fn editor_enumerates_form_controls_and_preserves_them_on_rewrite() {
         .unwrap()
         .edit_ole_objects()
         .unwrap();
-    editor.remove_object(0, 1).unwrap();
+    editor
+        .update_object_metadata(
+            0,
+            1,
+            litchi_xls::ole_object::ObjectMetadataChange::new().with_common_flags(0x6011),
+        )
+        .unwrap();
     let bytes = editor.commit().unwrap().patch().after().to_vec();
     let mut ole_file = OleFile::open(
         Cursor::new(bytes.clone()),

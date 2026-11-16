@@ -10,18 +10,17 @@
 //! PictFmlaEmbedInfo, 2.5.198.92 PtgTbl; [MS-OLEDS] 2.3.7 and 2.3.8).
 
 use litchi_core::edit::RefusalKind;
-use litchi_odraw::builder::PropertyBuilder;
 
-use super::super::super::drawing::{self, Block, ole_link};
+use super::super::super::drawing::Block;
 use super::super::super::equation::{
     self as model, EQUATION_NATIVE, Equation, EquationKind, MAX_EQUATION_NATIVE_BYTES,
     StagedStorage,
 };
-use super::super::super::stream::{Globals, OBJ, Sheet, u16_at, u32_at};
+use super::super::super::stream::{Globals, Sheet, u16_at, u32_at};
 #[cfg(feature = "equation")]
 use super::Error;
 use super::refused;
-use super::{Edit, NewObject, Property, Result, encode_fopt, fopt_of, image_kind, io, obj_record};
+use super::{Edit, Property, Result, encode_fopt, fopt_of, image_kind, io};
 
 /// New content of an OLE equation: its `Equation Native` stream, its
 /// preview picture and the size it is shown at.
@@ -118,75 +117,6 @@ fn check_size(size_pt: (f64, f64)) -> Result<()> {
             "the equation size is not a positive number of points",
         ))
     }
-}
-
-/// The `Obj` of an embedded equation: `ftCmo` (`ot` 8, locked, printed,
-/// auto-fill, auto-line), `ftCf` unspecified, `ftPioGrbit` `fAutoPict`, and
-/// `ftPictFmla` with a `PtgTbl` formula, the ProgID and the storage
-/// position, as Excel writes them.
-fn equation_obj(object_id: u16, prog_id: &str, storage: u32) -> Result<Vec<u8>> {
-    let class = prog_id.as_bytes();
-    let count = u8::try_from(class.len())
-        .map_err(|_| refused(RefusalKind::InvalidValue, "the ProgID is too long"))?;
-    // ObjectParsedFormula: cce = 5, four unused bytes, PtgTbl; then
-    // PictFmlaEmbedInfo: ttb 3, cbClass, reserved, an 8-bit
-    // XLUnicodeStringNoCch; padded to an even length.
-    let mut formula = vec![
-        0x05, 0x00, 0, 0, 0, 0, 0x02, 0, 0, 0, 0, 0x03, count, 0x00, 0x00,
-    ];
-    formula.extend_from_slice(class);
-    if formula.len() % 2 == 1 {
-        formula.push(0);
-    }
-    let formula_length = u16::try_from(formula.len())
-        .map_err(|_| refused(RefusalKind::InvalidValue, "the ProgID is too long"))?;
-    let mut extra = vec![
-        0x07, 0x00, 0x02, 0x00, 0xff, 0xff, 0x08, 0x00, 0x02, 0x00, 0x01, 0x00,
-    ];
-    extra.extend_from_slice(&0x0009u16.to_le_bytes());
-    extra.extend_from_slice(&(formula_length + 6).to_le_bytes());
-    extra.extend_from_slice(&formula_length.to_le_bytes());
-    extra.extend(formula);
-    extra.extend_from_slice(&storage.to_le_bytes());
-    obj_record(8, object_id, &extra)
-}
-
-/// The shape container of an embedded OLE object: a picture frame with
-/// `fOleShape`, the properties Excel writes for one, its anchor and its
-/// client data.
-fn ole_shape(shape_id: u32, pib: u32, anchor: [u8; 18]) -> Result<Vec<u8>> {
-    let mut properties = PropertyBuilder::new();
-    let pib = i32::try_from(pib).unwrap_or(i32::MAX);
-    #[allow(
-        clippy::cast_possible_wrap,
-        reason = "OfficeArt property values are raw 32-bit fields"
-    )]
-    for (id, value) in [
-        (0x00bfu16, 0x0008_0008u32),
-        (0x0104, 0),
-        (0x010b, 1),
-        (0x0181, 0x0800_0041),
-        (0x0183, 0x0800_0041),
-        (0x01bf, 0x0010_0010),
-        (0x01c0, 0x0800_0040),
-        (0x01ff, 0x0008_0008),
-        (0x033f, 0x0010_0010),
-    ] {
-        if id == 0x0104 {
-            properties.add_blip_id(litchi_odraw::prop::Id::from(id), pib);
-        } else {
-            properties.add_simple(litchi_odraw::prop::Id::from(id), value as i32);
-        }
-    }
-    super::shape_container_with(
-        75,
-        shape_id,
-        litchi_odraw::shape::Flags::OLE_SHAPE,
-        (false, false),
-        &properties,
-        anchor,
-        false,
-    )
 }
 
 /// The `CompObj` stream ([MS-OLEDS] 2.3.8) of an equation object, as
@@ -376,7 +306,6 @@ impl Edit {
         Ok((block, positions))
     }
 
-    /// The staged `Equation Native` stream of a storage, else the source's.
     /// The staged `Equation Native` stream of a storage, else the
     /// source's, or why the source's could not be read.
     fn staged_native(&self, storage: &str) -> Result<(Option<Vec<u8>>, Option<String>)> {
@@ -384,67 +313,9 @@ impl Edit {
             Some((_, StagedStorage::New { native, .. } | StagedStorage::Native(native))) => {
                 Ok((Some(native.clone()), None))
             },
-            Some((_, StagedStorage::Removed)) => Ok((None, None)),
+            Some((_, StagedStorage::File(_) | StagedStorage::Removed)) => Ok((None, None)),
             None => Ok(model::read_native(&self.base, storage)?),
         }
-    }
-
-    fn stage(&mut self, storage: String, change: StagedStorage) {
-        let staged_new = self.storages.iter().position(|(name, _)| *name == storage);
-        match (staged_new, change) {
-            (Some(index), StagedStorage::Removed) => {
-                if matches!(self.storages[index].1, StagedStorage::New { .. }) {
-                    self.storages.remove(index);
-                } else {
-                    self.storages[index].1 = StagedStorage::Removed;
-                }
-            },
-            (Some(index), StagedStorage::Native(native)) => match &mut self.storages[index].1 {
-                StagedStorage::New { native: staged, .. } => *staged = native,
-                other => *other = StagedStorage::Native(native),
-            },
-            (Some(index), change) => self.storages[index].1 = change,
-            (None, change) => self.storages.push((storage, change)),
-        }
-    }
-
-    /// Every `MBD` storage position an `Obj` of the workbook names.
-    fn referenced_storages(&self) -> Result<Vec<u32>> {
-        let globals = Globals::parse(&self.stream)?;
-        let mut out = Vec::new();
-        for bound in globals.bounds.iter().filter(|bound| bound.kind == 0) {
-            let layout = Sheet::parse(&self.stream, bound.position)?;
-            for (index, record) in layout.records.iter().enumerate() {
-                if record.kind == OBJ {
-                    if let Some(link) = ole_link(record.payload(&self.stream), index) {
-                        out.push(link.storage);
-                    }
-                }
-            }
-        }
-        Ok(out)
-    }
-
-    /// A storage position no `Obj`, staged change or compound-file entry
-    /// uses.
-    fn free_storage(&self) -> Result<u32> {
-        let referenced = self.referenced_storages()?;
-        let mut candidate = referenced.iter().max().map_or(1, |max| max.wrapping_add(1));
-        for _ in 0..4_096 {
-            let name = format!("MBD{candidate:08X}");
-            let taken = candidate == 0
-                || referenced.contains(&candidate)
-                || self.storages.iter().any(|(staged, _)| *staged == name)
-                || self.base.package_entry_exists(&[name.as_str()])?;
-            if !taken {
-                return Ok(candidate);
-            }
-            candidate = candidate.wrapping_add(1);
-        }
-        Err(refused(
-            RefusalKind::UnsupportedOperation,
-            "no free embedded-object storage name was found",
-        ))
     }
 
     /// The staged OLE equations of a worksheet, in drawing order.
@@ -498,33 +369,29 @@ impl Edit {
                 "the anchor is outside the BIFF8 grid",
             ));
         }
-        let kind = image_kind(&spec.content.preview).ok_or(refused(
-            RefusalKind::InvalidValue,
-            "the preview is not PNG or JPEG",
-        ))?;
+        if image_kind(&spec.content.preview).is_none() {
+            return Err(refused(
+                RefusalKind::InvalidValue,
+                "the preview is not PNG or JPEG",
+            ));
+        }
         let count = self.equations(sheet)?.len();
-        let storage = self.free_storage()?;
         let (_, layout) = self.sheet(sheet)?;
         let anchor = Grid::parse(&self.stream, &layout).anchor(
             (spec.column, 0),
             (spec.row, 0),
             spec.content.size_pt,
         );
-        let pib = self.add_blip(kind, &spec.content.preview)?;
-        self.append_object(sheet, |shape_id, object_id| {
-            Ok(NewObject {
-                sp: ole_shape(shape_id, pib, anchor)?,
-                obj: equation_obj(object_id, identity.prog_id, storage)?,
-                textbox: None,
-            })
-        })?;
-        self.stage(
-            format!("MBD{storage:08X}"),
+        self.add_embedded(
+            sheet,
+            identity.prog_id,
+            &spec.content.preview,
+            anchor,
             StagedStorage::New {
                 kind: spec.kind,
                 native: spec.content.native.clone(),
             },
-        );
+        )?;
         Ok(count)
     }
 
@@ -621,23 +488,7 @@ impl Edit {
             RefusalKind::NotFound,
             "the equation does not exist",
         ))?;
-        let object = self.remove_object(sheet, position)?;
-        if let Some(prop) = object.prop(0x0104) {
-            self.release_blip(prop.value)?;
-        }
-        self.drop_empty_group()?;
-        if let Some(ole) = &object.ole {
-            // Another Obj naming the same storage keeps it; a storage the
-            // compound file does not have is not removed.
-            let name = ole.storage_name();
-            let staged = self.storages.iter().any(|(staged, _)| *staged == name);
-            if !self.referenced_storages()?.contains(&ole.storage)
-                && (staged || self.base.package_entry_exists(&[name.as_str()])?)
-            {
-                self.stage(name, StagedStorage::Removed);
-            }
-        }
-        Ok(())
+        self.remove_embedded(sheet, position)
     }
 
     /// Point a picture at new image bytes: the blip `old` is replaced in
@@ -650,7 +501,7 @@ impl Edit {
         data: &[u8],
     ) -> Result<u32> {
         let globals = Globals::parse(&self.stream)?;
-        let group = drawing::Group::parse(&self.stream, &globals)?;
+        let group = Self::group(&self.stream, &globals)?;
         let entries = match &group {
             Some(group) => group.store()?,
             None => None,
@@ -660,7 +511,11 @@ impl Edit {
             let index = (pib as usize).checked_sub(1)?;
             let entry = entries.get(index)?;
             let refs = u32_at(&group.as_ref()?.bytes, entry.at + 8 + 24);
-            (entry.win != 0 && refs == 1).then_some((*store_at, entry.at, entry.length))
+            (entry.fbse && entry.win != 0 && refs == 1).then_some((
+                *store_at,
+                entry.at,
+                entry.length,
+            ))
         });
         let (Some((store_at, entry_at, length)), Some(group), Some(pib)) = (sole, group, old)
         else {
@@ -675,13 +530,24 @@ impl Edit {
             globals.records[group.end - 1].end,
         );
         let mut bytes = group.bytes.clone();
+        // `check` keeps the entry inside the store and the store inside the
+        // container.
         let removed = 8 + length;
+        let delta = i64::try_from(entry.len()).unwrap_or(i64::MAX)
+            - i64::try_from(removed).unwrap_or(i64::MAX);
+        let grow = |value: u32| {
+            i64::from(value)
+                .checked_add(delta)
+                .and_then(|value| u32::try_from(value).ok())
+                .ok_or(refused(
+                    RefusalKind::InvalidValue,
+                    "a drawing-group count or length is at its limit",
+                ))
+        };
+        let store_length = grow(u32_at(&bytes, store_at + 4))?;
+        let container = grow(u32_at(&bytes, 4))?;
         bytes.splice(entry_at..entry_at + removed, entry.iter().copied());
-        let delta = i64::try_from(entry.len()).unwrap_or(0) - i64::try_from(removed).unwrap_or(0);
-        let grow = |value: u32| u32::try_from(i64::from(value) + delta).unwrap_or(value);
-        let store_length = grow(u32_at(&bytes, store_at + 4));
         bytes[store_at + 4..store_at + 8].copy_from_slice(&store_length.to_le_bytes());
-        let container = grow(u32_at(&bytes, 4));
         bytes[4..8].copy_from_slice(&container.to_le_bytes());
         self.put_group(bytes, Some(range), group.continuation)?;
         Ok(pib)
@@ -879,11 +745,13 @@ impl Edit {
 
 #[cfg(test)]
 mod tests {
+    use super::super::super::super::drawing::ole_link;
+    use super::super::embedded::embedded_obj;
     use super::*;
 
     #[test]
     fn equation_obj_matches_the_excel_layout() {
-        let obj = equation_obj(3, "Equation.DSMT4", 0x00DD_3649).unwrap();
+        let obj = embedded_obj(3, "Equation.DSMT4", 0x00DD_3649).unwrap();
         // Obj header, then ftCmo.
         assert_eq!(&obj[..4], &[0x5d, 0x00, 0x4e, 0x00]);
         assert_eq!(&obj[4..10], &[0x15, 0x00, 0x12, 0x00, 0x08, 0x00]);

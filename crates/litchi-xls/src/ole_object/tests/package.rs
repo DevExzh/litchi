@@ -3,7 +3,7 @@
 use super::super::package::{Editor, read_workbook, targets_for_sheets};
 use super::super::*;
 use crate::error::Error;
-use litchi_cfb::{OleFile, OleWriter};
+use litchi_cfb::OleWriter;
 use litchi_ole_common::property_set::document_summary::DIGITAL_SIGNATURE;
 use litchi_ole_common::property_set::{
     CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, Section, Stream, Value,
@@ -175,111 +175,6 @@ fn pidssi_with_signature() -> Vec<u8> {
     Stream::new(section)
         .to_bytes()
         .expect("PIDDSI stream should serialize")
-}
-
-fn checkbox_control(id: u16, marker: u8) -> FormControl {
-    FormControl {
-        subrecords: vec![
-            ObjSubrecord::Common(FtCmo {
-                object_type: 0x000B,
-                object_id: id,
-                flags: 0,
-                reserved: [0xCC; 12],
-            }),
-            ObjSubrecord::CheckBoxData(FtCblsData {
-                state: CheckState::Checked,
-                accelerator: 0,
-                reserved: 0,
-                flags: 1,
-            }),
-            ObjSubrecord::Unknown {
-                kind: 0x7777,
-                data: vec![marker],
-            },
-            ObjSubrecord::End,
-        ],
-        text_object: None,
-    }
-}
-
-fn occurrences(haystack: &[u8], needle: &[u8]) -> usize {
-    haystack
-        .windows(needle.len())
-        .filter(|window| *window == needle)
-        .count()
-}
-
-#[test]
-fn add_form_control_is_typed_atomic_and_lossless() {
-    let existing = checkbox_control(7, 0xA1).to_record_bytes().unwrap();
-    let mut editor = Editor::new(
-        workbook_cfb(std::slice::from_ref(&existing)),
-        Limits::default(),
-    )
-    .expect("workbook should open");
-    let authored = checkbox_control(8, 0xB2);
-    editor
-        .add_form_control(0, authored.clone())
-        .expect("typed control should be authored");
-    assert_eq!(editor.form_controls(0).unwrap().len(), 2);
-
-    let bytes = editor.finish().expect("transaction should finish");
-    let mut ole = OleFile::open(
-        Cursor::new(bytes.clone()),
-        litchi_cfb::OleFileLimits::default(),
-    )
-    .expect("CFB should reopen");
-    let workbook = ole
-        .open_stream(&["Workbook"])
-        .expect("Workbook stream should remain present");
-    let authored_bytes = authored.to_record_bytes().unwrap();
-    assert_eq!(occurrences(&workbook, &existing), 1);
-    assert_eq!(occurrences(&workbook, &authored_bytes), 1);
-
-    let mut editor = Editor::new(bytes, Limits::default()).expect("edited workbook should open");
-    let second_authored = checkbox_control(9, 0xC3);
-    editor
-        .add_form_control(0, second_authored.clone())
-        .expect("second typed control should be authored");
-    let bytes = editor.finish().expect("second transaction should finish");
-    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
-        .expect("second CFB should reopen");
-    let workbook = ole
-        .open_stream(&["Workbook"])
-        .expect("second Workbook stream should remain present");
-    assert_eq!(occurrences(&workbook, &existing), 1);
-    assert_eq!(occurrences(&workbook, &authored_bytes), 1);
-    assert_eq!(
-        occurrences(&workbook, &second_authored.to_record_bytes().unwrap()),
-        1
-    );
-}
-
-#[test]
-fn add_form_control_rejects_duplicate_ids_without_mutation() {
-    let existing = checkbox_control(7, 0xA1).to_record_bytes().unwrap();
-    let mut editor = Editor::new(
-        workbook_cfb(std::slice::from_ref(&existing)),
-        Limits::default(),
-    )
-    .expect("workbook should open");
-    let error = editor
-        .add_form_control(0, checkbox_control(7, 0xB2))
-        .expect_err("duplicate control IDs must be rejected");
-    assert!(matches!(
-        error,
-        Error::InvalidRecord {
-            record_type: OBJ,
-            ..
-        }
-    ));
-    assert_eq!(editor.form_controls(0).unwrap().len(), 1);
-    assert_eq!(
-        editor.form_controls(0).unwrap()[0]
-            .to_record_bytes()
-            .unwrap(),
-        existing
-    );
 }
 
 #[test]

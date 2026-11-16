@@ -373,9 +373,13 @@ impl Block {
         let children_start = spgr_start + 16 + patriarch.length;
         let mut spans = Vec::new();
         let mut at = children_start;
+        // A child that ends past its group is read, but the drawing is not
+        // rewritten: its lengths cannot be adjusted.
+        let mut overrun = false;
         while at + 8 <= spgr_end.min(ds.len()) {
             let child = header(&ds, at)?;
             let child_end = at + 8 + child.length;
+            overrun |= child_end > spgr_end;
             spans.push((at, child_end, child.kind == SPGR_CONTAINER));
             at = child_end;
         }
@@ -388,7 +392,7 @@ impl Block {
                 }
             })
         };
-        let mut canonical = spgr_end == dg_end && dg_end == ds.len();
+        let mut canonical = spgr_end == dg_end && dg_end == ds.len() && !overrun;
         let mut owned: Vec<Vec<usize>> = vec![Vec::new(); spans.len()];
         let mut shares_header = vec![false; spans.len()];
         for (offset, index) in (first..end).enumerate() {
@@ -493,10 +497,12 @@ impl Block {
                         object.props.extend(properties(&ds, at, atom));
                     },
                     CLIENT_ANCHOR if atom.length >= 18 => {
-                        let mut anchor = [0; 18];
-                        anchor.copy_from_slice(&ds[at + 8..at + 26]);
-                        object.anchor = Some(anchor);
-                        object.anchor_at = Some(at + 8);
+                        if let Some(bytes) = ds.get(at + 8..at + 26) {
+                            let mut anchor = [0; 18];
+                            anchor.copy_from_slice(bytes);
+                            object.anchor = Some(anchor);
+                            object.anchor_at = Some(at + 8);
+                        }
                     },
                     _ => {},
                 }
@@ -621,6 +627,9 @@ pub(super) struct Bse {
     pub(super) win: u8,
     pub(super) uid: [u8; 16],
     pub(super) size: u32,
+    /// Whether the entry is an `OfficeArtFBSE` of at least its 36 fixed
+    /// bytes, so its `cRef` can be read and written.
+    pub(super) fbse: bool,
 }
 
 impl Group {
@@ -660,6 +669,11 @@ impl Group {
                 "OfficeArtDggContainer does not start with OfficeArtFDGGBlock".into(),
             ));
         }
+        if block.length > self.bytes.len() - 16 {
+            return Err(Error::InvalidData(
+                "OfficeArtFDGGBlock is longer than the drawing group".into(),
+            ));
+        }
         let body = 16;
         let cidcl = u32_at(&self.bytes, body + 4) as usize;
         let count = cidcl.saturating_sub(1);
@@ -696,16 +710,20 @@ impl Group {
                 let store_end = (at + 8 + child.length).min(end);
                 while entry_at + 8 <= store_end {
                     let entry = header(&self.bytes, entry_at)?;
-                    if entry.kind == FBSE && entry.length >= 36 {
-                        let body = entry_at + 8;
+                    let body = entry_at + 8;
+                    let fbse = (entry.kind == FBSE && entry.length >= 36)
+                        .then(|| self.bytes.get(body..body + 24))
+                        .flatten();
+                    if let Some(fbse) = fbse {
                         let mut uid = [0; 16];
-                        uid.copy_from_slice(&self.bytes[body + 2..body + 18]);
+                        uid.copy_from_slice(&fbse[2..18]);
                         entries.push(Bse {
                             at: entry_at,
                             length: entry.length,
-                            win: self.bytes[body],
+                            win: fbse[0],
                             uid,
-                            size: u32_at(&self.bytes, body + 20),
+                            size: u32_at(fbse, 20),
+                            fbse: true,
                         });
                     } else {
                         // A blip outside an FBSE: keep it, but count it.
@@ -715,6 +733,7 @@ impl Group {
                             win: 0,
                             uid: [0; 16],
                             size: 0,
+                            fbse: false,
                         });
                     }
                     entry_at += 8 + entry.length;
@@ -724,6 +743,48 @@ impl Group {
             at += 8 + child.length;
         }
         Ok(None)
+    }
+
+    /// Check the structure the edits rewrite in place: the
+    /// `OfficeArtDggContainer` lies within the group, it starts with an
+    /// `OfficeArtFDGGBlock` whose cluster table matches its length, every
+    /// record directly inside it lies within it, and the blip store's
+    /// records exactly fill the store. The edits splice records at these
+    /// offsets and adjust these lengths, so a length that points outside its
+    /// parent is refused rather than followed.
+    pub(super) fn check(&self) -> Result<()> {
+        let malformed = |reason: &str| {
+            Error::InvalidData(format!("the drawing group cannot be edited: {reason}"))
+        };
+        let container = header(&self.bytes, 0)?;
+        let end = 8usize
+            .checked_add(container.length)
+            .filter(|end| *end <= self.bytes.len())
+            .ok_or_else(|| malformed("its container is longer than the group"))?;
+        self.fdgg()?;
+        let mut at = 8;
+        while at + 8 <= end {
+            let child = header(&self.bytes, at)?;
+            let child_end = (at + 8)
+                .checked_add(child.length)
+                .filter(|child_end| *child_end <= end)
+                .ok_or_else(|| malformed("a record is longer than its container"))?;
+            if child.kind == BSTORE_CONTAINER {
+                let mut entry_at = at + 8;
+                while entry_at < child_end {
+                    if child_end - entry_at < 8 {
+                        return Err(malformed("a blip store record header is cut off"));
+                    }
+                    let entry = header(&self.bytes, entry_at)?;
+                    entry_at = (entry_at + 8)
+                        .checked_add(entry.length)
+                        .filter(|entry_end| *entry_end <= child_end)
+                        .ok_or_else(|| malformed("a blip store record is longer than the store"))?;
+                }
+            }
+            at = child_end;
+        }
+        Ok(())
     }
 
     /// The group's records, split as the source split them.
