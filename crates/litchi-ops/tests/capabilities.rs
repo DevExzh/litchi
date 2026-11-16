@@ -659,11 +659,13 @@ fn xlsx_reports_keep_selection_semantic_and_declare_cell_and_sheet_writes() {
         // Chart writes have their own report test (`tests/charts.rs`),
         // worksheet features theirs (`tests/xlsx_features.rs`),
         // the root's metadata keys theirs (`tests/root_metadata.rs`),
-        // and rich-text runs theirs (`tests/xlsx_cells_runs.rs`).
+        // rich-text runs theirs (`tests/xlsx_cells_runs.rs`) and
+        // equations theirs (`tests/xlsx_equations.rs`).
         if matches!(
             element.name(),
             "workbook"
                 | "run"
+                | "equation"
                 | "chart"
                 | "series"
                 | "axis"

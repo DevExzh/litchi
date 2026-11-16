@@ -8,8 +8,16 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+default = []
+# Office Math equations in text bodies (`math`): OMML through
+# `litchi-equation`, with the PNG picture an equation's fallback shows, so it
+# also turns on the renderer (`litchi-equation/render`).
+equation = ["dep:litchi-equation", "litchi-equation/render"]
+
 [dependencies]
 litchi-core = { workspace = true }
+litchi-equation = { workspace = true, optional = true }
 litchi-ooxml-common = { workspace = true }
 quick-xml = { workspace = true }
 thiserror = { workspace = true }

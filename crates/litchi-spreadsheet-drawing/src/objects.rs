@@ -1829,14 +1829,35 @@ pub fn count(xml: &[u8], kind: ElementKind, limits: &Limits) -> Result<usize> {
 }
 
 /// The `cNvPr/@id` a new object of a drawing part takes: one past the
-/// largest in use, and at least 2.
+/// largest in use anywhere in the part (group members and both branches of
+/// markup-compatibility blocks included), and at least 2.
 ///
 /// # Errors
 ///
 /// Returns [`Error::Invalid`] for malformed markup or an exceeded limit.
 pub fn next_id(xml: &[u8], limits: &Limits) -> Result<u32> {
     let limits = limits.validate()?;
-    let (_, _, max_id) = scan::<u32>(xml, limits)?;
+    let (_, _, top_level) = scan::<u32>(xml, limits)?;
+    let mut max_id = top_level;
+    let mut reader = quick_xml::Reader::from_reader(xml);
+    loop {
+        match reader
+            .read_event()
+            .map_err(|error| invalid(format!("drawing markup: {error}")))?
+        {
+            Event::Start(element) | Event::Empty(element)
+                if element.local_name().as_ref() == b"cNvPr" =>
+            {
+                if let Some(id) =
+                    attribute(&element, b"id").and_then(|id| id.trim().parse::<u32>().ok())
+                {
+                    max_id = max_id.max(id);
+                }
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
     Ok(max_id.saturating_add(1).max(2))
 }
 
@@ -2096,6 +2117,22 @@ pub fn detach(xml: &[u8], kind: ElementKind, index: usize, limits: &Limits) -> R
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn new_ids_pass_every_shape_id_of_the_part() {
+        let xml = concat!(
+            r#"<xdr:wsDr xmlns:xdr="x" xmlns:a="a" xmlns:mc="m">"#,
+            r#"<xdr:oneCellAnchor><xdr:sp><xdr:nvSpPr><xdr:cNvPr id="3" name="s"/></xdr:nvSpPr></xdr:sp><xdr:clientData/></xdr:oneCellAnchor>"#,
+            r#"<mc:AlternateContent><mc:Choice Requires="a14"><xdr:oneCellAnchor><xdr:sp><xdr:nvSpPr><xdr:cNvPr id="9" name="e"/></xdr:nvSpPr></xdr:sp></xdr:oneCellAnchor></mc:Choice></mc:AlternateContent>"#,
+            r#"<xdr:twoCellAnchor><xdr:grpSp><xdr:nvGrpSpPr><xdr:cNvPr id="4" name="g"/></xdr:nvGrpSpPr><xdr:sp><xdr:nvSpPr><xdr:cNvPr id="12" name="m"/></xdr:nvSpPr></xdr:sp></xdr:grpSp></xdr:twoCellAnchor>"#,
+            "</xdr:wsDr>"
+        );
+        assert_eq!(next_id(xml.as_bytes(), &Limits::DEFAULT).unwrap(), 13);
+        assert_eq!(
+            next_id(b"<xdr:wsDr></xdr:wsDr>", &Limits::DEFAULT).unwrap(),
+            2
+        );
+    }
+
     use super::*;
 
     #[test]

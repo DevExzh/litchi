@@ -31,16 +31,7 @@ pub(crate) mod sites;
 
 /// What an equation is written from.
 #[cfg(feature = "equation")]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum EquationSource<'a> {
-    /// LaTeX math, converted to OMML through `litchi-equation`.
-    Latex(&'a str),
-    /// An OMML `m:oMath` or `m:oMathPara` element, written as given. The
-    /// conventional `m` (math) and `a` (DrawingML) prefixes may be left
-    /// undeclared.
-    Omml(&'a str),
-}
+pub use litchi_drawingml::math::EquationSource;
 
 /// The outcome of an equation write.
 #[cfg(feature = "equation")]

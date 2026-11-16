@@ -12,6 +12,13 @@ rust-version.workspace = true
 default = []
 encryption = ["dep:litchi-crypto", "litchi-crypto/ooxml", "litchi-ooxml-common/encryption"]
 vba-inspection = ["dep:litchi-vba", "litchi-ooxml-common/vba-inspection"]
+# Converts worksheet-drawing equations (OMML) to LaTeX through
+# `litchi-equation`, and writes them (`drawing::edit::Edit::add_equation`,
+# `set_equation`, `remove_equation`). Writing measures each equation to size
+# its text box and redraws the picture fallback other producers keep, so
+# this feature also turns on the renderer (`litchi-equation/render`, which
+# embeds about 1.9 MB of fonts).
+equation = ["dep:litchi-equation", "litchi-drawingml/equation"]
 
 [dependencies]
 base64 = { workspace = true }
@@ -22,6 +29,7 @@ itoa = { workspace = true }
 litchi-core = { workspace = true }
 litchi-crypto = { workspace = true, optional = true }
 litchi-drawingml = { workspace = true }
+litchi-equation = { workspace = true, optional = true }
 litchi-ooxml-common = { workspace = true }
 litchi-opc = { workspace = true }
 litchi-sheet = { workspace = true }

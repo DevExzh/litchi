@@ -12,6 +12,7 @@
 //! | `dataValidation` | `data_validation::edit` |
 //! | `autofilter` | `auto_filter::edit` |
 //! | `rowbreak`, `colbreak` | `Package::edit_page_breaks` |
+//! | `equation` | `drawing::edit` (`add_equation`, `set_equation`, `remove_equation`; the `equation` feature) |
 //!
 //! Property names and defaults follow OfficeCLI's Excel handler; where this
 //! adapter is stricter (an unknown CF `type`, a list literal with quotes) it
@@ -76,6 +77,8 @@ native_feature_commit!(xlsx::conditional_formatting::edit::Commit);
 native_feature_commit!(xlsx::data_validation::edit::Commit);
 native_feature_commit!(xlsx::auto_filter::edit::Commit);
 native_feature_commit!(xlsx::page_breaks::edit::Commit);
+
+mod equations;
 
 /// Reserve both package endpoints before admitting a part-family patch. The
 /// patch editor then checks its own exact semantic payload before constructing
@@ -316,6 +319,7 @@ impl Xlsx {
             Kind::DataValidation => self.add_validation(&parent, node.props(), limits),
             Kind::Autofilter => self.add_autofilter(&parent, node.props(), limits),
             Kind::RowBreak | Kind::ColBreak => self.add_break(&parent, kind, node.props(), limits),
+            Kind::Equation => self.add_equation(&parent, node.props(), limits),
             _ => Err(error(
                 Code::UnsupportedElement,
                 "this element kind cannot be added to an XLSX worksheet",
@@ -365,6 +369,7 @@ impl Xlsx {
             Kind::Cf => self.set_cf(sheet, feature, props, limits)?,
             Kind::DataValidation => self.set_validation(sheet, feature, props, limits)?,
             Kind::Autofilter => self.set_autofilter(sheet, props, limits)?,
+            Kind::Equation => self.set_equation(sheet, feature, props, limits)?,
             _ => self.set_break(sheet, feature, props, limits)?,
         }))
     }
@@ -465,6 +470,7 @@ impl Xlsx {
                 let native_patch_bytes = commit.patch().retained_bytes();
                 (commit.into_package(), changed, native_patch_bytes)
             },
+            Data::Equation(_) => return self.remove_equation(sheet, feature, limits).map(Some),
             Data::Break(_) => {
                 let mut breaks = self.breaks(sheet, feature.kind)?;
                 remove_at(&mut breaks, feature.index)?;

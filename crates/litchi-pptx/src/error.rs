@@ -949,6 +949,23 @@ pub enum Error {
     Equation(#[from] litchi_equation::Error),
 }
 
+#[cfg(feature = "equation")]
+impl From<litchi_drawingml::math::Error> for Error {
+    fn from(error: litchi_drawingml::math::Error) -> Self {
+        use litchi_drawingml::math::Error as Math;
+        match error {
+            Math::Xml(message) => Self::Xml(message),
+            Math::Invalid(message) => Self::Invalid(message.to_owned()),
+            Math::RelationshipReference => Self::Invalid(
+                "equation OMML cannot refer to relationships (r:id, r:embed and the like): the slide has none for it"
+                    .to_owned(),
+            ),
+            Math::Equation(error) => Self::Equation(error),
+            other => Self::Invalid(other.to_string()),
+        }
+    }
+}
+
 impl Error {
     /// A refusal of `operation` for `reason`, classified by `kind`.
     pub(crate) const fn refused(

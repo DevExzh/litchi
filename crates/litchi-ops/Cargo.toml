@@ -144,6 +144,7 @@ equation = [
     "litchi-ppt?/equation",
     "litchi-pptx?/equation",
     "litchi-xls?/equation",
+    "litchi-xlsx?/equation",
 ]
 yaml = ["dep:serde-saphyr"]
 

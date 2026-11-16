@@ -152,6 +152,7 @@ equation = [
     "litchi-ppt?/equation",
     "litchi-pptx?/equation",
     "litchi-xls?/equation",
+    "litchi-xlsx?/equation",
 ]
 fonts = [
     "dep:litchi-fonts",

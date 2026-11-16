@@ -1444,10 +1444,7 @@ static XLSX_ELEMENTS: [ElementSpec<Kind>; 27] = [
         paths: &["/<sheet>/<A1>/run[N]"],
         ..workbook::SPEC.elements[25]
     },
-    // Equations: the shared gap.
-    ElementSpec {
-        ..workbook::SPEC.elements[26]
-    },
+    feature(26, super::features::EQUATION_PROPS),
 ];
 
 /// XLSX's format specification, with native range merge readback.  The

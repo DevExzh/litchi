@@ -260,8 +260,8 @@ reuses the existing investment in 60+ crates, and complies with ADR 0007.
   objects get typed representations and CRUD verbs so agents rarely need the
   escape hatch: charts, SmartArt/diagrams, equations (LaTeX through
   `litchi-equation`; an equation node reads and writes `latex` and its
-  native `omml`, and PPTX writes keep PowerPoint's PNG picture fallback for
-  readers without Office Math; an XLS equation is an OLE object whose
+  native `omml`; PPTX writes keep PowerPoint's PNG picture fallback for
+  readers without Office Math and XLSX writes a linear-text fallback; an XLS equation is an OLE object whose
   native `mtef` is its base64 `Equation Native` stream, new ones are MathType
   objects with a PNG preview, and updates keep the object's kind; a DOC
   equation is a MathType or Equation Editor object whose node reads and

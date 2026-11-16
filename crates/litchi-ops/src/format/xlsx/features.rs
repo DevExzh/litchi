@@ -1,7 +1,7 @@
 //! Worksheet features as unified nodes: legacy notes
-//! (`comment`), hyperlinks, drawing pictures and shapes, conditional
-//! formats (`cf`), data validations, the auto-filter and manual page
-//! breaks.
+//! (`comment`), hyperlinks, drawing pictures, shapes and equations,
+//! conditional formats (`cf`), data validations, the auto-filter and manual
+//! page breaks.
 //!
 //! Every feature is a child of its worksheet, addressed by its position
 //! among the worksheet's features of its kind (`/Sheet1/comment[2]`,
@@ -10,9 +10,15 @@
 //! from, behind one `Arc`. Listing a kind reads only the worksheet parts that
 //! kind lives in: the worksheet's blocks outside `sheetData` for
 //! conditional formats, validations, the auto-filter, hyperlinks and page
-//! breaks; the comments part for notes; the drawing part for pictures and
-//! shapes; and the styles part's differential formats for a conditional
-//! format's formatting.
+//! breaks; the comments part for notes; the drawing part for pictures,
+//! shapes and equations; and the styles part's differential formats for a
+//! conditional format's formatting.
+//!
+//! An equation (`/Sheet1/equation[N]`) is the N-th Office Math `a14:m` of
+//! the worksheet's drawing in document order: its `latex` (converted from
+//! the OMML; absent without the `equation` feature or when the OMML does
+//! not convert), its raw `omml`, the `anchor` cell of its text box and the
+//! text box's `name`.
 //!
 //! Positions follow the native order, except notes, which a comments part
 //! keys by cell: they are numbered in row-major order of their cells. The
@@ -38,7 +44,7 @@ use crate::registry::{Access, Alias, Constraint, Entry, Table};
 use crate::value::{Color, ColorContext, Length, LengthSpec, ValueType};
 
 /// The feature kinds of a worksheet, in listing order.
-pub(super) const KINDS: [Kind; 9] = [
+pub(super) const KINDS: [Kind; 10] = [
     Kind::Comment,
     Kind::Hyperlink,
     Kind::Picture,
@@ -48,6 +54,7 @@ pub(super) const KINDS: [Kind; 9] = [
     Kind::Autofilter,
     Kind::RowBreak,
     Kind::ColBreak,
+    Kind::Equation,
 ];
 
 /// Whether `kind` is a worksheet feature this module lists.
@@ -74,6 +81,7 @@ pub(crate) enum Data {
     Validation(Box<xlsx::data_validation::Validation>),
     Autofilter(Box<xlsx::auto_filter::Definition>),
     Break(xlsx::page_breaks::Break),
+    Equation(Box<xlsx::drawing::math::Equation>),
 }
 
 /// A legacy note.
@@ -120,6 +128,7 @@ impl Feature {
             Data::Validation(validation) => Cow::Owned(sqref(validation)),
             Data::Autofilter(filter) => Cow::Borrowed(filter.reference()?.as_str()),
             Data::Break(_) => return None,
+            Data::Equation(equation) => Cow::Borrowed(equation.text()),
         })
     }
 
@@ -137,6 +146,7 @@ impl Feature {
             Data::Validation(validation) => Cow::Owned(sqref(validation)),
             Data::Autofilter(filter) => Cow::Borrowed(filter.reference()?.as_str()),
             Data::Break(item) => Cow::Owned(item.id().to_string()),
+            Data::Equation(equation) => Cow::Borrowed(equation.text()),
         }))
     }
 
@@ -167,6 +177,7 @@ impl Feature {
                 AutofilterKey::Criteria => None,
             },
             Data::Break(item) => break_value(self.kind, *item, *BREAK_KEYS.get(index)?),
+            Data::Equation(equation) => equation_value(equation, *EQUATION_KEYS.get(index)?),
         }
     }
 }
@@ -182,6 +193,7 @@ pub(super) const fn step_name(kind: Kind) -> &'static str {
         Kind::DataValidation => "dataValidation",
         Kind::Autofilter => "autofilter",
         Kind::RowBreak => "rowbreak",
+        Kind::Equation => "equation",
         _ => "colbreak",
     }
 }
@@ -197,6 +209,7 @@ pub(super) fn props(kind: Kind) -> &'static [PropSpec] {
         Kind::DataValidation => VALIDATION_PROPS,
         Kind::Autofilter => AUTOFILTER_PROPS,
         Kind::RowBreak => ROW_BREAK_PROPS,
+        Kind::Equation => EQUATION_PROPS,
         _ => COL_BREAK_PROPS,
     }
 }
@@ -286,6 +299,16 @@ impl SheetHandle {
         Ok(match self {
             Self::Eager { sheet, .. } => sheet.auto_filter()?,
             Self::Source { sheet } => sheet.auto_filter()?,
+        })
+    }
+
+    fn equations(&self) -> Result<Vec<xlsx::drawing::math::Equation>> {
+        Ok(match self {
+            Self::Eager { sheet, workbook } => match &workbook.0.owner {
+                XlsxOwner::Eager(package) => package.equations(sheet.position())?,
+                XlsxOwner::Source(_) => return Err(lost_owner()),
+            },
+            Self::Source { sheet } => sheet.equations()?,
         })
     }
 
@@ -412,6 +435,11 @@ pub(super) fn list(file: &Xlsx, sheet: &Sheet, kind: Kind) -> Result<Vec<Feature
                 })
                 .unwrap_or_default()
         },
+        Kind::Equation => handle
+            .equations()?
+            .into_iter()
+            .map(|equation| Data::Equation(Box::new(equation)))
+            .collect(),
         _ => Vec::new(),
     };
     Ok(data
@@ -1456,6 +1484,60 @@ fn break_value(
     }
 }
 
+/// Equation keys.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum EquationKey {
+    Latex,
+    Omml,
+    Anchor,
+    Name,
+    Size,
+}
+
+/// An equation's content: `latex` or `omml`, one of them, never empty.
+const fn content(spec: PropSpec, setter: EquationKey) -> Entry<EquationKey> {
+    Entry {
+        spec,
+        access: Access::SetAndAdd(setter),
+        constraint: Constraint::NotEmpty,
+        clear: false,
+    }
+}
+
+keyed!(EquationKey, EquationKey, EQUATION_TABLE, EQUATION_PROPS, EQUATION_KEYS, [
+    content(read("latex", TEXT), EquationKey::Latex) => Latex,
+    content(read("omml", TEXT), EquationKey::Omml) => Omml,
+    entry(read("anchor", TEXT), Access::Add(EquationKey::Anchor)) => Anchor,
+    entry(read("name", TEXT), Access::ReadOnly) => Name,
+    entry(write_only("size", FONT_SIZE), Access::Add(EquationKey::Size)) => Size,
+], [
+    alias("ref", 2),
+]);
+
+fn equation_value(equation: &xlsx::drawing::math::Equation, key: EquationKey) -> Option<Value<'_>> {
+    match key {
+        EquationKey::Latex => latex(equation).map(owned),
+        EquationKey::Omml => Some(text(equation.omml())),
+        EquationKey::Anchor => equation.cell().map(owned),
+        EquationKey::Name => equation.name().map(text),
+        EquationKey::Size => None,
+    }
+}
+
+/// The LaTeX of an equation; `None` without the `equation` feature and for
+/// OMML that does not convert.
+fn latex(equation: &xlsx::drawing::math::Equation) -> Option<String> {
+    #[cfg(feature = "equation")]
+    {
+        equation.latex().ok()
+    }
+    #[cfg(not(feature = "equation"))]
+    {
+        let _ = equation;
+        None
+    }
+}
+
 /// The canonical names of the feature elements: settable, addable and
 /// removable through the unified verbs (`capabilities()`).
 pub(crate) const FEATURE_ELEMENTS: &[&str] = &[
@@ -1468,4 +1550,5 @@ pub(crate) const FEATURE_ELEMENTS: &[&str] = &[
     "autofilter",
     "rowbreak",
     "colbreak",
+    "equation",
 ];

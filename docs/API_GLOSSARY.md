@@ -2169,6 +2169,7 @@ transform, theme-family, and ink-action consumer uses the focused
 | `litchi_drawingml::ink::actions::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | adopted (`Prepared` package triad) |
 | `litchi_drawingml::ink::actions::builder::{Draft, ActionDraft, ActionGroupDraft, ActionDataDraft, DataGroupDraft, PropertyDraft, OpaquePayload, EditOptions}` | adopted (canonical fresh-action authoring) |
 | `litchi_drawingml::ink::builder::{Draft, Prepared, AuthoringLimits}` | adopted (canonical fresh InkML authoring) |
+| `litchi_drawingml::math::{EquationSource, HostRun, Form, Prepared, Picture, Error, prepare, admit_omml, apply_host_runs, render, fitted, fallback_picture, linear_run}` (feature `equation`) | adopted: the Office Math text-body logic PPTX and XLSX equation writes share; `EquationSource` is re-exported as `litchi_pptx::shape::math::EquationSource` and `litchi_xlsx::drawing::math::EquationSource` |
 | `litchi_drawingml::ink::Prepared::from_bytes(bytes, AuthoringLimits)` | adopted (required raw limit) |
 | `litchi_drawingml::chart::Package::apply`, `transform::Package::apply`, `theme::family::Package::apply` | adopted (source-checked replay returns `Commit`) |
 | `litchi_drawingml::ink::actions::Prepared::{edit, edit_with_options, apply}` | adopted (O(1) shared owner routes and commit triads) |
@@ -2999,6 +3000,8 @@ staging returns the source package (an exact no-op keeps every byte).
 | `litchi_xlsx::workbook::comments::edit::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`, `Package::{edit_comments, apply_comments}` | `Edit::{comments, set, add, remove, set_runs, add_runs}` (`add` refuses an annotated cell and returns the row-major position); splices notes and their VML note shapes, keeping the other notes' bytes; rich notes as `TextRun` with `RunFont` and `RunColor` (`Comment::runs` reads them); whole typed graph `Edit::{replace, set_comment, set_author, rename_author, clear, reset}` (the former `workbook::comments::Transaction`) | ✅ family registered in the gate |
 | `litchi_xlsx::drawing::edit::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`, `Package::{drawing_elements, edit_drawings, apply_drawings}` | `Edit::{elements, add_picture, add_shape, set, remove}`; read model `Element`, `ElementKind`, `Placement`, `Marker`, `Image`, `Fill`, `Line`, `Font`, `Align`, `VerticalAlign`; specs `PictureSpec`, `ShapeSpec`, `Change` | ✅ family registered in the gate |
 | `litchi_xlsx::Worksheet::comments`, `SourceWorksheet::{comments, page_breaks, drawing_elements}` | reads on both owners | ✅ |
+| `litchi_xlsx::drawing::math::{Equation, equations, MAX_EQUATIONS}`, `Package::equations`, `SourceWorksheet::equations` | worksheet-drawing equations (`a14:m`) in document order, with the shape's cell anchor; `Equation::latex` with the `equation` feature | ✅ |
+| `litchi_xlsx::drawing::edit::Edit::{equations, add_equation, set_equation, remove_equation}`; `drawing::math::{EquationSource, EquationWrite}` (feature `equation`); equations are addressed by their position among `Package::equations` | adopted |
 
 ## PPTX theme, columns, hyperlinks, media, equations, masters and layouts
 

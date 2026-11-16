@@ -1272,6 +1272,18 @@ impl SourceWorksheet {
         crate::drawing::edit::source_elements(&self.owner.package, &self.data.part_uri)
     }
 
+    /// The equations of this worksheet's drawing, in document order (see
+    /// [`crate::drawing::math`]). Only the worksheet's relationships and its
+    /// drawing part are read.
+    pub fn equations(&self) -> Result<Vec<crate::drawing::math::Equation>> {
+        if self.data.kind != WorksheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: self.data.name().to_owned(),
+            });
+        }
+        crate::drawing::edit::source_equations(&self.owner.package, &self.data.part_uri)
+    }
+
     /// Read the worksheet's admitted SpreadsheetML form controls.
     pub fn form_controls(&self) -> Result<crate::form_control::FormControlCollection> {
         if self.data.kind != WorksheetKind::Worksheet {

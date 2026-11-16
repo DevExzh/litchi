@@ -22,7 +22,7 @@ encryption = ["dep:litchi-crypto", "litchi-ooxml-common/encryption"]
 # every equation for readers without Office Math, so this feature also turns
 # on the renderer (`litchi-equation/render`, which embeds about 1.9 MB of
 # fonts).
-equation = ["dep:litchi-equation", "litchi-equation/render"]
+equation = ["dep:litchi-equation", "litchi-equation/render", "litchi-drawingml/equation"]
 
 [dependencies]
 base64 = { workspace = true }

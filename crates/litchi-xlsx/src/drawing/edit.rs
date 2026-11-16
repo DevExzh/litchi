@@ -50,6 +50,9 @@ use crate::part_edit::{Staged, WorksheetLayout, family};
 
 family!("drawing");
 
+#[cfg(feature = "equation")]
+mod equation;
+
 pub use litchi_spreadsheet_drawing::LimitKind;
 pub use objects::{
     Align, COLUMN_EMU, Change, DASHES, ElementKind, Image, Limits, MAX_DRAWING_BYTES, MAX_ELEMENTS,
@@ -147,6 +150,33 @@ impl Package {
         eager_elements(self.opc(), &worksheet)
     }
 
+    /// The equations of a worksheet's drawing, in document order (see
+    /// [`crate::drawing::math`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing sheet, a chartsheet, or a malformed
+    /// drawing.
+    pub fn equations(&self, sheet: usize) -> Result<Vec<crate::drawing::math::Equation>> {
+        let worksheet = worksheet_uri(self, sheet)?;
+        let opc = self.opc();
+        match objects::drawing_of(opc.get_part(&worksheet)?.rels())? {
+            Some(drawing) => {
+                let part = opc.get_part(&drawing)?;
+                let limits = Limits::from_source_limits(opc.read_limits()).validate()?;
+                if part.blob().len() > limits.max_drawing_bytes {
+                    return Err(Error::limit(
+                        LimitKind::DrawingBytes,
+                        part.blob().len(),
+                        limits.max_drawing_bytes,
+                    ));
+                }
+                crate::drawing::math::equations(part.blob())
+            },
+            None => Ok(Vec::new()),
+        }
+    }
+
     /// Start a worksheet drawing edit.
     ///
     /// # Errors
@@ -178,6 +208,31 @@ impl Package {
             patch.0.clone(),
         )))
     }
+}
+
+/// The equations of a worksheet part's drawing in a source-backed package:
+/// only the worksheet's relationships and its drawing part are read.
+pub(crate) fn source_equations(
+    package: &litchi_opc::SourceBackedPackage,
+    worksheet: &PackURI,
+) -> Result<Vec<crate::drawing::math::Equation>> {
+    package.check_execution()?;
+    let Some(drawing) = objects::drawing_of(package.part(worksheet)?.rels())? else {
+        return Ok(Vec::new());
+    };
+    let part = package.part(&drawing)?;
+    let declared = part.declared_uncompressed_size()?;
+    let limits = Limits::from_source_limits(package.read_limits());
+    let declared = usize::try_from(declared).unwrap_or(usize::MAX);
+    if declared > limits.max_drawing_bytes {
+        return Err(Error::limit(
+            LimitKind::DrawingBytes,
+            declared,
+            limits.max_drawing_bytes,
+        ));
+    }
+    let data = part.data()?;
+    crate::drawing::math::equations(data.as_bytes())
 }
 
 /// A replacement image's size, content type and extension.

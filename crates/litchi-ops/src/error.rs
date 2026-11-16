@@ -1434,6 +1434,21 @@ impl Classify for litchi_docx::metadata::Error {
     }
 }
 
+/// The class of an equation that does not convert or render.
+#[cfg(all(feature = "equation", any(feature = "pptx", feature = "xlsx")))]
+fn classify_equation(error: &litchi_equation::Error) -> Class {
+    match error {
+        litchi_equation::Error::Malformed { .. } | litchi_equation::Error::Unsupported(_) => {
+            Class::of(Code::InvalidValue)
+        },
+        litchi_equation::Error::InputTooLarge { .. }
+        | litchi_equation::Error::LimitExceeded { .. }
+        | litchi_equation::Error::Render(_) => Class::of(Code::LimitExceeded),
+        litchi_equation::Error::InvalidLimit(_) => Class::of(Code::InvalidArgument),
+        _ => Class::of(Code::InternalError),
+    }
+}
+
 #[cfg(feature = "pptx")]
 impl Classify for litchi_pptx::Error {
     fn classify(&self) -> Class {
@@ -1488,16 +1503,7 @@ impl Classify for litchi_pptx::Error {
             | Self::Internal { .. } => Class::of(Code::InternalError),
             // The caller's equation does not convert or render.
             #[cfg(feature = "equation")]
-            Self::Equation(error) => match error {
-                litchi_equation::Error::Malformed { .. } | litchi_equation::Error::Unsupported(_) => {
-                    Class::of(Code::InvalidValue)
-                },
-                litchi_equation::Error::InputTooLarge { .. }
-                | litchi_equation::Error::LimitExceeded { .. }
-                | litchi_equation::Error::Render(_) => Class::of(Code::LimitExceeded),
-                litchi_equation::Error::InvalidLimit(_) => Class::of(Code::InvalidArgument),
-                _ => Class::of(Code::InternalError),
-            },
+            Self::Equation(error) => classify_equation(error),
             _ => Class::of(Code::CorruptFile),
         }
     }
@@ -1512,6 +1518,9 @@ fn classify_xlsx_join_source(source: Option<&litchi_xlsx::Error>) -> Class {
 impl Classify for litchi_xlsx::Error {
     fn classify(&self) -> Class {
         match self {
+            // The caller's equation does not convert or render.
+            #[cfg(feature = "equation")]
+            Self::Equation(error) => classify_equation(error),
             Self::SheetNameDependency(error) => match error {
                 litchi_ooxml_common::xml::sheet_name::Error::Blocked(_) => {
                     Class::of(Code::UnsupportedCapability)

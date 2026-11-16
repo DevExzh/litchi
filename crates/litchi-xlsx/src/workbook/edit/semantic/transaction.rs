@@ -6792,6 +6792,8 @@ fn join_normalization(error: &Error) -> JoinNormalization {
         | Error::Outline(_)
         | Error::SheetName(_)
         | Error::Invalid(_) => JoinNormalization::Invalid,
+        #[cfg(feature = "equation")]
+        Error::Equation(_) => JoinNormalization::Invalid,
         Error::Allocation { .. } => JoinNormalization::Allocation,
         Error::Refused(_)
         | Error::FormControl(_)

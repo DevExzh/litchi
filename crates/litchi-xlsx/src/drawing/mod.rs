@@ -7,6 +7,7 @@
 
 mod codec;
 pub mod edit;
+pub mod math;
 mod model;
 pub mod source;
 mod svg;

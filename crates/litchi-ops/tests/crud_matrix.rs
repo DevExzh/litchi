@@ -449,6 +449,15 @@ const MP4: &str = "data:video/mp4;base64,AAAAGGZ0eXBtcDQyAAAAAG1wNDJpc29t";
 const MP3: &str = "data:audio/mpeg;base64,SUQzAwAAAAAAAA==";
 
 const RECIPES: &[Recipe] = &[
+    // An equation takes one of `latex` and `omml`, never both.
+    Recipe {
+        format: "xlsx",
+        element: "equation",
+        fixture: "create()",
+        parent: "/Sheet1",
+        props: &[("latex", "x^2"), ("anchor", "B2")],
+        start: false,
+    },
     // An added XLSX cell names its address and a value.
     Recipe {
         format: "xlsx",

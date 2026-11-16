@@ -26,6 +26,8 @@ pub mod fill;
 pub mod geom;
 pub mod geometry;
 pub mod ink;
+#[cfg(feature = "equation")]
+pub mod math;
 pub mod model3d;
 pub mod svg_blip;
 pub mod text;

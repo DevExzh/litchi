@@ -22,9 +22,7 @@ use crate::{Error, Result};
 const DML: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
 const STRICT_DML: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/main";
 
-/// The default text-body insets in EMU: left, top, right and bottom
-/// (ECMA-376 Part 1, §21.1.2.1.1 `bodyPr`).
-pub(crate) const DEFAULT_INSETS: [i64; 4] = [91_440, 45_720, 91_440, 45_720];
+pub(crate) use litchi_drawingml::math::DEFAULT_INSETS;
 
 /// One shape-level `mc:AlternateContent` block whose Choice holds an
 /// equation.

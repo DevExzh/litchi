@@ -268,6 +268,10 @@ pub enum Error {
     /// Removing this storage requires an explicit connection disposition.
     #[error("Custom Data storage '{id}' is referenced by {connections} connections")]
     CustomDataReferenced { id: String, connections: usize },
+    /// An equation could not be converted or rendered.
+    #[cfg(feature = "equation")]
+    #[error("XLSX equation error: {0}")]
+    Equation(#[from] litchi_equation::Error),
 }
 
 impl Error {
@@ -469,6 +473,21 @@ limit_kind_from!(
 impl From<std::convert::Infallible> for Error {
     fn from(never: std::convert::Infallible) -> Self {
         match never {}
+    }
+}
+
+#[cfg(feature = "equation")]
+impl From<litchi_drawingml::math::Error> for Error {
+    fn from(error: litchi_drawingml::math::Error) -> Self {
+        use litchi_drawingml::math::Error as Math;
+        match error {
+            Math::Equation(error) => Self::Equation(error),
+            Math::RelationshipReference => Self::Invalid(
+                "equation OMML cannot refer to relationships (r:id, r:embed and the like): the drawing has none for it"
+                    .to_owned(),
+            ),
+            other => Self::Invalid(other.to_string()),
+        }
     }
 }
 

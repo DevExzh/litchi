@@ -78,6 +78,7 @@
     ],
     "litchi-drawingml": [
       "litchi-core",
+      "litchi-equation",
       "litchi-ooxml-common"
     ],
     "litchi-equation": [],
@@ -417,6 +418,7 @@
       "litchi-core",
       "litchi-crypto",
       "litchi-drawingml",
+      "litchi-equation",
       "litchi-ooxml-common",
       "litchi-opc",
       "litchi-sheet",
