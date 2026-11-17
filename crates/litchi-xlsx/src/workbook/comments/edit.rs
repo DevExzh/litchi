@@ -39,8 +39,7 @@ use std::ops::Range;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, PackURI};
 use litchi_spreadsheet_drawing::vml::{
-    Limits as VmlLimits, SHAPE_TYPE, contains, new_drawing, next_shape_id, note_shape, rfind,
-    shapes,
+    Limits as VmlLimits, SHAPE_TYPE, contains, note_shape, rfind, shapes,
 };
 use quick_xml::events::Event;
 
@@ -533,7 +532,17 @@ impl Edit {
                 if shapes.iter().any(|shape| shape.note == Some((row, column))) {
                     return Ok(());
                 }
-                let id = next_shape_id(xml, &shapes, sheet);
+                // Past every shape of this drawing and every id the
+                // workbook's other VML drawings use.
+                let id = u64::from(
+                    crate::vml_ids::allocate(
+                        self.staged.opc(),
+                        Some(&name),
+                        sheet,
+                        &std::collections::HashSet::new(),
+                    )?
+                    .id,
+                );
                 let close = rfind(xml, b"</xml>")
                     .ok_or_else(|| invalid("the VML drawing has no closing xml element"))?;
                 let mut out = xml.to_vec();
@@ -547,7 +556,15 @@ impl Edit {
             },
             None => {
                 let name = self.staged.free_name("/xl/drawings/vmlDrawing", ".vml")?;
-                let xml = new_drawing(sheet, row, column);
+                // A block no other VML drawing of the workbook claims.
+                let allocation = crate::vml_ids::allocate(
+                    self.staged.opc(),
+                    None,
+                    sheet,
+                    &std::collections::HashSet::new(),
+                )?;
+                let xml =
+                    crate::vml_ids::new_note_drawing(allocation.block, allocation.id, row, column);
                 let layout = WorksheetLayout::scan(self.staged.blob(worksheet)?)?;
                 let opc = self.staged.opc_mut()?;
                 opc.add_part(Box::new(BlobPart::new(

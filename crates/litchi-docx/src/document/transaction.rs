@@ -7,7 +7,11 @@ mod durable;
 #[cfg(test)]
 mod element_tests;
 mod formatting;
-pub(crate) use formatting::{ChartMarkup, PictureMarkup, PictureRewrite, SmartArtMarkup};
+pub(crate) use formatting::{
+    ChartMarkup, FontHint, PictureMarkup, PictureRewrite, SmartArtMarkup, object_numbers,
+};
+#[cfg(feature = "equation")]
+pub(crate) use formatting::{ObjectMarkup, ObjectRewrite};
 pub(crate) mod fields;
 #[cfg(test)]
 mod formatting_tests;
@@ -535,23 +539,36 @@ pub(crate) struct TransferRelationship {
 }
 
 /// A package-graph change staged with a main-document edit: relationships added
-/// to the main part, new parts related from it, and exact replacements of
-/// existing parts. Applied forward, it requires every relationship and new part
-/// to be absent and every replaced part to hold its `before` bytes; applied
-/// backward, the reverse.
+/// to the main part, new parts related from it, exact replacements of
+/// existing parts, and relationships added to other existing parts (a header,
+/// a footer or a notes part). Applied forward, it requires every relationship
+/// and new part to be absent and every replaced part to hold its `before`
+/// bytes; applied backward, the reverse.
 #[derive(Clone, PartialEq, Eq)]
 pub struct GraphChange {
     pub(crate) relationships: Arc<[TransferRelationship]>,
     pub(crate) parts: Arc<[TransferPart]>,
     pub(crate) replaced: Arc<[ReplacedPart]>,
+    pub(crate) part_relationships: Arc<[PartRelationship]>,
 }
 
 impl GraphChange {
     /// Whether the change holds nothing.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.relationships.is_empty() && self.parts.is_empty() && self.replaced.is_empty()
+        self.relationships.is_empty()
+            && self.parts.is_empty()
+            && self.replaced.is_empty()
+            && self.part_relationships.is_empty()
     }
+}
+
+/// One relationship of an existing part other than the main document part.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct PartRelationship {
+    /// The part the relationship belongs to.
+    pub(crate) part: String,
+    pub(crate) relationship: TransferRelationship,
 }
 
 /// One exact replacement of an existing part's payload.

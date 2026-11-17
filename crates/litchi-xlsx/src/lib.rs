@@ -48,6 +48,8 @@ pub mod data_validation;
 pub mod defined_names;
 pub mod drawing;
 pub mod edit;
+#[cfg(feature = "equation")]
+pub mod equation_objects;
 mod error;
 pub mod external_links;
 pub mod form_control;
@@ -117,6 +119,7 @@ pub mod timeline;
     reason = "the legacy timeline wire model is retained for round-trip compatibility"
 )]
 mod timelines;
+mod vml_ids;
 pub mod volatile_dependencies;
 pub mod web;
 

@@ -67,6 +67,7 @@ impl fmt::Debug for GraphChange {
             .field("relationships", &self.relationships.len())
             .field("parts", &self.parts.len())
             .field("replaced", &self.replaced.len())
+            .field("part_relationships", &self.part_relationships.len())
             .finish()
     }
 }

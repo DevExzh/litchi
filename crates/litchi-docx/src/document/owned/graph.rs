@@ -60,6 +60,7 @@ impl Edit<Package> {
                 }]),
                 parts: Arc::new([]),
                 replaced: Arc::new([]),
+                part_relationships: Arc::new([]),
             }),
             true,
         )?;
@@ -139,6 +140,7 @@ impl Edit<Package> {
                     relationships: Arc::new([]),
                 }]),
                 replaced: Arc::new([]),
+                part_relationships: Arc::new([]),
             }),
             true,
         )?;
@@ -166,6 +168,7 @@ impl Edit<Package> {
                     before,
                     after: Arc::new(payload),
                 }]),
+                part_relationships: Arc::new([]),
             }),
             true,
         )?;

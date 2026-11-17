@@ -548,6 +548,25 @@ impl<'f> Navigate<'f> for Nav<'f> {
                     None => Lookup::NotApplicable,
                 })
             },
+            // OLE equation objects, `equation[N]`.
+            (Value::Paragraph { paragraph, .. }, Kind::Equation)
+                if step.named.eq_ignore_ascii_case("equation") =>
+            {
+                let objects = paragraph.equation_objects()?;
+                Ok(match pick_index(objects.len(), &step.select) {
+                    Some(Some(index)) => {
+                        let object = objects.into_iter().nth(index).ok_or_else(missing_child)?;
+                        Lookup::Found(super::equation::object_node(
+                            self.docx,
+                            &address,
+                            ordinal(index),
+                            object,
+                        ))
+                    },
+                    Some(None) => Lookup::Missing,
+                    None => Lookup::NotApplicable,
+                })
+            },
             // Inline math, `oMath[N]`, and math paragraphs, `oMathPara[N]`.
             (Value::Paragraph { paragraph, .. }, Kind::Equation) => {
                 let display = step.named.eq_ignore_ascii_case("oMathPara");
@@ -668,6 +687,7 @@ impl<'f> Navigate<'f> for Nav<'f> {
                 out.kind("picture", paragraph.images()?.len());
                 out.kind("oMath", paragraph.omml_equations()?.len());
                 out.kind("oMathPara", paragraph.math_paragraphs()?.len());
+                out.kind("equation", paragraph.equation_objects()?.len());
             },
             _ => {},
         }

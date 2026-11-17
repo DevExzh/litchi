@@ -55,6 +55,18 @@
         "write": "✅"
       },
       "scope_limit": "Fresh workbooks seeded from selected native values; not a source resave, arbitrary feature transfer or native Excel reopen."
+    },
+    {
+      "id": "xlsx-current-ole-equation-objects",
+      "format": "xlsx",
+      "source_matrix": "crates/litchi-xlsx/docs/FEATURE_MATRIX.md",
+      "feature": "OLE equation objects (MathType and Equation Editor 3.0)",
+      "current_status": {
+        "status": "🟡",
+        "read": "✅",
+        "write": "✅"
+      },
+      "scope_limit": "Worksheet OLE equation objects of Transitional workbooks with PNG previews; Strict worksheets are not written and no equation server redraws the preview."
     }
   ],
   "status_changes": [

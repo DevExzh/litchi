@@ -85,6 +85,11 @@ pub(crate) enum Setter {
     EquationLatex,
     /// An equation's content, from OMML.
     EquationOmml,
+    /// An equation object's content, from an `Equation Native` stream or
+    /// bare MTEF (base64).
+    EquationMtef,
+    /// A new equation object's ProgID.
+    EquationProgId,
     /// A new picture's image source.
     PictureSrc,
     /// A new picture's width.

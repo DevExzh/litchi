@@ -831,6 +831,10 @@ impl<'a> TransferGraphDecoder<'a> {
         Ok(value)
     }
 
+    fn is_finished(&self) -> bool {
+        self.offset == self.bytes.len()
+    }
+
     fn finish(self) -> TransactionResult<()> {
         if self.offset != self.bytes.len() {
             return Err(invalid_durable("transfer graph has trailing bytes"));
@@ -1993,6 +1997,15 @@ fn encode_graph_change(change: &GraphChange) -> Result<Vec<u8>, litchi_core::pat
         put_transfer_bytes(&mut output, replaced.before.as_slice())?;
         put_transfer_bytes(&mut output, replaced.after.as_slice())?;
     }
+    // Relationships of other parts follow only when there are any, so a
+    // change without them keeps its encoding.
+    if !change.part_relationships.is_empty() {
+        put_transfer_count(&mut output, change.part_relationships.len())?;
+        for owned in change.part_relationships.iter() {
+            put_transfer_bytes(&mut output, owned.part.as_bytes())?;
+            encode_transfer_relationship(&mut output, &owned.relationship)?;
+        }
+    }
     Ok(output)
 }
 
@@ -2040,11 +2053,21 @@ fn decode_graph_change(bytes: &[u8]) -> TransactionResult<GraphChange> {
             after: Arc::new(after.to_vec()),
         });
     }
+    let mut part_relationships = Vec::new();
+    if !decoder.is_finished() {
+        let count = decoder.count(crate::document::LimitKind::PartRelationships, 256)?;
+        for _ in 0..count {
+            let part = decoder.string()?;
+            let relationship = decoder.relationship()?;
+            part_relationships.push(super::PartRelationship { part, relationship });
+        }
+    }
     decoder.finish()?;
     Ok(GraphChange {
         relationships: relationships.into(),
         parts: parts.into(),
         replaced: replaced.into(),
+        part_relationships: part_relationships.into(),
     })
 }
 
@@ -2907,6 +2930,39 @@ mod limit_tests {
                 matches!(checked_transfer_graph_bytes(current, additional), Err(TransactionError::Limit { kind: crate::document::LimitKind::TransferGraphBytes, observed, maximum: MAX_TRANSFER_GRAPH_BYTES }) if observed == expected)
             );
         }
+    }
+
+    #[test]
+    fn graph_changes_round_trip_with_and_without_part_relationships() {
+        let relationship = |id: &str| TransferRelationship {
+            id: id.to_owned(),
+            relationship_type: "urn:type".to_owned(),
+            target: "embeddings/oleObject1.bin".to_owned(),
+            external: false,
+        };
+        let plain = GraphChange {
+            relationships: Arc::new([relationship("rId9")]),
+            parts: Arc::new([]),
+            replaced: Arc::new([]),
+            part_relationships: Arc::new([]),
+        };
+        let encoded = encode_graph_change(&plain).unwrap();
+        // Without relationships of other parts the encoding ends after the
+        // replaced parts, as before they existed.
+        assert!(encoded.ends_with(&0u64.to_le_bytes()));
+        assert!(decode_graph_change(&encoded).unwrap() == plain);
+        let owned = GraphChange {
+            part_relationships: Arc::new([super::super::PartRelationship {
+                part: "/word/header1.xml".to_owned(),
+                relationship: relationship("rId2"),
+            }]),
+            ..plain
+        };
+        let encoded = encode_graph_change(&owned).unwrap();
+        assert!(decode_graph_change(&encoded).unwrap() == owned);
+        let mut trailing = encoded;
+        trailing.push(0);
+        assert!(decode_graph_change(&trailing).is_err());
     }
 
     #[test]

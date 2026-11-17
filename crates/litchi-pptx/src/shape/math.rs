@@ -29,11 +29,31 @@ const MAX_NODES: usize = 1_000_000;
 #[cfg(feature = "equation")]
 pub(crate) mod sites;
 
+pub(crate) mod ole;
+pub use ole::{OleEquation, Unreadable, is_equation_prog_id};
+
 /// What an equation is written from.
 #[cfg(feature = "equation")]
 pub use litchi_drawingml::math::EquationSource;
 
-/// The outcome of an equation write.
+/// What an OLE equation object (MathType, Equation Editor 3.0) is written
+/// from.
+#[cfg(feature = "equation")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum OleEquationSource<'a> {
+    /// LaTeX math, converted to MTEF through `litchi-equation`.
+    Latex(&'a str),
+    /// An OMML `m:oMath` or `m:oMathPara` element, converted to MTEF.
+    Omml(&'a str),
+    /// Raw MTEF: a complete `Equation Native` stream, or bare MTEF to which
+    /// the 28-byte OLE header is added.
+    Mtef(&'a [u8]),
+}
+
+/// The outcome of an equation write. For an OLE equation, `index` is the
+/// object's position among the slide's OLE equations
+/// ([`Slide::ole_equations`](crate::slide::Slide::ole_equations)).
 #[cfg(feature = "equation")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]

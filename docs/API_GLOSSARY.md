@@ -3022,6 +3022,8 @@ Action}`); the authored relationship ID of a `Click` stays crate-private.
 | `litchi_pptx::media_parts::{Summary, summary}`; `opened::{Edit::add_media, MediaFile}` | adopted |
 | `litchi_pptx::shape::math::{Equation, equations}`; `Slide::equations`, `SourceSlide::equations`, `source::Slide::equations` | adopted |
 | `litchi_pptx::opened::Edit::{add_equation, add_equation_to_shape, set_equation, remove_equation}`; `shape::math::{EquationSource, EquationWrite}` (feature `equation`); equations are addressed by their position among `Slide::equations` | adopted |
+| `litchi_pptx::shape::math::{OleEquation, Unreadable, is_equation_prog_id}`; `Slide::ole_equations`, `SourceSlide::ole_equations`, `source::Slide::ole_equations`; `OleEquation::{equation_native, latex}` (feature `equation`) | adopted; the OLE equation objects (`Equation.DSMT*`, `Equation.3`) of a slide, each reading its `Equation Native` stream on first use |
+| `litchi_pptx::opened::Edit::{add_ole_equation, set_ole_equation, remove_ole_equation}`; `EquationSource::Mtef` (feature `equation`); OLE equations are addressed by their position among `Slide::ole_equations` | adopted; the Office Math verbs refuse `EquationSource::Mtef` |
 
 ## PPTX P0 residue: text structure, rows, cell properties, comments, pictures
 
@@ -3584,3 +3586,27 @@ attributes of those namespaces.
 | `Refusal::EquationContent` | new equation markup holding anything but Office Math and Word run content (`InvalidValue`) | ✅ |
 | `litchi_docx::OfficeMath::{from_latex, latex}` (`equation` feature) | through `litchi_equation` with the WordprocessingML host and caller `Limits`; `from_latex` returns the conversion losses | ✅ |
 | DOCX `equation` add, set, remove (`mode`, `latex`, `omml`); `/…/oMathPara[N]` display, `/…/p[N]/oMath[M]` inline and `/…/p[N]/oMathPara[M]` display math of a paragraph | the `latex` and `omml` keys of the PPTX equation | ✅ |
+| `litchi_docx::object::{EquationObject, is_equation_prog_id}`, `Paragraph::equation_objects` | a paragraph's OLE equation objects (MathType `Equation.DSMT*`, Equation Editor 3.0 `Equation.3`) in document order: ProgID, `Type`, embedding and preview relationships, shape id, shown size | ✅ |
+| `litchi_docx::Package::{related_part_payload, story_parts}`, `source_backed::Package::related_part_payload` | the part a story part (main, header, footer, notes) relates by id, as the owner's effective graph has it; read lazily per object | ✅ |
+| `litchi_docx::document::{EquationContent, EquationSource}` (`equation` feature) | an object's `Equation Native` stream from LaTeX, OMML or raw MTEF (an `Equation Native` stream or bare MTEF, which keeps its own version), with its PNG preview drawn for a given text size, shown size, lowering (`w:position`, from the rendered depth) and conversion losses | ✅ |
+| `Edit::{equation_objects_at, equation_object_payload, remove_equation_object_at, equation_object_font_size_pt, existing_equation_object_font_size_pt}`; `Edit::{insert_equation_object_at, equation_object_kind, set_equation_object_at}` (`equation` feature) | each takes the story (`None` for the main document, else a `StoryTarget` header, footer or note), whose own part relates the object's parts: a new MathType run with an `oleObject` embedding and an `image` PNG preview; a replacement in the object's own kind that rewrites its compound file and preview (in place when only it uses them and the preview is PNG) and resizes its markup; a removal that drops the run and the parts nothing else names; a part's `_x0000_t75` shape type is written once and kept while other shapes use it; the text size is the run's, resolved through its character style, its paragraph style (or the default paragraph style), `w:basedOn` chains and the document defaults | ✅ |
+| Package-graph changes (`GraphChange`) of a main-document edit | also add and remove relationships of an existing header, footer or notes part, so story edits that add or drop parts replay through `Package::apply` and invert exactly; their durable encoding appends those relationships only when there are any | ✅ |
+| DOCX `equation` objects: `/…/p[N]/equation[M]` with `mode` (`inline`), `latex`, `mtef` (base64 `Equation Native`), `progId`, `error`; `add` with `mtef` or `progId` (`Equation.DSMT4` only), `set` of `latex`, `omml` or `mtef`, `remove` | the PPT equation keys, in the body, cells, content controls, headers, footers and notes; `equation[M]` of a paragraph names its OLE equation objects, as in DOC (it was an alias of `oMath[M]`), and Office Math stays `oMath[M]` / `oMathPara[M]`; under a block container `equation[N]` remains an alias of display math (canonical `…/oMathPara[N]`); an unreadable embedding is rewritten as a new object of the ProgID's kind; `mtef` on Office Math is refused | ✅ |
+
+## XLSX OLE equation objects
+
+One scoped family (`litchi_xlsx::equation_objects`, feature `equation`)
+reads, adds, replaces and removes the MathType (`Equation.DSMT*`) and
+Equation Editor 3.0 (`Equation.3`) objects of a worksheet's
+`<oleObjects>`. An object is addressed by its shape id. A new object is the
+embedding part, a PNG preview part, the worksheet's `x14` choice with its
+bare `oleObject` fallback, a VML picture shape and a hidden drawing shape
+linked to it by `a14:compatExt`, as Excel writes an embedded object. Every
+byte the edited object does not own is kept.
+
+| Name | Notes | Status |
+|---|---|---|
+| `litchi_xlsx::equation_objects::EquationObject` (`shape_id`, `prog_id`, `kind`, `anchor`, `embedding`, `preview`, `native`, `error`, `latex`); `Package::equation_objects`, `SourceWorksheet::equation_objects` | a worksheet's equation objects in `<oleObjects>` order on both owners; each embedding is read bounded, and one that cannot be read is that object's `error`, not a failed listing | ✅ |
+| `equation_objects::{Edit, Patch, Commit, Diagnostics, Error, Source, Written}`, `Package::{edit_equation_objects, edit_equation_objects_with_options, apply_equation_objects}` | `Edit::{equations, add, set, remove, reset, commit}`; `add` writes MathType for LaTeX and OMML and the data's own kind for MTEF; `set` keeps the object's kind and redraws its preview; `remove` drops the object's parts, relationships, VML and drawing shapes, and the VML drawing, drawing and `<oleObjects>` element it leaves empty | ✅ |
+| `litchi_xlsx::Error::Equation` (feature `equation`) | the conversion, rendering or compound-file error of an equation | ✅ |
+| XLSX `equation` get, query, add, set, remove (`latex`, `omml`, `mtef`, `progId`, `anchor`, `name`, `size`, `error`); `/<sheet>/equation[N]` | one element for both kinds: the sheet's Office Math equations come first, then its OLE equation objects; `add` writes an object when the properties name `mtef` or `progId` (only `Equation.DSMT4`), else Office Math; `set` and `remove` follow the node's kind, and `mtef` on an Office Math equation is refused | ✅ |

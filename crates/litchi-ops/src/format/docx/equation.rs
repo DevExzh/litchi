@@ -5,6 +5,7 @@
 //! | `/body/oMathPara[N]`, `…/tc[K]/oMathPara[N]`, `/header[N]/oMathPara[M]` | display math of a block container: a `w:p` holding one `m:oMathPara`, or a bare `m:oMathPara` (read only) |
 //! | `/body/p[N]/oMath[M]`, `/footnote[N]/p[M]/oMath[K]` | inline math of a paragraph: its M-th `m:oMath` outside a math paragraph, in document order |
 //! | `/body/p[N]/oMathPara[M]` | display math of a paragraph that also holds other content (a bookmark, text, inline math) |
+//! | `/body/p[N]/equation[M]`, `/header[N]/p[M]/equation[K]` | an OLE equation object (MathType, Equation Editor 3.0) of a paragraph: its M-th, in document order (see [`object`]) |
 //!
 //! Each reads `mode` (`display` or `inline`), `latex` (its OMML converted to
 //! LaTeX; absent without the `equation` feature or when the OMML does not
@@ -22,6 +23,12 @@
 //! `litchi-equation` and needs the `equation` feature; a conversion the
 //! converter reports as dropping formatting is refused (it reports no loss
 //! for a LaTeX command it does not know, which it writes as text).
+//!
+//! An `add` whose properties hold `mtef` or `progId` makes an OLE equation
+//! object instead, and `set` and `remove` of an object node write the
+//! object; see [`object`].
+
+mod object;
 
 use litchi_core::selector::Path;
 use litchi_core::{FileFormat, Position};
@@ -82,25 +89,67 @@ pub(super) fn inline_node<'f>(
     )
 }
 
+pub(crate) use object::ObjectMath;
+pub(super) use object::object_node;
+
+/// One equation of a paragraph, as its children list them: inline math,
+/// a math paragraph, or an OLE equation object.
+pub(super) enum ParagraphMath {
+    Inline(String),
+    Display(String),
+    Object(litchi_docx::object::EquationObject),
+}
+
+impl ParagraphMath {
+    /// Which family the equation is counted in: `oMath`, `oMathPara` or
+    /// `equation`.
+    pub(super) const fn family(&self) -> usize {
+        match self {
+            Self::Inline(_) => 0,
+            Self::Display(_) => 1,
+            Self::Object(_) => 2,
+        }
+    }
+
+    /// The equation's node, the `ordinal`-th of its family in the paragraph
+    /// at `paragraph`.
+    pub(super) fn node<'f>(self, docx: &'f Docx, paragraph: &Address, ordinal: u32) -> Node<'f> {
+        match self {
+            Self::Inline(omml) => inline_node(docx, paragraph, ordinal, omml, false),
+            Self::Display(omml) => inline_node(docx, paragraph, ordinal, omml, true),
+            Self::Object(object) => object_node(docx, paragraph, ordinal, object),
+        }
+    }
+}
+
 /// An equation's properties, in the order of the equation table.
+#[derive(Default)]
 pub(crate) struct EquationProps {
     pub(super) mode: &'static str,
     pub(super) latex: Option<String>,
     pub(super) omml: Option<String>,
+    /// An equation object's `Equation Native` stream, base64.
+    pub(super) mtef: Option<String>,
+    /// An equation object's ProgID.
+    pub(super) prog_id: Option<String>,
+    /// Why an equation object's embedding cannot be read.
+    pub(super) error: Option<String>,
 }
 
 /// The value of the equation property at `index`.
 pub(super) fn value<'a>(props: &EquationProps, index: usize) -> Option<NodeValue<'a>> {
+    let text = |value: &Option<String>| {
+        value
+            .as_ref()
+            .map(|value| NodeValue::Text(value.clone().into()))
+    };
     match index {
         0 => Some(NodeValue::Token(props.mode)),
-        1 => props
-            .latex
-            .as_ref()
-            .map(|latex| NodeValue::Text(latex.clone().into())),
-        2 => props
-            .omml
-            .as_ref()
-            .map(|omml| NodeValue::Text(omml.clone().into())),
+        1 => text(&props.latex),
+        2 => text(&props.omml),
+        3 => text(&props.mtef),
+        4 => text(&props.prog_id),
+        5 => text(&props.error),
         _ => None,
     }
 }
@@ -135,15 +184,33 @@ pub(super) fn display_omml(block: &super::node::Block) -> Result<Option<String>>
 // ---------------------------------------------------------------------------
 
 /// Where new or replaced content comes from.
+#[cfg_attr(
+    not(feature = "equation"),
+    allow(
+        dead_code,
+        reason = "equation objects are written with the equation feature"
+    )
+)]
 enum Source {
     Latex(String),
     Omml(String),
+    /// An `Equation Native` stream or bare MTEF, decoded from base64.
+    Mtef(Vec<u8>),
 }
 
-/// An admitted `add` or `set`: the requested mode and the content.
+/// An admitted `add` or `set`: the requested mode, the content and, for a
+/// new equation object, its ProgID.
 struct Request {
     mode: Option<Mode>,
     source: Source,
+    prog_id: Option<String>,
+}
+
+impl Request {
+    /// Whether the request writes an OLE equation object.
+    const fn is_object(&self) -> bool {
+        self.prog_id.is_some() || matches!(self.source, Source::Mtef(_))
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -152,11 +219,12 @@ enum Mode {
     Inline,
 }
 
-/// Admit an equation's `add` or `set` properties: exactly one of `latex`
-/// and `omml`, and, for `add`, the `mode`.
+/// Admit an equation's `add` or `set` properties: exactly one of `latex`,
+/// `omml` and `mtef`, and, for `add`, the `mode` and the `progId`.
 fn request(props: &Props<'_>, operation: Operation) -> Result<Request> {
     let mut mode = None;
     let mut source = None;
+    let mut prog_id = None;
     for (key, value) in props.iter() {
         let (_, entry) = EQUATION_REGISTRY
             .resolve(key.as_str())
@@ -177,8 +245,14 @@ fn request(props: &Props<'_>, operation: Operation) -> Result<Request> {
                         });
                         return Ok(());
                     },
+                    Setter::EquationProgId => {
+                        object::check_prog_id(&text)?;
+                        prog_id = Some(text);
+                        return Ok(());
+                    },
                     Setter::EquationLatex => Source::Latex(text),
                     Setter::EquationOmml => Source::Omml(text),
+                    Setter::EquationMtef => Source::Mtef(object::decode_mtef(&text)?),
                     _ => {
                         return Err(Error::new(
                             Code::UnsupportedProperty,
@@ -189,7 +263,7 @@ fn request(props: &Props<'_>, operation: Operation) -> Result<Request> {
                 if source.replace(content).is_some() {
                     return Err(Error::new(
                         Code::InvalidArgument,
-                        "an equation takes its content from one of latex and omml",
+                        "an equation takes its content from one of latex, omml and mtef",
                     ));
                 }
                 Ok(())
@@ -208,7 +282,22 @@ fn request(props: &Props<'_>, operation: Operation) -> Result<Request> {
         .with_property("latex")
         .with_format(FileFormat::Docx)
     })?;
-    Ok(Request { mode, source })
+    Ok(Request {
+        mode,
+        source,
+        prog_id,
+    })
+}
+
+/// Refuse MTEF for Office Math, which holds none.
+fn no_mtef_for_office_math() -> Error {
+    Error::new(
+        Code::UnsupportedCapability,
+        "an Office Math equation holds no MTEF: mtef writes equation objects",
+    )
+    .with_property("mtef")
+    .with_format(FileFormat::Docx)
+    .with_suggestion("give the Office Math equation as latex or omml")
 }
 
 /// One `m:oMath` from LaTeX, refused when the converter reports that the
@@ -264,6 +353,7 @@ fn inline_math(source: &Source) -> Result<OfficeMath> {
         Source::Latex(latex) => from_latex(latex),
         Source::Omml(omml) => OfficeMath::from_xml(omml.as_str())
             .map_err(|_| invalid_omml("inline math is one well-formed m:oMath element")),
+        Source::Mtef(_) => Err(no_mtef_for_office_math()),
     }
 }
 
@@ -285,6 +375,7 @@ fn display_math(source: &Source) -> Result<Display> {
                     invalid_omml("display math is one well-formed m:oMath or m:oMathPara element")
                 }),
         },
+        Source::Mtef(_) => Err(no_mtef_for_office_math()),
     }
 }
 
@@ -434,6 +525,17 @@ fn in_story<T>(
     }
 }
 
+/// The package editor of an equation-object write.
+fn eager(edit: &mut WorkEdit) -> Result<&mut litchi_docx::document::Edit> {
+    match edit {
+        WorkEdit::Eager(edit) => Ok(edit.as_mut()),
+        WorkEdit::Source(_) => Err(error(
+            Code::InternalError,
+            "an equation object write needs the package editor",
+        )),
+    }
+}
+
 /// Which equation of a paragraph a node is.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Which {
@@ -448,6 +550,8 @@ enum Which {
         /// or a story, which keeps it).
         whole: bool,
     },
+    /// The equation object at this position.
+    Object(Position),
 }
 
 /// An equation node's paragraph, its story and which of its equations it
@@ -467,6 +571,23 @@ impl Target {
             })
         };
         match &node.value {
+            Value::Object(_) => {
+                let ordinal = node
+                    .address
+                    .steps()
+                    .last()
+                    .map(|step| Position::new(step.ordinal as usize))
+                    .ok_or_else(|| {
+                        error(Code::InternalError, "the equation node has no address")
+                    })?;
+                let parent = super::nested::parent_node(docx, node)?;
+                let (story, paragraph) = located(&parent)?;
+                Ok(Self {
+                    story,
+                    paragraph,
+                    which: Which::Object(ordinal),
+                })
+            },
             Value::Math(math) => {
                 let ordinal = node
                     .address
@@ -529,6 +650,7 @@ impl Target {
         let (kind, position) = match self.which {
             Which::Inline(position) => (0, position.get()),
             Which::MathParagraph { index, .. } => (1, index.get()),
+            Which::Object(position) => (2, position.get()),
         };
         (
             self.story.as_ref().map(|story| format!("{story:?}")),
@@ -568,6 +690,15 @@ impl Docx {
             .with_property("mode"));
         }
         request.mode = request.mode.or(named);
+        if request.is_object() {
+            if request.mode == Some(Mode::Display) || parent.element_kind() != Kind::Paragraph {
+                return Err(error(
+                    Code::UnsupportedCapability,
+                    "an equation object is added inline, under a paragraph",
+                ));
+            }
+            return self.add_object(editor, parent, node, &request.source);
+        }
         match parent.element_kind() {
             Kind::Paragraph => {
                 if request.mode == Some(Mode::Display) {
@@ -600,6 +731,79 @@ impl Docx {
         }
     }
 
+    /// `add` of an equation object under a paragraph, beside its runs.
+    fn add_object(
+        &self,
+        editor: DocxEditor,
+        parent: &Node<'_>,
+        node: &NewNode<'_>,
+        source: &Source,
+    ) -> Result<(Commit, Path<'static>)> {
+        let Value::Paragraph { paragraph, .. } = &parent.value else {
+            return Err(error(
+                Code::InternalError,
+                "the equation parent holds no paragraph",
+            ));
+        };
+        let (story, path) = match story_path(parent)? {
+            Some((key, path)) => (Some(key), path),
+            None => (None, element_path(parent)?),
+        };
+        let at = self.run_anchor(parent, paragraph, node)?;
+        #[cfg(feature = "equation")]
+        {
+            self.owner().check_source()?;
+            let mut edit = WorkEdit::from(self.eager_editor(editor)?)?;
+            let eager = eager(&mut edit)?;
+            let target = story.as_ref().map(super::story::target);
+            let size = eager
+                .equation_object_font_size_pt(target, &path, at)
+                .map_err(Error::from)?;
+            let content = object::content(source, None, size)?;
+            let ordinal = eager
+                .insert_equation_object_at(target, &path, at, &content)
+                .map_err(Error::from)?;
+            let commit = edit.commit(self)?;
+            Ok((commit, object::object_path(parent, ordinal)))
+        }
+        #[cfg(not(feature = "equation"))]
+        {
+            let _ = (editor, story, path, at, source);
+            Err(object::unavailable())
+        }
+    }
+
+    /// Where a new inline equation goes: before the direct run the
+    /// placement names, or after the paragraph's last child.
+    fn run_anchor(
+        &self,
+        parent: &Node<'_>,
+        paragraph: &litchi_docx::Paragraph,
+        node: &NewNode<'_>,
+    ) -> Result<Option<Position>> {
+        let locations = run_locations(self, paragraph)?;
+        let index = super::nested::sibling_position(
+            self,
+            parent,
+            Kind::Run,
+            locations.len(),
+            node.placement(),
+        )?;
+        Ok(match index {
+            None => None,
+            Some(index) if index >= locations.len() => None,
+            Some(index) => match locations.get(index).map(Vec::as_slice) {
+                Some([ElementStep::Run(run)]) => Some(*run),
+                _ => {
+                    return Err(error(
+                        Code::UnsupportedCapability,
+                        "an equation can only be added beside a direct run of the paragraph",
+                    ));
+                },
+            },
+        })
+    }
+
     fn add_inline(
         &self,
         editor: DocxEditor,
@@ -618,27 +822,7 @@ impl Docx {
             None => (None, element_path(parent)?),
         };
         // The new equation goes before a direct run, as a picture does.
-        let locations = run_locations(self, paragraph)?;
-        let index = super::nested::sibling_position(
-            self,
-            parent,
-            Kind::Run,
-            locations.len(),
-            node.placement(),
-        )?;
-        let at = match index {
-            None => None,
-            Some(index) if index >= locations.len() => None,
-            Some(index) => match locations.get(index).map(Vec::as_slice) {
-                Some([ElementStep::Run(run)]) => Some(*run),
-                _ => {
-                    return Err(error(
-                        Code::UnsupportedCapability,
-                        "an equation can only be added beside a direct run of the paragraph",
-                    ));
-                },
-            },
-        };
+        let at = self.run_anchor(parent, paragraph, node)?;
         let math = inline_math(source)?;
         self.owner().check_source()?;
         let mut edit = self.equation_edit(editor, story.is_some())?;
@@ -737,10 +921,42 @@ impl Docx {
             .any(|target| matches!(target.which, Which::MathParagraph { .. }))
             .then(|| display_math(&request.source))
             .transpose()?;
+        let objects = targets
+            .iter()
+            .any(|target| matches!(target.which, Which::Object(_)));
+        #[cfg(not(feature = "equation"))]
+        if objects {
+            return Err(object::unavailable());
+        }
         self.owner().check_source()?;
         let stories = targets.iter().any(|target| target.story.is_some());
-        let mut edit = self.equation_edit(editor, stories)?;
+        let mut edit = self.equation_edit(editor, stories || objects)?;
         for target in &targets {
+            if let Which::Object(index) = target.which {
+                #[cfg(feature = "equation")]
+                {
+                    let eager = eager(&mut edit)?;
+                    let story = target.story.as_ref().map(super::story::target);
+                    let kind = eager
+                        .equation_object_kind(
+                            story,
+                            &target.paragraph,
+                            index,
+                            &litchi_equation::Limits::DEFAULT,
+                        )
+                        .map_err(Error::from)?;
+                    let size = eager
+                        .existing_equation_object_font_size_pt(story, &target.paragraph, index)
+                        .map_err(Error::from)?;
+                    let content = object::content(&request.source, Some(&kind), size)?;
+                    eager
+                        .set_equation_object_at(story, &target.paragraph, index, &content)
+                        .map_err(Error::from)?;
+                }
+                #[cfg(not(feature = "equation"))]
+                let _ = index;
+                continue;
+            }
             in_story(&mut edit, target.story.as_ref(), |edit| {
                 match (target.which, &inline, &display) {
                     (Which::Inline(position), Some(math), _) => {
@@ -780,10 +996,23 @@ impl Docx {
         // Later equations first, so no removal shifts another.
         targets.sort_by_key(|target| std::cmp::Reverse(target.key()));
         targets.dedup_by(|left, right| left.key() == right.key());
+        let objects = targets
+            .iter()
+            .any(|target| matches!(target.which, Which::Object(_)));
         self.owner().check_source()?;
         let stories = targets.iter().any(|target| target.story.is_some());
-        let mut edit = self.equation_edit(editor, stories)?;
+        let mut edit = self.equation_edit(editor, stories || objects)?;
         for target in &targets {
+            if let Which::Object(index) = target.which {
+                eager(&mut edit)?
+                    .remove_equation_object_at(
+                        target.story.as_ref().map(super::story::target),
+                        &target.paragraph,
+                        index,
+                    )
+                    .map_err(Error::from)?;
+                continue;
+            }
             in_story(&mut edit, target.story.as_ref(), |edit| {
                 match target.which {
                     Which::Inline(position) => {
@@ -797,6 +1026,10 @@ impl Docx {
                         index,
                         whole: false,
                     } => edit.remove_paragraph(&target.paragraph, index),
+                    Which::Object(_) => Err(error(
+                        Code::InternalError,
+                        "an equation object is removed by the package editor",
+                    )),
                 }
             })?;
         }

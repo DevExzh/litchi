@@ -323,8 +323,8 @@ pub(super) fn path_with(node: &Node<'_>, child: Option<(Kind, Position)>) -> Pat
         .enumerate()
         .map(|(index, step)| {
             let parent = index.checked_sub(1).map(|parent| address[parent].kind);
-            if step.math_paragraph {
-                let name = "oMathPara";
+            if step.math_paragraph || step.object {
+                let name = step.name(parent);
                 PathStep::new(name).with(Predicate::Index(Position::new(step.ordinal as usize)))
             } else {
                 step_of(step.kind, parent, Position::new(step.ordinal as usize))

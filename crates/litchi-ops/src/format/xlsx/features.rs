@@ -82,6 +82,9 @@ pub(crate) enum Data {
     Autofilter(Box<xlsx::auto_filter::Definition>),
     Break(xlsx::page_breaks::Break),
     Equation(Box<xlsx::drawing::math::Equation>),
+    /// An OLE equation object (MathType or Equation Editor 3.0).
+    #[cfg(feature = "equation")]
+    OleEquation(Box<xlsx::equation_objects::EquationObject>),
 }
 
 /// A legacy note.
@@ -129,6 +132,8 @@ impl Feature {
             Data::Autofilter(filter) => Cow::Borrowed(filter.reference()?.as_str()),
             Data::Break(_) => return None,
             Data::Equation(equation) => Cow::Borrowed(equation.text()),
+            #[cfg(feature = "equation")]
+            Data::OleEquation(object) => ole_text(object),
         })
     }
 
@@ -147,6 +152,8 @@ impl Feature {
             Data::Autofilter(filter) => Cow::Borrowed(filter.reference()?.as_str()),
             Data::Break(item) => Cow::Owned(item.id().to_string()),
             Data::Equation(equation) => Cow::Borrowed(equation.text()),
+            #[cfg(feature = "equation")]
+            Data::OleEquation(object) => Cow::Borrowed(object.prog_id()),
         }))
     }
 
@@ -178,6 +185,8 @@ impl Feature {
             },
             Data::Break(item) => break_value(self.kind, *item, *BREAK_KEYS.get(index)?),
             Data::Equation(equation) => equation_value(equation, *EQUATION_KEYS.get(index)?),
+            #[cfg(feature = "equation")]
+            Data::OleEquation(object) => ole_equation_value(object, *EQUATION_KEYS.get(index)?),
         }
     }
 }
@@ -299,6 +308,18 @@ impl SheetHandle {
         Ok(match self {
             Self::Eager { sheet, .. } => sheet.auto_filter()?,
             Self::Source { sheet } => sheet.auto_filter()?,
+        })
+    }
+
+    /// The worksheet's OLE equation objects.
+    #[cfg(feature = "equation")]
+    pub(super) fn equation_objects(&self) -> Result<Vec<xlsx::equation_objects::EquationObject>> {
+        Ok(match self {
+            Self::Eager { sheet, workbook } => match &workbook.0.owner {
+                XlsxOwner::Eager(package) => package.equation_objects(sheet.position())?,
+                XlsxOwner::Source(_) => return Err(lost_owner()),
+            },
+            Self::Source { sheet } => sheet.equation_objects()?,
         })
     }
 
@@ -435,11 +456,21 @@ pub(super) fn list(file: &Xlsx, sheet: &Sheet, kind: Kind) -> Result<Vec<Feature
                 })
                 .unwrap_or_default()
         },
-        Kind::Equation => handle
-            .equations()?
-            .into_iter()
-            .map(|equation| Data::Equation(Box::new(equation)))
-            .collect(),
+        // The Office Math equations, then the OLE equation objects.
+        Kind::Equation => {
+            let equations = handle
+                .equations()?
+                .into_iter()
+                .map(|equation| Data::Equation(Box::new(equation)));
+            #[cfg(feature = "equation")]
+            let equations = equations.chain(
+                handle
+                    .equation_objects()?
+                    .into_iter()
+                    .map(|object| Data::OleEquation(Box::new(object))),
+            );
+            equations.collect()
+        },
         _ => Vec::new(),
     };
     Ok(data
@@ -1484,7 +1515,8 @@ fn break_value(
     }
 }
 
-/// Equation keys.
+/// Equation keys. `mtef`, `progId` and `error` belong to OLE equation
+/// objects; `name` and `size` to Office Math equations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum EquationKey {
     Latex,
@@ -1492,6 +1524,9 @@ pub(crate) enum EquationKey {
     Anchor,
     Name,
     Size,
+    Mtef,
+    ProgId,
+    Error,
 }
 
 /// An equation's content: `latex` or `omml`, one of them, never empty.
@@ -1510,6 +1545,9 @@ keyed!(EquationKey, EquationKey, EQUATION_TABLE, EQUATION_PROPS, EQUATION_KEYS, 
     entry(read("anchor", TEXT), Access::Add(EquationKey::Anchor)) => Anchor,
     entry(read("name", TEXT), Access::ReadOnly) => Name,
     entry(write_only("size", FONT_SIZE), Access::Add(EquationKey::Size)) => Size,
+    content(read("mtef", TEXT), EquationKey::Mtef) => Mtef,
+    entry(read("progId", TEXT), Access::Add(EquationKey::ProgId)) => ProgId,
+    entry(read("error", TEXT), Access::ReadOnly) => Error,
 ], [
     alias("ref", 2),
 ]);
@@ -1520,7 +1558,47 @@ fn equation_value(equation: &xlsx::drawing::math::Equation, key: EquationKey) ->
         EquationKey::Omml => Some(text(equation.omml())),
         EquationKey::Anchor => equation.cell().map(owned),
         EquationKey::Name => equation.name().map(text),
-        EquationKey::Size => None,
+        EquationKey::Size | EquationKey::Mtef | EquationKey::ProgId | EquationKey::Error => None,
+    }
+}
+
+/// The LaTeX of an OLE equation object; `None` when its MTEF does not
+/// convert or its embedding cannot be read.
+#[cfg(feature = "equation")]
+fn ole_latex(object: &xlsx::equation_objects::EquationObject) -> Option<String> {
+    object.latex(&litchi_equation::Limits::DEFAULT).ok()
+}
+
+/// The text a query matches for an OLE equation object: its LaTeX, read on
+/// first use within the listing's byte budget and once per embedding part;
+/// its ProgID when the embedding cannot be read, the budget is spent or the
+/// MTEF does not convert.
+#[cfg(feature = "equation")]
+fn ole_text(object: &xlsx::equation_objects::EquationObject) -> Cow<'_, str> {
+    Cow::Borrowed(object.default_latex().unwrap_or(object.prog_id()))
+}
+
+#[cfg(feature = "equation")]
+fn ole_equation_value(
+    object: &xlsx::equation_objects::EquationObject,
+    key: EquationKey,
+) -> Option<Value<'_>> {
+    match key {
+        EquationKey::Latex => ole_latex(object).map(owned),
+        EquationKey::Mtef => object.native().map(|native| {
+            use base64::Engine as _;
+            owned(base64::engine::general_purpose::STANDARD.encode(native))
+        }),
+        EquationKey::ProgId => Some(text(object.prog_id())),
+        EquationKey::Anchor => object.anchor().map(|anchor| {
+            owned(
+                super::node::Label::cell(anchor.from.column, anchor.from.row)
+                    .as_str()
+                    .to_owned(),
+            )
+        }),
+        EquationKey::Error => object.error().map(text),
+        EquationKey::Omml | EquationKey::Name | EquationKey::Size => None,
     }
 }
 

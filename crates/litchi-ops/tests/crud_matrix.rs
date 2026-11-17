@@ -476,7 +476,8 @@ const RECIPES: &[Recipe] = &[
         props: &[("url", "http://example.com/"), ("text", "Litchi")],
         start: false,
     },
-    // A PPTX equation names its content as one of `latex` and `omml`.
+    // A PPTX equation names its content as one of `latex`, `omml` and
+    // `mtef` (an OLE equation object).
     Recipe {
         format: "pptx",
         element: "equation",

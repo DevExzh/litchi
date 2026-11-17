@@ -375,15 +375,16 @@ fn ordinary_reports_hide_native_selection_fields() {
                 );
             } else if element.name() == "equation" {
                 // An equation's content is read, set and seeded as
-                // LaTeX or OMML; its mode is read and chooses where a new
-                // one goes.
-                assert!(property.get(), "equation {}", property.name());
-                assert!(property.add(), "equation {}", property.name());
+                // LaTeX, OMML or (for an equation object) MTEF; its mode
+                // and an object's ProgID are read and choose what a new
+                // one is; why an object cannot be read is read only.
+                let name = property.name();
+                assert!(property.get(), "equation {name}");
+                assert_eq!(property.add(), name != "error", "equation {name}");
                 assert_eq!(
                     property.set(),
-                    property.name() != "mode",
-                    "equation {}",
-                    property.name()
+                    !matches!(name, "mode" | "progId" | "error"),
+                    "equation {name}"
                 );
             } else if element.name() == "document" {
                 // Every root key is a document property, set

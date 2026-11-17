@@ -270,7 +270,21 @@ reuses the existing investment in 60+ crates, and complies with ADR 0007.
   equation is an OLE object too, whose node reads and writes `latex` and
   `mtef` the same way, takes `omml` on writes, and gets a PNG preview; PPT
   edits are append-only saves, so a replaced or removed equation's old
-  storage stays in the file, reachable through earlier persist directories), tables (word-processing tables, spreadsheet ListObjects,
+  storage stays in the file, reachable through earlier persist directories;
+  a PPTX slide's OLE equation objects (MathType, Equation Editor 3.0) are
+  equation nodes too, numbered after the slide's Office Math equations,
+  reading `latex`, `mtef`, `progId` and `error`; `add` with `mtef` or
+  `progId: Equation.DSMT4` writes a MathType object with a PNG preview,
+  `set` keeps the object's kind, and `remove` also drops its embedding,
+  preview and legacy VML shape;
+  a worksheet's OLE equation objects are XLSX equation nodes too:
+  `/<sheet>/equation[N]` numbers the sheet's Office Math equations first,
+  in drawing order, then its OLE objects in `<oleObjects>` order; an object
+  reads and writes `latex` and `mtef` the same way, takes `omml` on writes,
+  reports `progId`, `anchor` and an unreadable embedding's `error`, and is
+  added when the properties name `mtef` or `progId` `Equation.DSMT4`, with
+  the markup Excel writes for an embedded object and a PNG preview; `mtef`
+  on an Office Math equation is refused), tables (word-processing tables, spreadsheet ListObjects,
   slide tables), pictures, comments/notes (including threaded comments),
   hyperlinks, text boxes — and the structural plane where the workspace
   already has typed models: styles, numbering/lists, sections and page setup,
@@ -297,6 +311,30 @@ reuses the existing investment in 60+ crates, and complies with ADR 0007.
   `litchi-equation` (the `equation` feature); a conversion the converter
   reports as dropping formatting is refused, but it reports nothing for a
   LaTeX command it does not know, which it writes as text.
+  OLE equation objects (MathType and Equation Editor 3.0 `w:object`s) are
+  `equation` nodes too, `…/p[N]/equation[M]` of a paragraph (M counts the
+  paragraph's objects in document order, apart from its Office Math, as DOC
+  counts them), so a query for `equation` returns both kinds. Under a
+  paragraph, `equation[M]` therefore names an OLE equation object (before,
+  it was an alias of `oMath[M]`); Office Math keeps `oMath[M]` and
+  `oMathPara[M]`. The step name means different things by its parent: under
+  a block container (the body, a cell, a content control, a story)
+  `equation[N]` stays an alias of `oMathPara[N]`, display math, whose
+  canonical path is `…/oMathPara[N]`; only under a paragraph does it name an
+  OLE object, whose canonical path is `…/p[N]/equation[M]`. An object
+  reads `mode` (`inline`), `latex`, `mtef` (its `Equation Native` stream,
+  base64), `progId` and `error` (why its embedding cannot be read), and no
+  `omml`. An `add` under a paragraph whose properties hold `mtef` or `progId`
+  (only `Equation.DSMT4`) inserts a new MathType object with its embedding
+  and a PNG preview; `set` of `latex`, `omml` or `mtef` keeps the object's
+  kind (an object whose embedding cannot be read gets a new compound file of
+  its ProgID's kind); `remove` takes the object's run and the parts nothing
+  else names, also parts the same edit added.
+  Objects are written in the body, cells, content controls, headers, footers
+  and notes (a story's own part relates their parts). A preview is drawn at
+  the text size of the object's run, resolved through its styles and the
+  document defaults, and the run is lowered by the rendered depth. `mtef` on
+  Office Math is refused.
 
 ## 13. Feature tiers and v1 boundary
 

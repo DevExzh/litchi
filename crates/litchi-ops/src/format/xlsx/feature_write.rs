@@ -471,6 +471,8 @@ impl Xlsx {
                 (commit.into_package(), changed, native_patch_bytes)
             },
             Data::Equation(_) => return self.remove_equation(sheet, feature, limits).map(Some),
+            #[cfg(feature = "equation")]
+            Data::OleEquation(_) => return self.remove_equation(sheet, feature, limits).map(Some),
             Data::Break(_) => {
                 let mut breaks = self.breaks(sheet, feature.kind)?;
                 remove_at(&mut breaks, feature.index)?;

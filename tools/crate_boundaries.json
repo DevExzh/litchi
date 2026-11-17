@@ -81,7 +81,9 @@
       "litchi-equation",
       "litchi-ooxml-common"
     ],
-    "litchi-equation": [],
+    "litchi-equation": [
+      "litchi-cfb"
+    ],
     "litchi-eval": [
       "litchi-core"
     ],

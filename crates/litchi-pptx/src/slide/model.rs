@@ -480,6 +480,49 @@ impl<'a> Slide<'a> {
         crate::shape::math::equations(self.part.part().blob())
     }
 
+    /// The OLE equation objects of this slide (MathType and Equation Editor
+    /// 3.0), in document order. With the `equation` feature, each reads its
+    /// `Equation Native` stream from the embedding part on first use; an
+    /// object whose embedding is missing is still listed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed slide XML, a malformed relationship
+    /// target or exceeded bounds.
+    pub fn ole_equations(&self) -> Result<Vec<crate::shape::math::OleEquation>> {
+        use crate::shape::math::ole;
+        let part = self.part.part();
+        let rels = part.rels();
+        let package = self.package;
+        ole::list(
+            part.blob(),
+            |id| ole::resolve(rels.get(id)),
+            |target| {
+                #[cfg(feature = "equation")]
+                {
+                    let embedding = match target {
+                        Ok(name) => match litchi_opc::PackURI::new(name)
+                            .ok()
+                            .and_then(|uri| package.get_part(&uri).ok())
+                        {
+                            Some(part) => ole::Embedding::Bytes(part.blob_arc()),
+                            None => ole::Embedding::Unavailable(
+                                "the embedding part is missing".to_owned(),
+                            ),
+                        },
+                        Err(reason) => ole::Embedding::Unavailable(reason.to_owned()),
+                    };
+                    ole::Content::new(embedding)
+                }
+                #[cfg(not(feature = "equation"))]
+                {
+                    let _ = (target, package);
+                    ole::Content::new()
+                }
+            },
+        )
+    }
+
     /// Resolve a click action of this slide's shapes or text through the
     /// slide's relationships: an external URL, a slide of the presentation, or
     /// a relationship-free action. `None` when the click names a relationship

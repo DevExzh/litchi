@@ -309,6 +309,7 @@ impl Edit<Package> {
                 }]),
                 parts: parts.into(),
                 replaced: Arc::new([]),
+                part_relationships: Arc::new([]),
             }),
             true,
         )?;
@@ -407,6 +408,7 @@ impl Edit<Package> {
                 relationships: Arc::new([]),
                 parts: Arc::new([]),
                 replaced: replaced.into(),
+                part_relationships: Arc::new([]),
             }),
             true,
         )?;

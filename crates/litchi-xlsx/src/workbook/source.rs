@@ -1284,6 +1284,24 @@ impl SourceWorksheet {
         crate::drawing::edit::source_equations(&self.owner.package, &self.data.part_uri)
     }
 
+    /// The worksheet's OLE equation objects, in `<oleObjects>` order; see
+    /// [`crate::equation_objects`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::NotWorksheet`] for a chart or dialog sheet and the
+    /// errors of malformed `<oleObjects>` markup.
+    #[cfg(feature = "equation")]
+    pub fn equation_objects(&self) -> Result<Vec<crate::equation_objects::EquationObject>> {
+        if self.data.kind != WorksheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: self.data.name().to_owned(),
+            });
+        }
+        self.owner.package.check_execution()?;
+        crate::equation_objects::list(&self.owner.package, &self.data.part_uri)
+    }
+
     /// Read the worksheet's admitted SpreadsheetML form controls.
     pub fn form_controls(&self) -> Result<crate::form_control::FormControlCollection> {
         if self.data.kind != WorksheetKind::Worksheet {

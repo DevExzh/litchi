@@ -311,6 +311,29 @@ pub(super) fn load_part(
     Ok(part)
 }
 
+/// The bytes of an OLE equation's embedding part, refused before reading
+/// when its declared size exceeds the source's part limit or
+/// [`litchi_equation::MAX_EQUATION_OBJECT_BYTES`].
+#[cfg(feature = "equation")]
+fn load_embedding(owner: &SourceInner, uri: &PackURI) -> Result<Vec<u8>> {
+    with_fences(owner, || {
+        let view = owner.package.part(uri)?;
+        let declared = view.declared_uncompressed_size()?;
+        let maximum = owner
+            .limits
+            .max_part_bytes()
+            .min(litchi_equation::MAX_EQUATION_OBJECT_BYTES);
+        if declared > maximum {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PartBytes),
+                observed: usize::try_from(declared).unwrap_or(usize::MAX),
+                maximum: usize::try_from(maximum).unwrap_or(usize::MAX),
+            });
+        }
+        Ok(view.data()?.as_bytes().to_vec())
+    })
+}
+
 /// Process one eager related part with the same XML and bounded-MCE policy
 /// used by [`load_part`]. The returned blob is suitable for a leaf parser;
 /// callers retain the original package part separately when they need raw
@@ -906,6 +929,63 @@ impl SourceSlide {
             let data = view.data()?;
             crate::source_limits::validate_xml_limits(data.as_bytes(), self.owner.limits)?;
             crate::shape::math::equations(data.as_bytes())
+        })
+    }
+
+    /// The OLE equation objects of this slide; see
+    /// [`crate::slide::Slide::ole_equations`]. With the `equation` feature,
+    /// each reads its embedding part from the source on first use, bounded
+    /// by `litchi_equation::MAX_EQUATION_OBJECT_BYTES`.
+    ///
+    /// # Errors
+    /// Returns typed source, execution, limit, relationship or XML errors.
+    pub fn ole_equations(&self) -> Result<Vec<crate::shape::math::OleEquation>> {
+        use crate::shape::math::ole;
+        with_fences(&self.owner, || {
+            let view = self.owner.package.part(&self.data.part_uri)?;
+            let declared = view.declared_uncompressed_size()?;
+            let maximum = crate::open_options::selected(self.owner.semantic_limits.as_ref())
+                .shape()
+                .input_bytes();
+            if declared > maximum as u64 {
+                return Err(Error::Limit {
+                    kind: crate::opened::LimitKind::Codec(
+                        crate::opened::CodecLimitKind::SourceBytes,
+                    ),
+                    observed: usize::try_from(declared).unwrap_or(usize::MAX),
+                    maximum,
+                });
+            }
+            let rels = view.rels();
+            let data = view.data()?;
+            crate::source_limits::validate_xml_limits(data.as_bytes(), self.owner.limits)?;
+            ole::list(
+                data.as_bytes(),
+                |id| ole::resolve(rels.get(id)),
+                |target| {
+                    #[cfg(feature = "equation")]
+                    {
+                        let embedding = match target.map(PackURI::new) {
+                            Ok(Ok(uri)) => {
+                                let owner = Arc::clone(&self.owner);
+                                ole::Embedding::Deferred(Arc::new(move || {
+                                    load_embedding(&owner, &uri)
+                                }))
+                            },
+                            Ok(Err(_)) => ole::Embedding::Unavailable(
+                                "the embedding part name is invalid".to_owned(),
+                            ),
+                            Err(reason) => ole::Embedding::Unavailable(reason.to_owned()),
+                        };
+                        ole::Content::new(embedding)
+                    }
+                    #[cfg(not(feature = "equation"))]
+                    {
+                        let _ = target;
+                        ole::Content::new()
+                    }
+                },
+            )
         })
     }
 

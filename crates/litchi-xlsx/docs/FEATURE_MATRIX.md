@@ -61,6 +61,7 @@ Feature checklist. ✅ Supported · 🟡 Partial · ❌ Unsupported · N/A Not a
 | Existing worksheet SVG pictures | 🟡 | ✅ | 🟡 |
 | Core worksheet drawing content parts | 🟡 | ✅ | ❌ |
 | OLE objects and embedded packages | 🟡 | ✅ | 🟡 |
+| OLE equation objects (MathType and Equation Editor 3.0) | 🟡 | ✅ | ✅ |
 | Pivot caches | 🟡 | ✅ | 🟡 |
 | PivotTable views | 🟡 | ✅ | 🟡 |
 | PivotTable server formats (`pivotTableServerFormats`) | 🟡 | ✅ | 🟡 |

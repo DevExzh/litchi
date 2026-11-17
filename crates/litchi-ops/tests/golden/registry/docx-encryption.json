@@ -2305,7 +2305,8 @@
         "positional": [
           "/body/oMathPara[N]",
           "/body/p[N]/oMath[M]",
-          "/body/p[N]/oMathPara[M]"
+          "/body/p[N]/oMathPara[M]",
+          "/body/p[N]/equation[M]"
         ]
       },
       "properties": {
@@ -2335,6 +2336,30 @@
           },
           "add": true,
           "set": true,
+          "get": true
+        },
+        "mtef": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "progId": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "error": {
+          "type": "string",
+          "add": false,
+          "set": false,
           "get": true
         }
       },

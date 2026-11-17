@@ -58,8 +58,10 @@ pub enum Kind {
     /// A block content control, `sdt[N]`.
     Sdt,
     /// An equation: display math of a block container, `oMathPara[N]` (an
-    /// `m:oMathPara`, bare or held in a `w:p`), or inline math of a
-    /// paragraph, `oMath[N]` (an `m:oMath` outside a math paragraph).
+    /// `m:oMathPara`, bare or held in a `w:p`), inline math of a
+    /// paragraph, `oMath[N]` (an `m:oMath` outside a math paragraph), or an
+    /// OLE equation object of a paragraph, `equation[N]` (a MathType or
+    /// Equation Editor 3.0 `w:object`).
     Equation,
     /// A body-level section break (`w:sectPr`), `section[N]`.
     Section,
@@ -1065,7 +1067,12 @@ pub(crate) static EQUATION_MODE: Tokens = Tokens::new("equation mode", &["displa
 
 // `ElementToNode` for `oMathPara` and `oMath`: the equation's mode, its
 // LaTeX and its OMML. `latex` or `omml` seeds a new equation and replaces an
-// existing one's content; `mode` chooses where a new one goes.
+// existing one's content; `mode` chooses where a new one goes. An OLE
+// equation object (`equation[N]` of a paragraph) reads `mtef` (its
+// `Equation Native` stream, base64), `progId` and `error` (why its
+// embedding cannot be read) instead of `omml`; `mtef` or `progId` on `add`
+// makes a new MathType object, and `set` of `latex`, `omml` or `mtef`
+// replaces an object's equation in its own kind.
 crate::registry::registry! {
     pub(crate) EQUATION_PROPS, EQUATION_REGISTRY: Setter {
     read_add(
@@ -1088,6 +1095,20 @@ crate::registry::registry! {
         Constraint::NotEmpty,
         false,
     ),
+    writable(
+        "mtef",
+        ValueType::Text,
+        Setter::EquationMtef,
+        Constraint::NotEmpty,
+        false,
+    ),
+    read_add(
+        "progId",
+        ValueType::Text,
+        Setter::EquationProgId,
+        Constraint::NotEmpty,
+    ),
+    crate::registry::Entry::read(PropSpec::new("error", ValueType::Text)),
     }
 }
 
@@ -1357,6 +1378,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                     "/body/oMathPara[N]",
                     "/body/p[N]/oMath[M]",
                     "/body/p[N]/oMathPara[M]",
+                    "/body/p[N]/equation[M]",
                 ],
                 EQUATION_PROPS,
             ),

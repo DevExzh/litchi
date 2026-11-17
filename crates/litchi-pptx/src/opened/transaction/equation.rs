@@ -135,16 +135,16 @@ fn extent(tag: &[u8]) -> Option<(i64, i64)> {
 
 /// Replacements of byte ranges of one slide, applied in one pass.
 #[derive(Default)]
-struct Splice {
+pub(super) struct Splice {
     edits: Vec<(Range<usize>, String)>,
 }
 
 impl Splice {
-    fn replace(&mut self, range: Range<usize>, with: impl Into<String>) {
+    pub(super) fn replace(&mut self, range: Range<usize>, with: impl Into<String>) {
         self.edits.push((range, with.into()));
     }
 
-    fn apply(mut self, xml: &[u8], max_bytes: usize) -> Result<Vec<u8>> {
+    pub(super) fn apply(mut self, xml: &[u8], max_bytes: usize) -> Result<Vec<u8>> {
         self.edits.sort_by_key(|(range, _)| range.start);
         let mut out = Vec::new();
         let mut at = 0usize;
@@ -177,7 +177,12 @@ impl Splice {
 }
 
 /// Replace the `cx` and `cy` values of an `a:ext` start tag at `tag`.
-fn resize(splice: &mut Splice, xml: &[u8], tag: &Range<usize>, size: (i64, i64)) -> Result<()> {
+pub(super) fn resize(
+    splice: &mut Splice,
+    xml: &[u8],
+    tag: &Range<usize>,
+    size: (i64, i64),
+) -> Result<()> {
     let bytes = &xml[tag.clone()];
     for (name, value) in [(b"cx".as_slice(), size.0), (b"cy", size.1)] {
         let (span, _, _) = attribute_value(bytes, name)

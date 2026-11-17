@@ -3884,6 +3884,24 @@
           "set": true,
           "get": true
         },
+        "mtef": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "progId": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "error": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
         "x": {
           "type": "length",
           "add": true,

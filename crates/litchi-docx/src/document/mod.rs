@@ -70,6 +70,8 @@ pub use owned::{
     CommentChange, Commit, Edit, HyperlinkTarget, NewChart, NewComment, NewNote, NewPicture,
     NewSmartArt, NewStory, NoteKind, PictureChange, SmartArtParts, StoryTarget, chart_workbook,
 };
+#[cfg(feature = "equation")]
+pub use owned::{EquationContent, EquationSource};
 pub(crate) use transaction::Edit as TransactionEdit;
 pub(crate) use transaction::MAX_DOCUMENT_XML_BYTES;
 pub(crate) use transaction::validate_paragraph_text;

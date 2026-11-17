@@ -524,6 +524,11 @@ pub(super) fn apply_graph_change(
         .iter()
         .map(|part| PackURI::new(part.name.clone()).map_err(crate::Error::Invalid))
         .collect::<Result<Vec<_>, _>>()?;
+    let owners = change
+        .part_relationships
+        .iter()
+        .map(|owned| PackURI::new(owned.part.clone()).map_err(crate::Error::Invalid))
+        .collect::<Result<Vec<_>, _>>()?;
     // Preconditions, before any mutation.
     {
         let main = package.get_part(&main_name).map_err(crate::Error::from)?;
@@ -551,6 +556,19 @@ pub(super) fn apply_graph_change(
                 Ok(_) => return Err(TransactionError::SemanticPrecondition),
                 Err(_) if forward => {},
                 Err(_) => return Err(TransactionError::SemanticPrecondition),
+            }
+        }
+        for (owner, owned) in owners.iter().zip(change.part_relationships.iter()) {
+            let relationship = &owned.relationship;
+            let part = package.get_part(owner).map_err(crate::Error::from)?;
+            let present = part.rels().get(&relationship.id);
+            let matches = present.is_some_and(|actual| {
+                actual.reltype() == relationship.relationship_type
+                    && actual.target_ref() == relationship.target
+                    && actual.is_external() == relationship.external
+            });
+            if (forward && present.is_some()) || (!forward && !matches) {
+                return Err(TransactionError::SemanticPrecondition);
             }
         }
         for (name, planned) in replaced.iter().zip(change.replaced.iter()) {
@@ -592,7 +610,15 @@ pub(super) fn apply_graph_change(
             .get_part_mut(&main_name)
             .map_err(crate::Error::from)?;
         add_relationships(main.rels_mut(), &change.relationships)?;
+        for (owner, owned) in owners.iter().zip(change.part_relationships.iter()) {
+            let part = package.get_part_mut(owner).map_err(crate::Error::from)?;
+            add_relationships(part.rels_mut(), std::slice::from_ref(&owned.relationship))?;
+        }
     } else {
+        for (owner, owned) in owners.iter().zip(change.part_relationships.iter()) {
+            let part = package.get_part_mut(owner).map_err(crate::Error::from)?;
+            part.rels_mut().remove(&owned.relationship.id);
+        }
         let main = package
             .get_part_mut(&main_name)
             .map_err(crate::Error::from)?;

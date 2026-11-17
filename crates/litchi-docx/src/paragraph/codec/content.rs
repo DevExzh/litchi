@@ -612,3 +612,31 @@ impl Paragraph {
         }
     }
 }
+
+impl Paragraph {
+    /// The paragraph's OLE equation objects (MathType and Equation Editor
+    /// 3.0), in document order: every `w:object` whose `o:OLEObject` names
+    /// an equation ProgID ([`crate::object::is_equation_prog_id`]).
+    ///
+    /// ```
+    /// use litchi_docx::Package;
+    ///
+    /// let mut builder = litchi_docx::Builder::new()?;
+    /// builder.document()?.add_paragraph_with_text("No objects");
+    /// let package = builder.build()?;
+    /// assert!(package.document()?.paragraphs()?[0].equation_objects()?.is_empty());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed paragraph XML or a scan beyond its
+    /// bounds.
+    pub fn equation_objects(&self) -> Result<Vec<crate::object::EquationObject>> {
+        let _parser_admission = self.parser_admission()?;
+        Ok(crate::object::equation_spans(self.xml_bytes())?
+            .iter()
+            .map(crate::object::EquationSpan::object)
+            .collect())
+    }
+}

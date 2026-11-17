@@ -7,7 +7,7 @@
 //! | `body`, a cell, a content control | paragraphs, tables, content controls, display equations and (in the body) section breaks, in visible order; `w:customXml` wrappers flattened; `w:altChunk` anchors and unknown children skipped |
 //! | a table | rows |
 //! | a row | cells |
-//! | a paragraph | its inline equations and math paragraphs, then its addressable runs, then its direct hyperlinks, then its inline pictures, then its charts |
+//! | a paragraph | its inline equations and math paragraphs, then its equation objects, then its addressable runs, then its direct hyperlinks, then its inline pictures, then its charts |
 //! | a chart | its series, then its axes |
 //! | a SmartArt graphic or node | its child nodes |
 //!
@@ -66,11 +66,11 @@ enum Source {
         comments: vec::IntoIter<litchi_docx::comment::Comment>,
         next: u32,
     },
-    /// A paragraph's inline equations, then its math paragraphs (each
-    /// with whether it is one); its other children follow.
+    /// A paragraph's inline equations, then its math paragraphs, then its
+    /// OLE equation objects; its other children follow.
     Equations {
-        equations: vec::IntoIter<(bool, String)>,
-        next: [u32; 2],
+        equations: vec::IntoIter<super::equation::ParagraphMath>,
+        next: [u32; 3],
         then: Box<Source>,
     },
     /// The direct blocks of a block container, from `next` on.
@@ -207,20 +207,27 @@ impl<'f> Children<'f> {
                     rest.map_or(Source::Done, Source::Links)
                 };
                 if kinds.contains(Kind::Equation) {
-                    let mut equations: Vec<(bool, String)> = paragraph
+                    use super::equation::ParagraphMath;
+                    let mut equations: Vec<ParagraphMath> = paragraph
                         .omml_equations()?
                         .into_iter()
-                        .map(|omml| (false, omml))
+                        .map(ParagraphMath::Inline)
                         .collect();
                     equations.extend(
                         paragraph
                             .math_paragraphs()?
                             .into_iter()
-                            .map(|omml| (true, omml)),
+                            .map(ParagraphMath::Display),
+                    );
+                    equations.extend(
+                        paragraph
+                            .equation_objects()?
+                            .into_iter()
+                            .map(ParagraphMath::Object),
                     );
                     Source::Equations {
                         equations: equations.into_iter(),
-                        next: [0, 0],
+                        next: [0, 0, 0],
                         then: Box::new(then),
                     }
                 } else {
@@ -319,20 +326,14 @@ impl<'f> Children<'f> {
                     next,
                     then,
                 } => {
-                    let Some((display, omml)) = equations.next() else {
+                    let Some(math) = equations.next() else {
                         self.source = std::mem::replace(then.as_mut(), Source::Done);
                         continue;
                     };
-                    let counter = &mut next[usize::from(display)];
+                    let counter = &mut next[math.family()];
                     let ordinal = *counter;
                     *counter += 1;
-                    return Some(Ok(super::equation::inline_node(
-                        self.docx,
-                        &self.address,
-                        ordinal,
-                        omml,
-                        display,
-                    )));
+                    return Some(Ok(math.node(self.docx, &self.address, ordinal)));
                 },
                 Source::Built(items) => {
                     let (kind, value, step) = items.next()?;

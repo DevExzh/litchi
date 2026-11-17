@@ -1060,7 +1060,7 @@ fn capabilities_match_live_paths_queries_and_views() {
     // also holds a bookmark.
     let equated = crate::open_bytes(package(
         &format!(
-            r#"<w:document {NAMESPACES}><w:body><w:p><m:oMathPara><m:oMath><m:r><m:t>a</m:t></m:r></m:oMath></m:oMathPara></w:p><w:p><w:bookmarkStart w:id="0" w:name="eq"/><m:oMathPara><m:oMath><m:r><m:t>b</m:t></m:r></m:oMath></m:oMathPara><w:bookmarkEnd w:id="0"/><m:oMath><m:r><m:t>c</m:t></m:r></m:oMath></w:p></w:body></w:document>"#
+            r#"<w:document {NAMESPACES}><w:body><w:p><m:oMathPara><m:oMath><m:r><m:t>a</m:t></m:r></m:oMath></m:oMathPara></w:p><w:p><w:bookmarkStart w:id="0" w:name="eq"/><m:oMathPara><m:oMath><m:r><m:t>b</m:t></m:r></m:oMath></m:oMathPara><w:bookmarkEnd w:id="0"/><m:oMath><m:r><m:t>c</m:t></m:r></m:oMath><w:r><w:object xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office"><v:shape id="_x0000_i1025" style="width:9pt;height:9pt"><v:imagedata r:id="rId90"/></v:shape><o:OLEObject Type="Embed" ProgID="Equation.DSMT4" ShapeID="_x0000_i1025" r:id="rId91"/></w:object></w:r></w:p></w:body></w:document>"#
         ),
         None,
     ))

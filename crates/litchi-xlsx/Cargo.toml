@@ -17,8 +17,16 @@ vba-inspection = ["dep:litchi-vba", "litchi-ooxml-common/vba-inspection"]
 # `set_equation`, `remove_equation`). Writing measures each equation to size
 # its text box and redraws the picture fallback other producers keep, so
 # this feature also turns on the renderer (`litchi-equation/render`, which
-# embeds about 1.9 MB of fonts).
-equation = ["dep:litchi-equation", "litchi-drawingml/equation"]
+# embeds about 1.9 MB of fonts). It also reads, adds, replaces and removes
+# OLE equation objects (MathType and Equation Editor 3.0,
+# `equation_objects`): their compound files (`litchi-equation/ole`) and the
+# PNG previews drawn for them.
+equation = [
+  "dep:litchi-equation",
+  "litchi-drawingml/equation",
+  "litchi-equation/ole",
+  "litchi-equation/render",
+]
 
 [dependencies]
 base64 = { workspace = true }

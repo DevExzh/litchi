@@ -1219,6 +1219,49 @@ impl Package {
         Ok(Some(part.data()?.as_bytes().to_vec()))
     }
 
+    /// The payload of the internal part that `source_part` (the main
+    /// document part for `None`, or a header, footer or notes part by name)
+    /// relates through `relationship_id`, as this owner's effective graph
+    /// has it; `None` when the part has no such internal relationship or its
+    /// target is missing. Only those two parts are read.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source changed or a name is invalid.
+    pub fn related_part_payload(
+        &self,
+        source_part: Option<&str>,
+        relationship_id: &str,
+    ) -> Result<Option<Arc<Vec<u8>>>> {
+        let source = match source_part {
+            Some(name) => PackURI::new(name.to_owned()).map_err(Error::Invalid)?,
+            None => self.main_part_name()?,
+        };
+        let target = {
+            let read = |relationships: &litchi_opc::Relationships| -> Option<PackURI> {
+                let relationship = relationships.get(relationship_id)?;
+                if relationship.is_external() {
+                    return None;
+                }
+                relationship.target_partname().ok()
+            };
+            match &self.effective {
+                Some(topology) => match topology.part(&source) {
+                    Ok(part) => read(part.rels()),
+                    Err(_) => None,
+                },
+                None => match self.source_backed_package()?.part(&source) {
+                    Ok(part) => read(part.rels()),
+                    Err(_) => None,
+                },
+            }
+        };
+        match target {
+            Some(target) => self.effective_part_xml(&target),
+            None => Ok(None),
+        }
+    }
+
     /// Read relationship-selected OOXML core properties without loading the
     /// main document or unrelated package members. Retained owners resolve the
     /// effective graph, including edited relationships and property payloads.

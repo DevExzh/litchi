@@ -42,6 +42,24 @@ impl MtefTarget {
         }
     }
 
+    /// The kind of equation object a ProgID names: [`Self::MathType`] for
+    /// `Equation.DSMT4` and the other `Equation.DSMT*` ProgIDs,
+    /// [`Self::EquationEditor3`] for `Equation.3`, `None` for any other
+    /// class. Case is ignored, as COM ignores it.
+    #[must_use]
+    pub fn from_prog_id(prog_id: &str) -> Option<Self> {
+        if prog_id.eq_ignore_ascii_case("Equation.3") {
+            Some(Self::EquationEditor3)
+        } else if prog_id
+            .get(..13)
+            .is_some_and(|prefix| prefix.eq_ignore_ascii_case("Equation.DSMT"))
+        {
+            Some(Self::MathType)
+        } else {
+            None
+        }
+    }
+
     /// The OLE ProgID of the object: `Equation.DSMT4` or `Equation.3`.
     #[must_use]
     pub fn prog_id(&self) -> &'static str {

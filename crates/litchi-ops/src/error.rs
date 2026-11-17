@@ -1445,6 +1445,8 @@ fn classify_equation(error: &litchi_equation::Error) -> Class {
         | litchi_equation::Error::LimitExceeded { .. }
         | litchi_equation::Error::Render(_) => Class::of(Code::LimitExceeded),
         litchi_equation::Error::InvalidLimit(_) => Class::of(Code::InvalidArgument),
+        // An OLE equation object's compound file that cannot be read.
+        litchi_equation::Error::Object(_) => Class::of(Code::CorruptFile),
         _ => Class::of(Code::InternalError),
     }
 }

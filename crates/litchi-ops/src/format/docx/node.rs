@@ -72,6 +72,9 @@ pub(super) enum Value {
     Equation(Block),
     /// Inline math of a paragraph.
     Math(Arc<super::equation::InlineMath>),
+    /// An OLE equation object (MathType or Equation Editor 3.0) of a
+    /// paragraph.
+    Object(Arc<super::equation::ObjectMath>),
     /// A body-level section break, as a container entry.
     Section(Block),
     /// A table row, shared: the leaf value carries an inline cell cache.
@@ -134,6 +137,10 @@ pub(super) struct Step {
     /// paragraph's math paragraphs (`oMathPara[N]`) rather than its inline
     /// math (`oMath[N]`), which are counted apart.
     pub(super) math_paragraph: bool,
+    /// For an equation of a paragraph: whether it is one of the
+    /// paragraph's OLE equation objects (`equation[N]`), counted apart from
+    /// its Office Math.
+    pub(super) object: bool,
 }
 
 impl Step {
@@ -142,6 +149,7 @@ impl Step {
             kind,
             ordinal,
             math_paragraph: false,
+            object: false,
         }
     }
 
@@ -151,17 +159,35 @@ impl Step {
             kind: Kind::Equation,
             ordinal,
             math_paragraph: true,
+            object: false,
+        }
+    }
+
+    /// The step of the OLE equation object at `ordinal` of a paragraph.
+    pub(super) const fn equation_object(ordinal: u32) -> Self {
+        Self {
+            kind: Kind::Equation,
+            ordinal,
+            math_paragraph: false,
+            object: true,
+        }
+    }
+
+    /// The name of the step under a parent of kind `parent`.
+    pub(super) fn name(self, parent: Option<Kind>) -> &'static str {
+        if self.math_paragraph {
+            "oMathPara"
+        } else if self.object {
+            "equation"
+        } else {
+            self.kind.step_name_under(parent)
         }
     }
 
     /// The positional path step under a parent of kind `parent`: `p[3]`,
-    /// `oMathPara[1]`, `oMath[1]`, or `body`.
+    /// `oMathPara[1]`, `oMath[1]`, `equation[1]`, or `body`.
     pub(super) fn positional(self, parent: Option<Kind>) -> PathStep<'static> {
-        let name = if self.math_paragraph {
-            "oMathPara"
-        } else {
-            self.kind.step_name_under(parent)
-        };
+        let name = self.name(parent);
         if self.kind.is_singleton() {
             PathStep::new(name)
         } else {

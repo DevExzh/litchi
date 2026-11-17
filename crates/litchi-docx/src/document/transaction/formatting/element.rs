@@ -41,8 +41,12 @@ use super::{
 use crate::properties;
 
 mod equation;
+mod equation_object;
 mod grid;
 pub use equation::ParagraphEquation;
+pub(crate) use equation_object::{FontHint, object_numbers};
+#[cfg(feature = "equation")]
+pub(crate) use equation_object::{ObjectMarkup, ObjectRewrite};
 pub use grid::NewCell;
 
 /// One step of an [`ElementPath`]: the position of a direct

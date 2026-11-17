@@ -11889,6 +11889,22 @@
         "Both source modes expose all 17 outer-cell query paths and exact direct text, while the detached RTF table retains native nested cells and vertical merge roles. Public capabilities disclose separate table-order and nested-cell gaps. An outer-cell transaction survives save/reopen and exact inverse without altering any unrelated source byte."
       ],
       "scope_limit": "Nested metadata is accessible through the retained format model, not projected as generic query children. Separate paragraph/table catalogs do not establish mixed source order; no nested-cell setter, inferred logical grid span or native Word validation is claimed."
+    },
+    {
+      "crate": "litchi-xlsx",
+      "target": "equation_objects",
+      "name": "an_equation_object_joins_and_leaves_excel_embedded_objects",
+      "fixtures": [
+        "excel/excel-links-objects.xlsx"
+      ],
+      "feature_rows": [],
+      "current_features": [
+        "xlsx-current-ole-equation-objects"
+      ],
+      "assertions": [
+        "Adding a MathType equation object beside Excel's embedded document lists it with its LaTeX while the strict OLE-object owner reads both objects; removing it lists none, keeps the document object, and saves the workbook byte-identical to the unedited one."
+      ],
+      "scope_limit": "One worksheet with one other embedded object; rendering and Excel reopen are not checked."
     }
   ]
 }

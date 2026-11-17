@@ -73,17 +73,16 @@ pub(super) fn walk_children(file: &Pptx, parent: &Item, kinds: KindSet<Kind>) ->
     {
         out.extend(super::links::children(file, parent)?);
     }
-    // Equations outside a shape (none in PowerPoint's output) are listed
-    // under their slide.
+    // Equations outside a shape (OLE equation objects, and Office Math
+    // outside shapes, which PowerPoint does not write) are listed under
+    // their slide.
     if let Item::Slide(slide) = parent
         && kinds.contains(Kind::Equation)
     {
         out.extend(
             super::equations::items(file, slide.position, None)?
                 .into_iter()
-                .filter(|item| {
-                    matches!(item, Item::Equation(equation) if equation.equation.shape_id().is_none())
-                }),
+                .filter(|item| matches!(item, Item::Equation(equation) if !equation.in_shape())),
         );
     }
     Ok(out)

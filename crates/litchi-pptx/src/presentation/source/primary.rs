@@ -1314,6 +1314,19 @@ impl Slide {
         result
     }
 
+    /// The OLE equation objects of this slide; see
+    /// [`crate::slide::Slide::ole_equations`]. Like charts, only a physical
+    /// source slide can answer them; a restored slide answers none.
+    pub fn ole_equations(&self) -> Result<Vec<crate::shape::math::OleEquation>> {
+        self.package.check()?;
+        let result = match self.physical_source_slide() {
+            Some(slide) => slide.ole_equations(),
+            None => Ok(Vec::new()),
+        };
+        self.package.check()?;
+        result
+    }
+
     /// Resolve a click action of this slide's shapes or text; see
     /// [`crate::slide::Slide::hyperlink`]. A slide target is reported at its
     /// position in this revision. Like charts, only a physical source slide can

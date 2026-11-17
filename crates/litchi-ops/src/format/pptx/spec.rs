@@ -878,11 +878,18 @@ props! {
 }
 
 props! {
-    /// An Office Math equation of slide text (`equation.json`): its OMML
-    /// converted to LaTeX, and the OMML itself.
+    /// An equation (`equation.json`): an Office Math equation of slide
+    /// text, or an OLE equation object (MathType `Equation.DSMT4`, Equation
+    /// Editor 3.0 `Equation.3`). `latex` is its OMML or MTEF converted to
+    /// LaTeX, `omml` the Office Math XML (absent on OLE objects), `mtef` an
+    /// OLE object's `Equation Native` stream (base64), `progId` its ProgID
+    /// and `error` why its embedding cannot be read.
     EQUATION_PROPS, EquationKey {
         Latex = "latex": ValueType::Text,
         Omml = "omml": ValueType::Text,
+        Mtef = "mtef": ValueType::Text,
+        ProgId = "progId": ValueType::Text,
+        Error = "error": ValueType::Text,
     }
 }
 
@@ -2460,12 +2467,15 @@ pub(super) const PICTURE_WRITE_TABLE: crate::registry::Table<
 );
 pub(crate) const PICTURE_CAPABILITY_PROPS: &[PropSpec] = &PICTURE_WRITE_TABLE.readable();
 
-/// Equation assignments: `latex` or `omml` (one of them) on `add` and
-/// `set`; `add` also takes the new text box's position and text size.
+/// Equation assignments: `latex`, `omml` or `mtef` (one of them) on `add`
+/// and `set`; `add` also takes the new frame's position and text size, and
+/// `progId` (`Equation.DSMT4`) to add an OLE equation object.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum EquationSetter {
     Latex,
     Omml,
+    Mtef,
+    ProgId,
     X,
     Y,
     Size,
@@ -2499,6 +2509,15 @@ const fn equation_write_entries() -> [crate::registry::Entry<EquationSetter>; EQ
             EQUATION_PROPS[EquationKey::Omml as usize],
             EquationSetter::Omml,
         ),
+        content(
+            EQUATION_PROPS[EquationKey::Mtef as usize],
+            EquationSetter::Mtef,
+        ),
+        creation(
+            EQUATION_PROPS[EquationKey::ProgId as usize],
+            EquationSetter::ProgId,
+        ),
+        Entry::read(EQUATION_PROPS[EquationKey::Error as usize]),
         creation(write_only("x", POSITION), EquationSetter::X),
         creation(write_only("y", POSITION), EquationSetter::Y),
         creation(write_only("size", FONT_SIZE), EquationSetter::Size),

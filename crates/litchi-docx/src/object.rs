@@ -28,6 +28,11 @@
 //!   <o:OLEObject Type="Embed" ProgID="Equation.DSMT4" ShapeID="_x0000_i1025" DrawAspect="Content" ObjectID="_1468075725" r:id="rId8"/>
 //! </w:object>
 //! ```
+mod equation;
+
+pub use equation::{EquationObject, is_equation_prog_id};
+pub(crate) use equation::{EquationSpan, equation_spans};
+
 use crate::error::{Error, Result};
 use crate::image::InlineImage;
 use litchi_core::unit::{EMUS_PER_CM, EMUS_PER_INCH, EMUS_PER_MM, EMUS_PER_PT};

@@ -301,6 +301,7 @@ impl Edit<Package> {
                         relationships: Arc::new([]),
                     }]),
                     replaced: Arc::new([]),
+                    part_relationships: Arc::new([]),
                 });
                 Some(id)
             },
@@ -330,6 +331,7 @@ impl Edit<Package> {
                     relationships: Arc::new([]),
                     parts: Arc::new([]),
                     replaced: replaced.into(),
+                    part_relationships: Arc::new([]),
                 }),
                 true,
             )?;
@@ -498,6 +500,7 @@ impl Edit<Package> {
             relationships: removed.into(),
             parts: parts.into(),
             replaced: Arc::new([]),
+            part_relationships: Arc::new([]),
         })
     }
 
@@ -662,6 +665,7 @@ impl Edit<Package> {
                 relationships: relationships.into(),
                 parts: parts.into(),
                 replaced: Arc::new([]),
+                part_relationships: Arc::new([]),
             }),
             true,
         )?;

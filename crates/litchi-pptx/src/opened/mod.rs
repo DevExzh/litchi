@@ -30,6 +30,8 @@ mod xml;
 mod equation_edit_tests;
 #[cfg(test)]
 mod mce_retention_tests;
+#[cfg(all(test, feature = "equation"))]
+mod ole_equation_edit_tests;
 #[cfg(test)]
 mod picture_edit_tests;
 #[cfg(test)]

@@ -1073,7 +1073,7 @@ impl<'f> Node<'f> {
             | Item::Theme(_)
             | Item::Column(_) => None,
             Item::Hyperlink(item) => Some(super::links::link_text(&item.link)),
-            Item::Equation(item) => Some(Cow::Borrowed(item.equation.text())),
+            Item::Equation(item) => item.text(),
             // OfficeCLI's `GetShapeText` is "" for a shape without text.
             Item::Tree(tree) if tree.kind == Kind::Shape => {
                 Some(Cow::Borrowed(tree.handle.view().text().unwrap_or("")))

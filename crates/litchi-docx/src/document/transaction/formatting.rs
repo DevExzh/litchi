@@ -43,11 +43,15 @@ use crate::properties;
 type Result<T, E = Error> = std::result::Result<T, E>;
 
 mod element;
-pub(crate) use element::{ChartMarkup, PictureMarkup, PictureRewrite, SmartArtMarkup};
+pub(crate) use element::{
+    ChartMarkup, FontHint, PictureMarkup, PictureRewrite, SmartArtMarkup, object_numbers,
+};
 pub use element::{
     ElementAnchor, ElementPath, ElementStep, MAX_NEW_TABLE_DIMENSION, NewCell, NewTable,
     ParagraphEquation,
 };
+#[cfg(feature = "equation")]
+pub(crate) use element::{ObjectMarkup, ObjectRewrite};
 pub(in crate::document::transaction) use element::{body_children, locate_element};
 
 /// A run to insert: its direct properties and its text.

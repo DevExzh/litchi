@@ -8,6 +8,8 @@ mod masters;
 mod media;
 mod modern_comments;
 mod notes;
+#[cfg(feature = "equation")]
+mod ole_equation;
 mod picture;
 mod placeholders;
 mod smartart;

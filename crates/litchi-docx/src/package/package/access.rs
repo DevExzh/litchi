@@ -207,6 +207,53 @@ impl Package {
         Ok(Some(part.blob().to_vec()))
     }
 
+    /// The header, footer, footnotes, endnotes and comments parts the main
+    /// document relates, in relationship order, each once.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an unreadable main part.
+    pub fn story_parts(&self) -> Result<Vec<crate::document::substitute::StoryPart>> {
+        crate::document::story_parts_of(self.opc.main_document_part()?.rels())
+    }
+
+    /// The payload of the internal part that `source_part` (the main
+    /// document part for `None`, or a header, footer or notes part by name)
+    /// relates through `relationship_id`, such as the embedded compound
+    /// file of an [`EquationObject`](crate::object::EquationObject); `None`
+    /// when the part has no such internal relationship or its target is
+    /// missing.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid part name or an unreadable main part.
+    pub fn related_part_payload(
+        &self,
+        source_part: Option<&str>,
+        relationship_id: &str,
+    ) -> Result<Option<std::sync::Arc<Vec<u8>>>> {
+        let source = match source_part {
+            None => self.opc.main_document_part()?,
+            Some(name) => {
+                let uri = litchi_opc::PackURI::new(name.to_owned()).map_err(Error::Invalid)?;
+                match self.opc.get_part(&uri) {
+                    Ok(part) => part,
+                    Err(_) => return Ok(None),
+                }
+            },
+        };
+        let Some(relationship) = source.rels().get(relationship_id) else {
+            return Ok(None);
+        };
+        if relationship.is_external() {
+            return Ok(None);
+        }
+        let Ok(target) = relationship.target_partname() else {
+            return Ok(None);
+        };
+        Ok(self.opc.get_part(&target).ok().map(|part| part.blob_arc()))
+    }
+
     /// Load the typed, inert `SmartArt` (`DrawingML` diagram) inventory anchored
     /// in the main document.
     ///

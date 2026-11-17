@@ -268,7 +268,8 @@ pub enum Error {
     /// Removing this storage requires an explicit connection disposition.
     #[error("Custom Data storage '{id}' is referenced by {connections} connections")]
     CustomDataReferenced { id: String, connections: usize },
-    /// An equation could not be converted or rendered.
+    /// An equation could not be converted or rendered, or an OLE equation
+    /// object's compound file could not be read or written.
     #[cfg(feature = "equation")]
     #[error("XLSX equation error: {0}")]
     Equation(#[from] litchi_equation::Error),

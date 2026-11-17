@@ -475,6 +475,7 @@ impl Edit<Package> {
                 relationships: Arc::new([transfer_relationship]),
                 parts: parts.into(),
                 replaced: Arc::new([]),
+                part_relationships: Arc::new([]),
             }),
             false,
         )?;

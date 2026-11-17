@@ -13,6 +13,7 @@ use std::sync::{Mutex, TryLockError};
 mod chart;
 mod comments;
 mod equation;
+mod equation_object;
 mod fields;
 mod graph;
 mod notes;
@@ -27,6 +28,8 @@ mod substitute;
 mod threads;
 pub use chart::{NewChart, chart_workbook};
 pub use comments::{CommentChange, NewComment};
+#[cfg(feature = "equation")]
+pub use equation_object::{EquationContent, EquationSource};
 pub use graph::HyperlinkTarget;
 pub use notes::{NewNote, NoteKind};
 pub use picture::{NewPicture, PictureChange};

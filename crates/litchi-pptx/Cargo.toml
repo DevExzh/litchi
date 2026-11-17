@@ -21,8 +21,16 @@ encryption = ["dep:litchi-crypto", "litchi-ooxml-common/encryption"]
 # `remove_equation`). Writing needs the PNG picture PowerPoint keeps beside
 # every equation for readers without Office Math, so this feature also turns
 # on the renderer (`litchi-equation/render`, which embeds about 1.9 MB of
-# fonts).
-equation = ["dep:litchi-equation", "litchi-equation/render", "litchi-drawingml/equation"]
+# fonts). OLE equation objects (MathType, Equation Editor 3.0) are read and
+# written through `litchi-equation/ole` (`Slide::ole_equations`,
+# `opened::Edit::add_ole_equation`, `set_ole_equation`,
+# `remove_ole_equation`).
+equation = [
+  "dep:litchi-equation",
+  "litchi-equation/render",
+  "litchi-equation/ole",
+  "litchi-drawingml/equation",
+]
 
 [dependencies]
 base64 = { workspace = true }

@@ -51,6 +51,7 @@ pub(super) fn text<'n>(node: &'n Node<'_>) -> Result<Option<Cow<'n, str>>> {
         },
         Value::Equation(block) => equation_latex(block)?.map(Cow::Owned),
         Value::Math(math) => super::equation::latex(math.omml()).map(Cow::Owned),
+        Value::Object(object) => object.latex(node).map(Cow::Owned),
         Value::Comment(comment) => Some(Cow::Owned(comment_text(comment)?)),
         Value::SmartArt(smartart) => Some(Cow::Owned(super::smartart::smartart_text(smartart))),
         Value::Part(value) => super::parts::text(node.docx, *value)?.map(Cow::Owned),
@@ -154,6 +155,7 @@ pub(super) fn child_count(node: &Node<'_>) -> Result<Option<u32>> {
         | Value::Hyperlink(_)
         | Value::Equation(_)
         | Value::Math(_)
+        | Value::Object(_)
         | Value::Section(_)
         | Value::Comment(_)
         | Value::Picture(_)
@@ -236,12 +238,15 @@ pub(super) fn format<'n>(node: &'n Node<'_>) -> Result<Format<'n>> {
             mode: "display",
             latex: equation_latex(block)?,
             omml: super::equation::display_omml(block)?,
+            ..super::equation::EquationProps::default()
         })),
         Value::Math(math) => Props::Equation(Box::new(super::equation::EquationProps {
             mode: if math.display { "display" } else { "inline" },
             latex: super::equation::latex(math.omml()),
             omml: Some(math.omml().to_owned()),
+            ..super::equation::EquationProps::default()
         })),
+        Value::Object(object) => Props::Equation(Box::new(object.props(node))),
         Value::Comment(comment) => {
             let (done, parent) = comment_thread(node.docx, comment)?;
             Props::Comment(

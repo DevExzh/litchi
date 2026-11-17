@@ -33,10 +33,18 @@ mod render;
 pub use render::{Png, PngOptions, latex_to_png, omml_size_pt, omml_to_png};
 
 mod mtef_write;
+#[cfg(feature = "ole")]
+mod ole_object;
 #[cfg(feature = "render")]
 pub use mtef_write::mtef_to_png;
 pub use mtef_write::{
     EquationNative, MtefTarget, latex_to_equation_native, omml_to_equation_native,
+};
+#[cfg(feature = "ole")]
+pub use ole_object::{
+    MAX_EQUATION_NATIVE_BYTES, MAX_EQUATION_OBJECT_BYTES, MAX_EQUATION_OBJECT_DEPTH,
+    MAX_EQUATION_OBJECT_ENTRIES, equation_object, equation_object_native,
+    replace_equation_object_native,
 };
 
 /// Result type of every conversion in this crate.
@@ -105,6 +113,10 @@ pub enum Error {
     /// the picture would exceed [`PngOptions::max_pixels`].
     #[error("equation rendering failed: {0}")]
     Render(String),
+    /// The compound file of an OLE equation object is invalid, lacks its
+    /// `Equation Native` stream, or exceeds a size limit.
+    #[error("invalid OLE equation object: {0}")]
+    Object(String),
     /// The converter failed for a reason unrelated to the input.
     #[error("equation conversion failed: {0}")]
     Internal(String),
