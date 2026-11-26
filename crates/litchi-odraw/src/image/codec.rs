@@ -127,18 +127,22 @@ impl<'data> Blip<'data> {
                     });
                 }
                 offset = end;
-                let data = &body[offset..];
-                let actual =
-                    u64::try_from(data.len()).map_err(|_err| Error::ArithmeticOverflow {
-                        context: "metafile BLIP data length",
-                    })?;
-                if u64::from(saved) != actual {
-                    return Err(Error::ImageSizeMismatch {
+                let stored = usize::try_from(saved).map_err(|_err| Error::ArithmeticOverflow {
+                    context: "metafile BLIP data length",
+                })?;
+                // Some producers append bytes after the stored payload. Office
+                // and LibreOffice read exactly `cbSave` bytes and ignore the
+                // rest, so the image is the declared payload; the record keeps
+                // the remaining bytes available through `Meta::trailing_len`.
+                let data = body
+                    .get(offset..)
+                    .and_then(|rest| rest.get(..stored))
+                    .ok_or(Error::ImageSizeMismatch {
                         field: "cbSave",
                         declared: u64::from(saved),
-                        actual: data.len(),
-                    });
-                }
+                        actual: body.len().saturating_sub(offset),
+                    })?;
+                let trailing = body.len() - offset - stored;
                 if compression == Compression::None && size != saved {
                     return Err(Error::ImageSizeMismatch {
                         field: "cbSize",
@@ -158,6 +162,7 @@ impl<'data> Blip<'data> {
                         compression,
                     },
                     data,
+                    trailing,
                 };
                 match kind {
                     Kind::Emf => Ok(Self::Emf(meta)),
@@ -361,7 +366,10 @@ impl<'data> Store<'data> {
         Self::from_record(record, limits)
     }
 
-    /// Returns the number declared by the container header.
+    /// Returns the number of file blocks the container holds.
+    ///
+    /// This counts the children, not the container header's `recInstance`,
+    /// which some producers write incorrectly.
     #[must_use]
     pub const fn len(&self) -> u16 {
         self.count
@@ -373,7 +381,7 @@ impl<'data> Store<'data> {
         self.count == 0
     }
 
-    /// Iterates file blocks lazily and validates the exact declared count.
+    /// Iterates file blocks lazily and validates the admitted block count.
     #[must_use]
     pub fn iter(&self) -> super::model::Blocks<'data> {
         let limits = self.limits();
@@ -537,7 +545,7 @@ impl<'data> Iterator for super::model::Blocks<'data> {
             Some(Ok(_)) if self.seen >= self.expected => {
                 self.done = true;
                 Some(Err(Error::MalformedImage {
-                    reason: "BStore contains more file blocks than recInstance",
+                    reason: "BStore contains more file blocks than were counted at admission",
                 }))
             },
             Some(Ok(record)) => {
@@ -551,7 +559,7 @@ impl<'data> Iterator for super::model::Blocks<'data> {
             None if self.seen != self.expected => {
                 self.done = true;
                 Some(Err(Error::MalformedImage {
-                    reason: "BStore contains fewer file blocks than recInstance",
+                    reason: "BStore contains fewer file blocks than were counted at admission",
                 }))
             },
             None => {
