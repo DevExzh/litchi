@@ -170,8 +170,17 @@ impl WmfConverter {
         let mut groups = ClipGrouper::new();
         let mut element_count = 0usize;
         let mut output_limit_hit = false;
-        for record in &self.parser.records {
-            if let Some(element) = renderer.render_record(record) {
+        let mut records = self.parser.records.iter();
+        loop {
+            let element = match records.next() {
+                Some(record) => renderer.render_record(record),
+                // Deferred bitmap records paint at the end of playback.
+                None => match renderer.finish() {
+                    Some(element) => Some(element),
+                    None => break,
+                },
+            };
+            if let Some(element) = element {
                 element_count = element_count.saturating_add(svg_element_count(&element));
                 // Grouping only removes bytes, so the ungrouped size bounds the
                 // output.

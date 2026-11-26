@@ -4,7 +4,9 @@ use super::path::PathBuilder;
 use crate::emf::records::{
     ColorRef, XForm, brush_style, font_weight, hatch_style, pen_style, stock_objects,
 };
+use crate::metafile_bitmap::BrushPattern;
 use crate::svg_utils::{write_num, write_xml_escaped};
+use litchi_core::error::{Error, Result};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -28,6 +30,16 @@ pub struct RenderState {
     next_definition: u64,
     /// Non-fatal playback facts, as `(code, message)` pairs.
     pub diagnostics: Vec<(&'static str, String)>,
+    /// Bitmap records whose painting waits for the records after them.
+    pub(super) deferred_blits: Option<super::converter::DeferredBlits>,
+    /// Emitted brush pattern definitions by PNG tile and brush origin.
+    pattern_definitions: HashMap<(Vec<u8>, (i32, i32)), String>,
+    /// Fills XORed into the destination, waiting for the pass that undoes
+    /// them.
+    pub(super) xor_bracket: Option<super::converter::XorBracket>,
+    /// The current record's shape and elements, when they belong to an XOR
+    /// bracket.
+    pub(super) bracket_shape: Option<(super::converter::BracketShape, Vec<String>)>,
 }
 
 /// Device-space rectangle covered by the output canvas.
@@ -69,6 +81,10 @@ impl RenderState {
             defs: Vec::new(),
             next_definition: 0,
             diagnostics: Vec::new(),
+            deferred_blits: None,
+            pattern_definitions: HashMap::new(),
+            xor_bracket: None,
+            bracket_shape: None,
         }
     }
 
@@ -200,20 +216,76 @@ impl RenderState {
         self.defs.push(definition);
     }
 
-    pub fn prepare_brush_pattern(&mut self) {
+    /// Emits the fill pattern definition of the selected brush, once.
+    ///
+    /// GDI tiles brush patterns in device pixels from the brush origin, and
+    /// monochrome patterns paint their 0 bits with the text colour and their
+    /// 1 bits with the background colour. `maximum` bounds the encoded
+    /// pattern image.
+    pub fn prepare_brush_pattern(&mut self, maximum: usize) -> Result<()> {
         if !self.dc.brush.needs_pattern() || self.dc.brush.pattern_id.is_some() {
-            return;
+            return Ok(());
         }
-        let id = self.fresh_id("hatch");
-        if let Some(definition) = self.dc.brush.svg_pattern(
-            &id,
-            self.dc.bg_color,
-            self.dc.bg_mode == 2,
-            self.dc.brush_org,
-        ) {
+        if let Some(pattern) = self.dc.brush.pattern.clone() {
+            let pattern = pattern.map_err(|reason| {
+                Error::Unsupported(format!("pattern brush has no usable bitmap: {reason}"))
+            })?;
+            let png = pattern.tile_png(
+                self.dc.text_color.value & 0x00ff_ffff,
+                self.dc.bg_color.value & 0x00ff_ffff,
+                maximum,
+            )?;
+            let id = self.pattern_definition(
+                png,
+                (f64::from(pattern.width()), f64::from(pattern.height())),
+                self.dc.brush_org,
+            )?;
             self.dc.brush.pattern_id = Some(id);
-            self.add_definition(definition);
+            return Ok(());
         }
+        let id = self.fresh_id("brush");
+        let definition = self
+            .dc
+            .brush
+            .svg_pattern(
+                &id,
+                self.dc.bg_color,
+                self.dc.bg_mode == 2,
+                self.dc.brush_org,
+            )
+            .ok_or_else(|| {
+                Error::Unsupported(format!(
+                    "hatch style {:?} has no pattern definition",
+                    self.dc.brush.hatch
+                ))
+            })?;
+        self.dc.brush.pattern_id = Some(id);
+        self.add_definition(definition);
+        Ok(())
+    }
+
+    /// The id of the pattern definition tiling `png` from the device-space
+    /// `origin`, emitted once.
+    pub fn pattern_definition(
+        &mut self,
+        png: Vec<u8>,
+        tile: (f64, f64),
+        origin: (i32, i32),
+    ) -> Result<String> {
+        let key = (png, origin);
+        if let Some(id) = self.pattern_definitions.get(&key) {
+            return Ok(id.clone());
+        }
+        let id = self.fresh_id("brush");
+        let definition = BrushPattern::svg_definition(
+            &id,
+            &key.0,
+            tile,
+            (f64::from(origin.0), f64::from(origin.1)),
+        )?;
+        self.add_definition(definition);
+        self.pattern_definitions.insert(key, id.clone());
+        Ok(id)
     }
 
     /// Combines `path` with the current clip under the RGN_* `mode` and makes
@@ -415,9 +487,15 @@ impl DeviceContext {
             return "stroke=\"none\"".to_string();
         }
         let mut attrs = format!("stroke=\"{}\"", self.pen.color.to_svg_color());
+        self.push_pen_shape_attrs(&mut attrs);
+        attrs
+    }
+
+    /// Appends width, dash, cap, join and miter attributes of the pen.
+    fn push_pen_shape_attrs(&self, attrs: &mut String) {
         if self.pen.width > 1.0 {
             attrs.push_str(" stroke-width=\"");
-            write_num(&mut attrs, self.pen.width);
+            write_num(attrs, self.pen.width);
             attrs.push('"');
         }
         if let Some(dash) = &self.pen.dash_pattern {
@@ -439,7 +517,6 @@ impl DeviceContext {
             " stroke-linecap=\"{cap}\" stroke-linejoin=\"{join}\" stroke-miterlimit=\"{}\"",
             self.miter_limit
         ));
-        attrs
     }
 
     pub fn get_fill_attr(&self) -> String {
@@ -525,6 +602,9 @@ pub struct Brush {
     pub style: u32,
     pub color: ColorRef,
     pub hatch: Option<u32>,
+    /// Pattern bitmap of a pattern brush, or why its record carries no
+    /// usable bitmap.
+    pub pattern: Option<std::result::Result<Arc<BrushPattern>, Arc<str>>>,
     pub pattern_id: Option<String>,
 }
 
@@ -540,12 +620,27 @@ impl Brush {
             style,
             color,
             hatch: (style == brush_style::HATCHED).then_some(hatch),
+            pattern: None,
+            pattern_id: None,
+        }
+    }
+
+    /// Creates a brush painted with a bitmap pattern.
+    pub fn from_pattern(
+        style: u32,
+        pattern: std::result::Result<Arc<BrushPattern>, Arc<str>>,
+    ) -> Self {
+        Self {
+            style,
+            color: ColorRef::from_rgb(0, 0, 0),
+            hatch: None,
+            pattern: Some(pattern),
             pattern_id: None,
         }
     }
 
     pub fn needs_pattern(&self) -> bool {
-        self.style == brush_style::HATCHED && self.hatch.is_some()
+        self.pattern.is_some() || (self.style == brush_style::HATCHED && self.hatch.is_some())
     }
 
     fn svg_pattern(

@@ -1,36 +1,29 @@
 //! SVG style and XML serialization helpers.
 
-use super::super::constants::{bk_mode, brush, pen};
+use super::super::constants::{brush, pen};
 use super::state::{Brush, MappingState, Pen};
 use super::transform::CoordinateTransform;
 use crate::svg_utils::{write_color_hex, write_num};
 
-pub(super) fn fill_attrs(
-    brush_value: &Brush,
-    poly_fill_mode: u16,
-    pattern: Option<&str>,
-) -> String {
-    let mut attrs = String::with_capacity(64);
-    match brush_value.style {
-        brush::BS_NULL => attrs.push_str(r#" fill="none""#),
-        brush::BS_HATCHED if pattern.is_some() => {
-            attrs.push_str(r#" fill="url(#"#);
-            attrs.push_str(pattern.unwrap_or_default());
-            attrs.push_str(r#")""#);
-        },
-        brush::BS_SOLID | brush::BS_HATCHED => {
-            attrs.push_str(r#" fill=""#);
-            write_color_hex(&mut attrs, brush_value.color);
-            attrs.push('"');
-        },
-        _ => attrs.push_str(r#" fill="none""#),
-    }
+/// Fill attributes for an SVG paint value under the polygon fill mode.
+pub(super) fn fill_attrs(paint: &str, poly_fill_mode: u16) -> String {
+    let mut attrs = String::with_capacity(48 + paint.len());
+    attrs.push_str(r#" fill=""#);
+    attrs.push_str(paint);
+    attrs.push('"');
     attrs.push_str(if poly_fill_mode == 2 {
         r#" fill-rule="nonzero""#
     } else {
         r#" fill-rule="evenodd""#
     });
     attrs
+}
+
+/// The SVG paint value of a `COLORREF`.
+pub(super) fn color_paint(color: u32) -> String {
+    let mut paint = String::with_capacity(7);
+    write_color_hex(&mut paint, color);
+    paint
 }
 
 pub(super) fn stroke_attrs(
@@ -91,17 +84,14 @@ pub(super) fn stroke_attrs(
     attrs
 }
 
-pub(super) fn hatch_definition(
-    id: &str,
-    brush_value: &Brush,
-    background_mode: u16,
-    background_color: u32,
-) -> String {
+/// Hatch pattern definition; `background` is `None` for a transparent
+/// background.
+pub(super) fn hatch_definition(id: &str, brush_value: &Brush, background: Option<u32>) -> String {
     let mut definition = String::with_capacity(320);
     definition.push_str(r#"<pattern id=""#);
     escape_xml_attr_into(&mut definition, id);
     definition.push_str(r#"" patternUnits="userSpaceOnUse" width="8" height="8">"#);
-    if background_mode == bk_mode::OPAQUE {
+    if let Some(background_color) = background {
         definition.push_str(r#"<rect width="8" height="8" fill=""#);
         write_color_hex(&mut definition, background_color);
         definition.push_str(r#""/>"#);

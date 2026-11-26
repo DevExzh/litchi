@@ -153,6 +153,49 @@ pub struct DibInfo {
     pub pixel_data_len: usize,
     /// Red, green, blue, and alpha masks. Alpha is zero when absent.
     pub masks: [u32; 4],
+    /// Contradictory header fields that GDI ignores.
+    pub tolerances: DibTolerances,
+}
+
+/// Header fields that contradict the rest of a DIB but that Windows GDI
+/// ignores, so the bitmap still decodes as GDI draws it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct DibTolerances {
+    /// `biSizeImage` of an uncompressed DIB is smaller than its scanlines;
+    /// GDI sizes uncompressed bits from the dimensions.
+    pub short_image_size: bool,
+    /// `biClrImportant` exceeds the color table; it only hints at palette
+    /// realization.
+    pub excess_important_colors: bool,
+    /// `biClrUsed` declares more color-table entries than pixel values can
+    /// index; GDI skips the extra entries.
+    pub oversized_color_table: bool,
+}
+
+impl DibTolerances {
+    /// Stable `noncanonical-` diagnostic codes and messages of the tolerated
+    /// fields.
+    pub fn diagnostics(self) -> impl Iterator<Item = (&'static str, &'static str)> {
+        [
+            (
+                self.short_image_size,
+                "noncanonical-dib-image-size",
+                "DIB image-size field is smaller than its scanlines; the dimensions size the bits",
+            ),
+            (
+                self.excess_important_colors,
+                "noncanonical-dib-important-colors",
+                "DIB important-color count exceeds the color table and is ignored",
+            ),
+            (
+                self.oversized_color_table,
+                "noncanonical-dib-color-table-size",
+                "DIB color table has more entries than pixel values can index",
+            ),
+        ]
+        .into_iter()
+        .filter_map(|(present, code, message)| present.then_some((code, message)))
+    }
 }
 
 /// A parsed DIB borrowing its bitmap-info and bitmap-bits buffers.
@@ -287,6 +330,7 @@ impl<'a> Dib<'a> {
                 stride: layout.stride,
                 pixel_data_len: bitmap_bits.len(),
                 masks: layout.masks,
+                tolerances: layout.tolerances,
             },
             bitmap_info,
             bitmap_bits,
@@ -348,7 +392,14 @@ impl<'a> Dib<'a> {
         bytes.extend_from_slice(&file_len_u32.to_le_bytes());
         bytes.extend_from_slice(&0u32.to_le_bytes());
         bytes.extend_from_slice(&pixel_offset_u32.to_le_bytes());
+        let info_start = bytes.len();
         bytes.extend_from_slice(self.bitmap_info);
+        if self.info.header != HeaderKind::Core && self.info.tolerances.oversized_color_table {
+            // BMP readers expect `biClrUsed` to count the indexable entries;
+            // the pixel offset still skips the whole stored table.
+            bytes[info_start + 32..info_start + 36]
+                .copy_from_slice(&self.info.palette_entries.to_le_bytes());
+        }
         bytes.extend_from_slice(self.bitmap_bits);
         Ok(ValidatedBmp {
             bytes,
@@ -480,7 +531,11 @@ struct Layout {
     masks: [u32; 4],
     bitmap_info_len: usize,
     profile_range: Option<(usize, usize)>,
+    tolerances: DibTolerances,
 }
+
+/// Most color-table entries GDI reads from a DIB.
+const MAX_COLOR_TABLE_ENTRIES: u32 = 256;
 
 fn parse_layout(data: &[u8], usage: ColorUsage, limits: DibLimits) -> Result<Layout> {
     let header_size = read_u32(data, 0, "DIB header size")?;
@@ -563,17 +618,22 @@ fn parse_layout(data: &[u8], usage: ColorUsage, limits: DibLimits) -> Result<Lay
     } else {
         0
     };
-    let palette_entries = if usage == ColorUsage::PaletteIndices
+    // GDI sizes the color table as `biClrUsed` entries, at most 256, and
+    // pixel values index only the first `1 << biBitCount` of them.
+    let table_entries = if usage == ColorUsage::PaletteIndices
         || compression.is_embedded()
         || compression.is_cmyk()
     {
         0
     } else if colors_used == 0 {
         maximum_colors
-    } else if maximum_colors != 0 {
-        colors_used.min(maximum_colors)
     } else {
-        colors_used
+        colors_used.min(MAX_COLOR_TABLE_ENTRIES)
+    };
+    let palette_entries = if maximum_colors != 0 {
+        table_entries.min(maximum_colors)
+    } else {
+        table_entries
     };
     if (compression.is_embedded() || compression.is_cmyk()) && colors_used != 0 {
         return Err(parse("embedded or CMYK DIB must not have a color table"));
@@ -584,11 +644,12 @@ fn parse_layout(data: &[u8], usage: ColorUsage, limits: DibLimits) -> Result<Lay
             usize_from_u32(limits.max_palette_entries)?,
         ));
     }
-    if colors_important != 0 && colors_important > palette_entries {
-        return Err(parse(
-            "DIB important-color count exceeds the color-table size",
-        ));
-    }
+    let mut tolerances = DibTolerances {
+        excess_important_colors: colors_important != 0 && colors_important > palette_entries,
+        oversized_color_table: table_entries != 0
+            && (table_entries > palette_entries || colors_used > MAX_COLOR_TABLE_ENTRIES),
+        ..DibTolerances::default()
+    };
 
     let external_mask_count =
         usize::from(header == HeaderKind::Info && compression == Compression::Bitfields) * 3;
@@ -601,7 +662,7 @@ fn parse_layout(data: &[u8], usage: ColorUsage, limits: DibLimits) -> Result<Lay
         ColorUsage::PaletteEntries => 2,
         ColorUsage::PaletteIndices => 0,
     };
-    let palette_len = usize_from_u32(palette_entries)?
+    let palette_len = usize_from_u32(table_entries)?
         .checked_mul(palette_entry_len)
         .ok_or_else(|| parse("DIB color-table length overflows"))?;
     let bitmap_info_len = header_len
@@ -673,6 +734,13 @@ fn parse_layout(data: &[u8], usage: ColorUsage, limits: DibLimits) -> Result<Lay
         None
     };
 
+    if let Some(stride) = stride {
+        let expected = stride
+            .checked_mul(usize_from_u32(height)?)
+            .ok_or_else(|| parse("DIB pixel byte length overflows"))?;
+        tolerances.short_image_size = image_size != 0 && usize_from_u32(image_size)? < expected;
+    }
+
     Ok(Layout {
         header,
         width,
@@ -686,6 +754,7 @@ fn parse_layout(data: &[u8], usage: ColorUsage, limits: DibLimits) -> Result<Lay
         masks,
         bitmap_info_len,
         profile_range,
+        tolerances,
     })
 }
 
@@ -745,13 +814,11 @@ fn validate_masks(masks: [u32; 4], bit_count: u16) -> Result<()> {
 
 fn required_pixel_len(layout: &Layout) -> Result<usize> {
     if let Some(stride) = layout.stride {
-        let expected = stride
+        // Uncompressed bits are sized by the dimensions; parse_layout
+        // records a contradicting image-size field as a tolerance.
+        stride
             .checked_mul(usize_from_u32(layout.height)?)
-            .ok_or_else(|| parse("DIB pixel byte length overflows"))?;
-        if layout.image_size != 0 && usize_from_u32(layout.image_size)? < expected {
-            return Err(parse("DIB image-size field is smaller than its scanlines"));
-        }
-        Ok(expected)
+            .ok_or_else(|| parse("DIB pixel byte length overflows"))
     } else {
         if layout.image_size == 0 {
             return Err(parse("compressed DIB image-size field must be nonzero"));
@@ -1003,6 +1070,34 @@ mod tests {
                 .get_pixel(0, 0),
             Rgba([59, 39, 19, 128])
         );
+    }
+
+    #[test]
+    fn color_table_larger_than_the_bit_count_is_skipped_like_gdi() {
+        // A 1-bpp DIB declaring three color-table entries, whose pixels
+        // follow all three; a too-small image size and too many important
+        // colors are ignored as well.
+        let mut dib = vec![0u8; 40];
+        dib[0..4].copy_from_slice(&40u32.to_le_bytes());
+        dib[4..8].copy_from_slice(&2i32.to_le_bytes());
+        dib[8..12].copy_from_slice(&1i32.to_le_bytes());
+        dib[12..14].copy_from_slice(&1u16.to_le_bytes());
+        dib[14..16].copy_from_slice(&1u16.to_le_bytes());
+        dib[20..24].copy_from_slice(&1u32.to_le_bytes());
+        dib[32..36].copy_from_slice(&3u32.to_le_bytes());
+        dib[36..40].copy_from_slice(&9u32.to_le_bytes());
+        dib.extend_from_slice(&[0, 0, 255, 0, 255, 0, 0, 0, 0, 255, 0, 0]);
+        dib.extend_from_slice(&[0b0100_0000, 0, 0, 0]);
+        let parsed = Dib::parse(&dib, DibLimits::default()).unwrap();
+        assert_eq!(parsed.info().palette_entries, 2);
+        let tolerances = parsed.info().tolerances;
+        assert!(tolerances.oversized_color_table);
+        assert!(tolerances.short_image_size);
+        assert!(tolerances.excess_important_colors);
+        assert_eq!(tolerances.diagnostics().count(), 3);
+        let image = parsed.to_dynamic_image().unwrap().to_rgba8();
+        assert_eq!(image.get_pixel(0, 0).0, [255, 0, 0, 255]);
+        assert_eq!(image.get_pixel(1, 0).0, [0, 0, 255, 255]);
     }
 
     #[test]
