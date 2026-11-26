@@ -4,7 +4,8 @@ use super::{
     buffer::ElementBuffer,
     path::PathBuilder,
     state::{
-        Brush, Canvas, ClipRule, DashPattern, DeviceContext, Font, GdiObject, Pen, RenderState,
+        Brush, Canvas, ClipRule, ClipShape, DashPattern, DeviceContext, Font, GdiObject, Pen,
+        RenderState,
     },
 };
 use crate::emf::{
@@ -776,7 +777,12 @@ impl<'a> EmfSvgConverter<'a> {
                 let builder = state.take_path().ok_or_else(|| {
                     Error::ParseError("SelectClipPath without a completed path".into())
                 })?;
-                if !state.install_clip(&builder.build(), ClipRule::NonZero, mode) {
+                let path = builder.build();
+                if !state.install_clip(
+                    ClipShape::Path(&path, ClipRule::NonZero),
+                    mode,
+                    self.canvas(),
+                ) {
                     return unsupported(
                         kind,
                         "requested region combine mode is not faithfully representable",
@@ -867,20 +873,24 @@ impl<'a> EmfSvgConverter<'a> {
             // Clipping and regions.
             EmrType::IntersectClipRect | EmrType::ExcludeClipRect => {
                 let rect = read_record::<RectL>(data, kind)?;
-                let (path, rule) = if kind == EmrType::IntersectClipRect {
+                let canvas = self.canvas();
+                let installed = if kind == EmrType::IntersectClipRect {
                     // An empty rectangle leaves an empty clip region, which
                     // hides everything drawn through it.
-                    (
-                        rectangle_outline(rect, &state.dc).build(),
-                        ClipRule::NonZero,
-                    )
+                    let outline = rectangle_outline(rect, &state.dc);
+                    match device_rect(rect, &state.dc) {
+                        Some(device) => state.install_clip(ClipShape::Rect(device), 1, canvas),
+                        None => state.install_clip(
+                            ClipShape::Path(&outline.build(), ClipRule::NonZero),
+                            1,
+                            canvas,
+                        ),
+                    }
                 } else {
-                    (
-                        exclusion_path(rect, &state.dc, self.canvas())?,
-                        ClipRule::EvenOdd,
-                    )
+                    let path = exclusion_path(rect, &state.dc, canvas)?;
+                    state.install_clip(ClipShape::Path(&path, ClipRule::EvenOdd), 1, canvas)
                 };
-                if !state.install_clip(&path, rule, 1) {
+                if !installed {
                     return unsupported(kind, "clip combine mode");
                 }
                 Ok(Vec::new())
@@ -907,7 +917,7 @@ impl<'a> EmfSvgConverter<'a> {
                     if mode != 5 {
                         return malformed(kind, "empty region requires RGN_COPY");
                     }
-                    state.dc.clip_id = None;
+                    state.clear_clip();
                     return Ok(Vec::new());
                 }
                 let end = 8usize
@@ -923,7 +933,11 @@ impl<'a> EmfSvgConverter<'a> {
                     self.limits.max_path_points,
                     self.limits.max_output_bytes,
                 )?;
-                if !state.install_clip(&path, ClipRule::NonZero, mode) {
+                let shape = match region_rect(&data[8..end], &state.dc) {
+                    Some(rect) => ClipShape::Rect(rect),
+                    None => ClipShape::Path(&path, ClipRule::NonZero),
+                };
+                if !state.install_clip(shape, mode, self.canvas()) {
                     return unsupported(
                         kind,
                         "requested region combine mode is not faithfully representable",
@@ -2840,6 +2854,39 @@ fn rectangle_path(rect: RectL, dc: &DeviceContext) -> Result<PathBuilder> {
     Ok(rectangle_outline(rect, dc))
 }
 
+/// The device-space rectangle `[left, top, right, bottom]` that `rect`
+/// maps to, when the mapping keeps it axis-aligned.
+fn device_rect(rect: RectL, dc: &DeviceContext) -> Option<[f64; 4]> {
+    let [a, b, c, d] = [
+        (rect.left, rect.top),
+        (rect.right, rect.top),
+        (rect.right, rect.bottom),
+        (rect.left, rect.bottom),
+    ]
+    .map(|point| transform(point, dc));
+    let aligned = (a.1 == b.1 && b.0 == c.0 && c.1 == d.1 && d.0 == a.0)
+        || (a.0 == b.0 && b.1 == c.1 && c.0 == d.0 && d.1 == a.1);
+    let values = [a.0, a.1, c.0, c.1];
+    (aligned && values.iter().all(|value| value.is_finite()))
+        .then(|| [a.0.min(c.0), a.1.min(c.1), a.0.max(c.0), a.1.max(c.1)])
+}
+
+/// The device-space rectangle of a region that holds exactly one
+/// rectangle, when the mapping keeps it axis-aligned.
+fn region_rect(data: &[u8], dc: &DeviceContext) -> Option<[f64; 4]> {
+    let field = |offset: usize| {
+        Some(u32::from_le_bytes(
+            data.get(offset..offset + 4)?.try_into().ok()?,
+        ))
+    };
+    let header_size = usize::try_from(field(0)?).ok()?;
+    if field(8)? != 1 {
+        return None;
+    }
+    let rect = read_record::<RectL>(data.get(header_size..)?, EmrType::ExtSelectClipRgn).ok()?;
+    device_rect(rect, dc)
+}
+
 /// The closed outline of a rectangle, which has no area when two opposite
 /// sides coincide.
 fn rectangle_outline(rect: RectL, dc: &DeviceContext) -> PathBuilder {
@@ -3897,6 +3944,32 @@ mod tests {
 
         // 100 by 100 canvas minus the excluded 60 by 60 rectangle.
         assert_eq!(painted_pixels(records), 10_000 - 3_600);
+    }
+
+    #[test]
+    fn nested_rectangle_clips_render_as_one_clip() {
+        let mut records = (0..5_000)
+            .map(|step| clip_rect(step % 5, 0, 100 - step % 5, 90))
+            .collect::<Vec<_>>();
+        records.extend(black_filled_canvas());
+        records.push(clip_rect(0, 0, 100, 100));
+        records.extend(black_filled_canvas());
+        let bytes = classic_emf(records.clone());
+        let parser = EmfParser::new(&bytes, &crate::Limits::default()).unwrap();
+        let svg = EmfSvgConverter::new(&parser).convert().unwrap();
+        // One clip definition per distinct region, none referencing another;
+        // both fills share the last one.
+        let (defs, body) = svg.split_once("</defs>").unwrap();
+        assert_eq!(defs.matches("<clipPath").count(), 5, "{defs}");
+        assert!(!defs.contains("clip-path="), "{defs}");
+        assert_eq!(
+            body.matches("clip-path=\"url(#emf-clip-4)\"").count(),
+            1,
+            "{body}"
+        );
+
+        // The intersection is x 4..96, y 0..90.
+        assert_eq!(painted_pixels(records), 92 * 90);
     }
 
     #[test]
