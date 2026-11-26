@@ -898,12 +898,12 @@ impl EmfPlusSvgRenderer {
                     },
                 }
             },
-            Clip::Intersect {
-                outer: first,
-                inner,
-            } => {
-                let first = self.define_clip(first, outer, offset)?;
-                self.define_clip(inner, first.as_ref(), offset)
+            Clip::Intersect(members) => {
+                let mut current = outer.cloned();
+                for member in members {
+                    current = self.define_clip(member, current.as_ref(), offset)?;
+                }
+                Ok(current)
             },
             Clip::Offset { clip, .. } => {
                 self.diag(
@@ -2245,6 +2245,8 @@ mod tests {
         let second = floats(&[10.0, 10.0, 50.0, 50.0]);
         let output = render_records(&[
             record(RecordType::SetClipRect, 0, &std::mem::take(&mut first)),
+            // Rectangles set under one transform would merge instead.
+            record(RecordType::ScaleWorldTransform, 0, &floats(&[2.0, 2.0])),
             // CombineModeIntersect in the second flag byte.
             record(RecordType::SetClipRect, 0x0100, &second),
             fill_rect(0xff00_0000, [0.0, 0.0, 100.0, 100.0]),
@@ -2254,6 +2256,49 @@ mod tests {
             defs.contains("<clipPath id=\"emfplus-clip-2\" clip-path=\"url(#emfplus-clip-1)\">"),
             "{defs}"
         );
+    }
+
+    #[test]
+    fn intersected_rectangles_in_one_space_merge_and_other_clips_stop_at_a_depth() {
+        let rect = floats(&[0.0, 0.0, 50.0, 50.0]);
+        let mut records = vec![record(RecordType::SetClipRect, 0, &rect)];
+        records.extend(std::iter::repeat_n(
+            record(
+                RecordType::SetClipRect,
+                0x0100,
+                &floats(&[10.0, 0.0, 50.0, 50.0]),
+            ),
+            100_000,
+        ));
+        records.push(fill_rect(0xff00_0000, [0.0, 0.0, 100.0, 100.0]));
+        let output = render_records(&records);
+        let defs = output.fragment().defs();
+        assert_eq!(defs.matches("<clipPath").count(), 1, "{defs}");
+        assert!(
+            defs.contains("x=\"10\" y=\"0\" width=\"40\" height=\"50\""),
+            "{defs}"
+        );
+        assert!(codes(&output).is_empty());
+
+        // Rectangles set under other transforms do not merge.
+        let mut records = vec![record(RecordType::SetClipRect, 0, &rect)];
+        for _ in 0..100_000 {
+            records.push(record(
+                RecordType::TranslateWorldTransform,
+                0,
+                &floats(&[1.0, 0.0]),
+            ));
+            records.push(record(RecordType::SetClipRect, 0x0100, &rect));
+            records.push(record(RecordType::OffsetClip, 0, &floats(&[0.0, 0.0])));
+        }
+        records.push(fill_rect(0xff00_0000, [0.0, 0.0, 100.0, 100.0]));
+        let output = render_records(&records);
+        let defs = output.fragment().defs();
+        assert_eq!(
+            defs.matches("<clipPath").count(),
+            crate::emfplus::playback::MAX_CLIP_INTERSECTIONS
+        );
+        assert!(codes(&output).contains(&"clip_depth_limit"));
     }
 
     #[test]

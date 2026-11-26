@@ -172,16 +172,76 @@ pub enum Clip {
         region: Rc<ObjectBlob>,
         space: ClipSpace,
     },
-    /// The intersection of an earlier clip and a later intersected clip.
-    Intersect {
-        outer: Box<Self>,
-        inner: Box<Self>,
-    },
+    /// The intersection of an earlier clip and the clips intersected with
+    /// it later, in order; no member is itself an intersection, and at most
+    /// [`MAX_CLIP_INTERSECTIONS`] members are kept.
+    Intersect(Vec<Self>),
+    /// A clip that is not an intersection or an offset, moved by `(dx, dy)`.
     Offset {
         clip: Box<Self>,
         dx: f32,
         dy: f32,
     },
+}
+
+/// Most clips one intersection keeps. Renderers mask every clipped element
+/// once per intersected clip, so a longer chain costs far more to draw than
+/// any real picture needs; rectangles in the same space merge instead of
+/// adding a member.
+pub const MAX_CLIP_INTERSECTIONS: usize = 16;
+
+impl Clip {
+    /// The clip moved by `(dx, dy)`.
+    fn offset(self, dx: f32, dy: f32) -> Self {
+        match self {
+            Self::Infinite => Self::Infinite,
+            Self::Intersect(members) => Self::Intersect(
+                members
+                    .into_iter()
+                    .map(|member| member.offset(dx, dy))
+                    .collect(),
+            ),
+            Self::Offset {
+                clip,
+                dx: earlier_dx,
+                dy: earlier_dy,
+            } => Self::Offset {
+                clip,
+                dx: earlier_dx + dx,
+                dy: earlier_dy + dy,
+            },
+            clip => Self::Offset {
+                clip: Box::new(clip),
+                dx,
+                dy,
+            },
+        }
+    }
+}
+
+/// The intersection of two rectangles with non-negative extents, or `None`
+/// when either extent is negative or not finite.
+fn intersect_rects(first: Rect, second: Rect) -> Option<Rect> {
+    let valid = |rect: Rect| {
+        [rect.x, rect.y, rect.width, rect.height]
+            .iter()
+            .all(|value| value.is_finite())
+            && rect.width >= 0.0
+            && rect.height >= 0.0
+    };
+    if !valid(first) || !valid(second) {
+        return None;
+    }
+    let left = first.x.max(second.x);
+    let top = first.y.max(second.y);
+    let right = (first.x + first.width).min(second.x + second.width);
+    let bottom = (first.y + first.height).min(second.y + second.height);
+    Some(Rect {
+        x: left,
+        y: top,
+        width: (right - left).max(0.0),
+        height: (bottom - top).max(0.0),
+    })
 }
 
 /// Source-over or source-copy compositing.
@@ -760,7 +820,7 @@ impl PlaybackEngine {
             rect: rect_at(record.data, 0)?,
             space: self.clip_space(),
         };
-        self.set_clip(clip);
+        self.set_clip(clip, record.offset);
         Ok(Vec::new())
     }
     fn clip_object(&mut self, record: EmfPlusRecord<'_>, path: bool) -> Result<Vec<DrawCommand>> {
@@ -791,7 +851,7 @@ impl PlaybackEngine {
                 space,
             }
         };
-        self.set_clip(clip);
+        self.set_clip(clip, record.offset);
         Ok(Vec::new())
     }
     fn clip_space(&self) -> ClipSpace {
@@ -802,7 +862,7 @@ impl PlaybackEngine {
     }
     /// Combine a new clip with the current one. Replacing, or intersecting
     /// with the infinite clip, keeps only the new clip.
-    fn set_clip(&mut self, clip: Clip) {
+    fn set_clip(&mut self, clip: Clip, offset: usize) {
         let intersect = matches!(
             clip,
             Clip::Rect {
@@ -816,22 +876,53 @@ impl PlaybackEngine {
                 ..
             }
         );
-        self.state.clip = if intersect && self.state.clip != Clip::Infinite {
-            Clip::Intersect {
-                outer: Box::new(std::mem::replace(&mut self.state.clip, Clip::Infinite)),
-                inner: Box::new(clip),
+        if !intersect || self.state.clip == Clip::Infinite {
+            self.state.clip = clip;
+            return;
+        }
+        let mut members = match std::mem::replace(&mut self.state.clip, Clip::Infinite) {
+            Clip::Intersect(members) => members,
+            current => vec![current],
+        };
+        // A rectangle intersects a rectangle set in the same space exactly:
+        // one affine map takes both to device space.
+        let merged = match &clip {
+            Clip::Rect { rect, space, .. } => members.iter_mut().any(|member| match member {
+                Clip::Rect {
+                    mode: CombineMode::Replace | CombineMode::Intersect,
+                    rect: earlier,
+                    space: earlier_space,
+                } if earlier_space == space => intersect_rects(*earlier, *rect)
+                    .map(|intersection| *earlier = intersection)
+                    .is_some(),
+                _ => false,
+            }),
+            _ => false,
+        };
+        if !merged {
+            if members.len() >= MAX_CLIP_INTERSECTIONS {
+                self.diag(
+                    PlaybackDiagnosticSeverity::Warning,
+                    "clip_depth_limit",
+                    format!(
+                        "a clip intersecting more than {MAX_CLIP_INTERSECTIONS} clips was drawn without the later ones"
+                    ),
+                    offset,
+                );
+            } else {
+                members.push(clip);
             }
+        }
+        self.state.clip = if members.len() == 1 {
+            members.pop().unwrap_or(Clip::Infinite)
         } else {
-            clip
+            Clip::Intersect(members)
         };
     }
     fn offset_clip(&mut self, record: EmfPlusRecord<'_>) -> Result<Vec<DrawCommand>> {
         self.require(record, 8)?;
-        self.state.clip = Clip::Offset {
-            clip: Box::new(self.state.clip.clone()),
-            dx: f32_at(record.data, 0)?,
-            dy: f32_at(record.data, 4)?,
-        };
+        let (dx, dy) = (f32_at(record.data, 0)?, f32_at(record.data, 4)?);
+        self.state.clip = std::mem::replace(&mut self.state.clip, Clip::Infinite).offset(dx, dy);
         Ok(Vec::new())
     }
     fn apply_matrix(&mut self, matrix: Matrix, flags: u16) {
