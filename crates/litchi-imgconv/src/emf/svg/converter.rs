@@ -687,7 +687,9 @@ impl<'a> EmfSvgConverter<'a> {
             EmrType::IntersectClipRect | EmrType::ExcludeClipRect => {
                 let rect = read_record::<RectL>(data, kind)?;
                 let path = if kind == EmrType::IntersectClipRect {
-                    rectangle_path(rect, &state.dc)?.build()
+                    // An empty rectangle leaves an empty clip region, which
+                    // hides everything drawn through it.
+                    rectangle_outline(rect, &state.dc).build()
                 } else {
                     exclusion_path(rect, &state.dc)?
                 };
@@ -1654,6 +1656,12 @@ fn rectangle_path(rect: RectL, dc: &DeviceContext) -> Result<PathBuilder> {
     if rect.left == rect.right || rect.top == rect.bottom {
         return Err(Error::ParseError("empty EMF rectangle".into()));
     }
+    Ok(rectangle_outline(rect, dc))
+}
+
+/// The closed outline of a rectangle, which has no area when two opposite
+/// sides coincide.
+fn rectangle_outline(rect: RectL, dc: &DeviceContext) -> PathBuilder {
     let points = [
         (rect.left, rect.top),
         (rect.right, rect.top),
@@ -1670,7 +1678,7 @@ fn rectangle_path(rect: RectL, dc: &DeviceContext) -> Result<PathBuilder> {
         }
     }
     builder.close();
-    Ok(builder)
+    builder
 }
 
 fn ellipse_path(rect: RectL, dc: &DeviceContext) -> Result<PathBuilder> {
@@ -1939,7 +1947,9 @@ fn render_text_element(
     let origin = state.dc.transform_point(logical.0, logical.1);
     let mut output = Vec::new();
     if options & text_options::OPAQUE != 0 || (state.dc.bg_mode == 2 && rectangle.is_some()) {
-        if let Some(rect) = rectangle {
+        // A rectangle without area paints no background.
+        if let Some(rect) = rectangle.filter(|rect| rect.left != rect.right && rect.top != rect.bottom)
+        {
             let p = rectangle_path(rect, &state.dc)?;
             output.push(format!(
                 "<path d=\"{}\" fill=\"{}\" stroke=\"none\" {}/>",
