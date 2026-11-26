@@ -69,6 +69,12 @@ impl ConvertedFormat {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConversionDiagnostic {
     /// A stable, machine-readable diagnostic code.
+    ///
+    /// Codes starting with `noncanonical-` report input that departs from
+    /// the specification in a way Windows GDI playback tolerates without
+    /// changing the picture; the strict helpers accept them. Every other
+    /// code, except `auto-*` output selection notes, reports an
+    /// approximation that the strict helpers reject.
     pub code: &'static str,
     /// A concise human-readable explanation.
     pub message: String,
@@ -277,13 +283,23 @@ pub(crate) fn rasterize_raw_metafile(
     Ok(converted.bytes)
 }
 
+/// Returns whether a diagnostic records an approximation of the source.
+///
+/// Codes starting with [`NONCANONICAL_PREFIX`] describe input that departs
+/// from the specification in a way Windows GDI playback tolerates without
+/// changing the picture, so the rendering is still faithful.
+pub(crate) fn is_lossy_diagnostic(code: &str) -> bool {
+    !(code.starts_with(NONCANONICAL_PREFIX) || code == "comment")
+}
+
+/// Prefix of diagnostic codes that never change the rendered picture.
+pub(crate) const NONCANONICAL_PREFIX: &str = "noncanonical-";
+
 pub(crate) fn reject_lossy_diagnostics(report: &ConversionReport) -> Result<()> {
-    let lossy = report.diagnostics.iter().find(|diagnostic| {
-        !matches!(
-            diagnostic.code,
-            "noncanonical-emf-eof-size-last" | "comment"
-        )
-    });
+    let lossy = report
+        .diagnostics
+        .iter()
+        .find(|diagnostic| is_lossy_diagnostic(diagnostic.code));
     if let Some(diagnostic) = lossy {
         return Err(Error::Unsupported(format!(
             "conversion requires reported approximation ({}): {}",

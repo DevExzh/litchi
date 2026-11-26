@@ -15,7 +15,10 @@ The output policy is deliberately stricter than best-effort metafile viewers:
   `Error::Unsupported`;
 - bounded EMF+ approximations are reported through
   `ConversionReport::diagnostics`; payload-only convenience helpers and the
-  lower-level strict `EmfSvgConverter::convert` reject such diagnostics.
+  lower-level strict `EmfSvgConverter::convert` reject such diagnostics;
+- input that departs from the specification in a way Windows GDI playback
+  tolerates without changing the picture is accepted and reported with a
+  `noncanonical-*` diagnostic, which the strict helpers also accept.
 
 ## Record catalogs
 
