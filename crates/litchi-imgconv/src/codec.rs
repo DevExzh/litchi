@@ -1212,8 +1212,22 @@ fn wmf_with_header<'data>(
     };
     let has_standard_header =
         data.len() >= STANDARD_HEADER_LEN && read_u16_at(&data, 2) == Some(WMF_HEADER_WORDS);
+    let frame = Frame::of(window);
     let frame_records = if has_standard_header {
-        frame_records(window)
+        let mapping = if !frame.halved {
+            FrameMapping::Frame
+        } else {
+            match window_extent_use(&data[STANDARD_HEADER_LEN..]) {
+                WindowExtentUse::BeforeDrawing => FrameMapping::Frame,
+                WindowExtentUse::Never => FrameMapping::Halved,
+                WindowExtentUse::AfterDrawing => {
+                    return Err(Error::Unsupported(
+                        "conversion requires reported approximation (wmf-blip-frame-halved): the picture frame exceeds the 16-bit WMF mapping range and the metafile draws before it sets its window extent".into(),
+                    ));
+                },
+            }
+        };
+        frame_records(window, frame, mapping)
     } else {
         Vec::new()
     };
@@ -1227,15 +1241,15 @@ fn wmf_with_header<'data>(
             limits.max_uncompressed_bytes,
         ));
     }
-    let (left, top, right, bottom) = window;
-    let (width, height) = (frame_extent(left, right), frame_extent(top, bottom));
     let mut output = Vec::with_capacity(total);
     output.extend_from_slice(&0x9AC6_CDD7u32.to_le_bytes());
     output.extend_from_slice(&0u16.to_le_bytes());
-    for coordinate in [0, 0, width, height] {
+    for coordinate in [0, 0, frame.width, frame.height] {
         output.extend_from_slice(&coordinate.to_le_bytes());
     }
-    output.extend_from_slice(&1440u16.to_le_bytes());
+    // A halved frame keeps its physical size at half as many units per inch.
+    let units_per_inch: u16 = if frame.halved { 720 } else { 1440 };
+    output.extend_from_slice(&units_per_inch.to_le_bytes());
     output.extend_from_slice(&0u32.to_le_bytes());
     let checksum = output[..20]
         .as_chunks::<2>()
@@ -1272,17 +1286,128 @@ const WMF_HEADER_WORDS: u16 = 9;
 /// Size in words of the largest record `frame_records` emits.
 const FRAME_RECORD_MAX_WORDS: u32 = 5;
 
-/// Returns the length of one side of the frame, bounded to the 16-bit range
-/// the placeable header and the mapping records use.
-fn frame_extent(low: i16, high: i16) -> i16 {
-    let extent = i32::from(high) - i32::from(low);
-    i16::try_from(extent).unwrap_or(i16::MAX)
+/// The size of the device frame a BLIP's metafile plays into.
+///
+/// The placeable header and the mapping records hold 16-bit values, but the
+/// two sides of a window can be up to 65535 units apart. Such a frame is
+/// halved, rounding up, so that every side fits.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Frame {
+    width: i16,
+    height: i16,
+    halved: bool,
+}
+
+impl Frame {
+    fn of(window: (i16, i16, i16, i16)) -> Self {
+        let (left, top, right, bottom) = window;
+        let width = i32::from(right) - i32::from(left);
+        let height = i32::from(bottom) - i32::from(top);
+        let max = i32::from(i16::MAX);
+        let halved = width > max || height > max;
+        let side = |extent: i32| {
+            let extent = if halved { (extent + 1) / 2 } else { extent };
+            i16::try_from(extent).unwrap_or(i16::MAX)
+        };
+        Self {
+            width: side(width),
+            height: side(height),
+            halved,
+        }
+    }
+}
+
+/// How the window a viewer sets maps onto the frame.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FrameMapping {
+    /// The window and the viewport are both the frame; a window extent the
+    /// metafile sets then maps onto the whole frame.
+    Frame,
+    /// The window is twice the halved frame, written as the 2:1 ratio it
+    /// has, for a metafile that never sets its own window extent.
+    Halved,
+}
+
+/// Where a metafile first sets its window extent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum WindowExtentUse {
+    BeforeDrawing,
+    AfterDrawing,
+    Never,
+}
+
+/// Where the records after a standard WMF header first set the window
+/// extent, relative to the first record that uses the mapping.
+fn window_extent_use(records: &[u8]) -> WindowExtentUse {
+    // Records that neither draw nor store coordinates; the mapping in effect
+    // when they play does not matter.
+    const MAPPING_FREE: &[u16] = &[
+        0x001e, // SaveDC
+        0x0035, // RealizePalette
+        0x0037, // SetPaletteEntries
+        0x00f7, // CreatePalette
+        0x0102, // SetBkMode
+        0x0103, // SetMapMode
+        0x0104, // SetROP2
+        0x0105, // SetRelAbs
+        0x0106, // SetPolyFillMode
+        0x0107, // SetStretchBltMode
+        0x0108, // SetTextCharExtra
+        0x012d, // SelectObject
+        0x012e, // SetTextAlign
+        0x0139, // ResizePalette
+        0x0142, // DibCreatePatternBrush
+        0x0149, // SetLayout
+        0x01f0, // DeleteObject
+        0x01f9, // CreatePatternBrush
+        0x0201, // SetBkColor
+        0x0209, // SetTextColor
+        0x020a, // SetTextJustification
+        0x020b, // SetWindowOrg
+        0x020d, // SetViewportOrg
+        0x0231, // SetMapperFlags
+        0x0234, // SelectPalette
+        0x02fa, // CreatePenIndirect
+        0x02fb, // CreateFontIndirect
+        0x02fc, // CreateBrushIndirect
+        0x0626, // Escape
+        0x06ff, // CreateRegion
+    ];
+    const SET_WINDOW_EXT: u16 = 0x020c;
+    let mut offset = 0usize;
+    let mut drawn = false;
+    while let (Some(words), Some(function)) = (
+        read_u32_at(records, offset),
+        read_u16_at(records, offset + 4),
+    ) {
+        if function == SET_WINDOW_EXT {
+            return if drawn {
+                WindowExtentUse::AfterDrawing
+            } else {
+                WindowExtentUse::BeforeDrawing
+            };
+        }
+        if function == 0 {
+            break;
+        }
+        drawn |= !MAPPING_FREE.contains(&function);
+        let Some(next) = usize::try_from(words)
+            .ok()
+            .filter(|words| *words >= 3)
+            .and_then(|words| words.checked_mul(2))
+            .and_then(|bytes| offset.checked_add(bytes))
+        else {
+            break;
+        };
+        offset = next;
+    }
+    WindowExtentUse::Never
 }
 
 /// Returns the records that set the playback mapping a viewer starts from:
 /// anisotropic mode, the BLIP rectangle as the window, and a viewport that is
 /// the frame at the origin.
-fn frame_records(window: (i16, i16, i16, i16)) -> Vec<u8> {
+fn frame_records(window: (i16, i16, i16, i16), frame: Frame, mapping: FrameMapping) -> Vec<u8> {
     const SET_MAP_MODE: u16 = 0x0103;
     const SET_WINDOW_ORG: u16 = 0x020B;
     const SET_WINDOW_EXT: u16 = 0x020C;
@@ -1290,16 +1415,19 @@ fn frame_records(window: (i16, i16, i16, i16)) -> Vec<u8> {
     const SET_VIEWPORT_EXT: u16 = 0x020E;
     const MM_ANISOTROPIC: i16 = 8;
 
-    let (left, top, right, bottom) = window;
-    let (width, height) = (frame_extent(left, right), frame_extent(top, bottom));
+    let (left, top, _, _) = window;
+    let (window_extent, viewport_extent) = match mapping {
+        FrameMapping::Frame => ([frame.height, frame.width], [frame.height, frame.width]),
+        FrameMapping::Halved => ([2, 2], [1, 1]),
+    };
     let mut records = Vec::new();
     // Origin and extent records store their y operand first.
     for (function, parameters) in [
         (SET_MAP_MODE, &[MM_ANISOTROPIC][..]),
         (SET_WINDOW_ORG, &[top, left][..]),
-        (SET_WINDOW_EXT, &[height, width][..]),
+        (SET_WINDOW_EXT, &window_extent[..]),
         (SET_VIEWPORT_ORG, &[0, 0][..]),
-        (SET_VIEWPORT_EXT, &[height, width][..]),
+        (SET_VIEWPORT_EXT, &viewport_extent[..]),
     ] {
         let words = u32::try_from(3 + parameters.len()).unwrap_or(3);
         records.extend_from_slice(&words.to_le_bytes());
@@ -2248,6 +2376,59 @@ mod tests {
                 "window origin {left},{top}"
             );
         }
+    }
+
+    #[test]
+    fn frames_wider_than_16_bits_are_halved_with_their_mapping() {
+        let bounds = Rect {
+            left: -20_000,
+            top: -5_000,
+            right: 20_000,
+            bottom: 5_000,
+        };
+        let extent = Point {
+            x: 1_905_000,
+            y: 476_250,
+        };
+        let outline = wmf_record(0x041B, &wmf_params(&[5_000, 20_000, -5_000, -20_000]));
+        let window_extent = wmf_record(0x020C, &wmf_params(&[10_000, 30_000]));
+        let window_origin = wmf_record(0x020B, &wmf_params(&[-5_000, -20_000]));
+        // A black solid brush, selected.
+        let brush = [
+            wmf_record(0x02FC, &wmf_params(&[0, 0, 0, 0])),
+            wmf_record(0x012D, &wmf_params(&[0])),
+        ];
+        let own_window = wmf_from_records(&[
+            brush[0].clone(),
+            brush[1].clone(),
+            window_origin.clone(),
+            window_extent.clone(),
+            wmf_record(0x041B, &wmf_params(&[5_000, 10_000, -5_000, -20_000])),
+        ]);
+        let no_window = wmf_from_records(&[brush[0].clone(), brush[1].clone(), outline.clone()]);
+        for metafile in [own_window, no_window] {
+            let bytes = wmf_blip(bounds, extent, &metafile);
+            let blip = Blip::parse(&bytes, Default::default()).unwrap();
+            let svg = to_svg(&blip, Options::default()).unwrap();
+            // The 4:1 frame keeps its shape instead of being cut to 32767
+            // units wide.
+            assert!(svg.contains(r#"viewBox="0 0 768 192""#), "{svg}");
+            let png = to_png(&blip, Options::default()).unwrap();
+            let image = image::load_from_memory_with_format(&png, ImageFormat::Png)
+                .unwrap()
+                .to_luma8();
+            // The black fill covers the frame.
+            let dark = image.pixels().filter(|pixel| pixel.0[0] < 128).count();
+            assert!(dark * 10 > image.pixels().count() * 9, "{dark}");
+        }
+
+        // A record drawn before the window extent is set would play under
+        // the halved mapping the viewer never uses.
+        let late_window = wmf_from_records(&[outline, window_origin, window_extent]);
+        let bytes = wmf_blip(bounds, extent, &late_window);
+        let blip = Blip::parse(&bytes, Default::default()).unwrap();
+        let error = to_svg(&blip, Options::default()).unwrap_err().to_string();
+        assert!(error.contains("wmf-blip-frame-halved"), "{error}");
     }
 
     #[test]
