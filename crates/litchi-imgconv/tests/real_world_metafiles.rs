@@ -381,6 +381,6 @@ fn minimized_fuzz_inputs_convert_or_fail_without_panicking() {
         }
         checked += 1;
     }
-    assert!(checked >= 9, "only {checked} fuzz inputs were found");
+    assert!(checked >= 12, "only {checked} fuzz inputs were found");
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
