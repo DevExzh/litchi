@@ -31,10 +31,12 @@ fn picture_frames_without_stored_pictures_are_skipped() {
 #[test]
 fn floating_pictures_are_not_merged_by_their_shared_picture_location() {
     // Floating anchors keep CPicLocation 0, which is also the Data-stream
-    // offset of the first inline picture.
+    // offset of the first inline picture, and two consecutive anchors share
+    // one run.
     let trigonometry = kinds("ole/doc/trigonometric_ratios.doc");
-    assert_eq!(trigonometry.len(), 675);
-    assert_eq!(count(&trigonometry, Kind::Png), 3);
+    assert_eq!(trigonometry.len(), 677);
+    assert_eq!(count(&trigonometry, Kind::Png), 4);
+    assert_eq!(count(&trigonometry, Kind::Emf), 1);
     let floating = kinds("ole/doc/FloatingPictures.doc");
     assert_eq!(floating.len(), 20);
     assert_eq!(count(&floating, Kind::Png), 19);

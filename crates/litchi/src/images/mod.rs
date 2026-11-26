@@ -67,9 +67,10 @@ pub fn ppt(path: impl AsRef<std::path::Path>) -> Result<Vec<File<'static>>> {
 /// closed before this function returns. Native image data is not decoded.
 ///
 /// Each inline picture (one Data-stream PICF) and each floating picture (one
-/// OfficeArt shape) is returned once. Picture frames that store no picture,
-/// such as linked pictures saved without their data, are skipped. The
-/// document is read with [`litchi_doc::Leniency::TolerateStylesheetDefects`].
+/// OfficeArt shape, including each picture inside an anchored group) is
+/// returned once. Picture frames that store no picture, such as linked
+/// pictures saved without their data, are skipped. The document is read with
+/// [`litchi_doc::Leniency::TolerateStylesheetDefects`].
 #[cfg(feature = "doc")]
 pub fn doc(path: impl AsRef<std::path::Path>) -> Result<Vec<File<'static>>> {
     // Style names only label styles; a duplicated one, which Word opens
@@ -83,28 +84,57 @@ pub fn doc(path: impl AsRef<std::path::Path>) -> Result<Vec<File<'static>>> {
 
     for paragraph in document.paragraphs().map_err(Error::from)? {
         for run in paragraph.runs().map_err(Error::from)? {
-            let Some(image) = run.image() else {
-                continue;
+            let pictures = match run.image() {
+                Some(image) => vec![*image],
+                None => anchored_pictures(&document, &run)?,
             };
-            // A floating picture's CPicLocation is only a legacy hint that
-            // other pictures can share; its shape identifies it.
-            let identity = image
-                .drawing_shape_id()
-                .map_or((false, image.pic_offset()), |shape_id| (true, shape_id));
-            if !seen.insert(identity) {
-                continue;
+            for image in &pictures {
+                // A floating picture's CPicLocation is only a legacy hint that
+                // other pictures can share; its shape identifies it.
+                let identity = image
+                    .drawing_shape_id()
+                    .map_or((false, image.pic_offset()), |shape_id| (true, shape_id));
+                if !seen.insert(identity) {
+                    continue;
+                }
+                let file = match document.image_data(image) {
+                    Ok(file) => file,
+                    Err(litchi_doc::ImageError::NoPicture) => continue,
+                    Err(error) => return Err(Error::ParseError(error.to_string())),
+                };
+                let index = images.len();
+                images.push(file.with_index(index).into_owned().map_err(office_art)?);
             }
-            let file = match document.image_data(image) {
-                Ok(file) => file,
-                Err(litchi_doc::ImageError::NoPicture) => continue,
-                Err(error) => return Err(Error::ParseError(error.to_string())),
-            };
-            let index = images.len();
-            images.push(file.with_index(index).into_owned().map_err(office_art)?);
         }
     }
 
     Ok(images)
+}
+
+/// The floating pictures of a run that `Run::image` does not describe: a run
+/// of several anchor characters, or an anchor of a group of pictures.
+#[cfg(feature = "doc")]
+fn anchored_pictures(
+    document: &litchi_doc::Document,
+    run: &litchi_doc::Run,
+) -> Result<Vec<litchi_doc::Image>> {
+    let properties = run.properties();
+    if !properties.is_spec || properties.is_obj || properties.is_ole2 || properties.is_data {
+        return Ok(Vec::new());
+    }
+    let (Some(range), Ok(text)) = (run.cp_range(), run.text()) else {
+        return Ok(Vec::new());
+    };
+    let mut pictures = Vec::new();
+    for (offset, unit) in text.encode_utf16().enumerate() {
+        let cp = u32::try_from(offset)
+            .ok()
+            .and_then(|offset| range.start().checked_add(offset));
+        if let (0x0008, Some(cp)) = (unit, cp) {
+            pictures.extend(document.floating_images_at(cp).map_err(Error::from)?);
+        }
+    }
+    Ok(pictures)
 }
 
 /// Discovers borrowed images in an OfficeArt record sequence.
