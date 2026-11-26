@@ -46,7 +46,9 @@ pub(super) struct SvgRenderer<'hook> {
     objects: ObjectTable,
     definitions: String,
     hatch_ids: HashMap<(u32, u16, u16, u32), String>,
-    clip_ids: HashMap<u64, String>,
+    /// Clip reference per clip revision; `Some(None)` records a clip that covers
+    /// the whole canvas and therefore needs no reference at all.
+    clip_ids: HashMap<u64, Option<String>>,
     next_clip_revision: u64,
     next_definition_id: usize,
     issues: Vec<RenderIssue>,
@@ -1737,8 +1739,10 @@ impl<'hook> SvgRenderer<'hook> {
         if self.state.clip.is_unbounded() {
             return String::new();
         }
-        if let Some(id) = self.clip_ids.get(&self.state.clip_revision) {
-            return format!(r#" clip-path="url(#{id})""#);
+        match self.clip_ids.get(&self.state.clip_revision) {
+            Some(None) => return String::new(),
+            Some(Some(id)) => return format!(r#" clip-path="url(#{id})""#),
+            None => {},
         }
         let included_count = self.state.clip.rects.as_ref().map_or(1usize, Vec::len);
         let clip_work = included_count
@@ -1756,6 +1760,23 @@ impl<'hook> SvgRenderer<'hook> {
                 .collect(),
             None => vec![self.transform.canvas_rect()],
         };
+        // A region that already covers the canvas clips nothing away. Dropping
+        // the reference keeps one mask per drawn element out of the rasterizer,
+        // which dominates the cost of a busy picture.
+        let canvas = self.transform.canvas_rect();
+        let covers_canvas = included
+            .iter()
+            .any(|rect| rect.intersect(canvas) == Some(canvas))
+            && !self
+                .state
+                .clip
+                .excluded
+                .iter()
+                .any(|rect| self.transform.rect(*rect).intersect(canvas).is_some());
+        if covers_canvas {
+            self.clip_ids.insert(self.state.clip_revision, None);
+            return String::new();
+        }
         for rect in &included {
             append_rect_path(&mut path, *rect);
         }
@@ -1774,7 +1795,8 @@ impl<'hook> SvgRenderer<'hook> {
             r#"<clipPath id="{id}" clipPathUnits="userSpaceOnUse"><path d="{path}" clip-rule="evenodd" fill-rule="evenodd"/></clipPath>"#
         );
         self.push_definition(&definition);
-        self.clip_ids.insert(self.state.clip_revision, id.clone());
+        self.clip_ids
+            .insert(self.state.clip_revision, Some(id.clone()));
         format!(r#" clip-path="url(#{id})""#)
     }
 
@@ -2158,6 +2180,32 @@ mod tests {
         renderer.render_record(&rec(record::SET_TEXT_COLOR, &[4, 5, 6, 0]));
         renderer.render_record(&rec(record::RESTORE_DC, &[0xff, 0xff]));
         assert_eq!(renderer.state.text_color, 0x0003_0201);
+    }
+
+    #[test]
+    fn clip_that_covers_the_canvas_needs_no_reference() {
+        let mut renderer = renderer();
+        renderer.state.clip =
+            ClipRegion::from_rects(vec![DeviceRect::new(-5.0, -5.0, 110.0, 110.0)]);
+
+        assert_eq!(renderer.clip_attr(), "");
+        assert!(renderer.definitions.is_empty());
+    }
+
+    #[test]
+    fn clip_that_cuts_into_the_canvas_keeps_its_reference() {
+        let mut renderer = renderer();
+        renderer.state.clip = ClipRegion::from_rects(vec![DeviceRect::new(0.0, 0.0, 50.0, 50.0)]);
+
+        assert_eq!(renderer.clip_attr(), r#" clip-path="url(#wmf-clip-0)""#);
+
+        renderer
+            .state
+            .clip
+            .excluded
+            .push(DeviceRect::new(10.0, 10.0, 20.0, 20.0));
+        renderer.bump_clip_revision();
+        assert_eq!(renderer.clip_attr(), r#" clip-path="url(#wmf-clip-1)""#);
     }
 
     #[test]

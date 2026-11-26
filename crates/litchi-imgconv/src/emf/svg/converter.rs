@@ -10,7 +10,7 @@ use crate::emf::{
     record_parser::{parse_pointl_array, parse_points_array, parse_poly_counts},
     records::*,
 };
-use crate::svg_utils::{write_num, write_xml_escaped};
+use crate::svg_utils::{ClipGrouper, write_num, write_xml_escaped};
 use crate::{
     dib::DibLimits,
     metafile_bitmap::{BitmapOp, StretchPolicy},
@@ -141,7 +141,7 @@ impl<'a> EmfSvgConverter<'a> {
                 self.limits.max_svg_elements
             )));
         }
-        let svg = self.build_svg(&buffer.elements, &state)?;
+        let svg = self.build_svg(&buffer.elements, &state, generated_elements)?;
         let diagnostics = std::mem::take(&mut state.diagnostics)
             .into_iter()
             .map(
@@ -1438,7 +1438,12 @@ impl<'a> EmfSvgConverter<'a> {
         )
     }
 
-    fn build_svg(&self, elements: &[String], state: &RenderState) -> Result<String> {
+    fn build_svg(
+        &self,
+        elements: &[String],
+        state: &RenderState,
+        generated_elements: usize,
+    ) -> Result<String> {
         let header = &self.parser.header;
         let width = header.width().unsigned_abs().max(1);
         let height = header.height().unsigned_abs().max(1);
@@ -1468,8 +1473,16 @@ impl<'a> EmfSvgConverter<'a> {
             }
             svg.push_str("</defs>");
         }
+        let mut groups = ClipGrouper::new();
         for element in elements {
-            svg.push_str(element);
+            groups.push(&mut svg, element);
+        }
+        groups.finish(&mut svg);
+        if generated_elements.saturating_add(groups.groups()) > self.limits.max_svg_elements {
+            return Err(Error::ParseError(format!(
+                "EMF SVG element count exceeds limit {}",
+                self.limits.max_svg_elements
+            )));
         }
         svg.push_str("</svg>");
         if svg.len() > self.limits.max_output_bytes {

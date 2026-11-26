@@ -10,7 +10,7 @@ mod transform;
 use std::sync::Arc;
 
 use super::parser::WmfParser;
-use crate::svg_utils::write_num;
+use crate::svg_utils::{ClipGrouper, write_num};
 use bounds::BoundsCalculator;
 use litchi_core::error::{Error, Result};
 use renderer::SvgRenderer;
@@ -156,11 +156,14 @@ impl WmfConverter {
             self.limits.max_uncompressed_bytes,
         );
         let mut elements = String::with_capacity(4096);
+        let mut groups = ClipGrouper::new();
         let mut element_count = 0usize;
         let mut output_limit_hit = false;
         for record in &self.parser.records {
             if let Some(element) = renderer.render_record(record) {
                 element_count = element_count.saturating_add(svg_element_count(&element));
+                // Grouping only removes bytes, so the ungrouped size bounds the
+                // output.
                 if elements
                     .len()
                     .checked_add(element.len())
@@ -169,11 +172,14 @@ impl WmfConverter {
                     output_limit_hit = true;
                     break;
                 }
-                elements.push_str(&element);
+                groups.push(&mut elements, &element);
             }
         }
+        groups.finish(&mut elements);
         let (definitions, mut issues) = renderer.into_parts();
-        element_count = element_count.saturating_add(svg_element_count(&definitions));
+        element_count = element_count
+            .saturating_add(svg_element_count(&definitions))
+            .saturating_add(groups.groups());
         if element_count > self.limits.max_svg_elements {
             issues.push(renderer::RenderIssue {
                 fatal: true,
