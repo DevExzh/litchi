@@ -96,7 +96,7 @@ pub(crate) fn rasterize_svg(
         image_href_resolver: bounded_image_resolver(*limits),
         fontdb: Arc::clone(&fonts.database),
         font_resolver: usvg::FontResolver {
-            select_font: usvg::FontResolver::default_font_selector(),
+            select_font: stand_in_font_selector(),
             // Offer each resident face once; shaping skips faces that still
             // lack the character, so the search stays bounded.
             select_fallback: Box::new(move |_, used, _| {
@@ -196,6 +196,93 @@ fn group_fits(group: &usvg::Group, scale_x: f32, scale_y: f32) -> bool {
                 },
                 usvg::Node::Image(_) | usvg::Node::Text(_) => true,
             }
+    })
+}
+
+/// Installed families that stand in for faces that metafiles name.
+///
+/// Liberation and the Chrome OS core fonts (Arimo, Tinos, Cousine, Carlito,
+/// Caladea) are metric-compatible with the Windows core fonts they replace,
+/// so text set with them keeps the widths the picture was laid out with.
+const FACE_STAND_INS: &[(&[&str], &[&str])] = &[
+    (
+        &["Arial", "Helvetica", "Helv", "Arial MT"],
+        &["Liberation Sans", "Arimo"],
+    ),
+    (
+        &["Arial Narrow", "Helvetica Narrow"],
+        &["Liberation Sans Narrow"],
+    ),
+    (
+        &["Times New Roman", "Times", "Tms Rmn", "Times New Roman PS"],
+        &["Liberation Serif", "Tinos"],
+    ),
+    (&["Courier New", "Courier"], &["Liberation Mono", "Cousine"]),
+    (&["Calibri"], &["Carlito"]),
+    (&["Cambria"], &["Caladea"]),
+];
+
+/// Families that carry the mathematical symbols, arrows, geometric shapes and
+/// dingbats that symbol-face text is decoded to; they draw those characters
+/// when the selected face lacks them. They do not stand in for the symbol
+/// faces themselves: a glyph position without a Unicode equivalent keeps the
+/// missing glyph of the selected text face, which the common text faces leave
+/// empty, instead of the missing-glyph box of a symbol family.
+const SYMBOL_FAMILIES: &[&str] = &[
+    "DejaVu Sans",
+    "Noto Sans Symbols",
+    "Noto Sans Symbols 2",
+    "Noto Sans Math",
+    "OpenSymbol",
+];
+
+/// Installed families to try in place of the face `name`.
+fn face_stand_ins(name: &str) -> &'static [&'static str] {
+    FACE_STAND_INS
+        .iter()
+        .find(|(names, _)| names.iter().any(|known| known.eq_ignore_ascii_case(name)))
+        .map_or(&[], |(_, stand_ins)| stand_ins)
+}
+
+/// Font database query families for an SVG `font-family` list: each family
+/// followed by its stand-ins, then the serif default that usvg's own
+/// selector ends with.
+fn query_families<'a>(families: &'a [usvg::FontFamily]) -> Vec<usvg::fontdb::Family<'a>> {
+    use usvg::fontdb::Family;
+    let mut query = Vec::with_capacity(families.len() * 3 + 1);
+    for family in families {
+        match family {
+            usvg::FontFamily::Named(name) => {
+                query.push(Family::Name(name));
+                query.extend(
+                    face_stand_ins(name)
+                        .iter()
+                        .map(|&stand_in| Family::Name(stand_in)),
+                );
+            },
+            usvg::FontFamily::Serif => query.push(Family::Serif),
+            usvg::FontFamily::SansSerif => query.push(Family::SansSerif),
+            usvg::FontFamily::Cursive => query.push(Family::Cursive),
+            usvg::FontFamily::Fantasy => query.push(Family::Fantasy),
+            usvg::FontFamily::Monospace => query.push(Family::Monospace),
+        }
+    }
+    query.push(Family::Serif);
+    query
+}
+
+/// Font selector that replaces a face the system lacks by an installed
+/// stand-in before falling back to the generic families; usvg's default
+/// selector falls back to the serif default directly, so a picture that
+/// names Arial alone would be drawn with a serif face.
+fn stand_in_font_selector() -> usvg::FontSelectionFn<'static> {
+    Box::new(|font, database| {
+        database.query(&usvg::fontdb::Query {
+            families: &query_families(font.families()),
+            weight: usvg::fontdb::Weight(font.weight()),
+            stretch: font.stretch().into(),
+            style: font.style().into(),
+        })
     })
 }
 
@@ -353,7 +440,14 @@ fn build_system_fonts() -> SystemFonts {
         .into_iter()
         .flatten()
         .collect();
-    let fallback = make_resident(&mut database, &families);
+    let mut fallback = make_resident(&mut database, &families, false);
+    // Symbol-face text decodes to symbols that text faces rarely carry; the
+    // regular face of each symbol family is enough to draw them.
+    let symbols: Vec<String> = SYMBOL_FAMILIES
+        .iter()
+        .map(|family| (*family).to_string())
+        .collect();
+    fallback.extend(make_resident(&mut database, &symbols, true));
     SystemFonts {
         database: Arc::new(database),
         fallback: fallback.into(),
@@ -374,10 +468,12 @@ fn preferred_family(database: &usvg::fontdb::Database, candidates: &[&str]) -> O
 }
 
 /// Replaces the file-backed faces of `families` with in-memory copies and
-/// returns their identifiers in family order.
+/// returns their identifiers in family order; `regular_only` limits the
+/// copies to the upright, normal-weight, normal-width faces.
 fn make_resident(
     database: &mut usvg::fontdb::Database,
     families: &[String],
+    regular_only: bool,
 ) -> Vec<usvg::fontdb::ID> {
     let mut paths = Vec::new();
     for family in families {
@@ -386,6 +482,13 @@ fn make_resident(
                 .families
                 .iter()
                 .any(|name| name.0.eq_ignore_ascii_case(family))
+            {
+                continue;
+            }
+            if regular_only
+                && (face.weight != usvg::fontdb::Weight::NORMAL
+                    || face.style != usvg::fontdb::Style::Normal
+                    || face.stretch != usvg::fontdb::Stretch::Normal)
             {
                 continue;
             }
@@ -744,5 +847,83 @@ mod tests {
                 .0,
             [7, 11, 13, 255]
         );
+    }
+
+    fn render_text(family: &str, text: &str) -> Vec<u8> {
+        let svg = format!(
+            concat!(
+                r#"<svg xmlns="http://www.w3.org/2000/svg" width="96" height="48">"#,
+                r#"<text x="4" y="38" font-family="{}" font-size="36" fill="black">{}</text>"#,
+                "</svg>",
+            ),
+            family, text
+        );
+        rasterize_svg(
+            &svg,
+            96,
+            48,
+            Rgba([255; 4]),
+            ImageFormat::Png,
+            &RasterLimits::default(),
+        )
+        .unwrap()
+    }
+
+    fn installed(family: &str) -> bool {
+        preferred_family(&system_fonts().database, &[family]).is_some()
+    }
+
+    #[test]
+    fn stand_ins_follow_the_face_they_replace() {
+        use usvg::fontdb::Family;
+        let families = [
+            usvg::FontFamily::Named("arial".to_owned()),
+            usvg::FontFamily::SansSerif,
+            usvg::FontFamily::Named("Unlisted Face".to_owned()),
+        ];
+        assert_eq!(
+            query_families(&families),
+            [
+                Family::Name("arial"),
+                Family::Name("Liberation Sans"),
+                Family::Name("Arimo"),
+                Family::SansSerif,
+                Family::Name("Unlisted Face"),
+                Family::Serif,
+            ]
+        );
+        assert_eq!(
+            face_stand_ins("Times New Roman"),
+            ["Liberation Serif", "Tinos"]
+        );
+        assert_eq!(
+            face_stand_ins("Courier New"),
+            ["Liberation Mono", "Cousine"]
+        );
+        assert!(face_stand_ins("MT Extra").is_empty());
+    }
+
+    #[test]
+    fn a_missing_windows_face_renders_with_its_metric_compatible_stand_in() {
+        if installed("Arial") || !installed("Liberation Sans") {
+            return;
+        }
+        assert_eq!(
+            render_text("Arial", "Ag"),
+            render_text("Liberation Sans", "Ag")
+        );
+    }
+
+    #[test]
+    fn symbol_characters_draw_from_a_symbol_fallback_face() {
+        if !SYMBOL_FAMILIES.iter().any(|family| installed(family)) {
+            return;
+        }
+        // MT Extra's ellipsis and h-bar, which text faces often lack.
+        let symbols = render_text("MT Extra, serif", "\u{22ef}\u{210f}");
+        let image = decode(&symbols, ImageFormat::Png).to_rgb8();
+        assert!(image.pixels().any(|pixel| pixel.0 != [255; 3]));
+        let missing = render_text("MT Extra, serif", "\u{10fffd}\u{10fffd}");
+        assert_ne!(symbols, missing, "the symbols drew missing-glyph boxes");
     }
 }
