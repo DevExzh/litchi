@@ -349,17 +349,7 @@ fn raw_metafile_svg(
             let mut diagnostics: Vec<_> = parser
                 .warnings()
                 .iter()
-                .map(|warning| match *warning {
-                    crate::emf::parser::EmfParserWarning::EofSizeLastMismatch {
-                        expected,
-                        found,
-                    } => ConversionDiagnostic {
-                        code: "noncanonical-emf-eof-size-last",
-                        message: format!(
-                            "accepted legacy EMF EOF SizeLast {found}; the specification requires {expected}"
-                        ),
-                    },
-                })
+                .map(emf_parser_diagnostic)
                 .collect();
             diagnostics.extend(emfplus_diagnostics.into_iter().map(|diagnostic| {
                 ConversionDiagnostic {
@@ -422,14 +412,10 @@ fn validate_limits(limits: &Limits) -> Result<()> {
 }
 
 fn preflight_emf_header(data: &[u8], limits: &Limits) -> Result<()> {
-    let records = read_u32_at(data, 52)
-        .ok_or_else(|| parse("EMF header is too short for its record count"))?;
-    let records = usize::try_from(records).map_err(|_| parse("EMF record count overflow"))?;
-    if records > limits.max_records {
-        return Err(parse(format!(
-            "EMF declares {records} records; limit is {}",
-            limits.max_records
-        )));
+    // The declared record count is not trusted: playback follows the records
+    // themselves, and the parser bounds the records it walks.
+    if data.len() < 56 {
+        return Err(parse("EMF header is too short for its record count"));
     }
     let handles = data
         .get(56..58)
@@ -442,6 +428,59 @@ fn preflight_emf_header(data: &[u8], limits: &Limits) -> Result<()> {
         )));
     }
     Ok(())
+}
+
+/// Maps an EMF framing deviation to the diagnostic reported with the picture.
+///
+/// Deviations that leave the picture unchanged use `noncanonical-` codes; a
+/// stream that stops before its terminator reports an approximation.
+fn emf_parser_diagnostic(warning: &crate::emf::parser::EmfParserWarning) -> ConversionDiagnostic {
+    use crate::emf::parser::EmfParserWarning;
+    let (code, message) = match *warning {
+        EmfParserWarning::EofSizeLastMismatch { expected, found } => (
+            "noncanonical-emf-eof-size-last",
+            format!(
+                "accepted legacy EMF EOF SizeLast {found}; the specification requires {expected}"
+            ),
+        ),
+        EmfParserWarning::ShortEof { size } => (
+            "noncanonical-emf-short-eof",
+            format!("EMR_EOF has {size} bytes; playback ends at the record type"),
+        ),
+        EmfParserWarning::DeclaredSize { declared, actual } => (
+            "noncanonical-emf-declared-size",
+            format!("the header declares {declared} bytes; the input has {actual} bytes"),
+        ),
+        EmfParserWarning::RecordCount { declared, found } => (
+            "noncanonical-emf-record-count",
+            format!("the header declares {declared} records; the stream has {found}"),
+        ),
+        EmfParserWarning::RepeatedHeader { offset } => (
+            "noncanonical-emf-repeated-header",
+            format!("ignored an EMR_HEADER record at offset {offset}"),
+        ),
+        EmfParserWarning::TrailingData { bytes } => (
+            "noncanonical-emf-trailing-data",
+            format!("{bytes} bytes follow the EMR_EOF record"),
+        ),
+        EmfParserWarning::TruncatedRecord { offset, available } => (
+            "emf-truncated-record",
+            format!(
+                "playback stops at offset {offset}: {available} bytes do not form a complete record"
+            ),
+        ),
+        EmfParserWarning::MissingEof { at_declared_end } => (
+            // Playback ends with the last record; only a stream that stops
+            // exactly where the header says it ends is known to be complete.
+            if at_declared_end {
+                "noncanonical-emf-missing-eof"
+            } else {
+                "emf-missing-eof"
+            },
+            "the record stream ends without an EMR_EOF record".to_owned(),
+        ),
+    };
+    ConversionDiagnostic { code, message }
 }
 
 /// Maps a WMF framing deviation to the diagnostic reported with the picture.

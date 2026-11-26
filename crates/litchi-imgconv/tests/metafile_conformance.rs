@@ -129,7 +129,8 @@ fn auto_selects_png_for_bitmap_only_emf() {
 }
 
 #[test]
-fn malformed_emf_lengths_and_missing_eof_are_rejected() {
+fn emf_framing_defects_render_with_diagnostics_or_stay_rejected() {
+    // An unusable header size is not a header.
     let mut malformed_header = emf_vector(10, 10);
     malformed_header[48..52].copy_from_slice(&u32::MAX.to_le_bytes());
     assert_err(
@@ -139,23 +140,41 @@ fn malformed_emf_lengths_and_missing_eof_are_rejected() {
         Options::default(),
     );
 
-    let malformed_record = emf_file(10, 10, &[emr(EMR_RECTANGLE, &rectl(0, 0, 10, 10))]);
-    assert_err(
-        &malformed_record,
+    // Playback ends with the last record when no terminator follows it.
+    let without_eof = emf_file(10, 10, &[emr(EMR_RECTANGLE, &rectl(0, 0, 10, 10))]);
+    let converted = convert(
+        &without_eof,
         InputFormat::Emf,
         OutputFormat::Svg,
         Options::default(),
     );
+    assert!(
+        converted
+            .report
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "noncanonical-emf-missing-eof")
+    );
 
+    // A record length that runs past the input stops playback: the picture
+    // is an approximation, so the strict helper refuses it.
     let mut overlong_record = emf_vector(10, 10);
     overlong_record[EMF_HEADER_SIZE + 4..EMF_HEADER_SIZE + 8]
         .copy_from_slice(&u32::MAX.to_le_bytes());
-    assert_err(
+    let converted = convert(
         &overlong_record,
         InputFormat::Emf,
         OutputFormat::Svg,
         Options::default(),
     );
+    assert!(
+        converted
+            .report
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "emf-truncated-record")
+    );
+    assert!(litchi_imgconv::emf::convert_emf_to_svg(&overlong_record).is_err());
 }
 
 #[test]

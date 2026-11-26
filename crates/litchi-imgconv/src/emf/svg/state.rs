@@ -114,15 +114,19 @@ impl RenderState {
         self.path_builder = None;
     }
 
+    /// Stores an object under a handle and reports whether it replaced a live
+    /// object.
     pub fn insert_object(&mut self, handle: u32, object: GdiObject) -> bool {
-        self.objects.insert(handle, object).is_none()
+        self.objects.insert(handle, object).is_some()
     }
 
+    /// Frees a handle-table slot.
+    ///
+    /// GDI frees the slot even when the object is still selected into a
+    /// device context: the context keeps drawing with it, and the handle can
+    /// be created again.
     pub fn delete_object(&mut self, handle: u32) -> bool {
-        !stock_objects::is_stock_object(handle)
-            && !self.dc.references(handle)
-            && !self.dc_stack.iter().any(|dc| dc.references(handle))
-            && self.objects.remove(&handle).is_some()
+        !stock_objects::is_stock_object(handle) && self.objects.remove(&handle).is_some()
     }
 
     pub fn select_object(&mut self, handle: u32) -> bool {
@@ -255,6 +259,8 @@ pub struct DeviceContext {
     pub bg_mode: u32,
     pub poly_fill_mode: u32,
     pub text_align: u32,
+    /// Extra width that `EMR_SETTEXTJUSTIFICATION` adds to break characters.
+    pub text_break_extra: i32,
     pub rop2: u32,
     pub stretch_mode: u32,
     pub arc_direction: bool,
@@ -292,6 +298,7 @@ impl DeviceContext {
             bg_mode: 2,
             poly_fill_mode: 1,
             text_align: 0,
+            text_break_extra: 0,
             rop2: 13,
             stretch_mode: 3,
             arc_direction: false,
@@ -401,12 +408,6 @@ impl DeviceContext {
             .as_ref()
             .map(|id| format!("clip-path=\"url(#{id})\""))
             .unwrap_or_default()
-    }
-
-    fn references(&self, handle: u32) -> bool {
-        self.pen_handle == Some(handle)
-            || self.brush_handle == Some(handle)
-            || self.font_handle == Some(handle)
     }
 }
 
