@@ -11,7 +11,7 @@ use super::state::{
 };
 use super::style::{
     color_paint, escape_xml_attr_into, escape_xml_text_into, fill_attrs, hatch_definition,
-    map_font_family, stroke_attrs,
+    stroke_attrs,
 };
 use super::transform::CoordinateTransform;
 use crate::svg_utils::{write_color_hex, write_num};
@@ -796,10 +796,12 @@ impl<'hook> SvgRenderer<'hook> {
             .iter()
             .map(|&byte| char::from(byte))
             .collect();
+        // The recorded face stays first in the SVG font family so a system
+        // that has it uses it; the generic class follows as a stand-in.
         let name = if name.is_empty() {
             "serif".to_owned()
         } else {
-            map_font_family(&name).to_owned()
+            name
         };
         if !self.reserve_object_bytes(name.len()) {
             return;
@@ -814,6 +816,7 @@ impl<'hook> SvgRenderer<'hook> {
             underline: rec.params[11] != 0,
             strike_out: rec.params[12] != 0,
             charset: rec.params[13],
+            pitch_and_family: rec.params[17],
             name,
         }));
     }
@@ -1728,29 +1731,32 @@ impl<'hook> SvgRenderer<'hook> {
             self.malformed(record::EXT_TEXT_OUT, "text payload");
             return None;
         }
+        // The dx array holds the distance between the origins of adjacent
+        // character cells, one value per byte of the string, or an x and a y
+        // value with ETO_PDY ([MS-WMF] 2.3.3.5).
         let dx_offset = string_offset + ((length + 1) & !1);
-        let dx_count = (rec.params.len().saturating_sub(dx_offset)) / 2;
-        // With ETO_PDY every character has an x and a y displacement.
         let stride = if options & ext_text_out::ETO_PDY != 0 {
-            self.note(
-                "wmf-text-vertical-displacement-ignored",
-                "ExtTextOut ETO_PDY vertical displacements are not applied".to_owned(),
-            );
             2
         } else {
             1
         };
-        let mut dx = Vec::with_capacity(dx_count.min(length));
-        for index in 0..(dx_count / stride).min(length) {
-            dx.push(read_i16_le(&rec.params, dx_offset + index * stride * 2).unwrap_or(0));
-        }
+        let dx_count = (rec.params.len().saturating_sub(dx_offset) / 2 / stride).min(length);
+        let advance =
+            |index: usize| f64::from(read_i16_le(&rec.params, dx_offset + index * 2).unwrap_or(0));
+        let advances: Vec<(f64, f64)> = (0..dx_count)
+            .map(|index| {
+                let first = index * stride;
+                let dy = if stride == 2 { advance(first + 1) } else { 0.0 };
+                (advance(first), dy)
+            })
+            .collect();
         self.render_text_bytes(
             &rec.params[string_offset..string_offset + length],
             x,
             y,
             options,
             rect,
-            &dx,
+            &advances,
         )
     }
 
@@ -1761,12 +1767,12 @@ impl<'hook> SvgRenderer<'hook> {
         supplied_y: i16,
         options: u16,
         option_rect: Option<(i16, i16, i16, i16)>,
-        dx: &[i16],
+        advances: &[(f64, f64)],
     ) -> Option<String> {
         if bytes.is_empty() {
             return None;
         }
-        let decoded = crate::text_charset::decode_logfont_text(
+        let mut decoded = crate::text_charset::decode_logfont_text(
             bytes,
             self.state.font.charset,
             &self.state.font.name,
@@ -1781,22 +1787,24 @@ impl<'hook> SvgRenderer<'hook> {
             );
         }
         let use_face = !decoded.unicode_face;
-        let text = decoded.text;
         let update_position = self.state.text_align & text_align::TA_UPDATECP != 0;
         let (logical_x, logical_y) = if update_position {
             self.state.position
         } else {
             (supplied_x, supplied_y)
         };
-        let (x, y) = self
-            .transform
-            .point(&self.state.mapping, logical_x, logical_y);
+        let (logical_x, logical_y) = (f64::from(logical_x), f64::from(logical_y));
+        let device_position = |x: f64, y: f64| {
+            let (device_x, device_y) = self.state.mapping.point_f64(x, y);
+            self.transform.device_point(device_x, device_y)
+        };
+        let (x, y) = device_position(logical_x, logical_y);
         let (_, font_height) = self
             .state
             .mapping
             .vector(0.0, f64::from(self.state.font.height).abs().max(1.0));
         let font_size = self.transform.device_height(font_height).max(1.0);
-        let logical_advance = if dx.is_empty() {
+        let logical_advance = if advances.is_empty() {
             let nominal = if self.state.font.width == 0 {
                 f64::from(self.state.font.height).abs() * 0.6
             } else {
@@ -1804,23 +1812,81 @@ impl<'hook> SvgRenderer<'hook> {
             };
             (nominal + f64::from(self.state.text_char_extra)) * bytes.len() as f64
         } else {
-            dx.iter().map(|&value| f64::from(value)).sum()
+            advances.iter().map(|advance| advance.0).sum()
         };
 
-        let mut text_element = String::with_capacity(text.len() + dx.len() * 8 + 320);
+        // Each character is placed at the origin the advances give it; SVG
+        // would add a `dx` value to the glyph's own advance instead.
+        let mut positions: Vec<(f64, f64)> = decoded
+            .origin_offsets(advances)
+            .into_iter()
+            .map(|(dx, dy)| device_position(logical_x + dx, logical_y + dy))
+            .collect();
+        // GDI aligns the whole string on the reference point, while SVG
+        // applies text-anchor to every absolutely positioned character; with
+        // recorded advances the string extent is known, so the positions move
+        // instead.
+        let anchor = self.state.text_align & text_align::HORIZONTAL_MASK;
+        let positioned = positions.len() > 1;
+        if positioned {
+            let extent = advances.iter().fold((0.0, 0.0), |sum, advance| {
+                (sum.0 + advance.0, sum.1 + advance.1)
+            });
+            let (width, height) =
+                self.transform
+                    .logical_vector(&self.state.mapping, extent.0, extent.1);
+            let shift = match anchor {
+                text_align::TA_RIGHT => 1.0,
+                text_align::TA_CENTER => 0.5,
+                _ => 0.0,
+            };
+            for position in &mut positions {
+                position.0 -= width * shift;
+                position.1 -= height * shift;
+            }
+        }
+        let canvas = self.transform.canvas_rect();
+        let positions = decoded.retain_visible(&positions, |position| {
+            crate::text_charset::origin_reaches_canvas(
+                position,
+                (x, y),
+                (canvas.left, canvas.top, canvas.right, canvas.bottom),
+                4.0 * font_size,
+            )
+        });
+        let positioned = positions.len() > 1;
+        let text = decoded.text;
+
+        let mut text_element = String::with_capacity(text.len() + positions.len() * 16 + 320);
         text_element.push_str(r#"<text x=""#);
-        write_num(&mut text_element, x);
+        if positioned {
+            write_num_list(
+                &mut text_element,
+                positions.iter().map(|position| position.0),
+            );
+        } else {
+            write_num(&mut text_element, x);
+        }
         text_element.push_str(r#"" y=""#);
-        write_num(&mut text_element, y);
+        if positioned {
+            write_num_list(
+                &mut text_element,
+                positions.iter().map(|position| position.1),
+            );
+        } else {
+            write_num(&mut text_element, y);
+        }
         text_element.push_str(r#"" font-size=""#);
         write_num(&mut text_element, font_size);
         text_element.push_str(r#"" fill=""#);
         write_color_hex(&mut text_element, self.state.text_color);
         text_element.push('"');
-        match self.state.text_align & text_align::HORIZONTAL_MASK {
-            text_align::TA_RIGHT => text_element.push_str(r#" text-anchor="end""#),
-            text_align::TA_CENTER => text_element.push_str(r#" text-anchor="middle""#),
-            _ => {},
+        if !positioned {
+            match anchor {
+                text_align::TA_RIGHT => text_element.push_str(r#" text-anchor="end""#),
+                text_align::TA_CENTER => text_element.push_str(r#" text-anchor="middle""#),
+                _ => {},
+            }
         }
         match self.state.text_align & text_align::VERTICAL_MASK {
             text_align::TA_BOTTOM => {
@@ -1831,7 +1897,13 @@ impl<'hook> SvgRenderer<'hook> {
         }
         if use_face && self.state.font.name != "serif" {
             text_element.push_str(r#" font-family=""#);
-            escape_xml_attr_into(&mut text_element, &self.state.font.name);
+            escape_xml_attr_into(
+                &mut text_element,
+                &crate::text_charset::svg_font_family(
+                    &self.state.font.name,
+                    self.state.font.pitch_and_family,
+                ),
+            );
             text_element.push('"');
         }
         if self.state.font.italic {
@@ -1888,17 +1960,7 @@ impl<'hook> SvgRenderer<'hook> {
         {
             text_element.push_str(r#" direction="rtl" unicode-bidi="bidi-override""#);
         }
-        if !dx.is_empty() {
-            text_element.push_str(r#" dx="0"#);
-            for value in dx.iter().take(bytes.len().saturating_sub(1)) {
-                text_element.push(' ');
-                let (advance, _) =
-                    self.transform
-                        .logical_vector(&self.state.mapping, f64::from(*value), 0.0);
-                write_num(&mut text_element, advance);
-            }
-            text_element.push('"');
-        } else if self.state.text_char_extra != 0 {
+        if advances.is_empty() && self.state.text_char_extra != 0 {
             let (spacing, _) = self.transform.logical_vector(
                 &self.state.mapping,
                 f64::from(self.state.text_char_extra),
@@ -1918,9 +1980,14 @@ impl<'hook> SvgRenderer<'hook> {
             write_num(&mut text_element, spacing);
             text_element.push('"');
         }
-        text_element.push('>');
+        // GDI draws and advances over every space; XML would collapse runs of
+        // them and shift the characters after them onto earlier positions.
+        text_element.push_str(r#" xml:space="preserve">"#);
         escape_xml_text_into(&mut text_element, &text);
         text_element.push_str("</text>");
+        if text.is_empty() {
+            text_element.clear();
+        }
 
         let explicit_opaque = options & ext_text_out::ETO_OPAQUE != 0;
         let background = if explicit_opaque || self.state.bk_mode == bk_mode::OPAQUE {
@@ -1958,6 +2025,9 @@ impl<'hook> SvgRenderer<'hook> {
             };
         }
 
+        if text_element.is_empty() && background.is_empty() {
+            return None;
+        }
         let needs_group = !background.is_empty()
             || options & ext_text_out::ETO_CLIPPED != 0
             || !self.state.clip.is_unbounded();
@@ -3235,6 +3305,16 @@ fn read_box(data: &[u8], offset: usize) -> Option<(i16, i16, i16, i16)> {
     ))
 }
 
+/// Writes space-separated numbers, as SVG coordinate lists take them.
+fn write_num_list(output: &mut String, values: impl Iterator<Item = f64>) {
+    for (index, value) in values.enumerate() {
+        if index != 0 {
+            output.push(' ');
+        }
+        write_num(output, value);
+    }
+}
+
 fn write_rect_start(output: &mut String, rect: DeviceRect) {
     output.push_str(r#"<rect x=""#);
     write_num(output, rect.left);
@@ -4320,8 +4400,20 @@ mod tests {
         let output = dingbat
             .render_record(&rec(record::TEXT_OUT, &[1, 0, b'a', 0, 0, 0, 0, 0]))
             .unwrap();
-        assert!(output.contains("\u{f061}"));
-        assert!(output.contains("Wingdings"));
+        assert!(output.contains('\u{264b}'), "{output}");
+        assert!(output.contains("Wingdings"), "{output}");
+
+        let mut unmapped = renderer();
+        unmapped.render_record(&rec(
+            record::CREATE_FONT_INDIRECT,
+            &font_params(2, "Webdings"),
+        ));
+        unmapped.render_record(&rec(record::SELECT_OBJECT, &[0, 0]));
+        let output = unmapped
+            .render_record(&rec(record::TEXT_OUT, &[1, 0, b'a', 0, 0, 0, 0, 0]))
+            .unwrap();
+        assert!(output.contains("\u{f061}"), "{output}");
+        assert!(output.contains("Webdings"), "{output}");
     }
 
     fn region_params(left: i16, top: i16, right: i16, bottom: i16) -> Vec<u8> {
@@ -4383,5 +4475,97 @@ mod tests {
         );
         assert_eq!(issue_codes(&renderer), ["wmf-glyph-index-text-omitted"]);
         assert!(renderer.issues.iter().all(|issue| !issue.fatal));
+    }
+
+    /// ExtTextOut with a dx array: y, x, count, options, the string padded to
+    /// a word boundary, then one advance per character.
+    fn ext_text_out_params(x: i16, options: u16, text: &[u8], dx: &[i16]) -> Vec<u8> {
+        let mut params = Vec::new();
+        for value in [0_i16, x] {
+            params.extend_from_slice(&value.to_le_bytes());
+        }
+        params.extend_from_slice(&(text.len() as u16).to_le_bytes());
+        params.extend_from_slice(&options.to_le_bytes());
+        params.extend_from_slice(text);
+        if text.len() % 2 != 0 {
+            params.push(0);
+        }
+        for value in dx {
+            params.extend_from_slice(&value.to_le_bytes());
+        }
+        params
+    }
+
+    #[test]
+    fn the_recorded_face_stays_first_in_the_font_family() {
+        let mut renderer = renderer();
+        let mut params = font_params(0, "Arial");
+        params[17] = 0x20; // FF_SWISS
+        renderer.render_record(&rec(record::CREATE_FONT_INDIRECT, &params));
+        renderer.render_record(&rec(record::SELECT_OBJECT, &[0, 0]));
+        let output = renderer
+            .render_record(&rec(record::TEXT_OUT, &[1, 0, b'a', 0, 0, 0, 0, 0]))
+            .unwrap();
+        assert!(
+            output.contains(r#"font-family="Arial, sans-serif""#),
+            "{output}"
+        );
+    }
+
+    #[test]
+    fn ext_text_out_dx_array_places_each_glyph_at_its_own_origin() {
+        let mut renderer = renderer();
+        // GDI advances 10 then 20 logical units; SVG must not add these to the
+        // natural advances as well.
+        let params = ext_text_out_params(0, 0, b"abc", &[10, 20]);
+        let element = renderer
+            .render_record(&rec(record::EXT_TEXT_OUT, &params))
+            .expect("text element");
+        assert!(element.contains(r#"<text x="0 10 30"#), "{element}");
+        assert!(element.contains(r#"y="0 0 0"#), "{element}");
+        assert!(!element.contains(" dx="), "{element}");
+    }
+
+    #[test]
+    fn ext_text_out_dx_array_keeps_gdi_string_anchoring() {
+        let mut renderer = renderer();
+        renderer.state.text_align = text_align::TA_CENTER | text_align::TA_TOP;
+        let params = ext_text_out_params(40, 0, b"abc", &[10, 20]);
+        let element = renderer
+            .render_record(&rec(record::EXT_TEXT_OUT, &params))
+            .expect("text element");
+        // The 30 unit string is centered on 40: glyphs at 25, 35 and 55.
+        assert!(element.contains(r#"<text x="25 35 55"#), "{element}");
+        assert!(!element.contains("text-anchor"), "{element}");
+    }
+
+    #[test]
+    fn ext_text_out_advances_cover_every_byte_of_a_double_byte_character() {
+        let mut renderer = renderer();
+        renderer.render_record(&rec(
+            record::CREATE_FONT_INDIRECT,
+            &font_params(128, "MS Mincho"),
+        ));
+        renderer.render_record(&rec(record::SELECT_OBJECT, &[0, 0]));
+        let params = ext_text_out_params(0, 0, b"a\x82\xa0b", &[10, 6, 6, 8]);
+        let element = renderer
+            .render_record(&rec(record::EXT_TEXT_OUT, &params))
+            .expect("text element");
+        assert!(
+            element.contains(r#"<text x="0 10 22" y="0 0 0""#),
+            "{element}"
+        );
+        assert!(element.contains("aあb"), "{element}");
+    }
+
+    #[test]
+    fn ext_text_out_vertical_advances_are_applied() {
+        let mut renderer = renderer();
+        let params = ext_text_out_params(0, ext_text_out::ETO_PDY, b"ab", &[10, 4, 10, 4]);
+        let element = renderer
+            .render_record(&rec(record::EXT_TEXT_OUT, &params))
+            .expect("text element");
+        assert!(element.contains(r#"<text x="0 10" y="0 4""#), "{element}");
+        assert!(renderer.issues.is_empty());
     }
 }

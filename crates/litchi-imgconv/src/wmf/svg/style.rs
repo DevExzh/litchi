@@ -112,33 +112,6 @@ pub(super) fn hatch_definition(id: &str, brush_value: &Brush, background: Option
     definition
 }
 
-pub(super) fn map_font_family(name: &str) -> &str {
-    if name.eq_ignore_ascii_case("Times New Roman")
-        || name.eq_ignore_ascii_case("Times")
-        || name.eq_ignore_ascii_case("Georgia")
-        || name.eq_ignore_ascii_case("Garamond")
-    {
-        "serif"
-    } else if name.eq_ignore_ascii_case("Arial")
-        || name.eq_ignore_ascii_case("Helvetica")
-        || name.eq_ignore_ascii_case("Verdana")
-        || name.eq_ignore_ascii_case("Tahoma")
-        || name.eq_ignore_ascii_case("Trebuchet MS")
-        || name.eq_ignore_ascii_case("Arial Black")
-    {
-        "sans-serif"
-    } else if name.eq_ignore_ascii_case("Courier New")
-        || name.eq_ignore_ascii_case("Courier")
-        || name.eq_ignore_ascii_case("Consolas")
-        || name.eq_ignore_ascii_case("Monaco")
-        || name.eq_ignore_ascii_case("Lucida Console")
-    {
-        "monospace"
-    } else {
-        name
-    }
-}
-
 pub(super) fn escape_xml_text_into(output: &mut String, value: &str) {
     for character in value.chars() {
         match character {

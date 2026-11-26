@@ -252,6 +252,9 @@ pub(super) struct Font {
     pub underline: bool,
     pub strike_out: bool,
     pub charset: u8,
+    /// `lfPitchAndFamily` byte, whose family class names the generic SVG
+    /// family to fall back to.
+    pub pitch_and_family: u8,
     pub name: String,
 }
 
@@ -267,6 +270,7 @@ impl Default for Font {
             underline: false,
             strike_out: false,
             charset: 0,
+            pitch_and_family: 0,
             name: "serif".to_owned(),
         }
     }
