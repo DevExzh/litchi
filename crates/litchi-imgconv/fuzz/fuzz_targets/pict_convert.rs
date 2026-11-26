@@ -5,8 +5,8 @@ mod common;
 
 use image::ImageFormat;
 use libfuzzer_sys::fuzz_target;
-use litchi_imgconv::pict::convert_pict_with_options;
 use litchi_imgconv::Options;
+use litchi_imgconv::pict::convert_pict_with_options;
 
 fuzz_target!(|data: &[u8]| {
     let limits = common::small_limits();
