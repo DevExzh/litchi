@@ -178,6 +178,35 @@ fn emf_framing_defects_render_with_diagnostics_or_stay_rejected() {
 }
 
 #[test]
+fn emf_declared_counts_and_sizes_do_not_have_to_match_the_records() {
+    // Neither nRecords nor nBytes changes what playback draws.
+    let mut emf = emf_vector(10, 10);
+    emf[52..56].copy_from_slice(&40_u32.to_le_bytes());
+    let declared = u32::try_from(emf.len()).unwrap() + 64;
+    emf[48..52].copy_from_slice(&declared.to_le_bytes());
+    let converted = convert(
+        &emf,
+        InputFormat::Emf,
+        OutputFormat::Svg,
+        Options::default(),
+    );
+    let codes: Vec<_> = converted
+        .report
+        .diagnostics
+        .iter()
+        .map(|diagnostic| diagnostic.code)
+        .collect();
+    assert_eq!(
+        codes,
+        [
+            "noncanonical-emf-declared-size",
+            "noncanonical-emf-record-count"
+        ]
+    );
+    assert!(litchi_imgconv::emf::convert_emf_to_svg(&emf).is_ok());
+}
+
+#[test]
 fn wmf_framing_defects_render_with_diagnostics_or_stay_rejected() {
     // GDI never reads the placeable checksum.
     let mut bad_checksum = wmf_vector(10, 10);
