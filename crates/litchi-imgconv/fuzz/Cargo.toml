@@ -10,12 +10,84 @@ license = "Apache-2.0"
 cargo-fuzz = true
 
 [dependencies]
+image = { version = "0.25.10", default-features = false }
 libfuzzer-sys = "0.4.13"
 litchi-imgconv = { path = ".." }
+litchi-odraw = { path = "../../litchi-odraw" }
 
 [[bin]]
-name = "convert_image"
-path = "fuzz_targets/convert_image.rs"
+name = "emf_svg"
+path = "fuzz_targets/emf_svg.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "emf_png"
+path = "fuzz_targets/emf_png.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "wmf_svg"
+path = "fuzz_targets/wmf_svg.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "wmf_png"
+path = "fuzz_targets/wmf_png.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pict_png"
+path = "fuzz_targets/pict_png.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pict_convert"
+path = "fuzz_targets/pict_convert.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "blip_convert"
+path = "fuzz_targets/blip_convert.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "odraw_scan"
+path = "fuzz_targets/odraw_scan.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "emfplus_stream"
+path = "fuzz_targets/emfplus_stream.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "emfplus_render"
+path = "fuzz_targets/emfplus_render.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "dib_decode"
+path = "fuzz_targets/dib_decode.rs"
 test = false
 doc = false
 bench = false
