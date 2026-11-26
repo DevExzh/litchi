@@ -209,8 +209,17 @@ fn target_and_output_limits_are_enforced() {
         &emf,
         InputFormat::Emf,
         OutputFormat::Png,
+        Options::default().limits(target_limited).width(10),
+    );
+    // Without a requested size the natural size is fitted to the limits
+    // instead of being rejected.
+    let fitted = convert(
+        &emf,
+        InputFormat::Emf,
+        OutputFormat::Png,
         Options::default().limits(target_limited),
     );
+    assert_dimensions(&fitted.bytes, ImageFormat::Png, 9, 9);
     let svg_limited = Limits {
         max_output_bytes: 1,
         ..Limits::default()
