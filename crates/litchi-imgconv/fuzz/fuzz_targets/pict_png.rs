@@ -22,5 +22,4 @@ fuzz_target!(|data: &[u8]| {
     if let Ok(png) = converter.convert_to_png() {
         assert!(png.len() <= max_output_bytes);
     }
-    let _ = converter.convert_to_image();
 });

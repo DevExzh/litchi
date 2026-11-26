@@ -16,5 +16,4 @@ fuzz_target!(|data: &[u8]| {
     if let Ok(image) = png {
         assert!(image.bytes.len() <= limits.max_output_bytes);
     }
-    let _ = convert_metafile(data, InputFormat::Wmf, OutputFormat::Auto, options);
 });

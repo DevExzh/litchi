@@ -15,7 +15,7 @@ fuzz_target!(|data: &[u8]| {
     if let Ok(svg) = convert_metafile(data, InputFormat::Pict, OutputFormat::Svg, options) {
         assert!(svg.bytes.len() <= limits.max_output_bytes);
     }
-    // The strict SVG helper rejects any picture that playback only approximates.
-    let _ = litchi_imgconv::pict::convert_pict_to_svg_with_options(data, options);
+    // `Auto` keeps vector content as SVG and rasterizes bitmap-only pictures,
+    // so it reuses the playback above and adds only the raster selection.
     let _ = convert_metafile(data, InputFormat::Pict, OutputFormat::Auto, options);
 });

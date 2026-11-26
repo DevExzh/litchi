@@ -6,13 +6,13 @@ finding rather than an accident:
 
 | Target | Entry point | Budget |
 | --- | --- | --- |
-| `emf_svg` | `convert_metafile(Emf, Svg)` | 256x256 render, 1 MiB output, 20 000 records |
-| `emf_png` | `convert_metafile(Emf, Png)` and `(Emf, Auto)` | 256x256 render, 1 MiB output, 20 000 records |
-| `wmf_svg` | `convert_metafile(Wmf, Svg)` | 256x256 render, 1 MiB output, 20 000 records |
-| `wmf_png` | `convert_metafile(Wmf, Png)` and `(Wmf, Auto)` | 256x256 render, 1 MiB output, 20 000 records |
-| `pict_png` | `pict::PictParser` + `PictConverter` | 256x256 bitmap, 1 MiB output |
-| `pict_convert` | `pict::convert_pict_with_options` | 256x256 render, 1 MiB output, 20 000 records |
-| `pict_svg` | `convert_metafile(Pict, Svg)`/`(Pict, Auto)` and `pict::convert_pict_to_svg_with_options` | 256x256 render, 1 MiB output, 20 000 records |
+| `emf_svg` | `convert_metafile(Emf, Svg)` and `(Emf, Auto)` | 256x256 render, 1 MiB output, 20 000 records |
+| `emf_png` | `convert_metafile(Emf, Png)` | 256x256 render, 1 MiB output, 20 000 records |
+| `wmf_svg` | `convert_metafile(Wmf, Svg)` and `(Wmf, Auto)` | 256x256 render, 1 MiB output, 20 000 records |
+| `wmf_png` | `convert_metafile(Wmf, Png)` | 256x256 render, 1 MiB output, 20 000 records |
+| `pict_png` | `pict::PictParser` + `PictConverter::convert_to_png` | 256x256 bitmap, 1 MiB output |
+| `pict_convert` | `pict::convert_pict_with_options` at the source size and at a requested width | 256x256 render, 1 MiB output, 20 000 records |
+| `pict_svg` | `convert_metafile(Pict, Svg)` and `(Pict, Auto)` | 256x256 render, 1 MiB output, 20 000 records |
 | `blip_convert` | `image::Blip::parse` + `decode_data` + `to_png`/`to_svg` | 1 MiB BLIP, 256x256 render |
 | `odraw_scan` | `image::scan`/`store`/`get`/`all`/`delay`/`record` | 20 000 records, 1 MiB record body |
 | `emfplus_stream` | `EmfPlusRecordIter`, `validate_complete_stream`, `try_extract_emfplus_comment_body` | 1 MiB, 20 000 records |

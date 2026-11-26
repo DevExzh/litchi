@@ -6,7 +6,7 @@ mod common;
 use image::ImageFormat;
 use libfuzzer_sys::fuzz_target;
 use litchi_imgconv::pict::convert_pict_with_options;
-use litchi_imgconv::{InputFormat, Options, OutputFormat, convert_metafile};
+use litchi_imgconv::Options;
 
 fuzz_target!(|data: &[u8]| {
     let limits = common::small_limits();
@@ -18,8 +18,7 @@ fuzz_target!(|data: &[u8]| {
     if let Ok(png) = png {
         assert!(png.len() <= limits.max_output_bytes);
     }
-    // A requested width exercises the scaled-down raster path of the same
-    // strict helper.
+    // A requested width plays the picture at a scaled-down size instead.
     let _ = convert_pict_with_options(
         data,
         ImageFormat::Png,
@@ -28,5 +27,4 @@ fuzz_target!(|data: &[u8]| {
             ..options
         },
     );
-    let _ = convert_metafile(data, InputFormat::Pict, OutputFormat::Auto, options);
 });
