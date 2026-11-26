@@ -108,8 +108,12 @@ impl DrawingSource {
             .ok_or(ImageError::NoPicture)?;
         let props = litchi_odraw::prop::Props::from_container(&shape, Default::default())
             .map_err(ImageError::DecodeOfficeArtRecord)?;
+        // A frame without pib stores no picture: a linked picture saved
+        // without its data names its file through pibName only.
         let id = props
             .prop(litchi_odraw::prop::Id::BlipToDisplay)
+            .ok_or(ImageError::NoPicture)?;
+        let id = Some(id)
             .filter(|p| p.is_blip() && !p.is_complex() && p.raw_value() > 0)
             .ok_or_else(|| ImageError::InvalidDrawing("picture frame has no usable pib".into()))?;
         let raw_id = u32::try_from(id.raw_value())
@@ -240,6 +244,23 @@ mod tests {
         assert!(
             matches!(source.data(false,7,&[]),Err(ImageError::InvalidDrawing(message)) if message=="picture frame has no image store")
         );
+    }
+
+    #[test]
+    fn linked_picture_frame_without_pib_stores_no_picture() {
+        let mut fsp = 7u32.to_le_bytes().to_vec();
+        fsp.extend_from_slice(&0xA00u32.to_le_bytes());
+        let mut children = record(0xF00A, 2, 75, &fsp);
+        // pibFlags = msoblipflagFile; the file name itself is not needed.
+        let mut flags = 0x0106u16.to_le_bytes().to_vec();
+        flags.extend_from_slice(&1u32.to_le_bytes());
+        children.extend(record(0xF00B, 3, 1, &flags));
+        let source = source(&[(0, record(0xF004, 15, 0, &children))]);
+        assert!(source.image(false, 7, 0).unwrap().is_some());
+        assert!(matches!(
+            source.data(false, 7, &[]),
+            Err(ImageError::NoPicture)
+        ));
     }
 
     #[test]

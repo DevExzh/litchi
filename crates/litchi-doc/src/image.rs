@@ -2,6 +2,7 @@ use super::parts::chp::CharacterProperties;
 use std::mem::size_of;
 
 mod drawing;
+mod metafile;
 pub(crate) use drawing::DrawingSource;
 
 const BLOCK_TYPE_OFFSET: usize = 0xE;
@@ -90,8 +91,22 @@ fn is_picture_recognized(block_type: BlockType, mm_mode_type: u8) -> bool {
     )
 }
 
+/// The raw metafile of a METAFILEPICT-form PICF at `pic_offset`, if any.
+fn raw_metafile_at(data_buff: &[u8], pic_offset: u32) -> Option<metafile::Payload<'_>> {
+    let base = usize::try_from(pic_offset).ok()?;
+    let fields = PictureFields::try_parse(data_buff, base)?;
+    let end = base.checked_add(usize::try_from(fields.lcb).ok()?)?;
+    let picture = data_buff.get(base.checked_add(size_of::<PictureFields>())?..end)?;
+    metafile::payload(&fields, picture)
+}
+
 /// Check whether a block contains an image.
 fn does_block_contain_image(data_buff: &[u8], pic_offset: u32) -> Result<bool, ImageError> {
+    // The byte the block-type heuristic reads belongs to the ignored PICF
+    // innerHeader; a raw metafile is recognized from mfpf.mm and its header.
+    if raw_metafile_at(data_buff, pic_offset).is_some() {
+        return Ok(true);
+    }
     Ok(is_picture_recognized(
         get_block_type(data_buff, pic_offset)?,
         get_mm_mode_type(data_buff, pic_offset)?,
@@ -294,6 +309,8 @@ impl Image {
     /// This method extracts an inline PICF's stored BLIP data. Metafile bytes
     /// can remain compressed, as described by the BLIP metadata. Floating
     /// pictures require the higher-level `Document::image_data()` API.
+    /// A PICF that stores a raw metafile instead of OfficeArt data yields an
+    /// owned metafile BLIP built around that metafile.
     ///
     /// - After header: actual picture content (may include BLIP container)
     ///
@@ -326,6 +343,10 @@ impl Image {
             .filter(|offset| *offset <= block_end)
             .ok_or(ImageError::InvalidPictureLength(pic_fields.lcb))?;
 
+        if let Some(payload) = metafile::payload(&pic_fields, &data_stream[offset..block_end]) {
+            return metafile::file(&pic_fields, payload);
+        }
+
         // Handle picture name if mm == 0x66
         if pic_fields.mm == 0x66 {
             let cch_pic_name = match data_stream.get(offset) {
@@ -348,6 +369,7 @@ impl Image {
             .ok_or(ImageError::InvalidPictureLength(pic_fields.lcb))?;
 
         // Continue parsing remaining records looking for BSE or BLIP
+        let mut picture_error = None;
         while offset < block_end {
             let (next_record, next_record_size) =
                 match Record::parse(data_stream, offset, litchi_odraw::Limits::default()) {
@@ -366,19 +388,22 @@ impl Image {
                 .filter(|offset| *offset <= block_end)
                 .ok_or(ImageError::InvalidPictureLength(pic_fields.lcb))?;
 
-            // Try to extract image from this record
-            // Pass data_stream for delay-loaded BLIPs
-            if let Ok(img) = litchi_odraw::image::record_with_delay(
+            // A BSE delay offset addresses the WordDocument stream.
+            match litchi_odraw::image::record_with_delay(
                 &next_record,
                 Some(word_document),
                 litchi_odraw::image::Limits::default(),
             ) {
-                return Ok(img);
+                Ok(img) => return Ok(img),
+                Err(error) => {
+                    picture_error.get_or_insert(error);
+                },
             }
-            // TODO: log this error?
         }
 
-        Err(ImageError::NoPicture)
+        // A PICF whose shape carries no BLIP (a linked or empty picture frame)
+        // has no stored picture; a BLIP that fails to parse is reported as such.
+        Err(picture_error.map_or(ImageError::NoPicture, ImageError::ExtractImageFailed))
     }
 }
 
@@ -466,6 +491,70 @@ mod tests {
         assert!(matches!(
             image.data(&data, &[]),
             Err(ImageError::InvalidPictureLength(1024))
+        ));
+    }
+
+    /// A PICF with `mm` whose picture bytes follow the 68-byte header.
+    fn picf(mm: i16, picture: &[u8]) -> Vec<u8> {
+        let mut data = vec![0; size_of::<PictureFields>()];
+        let lcb = i32::try_from(data.len() + picture.len()).unwrap();
+        data[..4].copy_from_slice(&lcb.to_le_bytes());
+        data[4..6].copy_from_slice(&0x44i16.to_le_bytes());
+        data[6..8].copy_from_slice(&mm.to_le_bytes());
+        data[28..30].copy_from_slice(&1440i16.to_le_bytes());
+        data[30..32].copy_from_slice(&720i16.to_le_bytes());
+        data.extend_from_slice(picture);
+        data
+    }
+
+    fn office_art_record(kind: u16, version: u16, instance: u16, body: &[u8]) -> Vec<u8> {
+        let mut bytes = ((instance << 4) | version).to_le_bytes().to_vec();
+        bytes.extend_from_slice(&kind.to_le_bytes());
+        bytes.extend_from_slice(&u32::try_from(body.len()).unwrap().to_le_bytes());
+        bytes.extend_from_slice(body);
+        bytes
+    }
+
+    #[test]
+    fn metafilepict_picf_is_a_picture_holding_its_raw_wmf() {
+        let wmf = metafile::tests::wmf();
+        // A zero innerHeader byte would fail the block-type heuristic.
+        let data = picf(8, &wmf);
+        assert!(has_picture(&data, "\u{0001}", &make_props(Some(0))).unwrap());
+        let file = Image::new(0).data(&data, &[]).unwrap();
+        assert_eq!(file.kind(), litchi_odraw::image::Kind::Wmf);
+        assert_eq!(file.data().unwrap(), wmf.as_slice());
+
+        let mac = picf(8, &[wmf.as_slice(), &metafile::tests::pict()].concat());
+        let file = Image::new(0).data(&mac, &[]).unwrap();
+        assert_eq!(file.kind(), litchi_odraw::image::Kind::Pict);
+    }
+
+    #[test]
+    fn metafilepict_without_a_wmf_header_is_not_a_picture() {
+        let data = picf(8, &[0; 32]);
+        assert!(!has_picture(&data, "\u{0001}", &make_props(Some(0))).unwrap());
+    }
+
+    #[test]
+    fn shape_without_a_blip_stores_no_picture() {
+        let shape = office_art_record(0xF004, 0xF, 0, &[]);
+        let data = picf(0x64, &shape);
+        assert!(matches!(
+            Image::new(0).data(&data, &[]),
+            Err(ImageError::NoPicture)
+        ));
+    }
+
+    #[test]
+    fn unreadable_blip_is_reported_instead_of_no_picture() {
+        let shape = office_art_record(0xF004, 0xF, 0, &[]);
+        // A PNG BLIP too short to hold its UID and tag.
+        let blip = office_art_record(0xF01E, 0, 0x6E0, &[0; 4]);
+        let data = picf(0x64, &[shape, blip].concat());
+        assert!(matches!(
+            Image::new(0).data(&data, &[]),
+            Err(ImageError::ExtractImageFailed(_))
         ));
     }
 

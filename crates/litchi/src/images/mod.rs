@@ -65,6 +65,10 @@ pub fn ppt(path: impl AsRef<std::path::Path>) -> Result<Vec<File<'static>>> {
 ///
 /// Returned records own their OfficeArt framing because the compound file is
 /// closed before this function returns. Native image data is not decoded.
+///
+/// Each inline picture (one Data-stream PICF) and each floating picture (one
+/// OfficeArt shape) is returned once. Picture frames that store no picture,
+/// such as linked pictures saved without their data, are skipped.
 #[cfg(feature = "doc")]
 pub fn doc(path: impl AsRef<std::path::Path>) -> Result<Vec<File<'static>>> {
     let package = litchi_doc::Package::open(path).map_err(Error::from)?;
@@ -77,12 +81,19 @@ pub fn doc(path: impl AsRef<std::path::Path>) -> Result<Vec<File<'static>>> {
             let Some(image) = run.image() else {
                 continue;
             };
-            if !seen.insert(image.pic_offset()) {
+            // A floating picture's CPicLocation is only a legacy hint that
+            // other pictures can share; its shape identifies it.
+            let identity = image
+                .drawing_shape_id()
+                .map_or((false, image.pic_offset()), |shape_id| (true, shape_id));
+            if !seen.insert(identity) {
                 continue;
             }
-            let file = document
-                .image_data(image)
-                .map_err(|error| Error::ParseError(error.to_string()))?;
+            let file = match document.image_data(image) {
+                Ok(file) => file,
+                Err(litchi_doc::ImageError::NoPicture) => continue,
+                Err(error) => return Err(Error::ParseError(error.to_string())),
+            };
             let index = images.len();
             images.push(file.with_index(index).into_owned().map_err(office_art)?);
         }
