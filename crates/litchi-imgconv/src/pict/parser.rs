@@ -723,7 +723,6 @@ pub(super) mod tests {
         data[..2].copy_from_slice(&declared.to_be_bytes());
         let parser = PictParser::new(&data, &crate::Limits::default()).unwrap();
         assert_eq!(parser.warnings()[0].code, "noncanonical-pict-missing-end");
-        let mut records = records;
 
         records.extend_from_slice(&0x0020u16.to_be_bytes()); // Line needs 8 bytes
         records.extend_from_slice(&[0, 1]);
