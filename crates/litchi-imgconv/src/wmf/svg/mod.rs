@@ -70,21 +70,23 @@ impl WmfConverter {
     /// malformed or unsupported output-affecting record.
     pub fn to_svg(&self) -> Result<String> {
         let (svg, issues) = self.render();
-        if issues.is_empty() {
+        let inexact = issues
+            .iter()
+            .filter(|issue| issue.fatal || crate::codec::is_lossy_diagnostic(issue.code))
+            .map(|issue| issue.message.as_str())
+            .collect::<Vec<_>>();
+        if inexact.is_empty() {
             Ok(svg)
         } else {
             Err(Error::Unsupported(format!(
                 "WMF SVG playback is not exact: {}",
-                issues
-                    .iter()
-                    .map(|issue| issue.message.as_str())
-                    .collect::<Vec<_>>()
-                    .join("; ")
+                inexact.join("; ")
             )))
         }
     }
 
-    pub(crate) fn to_svg_reported(&self) -> Result<(String, Vec<String>)> {
+    /// Converts and returns every non-fatal issue with its diagnostic code.
+    pub(crate) fn to_svg_reported(&self) -> Result<(String, Vec<(&'static str, String)>)> {
         let (svg, issues) = self.render();
         let fatal = issues
             .iter()
@@ -97,7 +99,13 @@ impl WmfConverter {
                 fatal.join("; ")
             )));
         }
-        Ok((svg, issues.into_iter().map(|issue| issue.message).collect()))
+        Ok((
+            svg,
+            issues
+                .into_iter()
+                .map(|issue| (issue.code, issue.message))
+                .collect(),
+        ))
     }
 
     /// Lenient conversion that returns the SVG plus all playback diagnostics.
@@ -169,6 +177,7 @@ impl WmfConverter {
         if element_count > self.limits.max_svg_elements {
             issues.push(renderer::RenderIssue {
                 fatal: true,
+                code: renderer::PLAYBACK_WARNING,
                 message: format!(
                     "WMF SVG element count exceeds limit {}",
                     self.limits.max_svg_elements
@@ -178,6 +187,7 @@ impl WmfConverter {
         if output_limit_hit {
             issues.push(renderer::RenderIssue {
                 fatal: true,
+                code: renderer::PLAYBACK_WARNING,
                 message: format!(
                     "WMF SVG output exceeds limit {} bytes",
                     self.limits.max_output_bytes
@@ -192,6 +202,7 @@ impl WmfConverter {
         if estimated.is_none_or(|size| size > self.limits.max_output_bytes) {
             issues.push(renderer::RenderIssue {
                 fatal: true,
+                code: renderer::PLAYBACK_WARNING,
                 message: format!(
                     "WMF SVG output exceeds limit {} bytes",
                     self.limits.max_output_bytes
@@ -219,6 +230,7 @@ impl WmfConverter {
         if svg.len() > self.limits.max_output_bytes {
             issues.push(renderer::RenderIssue {
                 fatal: true,
+                code: renderer::PLAYBACK_WARNING,
                 message: format!(
                     "WMF SVG output exceeds limit {} bytes",
                     self.limits.max_output_bytes

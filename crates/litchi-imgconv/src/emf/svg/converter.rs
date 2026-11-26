@@ -40,7 +40,10 @@ impl<'a> EmfSvgConverter<'a> {
 
     pub fn convert(&self) -> Result<String> {
         let (svg, diagnostics) = self.convert_with_diagnostics()?;
-        if let Some(diagnostic) = diagnostics.first() {
+        if let Some(diagnostic) = diagnostics
+            .iter()
+            .find(|diagnostic| crate::codec::is_lossy_diagnostic(diagnostic.code))
+        {
             return Err(Error::Unsupported(format!(
                 "EMF+ SVG playback is not exact ({}): {}",
                 diagnostic.code, diagnostic.message
@@ -138,7 +141,18 @@ impl<'a> EmfSvgConverter<'a> {
                 self.limits.max_svg_elements
             )));
         }
-        Ok((self.build_svg(&buffer.elements, &state)?, Vec::new()))
+        let svg = self.build_svg(&buffer.elements, &state)?;
+        let diagnostics = std::mem::take(&mut state.diagnostics)
+            .into_iter()
+            .map(
+                |(code, message)| crate::emfplus::renderer::RendererDiagnostic {
+                    code,
+                    message,
+                    record_offset: None,
+                },
+            )
+            .collect();
+        Ok((svg, diagnostics))
     }
 
     /// Select one complete EMF+ rendering track before classic playback.

@@ -31,8 +31,13 @@ enum ArcType {
 #[derive(Debug, Clone)]
 pub(super) struct RenderIssue {
     pub fatal: bool,
+    /// Stable diagnostic code reported for non-fatal issues.
+    pub code: &'static str,
     pub message: String,
 }
+
+/// Diagnostic code of non-fatal playback issues that approximate the source.
+pub(super) const PLAYBACK_WARNING: &str = "wmf-playback-warning";
 
 pub(super) struct SvgRenderer<'hook> {
     transform: CoordinateTransform,
@@ -1850,6 +1855,7 @@ impl<'hook> SvgRenderer<'hook> {
         self.halted = true;
         self.issues.push(RenderIssue {
             fatal: true,
+            code: PLAYBACK_WARNING,
             message,
         });
     }
@@ -1911,10 +1917,26 @@ impl<'hook> SvgRenderer<'hook> {
         }
     }
 
+    /// Records an approximation of the source picture.
     fn warn(&mut self, message: String) {
-        if !self.issues.iter().any(|issue| issue.message == message) {
+        self.note(PLAYBACK_WARNING, message);
+    }
+
+    /// Records a non-fatal issue under a stable diagnostic code.
+    ///
+    /// Use a `noncanonical-` code when Windows GDI playback tolerates the
+    /// input without changing the picture; any other code reports an
+    /// approximation that strict conversion rejects.
+    #[allow(dead_code, reason = "lanes adopt typed codes incrementally")]
+    fn note(&mut self, code: &'static str, message: String) {
+        if !self
+            .issues
+            .iter()
+            .any(|issue| issue.code == code && issue.message == message)
+        {
             self.issues.push(RenderIssue {
                 fatal: false,
+                code,
                 message,
             });
         }

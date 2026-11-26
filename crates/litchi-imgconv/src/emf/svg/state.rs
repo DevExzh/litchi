@@ -26,7 +26,12 @@ pub struct RenderState {
     pub objects: HashMap<u32, GdiObject>,
     pub defs: Vec<String>,
     next_definition: u64,
+    /// Non-fatal playback facts, as `(code, message)` pairs.
+    pub diagnostics: Vec<(&'static str, String)>,
 }
+
+/// Most distinct diagnostics retained for one classic EMF playback.
+const MAX_DIAGNOSTICS: usize = 64;
 
 impl RenderState {
     pub fn new() -> Self {
@@ -42,6 +47,25 @@ impl RenderState {
             objects: HashMap::new(),
             defs: Vec::new(),
             next_definition: 0,
+            diagnostics: Vec::new(),
+        }
+    }
+
+    /// Records a non-fatal playback fact under a stable diagnostic code.
+    ///
+    /// Use a `noncanonical-` code when Windows GDI playback tolerates the
+    /// input without changing the picture; any other code reports an
+    /// approximation that strict conversion rejects. Repeated facts are
+    /// reported once, and the list is bounded.
+    #[allow(dead_code, reason = "lanes adopt typed codes incrementally")]
+    pub fn note(&mut self, code: &'static str, message: String) {
+        if self.diagnostics.len() < MAX_DIAGNOSTICS
+            && !self
+                .diagnostics
+                .iter()
+                .any(|(seen, text)| *seen == code && *text == message)
+        {
+            self.diagnostics.push((code, message));
         }
     }
 

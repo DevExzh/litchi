@@ -390,10 +390,7 @@ fn raw_metafile_svg(
                 crate::wmf::WmfSvgConverter::with_limits(parser, *limits).to_svg_reported()?;
             let diagnostics = warnings
                 .into_iter()
-                .map(|message| ConversionDiagnostic {
-                    code: "wmf-playback-warning",
-                    message,
-                })
+                .map(|(code, message)| ConversionDiagnostic { code, message })
                 .collect();
             Ok((svg, width, height, bitmap_only, diagnostics))
         },
