@@ -801,6 +801,7 @@ dependencies = [
  "libfuzzer-sys",
  "litchi-imgconv",
  "litchi-odraw",
+ "roxmltree 0.20.0",
 ]
 
 [[package]]

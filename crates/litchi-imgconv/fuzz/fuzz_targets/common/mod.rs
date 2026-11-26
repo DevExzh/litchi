@@ -20,6 +20,32 @@ pub fn small_limits() -> litchi_imgconv::Limits {
     }
 }
 
+/// The budget of the targets that rasterize: the rasterizer's cost grows with
+/// the canvas area, and the sanitizer-instrumented build runs it much slower
+/// than a release build, so the canvas is a quarter of [`small_limits`].
+pub fn raster_limits() -> litchi_imgconv::Limits {
+    litchi_imgconv::Limits {
+        max_width: 128,
+        max_height: 128,
+        max_pixels: 128 * 128,
+        ..small_limits()
+    }
+}
+
+/// Asserts what every successful SVG conversion promises: the output stays
+/// within `max_output_bytes`, is UTF-8 and parses as an XML document whose
+/// root element is `svg`. A viewer rejects anything less.
+pub fn assert_well_formed_svg(bytes: &[u8], max_output_bytes: usize) {
+    assert!(
+        bytes.len() <= max_output_bytes,
+        "SVG exceeds the output limit"
+    );
+    let text = std::str::from_utf8(bytes).expect("SVG output is not UTF-8");
+    let document = roxmltree::Document::parse(text)
+        .unwrap_or_else(|error| panic!("SVG output is not well-formed XML: {error}"));
+    assert_eq!(document.root_element().tag_name().name(), "svg");
+}
+
 /// The `OfficeArt` traversal budget: 20 000 records, 1 MiB per record body and
 /// 256 image files per scanner.
 pub fn art_limits() -> litchi_odraw::image::Limits {

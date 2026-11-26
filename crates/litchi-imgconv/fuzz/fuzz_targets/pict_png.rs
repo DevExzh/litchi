@@ -12,9 +12,9 @@ fuzz_target!(|data: &[u8]| {
     };
     let max_output_bytes = 1 << 20;
     let options = PictToRasterOptions {
-        max_width: 256,
-        max_height: 256,
-        max_pixels: 256 * 256,
+        max_width: 128,
+        max_height: 128,
+        max_pixels: 128 * 128,
         max_output_bytes,
         ..PictToRasterOptions::default()
     };

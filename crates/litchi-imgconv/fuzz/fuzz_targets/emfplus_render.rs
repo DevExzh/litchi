@@ -48,10 +48,11 @@ fuzz_target!(|data: &[u8]| {
     }
 
     let emf = common::wrap_emfplus(data);
-    let _ = convert_metafile(
-        &emf,
-        InputFormat::Emf,
-        OutputFormat::Svg,
-        Options::default(),
-    );
+    let options = Options {
+        limits: common::small_limits(),
+        ..Options::default()
+    };
+    if let Ok(svg) = convert_metafile(&emf, InputFormat::Emf, OutputFormat::Svg, options) {
+        common::assert_well_formed_svg(&svg.bytes, options.limits.max_output_bytes);
+    }
 });

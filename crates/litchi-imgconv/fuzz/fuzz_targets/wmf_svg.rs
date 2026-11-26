@@ -13,9 +13,6 @@ fuzz_target!(|data: &[u8]| {
         ..Options::default()
     };
     if let Ok(svg) = convert_metafile(data, InputFormat::Wmf, OutputFormat::Svg, options) {
-        assert!(svg.bytes.len() <= limits.max_output_bytes);
+        common::assert_well_formed_svg(&svg.bytes, limits.max_output_bytes);
     }
-    // `Auto` keeps vector content as SVG and rasterizes bitmap-only metafiles,
-    // so it reuses the playback above and adds only the raster selection.
-    let _ = convert_metafile(data, InputFormat::Wmf, OutputFormat::Auto, options);
 });

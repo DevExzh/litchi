@@ -14,6 +14,7 @@ image = { version = "0.25.10", default-features = false }
 libfuzzer-sys = "0.4.13"
 litchi-imgconv = { path = ".." }
 litchi-odraw = { path = "../../litchi-odraw" }
+roxmltree = "0.20"
 
 [[bin]]
 name = "emf_svg"
@@ -60,6 +61,13 @@ bench = false
 [[bin]]
 name = "pict_svg"
 path = "fuzz_targets/pict_svg.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "bitmap_op"
+path = "fuzz_targets/bitmap_op.rs"
 test = false
 doc = false
 bench = false
