@@ -39,3 +39,17 @@ fn floating_pictures_are_not_merged_by_their_shared_picture_location() {
     assert_eq!(floating.len(), 20);
     assert_eq!(count(&floating, Kind::Png), 19);
 }
+
+#[test]
+fn duplicated_style_names_do_not_hide_pictures() {
+    // The stylesheet repeats a style name, which strict reading rejects.
+    assert!(strict_open_fails("ole/doc/picture.doc"));
+    assert_eq!(kinds("ole/doc/picture.doc"), [Kind::Emf]);
+}
+
+fn strict_open_fails(path: &str) -> bool {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data")
+        .join(path);
+    litchi::doc::Package::open(path).is_err()
+}

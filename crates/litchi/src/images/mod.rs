@@ -68,10 +68,15 @@ pub fn ppt(path: impl AsRef<std::path::Path>) -> Result<Vec<File<'static>>> {
 ///
 /// Each inline picture (one Data-stream PICF) and each floating picture (one
 /// OfficeArt shape) is returned once. Picture frames that store no picture,
-/// such as linked pictures saved without their data, are skipped.
+/// such as linked pictures saved without their data, are skipped. The
+/// document is read with [`litchi_doc::Leniency::TolerateStylesheetDefects`].
 #[cfg(feature = "doc")]
 pub fn doc(path: impl AsRef<std::path::Path>) -> Result<Vec<File<'static>>> {
-    let package = litchi_doc::Package::open(path).map_err(Error::from)?;
+    // Style names only label styles; a duplicated one, which Word opens
+    // without complaint, cannot change where a picture is stored.
+    let options = litchi_doc::OpenOptions::default()
+        .leniency(litchi_doc::Leniency::TolerateStylesheetDefects);
+    let package = litchi_doc::Package::open_with_options(path, options).map_err(Error::from)?;
     let document = package.document();
     let mut seen = std::collections::HashSet::new();
     let mut images = Vec::new();
