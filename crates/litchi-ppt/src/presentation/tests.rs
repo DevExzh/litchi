@@ -685,3 +685,84 @@ fn duplicate_or_invalid_live_doc_info_owner_is_rejected() {
         ));
     }
 }
+
+/// A `PPDrawingGroup` record whose `OfficeArtDggContainer` stores one PNG.
+fn drawing_group_with_one_picture(payload: &[u8]) -> Vec<u8> {
+    use litchi_odraw::Limits;
+    use litchi_odraw::image::builder::{BlipBuilder, StoreBuilder};
+    use litchi_odraw::write::Container;
+
+    let mut store = StoreBuilder::new();
+    store
+        .add_embedded(
+            BlipBuilder::bitmap(litchi_odraw::image::Kind::Png, payload.to_vec()).unwrap(),
+        )
+        .unwrap();
+    let mut bstore = Vec::new();
+    store
+        .write_store(&mut bstore, litchi_odraw::image::Limits::default())
+        .unwrap();
+    let mut dgg = Vec::new();
+    litchi_odraw::write::container(&mut dgg, 0, Container::Dgg, &bstore, Limits::default())
+        .unwrap();
+    record_bytes(0xf, 0, RecordType::PPDrawingGroup, &dgg)
+}
+
+/// A stream whose live `DocumentContainer` follows a superseded version, as
+/// an incremental save leaves it. Both arguments are `DocumentContainer`
+/// child records.
+fn presentation_with_superseded_document(stale: &[u8], live: &[u8]) -> Presentation {
+    let mut bytes = record_bytes(0xf, 0, RecordType::Document, stale);
+    let offset = bytes.len();
+    bytes.extend_from_slice(&record_bytes(0xf, 0, RecordType::Document, live));
+    let mut parser = RecordParser::new();
+    parser
+        .parse_document(&bytes, &crate::SourceLimits::default())
+        .unwrap();
+    let mut persist_mapping = PersistMapping::new();
+    persist_mapping.add_mapping(1, u32::try_from(offset).unwrap());
+    Presentation::from_data(PresentationData {
+        powerpoint_document: std::sync::Arc::new(bytes),
+        parser,
+        persist_mapping,
+        slide_directory: SlideDirectory::new_for_test(offset),
+        pictures_data: None,
+        pictures_source: None,
+        source_limits: crate::SourceLimits::default(),
+        #[cfg(feature = "vba-inspection")]
+        vba_project_limits: crate::VbaProjectLimits::default(),
+        tolerance: crate::leniency::ToleranceReport::default(),
+        source: None,
+        #[cfg(feature = "encryption")]
+        encryption: None,
+        shape_memo: crate::slide::ShapeMemo::default(),
+        equation_memo: crate::equation::Memo::default(),
+    })
+}
+
+#[test]
+fn image_store_reads_only_the_live_document_drawing_group() {
+    let p = presentation_with_superseded_document(
+        &drawing_group_with_one_picture(b"superseded"),
+        &drawing_group_with_one_picture(b"live"),
+    );
+    let images = p.images().unwrap();
+    assert_eq!(images.len(), 1);
+    assert_eq!(images[0].data().unwrap(), b"live");
+    assert_eq!(p.image_at(1).unwrap().unwrap().data().unwrap(), b"live");
+}
+
+#[test]
+fn image_store_ignores_a_superseded_drawing_group_the_live_document_lacks() {
+    let p =
+        presentation_with_superseded_document(&drawing_group_with_one_picture(b"superseded"), &[]);
+    assert!(p.image_store().unwrap().is_none());
+    assert!(p.images().unwrap().is_empty());
+}
+
+#[test]
+fn duplicate_live_document_drawing_groups_still_refuse() {
+    let group = drawing_group_with_one_picture(b"live");
+    let p = presentation_with_superseded_document(&[], &[group.clone(), group].concat());
+    assert!(matches!(p.image_store(), Err(Error::Corrupted(_))));
+}

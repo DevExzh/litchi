@@ -1543,7 +1543,13 @@ impl Presentation {
         self.image(ImageId::new(index)?)
     }
 
-    /// Parses the borrowed BLIP store from the document's drawing group.
+    /// Parses the borrowed BLIP store from the live document's drawing group.
+    ///
+    /// MS-PPT 2.4.1: the `drawingGroup` of the live `DocumentContainer` owns
+    /// the presentation's pictures. An incrementally saved presentation keeps
+    /// the drawing groups of superseded document versions in the stream, so a
+    /// scan of every `PPDrawingGroup` would see stores that the live document
+    /// no longer references.
     ///
     /// No parsed store is retained inside `Presentation`; this avoids
     /// self-referential storage while keeping the view zero-copy.
@@ -1553,12 +1559,11 @@ impl Presentation {
     /// Returns an error if the operation fails.
     pub fn image_store(&self) -> Result<Option<ImageStore<'_>>> {
         self.check_source()?;
+        let document = self.live_document_ref()?;
         let mut store = None;
-        for record in self
-            .inner
-            .parser
-            .find_records_ref()
-            .into_iter()
+        for record in document
+            .children
+            .iter()
             .filter(|record| record.record_type == RecordType::PPDrawingGroup)
         {
             let candidate =
@@ -1568,7 +1573,7 @@ impl Presentation {
                 && store.replace(parsed_store).is_some()
             {
                 return Err(Error::Corrupted(
-                    "Presentation contains multiple OfficeArt BStore containers".to_string(),
+                    "live document contains multiple OfficeArt BStore containers".to_string(),
                 ));
             }
         }
