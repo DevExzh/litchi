@@ -198,7 +198,7 @@ impl<'a> EmfSvgConverter<'a> {
     ///
     /// Clips are bounded by it instead of by an unbounded sentinel box.
     fn canvas(&self) -> Canvas {
-        let bounds = self.parser.header.bounds;
+        let bounds = self.parser.header.canvas();
         Canvas {
             left: f64::from(bounds.0),
             top: f64::from(bounds.1),
@@ -1463,7 +1463,12 @@ impl<'a> EmfSvgConverter<'a> {
         write!(
             &mut svg,
             "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{}\" height=\"{}\" viewBox=\"{} {} {} {}\">",
-            width, height, header.bounds.0, header.bounds.1, width, height
+            width,
+            height,
+            header.canvas().0,
+            header.canvas().1,
+            width,
+            height
         )
         .map_err(|_| Error::ParseError("failed to write EMF SVG header".into()))?;
         if !state.defs.is_empty() {
