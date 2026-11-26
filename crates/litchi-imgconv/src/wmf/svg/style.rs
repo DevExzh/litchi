@@ -43,17 +43,15 @@ pub(super) fn stroke_attrs(
         return r#" stroke="none""#.to_owned();
     }
 
-    let (width_x, width_y) = transform.logical_vector(
-        mapping,
-        f64::from(pen_value.width.0).abs(),
-        f64::from(pen_value.width.1).abs(),
-    );
-    let width = match (width_x > 0.0, width_y > 0.0) {
-        (true, true) => (width_x + width_y) / 2.0,
-        (true, false) => width_x,
-        (false, true) => width_y,
-        (false, false) => transform.device_width(1.0).max(0.01),
-    };
+    // [MS-WMF] 2.2.1.4: the x-coordinate of the Width point is the pen
+    // width and the y-coordinate is ignored. Programs leave arbitrary values
+    // there, so reading it would draw strokes far wider than Windows does.
+    // GDI draws every pen, and a zero-width cosmetic pen in particular, at
+    // least one device pixel wide. The SVG canvas stands for the playback
+    // device, so one user unit is one device pixel: the metafile's own
+    // viewport is often a token 1-by-1 extent that cannot define a pixel.
+    let (width_x, _) = transform.logical_vector(mapping, f64::from(pen_value.width.0).abs(), 0.0);
+    let width = width_x.max(1.0);
 
     let mut attrs = String::with_capacity(128);
     attrs.push_str(r#" stroke=""#);
@@ -204,5 +202,45 @@ mod tests {
         assert!(attrs.contains(r#"stroke-linecap="square""#));
         assert!(attrs.contains(r#"stroke-linejoin="bevel""#));
         assert!(attrs.contains(r#"stroke-dasharray="6,2""#));
+    }
+
+    #[test]
+    fn pen_is_at_least_one_canvas_unit_wide() {
+        // One logical unit is a hundredth of a canvas unit here.
+        let transform = CoordinateTransform::new((0.0, 0.0, 10_000.0, 10_000.0), 100.0, 100.0);
+        for width in [(0, 0), (20, 0)] {
+            let pen = Pen {
+                style: pen::PS_SOLID,
+                width,
+                color: 0,
+            };
+            assert!(
+                stroke_attrs(&pen, &MappingState::default(), &transform)
+                    .contains(r#"stroke-width="1""#)
+            );
+        }
+    }
+
+    #[test]
+    fn pen_width_ignores_the_y_coordinate() {
+        let transform = CoordinateTransform::new((0.0, 0.0, 100.0, 100.0), 100.0, 100.0);
+        let wide_y = Pen {
+            style: pen::PS_SOLID,
+            width: (3, -12_860),
+            color: 0,
+        };
+        let only_y = Pen {
+            width: (0, 3_711),
+            ..wide_y.clone()
+        };
+
+        assert!(
+            stroke_attrs(&wide_y, &MappingState::default(), &transform)
+                .contains(r#"stroke-width="3""#)
+        );
+        assert!(
+            stroke_attrs(&only_y, &MappingState::default(), &transform)
+                .contains(r#"stroke-width="1""#)
+        );
     }
 }

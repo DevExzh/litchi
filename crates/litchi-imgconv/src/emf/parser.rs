@@ -254,14 +254,47 @@ impl EmfHeader {
         })
     }
 
+    /// Device-space rectangle `(left, top, right, bottom)` the picture covers.
+    ///
+    /// This is the bounds rectangle unless it is empty or degenerate, as in
+    /// the (0, 0, -1, -1) that programs write when they do not accumulate
+    /// bounds; GDI playback maps the frame, so the frame converted to device
+    /// units stands in then.
+    pub fn canvas(&self) -> (i32, i32, i32, i32) {
+        let (left, top, right, bottom) = self.bounds;
+        if right > left && bottom > top {
+            return self.bounds;
+        }
+        let x = |value: i32, round_up: bool| {
+            frame_to_device(value, self.device_width, self.device_width_mm, round_up)
+        };
+        let y = |value: i32, round_up: bool| {
+            frame_to_device(value, self.device_height, self.device_height_mm, round_up)
+        };
+        let (frame_left, frame_top, frame_right, frame_bottom) = self.frame;
+        match (
+            x(frame_left.min(frame_right), false),
+            y(frame_top.min(frame_bottom), false),
+            x(frame_left.max(frame_right), true),
+            y(frame_top.max(frame_bottom), true),
+        ) {
+            (Some(left), Some(top), Some(right), Some(bottom)) if right > left && bottom > top => {
+                (left, top, right, bottom)
+            },
+            _ => self.bounds,
+        }
+    }
+
     /// Get the width of the metafile in device units
     pub fn width(&self) -> i32 {
-        self.bounds.2.saturating_sub(self.bounds.0)
+        let (left, _, right, _) = self.canvas();
+        right.saturating_sub(left)
     }
 
     /// Get the height of the metafile in device units
     pub fn height(&self) -> i32 {
-        self.bounds.3.saturating_sub(self.bounds.1)
+        let (_, top, _, bottom) = self.canvas();
+        bottom.saturating_sub(top)
     }
 
     /// Get aspect ratio (width / height)
@@ -270,6 +303,22 @@ impl EmfHeader {
         let h = self.height() as f64;
         if h == 0.0 { 1.0 } else { w / h }
     }
+}
+
+/// Converts a frame coordinate in 0.01 mm to reference-device pixels, given
+/// the device size in pixels and in millimetres.
+fn frame_to_device(value: i32, pixels: i32, millimetres: i32, round_up: bool) -> Option<i32> {
+    if pixels <= 0 || millimetres <= 0 {
+        return None;
+    }
+    let numerator = i64::from(value) * i64::from(pixels);
+    let denominator = i64::from(millimetres) * 100;
+    let device = if round_up {
+        numerator.div_euclid(denominator) + i64::from(numerator.rem_euclid(denominator) != 0)
+    } else {
+        numerator.div_euclid(denominator)
+    };
+    i32::try_from(device).ok()
 }
 
 /// EMF record with borrowed data for zero-copy parsing
@@ -1115,6 +1164,27 @@ mod tests {
             owned.records[0].data.as_ptr(),
             owned.data().as_ptr().wrapping_add(96)
         );
+    }
+
+    #[test]
+    fn empty_bounds_fall_back_to_the_frame_in_device_units() {
+        let mut data = valid_emf();
+        put_u32(&mut data, 16, u32::MAX); // right = -1
+        put_u32(&mut data, 20, u32::MAX); // bottom = -1
+        put_u32(&mut data, 32, 2540); // 25.4 mm
+        put_u32(&mut data, 36, 1270); // 12.7 mm
+        let parsed = EmfParser::new(&data, &crate::Limits::default()).unwrap();
+
+        // 100 pixels per 25 mm.
+        assert_eq!(parsed.header.canvas(), (0, 0, 102, 51));
+        assert_eq!((parsed.width(), parsed.height()), (102, 51));
+    }
+
+    #[test]
+    fn nonempty_bounds_are_the_canvas() {
+        let parsed = EmfParser::new(&valid_emf(), &crate::Limits::default()).unwrap();
+
+        assert_eq!(parsed.header.canvas(), (0, 0, 10, 10));
     }
 
     #[test]

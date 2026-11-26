@@ -30,6 +30,27 @@ pub struct RenderState {
     pub diagnostics: Vec<(&'static str, String)>,
 }
 
+/// Device-space rectangle covered by the output canvas.
+///
+/// A clip region never needs to cover ground outside the canvas, and bounding
+/// "every point" to it keeps clip definitions inside the coordinate range SVG
+/// rasterizers handle reliably: geometry near a billion units renders as
+/// nothing, and larger coordinates overflow the rasterizer.
+#[derive(Debug, Clone, Copy)]
+pub struct Canvas {
+    pub left: f64,
+    pub top: f64,
+    pub right: f64,
+    pub bottom: f64,
+}
+
+/// Fill rule that decides which points of a clip path are inside the clip.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClipRule {
+    NonZero,
+    EvenOdd,
+}
+
 /// Most distinct diagnostics retained for one classic EMF playback.
 const MAX_DIAGNOSTICS: usize = 64;
 
@@ -195,36 +216,69 @@ impl RenderState {
         }
     }
 
-    pub fn install_clip(&mut self, path: &str, mode: u32) -> bool {
+    /// Combines `path` with the current clip under the RGN_* `mode` and makes
+    /// the result the current clip. Returns `false` for a combine mode that
+    /// SVG clipping cannot express exactly.
+    pub fn install_clip(&mut self, path: &str, rule: ClipRule, mode: u32) -> bool {
         let previous = self.dc.clip_id.clone();
         let id = self.fresh_id("clip");
-        let definition = match (mode, previous) {
-            (5, _) | (1 | 2, None) => format!(
-                "<clipPath id=\"{}\" clipPathUnits=\"userSpaceOnUse\"><path d=\"{}\"/></clipPath>",
-                id, path
-            ),
-            (1, Some(old)) => format!(
-                "<clipPath id=\"{}\" clipPathUnits=\"userSpaceOnUse\"><g clip-path=\"url(#{})\"><path d=\"{}\"/></g></clipPath>",
-                id, old, path
-            ),
+        let mut definition = String::from("<clipPath id=\"");
+        definition.push_str(&id);
+        definition.push_str("\" clipPathUnits=\"userSpaceOnUse\"><path d=\"");
+        definition.push_str(path);
+        definition.push('"');
+        if rule == ClipRule::EvenOdd {
+            definition.push_str(" clip-rule=\"evenodd\"");
+        }
+        match (mode, previous) {
+            (5, _) | (1 | 2, None) => {},
+            // RGN_AND. The clipPath content model admits shape elements but
+            // not `<g>`, so the previous clip is referenced from the child
+            // shape; renderers drop a clip path that holds a group and then
+            // clip everything away.
+            (1, Some(old)) => {
+                definition.push_str(" clip-path=\"url(#");
+                definition.push_str(&old);
+                definition.push_str(")\"");
+            },
             // OR, XOR and DIFF need a stored copy of the old geometry or mask
             // semantics; do not pretend a lossy clip is equivalent.
             _ => return false,
-        };
+        }
+        definition.push_str("/></clipPath>");
         self.add_definition(definition);
         self.dc.clip_id = Some(id);
         true
     }
 
-    pub fn offset_clip(&mut self, x: f64, y: f64) {
+    /// Moves the current clip by the device-space vector `(x, y)`.
+    pub fn offset_clip(&mut self, x: f64, y: f64, canvas: Canvas) {
         let Some(old) = self.dc.clip_id.clone() else {
             return;
         };
         let id = self.fresh_id("clip");
-        self.add_definition(format!(
-            "<clipPath id=\"{}\" clipPathUnits=\"userSpaceOnUse\"><g transform=\"translate({} {})\" clip-path=\"url(#{})\"><rect x=\"-1000000000\" y=\"-1000000000\" width=\"2000000000\" height=\"2000000000\"/></g></clipPath>",
-            id, x, y, old
-        ));
+        // The translate moves the previous clip; the rectangle that carries
+        // the reference stands in for "every point" and is placed so that it
+        // covers the canvas after the translate. The reference sits on a shape
+        // element because the clipPath content model does not admit `<g>`.
+        let mut definition = String::from("<clipPath id=\"");
+        definition.push_str(&id);
+        definition.push_str("\" clipPathUnits=\"userSpaceOnUse\" transform=\"translate(");
+        write_num(&mut definition, x);
+        definition.push(' ');
+        write_num(&mut definition, y);
+        definition.push_str(")\"><rect x=\"");
+        write_num(&mut definition, canvas.left - x);
+        definition.push_str("\" y=\"");
+        write_num(&mut definition, canvas.top - y);
+        definition.push_str("\" width=\"");
+        write_num(&mut definition, canvas.right - canvas.left);
+        definition.push_str("\" height=\"");
+        write_num(&mut definition, canvas.bottom - canvas.top);
+        definition.push_str("\" clip-path=\"url(#");
+        definition.push_str(&old);
+        definition.push_str(")\"/></clipPath>");
+        self.add_definition(definition);
         self.dc.clip_id = Some(id);
     }
 }
@@ -674,5 +728,85 @@ mod tests {
         assert!(state.pop_dc(-2));
         assert_eq!(state.dc.current_pos, (0.0, 0.0));
         assert!(state.dc_stack.is_empty());
+    }
+
+    fn canvas_rect() -> Canvas {
+        Canvas {
+            left: 0.0,
+            top: 0.0,
+            right: 10.0,
+            bottom: 10.0,
+        }
+    }
+
+    /// Rasterizes a black square of the given geometry under the state's
+    /// definitions and returns how many pixels it covers.
+    fn covered_pixels(state: &RenderState, clip: &str) -> usize {
+        let svg = format!(
+            concat!(
+                r#"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" "#,
+                r##"viewBox="0 0 10 10"><defs>{}</defs>"##,
+                r##"<rect width="10" height="10" fill="#000000" clip-path="url(#{})"/></svg>"##,
+            ),
+            state.defs.join(""),
+            clip
+        );
+        let png = crate::raster::rasterize_svg(
+            &svg,
+            10,
+            10,
+            image::Rgba([255, 255, 255, 255]),
+            image::ImageFormat::Png,
+            &crate::raster::RasterLimits::default(),
+        )
+        .expect("clip markup must rasterize");
+        let image = image::load_from_memory_with_format(&png, image::ImageFormat::Png)
+            .expect("rasterized PNG must decode")
+            .to_rgba8();
+        image.pixels().filter(|pixel| pixel.0 != [255; 4]).count()
+    }
+
+    #[test]
+    fn intersected_clip_keeps_both_regions() {
+        let mut state = RenderState::new();
+        assert!(state.install_clip("M0 0L10 0 10 10 0 10Z", ClipRule::NonZero, 1));
+        assert!(state.install_clip("M0 0L5 0 5 10 0 10Z", ClipRule::NonZero, 1));
+        let clip = state.dc.clip_id.clone().unwrap();
+
+        // The intersection covers the left half, not nothing and not all.
+        assert_eq!(covered_pixels(&state, &clip), 50);
+    }
+
+    #[test]
+    fn offset_clip_moves_the_region() {
+        let mut state = RenderState::new();
+        assert!(state.install_clip("M0 0L2 0 2 2 0 2Z", ClipRule::NonZero, 1));
+        state.offset_clip(4.0, 3.0, canvas_rect());
+        let clip = state.dc.clip_id.clone().unwrap();
+
+        assert_eq!(covered_pixels(&state, &clip), 4);
+    }
+
+    #[test]
+    fn offset_clip_brings_an_off_canvas_region_onto_the_canvas() {
+        let mut state = RenderState::new();
+        assert!(state.install_clip("M-6 0L-2 0 -2 2 -6 2Z", ClipRule::NonZero, 1));
+        state.offset_clip(6.0, 0.0, canvas_rect());
+        let clip = state.dc.clip_id.clone().unwrap();
+
+        assert_eq!(covered_pixels(&state, &clip), 8);
+    }
+
+    #[test]
+    fn even_odd_clip_cuts_out_an_equally_oriented_inner_rectangle() {
+        let mut state = RenderState::new();
+        assert!(state.install_clip(
+            "M0 0L10 0 10 10 0 10Z M2 2L8 2 8 8 2 8Z",
+            ClipRule::EvenOdd,
+            1
+        ));
+        let clip = state.dc.clip_id.clone().unwrap();
+
+        assert_eq!(covered_pixels(&state, &clip), 100 - 36);
     }
 }

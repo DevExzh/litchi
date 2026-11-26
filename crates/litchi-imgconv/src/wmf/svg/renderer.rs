@@ -6,8 +6,8 @@ use super::super::constants::{bk_mode, brush, ext_text_out, record, rop3, stock,
 use super::super::parser::WmfRecord;
 use super::BitmapHook;
 use super::state::{
-    Brush, ClipRegion, DeviceRect, Font, GdiObject, GraphicsState, ObjectTable, Palette, Pen,
-    Region,
+    Brush, ClipRegion, DeviceRect, Font, GdiObject, GraphicsState, MappingState, ObjectTable,
+    Palette, Pen, Region,
 };
 use super::style::{
     escape_xml_attr_into, escape_xml_text_into, fill_attrs, hatch_definition, map_font_family,
@@ -46,7 +46,9 @@ pub(super) struct SvgRenderer<'hook> {
     objects: ObjectTable,
     definitions: String,
     hatch_ids: HashMap<(u32, u16, u16, u32), String>,
-    clip_ids: HashMap<u64, String>,
+    /// Clip reference per clip revision; `Some(None)` records a clip that covers
+    /// the whole canvas and therefore needs no reference at all.
+    clip_ids: HashMap<u64, Option<String>>,
     next_clip_revision: u64,
     next_definition_id: usize,
     issues: Vec<RenderIssue>,
@@ -62,6 +64,12 @@ pub(super) struct SvgRenderer<'hook> {
 }
 
 impl<'hook> SvgRenderer<'hook> {
+    /// Starts playback under `mapping` instead of the default device context
+    /// mapping.
+    pub(super) fn set_initial_mapping(&mut self, mapping: MappingState) {
+        self.state.mapping = mapping;
+    }
+
     pub(super) fn new(
         transform: CoordinateTransform,
         bitmap_hook: Option<&'hook BitmapHook>,
@@ -1076,7 +1084,8 @@ impl<'hook> SvgRenderer<'hook> {
         let y = read_i16_le(&rec.params, 4).unwrap_or(0);
         let x = read_i16_le(&rec.params, 6).unwrap_or(0);
         let (x, y) = self.transform.point(&self.state.mapping, x, y);
-        let size = self.transform.device_width(1.0).max(1.0);
+        // One device pixel; the SVG canvas stands for the playback device.
+        let size = 1.0;
         let mut output = String::with_capacity(144);
         output.push_str(r#"<rect x=""#);
         write_num(&mut output, x - size / 2.0);
@@ -1805,8 +1814,10 @@ impl<'hook> SvgRenderer<'hook> {
         if self.state.clip.is_unbounded() {
             return String::new();
         }
-        if let Some(id) = self.clip_ids.get(&self.state.clip_revision) {
-            return format!(r#" clip-path="url(#{id})""#);
+        match self.clip_ids.get(&self.state.clip_revision) {
+            Some(None) => return String::new(),
+            Some(Some(id)) => return format!(r#" clip-path="url(#{id})""#),
+            None => {},
         }
         let included_count = self.state.clip.rects.as_ref().map_or(1usize, Vec::len);
         let clip_work = included_count
@@ -1824,6 +1835,23 @@ impl<'hook> SvgRenderer<'hook> {
                 .collect(),
             None => vec![self.transform.canvas_rect()],
         };
+        // A region that already covers the canvas clips nothing away. Dropping
+        // the reference keeps one mask per drawn element out of the rasterizer,
+        // which dominates the cost of a busy picture.
+        let canvas = self.transform.canvas_rect();
+        let covers_canvas = included
+            .iter()
+            .any(|rect| rect.intersect(canvas) == Some(canvas))
+            && !self
+                .state
+                .clip
+                .excluded
+                .iter()
+                .any(|rect| self.transform.rect(*rect).intersect(canvas).is_some());
+        if covers_canvas {
+            self.clip_ids.insert(self.state.clip_revision, None);
+            return String::new();
+        }
         for rect in &included {
             append_rect_path(&mut path, *rect);
         }
@@ -1842,7 +1870,8 @@ impl<'hook> SvgRenderer<'hook> {
             r#"<clipPath id="{id}" clipPathUnits="userSpaceOnUse"><path d="{path}" clip-rule="evenodd" fill-rule="evenodd"/></clipPath>"#
         );
         self.push_definition(&definition);
-        self.clip_ids.insert(self.state.clip_revision, id.clone());
+        self.clip_ids
+            .insert(self.state.clip_revision, Some(id.clone()));
         format!(r#" clip-path="url(#{id})""#)
     }
 
@@ -2110,7 +2139,7 @@ fn parse_region(data: &[u8], max_rects: usize) -> Option<Region> {
 fn bitmap_destination(
     function: u16,
     data: &[u8],
-    mapping: &super::state::MappingState,
+    mapping: &MappingState,
     transform: &CoordinateTransform,
 ) -> Option<DeviceRect> {
     let (height_offset, width_offset, y_offset, x_offset) = match function {
@@ -2154,8 +2183,16 @@ mod tests {
     }
 
     fn renderer() -> SvgRenderer<'static> {
+        renderer_with(CoordinateTransform::new(
+            (0.0, 0.0, 100.0, 100.0),
+            100.0,
+            100.0,
+        ))
+    }
+
+    fn renderer_with(transform: CoordinateTransform) -> SvgRenderer<'static> {
         SvgRenderer::new(
-            CoordinateTransform::new((0.0, 0.0, 100.0, 100.0), 100.0, 100.0),
+            transform,
             None,
             DibLimits::default(),
             crate::Limits::default().max_state_depth,
@@ -2188,6 +2225,32 @@ mod tests {
         renderer.render_record(&rec(record::SET_TEXT_COLOR, &[4, 5, 6, 0]));
         renderer.render_record(&rec(record::RESTORE_DC, &[0xff, 0xff]));
         assert_eq!(renderer.state.text_color, 0x0003_0201);
+    }
+
+    #[test]
+    fn clip_that_covers_the_canvas_needs_no_reference() {
+        let mut renderer = renderer();
+        renderer.state.clip =
+            ClipRegion::from_rects(vec![DeviceRect::new(-5.0, -5.0, 110.0, 110.0)]);
+
+        assert_eq!(renderer.clip_attr(), "");
+        assert!(renderer.definitions.is_empty());
+    }
+
+    #[test]
+    fn clip_that_cuts_into_the_canvas_keeps_its_reference() {
+        let mut renderer = renderer();
+        renderer.state.clip = ClipRegion::from_rects(vec![DeviceRect::new(0.0, 0.0, 50.0, 50.0)]);
+
+        assert_eq!(renderer.clip_attr(), r#" clip-path="url(#wmf-clip-0)""#);
+
+        renderer
+            .state
+            .clip
+            .excluded
+            .push(DeviceRect::new(10.0, 10.0, 20.0, 20.0));
+        renderer.bump_clip_revision();
+        assert_eq!(renderer.clip_attr(), r#" clip-path="url(#wmf-clip-1)""#);
     }
 
     #[test]
@@ -2244,6 +2307,18 @@ mod tests {
             .unwrap();
         assert!(output.contains(r##"fill="#112233""##));
         assert_eq!(renderer.state.position, (9, 8));
+    }
+
+    #[test]
+    fn set_pixel_paints_one_canvas_unit_under_a_magnifying_transform() {
+        // The whole 1-by-1 device extent fills a 100-unit canvas.
+        let mut renderer =
+            renderer_with(CoordinateTransform::new((0.0, 0.0, 1.0, 1.0), 100.0, 100.0));
+        let output = renderer
+            .render_record(&rec(record::SET_PIXEL, &[0, 0, 0, 0, 0, 0, 0, 0]))
+            .unwrap();
+
+        assert!(output.contains(r#"width="1" height="1""#));
     }
 
     #[test]
