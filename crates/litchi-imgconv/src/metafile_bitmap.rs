@@ -1045,27 +1045,76 @@ pub fn xor_bracket_paint(rop2: Rop2, color: u32, xor: u32) -> Option<Option<u32>
     }
 }
 
-/// Whether a polygon outline is convex.
+/// Most XOR fills one XOR bracket holds while it waits for the pass that
+/// undoes them.
+pub const MAX_BRACKET_SHAPES: usize = 4096;
+
+/// Most vertices an outline may have to take part in the XOR bracket
+/// overlap test; a polygon with more vertices has no bracket outline.
+pub const MAX_BRACKET_OUTLINE_VERTICES: usize = 64;
+
+/// Most pairwise work [`convex_outlines_overlap`] spends before it gives up
+/// and reports an overlap: one unit per pair of bounding boxes, and the
+/// product of the vertex counts, twice, per separating-axis test.
+const MAX_OVERLAP_WORK: u64 = 1 << 24;
+
+/// Whether a polygon outline is convex: every turn bends the same way and
+/// the edges wind around the interior exactly once, so self-intersecting
+/// outlines such as a pentagram are not convex.
+///
+/// Products are taken in `i128`, so any `i32` coordinates are exact.
 #[must_use]
 pub fn is_convex(outline: &[(i64, i64)]) -> bool {
-    let mut sign = 0i64;
-    for index in 0..outline.len() {
+    let count = outline.len();
+    let mut sign = 0i128;
+    // A simple convex outline reverses its horizontal and its vertical
+    // direction of travel at most twice each around the loop.
+    let mut reversals = [0usize; 2];
+    let mut first_direction = [0i128; 2];
+    let mut last_direction = [0i128; 2];
+    for index in 0..count {
         let a = outline[index];
-        let b = outline[(index + 1) % outline.len()];
-        let c = outline[(index + 2) % outline.len()];
-        let cross = (b.0 - a.0) * (c.1 - b.1) - (b.1 - a.1) * (c.0 - b.0);
+        let b = outline[(index + 1) % count];
+        let c = outline[(index + 2) % count];
+        let edge = (
+            i128::from(b.0) - i128::from(a.0),
+            i128::from(b.1) - i128::from(a.1),
+        );
+        let next = (
+            i128::from(c.0) - i128::from(b.0),
+            i128::from(c.1) - i128::from(b.1),
+        );
+        let cross = edge.0 * next.1 - edge.1 * next.0;
         if cross != 0 {
             if sign != 0 && cross.signum() != sign {
                 return false;
             }
             sign = cross.signum();
         }
+        for (axis, delta) in [edge.0, edge.1].into_iter().enumerate() {
+            let direction = delta.signum();
+            if direction == 0 {
+                continue;
+            }
+            if first_direction[axis] == 0 {
+                first_direction[axis] = direction;
+            } else if direction != last_direction[axis] {
+                reversals[axis] += 1;
+            }
+            last_direction[axis] = direction;
+        }
     }
-    true
+    (0..2).all(|axis| {
+        let closing = usize::from(first_direction[axis] != last_direction[axis]);
+        reversals[axis] + closing <= 2
+    })
 }
 
 /// Whether the interiors of any two convex outlines overlap; touching
 /// edges do not count. Exact for integer coordinates.
+///
+/// Reports an overlap, so that the caller keeps its conservative path,
+/// when the test would take more than a fixed amount of work.
 #[must_use]
 pub fn convex_outlines_overlap(outlines: &[&[(i64, i64)]]) -> bool {
     let bounds = |outline: &[(i64, i64)]| {
@@ -1078,11 +1127,22 @@ pub fn convex_outlines_overlap(outlines: &[&[(i64, i64)]]) -> bool {
         .iter()
         .map(|outline| bounds(outline))
         .collect::<Vec<_>>();
+    let mut work = 0u64;
     for first in 0..outlines.len() {
         for second in first + 1..outlines.len() {
+            work += 1;
+            if work > MAX_OVERLAP_WORK {
+                return true;
+            }
             let (a, b) = (boxes[first], boxes[second]);
             if a.2 <= b.0 || b.2 <= a.0 || a.3 <= b.1 || b.3 <= a.1 {
                 continue;
+            }
+            let (first_len, second_len) =
+                (outlines[first].len() as u64, outlines[second].len() as u64);
+            work = work.saturating_add(2 * first_len.saturating_mul(second_len));
+            if work > MAX_OVERLAP_WORK {
+                return true;
             }
             if convex_interiors_overlap(outlines[first], outlines[second]) {
                 return true;
@@ -1094,20 +1154,25 @@ pub fn convex_outlines_overlap(outlines: &[&[(i64, i64)]]) -> bool {
 
 /// Separating-axis test for two convex outlines; touching edges do not
 /// count as overlap.
+///
+/// Projections are taken in `i128`, so any `i32` coordinates are exact.
 fn convex_interiors_overlap(first: &[(i64, i64)], second: &[(i64, i64)]) -> bool {
     for outline in [first, second] {
         for index in 0..outline.len() {
             let (x0, y0) = outline[index];
             let (x1, y1) = outline[(index + 1) % outline.len()];
-            let axis = (y0 - y1, x1 - x0);
+            let axis = (
+                i128::from(y0) - i128::from(y1),
+                i128::from(x1) - i128::from(x0),
+            );
             if axis == (0, 0) {
                 continue;
             }
             let project = |points: &[(i64, i64)]| {
                 points
                     .iter()
-                    .fold((i64::MAX, i64::MIN), |(low, high), &(x, y)| {
-                        let value = axis.0 * x + axis.1 * y;
+                    .fold((i128::MAX, i128::MIN), |(low, high), &(x, y)| {
+                        let value = axis.0 * i128::from(x) + axis.1 * i128::from(y);
                         (low.min(value), high.max(value))
                     })
             };
@@ -2694,5 +2759,39 @@ mod tests {
             r#"<pattern id="brush" patternUnits="userSpaceOnUse" x="1" y="0" width="8" height="2">"#
         ));
         assert!(BrushPattern::from_monochrome_bits(8, 2, 1, &[0], true).is_err());
+    }
+
+    #[test]
+    fn convexity_rejects_self_intersecting_outlines_and_stays_exact_at_i32_extremes() {
+        let square = [(0, 0), (10, 0), (10, 10), (0, 10)];
+        assert!(is_convex(&square));
+        // Every turn of a pentagram bends the same way, but it winds twice.
+        let pentagram = [(0, -10), (6, 8), (-10, -3), (10, -3), (-6, 8)];
+        assert!(!is_convex(&pentagram));
+        let (low, high) = (i64::from(i32::MIN), i64::from(i32::MAX));
+        // Edge differences of 2^32 multiply past the range of `i64`.
+        let huge = [(low, low), (high, low), (high, high), (low, high)];
+        assert!(is_convex(&huge));
+        let bent = [(low, low), (high, low), (low + 1, low + 1), (low, high)];
+        assert!(!is_convex(&bent));
+        let right = [(0, low), (high, low), (high, high), (0, high)];
+        let left = [(low, low), (0, low), (0, high), (low, high)];
+        assert!(!convex_outlines_overlap(&[&left, &right]));
+        assert!(convex_outlines_overlap(&[&huge, &right]));
+    }
+
+    #[test]
+    fn convex_overlap_test_gives_up_on_too_much_pairwise_work() {
+        // Thin triangles fanned around one point: every bounding box
+        // overlaps every other one, but no two interiors do.
+        let fan = (0..4096i64)
+            .map(|index| vec![(0, 0), (1 << 20, index), (1 << 20, index + 1)])
+            .collect::<Vec<_>>();
+        let few = fan[..64].iter().map(Vec::as_slice).collect::<Vec<_>>();
+        assert!(!convex_outlines_overlap(&few));
+        let all = fan.iter().map(Vec::as_slice).collect::<Vec<_>>();
+        let started = std::time::Instant::now();
+        assert!(convex_outlines_overlap(&all));
+        assert!(started.elapsed() < std::time::Duration::from_secs(5));
     }
 }

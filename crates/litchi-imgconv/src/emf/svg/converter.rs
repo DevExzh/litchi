@@ -16,9 +16,9 @@ use crate::svg_utils::{ClipGrouper, write_num, write_xml_escaped};
 use crate::{
     dib::{ColorUsage, Dib, DibLimits},
     metafile_bitmap::{
-        BitmapOp, BitmapPaint, BitmapSource, BlitGrid, BrushPattern, RasterComposite, Rop2,
-        Rop2Paint, Rop3, StretchPolicy, convex_outlines_overlap, is_convex, parse_emf_object_dib,
-        xor_bracket_paint,
+        BitmapOp, BitmapPaint, BitmapSource, BlitGrid, BrushPattern, MAX_BRACKET_OUTLINE_VERTICES,
+        MAX_BRACKET_SHAPES, RasterComposite, Rop2, Rop2Paint, Rop3, StretchPolicy,
+        convex_outlines_overlap, is_convex, parse_emf_object_dib, xor_bracket_paint,
     },
     text_charset::DecodedText,
 };
@@ -1359,8 +1359,12 @@ impl<'a> EmfSvgConverter<'a> {
                     outline,
                 };
                 let Some(bracket) = &mut state.xor_bracket else {
+                    if shape.element.len() > self.limits.max_output_bytes {
+                        return Err(xor_bracket_failure());
+                    }
                     state.xor_bracket = Some(XorBracket {
                         matrix,
+                        bytes: shape.element.len(),
                         first: vec![shape],
                         middle: None,
                         matched: 0,
@@ -1372,6 +1376,15 @@ impl<'a> EmfSvgConverter<'a> {
                     return Err(xor_bracket_failure());
                 }
                 if bracket.middle.is_none() {
+                    // The fills wait outside every output limit until the
+                    // bracket completes, so the bracket bounds them itself.
+                    bracket.bytes = bracket.bytes.saturating_add(shape.element.len());
+                    if bracket.first.len() >= MAX_BRACKET_SHAPES
+                        || bracket.bytes > self.limits.max_output_bytes
+                    {
+                        state.xor_bracket = None;
+                        return Err(xor_bracket_failure());
+                    }
                     bracket.first.push(shape);
                     return Ok(Vec::new());
                 }
@@ -1394,6 +1407,11 @@ impl<'a> EmfSvgConverter<'a> {
             },
             BracketShape::Middle(middle) => {
                 if let Some(bracket) = &mut state.xor_bracket {
+                    bracket.bytes = bracket.bytes.saturating_add(element.len());
+                    if bracket.bytes > self.limits.max_output_bytes {
+                        state.xor_bracket = None;
+                        return Err(xor_bracket_failure());
+                    }
                     bracket.middle = Some((element, middle, outline));
                 }
                 Ok(Vec::new())
@@ -1420,7 +1438,7 @@ impl<'a> EmfSvgConverter<'a> {
                 .map(|shape| shape.outline.as_deref())
                 .collect::<Option<Vec<_>>>()
                 .ok_or_else(xor_bracket_failure)?;
-            if outlines.len() > 4096 || convex_outlines_overlap(&outlines) {
+            if convex_outlines_overlap(&outlines) {
                 return Err(xor_bracket_failure());
             }
         }
@@ -2422,6 +2440,8 @@ pub(super) enum XorMiddle {
 #[derive(Debug, Clone)]
 pub(super) struct XorBracket {
     matrix: [f64; 6],
+    /// Bytes of the waiting fill and middle elements.
+    bytes: usize,
     first: Vec<XorShape>,
     /// The middle elements, with [`XOR_FILL`] as their fill, their paint and
     /// their logical outline, when the record has one.
@@ -2575,7 +2595,8 @@ fn rop3_as_rop2(rop3: Rop3) -> Rop2 {
 }
 
 /// The convex outline of a rectangle or polygon record in logical
-/// coordinates, or `None` for other records and non-convex polygons.
+/// coordinates, or `None` for other records, non-convex polygons and
+/// polygons with more than [`MAX_BRACKET_OUTLINE_VERTICES`] vertices.
 fn logical_outline(record: &EmfRecord) -> Option<Vec<(i64, i64)>> {
     let data: &[u8] = &record.data;
     let int = |offset: usize| -> Option<i64> {
@@ -2595,13 +2616,19 @@ fn logical_outline(record: &EmfRecord) -> Option<Vec<(i64, i64)>> {
         },
         EmrType::Polygon => {
             let count = usize::try_from(int(16)?).ok()?;
-            (0..count.min(MAX_RECORD_ITEMS))
+            if count > MAX_BRACKET_OUTLINE_VERTICES {
+                return None;
+            }
+            (0..count)
                 .map(|index| Some((int(20 + index * 8)?, int(24 + index * 8)?)))
                 .collect::<Option<Vec<_>>>()?
         },
         EmrType::Polygon16 => {
             let count = usize::try_from(int(16)?).ok()?;
-            (0..count.min(MAX_RECORD_ITEMS))
+            if count > MAX_BRACKET_OUTLINE_VERTICES {
+                return None;
+            }
+            (0..count)
                 .map(|index| Some((short(20 + index * 4)?, short(22 + index * 4)?)))
                 .collect::<Option<Vec<_>>>()?
         },
@@ -4156,6 +4183,111 @@ mod tests {
             EmfSvgConverter::new(&parser).convert(),
             Err(Error::Unsupported(_))
         ));
+    }
+
+    /// A Polygon record through `points`, bounded by their extremes.
+    fn polygon_record(points: &[(i32, i32)]) -> Vec<u8> {
+        let mut payload = Vec::new();
+        let xs = points.iter().map(|point| point.0);
+        let ys = points.iter().map(|point| point.1);
+        for value in [
+            xs.clone().min().unwrap(),
+            ys.clone().min().unwrap(),
+            xs.max().unwrap(),
+            ys.max().unwrap(),
+        ] {
+            sdword(&mut payload, value);
+        }
+        dword(&mut payload, u32::try_from(points.len()).unwrap());
+        for (x, y) in points {
+            payload.extend_from_slice(&point(*x, *y));
+        }
+        record(EmrType::Polygon, &payload)
+    }
+
+    /// Two XOR strips with `vertices` vertices each, a black middle fill
+    /// and the second XOR pass.
+    fn polygon_xor_bracket(vertices: i32) -> Vec<Vec<u8>> {
+        // A rectangle strip whose top edge holds collinear vertices.
+        let strip = |left: i32| {
+            let mut points = (0..vertices - 2)
+                .map(|index| (left + index * 20 / (vertices - 3), 0))
+                .collect::<Vec<_>>();
+            points.extend([(left + 20, 50), (left, 50)]);
+            polygon_record(&points)
+        };
+        let pass = || {
+            vec![
+                set_rop2(7),
+                select_object(1),
+                strip(0),
+                select_object(2),
+                strip(20),
+            ]
+        };
+        let mut records = vec![
+            create_solid_brush(1, 0x0000_00ff),
+            create_solid_brush(2, 0x0000_ff00),
+            create_solid_brush(3, 0),
+            select_object(stock_objects::NULL_PEN),
+        ];
+        records.extend(pass());
+        records.extend([
+            set_rop2(13),
+            select_object(3),
+            polygon_record(&[(0, 0), (40, 0), (0, 40)]),
+        ]);
+        records.extend(pass());
+        records
+    }
+
+    #[test]
+    fn xor_bracket_outlines_with_many_vertices_are_not_overlap_tested() {
+        let (svg, diagnostics) = convert_with_report(polygon_xor_bracket(
+            i32::try_from(MAX_BRACKET_OUTLINE_VERTICES).unwrap(),
+        ));
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+        assert!(svg.contains("<g clip-path=\"url(#emf-xor-clip-"), "{svg}");
+
+        let bytes = classic_emf(polygon_xor_bracket(
+            i32::try_from(MAX_BRACKET_OUTLINE_VERTICES + 1).unwrap(),
+        ));
+        let parser = EmfParser::new(&bytes, &crate::Limits::default()).unwrap();
+        assert!(matches!(
+            EmfSvgConverter::new(&parser).convert(),
+            Err(Error::Unsupported(_))
+        ));
+    }
+
+    #[test]
+    fn xor_bracket_fails_once_its_waiting_fills_pass_a_limit() {
+        let fills = |count: usize, limits: crate::Limits| {
+            let patinvert = brush_bitblt(0x005a_0049, 0, 0, 40, 40);
+            let mut records = vec![create_solid_brush(1, 0x0000_00ff), select_object(1)];
+            records.extend(std::iter::repeat_n(patinvert, count));
+            let bytes = classic_emf(records);
+            let parser = EmfParser::new(&bytes, &limits).unwrap();
+            let converter = EmfSvgConverter::with_limits(&parser, limits);
+            let mut state = RenderState::new();
+            // Every fill waits in the bracket until one fails it.
+            let played = parser
+                .records
+                .iter()
+                .take_while(|record| converter.play_record(record, &mut state).is_ok())
+                .count();
+            (played, state.xor_bracket.map(|bracket| bracket.first.len()))
+        };
+        let (played, waiting) = fills(MAX_BRACKET_SHAPES + 1, crate::Limits::default());
+        assert_eq!(played, MAX_BRACKET_SHAPES + 2);
+        assert_eq!(waiting, None);
+
+        let limits = crate::Limits {
+            max_output_bytes: 1000,
+            ..crate::Limits::default()
+        };
+        let (played, waiting) = fills(100, limits);
+        assert!(played < 20, "{played}");
+        assert_eq!(waiting, None);
     }
 
     #[test]
