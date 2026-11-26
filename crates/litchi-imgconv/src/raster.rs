@@ -146,6 +146,14 @@ pub(crate) fn rasterize_svg(
                 "picture geometry extends beyond the rasterizer's numeric range".to_string(),
             ));
         }
+        let budget = limits.max_pixels.saturating_mul(MAX_LAYER_PIXELS_PER_PIXEL);
+        let canvas = (width as f32, height as f32);
+        let composited = group_layer_pixels(tree.root(), scale_x, scale_y, canvas, 0);
+        if composited > budget as f64 {
+            return Err(parse(format!(
+                "picture composites about {composited:.0} layer pixels; limit is {budget}"
+            )));
+        }
         let transform = tiny_skia::Transform::from_scale(scale_x, scale_y);
         resvg::render(&tree, transform, &mut pixmap);
     }
@@ -197,6 +205,93 @@ fn group_fits(group: &usvg::Group, scale_x: f32, scale_y: f32) -> bool {
                 usvg::Node::Image(_) | usvg::Node::Text(_) => true,
             }
     })
+}
+
+/// Most pixels, per pixel of [`RasterLimits::max_pixels`], that rendering may
+/// spend on layers.
+///
+/// resvg draws every group with a clip path, a mask or group opacity into a
+/// layer the size of the group's content, up to 25 times the canvas, and each
+/// clip path into another layer of that size, once more per clip path the clip
+/// path is itself clipped by. Real pictures stay well under ten canvases of
+/// layers; a picture that clips many large groups through deep clip chains
+/// would take minutes and gigabytes to render.
+const MAX_LAYER_PIXELS_PER_PIXEL: u64 = 64;
+
+/// Deepest nesting of clip paths and masks [`group_layer_pixels`] follows;
+/// anything deeper counts as exceeding every budget.
+const MAX_LAYER_NESTING: usize = 64;
+
+/// Estimated layer pixels resvg allocates and composites to render `group`
+/// onto a canvas of `canvas` output pixels.
+fn group_layer_pixels(
+    group: &usvg::Group,
+    scale_x: f32,
+    scale_y: f32,
+    canvas: (f32, f32),
+    nesting: usize,
+) -> f64 {
+    if nesting > MAX_LAYER_NESTING {
+        return f64::INFINITY;
+    }
+    let mut total = 0.0;
+    if group.should_isolate() {
+        // resvg bounds a layer to the canvas grown by twice its size on
+        // every side.
+        let (width, height) = canvas;
+        let bounds = group.abs_layer_bounding_box();
+        let left = (bounds.left() * scale_x).max(-2.0 * width);
+        let right = (bounds.right() * scale_x).min(3.0 * width);
+        let top = (bounds.top() * scale_y).max(-2.0 * height);
+        let bottom = (bounds.bottom() * scale_y).min(3.0 * height);
+        let area = f64::from((right - left).max(0.0)) * f64::from((bottom - top).max(0.0));
+        let passes = 1.0
+            + group
+                .clip_path()
+                .map_or(0.0, |clip| clip_passes(clip, nesting + 1))
+            + group
+                .mask()
+                .map_or(0.0, |mask| mask_passes(mask, nesting + 1));
+        total += area * passes;
+    }
+    for node in group.children() {
+        if let usvg::Node::Group(child) = node {
+            total += group_layer_pixels(child, scale_x, scale_y, canvas, nesting);
+        }
+    }
+    total
+}
+
+/// Layers of its group's size that resvg draws to apply `clip`.
+fn clip_passes(clip: &usvg::ClipPath, nesting: usize) -> f64 {
+    if nesting > MAX_LAYER_NESTING {
+        return f64::INFINITY;
+    }
+    // A clipped child of the clip path draws into a layer of its own.
+    let children = clip
+        .root()
+        .children()
+        .iter()
+        .filter_map(|node| match node {
+            usvg::Node::Group(child) => child.clip_path(),
+            _ => None,
+        })
+        .map(|child| 1.0 + clip_passes(child, nesting + 1))
+        .sum::<f64>();
+    1.0 + children
+        + clip
+            .clip_path()
+            .map_or(0.0, |outer| clip_passes(outer, nesting + 1))
+}
+
+/// Layers of its group's size that resvg draws to apply `mask`.
+fn mask_passes(mask: &usvg::Mask, nesting: usize) -> f64 {
+    if nesting > MAX_LAYER_NESTING {
+        return f64::INFINITY;
+    }
+    1.0 + mask
+        .mask()
+        .map_or(0.0, |outer| mask_passes(outer, nesting + 1))
 }
 
 /// Installed families that stand in for faces that metafiles name.
@@ -617,6 +712,45 @@ mod tests {
             &RasterLimits::default(),
         );
         assert!(matches!(result, Err(Error::Unsupported(_))), "{result:?}");
+    }
+
+    #[test]
+    fn pictures_that_composite_too_many_layer_pixels_are_rejected() {
+        // Each group clips a rectangle five times the canvas wide through a
+        // chain of clip paths just as large.
+        let mut svg = String::from(
+            r#"<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><defs><clipPath id="c0"><rect x="-200" y="-200" width="500" height="500"/></clipPath>"#,
+        );
+        for depth in 1..8 {
+            svg.push_str(&format!(
+                r#"<clipPath id="c{depth}"><rect x="-200" y="-200" width="500" height="500" clip-path="url(#c{})"/></clipPath>"#,
+                depth - 1
+            ));
+        }
+        svg.push_str("</defs>");
+        let group = r#"<rect x="-200" y="-200" width="500" height="500" clip-path="url(#c7)"/>"#;
+        let render = |groups: usize, max_pixels: u64| {
+            let mut picture = svg.clone();
+            for _ in 0..groups {
+                picture.push_str(group);
+            }
+            picture.push_str("</svg>");
+            let limits = RasterLimits {
+                max_pixels,
+                ..RasterLimits::default()
+            };
+            rasterize_svg(
+                &picture,
+                100,
+                100,
+                Rgba([255, 255, 255, 255]),
+                ImageFormat::Png,
+                &limits,
+            )
+        };
+        assert!(render(1, RasterLimits::default().max_pixels).is_ok());
+        let error = render(100, 1 << 20).unwrap_err().to_string();
+        assert!(error.contains("layer pixels"), "{error}");
     }
 
     #[test]
