@@ -737,6 +737,28 @@ fn opens_files_whose_length_is_not_a_whole_number_of_sectors() {
     );
 }
 
+/// The short final sector is a physical sector of the file like any other,
+/// as Apache POI counts it: a table or stream may claim it, and its missing
+/// tail reads as zeroes.
+#[test]
+fn claims_the_short_final_sector_like_any_other() {
+    let content = vec![0xABu8; 4096];
+    let mut writer = OleWriter::new();
+    writer.create_stream(&["Data"], &content).unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    let mut bytes = output.into_inner();
+    // The writer stores the FAT in the last sector; its final entries are
+    // free sectors past the end of the file.
+    let fat_sector = read_u32(&bytes, HEADER_DIFAT_OFFSET) as usize;
+    assert_eq!((fat_sector + 2) * SECTOR_SIZE_V3, bytes.len());
+    bytes.truncate(bytes.len() - 90);
+
+    let mut file = OleFile::open(Cursor::new(bytes), OleFileLimits::default())
+        .expect("the FAT in the short final sector is read");
+    assert_eq!(file.open_stream(&["Data"]).unwrap(), content);
+}
+
 /// A sector that begins at or beyond the end of the file is still an error:
 /// tolerating a short final sector must not mask a genuinely missing one.
 #[test]
