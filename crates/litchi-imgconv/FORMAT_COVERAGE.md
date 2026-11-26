@@ -18,7 +18,11 @@ The output policy is deliberately stricter than best-effort metafile viewers:
   lower-level strict `EmfSvgConverter::convert` reject such diagnostics;
 - input that departs from the specification in a way Windows GDI playback
   tolerates without changing the picture is accepted and reported with a
-  `noncanonical-*` diagnostic, which the strict helpers also accept.
+  `noncanonical-*` diagnostic, which the strict helpers also accept;
+- input whose picture cannot be reproduced exactly, such as a record stream
+  that stops at a corrupt record, text given as font glyph indices, or text
+  whose character set cannot be decoded exactly, is still converted and
+  reported with a diagnostic that strict helpers reject.
 
 ## Record catalogs
 
@@ -33,8 +37,8 @@ The seven classic EMF records that are unconditionally rejected are
 `EMR_CREATEDIBPATTERNBRUSHPT`, `EMR_DRAWESCAPE`, `EMR_EXTESCAPE`, and
 `EMR_NAMEDESCAPE`. Additional records can be rejected conditionally when their
 specific flags or payload require semantics SVG cannot reproduce—for example,
-destination-dependent raster operations, unsupported bitmap masks, glyph-index
-text, device-dependent bitmaps, or non-representable clip combinations.
+destination-dependent raster operations, unsupported bitmap masks,
+device-dependent bitmaps, or non-representable clip combinations.
 
 EMF+ `GetDC` requires ordered interleaving with classic EMF records. Both
 EMF+-only and dual streams containing it are rejected until the two playback
@@ -55,7 +59,8 @@ dependent ROPs fail explicitly.
 
 ## Resource and safety model
 
-Strict framing checks run before playback. Caller limits cover encoded and
+Record streams are walked the way GDI playback walks them, so declared sizes
+and counts that disagree with the records are reported, not trusted. Caller limits cover encoded and
 decoded bytes, dimensions, pixels, records, retained objects, saved graphics
 states, path points, SVG elements, and encoded output. Embedded image decoders
 receive the same dimension and allocation ceilings. SVG emission accepts only
