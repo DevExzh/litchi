@@ -2468,14 +2468,16 @@ fn xor_fills_cover(fills: &[XorShape], middle: Option<&[(i64, i64)]>) -> bool {
             },
         )
     };
+    // Exact for `i32` coordinates: each product stays below 2^62 and at
+    // most [`MAX_BRACKET_OUTLINE_VERTICES`] terms are added.
     let doubled_area = |outline: &[(i64, i64)]| {
-        let mut sum = 0i64;
+        let mut sum = 0i128;
         for index in 0..outline.len() {
             let (x0, y0) = outline[index];
             let (x1, y1) = outline[(index + 1) % outline.len()];
-            sum = sum.saturating_add(x0.saturating_mul(y1).saturating_sub(x1.saturating_mul(y0)));
+            sum += i128::from(x0) * i128::from(y1) - i128::from(x1) * i128::from(y0);
         }
-        sum.saturating_abs()
+        sum.abs()
     };
     let (Some(middle), Some(outlines)) = (
         middle,
@@ -2502,15 +2504,13 @@ fn xor_fills_cover(fills: &[XorShape], middle: Option<&[(i64, i64)]>) -> bool {
     };
     // Disjoint fills tile their bounds exactly when their areas add up to
     // its area; both sides are doubled to stay in integers.
-    let area = outlines.iter().try_fold(0i64, |total, outline| {
-        total.checked_add(doubled_area(outline))
-    });
-    let cover_area = (cover[2] - cover[0])
-        .checked_mul(cover[3] - cover[1])
-        .and_then(|value| value.checked_mul(2));
+    let area = outlines
+        .iter()
+        .map(|outline| doubled_area(outline))
+        .sum::<i128>();
+    let cover_area = 2 * i128::from(cover[2] - cover[0]) * i128::from(cover[3] - cover[1]);
     let inner = bounds(middle);
-    area.is_some()
-        && area == cover_area
+    area == cover_area
         && inner[0] >= cover[0]
         && inner[1] >= cover[1]
         && inner[2] <= cover[2]
@@ -4256,6 +4256,25 @@ mod tests {
         assert!(matches!(
             EmfSvgConverter::new(&parser).convert(),
             Err(Error::Unsupported(_))
+        ));
+    }
+
+    #[test]
+    fn xor_fills_cover_stays_exact_at_i32_extremes() {
+        let (low, high) = (i64::from(i32::MIN), i64::from(i32::MAX));
+        let fill = |left: i64, right: i64| XorShape {
+            element: String::new(),
+            color: 0x0000_00ff,
+            outline: Some(vec![(left, low), (right, low), (right, high), (left, high)]),
+        };
+        let middle = [(-5, -5), (5, -5), (0, 5)];
+        assert!(xor_fills_cover(
+            &[fill(low, 0), fill(0, high)],
+            Some(&middle)
+        ));
+        assert!(!xor_fills_cover(
+            &[fill(low, -1), fill(0, high)],
+            Some(&middle)
         ));
     }
 
