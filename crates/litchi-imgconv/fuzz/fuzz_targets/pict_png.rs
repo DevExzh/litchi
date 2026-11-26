@@ -10,17 +10,19 @@ fuzz_target!(|data: &[u8]| {
     let Ok(parser) = PictParser::new(data, &common::small_limits()) else {
         return;
     };
-    let max_output_bytes = 1 << 20;
+    let limits = litchi_imgconv::Limits {
+        max_output_bytes: 1 << 20,
+        ..common::raster_limits()
+    };
     let options = PictToRasterOptions {
-        max_width: 256,
-        max_height: 256,
-        max_pixels: 256 * 256,
-        max_output_bytes,
+        max_width: limits.max_width,
+        max_height: limits.max_height,
+        max_pixels: limits.max_pixels,
+        max_output_bytes: limits.max_output_bytes,
         ..PictToRasterOptions::default()
     };
     let converter = PictConverter::new(parser, options);
     if let Ok(png) = converter.convert_to_png() {
-        assert!(png.len() <= max_output_bytes);
+        common::assert_decodable_png(&png, &limits);
     }
-    let _ = converter.convert_to_image();
 });

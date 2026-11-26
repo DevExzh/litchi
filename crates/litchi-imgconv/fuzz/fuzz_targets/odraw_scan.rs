@@ -5,11 +5,25 @@ mod common;
 
 use libfuzzer_sys::fuzz_target;
 use litchi_odraw::Parser;
-use litchi_odraw::image::{Id, all, delay, get, record, scan, store};
+use litchi_odraw::image::write::copy;
+use litchi_odraw::image::{Blip, Id, all, delay, get, record, scan, store};
 
 fuzz_target!(|data: &[u8]| {
     let limits = common::art_limits();
     let _ = scan(data, limits);
+
+    // A parsed BLIP survives being copied record-for-record: the copy parses
+    // again to the same kind, instance, UIDs and file data.
+    if let Ok(blip) = Blip::parse(data, limits) {
+        let mut copied = Vec::new();
+        if copy(&mut copied, &blip, limits).is_ok() {
+            let again = Blip::parse(&copied, limits).expect("a copied BLIP parses again");
+            assert_eq!(again.raw_kind(), blip.raw_kind());
+            assert_eq!(again.record().instance(), blip.record().instance());
+            assert_eq!(again.uids(), blip.uids());
+            assert_eq!(again.data(), blip.data());
+        }
+    }
     let _ = delay(data, limits);
 
     if let Ok(Some(store)) = store(data, limits) {

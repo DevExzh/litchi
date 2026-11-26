@@ -1283,7 +1283,12 @@ fn write_xml_escaped(output: &mut String, value: &str) {
             '>' => output.push_str("&gt;"),
             '\"' => output.push_str("&quot;"),
             '\'' => output.push_str("&apos;"),
-            '\t' | '\n' | '\r' | '\u{20}'..='\u{d7ff}' | '\u{e000}'..='\u{10ffff}' => {
+            '\t'
+            | '\n'
+            | '\r'
+            | '\u{20}'..='\u{d7ff}'
+            | '\u{e000}'..='\u{fffd}'
+            | '\u{10000}'..='\u{10ffff}' => {
                 output.push(character);
             },
             _ => output.push('\u{fffd}'),
@@ -1427,7 +1432,7 @@ mod tests {
         let mut svg = builder();
         svg.text(
             &SvgText {
-                value: "<script>&'\"\u{1}".to_owned(),
+                value: "<script>&'\"\u{1}\u{fffe}\u{ffff}".to_owned(),
                 origin: SvgPoint { x: 1.0, y: 2.0 },
                 positions: Vec::new(),
                 bold: false,
@@ -1443,7 +1448,7 @@ mod tests {
         )
         .unwrap();
         let result = svg.finish().unwrap().into_string();
-        assert!(result.contains("&lt;script&gt;&amp;&apos;&quot;�"));
+        assert!(result.contains("&lt;script&gt;&amp;&apos;&quot;���"));
         assert!(result.contains("font-family=\"a&quot; onclick=&quot;evil\""));
         assert!(!result.contains("<script>"));
     }

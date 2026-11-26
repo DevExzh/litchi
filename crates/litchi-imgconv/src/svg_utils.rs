@@ -112,7 +112,12 @@ pub fn write_xml_escaped(buf: &mut String, text: &str) {
             '>' => buf.push_str("&gt;"),
             '"' => buf.push_str("&quot;"),
             '\'' => buf.push_str("&apos;"),
-            '\u{9}' | '\u{a}' | '\u{d}' | '\u{20}'..='\u{d7ff}' | '\u{e000}'..='\u{10ffff}' => {
+            '\u{9}'
+            | '\u{a}'
+            | '\u{d}'
+            | '\u{20}'..='\u{d7ff}'
+            | '\u{e000}'..='\u{fffd}'
+            | '\u{10000}'..='\u{10ffff}' => {
                 buf.push(ch);
             },
             _ => buf.push('\u{fffd}'),
@@ -386,6 +391,13 @@ mod tests {
         let mut buf = String::new();
         write_xml_escaped(&mut buf, "a\0b\u{8}c\t\nd");
         assert_eq!(buf, "a\u{fffd}b\u{fffd}c\t\nd");
+    }
+
+    #[test]
+    fn xml_escaping_replaces_the_noncharacters_xml_forbids() {
+        let mut buf = String::new();
+        write_xml_escaped(&mut buf, "a\u{fffe}b\u{ffff}c\u{fffd}d\u{10ffff}e\u{10000}");
+        assert_eq!(buf, "a\u{fffd}b\u{fffd}c\u{fffd}d\u{10ffff}e\u{10000}");
     }
 
     fn grouped(elements: &[&str]) -> (String, usize) {

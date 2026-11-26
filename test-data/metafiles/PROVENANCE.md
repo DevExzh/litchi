@@ -12,8 +12,9 @@ container, the extraction route, and how many corpus documents contain the
 identical bytes.
 
 `fuzz/` holds inputs that libFuzzer minimized from seeds drawn from these
-metafiles; each one once panicked, exhausted memory or crashed the
-rasterizer, and must now convert or fail with an error.
+metafiles; each one once panicked, exhausted memory, ran far too long,
+crashed the rasterizer or produced SVG that is not well-formed XML, and must
+now convert or fail with an error.
 
 ## Sources
 
