@@ -69,15 +69,15 @@ pub fn wrap_emfplus(payload: &[u8]) -> Vec<u8> {
         0x464D_4520, // "EMF "
         0x0001_0000, // version
         file_size as u32,
-        3,      // nRecords: header, comment, EOF
-        1,      // nHandles, with the reserved high half zero
-        0,      // nDescription
-        0,      // offDescription
-        0,      // nPalEntries
-        256,    // szlDevice.cx
-        256,    // szlDevice.cy
-        254,    // szlMillimeters.cx
-        254,    // szlMillimeters.cy
+        3,   // nRecords: header, comment, EOF
+        1,   // nHandles, with the reserved high half zero
+        0,   // nDescription
+        0,   // offDescription
+        0,   // nPalEntries
+        256, // szlDevice.cx
+        256, // szlDevice.cy
+        254, // szlMillimeters.cx
+        254, // szlMillimeters.cy
     ] {
         emf.extend_from_slice(&value.to_le_bytes());
     }
@@ -91,7 +91,13 @@ pub fn wrap_emfplus(payload: &[u8]) -> Vec<u8> {
     emf.resize(file_size - EOF_SIZE, 0);
 
     // EMR_EOF (MS-EMF 2.3.4.1).
-    for value in [EMR_EOF, EOF_SIZE as u32, 0, EOF_SIZE as u32, EOF_SIZE as u32] {
+    for value in [
+        EMR_EOF,
+        EOF_SIZE as u32,
+        0,
+        EOF_SIZE as u32,
+        EOF_SIZE as u32,
+    ] {
         emf.extend_from_slice(&value.to_le_bytes());
     }
     debug_assert_eq!(emf.len(), file_size);

@@ -4,8 +4,8 @@
 mod common;
 
 use libfuzzer_sys::fuzz_target;
-use litchi_odraw::image::{Id, all, delay, get, record, scan, store};
 use litchi_odraw::Parser;
+use litchi_odraw::image::{Id, all, delay, get, record, scan, store};
 
 fuzz_target!(|data: &[u8]| {
     let limits = common::art_limits();

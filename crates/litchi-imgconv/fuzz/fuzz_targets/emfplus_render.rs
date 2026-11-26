@@ -4,11 +4,11 @@
 mod common;
 
 use libfuzzer_sys::fuzz_target;
+use litchi_imgconv::emfplus::ParserLimits;
 use litchi_imgconv::emfplus::objects::DecodeLimits;
 use litchi_imgconv::emfplus::playback::PlaybackLimits;
 use litchi_imgconv::emfplus::renderer::{EmfPlusSvgRenderer, RendererLimits};
 use litchi_imgconv::emfplus::svg::SvgLimits;
-use litchi_imgconv::emfplus::ParserLimits;
 use litchi_imgconv::{InputFormat, Options, OutputFormat, convert_metafile};
 
 fn renderer_limits() -> RendererLimits {
@@ -48,5 +48,10 @@ fuzz_target!(|data: &[u8]| {
     }
 
     let emf = common::wrap_emfplus(data);
-    let _ = convert_metafile(&emf, InputFormat::Emf, OutputFormat::Svg, Options::default());
+    let _ = convert_metafile(
+        &emf,
+        InputFormat::Emf,
+        OutputFormat::Svg,
+        Options::default(),
+    );
 });
