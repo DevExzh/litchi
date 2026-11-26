@@ -1306,7 +1306,7 @@ impl Frame {
         let max = i32::from(i16::MAX);
         let halved = width > max || height > max;
         let side = |extent: i32| {
-            let extent = if halved { (extent + 1) / 2 } else { extent };
+            let extent = if halved { extent / 2 } else { extent };
             i16::try_from(extent).unwrap_or(i16::MAX)
         };
         Self {

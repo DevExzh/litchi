@@ -733,6 +733,18 @@ fn decode_symbol_text(bytes: &[u8], face: SymbolFace) -> DecodedText {
 /// punctuation and high positions; the table follows the encoding vector of
 /// the Adobe Symbol font.
 fn adobe_symbol(byte: u8) -> char {
+    // Positions without a glyph in the encoding keep their private-use code
+    // point, so they draw what the face itself has there (nothing, on
+    // Windows) rather than a replacement glyph.
+    let mapped = adobe_symbol_glyph(byte);
+    if mapped == '\u{fffd}' {
+        char::from_u32(0xf000 + u32::from(byte)).unwrap_or(mapped)
+    } else {
+        mapped
+    }
+}
+
+fn adobe_symbol_glyph(byte: u8) -> char {
     /// Uppercase Greek in Adobe Symbol letter order: alpha, beta, chi, ...
     const UPPER: [char; 26] = [
         '\u{0391}', '\u{0392}', '\u{03a7}', '\u{0394}', '\u{0395}', '\u{03a6}', '\u{0393}',
@@ -881,7 +893,7 @@ mod tests {
             charset::SYMBOL,
             "Symbol",
         );
-        assert_eq!(text.text, "±×÷≤≥≠≈∑∫⌡⊂⊆\u{fffd}");
+        assert_eq!(text.text, "±×÷≤≥≠≈∑∫⌡⊂⊆\u{f0ff}");
     }
 
     #[test]

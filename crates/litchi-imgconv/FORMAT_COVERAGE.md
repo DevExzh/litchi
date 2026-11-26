@@ -43,7 +43,9 @@ EMF+ records play only when an `EmfPlusHeader` is the first record after the
 EMF header, as in GDI+; otherwise the metafile plays as classic EMF. A dual
 metafile plays its EMF+ records and falls back to its classic records when the
 EMF+ records fail or need an approximation; a dual metafile containing
-`GetDC` plays its classic records, which hold the complete picture. An
+`GetDC` plays its classic records, which [MS-EMFPLUS] defines as an
+equivalent rendering of the complete picture, so the choice is reported as a
+`noncanonical-*` fact rather than an approximation. An
 EMF+-only metafile containing `GetDC` is rejected, because it needs its
 classic and EMF+ records interleaved in one drawing order. Legal but inexact
 EMF+ features such as complex brushes, some clip combinations, effects, or

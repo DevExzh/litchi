@@ -41,8 +41,9 @@ const CLEAR_BY_SECTOR_RATIO: usize = 8;
 /// reader's lifetime, the chain buffer would pin one `u32` per sector of the
 /// longest chain ever read, about 8 MiB after one 1 GiB stream of 512-byte
 /// sectors. The chain buffer grows by doubling, so a capacity above 1 MiB
-/// follows a chain of more than 131,072 sectors: a stream of more than 64 MiB
-/// even at 512-byte sectors, whose own buffer that read allocated anyway. The
+/// follows a chain of more than 262,144 sectors: a stream of more than
+/// 128 MiB even at 512-byte sectors, whose own buffer that read allocated
+/// anyway. The
 /// next such read allocates the chain buffer again; reads of shorter chains
 /// keep theirs, so the common small-file path is unchanged.
 ///

@@ -420,11 +420,17 @@ struct Renderer<'a> {
     bitmap_scale: f64,
     /// Pixels of the QuickTime images decoded so far.
     quicktime_pixels: u64,
+    /// Region pixels eroded so far to frame regions.
+    frame_pixels: u64,
 }
 
 /// Most pixels, per pixel of [`crate::Limits::max_pixels`], that the QuickTime
 /// images of one picture may decode to in total.
 const MAX_QUICKTIME_PIXELS_PER_PIXEL: u64 = 4;
+
+/// Most region pixels, per pixel of [`crate::Limits::max_pixels`], that the
+/// region frames of one picture may erode in total.
+const MAX_FRAME_PIXELS_PER_PIXEL: u64 = 4;
 
 impl<'a> Renderer<'a> {
     fn new(parser: &'a PictParser, limits: &'a crate::Limits, geometry: Geometry) -> Self {
@@ -453,6 +459,7 @@ impl<'a> Renderer<'a> {
             painted_vector: false,
             bitmap_scale: 1.0,
             quicktime_pixels: 0,
+            frame_pixels: 0,
         }
     }
 
@@ -1130,6 +1137,22 @@ impl<'a> Renderer<'a> {
             return;
         }
         let pen = pen.unwrap_or((1.0, 1.0));
+        // The paint is resolved first: a shape that paints nothing needs no
+        // geometry, however expensive its outline would be.
+        let paint = match verb {
+            Verb::Frame | Verb::Paint => {
+                self.pattern_paint(self.state.pen_pattern, self.state.pen_mode)
+            },
+            Verb::Erase => self.pattern_paint(self.state.background_pattern, 8),
+            Verb::Fill => self.pattern_paint(self.state.fill_pattern, 8),
+            Verb::Invert => {
+                self.note_xor();
+                Paint::Blend(WHITE, "difference")
+            },
+        };
+        if matches!(paint, Paint::None) {
+            return;
+        }
         let mut path = String::new();
         let mut even_odd = false;
         let area = match &shape {
@@ -1208,6 +1231,19 @@ impl<'a> Renderer<'a> {
                 let origin = self.state.origin;
                 let map = |x: f64, y: f64| (x - f64::from(origin.0), y - f64::from(origin.1));
                 if verb == Verb::Frame {
+                    let pixels = region_area(region);
+                    let budget = self
+                        .limits
+                        .max_pixels
+                        .saturating_mul(MAX_FRAME_PIXELS_PER_PIXEL);
+                    if self.frame_pixels.saturating_add(pixels) > budget {
+                        self.note(
+                            "pict-frame-region",
+                            format!("region frames beyond {budget} region pixels are not drawn"),
+                        );
+                        return;
+                    }
+                    self.frame_pixels += pixels;
                     match frame_region(region, self.state.pen_size) {
                         Some(frame) => frame.write_path(&mut path, map),
                         None => {
@@ -1223,17 +1259,6 @@ impl<'a> Renderer<'a> {
                 }
             },
         }
-        let paint = match verb {
-            Verb::Frame | Verb::Paint => {
-                self.pattern_paint(self.state.pen_pattern, self.state.pen_mode)
-            },
-            Verb::Erase => self.pattern_paint(self.state.background_pattern, 8),
-            Verb::Fill => self.pattern_paint(self.state.fill_pattern, 8),
-            Verb::Invert => {
-                self.note_xor();
-                Paint::Blend(WHITE, "difference")
-            },
-        };
         self.emit_path(&path, paint, even_odd, area);
     }
 
@@ -2150,6 +2175,24 @@ fn read_polygon(data: &[u8]) -> Vec<(i32, i32)> {
 
 /// `FrameRgn`: the region minus the region inset by the pen, computed on the
 /// region's pixel mask.
+/// Pixels of the mask that framing `region` erodes: the bounding box of its
+/// rectangles.
+fn region_area(region: &Region) -> u64 {
+    let span = |low: Option<i32>, high: Option<i32>| match (low, high) {
+        (Some(low), Some(high)) => u64::try_from(i64::from(high) - i64::from(low)).unwrap_or(0),
+        _ => 0,
+    };
+    let width = span(
+        region.rects.iter().map(|rect| rect[0]).min(),
+        region.rects.iter().map(|rect| rect[2]).max(),
+    );
+    let height = span(
+        region.rects.iter().map(|rect| rect[1]).min(),
+        region.rects.iter().map(|rect| rect[3]).max(),
+    );
+    width.saturating_mul(height)
+}
+
 fn frame_region(region: &Region, pen: (i32, i32)) -> Option<Region> {
     let (pen_width, pen_height) = pen;
     if pen_width <= 0 || pen_height <= 0 || region.rects.is_empty() {
@@ -2745,5 +2788,49 @@ mod tests {
                 .sum::<i32>(),
             2000 * 2000
         );
+    }
+
+    /// A rectangular region record covering `bounds`.
+    fn rect_region(bounds: [i16; 4]) -> Vec<u8> {
+        let mut data = 10u16.to_be_bytes().to_vec();
+        push_rect(&mut data, bounds);
+        data
+    }
+
+    #[test]
+    fn region_frames_with_an_invisible_pen_do_no_work() {
+        let mut records = Vec::new();
+        op(&mut records, 0x0009, &[0; 8]); // PnPat: all clear
+        op(&mut records, 0x0008, &9u16.to_be_bytes()); // PnMode: patOr
+        op(&mut records, 0x0007, &[0, 64, 0, 64]); // PnSize 64x64
+        op(&mut records, 0x0080, &rect_region([0, 0, 2000, 2000])); // frameRgn
+        for _ in 0..200_000 {
+            op(&mut records, 0x0088, &[]); // frameSameRgn
+        }
+        let started = std::time::Instant::now();
+        let rendered = play_frame([0, 0, 2000, 2000], &records);
+        assert!(started.elapsed() < std::time::Duration::from_secs(20));
+        assert!(!rendered.svg.contains("<path"), "{}", rendered.svg);
+    }
+
+    #[test]
+    fn region_frames_share_one_budget_per_picture() {
+        let mut records = Vec::new();
+        op(&mut records, 0x0007, &[0, 8, 0, 8]); // PnSize 8x8
+        op(&mut records, 0x0080, &rect_region([0, 0, 1000, 1000])); // frameRgn
+        for _ in 0..8 {
+            op(&mut records, 0x0088, &[]); // frameSameRgn
+        }
+        records.extend_from_slice(&0x00FFu16.to_be_bytes());
+        let data = version2_picture([0, 0, 1000, 1000], &records);
+        let limits = crate::Limits {
+            max_pixels: 250_000,
+            ..crate::Limits::default()
+        };
+        let parser = PictParser::new(&data, &limits).unwrap();
+        let rendered = render(&parser, &limits).unwrap();
+        assert!(codes(&rendered).contains(&"pict-frame-region"));
+        // Only the frame that fits the budget is drawn.
+        assert_eq!(rendered.svg.matches("<path").count(), 1, "{}", rendered.svg);
     }
 }

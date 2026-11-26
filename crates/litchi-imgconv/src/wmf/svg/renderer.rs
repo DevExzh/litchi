@@ -2742,6 +2742,18 @@ impl<'hook> SvgRenderer<'hook> {
             if bracket.first.len() > MAX_STROKED_BRACKET_FILLS {
                 return None;
             }
+            // Each XOR fill repeats every middle fill; give up before that
+            // output could exceed the caller's limit.
+            let middle_bytes = bracket
+                .middles
+                .iter()
+                .map(|middle| middle.element.len())
+                .fold(0usize, usize::saturating_add);
+            if middle_bytes.saturating_mul(bracket.first.len().saturating_add(1))
+                > self.max_output_bytes
+            {
+                return None;
+            }
             for shape in &bracket.first {
                 let middles = self.paint_middles(&bracket.middles, &paint, shape.color)?;
                 if middles.is_empty() {
@@ -2749,6 +2761,9 @@ impl<'hook> SvgRenderer<'hook> {
                 }
                 let id = self.bracket_clip(&shape.element);
                 output.push_str(&format!(r#"<g clip-path="url(#{id})">{middles}</g>"#));
+                if output.len() > self.max_output_bytes {
+                    return None;
+                }
             }
             return Some(output);
         }
@@ -4248,6 +4263,45 @@ mod tests {
         large.max_output_bytes = 1000;
         assert!(fills(&mut large, 100) < 20);
         assert!(large.xor_bracket.is_none());
+    }
+
+    /// An XOR bracket whose middle fill is outlined with the stock black
+    /// pen; returns what the second XOR pass resolves to.
+    fn stroked_xor_bracket(renderer: &mut SvgRenderer<'_>) -> Option<String> {
+        let pass = |renderer: &mut SvgRenderer<'_>| {
+            renderer.render_record(&rec(record::SET_ROP2, &[7, 0]));
+            let mut last = None;
+            for ((left, right), color) in [((0, 20), 0x0000_00ff), ((20, 40), 0x0000_ff00)] {
+                select_null_pen_and_brush(renderer, color);
+                last = renderer.render_record(&polygon(&[
+                    (left, 0),
+                    (right, 0),
+                    (right, 50),
+                    (left, 50),
+                ]));
+            }
+            last
+        };
+        pass(renderer);
+        renderer.render_record(&rec(record::SET_ROP2, &[13, 0]));
+        select_null_pen_and_brush(renderer, 0);
+        renderer.render_record(&rec(record::SELECT_OBJECT, &[7, 0x80]));
+        renderer.render_record(&polygon(&[(0, 0), (40, 0), (0, 40)]));
+        pass(renderer)
+    }
+
+    #[test]
+    fn stroked_xor_bracket_output_stays_within_the_output_limit() {
+        let mut unlimited = renderer();
+        let full = stroked_xor_bracket(&mut unlimited).unwrap();
+        assert!(full.contains("wmf-xor-clip"), "{full}");
+        let mut limited = renderer();
+        limited.max_output_bytes = full.len() - 1;
+        let output = stroked_xor_bracket(&mut limited);
+        assert!(
+            output.is_none_or(|output| output.len() <= limited.max_output_bytes),
+            "the stroked bracket exceeded its output limit"
+        );
     }
 
     #[test]
