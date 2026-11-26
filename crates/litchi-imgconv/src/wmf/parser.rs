@@ -449,7 +449,11 @@ pub enum WmfParserWarning {
         available: usize,
     },
     /// The record stream ends without a `META_EOF` record.
-    MissingEof,
+    MissingEof {
+        /// Whether the last record ends exactly where `mtSize` says the
+        /// metafile ends, so nothing indicates that records were lost.
+        at_declared_end: bool,
+    },
 }
 
 /// WMF file parser
@@ -661,7 +665,9 @@ impl WmfParser {
             if !compatible {
                 return Err(Error::ParseError("Missing WMF EOF record".into()));
             }
-            warnings.push(WmfParserWarning::MissingEof);
+            warnings.push(WmfParserWarning::MissingEof {
+                at_declared_end: incomplete.is_none() && declared_end == end,
+            });
         } else if trailing > 0 {
             if !compatible {
                 return Err(Error::ParseError(
@@ -1058,7 +1064,9 @@ mod tests {
                     offset: 26,
                     available: 4,
                 },
-                WmfParserWarning::MissingEof,
+                WmfParserWarning::MissingEof {
+                    at_declared_end: false,
+                },
             ]
         );
     }
@@ -1069,7 +1077,12 @@ mod tests {
         put_u16(&mut missing, 30, 0x0001);
         assert!(WmfParser::new(&missing, &crate::Limits::default()).is_err());
         let parsed = WmfParser::new_compatible(&missing, &crate::Limits::default()).unwrap();
-        assert_eq!(parsed.warnings(), &[WmfParserWarning::MissingEof]);
+        assert_eq!(
+            parsed.warnings(),
+            &[WmfParserWarning::MissingEof {
+                at_declared_end: true,
+            }]
+        );
 
         let mut placeable = with_placeable(valid_wmf());
         put_u16(&mut placeable, 20, 0x1234);

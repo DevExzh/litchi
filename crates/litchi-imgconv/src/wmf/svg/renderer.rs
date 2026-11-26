@@ -440,7 +440,12 @@ impl<'hook> SvgRenderer<'hook> {
             None
         };
         let Some(target) = target.filter(|&index| index < self.saved_states.len()) else {
-            self.warn(format!("ignored invalid RestoreDC level {level}"));
+            // GDI fails a RestoreDC level that names no saved state and leaves
+            // the device context unchanged.
+            self.note(
+                "noncanonical-wmf-restore-dc-level",
+                format!("ignored RestoreDC level {level}, which names no saved state"),
+            );
             return;
         };
         // The target snapshot becomes the live state. Moving it avoids an
@@ -620,12 +625,20 @@ impl<'hook> SvgRenderer<'hook> {
                 }
                 self.state.font = value.clone();
             },
-            Some(GdiObject::Palette(_)) | Some(GdiObject::Region(_)) => {
-                self.warn(format!(
-                    "SelectObject ignored non-selectable object {handle}"
-                ));
-            },
-            None => self.fatal(format!("SelectObject references missing object {handle}")),
+            // GDI selects a region object as the clip region, like
+            // SelectClipRgn with a copy.
+            Some(GdiObject::Region(_)) => self.select_clip_region_object(handle),
+            // A palette is selected with SelectPalette; SelectObject refuses it.
+            Some(GdiObject::Palette(_)) => self.note(
+                "noncanonical-wmf-select-palette-object",
+                format!("SelectObject ignored palette object {handle}"),
+            ),
+            // A handle without an object makes SelectObject fail, which
+            // leaves the selection unchanged.
+            None => self.note(
+                "noncanonical-wmf-select-missing-object",
+                format!("SelectObject ignored missing object {handle}"),
+            ),
         }
     }
 
@@ -635,7 +648,11 @@ impl<'hook> SvgRenderer<'hook> {
             return;
         };
         if index & stock::FLAG == 0 && !self.objects.delete(usize::from(index)) {
-            self.warn(format!("DeleteObject references missing object {index}"));
+            // GDI fails deleting a handle that holds no object.
+            self.note(
+                "noncanonical-wmf-delete-missing-object",
+                format!("DeleteObject ignored missing object {index}"),
+            );
         }
     }
 
@@ -652,7 +669,12 @@ impl<'hook> SvgRenderer<'hook> {
         ) {
             self.state.palette_index = Some(usize::from(index));
         } else {
-            self.fatal(format!("SelectPalette references missing palette {index}"));
+            // A handle without a palette makes SelectPalette fail, which
+            // leaves the selected palette unchanged.
+            self.note(
+                "noncanonical-wmf-select-missing-palette",
+                format!("SelectPalette ignored missing palette {index}"),
+            );
         }
     }
 
@@ -801,10 +823,25 @@ impl<'hook> SvgRenderer<'hook> {
             self.malformed(record::SELECT_CLIP_REGION, "region index");
             return;
         };
+        if !matches!(
+            self.objects.get(usize::from(index)),
+            Some(GdiObject::Region(_))
+        ) {
+            // SelectClipRgn with no region removes the clip region.
+            self.note(
+                "noncanonical-wmf-select-missing-region",
+                format!("SelectClipRegion found no region {index}; the clip region is removed"),
+            );
+            self.state.clip = ClipRegion::default();
+            self.bump_clip_revision();
+            return;
+        }
+        self.select_clip_region_object(index);
+    }
+
+    /// Makes the region stored under `index` the clip region.
+    fn select_clip_region_object(&mut self, index: u16) {
         let Some(GdiObject::Region(region)) = self.objects.get(usize::from(index)) else {
-            self.fatal(format!(
-                "SelectClipRegion references missing region {index}"
-            ));
             return;
         };
         let rect_count = region.rects.len();

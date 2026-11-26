@@ -159,37 +159,57 @@ fn malformed_emf_lengths_and_missing_eof_are_rejected() {
 }
 
 #[test]
-fn malformed_wmf_lengths_missing_eof_and_checksum_are_rejected() {
+fn wmf_framing_defects_render_with_diagnostics_or_stay_rejected() {
+    // GDI never reads the placeable checksum.
     let mut bad_checksum = wmf_vector(10, 10);
     bad_checksum[20..22].copy_from_slice(&0_u16.to_le_bytes());
-    assert_err(
+    let converted = convert(
         &bad_checksum,
         InputFormat::Wmf,
         OutputFormat::Svg,
         Options::default(),
     );
+    assert_eq!(
+        converted.report.diagnostics[0].code,
+        "noncanonical-wmf-placeable-header"
+    );
 
+    // Playback ends with the last record when no terminator follows it.
     let wmf_without_eof = wmf_file(
         10,
         10,
         &[wmf_record(WMF_RECTANGLE, &wmf_rect(0, 0, 10, 10))],
     );
-    assert_err(
+    let converted = convert(
         &wmf_without_eof,
         InputFormat::Wmf,
         OutputFormat::Svg,
         Options::default(),
     );
+    assert_eq!(
+        converted.report.diagnostics[0].code,
+        "noncanonical-wmf-missing-eof"
+    );
 
+    // A record length that runs past the input stops playback: the picture
+    // is an approximation, so the strict helper refuses it.
     let mut overlong_record = wmf_vector(10, 10);
     let record_offset = WMF_PLACEABLE_SIZE + WMF_HEADER_SIZE;
     overlong_record[record_offset..record_offset + 4].copy_from_slice(&u32::MAX.to_le_bytes());
-    assert_err(
+    let converted = convert(
         &overlong_record,
         InputFormat::Wmf,
         OutputFormat::Svg,
         Options::default(),
     );
+    assert!(
+        converted
+            .report
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "wmf-truncated-record")
+    );
+    assert!(litchi_imgconv::wmf::convert_wmf_to_svg(&overlong_record).is_err());
 }
 
 #[test]

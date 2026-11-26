@@ -482,8 +482,14 @@ fn wmf_parser_diagnostic(warning: &crate::wmf::parser::WmfParserWarning) -> Conv
                 "playback stops at offset {offset}: {available} bytes do not form a complete record"
             ),
         ),
-        WmfParserWarning::MissingEof => (
-            "wmf-missing-eof",
+        WmfParserWarning::MissingEof { at_declared_end } => (
+            // Playback ends with the last record; only a stream that stops
+            // exactly where mtSize says it ends is known to be complete.
+            if at_declared_end {
+                "noncanonical-wmf-missing-eof"
+            } else {
+                "wmf-missing-eof"
+            },
             "the record stream ends without a META_EOF record".to_owned(),
         ),
     };
