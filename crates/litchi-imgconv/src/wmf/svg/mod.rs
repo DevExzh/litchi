@@ -133,8 +133,14 @@ impl WmfConverter {
         ))
     }
 
-    fn render(&self) -> (String, Vec<renderer::RenderIssue>) {
-        let (bbox, mapping) = if let Some(placeable) = &self.parser.placeable {
+    /// Frame rectangle and playback mapping of the picture.
+    ///
+    /// A placeable header declares the frame in logical units. Without one,
+    /// the metafile declares nothing: the first window extent that can frame
+    /// a picture is the frame players give it, and the records' drawn bounds
+    /// say how much of it they use.
+    fn frame(&self) -> ((f64, f64, f64, f64), MappingState) {
+        if let Some(placeable) = &self.parser.placeable {
             let bbox = normalized_bbox((
                 f64::from(placeable.left),
                 f64::from(placeable.top),
@@ -152,7 +158,29 @@ impl WmfConverter {
             let mapping = MappingState::playback((0.0, 0.0), extent);
             let bbox = BoundsCalculator::scan_records(&self.parser.records, mapping).as_tuple();
             (bbox, mapping)
-        };
+        }
+    }
+
+    /// Size a raster converter samples the picture at.
+    ///
+    /// A placeable header declares the display size of the picture in logical
+    /// units. A metafile without one declares no size, so it gets the size of
+    /// its SVG canvas, which keeps the aspect ratio of the frame its own
+    /// records describe.
+    pub(crate) fn natural_size(&self) -> (u32, u32) {
+        if let Some(placeable) = &self.parser.placeable {
+            return (
+                u32::from(placeable.width().unsigned_abs()).max(1),
+                u32::from(placeable.height().unsigned_abs()).max(1),
+            );
+        }
+        let (bbox, _) = self.frame();
+        let (width, height) = Self::calculate_dimensions(bbox);
+        (rounded_dimension(width), rounded_dimension(height))
+    }
+
+    fn render(&self) -> (String, Vec<renderer::RenderIssue>) {
+        let (bbox, mapping) = self.frame();
         let (svg_width, svg_height) = Self::calculate_dimensions(bbox);
         let transform = CoordinateTransform::new(bbox, svg_width, svg_height);
         let mut renderer = SvgRenderer::new(
@@ -302,6 +330,15 @@ fn svg_element_count(fragment: &str) -> usize {
         .count()
 }
 
+/// Rounds a canvas dimension to the pixel size a raster samples it at.
+fn rounded_dimension(value: f64) -> u32 {
+    if value.is_finite() {
+        value.round().clamp(1.0, f64::from(u16::MAX)) as u32
+    } else {
+        1
+    }
+}
+
 fn normalized_bbox(bbox: (f64, f64, f64, f64)) -> (f64, f64, f64, f64) {
     let left = bbox.0.min(bbox.2);
     let top = bbox.1.min(bbox.3);
@@ -349,5 +386,98 @@ mod tests {
         assert!(svg.ends_with("</svg>"));
         assert!(!svg.contains("NaN"));
         assert!(!svg.contains("inf"));
+    }
+
+    /// A memory metafile made of `(function, parameters)` records, optionally
+    /// behind a placeable header.
+    fn wmf(records: &[(u16, Vec<u8>)], placeable: Option<(i16, i16, i16, i16)>) -> Vec<u8> {
+        let mut actions = Vec::new();
+        let mut max_record = 0_u32;
+        for (function, params) in records {
+            let mut body = function.to_le_bytes().to_vec();
+            body.extend_from_slice(params);
+            if body.len() % 2 != 0 {
+                body.push(0);
+            }
+            let words = u32::try_from((body.len() + 4) / 2).unwrap();
+            max_record = max_record.max(words);
+            actions.extend_from_slice(&words.to_le_bytes());
+            actions.extend_from_slice(&body);
+        }
+        let mut out = Vec::new();
+        if let Some((left, top, right, bottom)) = placeable {
+            let mut header = vec![0_u8; 22];
+            header[0..4].copy_from_slice(&0x9ac6_cdd7_u32.to_le_bytes());
+            header[6..8].copy_from_slice(&left.to_le_bytes());
+            header[8..10].copy_from_slice(&top.to_le_bytes());
+            header[10..12].copy_from_slice(&right.to_le_bytes());
+            header[12..14].copy_from_slice(&bottom.to_le_bytes());
+            header[14..16].copy_from_slice(&1440_u16.to_le_bytes());
+            let checksum = header[..20]
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|word| u16::from_le_bytes([word[0], word[1]]))
+                .fold(0_u16, |value, word| value ^ word);
+            header[20..22].copy_from_slice(&checksum.to_le_bytes());
+            out.extend_from_slice(&header);
+        }
+        let mut header = vec![0_u8; 18];
+        header[0..2].copy_from_slice(&1_u16.to_le_bytes());
+        header[2..4].copy_from_slice(&9_u16.to_le_bytes());
+        header[4..6].copy_from_slice(&0x0300_u16.to_le_bytes());
+        // The declared size covers the standard header and the records of the
+        // metafile itself, not the placeable header in front of them.
+        let words = u32::try_from((18 + actions.len()) / 2).unwrap();
+        header[6..10].copy_from_slice(&words.to_le_bytes());
+        header[12..16].copy_from_slice(&max_record.to_le_bytes());
+        out.extend_from_slice(&header);
+        out.extend_from_slice(&actions);
+        out
+    }
+
+    fn window_extent(width: i16, height: i16) -> (u16, Vec<u8>) {
+        let mut params = Vec::new();
+        params.extend_from_slice(&height.to_le_bytes());
+        params.extend_from_slice(&width.to_le_bytes());
+        (0x000b, params)
+    }
+
+    fn line(from: (i16, i16), to: (i16, i16)) -> Vec<(u16, Vec<u8>)> {
+        let mut move_params = Vec::new();
+        move_params.extend_from_slice(&from.1.to_le_bytes());
+        move_params.extend_from_slice(&from.0.to_le_bytes());
+        let mut line_params = Vec::new();
+        line_params.extend_from_slice(&to.1.to_le_bytes());
+        line_params.extend_from_slice(&to.0.to_le_bytes());
+        vec![(0x0214, move_params), (0x0213, line_params)]
+    }
+
+    #[test]
+    fn a_metafile_without_a_placeable_header_keeps_its_own_aspect_ratio() {
+        let mut records = vec![window_extent(768, 34)];
+        records.extend(line((0, 0), (768, 34)));
+        records.push((0x0000, Vec::new()));
+        let data = wmf(&records, None);
+        let parser = WmfParser::new(&data, &crate::Limits::default()).expect("parse WMF");
+        let converter = WmfConverter::new(parser);
+        assert_eq!(converter.natural_size(), (768, 34));
+        let svg = converter.to_svg().expect("render WMF");
+        assert!(svg.contains(r#"width="768" height="34""#), "{svg}");
+    }
+
+    #[test]
+    fn a_placeable_header_declares_the_natural_size() {
+        let mut records = vec![window_extent(768, 34)];
+        records.extend(line((0, 0), (768, 34)));
+        records.push((0x0000, Vec::new()));
+        let data = wmf(&records, Some((10, 20, 110, 220)));
+        let parser = WmfParser::new(&data, &crate::Limits::default()).expect("parse WMF");
+        assert_eq!(WmfConverter::new(parser).natural_size(), (100, 200));
+        // A rectangle recorded right to left and bottom to top has the same
+        // size.
+        let data = wmf(&records, Some((110, 220, 10, 20)));
+        let parser = WmfParser::new(&data, &crate::Limits::default()).expect("parse WMF");
+        assert_eq!(WmfConverter::new(parser).natural_size(), (100, 200));
     }
 }

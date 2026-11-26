@@ -407,8 +407,6 @@ fn raw_metafile_svg(
             let parser = crate::wmf::WmfParser::new_compatible(data, limits)?;
             check_record_count(parser.records.len(), limits)?;
             check_wmf_playback_limits(&parser, limits)?;
-            let width = positive(parser.width());
-            let height = positive(parser.height());
             let bitmap_only = parser
                 .records
                 .iter()
@@ -421,8 +419,9 @@ fn raw_metafile_svg(
                 .iter()
                 .map(wmf_parser_diagnostic)
                 .collect();
-            let (svg, warnings) =
-                crate::wmf::WmfSvgConverter::with_limits(parser, *limits).to_svg_reported()?;
+            let converter = crate::wmf::WmfSvgConverter::with_limits(parser, *limits);
+            let (width, height) = converter.natural_size();
+            let (svg, warnings) = converter.to_svg_reported()?;
             diagnostics.extend(
                 warnings
                     .into_iter()

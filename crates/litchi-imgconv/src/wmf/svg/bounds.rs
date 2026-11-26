@@ -377,13 +377,19 @@ impl BoundsCalculator {
             .normalized_or_fallback()
     }
 
-    /// Window extent of the first SetWindowExt record, the extent a player
-    /// gives the frame of a metafile without a placeable header.
+    /// Window extent of the first SetWindowExt record that can frame a
+    /// picture, the extent a player gives the frame of a metafile without a
+    /// placeable header.
+    ///
+    /// Some producers reset the window to one unit before they set the
+    /// extent the picture is drawn in; a window one unit wide or high holds
+    /// no picture, so it does not frame one.
     pub(super) fn first_window_extent(records: &[WmfRecord]) -> Option<(f64, f64)> {
         records
             .iter()
-            .find(|rec| record::canonical(rec.function) == record::SET_WINDOW_EXT)
-            .and_then(|rec| point_at(rec, 0))
+            .filter(|rec| record::canonical(rec.function) == record::SET_WINDOW_EXT)
+            .filter_map(|rec| point_at(rec, 0))
+            .find(|(width, height)| width.abs() > 1.0 && height.abs() > 1.0)
     }
 
     fn restore_dc(state: &mut ReplayState, saves: &mut Vec<ReplaySnapshot>, rec: &WmfRecord) {
@@ -823,6 +829,25 @@ mod tests {
         ];
         let bounds = BoundsCalculator::scan_records(&records, MappingState::default());
         assert_eq!(bounds.as_tuple(), (40.0, -180.0, 360.0, -20.0));
+    }
+
+    #[test]
+    fn a_one_unit_window_does_not_frame_the_picture() {
+        let records = [
+            record(record::SET_MAP_MODE, &[map_mode::MM_ANISOTROPIC as i16]),
+            record(record::SET_WINDOW_EXT, &[1, 1]),
+            record(record::SET_WINDOW_EXT, &[189, 342]),
+            record(record::SET_WINDOW_EXT, &[10, 20]),
+        ];
+        assert_eq!(
+            BoundsCalculator::first_window_extent(&records),
+            Some((342.0, 189.0))
+        );
+        assert_eq!(
+            BoundsCalculator::first_window_extent(&records[..2]),
+            None,
+            "no window extent frames the picture"
+        );
     }
 
     #[test]
