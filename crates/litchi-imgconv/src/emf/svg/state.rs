@@ -94,7 +94,6 @@ impl RenderState {
     /// input without changing the picture; any other code reports an
     /// approximation that strict conversion rejects. Repeated facts are
     /// reported once, and the list is bounded.
-    #[allow(dead_code, reason = "lanes adopt typed codes incrementally")]
     pub fn note(&mut self, code: &'static str, message: String) {
         if self.diagnostics.len() < MAX_DIAGNOSTICS
             && !self

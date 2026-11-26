@@ -3185,7 +3185,6 @@ impl<'hook> SvgRenderer<'hook> {
     /// Use a `noncanonical-` code when Windows GDI playback tolerates the
     /// input without changing the picture; any other code reports an
     /// approximation that strict conversion rejects.
-    #[allow(dead_code, reason = "lanes adopt typed codes incrementally")]
     fn note(&mut self, code: &'static str, message: String) {
         if !self
             .issues
