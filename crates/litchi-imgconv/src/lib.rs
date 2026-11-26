@@ -21,6 +21,7 @@ pub mod pict;
 mod raster;
 pub mod svg;
 pub mod svg_utils;
+mod text_charset;
 pub mod wmf;
 
 pub use codec::{

@@ -69,6 +69,20 @@ impl WmfPlaceableHeader {
 
     /// Parse placeable header from data
     pub fn parse(data: &[u8]) -> Result<Self> {
+        let (header, integrity) = Self::parse_compatible(data)?;
+        if let Some(field) = integrity {
+            return Err(Error::ParseError(field.to_string()));
+        }
+        Ok(header)
+    }
+
+    /// Parses the placeable header while reporting, rather than rejecting, an
+    /// inconsistent integrity field.
+    ///
+    /// The key and the fixed header length identify the header; the reserved
+    /// field, the units-per-inch field and the checksum are consistency hints
+    /// that playback does not depend on.
+    pub fn parse_compatible(data: &[u8]) -> Result<(Self, Option<&'static str>)> {
         if data.len() < 22 {
             return Err(Error::ParseError("WMF placeable header too short".into()));
         }
@@ -97,32 +111,28 @@ impl WmfPlaceableHeader {
             .iter()
             .map(|word| u16::from_le_bytes([word[0], word[1]]))
             .fold(0u16, |value, word| value ^ word);
-        if reserved != 0 {
-            return Err(Error::ParseError(
-                "WMF placeable reserved field is nonzero".into(),
-            ));
-        }
-        if inch == 0 {
-            return Err(Error::ParseError(
-                "WMF placeable units-per-inch must be nonzero".into(),
-            ));
-        }
-        if checksum != calculated_checksum {
-            return Err(Error::ParseError(format!(
-                "Invalid WMF placeable checksum: expected 0x{:04X}, found 0x{:04X}",
-                calculated_checksum, checksum
-            )));
-        }
+        let integrity = if reserved != 0 {
+            Some("WMF placeable reserved field is nonzero")
+        } else if inch == 0 {
+            Some("WMF placeable units-per-inch must be nonzero")
+        } else if checksum != calculated_checksum {
+            Some("Invalid WMF placeable checksum")
+        } else {
+            None
+        };
 
-        Ok(Self {
-            key,
-            left,
-            top,
-            right,
-            bottom,
-            inch,
-            checksum,
-        })
+        Ok((
+            Self {
+                key,
+                left,
+                top,
+                right,
+                bottom,
+                inch,
+                checksum,
+            },
+            integrity,
+        ))
     }
 
     /// Get width
@@ -158,6 +168,21 @@ pub struct WmfHeader {
 impl WmfHeader {
     /// Parse WMF standard header
     pub fn parse(data: &[u8]) -> Result<Self> {
+        let (header, deviation) = Self::parse_compatible(data)?;
+        if let Some(deviation) = deviation {
+            return Err(Error::ParseError(deviation.message()));
+        }
+        Ok(header)
+    }
+
+    /// Parses the standard header while reporting, rather than rejecting, a
+    /// declared value that playback does not depend on.
+    ///
+    /// `mtSize` locates the record stream end for recording tools and
+    /// `mtMaxRecord` only sizes their buffers; playback follows the record
+    /// lengths themselves. The fixed header fields that determine where the
+    /// records start stay mandatory.
+    pub fn parse_compatible(data: &[u8]) -> Result<(Self, Option<WmfHeaderDeviation>)> {
         if data.len() < 18 {
             return Err(Error::ParseError("WMF header too short".into()));
         }
@@ -185,38 +210,58 @@ impl WmfHeader {
         }
         if !matches!(version, 0x0100 | 0x0300) {
             return Err(Error::ParseError(format!(
-                "Unsupported WMF version: 0x{:04X}",
-                version
-            )));
-        }
-        if file_size < 12 {
-            return Err(Error::ParseError(format!(
-                "Invalid WMF file size: {} words",
-                file_size
-            )));
-        }
-        if max_record < 3 || max_record > file_size.saturating_sub(u32::from(header_size)) {
-            return Err(Error::ParseError(format!(
-                "Invalid WMF maximum record size: {} words",
-                max_record
-            )));
-        }
-        if u32::from(num_objects) > file_size.saturating_sub(u32::from(header_size)) / 3 {
-            return Err(Error::ParseError(format!(
-                "WMF object count {} cannot fit in the declared file size",
-                num_objects
+                "Unsupported WMF version: 0x{version:04X}"
             )));
         }
 
-        Ok(Self {
-            file_type,
-            header_size,
-            version,
-            file_size,
-            num_objects,
-            max_record,
-            num_params,
-        })
+        let deviation = if file_size < 12 {
+            Some(WmfHeaderDeviation::FileSize(file_size))
+        } else if max_record < 3 || max_record > file_size.saturating_sub(u32::from(header_size)) {
+            Some(WmfHeaderDeviation::MaxRecord(max_record))
+        } else if u32::from(num_objects) > file_size.saturating_sub(u32::from(header_size)) / 3 {
+            Some(WmfHeaderDeviation::ObjectCount(num_objects))
+        } else {
+            None
+        };
+        Ok((
+            Self {
+                file_type,
+                header_size,
+                version,
+                file_size,
+                num_objects,
+                max_record,
+                num_params,
+            },
+            deviation,
+        ))
+    }
+}
+
+/// A declared standard-header value that record playback does not depend on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WmfHeaderDeviation {
+    /// `mtSize` cannot hold the fixed header and a terminating record.
+    FileSize(u32),
+    /// `mtMaxRecord` is not a record length inside the declared file size.
+    MaxRecord(u32),
+    /// `mtNoObjects` cannot fit in the declared file size.
+    ObjectCount(u16),
+}
+
+impl WmfHeaderDeviation {
+    /// Human-readable description with the strict-validation wording.
+    #[must_use]
+    pub fn message(self) -> String {
+        match self {
+            Self::FileSize(words) => format!("Invalid WMF file size: {words} words"),
+            Self::MaxRecord(words) => {
+                format!("Invalid WMF maximum record size: {words} words")
+            },
+            Self::ObjectCount(objects) => {
+                format!("WMF object count {objects} cannot fit in the declared file size")
+            },
+        }
     }
 }
 
@@ -241,6 +286,14 @@ impl WmfRecord {
     /// # Returns
     /// A tuple of (parsed record, bytes consumed)
     pub fn parse(data: &Bytes, offset: usize, limits: &crate::Limits) -> Result<(Self, usize)> {
+        Self::check_input(data, offset, limits)?;
+        match Self::scan(data, offset, limits)? {
+            RecordScan::Complete { record, consumed } => Ok((record, consumed)),
+            RecordScan::Incomplete(reason) => Err(Error::ParseError(reason.message(offset))),
+        }
+    }
+
+    fn check_input(data: &[u8], offset: usize, limits: &crate::Limits) -> Result<()> {
         if limits.max_uncompressed_bytes == 0 || limits.max_records == 0 {
             return Err(Error::ParseError(
                 "WMF record parser limits must be greater than zero".into(),
@@ -258,21 +311,20 @@ impl WmfRecord {
                 offset
             )));
         }
-        let header_end = offset
-            .checked_add(6)
-            .ok_or_else(|| Error::ParseError("WMF record offset overflow".into()))?;
-        if header_end > data.len() {
-            return Err(Error::ParseError("Insufficient data for WMF record".into()));
-        }
+        Ok(())
+    }
 
+    /// Reads one record header and its payload.
+    ///
+    /// Structural problems are reported as [`RecordScan::Incomplete`] so that
+    /// playback can stop there; only a caller limit is an error.
+    fn scan(data: &Bytes, offset: usize, limits: &crate::Limits) -> Result<RecordScan> {
+        let Some(header) = data.get(offset..offset.saturating_add(6)) else {
+            return Ok(RecordScan::Incomplete(IncompleteRecord::Header));
+        };
         // Parse record header manually to avoid zerocopy alignment issues
-        let size = u32::from_le_bytes([
-            data[offset],
-            data[offset + 1],
-            data[offset + 2],
-            data[offset + 3],
-        ]);
-        let function = u16::from_le_bytes([data[offset + 4], data[offset + 5]]);
+        let size = u32::from_le_bytes([header[0], header[1], header[2], header[3]]);
+        let function = u16::from_le_bytes([header[4], header[5]]);
 
         // Size is in words (16-bit), convert to bytes
         let size_words = usize::try_from(size)
@@ -283,12 +335,14 @@ impl WmfRecord {
         let end = offset
             .checked_add(size_bytes)
             .ok_or_else(|| Error::ParseError("WMF record range overflow".into()))?;
-
-        if size < 3 || end > data.len() {
-            return Err(Error::ParseError(format!(
-                "Invalid WMF record size: {} at offset {}",
-                size, offset
-            )));
+        if size < 3 {
+            return Ok(RecordScan::Incomplete(IncompleteRecord::Size(size)));
+        }
+        if end > data.len() {
+            return Ok(RecordScan::Incomplete(IncompleteRecord::Payload {
+                size,
+                available: data.len() - offset,
+            }));
         }
         if size_bytes > limits.max_uncompressed_bytes {
             return Err(Error::ParseError(format!(
@@ -297,24 +351,109 @@ impl WmfRecord {
             )));
         }
 
-        // Parameters start after size and function
+        // Parameters start after size and function.
         // Zero-copy slice: this creates a shallow copy with reference counting
-        let params = data.slice(header_end..end);
-
-        Ok((
-            Self {
+        let params = data.slice(offset + 6..end);
+        Ok(RecordScan::Complete {
+            record: Self {
                 size,
                 function,
                 params,
             },
-            size_bytes,
-        ))
+            consumed: size_bytes,
+        })
     }
 
     /// Check if this is an EOF record
     pub const fn is_eof(&self) -> bool {
         self.function == 0x0000
     }
+}
+
+/// Outcome of reading one record header and its payload.
+enum RecordScan {
+    /// A complete record and its size in bytes.
+    Complete {
+        /// The record that was read.
+        record: WmfRecord,
+        /// Size of the record in bytes.
+        consumed: usize,
+    },
+    /// The bytes at the offset cannot form a complete record.
+    Incomplete(IncompleteRecord),
+}
+
+/// Why the bytes at a record offset do not form a complete record.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum IncompleteRecord {
+    /// Fewer than six bytes remain for the record header.
+    Header,
+    /// The record length cannot cover the size and function words.
+    Size(u32),
+    /// The record length extends beyond the remaining bytes.
+    Payload {
+        /// Declared record length in words.
+        size: u32,
+        /// Bytes available for this record.
+        available: usize,
+    },
+}
+
+impl IncompleteRecord {
+    /// Strict-parser message for this condition.
+    fn message(self, offset: usize) -> String {
+        match self {
+            Self::Header => "Insufficient data for WMF record".to_owned(),
+            Self::Size(size) => format!("Invalid WMF record size: {size} at offset {offset}"),
+            Self::Payload { size, .. } => {
+                format!("Invalid WMF record size: {size} at offset {offset}")
+            },
+        }
+    }
+}
+
+/// A framing deviation that a compatible parser records instead of rejecting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WmfParserWarning {
+    /// A placeable-header integrity field is inconsistent.
+    PlaceableHeader {
+        /// The field or rule that does not hold.
+        field: &'static str,
+    },
+    /// A declared standard-header value that playback does not use.
+    Header(WmfHeaderDeviation),
+    /// `mtSize` disagrees with the bytes present.
+    DeclaredSize {
+        /// Stream end implied by `mtSize`.
+        declared: usize,
+        /// Bytes actually present.
+        actual: usize,
+    },
+    /// `mtMaxRecord` disagrees with the largest record length.
+    MaxRecord {
+        /// Declared maximum record length in words.
+        declared: u32,
+        /// Largest record length in words.
+        found: u32,
+    },
+    /// Bytes follow the `META_EOF` record.
+    TrailingData {
+        /// Number of bytes after the `META_EOF` record.
+        bytes: usize,
+    },
+    /// Playback stops where the remaining bytes cannot form a complete record.
+    TruncatedRecord {
+        /// Offset of the bytes that do not form a record.
+        offset: usize,
+        /// Bytes remaining at that offset.
+        available: usize,
+    },
+    /// The record stream ends without a `META_EOF` record.
+    MissingEof {
+        /// Whether the last record ends exactly where `mtSize` says the
+        /// metafile ends, so nothing indicates that records were lost.
+        at_declared_end: bool,
+    },
 }
 
 /// WMF file parser
@@ -330,6 +469,8 @@ pub struct WmfParser {
     data: Bytes,
     /// Caller-selected raw parser policy retained by compatibility converters.
     limits: crate::Limits,
+    /// Framing deviations accepted instead of rejected.
+    warnings: Vec<WmfParserWarning>,
 }
 
 impl WmfParser {
@@ -347,7 +488,14 @@ impl WmfParser {
         Self::check_input(data, limits)?;
         // Convert to Bytes - requires copying since input is borrowed
         let data = Bytes::copy_from_slice(data);
-        Self::parse_internal(data, *limits)
+        Self::parse_internal(data, *limits, false)
+    }
+
+    /// Creates a parser that accepts the framing deviations Windows playback
+    /// tolerates and records each one as a [`WmfParserWarning`].
+    pub fn new_compatible(data: &[u8], limits: &crate::Limits) -> Result<Self> {
+        Self::check_input(data, limits)?;
+        Self::parse_internal(Bytes::copy_from_slice(data), *limits, true)
     }
 
     /// Create a new WMF parser from owned data (zero-copy)
@@ -364,16 +512,35 @@ impl WmfParser {
         Self::check_input(&data, limits)?;
         // Convert Vec to Bytes without copying
         let data = Bytes::from(data);
-        Self::parse_internal(data, *limits)
+        Self::parse_internal(data, *limits, false)
+    }
+
+    /// Creates a compatible parser from an owned buffer without copying it.
+    pub fn from_owned_compatible(data: Vec<u8>, limits: &crate::Limits) -> Result<Self> {
+        Self::check_input(&data, limits)?;
+        Self::parse_internal(Bytes::from(data), *limits, true)
+    }
+
+    /// Returns the framing deviations accepted while parsing.
+    #[must_use]
+    pub fn warnings(&self) -> &[WmfParserWarning] {
+        &self.warnings
     }
 
     /// Internal parsing implementation shared by both constructors
-    fn parse_internal(data: Bytes, limits: crate::Limits) -> Result<Self> {
+    fn parse_internal(data: Bytes, limits: crate::Limits, compatible: bool) -> Result<Self> {
+        let mut warnings = Vec::new();
         let mut offset = 0usize;
 
         // Check for placeable header
         let placeable = if WmfPlaceableHeader::is_placeable(&data) {
-            let header = WmfPlaceableHeader::parse(&data)?;
+            let (header, integrity) = WmfPlaceableHeader::parse_compatible(&data)?;
+            if let Some(field) = integrity {
+                if !compatible {
+                    return Err(Error::ParseError(field.to_owned()));
+                }
+                warnings.push(WmfParserWarning::PlaceableHeader { field });
+            }
             offset = 22; // Placeable header is 22 bytes
             Some(header)
         } else {
@@ -388,14 +555,31 @@ impl WmfParser {
             return Err(Error::ParseError("WMF data too short for header".into()));
         }
 
-        let header = WmfHeader::parse(&data[offset..])?;
-        if placeable.is_some()
-            && header.file_type == WmfFileType::Disk as u16
-            && u16::from_le_bytes([data[4], data[5]]) != 0
-        {
-            return Err(Error::ParseError(
-                "WMF placeable metafile handle must be zero on disk".into(),
-            ));
+        let (header, deviation) = WmfHeader::parse_compatible(&data[offset..])?;
+        if let Some(deviation) = deviation {
+            if !compatible {
+                return Err(Error::ParseError(deviation.message()));
+            }
+            // An unusable mtSize is reported once, together with the byte
+            // count the record stream really occupies.
+            if !matches!(deviation, WmfHeaderDeviation::FileSize(_)) {
+                warnings.push(WmfParserWarning::Header(deviation));
+            }
+        }
+        if placeable.is_some() && header.file_type == WmfFileType::Disk as u16 {
+            // The placeable header repeats the metafile handle, which is only
+            // meaningful for a memory metafile.
+            let handle = u16::from_le_bytes([data[4], data[5]]);
+            if handle != 0 {
+                if !compatible {
+                    return Err(Error::ParseError(
+                        "WMF placeable metafile handle must be zero on disk".into(),
+                    ));
+                }
+                warnings.push(WmfParserWarning::PlaceableHeader {
+                    field: "WMF placeable metafile handle must be zero on disk",
+                });
+            }
         }
         let metafile_bytes = usize::try_from(header.file_size)
             .map_err(|_| Error::ParseError("WMF file size does not fit in memory".into()))?
@@ -404,16 +588,24 @@ impl WmfParser {
         let declared_end = offset
             .checked_add(metafile_bytes)
             .ok_or_else(|| Error::ParseError("WMF declared range overflow".into()))?;
-        if declared_end != data.len() {
-            return Err(Error::ParseError(format!(
-                "WMF declared byte size {} does not match input length {}",
-                declared_end,
-                data.len()
-            )));
-        }
         offset = header_end;
+        // Playback walks record lengths, so the stream itself bounds the walk;
+        // the declared size only supplies the tail check below.
+        let end = data.len();
+        if declared_end != end {
+            if !compatible {
+                return Err(Error::ParseError(format!(
+                    "WMF declared byte size {} does not match input length {}",
+                    declared_end, end
+                )));
+            }
+            warnings.push(WmfParserWarning::DeclaredSize {
+                declared: declared_end,
+                actual: end,
+            });
+        }
 
-        let record_byte_bound = declared_end.saturating_sub(offset) / 6;
+        let record_byte_bound = end.saturating_sub(offset) / 6;
         let mut records = Vec::with_capacity(
             record_byte_bound
                 .min(Self::MAX_PREALLOCATED_RECORDS)
@@ -421,17 +613,25 @@ impl WmfParser {
         );
         let mut actual_max_record = 0u32;
         let mut saw_eof = false;
+        let mut trailing = 0usize;
+        let mut incomplete = None;
 
         // Parse records - all params will be zero-copy slices of the data buffer
-        while offset < declared_end {
+        while offset < end {
             if records.len() >= limits.max_records {
                 return Err(Error::ParseError(format!(
                     "WMF record count exceeds limit {}",
                     limits.max_records
                 )));
             }
-            let (record, consumed) = WmfRecord::parse(&data, offset, &limits)?;
-            if record.size > header.max_record {
+            let (record, consumed) = match WmfRecord::scan(&data, offset, &limits)? {
+                RecordScan::Complete { record, consumed } => (record, consumed),
+                RecordScan::Incomplete(reason) => {
+                    incomplete = Some(reason);
+                    break;
+                },
+            };
+            if record.size > header.max_record && !compatible {
                 return Err(Error::ParseError(format!(
                     "WMF record size {} exceeds declared maximum {}",
                     record.size, header.max_record
@@ -439,7 +639,7 @@ impl WmfParser {
             }
             actual_max_record = actual_max_record.max(record.size);
             let is_eof = record.is_eof();
-            if is_eof && (record.size != 3 || !record.params.is_empty()) {
+            if is_eof && (record.size != 3 || !record.params.is_empty()) && !compatible {
                 return Err(Error::ParseError("Malformed WMF EOF record".into()));
             }
             offset = offset
@@ -448,26 +648,45 @@ impl WmfParser {
             records.push(record);
 
             if is_eof {
-                if saw_eof {
-                    return Err(Error::ParseError("Multiple WMF EOF records".into()));
-                }
-                if offset != declared_end {
-                    return Err(Error::ParseError(
-                        "Trailing data after WMF EOF record".into(),
-                    ));
-                }
                 saw_eof = true;
+                trailing = end - offset;
+                break;
             }
         }
 
+        if let Some(reason) = incomplete {
+            if !compatible {
+                return Err(Error::ParseError(reason.message(offset)));
+            }
+            let available = end.saturating_sub(offset);
+            warnings.push(WmfParserWarning::TruncatedRecord { offset, available });
+        }
         if !saw_eof {
-            return Err(Error::ParseError("Missing WMF EOF record".into()));
+            if !compatible {
+                return Err(Error::ParseError("Missing WMF EOF record".into()));
+            }
+            warnings.push(WmfParserWarning::MissingEof {
+                at_declared_end: incomplete.is_none() && declared_end == end,
+            });
+        } else if trailing > 0 {
+            if !compatible {
+                return Err(Error::ParseError(
+                    "Trailing data after WMF EOF record".into(),
+                ));
+            }
+            warnings.push(WmfParserWarning::TrailingData { bytes: trailing });
         }
         if actual_max_record != header.max_record {
-            return Err(Error::ParseError(format!(
-                "WMF largest record {} does not match declared maximum {}",
-                actual_max_record, header.max_record
-            )));
+            if !compatible {
+                return Err(Error::ParseError(format!(
+                    "WMF largest record {} does not match declared maximum {}",
+                    actual_max_record, header.max_record
+                )));
+            }
+            warnings.push(WmfParserWarning::MaxRecord {
+                declared: header.max_record,
+                found: actual_max_record,
+            });
         }
 
         Ok(Self {
@@ -476,6 +695,7 @@ impl WmfParser {
             records,
             data,
             limits,
+            warnings,
         })
     }
 
@@ -752,6 +972,138 @@ mod tests {
         limits.max_uncompressed_bytes = data_len;
         limits.max_records = 0;
         assert!(WmfRecord::parse(&bytes, 18, &limits).is_err());
+    }
+
+    #[test]
+    fn compatible_mode_reports_framing_deviations() {
+        // mtSize smaller than the record stream that follows.
+        let mut understated = valid_wmf();
+        understated.splice(26..26, [3, 0, 0, 0, 1, 0]);
+        let words = (understated.len() / 2) as u32;
+        put_u32(&mut understated, 6, words - 3);
+        assert!(WmfParser::new(&understated, &crate::Limits::default()).is_err());
+        let parsed = WmfParser::new_compatible(&understated, &crate::Limits::default()).unwrap();
+        assert_eq!(
+            parsed.warnings(),
+            &[WmfParserWarning::DeclaredSize {
+                declared: understated.len() - 6,
+                actual: understated.len(),
+            }]
+        );
+        assert_eq!(parsed.records.len(), 3);
+
+        // mtMaxRecord larger than every record but still inside mtSize.
+        let mut max_record = valid_wmf();
+        put_u32(&mut max_record, 12, 6);
+        assert!(WmfParser::new(&max_record, &crate::Limits::default()).is_err());
+        let parsed = WmfParser::new_compatible(&max_record, &crate::Limits::default()).unwrap();
+        assert_eq!(
+            parsed.warnings(),
+            &[WmfParserWarning::MaxRecord {
+                declared: 6,
+                found: 4,
+            }]
+        );
+
+        // Declared record maximum below a record length.
+        let mut exceeds = valid_wmf();
+        put_u32(&mut exceeds, 12, 3);
+        assert!(WmfParser::new(&exceeds, &crate::Limits::default()).is_err());
+        let parsed = WmfParser::new_compatible(&exceeds, &crate::Limits::default()).unwrap();
+        assert_eq!(
+            parsed.warnings(),
+            &[WmfParserWarning::MaxRecord {
+                declared: 3,
+                found: 4,
+            }]
+        );
+
+        // A declared maximum too large for the declared file size.
+        let mut oversized = valid_wmf();
+        put_u32(&mut oversized, 12, 200);
+        assert!(WmfParser::new(&oversized, &crate::Limits::default()).is_err());
+        let parsed = WmfParser::new_compatible(&oversized, &crate::Limits::default()).unwrap();
+        assert_eq!(
+            parsed.warnings(),
+            &[
+                WmfParserWarning::Header(WmfHeaderDeviation::MaxRecord(200)),
+                WmfParserWarning::MaxRecord {
+                    declared: 200,
+                    found: 4,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn compatible_mode_reports_trailing_data_and_truncation() {
+        // Two bytes after the terminating record.
+        let mut trailing = valid_wmf();
+        trailing.extend_from_slice(&[0, 0]);
+        let words = (trailing.len() / 2) as u32;
+        put_u32(&mut trailing, 6, words);
+        assert!(WmfParser::new(&trailing, &crate::Limits::default()).is_err());
+        let parsed = WmfParser::new_compatible(&trailing, &crate::Limits::default()).unwrap();
+        assert_eq!(
+            parsed.warnings(),
+            &[WmfParserWarning::TrailingData { bytes: 2 }]
+        );
+
+        // A record header cut short by the end of the stream.
+        let mut truncated = valid_wmf();
+        truncated.truncate(30);
+        let words = (truncated.len() / 2) as u32;
+        put_u32(&mut truncated, 6, words);
+        assert!(WmfParser::new(&truncated, &crate::Limits::default()).is_err());
+        let parsed = WmfParser::new_compatible(&truncated, &crate::Limits::default()).unwrap();
+        assert_eq!(parsed.records.len(), 1);
+        assert_eq!(
+            parsed.warnings(),
+            &[
+                WmfParserWarning::TruncatedRecord {
+                    offset: 26,
+                    available: 4,
+                },
+                WmfParserWarning::MissingEof {
+                    at_declared_end: false,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn compatible_mode_reports_a_missing_terminator_and_placeable_integrity() {
+        let mut missing = valid_wmf();
+        put_u16(&mut missing, 30, 0x0001);
+        assert!(WmfParser::new(&missing, &crate::Limits::default()).is_err());
+        let parsed = WmfParser::new_compatible(&missing, &crate::Limits::default()).unwrap();
+        assert_eq!(
+            parsed.warnings(),
+            &[WmfParserWarning::MissingEof {
+                at_declared_end: true,
+            }]
+        );
+
+        let mut placeable = with_placeable(valid_wmf());
+        put_u16(&mut placeable, 20, 0x1234);
+        assert!(WmfParser::new(&placeable, &crate::Limits::default()).is_err());
+        let parsed =
+            WmfParser::from_owned_compatible(placeable, &crate::Limits::default()).unwrap();
+        assert_eq!(
+            parsed.warnings(),
+            &[WmfParserWarning::PlaceableHeader {
+                field: "Invalid WMF placeable checksum",
+            }]
+        );
+        assert_eq!(parsed.width(), 110);
+    }
+
+    #[test]
+    fn canonical_input_reports_no_warnings() {
+        let parsed =
+            WmfParser::new_compatible(&with_placeable(valid_wmf()), &crate::Limits::default())
+                .unwrap();
+        assert!(parsed.warnings().is_empty());
     }
 
     #[test]

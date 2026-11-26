@@ -324,11 +324,12 @@ impl<'hook> SvgRenderer<'hook> {
             | record::SET_REL_ABS
             | record::ESCAPE => None,
 
+            // PlayMetaFile skips a function number it does not know.
             _ => {
-                self.fatal(format!(
-                    "unsupported output-affecting WMF record 0x{:04X}",
-                    rec.function
-                ));
+                self.note(
+                    "noncanonical-wmf-unknown-record",
+                    format!("ignored unknown WMF record 0x{:04X}", rec.function),
+                );
                 None
             },
         };
@@ -440,7 +441,12 @@ impl<'hook> SvgRenderer<'hook> {
             None
         };
         let Some(target) = target.filter(|&index| index < self.saved_states.len()) else {
-            self.warn(format!("ignored invalid RestoreDC level {level}"));
+            // GDI fails a RestoreDC level that names no saved state and leaves
+            // the device context unchanged.
+            self.note(
+                "noncanonical-wmf-restore-dc-level",
+                format!("ignored RestoreDC level {level}, which names no saved state"),
+            );
             return;
         };
         // The target snapshot becomes the live state. Moving it avoids an
@@ -620,12 +626,20 @@ impl<'hook> SvgRenderer<'hook> {
                 }
                 self.state.font = value.clone();
             },
-            Some(GdiObject::Palette(_)) | Some(GdiObject::Region(_)) => {
-                self.warn(format!(
-                    "SelectObject ignored non-selectable object {handle}"
-                ));
-            },
-            None => self.fatal(format!("SelectObject references missing object {handle}")),
+            // GDI selects a region object as the clip region, like
+            // SelectClipRgn with a copy.
+            Some(GdiObject::Region(_)) => self.select_clip_region_object(handle),
+            // A palette is selected with SelectPalette; SelectObject refuses it.
+            Some(GdiObject::Palette(_)) => self.note(
+                "noncanonical-wmf-select-palette-object",
+                format!("SelectObject ignored palette object {handle}"),
+            ),
+            // A handle without an object makes SelectObject fail, which
+            // leaves the selection unchanged.
+            None => self.note(
+                "noncanonical-wmf-select-missing-object",
+                format!("SelectObject ignored missing object {handle}"),
+            ),
         }
     }
 
@@ -635,7 +649,11 @@ impl<'hook> SvgRenderer<'hook> {
             return;
         };
         if index & stock::FLAG == 0 && !self.objects.delete(usize::from(index)) {
-            self.warn(format!("DeleteObject references missing object {index}"));
+            // GDI fails deleting a handle that holds no object.
+            self.note(
+                "noncanonical-wmf-delete-missing-object",
+                format!("DeleteObject ignored missing object {index}"),
+            );
         }
     }
 
@@ -652,7 +670,12 @@ impl<'hook> SvgRenderer<'hook> {
         ) {
             self.state.palette_index = Some(usize::from(index));
         } else {
-            self.fatal(format!("SelectPalette references missing palette {index}"));
+            // A handle without a palette makes SelectPalette fail, which
+            // leaves the selected palette unchanged.
+            self.note(
+                "noncanonical-wmf-select-missing-palette",
+                format!("SelectPalette ignored missing palette {index}"),
+            );
         }
     }
 
@@ -801,10 +824,25 @@ impl<'hook> SvgRenderer<'hook> {
             self.malformed(record::SELECT_CLIP_REGION, "region index");
             return;
         };
+        if !matches!(
+            self.objects.get(usize::from(index)),
+            Some(GdiObject::Region(_))
+        ) {
+            // SelectClipRgn with no region removes the clip region.
+            self.note(
+                "noncanonical-wmf-select-missing-region",
+                format!("SelectClipRegion found no region {index}; the clip region is removed"),
+            );
+            self.state.clip = ClipRegion::default();
+            self.bump_clip_revision();
+            return;
+        }
+        self.select_clip_region_object(index);
+    }
+
+    /// Makes the region stored under `index` the clip region.
+    fn select_clip_region_object(&mut self, index: u16) {
         let Some(GdiObject::Region(region)) = self.objects.get(usize::from(index)) else {
-            self.fatal(format!(
-                "SelectClipRegion references missing region {index}"
-            ));
             return;
         };
         let rect_count = region.rects.len();
@@ -922,9 +960,17 @@ impl<'hook> SvgRenderer<'hook> {
             self.malformed(function, "point count");
             return None;
         };
-        let minimum = if closed { 2 } else { 2 };
-        if count < minimum || rec.params.len() < 2 + count.saturating_mul(4) {
+        if rec.params.len() < 2 + count.saturating_mul(4) {
             self.malformed(function, "points");
+            return None;
+        }
+        if count < 2 {
+            // GDI refuses a Polygon or Polyline with fewer than two points
+            // and draws nothing.
+            self.note(
+                "noncanonical-wmf-degenerate-polyline",
+                format!("ignored WMF record 0x{function:04X} with {count} points"),
+            );
             return None;
         }
         let mut xs = Vec::with_capacity(count);
@@ -1329,10 +1375,13 @@ impl<'hook> SvgRenderer<'hook> {
         let length = usize::from(read_u16_le(&rec.params, 4).unwrap_or(0));
         let options = read_u16_le(&rec.params, 6).unwrap_or(0);
         if options & ext_text_out::ETO_GLYPH_INDEX != 0 {
-            self.fatal("ExtTextOut glyph-index strings are unsupported".to_owned());
-        }
-        if options & ext_text_out::ETO_PDY != 0 {
-            self.fatal("ExtTextOut ETO_PDY displacements are unsupported".to_owned());
+            // The string holds glyph numbers of the recording system's font,
+            // which no character mapping can recover; the text is omitted.
+            self.note(
+                "wmf-glyph-index-text-omitted",
+                "ExtTextOut text given as font glyph indices is not drawn".to_owned(),
+            );
+            return None;
         }
         let has_rect = options & (ext_text_out::ETO_CLIPPED | ext_text_out::ETO_OPAQUE) != 0;
         let (rect, string_offset) = if has_rect {
@@ -1354,9 +1403,19 @@ impl<'hook> SvgRenderer<'hook> {
         }
         let dx_offset = string_offset + ((length + 1) & !1);
         let dx_count = (rec.params.len().saturating_sub(dx_offset)) / 2;
+        // With ETO_PDY every character has an x and a y displacement.
+        let stride = if options & ext_text_out::ETO_PDY != 0 {
+            self.note(
+                "wmf-text-vertical-displacement-ignored",
+                "ExtTextOut ETO_PDY vertical displacements are not applied".to_owned(),
+            );
+            2
+        } else {
+            1
+        };
         let mut dx = Vec::with_capacity(dx_count.min(length));
-        for index in 0..dx_count.min(length) {
-            dx.push(read_i16_le(&rec.params, dx_offset + index * 2).unwrap_or(0));
+        for index in 0..(dx_count / stride).min(length) {
+            dx.push(read_i16_le(&rec.params, dx_offset + index * stride * 2).unwrap_or(0));
         }
         self.render_text_bytes(
             &rec.params[string_offset..string_offset + length],
@@ -1380,13 +1439,22 @@ impl<'hook> SvgRenderer<'hook> {
         if bytes.is_empty() {
             return None;
         }
-        let (text, exact_charset) = decode_text(bytes, self.state.font.charset);
-        if !exact_charset {
-            self.warn(format!(
-                "font charset {} decoded with a safe Windows-1252 fallback",
-                self.state.font.charset
-            ));
+        let decoded = crate::text_charset::decode_logfont_text(
+            bytes,
+            self.state.font.charset,
+            &self.state.font.name,
+        );
+        if !decoded.exact {
+            self.note(
+                "wmf-text-charset-inexact",
+                format!(
+                    "text in font charset {} could not be decoded exactly; Windows-1252 or replacement characters were used",
+                    self.state.font.charset
+                ),
+            );
         }
+        let use_face = !decoded.unicode_face;
+        let text = decoded.text;
         let update_position = self.state.text_align & text_align::TA_UPDATECP != 0;
         let (logical_x, logical_y) = if update_position {
             self.state.position
@@ -1434,7 +1502,7 @@ impl<'hook> SvgRenderer<'hook> {
             text_align::TA_BASELINE => {},
             _ => text_element.push_str(r#" dominant-baseline="text-before-edge""#),
         }
-        if self.state.font.name != "serif" {
+        if use_face && self.state.font.name != "serif" {
             text_element.push_str(r#" font-family=""#);
             escape_xml_attr_into(&mut text_element, &self.state.font.name);
             text_element.push('"');
@@ -2039,54 +2107,6 @@ fn parse_region(data: &[u8], max_rects: usize) -> Option<Region> {
     Some(Region { rects })
 }
 
-fn decode_text(bytes: &[u8], charset: u8) -> (String, bool) {
-    if charset == 2 {
-        return (
-            bytes
-                .iter()
-                .map(|&byte| char::from_u32(0xf000 + u32::from(byte)).unwrap_or('\u{fffd}'))
-                .collect(),
-            true,
-        );
-    }
-    let exact = matches!(charset, 0 | 1);
-    let text = bytes
-        .iter()
-        .map(|&byte| match byte {
-            0x80 => '€',
-            0x82 => '‚',
-            0x83 => 'ƒ',
-            0x84 => '„',
-            0x85 => '…',
-            0x86 => '†',
-            0x87 => '‡',
-            0x88 => 'ˆ',
-            0x89 => '‰',
-            0x8a => 'Š',
-            0x8b => '‹',
-            0x8c => 'Œ',
-            0x8e => 'Ž',
-            0x91 => '‘',
-            0x92 => '’',
-            0x93 => '“',
-            0x94 => '”',
-            0x95 => '•',
-            0x96 => '–',
-            0x97 => '—',
-            0x98 => '˜',
-            0x99 => '™',
-            0x9a => 'š',
-            0x9b => '›',
-            0x9c => 'œ',
-            0x9e => 'ž',
-            0x9f => 'Ÿ',
-            0x81 | 0x8d | 0x8f | 0x90 | 0x9d => '\u{fffd}',
-            _ => char::from(byte),
-        })
-        .collect();
-    (text, exact)
-}
-
 fn bitmap_destination(
     function: u16,
     data: &[u8],
@@ -2121,6 +2141,16 @@ mod tests {
             function,
             params: Bytes::copy_from_slice(params),
         }
+    }
+
+    fn font_params(charset: u8, face: &str) -> Vec<u8> {
+        let mut params = vec![0u8; 18];
+        params[0..2].copy_from_slice(&(-12_i16).to_le_bytes());
+        params[13] = charset;
+        let mut name = [0u8; 32];
+        name[..face.len()].copy_from_slice(face.as_bytes());
+        params.extend_from_slice(&name);
+        params
     }
 
     fn renderer() -> SvgRenderer<'static> {
@@ -2240,12 +2270,39 @@ mod tests {
             let mut renderer = renderer();
             renderer.render_record(&rec(function, &[]));
             assert!(
-                renderer.issues.iter().all(|issue| !issue
-                    .message
-                    .starts_with("unsupported output-affecting WMF record")),
+                renderer
+                    .issues
+                    .iter()
+                    .all(|issue| issue.code != "noncanonical-wmf-unknown-record"),
                 "record 0x{function:04X} fell through classification"
             );
         }
+    }
+
+    #[test]
+    fn unknown_records_and_degenerate_polylines_are_ignored_like_gdi() {
+        let mut renderer = renderer();
+        assert!(renderer.render_record(&rec(0x0d32, &[0; 8])).is_none());
+        // A Polyline of one point, a Polygon of none.
+        assert!(
+            renderer
+                .render_record(&rec(record::POLYLINE, &[1, 0, 5, 0, 5, 0]))
+                .is_none()
+        );
+        assert!(
+            renderer
+                .render_record(&rec(record::POLYGON, &[0, 0]))
+                .is_none()
+        );
+        assert_eq!(
+            issue_codes(&renderer),
+            [
+                "noncanonical-wmf-unknown-record",
+                "noncanonical-wmf-degenerate-polyline",
+                "noncanonical-wmf-degenerate-polyline",
+            ]
+        );
+        assert!(renderer.issues.iter().all(|issue| !issue.fatal));
     }
 
     #[test]
@@ -2259,10 +2316,98 @@ mod tests {
 
     #[test]
     fn windows_1252_text_and_xml_metacharacters_are_safe() {
-        let (text, exact) = decode_text(&[0x80, b'<', b'&'], 0);
-        assert!(exact);
+        let decoded = crate::text_charset::decode_logfont_text(&[0x80, b'<', b'&'], 0, "");
+        assert!(decoded.exact);
         let mut escaped = String::new();
-        escape_xml_text_into(&mut escaped, &text);
+        escape_xml_text_into(&mut escaped, &decoded.text);
         assert_eq!(escaped, "€&lt;&amp;");
+    }
+
+    #[test]
+    fn symbol_font_text_uses_a_unicode_face_and_private_use_keeps_the_face() {
+        let mut greek = renderer();
+        greek.render_record(&rec(
+            record::CREATE_FONT_INDIRECT,
+            &font_params(2, "Symbol"),
+        ));
+        greek.render_record(&rec(record::SELECT_OBJECT, &[0, 0]));
+        let output = greek
+            .render_record(&rec(record::TEXT_OUT, &[1, 0, b'a', 0, 0, 0, 0, 0]))
+            .unwrap();
+        assert!(output.contains("α"));
+        assert!(!output.contains("Symbol"));
+
+        let mut dingbat = renderer();
+        dingbat.render_record(&rec(
+            record::CREATE_FONT_INDIRECT,
+            &font_params(2, "Wingdings"),
+        ));
+        dingbat.render_record(&rec(record::SELECT_OBJECT, &[0, 0]));
+        let output = dingbat
+            .render_record(&rec(record::TEXT_OUT, &[1, 0, b'a', 0, 0, 0, 0, 0]))
+            .unwrap();
+        assert!(output.contains("\u{f061}"));
+        assert!(output.contains("Wingdings"));
+    }
+
+    fn region_params(left: i16, top: i16, right: i16, bottom: i16) -> Vec<u8> {
+        let mut params = vec![0u8; 22];
+        params[2..4].copy_from_slice(&6_u16.to_le_bytes());
+        params[10..12].copy_from_slice(&1_u16.to_le_bytes());
+        for value in [2_i16, top, bottom, left, right, 2] {
+            params.extend_from_slice(&value.to_le_bytes());
+        }
+        params
+    }
+
+    fn issue_codes(renderer: &SvgRenderer<'_>) -> Vec<&'static str> {
+        renderer.issues.iter().map(|issue| issue.code).collect()
+    }
+
+    #[test]
+    fn selecting_a_region_object_sets_the_clip_region() {
+        let mut renderer = renderer();
+        renderer.render_record(&rec(record::CREATE_REGION, &region_params(0, 0, 10, 10)));
+        assert!(renderer.state.clip.is_unbounded());
+        renderer.render_record(&rec(record::SELECT_OBJECT, &[0, 0]));
+        assert!(!renderer.state.clip.is_unbounded());
+        assert!(renderer.issues.is_empty());
+    }
+
+    #[test]
+    fn object_table_misuse_that_gdi_ignores_reports_noncanonical_codes() {
+        let mut renderer = renderer();
+        renderer.render_record(&rec(record::CREATE_PALETTE, &[0, 3, 1, 0, 1, 2, 3, 0]));
+        renderer.render_record(&rec(record::SELECT_OBJECT, &[0, 0]));
+        renderer.render_record(&rec(record::SELECT_OBJECT, &[9, 0]));
+        renderer.render_record(&rec(record::DELETE_OBJECT, &[9, 0]));
+        renderer.render_record(&rec(record::SELECT_PALETTE, &[9, 0]));
+        renderer.render_record(&rec(record::RESTORE_DC, &[0xff, 0xff]));
+        renderer.render_record(&rec(record::SELECT_CLIP_REGION, &[9, 0]));
+        assert_eq!(
+            issue_codes(&renderer),
+            [
+                "noncanonical-wmf-select-palette-object",
+                "noncanonical-wmf-select-missing-object",
+                "noncanonical-wmf-delete-missing-object",
+                "noncanonical-wmf-select-missing-palette",
+                "noncanonical-wmf-restore-dc-level",
+                "noncanonical-wmf-select-missing-region",
+            ]
+        );
+        assert!(renderer.issues.iter().all(|issue| !issue.fatal));
+    }
+
+    #[test]
+    fn glyph_index_text_is_omitted_with_an_approximation_diagnostic() {
+        let mut renderer = renderer();
+        let params = [5, 0, 5, 0, 2, 0, 0x10, 0, 3, 0, 4, 0];
+        assert!(
+            renderer
+                .render_record(&rec(record::EXT_TEXT_OUT, &params))
+                .is_none()
+        );
+        assert_eq!(issue_codes(&renderer), ["wmf-glyph-index-text-omitted"]);
+        assert!(renderer.issues.iter().all(|issue| !issue.fatal));
     }
 }

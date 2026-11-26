@@ -204,16 +204,20 @@ impl<'a> EmfSvgConverter<'a> {
         let data: &[u8] = &record.data;
         match kind {
             EmrType::Header => Ok(Vec::new()),
-            EmrType::Eof => {
-                require_len(data, 12, kind)?;
-                Ok(Vec::new())
-            },
+            // The parser has already validated the terminator; playback ends at
+            // its record type.
+            EmrType::Eof => Ok(Vec::new()),
 
             // Mapping and graphics state.
             EmrType::SetWindowExtEx | EmrType::SetViewportExtEx => {
                 let extent = read_record::<SizeL>(data, kind)?;
                 if extent.cx == 0 || extent.cy == 0 {
-                    return malformed(kind, "zero mapping extent");
+                    // GDI refuses a zero extent and keeps the previous one.
+                    state.note(
+                        "noncanonical-emf-zero-mapping-extent",
+                        format!("{} with a zero extent is ignored", kind.name()),
+                    );
+                    return Ok(Vec::new());
                 }
                 if kind == EmrType::SetWindowExtEx {
                     state.dc.window_ext = (extent.cx, extent.cy);
@@ -261,14 +265,27 @@ impl<'a> EmfSvgConverter<'a> {
             },
             EmrType::ModifyWorldTransform => {
                 let modification = read_record::<EmrModifyWorldTransform>(data, kind)?;
-                validate_xform(&modification.xform, kind)?;
+                // MWT_IDENTITY ignores the transform, so only the other modes
+                // need a valid one.
+                if modification.mode != 1 {
+                    validate_xform(&modification.xform, kind)?;
+                }
                 state.dc.world_transform = match modification.mode {
                     1 => XForm::default(),
                     // With our column-vector representation, left multiplication
                     // is XForm * current and right multiplication the reverse.
                     2 => modification.xform.multiply(&state.dc.world_transform),
                     3 => state.dc.world_transform.multiply(&modification.xform),
-                    _ => return malformed(kind, "invalid ModifyWorldTransform mode"),
+                    // MWT_SET replaces the transform, as SetWorldTransform does.
+                    4 => modification.xform,
+                    mode => {
+                        // GDI fails an unknown mode and keeps the transform.
+                        state.note(
+                            "noncanonical-emf-modify-world-transform-mode",
+                            format!("{} with unknown mode {mode} is ignored", kind.name()),
+                        );
+                        return Ok(Vec::new());
+                    },
                 };
                 Ok(Vec::new())
             },
@@ -283,7 +300,15 @@ impl<'a> EmfSvgConverter<'a> {
             EmrType::RestoreDc => {
                 let index = read_i32(data, 0, kind)?;
                 if !state.pop_dc(index) {
-                    return malformed(kind, "RestoreDC references a missing saved state");
+                    // GDI fails a RestoreDC that names no saved state and
+                    // leaves the device context unchanged.
+                    state.note(
+                        "noncanonical-emf-restore-dc-level",
+                        format!(
+                            "{} level {index} names no saved state and is ignored",
+                            kind.name()
+                        ),
+                    );
                 }
                 Ok(Vec::new())
             },
@@ -301,7 +326,13 @@ impl<'a> EmfSvgConverter<'a> {
             EmrType::SetBkMode => {
                 let mode = read_u32(data, 0, kind)?;
                 if mode != 1 && mode != 2 {
-                    return malformed(kind, "invalid background mode");
+                    // GDI fails a mode that is neither TRANSPARENT nor OPAQUE
+                    // and keeps the background mode.
+                    state.note(
+                        "noncanonical-emf-background-mode",
+                        format!("{} with unknown mode {mode} is ignored", kind.name()),
+                    );
+                    return Ok(Vec::new());
                 }
                 state.dc.bg_mode = mode;
                 state.dc.brush.pattern_id = None;
@@ -310,7 +341,13 @@ impl<'a> EmfSvgConverter<'a> {
             EmrType::SetPolyFillMode => {
                 let mode = read_u32(data, 0, kind)?;
                 if mode != 1 && mode != 2 {
-                    return malformed(kind, "invalid polygon fill mode");
+                    // GDI fails a mode that is neither ALTERNATE nor WINDING
+                    // and keeps the fill mode.
+                    state.note(
+                        "noncanonical-emf-polygon-fill-mode",
+                        format!("{} with unknown mode {mode} is ignored", kind.name()),
+                    );
+                    return Ok(Vec::new());
                 }
                 state.dc.poly_fill_mode = mode;
                 Ok(Vec::new())
@@ -453,17 +490,21 @@ impl<'a> EmfSvgConverter<'a> {
             EmrType::SelectObject => {
                 let handle = read_u32(data, 0, kind)?;
                 if !state.select_object(handle) {
-                    return malformed(kind, "unknown object handle");
+                    // SelectObject fails for a handle without a selectable
+                    // object and leaves the selection unchanged.
+                    state.note(
+                        "noncanonical-emf-select-unknown-object",
+                        format!("{} of handle {handle:#x} selects nothing", kind.name()),
+                    );
+                    return Ok(Vec::new());
                 }
                 state.prepare_brush_pattern();
                 Ok(Vec::new())
             },
             EmrType::DeleteObject => {
                 let handle = read_u32(data, 0, kind)?;
-                // DeleteObject returns failure for an unknown, stock, or
-                // currently selected object. That failure does not alter the
-                // DC or subsequent drawing and is therefore a safe playback
-                // no-op rather than a malformed metafile.
+                // DeleteObject of an unknown or stock handle fails without
+                // altering the DC or subsequent drawing.
                 state.delete_object(handle);
                 Ok(Vec::new())
             },
@@ -517,7 +558,12 @@ impl<'a> EmfSvgConverter<'a> {
             EmrType::CloseFigure => {
                 require_len_exact(data, 0, kind)?;
                 if !state.in_path {
-                    return malformed(kind, "CloseFigure outside path bracket");
+                    // GDI fails CloseFigure outside a path bracket.
+                    state.note(
+                        "noncanonical-emf-close-figure",
+                        "CloseFigure outside a path bracket is ignored".to_owned(),
+                    );
+                    return Ok(Vec::new());
                 }
                 active_path(state)?.close();
                 Ok(Vec::new())
@@ -581,6 +627,17 @@ impl<'a> EmfSvgConverter<'a> {
             // Primitive shapes.
             EmrType::Rectangle | EmrType::Ellipse => {
                 let rect = read_record::<RectL>(data, kind)?;
+                if rect.left == rect.right || rect.top == rect.bottom {
+                    // A shape with no area draws nothing.
+                    state.note(
+                        "noncanonical-emf-empty-shape",
+                        format!(
+                            "{} with an empty bounding rectangle draws nothing",
+                            kind.name()
+                        ),
+                    );
+                    return Ok(Vec::new());
+                }
                 let builder = if kind == EmrType::Rectangle {
                     rectangle_path(rect, &state.dc)
                 } else {
@@ -630,7 +687,9 @@ impl<'a> EmfSvgConverter<'a> {
             EmrType::IntersectClipRect | EmrType::ExcludeClipRect => {
                 let rect = read_record::<RectL>(data, kind)?;
                 let path = if kind == EmrType::IntersectClipRect {
-                    rectangle_path(rect, &state.dc)?.build()
+                    // An empty rectangle leaves an empty clip region, which
+                    // hides everything drawn through it.
+                    rectangle_outline(rect, &state.dc).build()
                 } else {
                     exclusion_path(rect, &state.dc)?
                 };
@@ -694,11 +753,14 @@ impl<'a> EmfSvgConverter<'a> {
             EmrType::PolyTextOutA | EmrType::PolyTextOutW => self.poly_text_out(data, kind, state),
             EmrType::SmallTextOut => self.small_text_out(data, kind, state),
             EmrType::SetTextJustification => {
-                // SVG has no direct equivalent. Zero values have no visual effect.
+                // The extra space only matters for text drawn without explicit
+                // character displacements; see `render_text_element`.
                 let value = read_record::<EmrSetTextJustification>(data, kind)?;
-                if value.num_break_extra != 0 || value.num_break_count != 0 {
-                    return unsupported(kind, "text justification spacing is output-affecting");
-                }
+                state.dc.text_break_extra = if value.num_break_count != 0 {
+                    value.num_break_extra
+                } else {
+                    0
+                };
                 Ok(Vec::new())
             },
 
@@ -873,6 +935,14 @@ impl<'a> EmfSvgConverter<'a> {
                 .map(|p| (p.x, p.y))
                 .collect::<Vec<_>>()
         };
+        if points.is_empty() {
+            // A poly record without points draws nothing and moves nothing.
+            state.note(
+                "noncanonical-emf-empty-poly-record",
+                format!("{} without points is ignored", kind.name()),
+            );
+            return Ok(Vec::new());
+        }
         let is_to = matches!(
             kind,
             EmrType::PolyBezierTo
@@ -1356,12 +1426,21 @@ impl<'a> EmfSvgConverter<'a> {
         }
         let unicode = header.fu_options & 0x0200 == 0;
         let offset = size_of::<EmrSmallTextOutHeader>();
-        let text = decode_text(data, offset, count, unicode, state.dc.font.charset, kind)?;
+        let decoded = decode_text(data, offset, count, unicode, &state.dc.font, kind)?;
+        note_inexact_text(state, &decoded);
         let reference = PointL {
             x: header.x,
             y: header.y,
         };
-        render_text_element(&text, reference, header.fu_options, None, None, state, kind)
+        render_text_element(
+            &decoded,
+            reference,
+            header.fu_options,
+            None,
+            None,
+            state,
+            kind,
+        )
     }
 
     fn render_emr_text(
@@ -1373,24 +1452,24 @@ impl<'a> EmfSvgConverter<'a> {
         state: &mut RenderState,
     ) -> Result<Vec<String>> {
         if info.options & text_options::GLYPH_INDEX != 0 {
-            return unsupported(
-                kind,
-                "glyph-index text requires the original font glyph map",
+            // The string holds glyph numbers of the recording system's font,
+            // which no character mapping can recover; the text is omitted.
+            state.note(
+                "emf-glyph-index-text-omitted",
+                format!(
+                    "{} text given as font glyph indices is not drawn",
+                    kind.name()
+                ),
             );
+            return Ok(Vec::new());
         }
         let count = bounded_count(info.num_chars, kind)?;
         if count > self.limits.max_path_points || count > self.limits.max_output_bytes {
             return malformed(kind, "text character count exceeds configured limit");
         }
         let string_offset = payload_offset(info.off_string, kind)?;
-        let text = decode_text(
-            data,
-            string_offset,
-            count,
-            unicode,
-            state.dc.font.charset,
-            kind,
-        )?;
+        let decoded = decode_text(data, string_offset, count, unicode, &state.dc.font, kind)?;
+        note_inexact_text(state, &decoded);
         let dx = if info.off_dx == 0 {
             None
         } else {
@@ -1405,7 +1484,7 @@ impl<'a> EmfSvgConverter<'a> {
             Some(read_i32_array(data, offset, values, kind)?)
         };
         render_text_element(
-            &text,
+            &decoded,
             info.reference,
             info.options,
             Some(info.rectangle),
@@ -1577,6 +1656,12 @@ fn rectangle_path(rect: RectL, dc: &DeviceContext) -> Result<PathBuilder> {
     if rect.left == rect.right || rect.top == rect.bottom {
         return Err(Error::ParseError("empty EMF rectangle".into()));
     }
+    Ok(rectangle_outline(rect, dc))
+}
+
+/// The closed outline of a rectangle, which has no area when two opposite
+/// sides coincide.
+fn rectangle_outline(rect: RectL, dc: &DeviceContext) -> PathBuilder {
     let points = [
         (rect.left, rect.top),
         (rect.right, rect.top),
@@ -1593,7 +1678,7 @@ fn rectangle_path(rect: RectL, dc: &DeviceContext) -> Result<PathBuilder> {
         }
     }
     builder.close();
-    Ok(builder)
+    builder
 }
 
 fn ellipse_path(rect: RectL, dc: &DeviceContext) -> Result<PathBuilder> {
@@ -1834,7 +1919,7 @@ fn region_path(
 }
 
 fn render_text_element(
-    text: &str,
+    decoded: &DecodedEmfText,
     reference: PointL,
     options: u32,
     rectangle: Option<RectL>,
@@ -1842,6 +1927,17 @@ fn render_text_element(
     state: &mut RenderState,
     kind: EmrType,
 ) -> Result<Vec<String>> {
+    let text = decoded.text.as_str();
+    if state.dc.text_break_extra != 0 && dx.is_none() && text.contains(' ') {
+        state.note(
+            "emf-text-justification-ignored",
+            format!(
+                "{} text is drawn without the {} units of justification added to its break characters",
+                kind.name(),
+                state.dc.text_break_extra
+            ),
+        );
+    }
     let update = state.dc.text_align & text_align::UPDATECP != 0;
     let logical = if update {
         state.dc.current_pos
@@ -1851,7 +1947,10 @@ fn render_text_element(
     let origin = state.dc.transform_point(logical.0, logical.1);
     let mut output = Vec::new();
     if options & text_options::OPAQUE != 0 || (state.dc.bg_mode == 2 && rectangle.is_some()) {
-        if let Some(rect) = rectangle {
+        // A rectangle without area paints no background.
+        if let Some(rect) =
+            rectangle.filter(|rect| rect.left != rect.right && rect.top != rect.bottom)
+        {
             let p = rectangle_path(rect, &state.dc)?;
             output.push(format!(
                 "<path d=\"{}\" fill=\"{}\" stroke=\"none\" {}/>",
@@ -1939,7 +2038,7 @@ fn render_text_element(
         .join(" ");
     let mut escaped_text = String::with_capacity(text.len());
     write_xml_escaped(&mut escaped_text, text);
-    output.push(format!("<text x=\"{}\" y=\"{}\" fill=\"{}\" {} text-anchor=\"{}\" dominant-baseline=\"{}\" direction=\"{}\"{}>{}</text>",x,y,state.dc.text_color.to_svg_color(),state.dc.font.to_svg_attrs(),anchor,baseline,direction,attrs,escaped_text));
+    output.push(format!("<text x=\"{}\" y=\"{}\" fill=\"{}\" {} text-anchor=\"{}\" dominant-baseline=\"{}\" direction=\"{}\"{}>{}</text>",x,y,state.dc.text_color.to_svg_color(),state.dc.font.to_svg_attrs_for_face(!decoded.unicode_face),anchor,baseline,direction,attrs,escaped_text));
     if update {
         let estimated = if let Some(values) = dx {
             let stride = if options & text_options::PDY != 0 {
@@ -1961,9 +2060,9 @@ fn decode_text(
     offset: usize,
     count: usize,
     unicode: bool,
-    charset: u8,
+    font: &Font,
     kind: EmrType,
-) -> Result<String> {
+) -> Result<DecodedEmfText> {
     let bytes = count
         .checked_mul(if unicode { 2 } else { 1 })
         .ok_or_else(|| Error::ParseError("text byte length overflow".into()))?;
@@ -1980,44 +2079,48 @@ fn decode_text(
             .iter()
             .map(|v| u16::from_le_bytes([v[0], v[1]]))
             .collect::<Vec<_>>();
-        Ok(String::from_utf16_lossy(&units)
-            .trim_end_matches('\0')
-            .to_string())
+        let decoded = crate::text_charset::decode_unicode_logfont_text(
+            String::from_utf16_lossy(&units)
+                .trim_end_matches('\0')
+                .to_string(),
+            &font.face_name,
+        );
+        Ok(DecodedEmfText {
+            text: decoded.text,
+            exact: decoded.exact,
+            unicode_face: decoded.unicode_face,
+        })
     } else {
-        decode_ansi(raw, charset, kind)
+        let decoded = crate::text_charset::decode_logfont_text(raw, font.charset, &font.face_name);
+        Ok(DecodedEmfText {
+            text: decoded.text,
+            exact: decoded.exact,
+            unicode_face: decoded.unicode_face,
+        })
     }
 }
 
-fn decode_ansi(raw: &[u8], charset: u8, kind: EmrType) -> Result<String> {
-    match charset {
-        0 | 1 | 255 => Ok(raw
-            .iter()
-            .filter(|&&b| b != 0)
-            .map(|&b| cp1252(b))
-            .collect()),
-        2 => Ok(raw
-            .iter()
-            .filter(|&&b| b != 0)
-            .map(|&b| char::from_u32(0xf000 + u32::from(b)).unwrap_or('\u{fffd}'))
-            .collect()),
-        128 | 129 | 134 | 136 => unsupported(
-            kind,
-            "multibyte ANSI charset needs litchi-codepage integration",
-        ),
-        _ => unsupported(kind, "unsupported LOGFONT character set"),
+/// Reports text whose character set could not be resolved exactly.
+fn note_inexact_text(state: &mut RenderState, decoded: &DecodedEmfText) {
+    if !decoded.exact {
+        let charset = state.dc.font.charset;
+        state.note(
+            "emf-text-charset-inexact",
+            format!(
+                "text in font charset {charset} could not be decoded exactly; Windows-1252 or replacement characters were used"
+            ),
+        );
     }
 }
-fn cp1252(byte: u8) -> char {
-    const SPECIAL: [char; 32] = [
-        '€', '\u{0081}', '‚', 'ƒ', '„', '…', '†', '‡', 'ˆ', '‰', 'Š', '‹', 'Œ', '\u{008d}', 'Ž',
-        '\u{008f}', '\u{0090}', '‘', '’', '“', '”', '•', '–', '—', '˜', '™', 'š', '›', 'œ',
-        '\u{009d}', 'ž', 'Ÿ',
-    ];
-    if (0x80..=0x9f).contains(&byte) {
-        SPECIAL[usize::from(byte - 0x80)]
-    } else {
-        char::from(byte)
-    }
+
+/// Text decoded from one EMF text record.
+struct DecodedEmfText {
+    text: String,
+    /// Whether the conversion reproduces what Windows draws for this font.
+    exact: bool,
+    /// Whether the text needs a Unicode-capable face instead of the recorded
+    /// symbol face.
+    unicode_face: bool,
 }
 
 fn parse_font(data: &[u8], kind: EmrType) -> Result<(u32, Font)> {
@@ -2055,8 +2158,23 @@ fn insert_object(
     object: GdiObject,
     kind: EmrType,
 ) -> Result<()> {
-    if stock_objects::is_stock_object(handle) || !state.insert_object(handle, object) {
-        return malformed(kind, "duplicate or stock object handle");
+    if stock_objects::is_stock_object(handle) {
+        // A stock object cannot be recreated; GDI refuses the record.
+        state.note(
+            "noncanonical-emf-stock-object-handle",
+            format!(
+                "{} names stock object handle {handle:#x}; the record is ignored",
+                kind.name()
+            ),
+        );
+        return Ok(());
+    }
+    if state.insert_object(handle, object) {
+        // GDI overwrites the handle-table slot.
+        state.note(
+            "noncanonical-emf-object-handle-reused",
+            format!("{} reuses live object handle {handle}", kind.name()),
+        );
     }
     Ok(())
 }
@@ -2539,9 +2657,40 @@ mod tests {
     }
     #[test]
     fn ansi_is_not_decoded_as_utf8() {
-        assert_eq!(
-            decode_ansi(&[0x80, 0x93, 0x94], 0, EmrType::ExtTextOutA).unwrap(),
-            "€“”"
+        let font = Font {
+            charset: 0,
+            face_name: "Arial".to_owned(),
+            ..Font::default()
+        };
+        let decoded = decode_text(
+            &[0x80, 0x93, 0x94],
+            0,
+            3,
+            false,
+            &font,
+            EmrType::ExtTextOutA,
+        )
+        .expect("single-byte text");
+        assert_eq!(decoded.text, "€“”");
+        assert!(decoded.exact);
+    }
+
+    #[test]
+    fn symbol_face_text_decodes_to_greek_without_the_symbol_face() {
+        let font = Font {
+            charset: 2,
+            face_name: "Symbol".to_owned(),
+            ..Font::default()
+        };
+        let decoded =
+            decode_text(b"ab", 0, 2, false, &font, EmrType::ExtTextOutA).expect("symbol text");
+        assert_eq!(decoded.text, "αβ");
+        assert!(decoded.exact);
+        assert!(decoded.unicode_face);
+        assert!(
+            !font
+                .to_svg_attrs_for_face(!decoded.unicode_face)
+                .contains("Symbol")
         );
     }
 
@@ -2640,5 +2789,186 @@ mod tests {
         // Consecutive LineTo commands share one `L` command in compact SVG
         // grammar: M0 0L0 10 -20 10 -20 0z.
         assert!(path.contains("-20 10"), "{path}");
+    }
+
+    /// Converts a classic EMF built from `records` and returns its SVG and the
+    /// diagnostic codes of playback.
+    fn convert_codes(records: Vec<Vec<u8>>) -> (String, Vec<&'static str>) {
+        let bytes = classic_emf(records);
+        let parser = EmfParser::new(&bytes, &crate::Limits::default()).unwrap();
+        let (svg, diagnostics) = EmfSvgConverter::new(&parser)
+            .convert_with_diagnostics()
+            .unwrap();
+        (svg, diagnostics.into_iter().map(|d| d.code).collect())
+    }
+
+    fn handle_record(kind: EmrType, handle: u32) -> Vec<u8> {
+        let mut out = Vec::new();
+        dword(&mut out, handle);
+        record(kind, &out)
+    }
+
+    fn brush_record(handle: u32) -> Vec<u8> {
+        let mut out = Vec::new();
+        for value in [handle, 0, 0x0000_00ff, 0] {
+            dword(&mut out, value);
+        }
+        record(EmrType::CreateBrushIndirect, &out)
+    }
+
+    #[test]
+    fn a_handle_deleted_while_selected_can_be_created_again() {
+        let (svg, codes) = convert_codes(vec![
+            brush_record(1),
+            handle_record(EmrType::SelectObject, 1),
+            handle_record(EmrType::DeleteObject, 1),
+            brush_record(1),
+            handle_record(EmrType::SelectObject, 1),
+        ]);
+        assert!(svg.starts_with("<svg "));
+        assert!(codes.is_empty(), "{codes:?}");
+    }
+
+    #[test]
+    fn object_table_misuse_that_gdi_ignores_reports_noncanonical_codes() {
+        let (_, codes) = convert_codes(vec![
+            brush_record(1),
+            brush_record(1),
+            brush_record(0x8000_0005),
+            handle_record(EmrType::SelectObject, 9),
+            record(EmrType::RestoreDc, &(-1_i32).to_le_bytes()),
+            record(EmrType::CloseFigure, &[]),
+        ]);
+        assert_eq!(
+            codes,
+            [
+                "noncanonical-emf-object-handle-reused",
+                "noncanonical-emf-stock-object-handle",
+                "noncanonical-emf-select-unknown-object",
+                "noncanonical-emf-restore-dc-level",
+                "noncanonical-emf-close-figure",
+            ]
+        );
+    }
+
+    fn modify_world_transform(dx: f32, mode: u32) -> Vec<u8> {
+        let mut out = Vec::new();
+        for value in [1.0_f32, 0.0, 0.0, 1.0, dx, 0.0] {
+            out.extend_from_slice(&value.to_le_bytes());
+        }
+        dword(&mut out, mode);
+        record(EmrType::ModifyWorldTransform, &out)
+    }
+
+    #[test]
+    fn modify_world_transform_set_replaces_the_transform() {
+        let (svg, codes) = convert_codes(vec![
+            modify_world_transform(7.0, 4),
+            modify_world_transform(5.0, 4),
+            record(EmrType::MoveToEx, &point(0, 0)),
+            line_to(10, 0),
+        ]);
+        assert!(codes.is_empty(), "{codes:?}");
+        assert!(
+            svg.contains(r#"x1="5""#) && svg.contains(r#"x2="15""#),
+            "{svg}"
+        );
+
+        let (_, codes) = convert_codes(vec![modify_world_transform(5.0, 9)]);
+        assert_eq!(codes, ["noncanonical-emf-modify-world-transform-mode"]);
+    }
+
+    #[test]
+    fn invalid_state_records_that_gdi_refuses_are_ignored() {
+        let mut zero_extent = Vec::new();
+        sdword(&mut zero_extent, 0);
+        sdword(&mut zero_extent, 5);
+        let (_, codes) = convert_codes(vec![
+            record(EmrType::SetWindowExtEx, &zero_extent),
+            record(EmrType::SetBkMode, &0_u32.to_le_bytes()),
+            record(EmrType::SetPolyFillMode, &7_u32.to_le_bytes()),
+        ]);
+        assert_eq!(
+            codes,
+            [
+                "noncanonical-emf-zero-mapping-extent",
+                "noncanonical-emf-background-mode",
+                "noncanonical-emf-polygon-fill-mode",
+            ]
+        );
+    }
+
+    #[test]
+    fn shapes_without_area_and_empty_poly_records_draw_nothing() {
+        let mut rect = Vec::new();
+        for value in [3, 3, 3, 9] {
+            sdword(&mut rect, value);
+        }
+        let mut poly = vec![0u8; 16];
+        poly.extend_from_slice(&0_u32.to_le_bytes());
+        let (svg, codes) = convert_codes(vec![
+            record(EmrType::Rectangle, &rect),
+            record(EmrType::Ellipse, &rect),
+            record(EmrType::Polygon, &poly),
+        ]);
+        assert!(!svg.contains("<path"));
+        assert_eq!(
+            codes,
+            [
+                "noncanonical-emf-empty-shape",
+                "noncanonical-emf-empty-shape",
+                "noncanonical-emf-empty-poly-record"
+            ]
+        );
+    }
+
+    #[test]
+    fn multibyte_ansi_text_uses_the_font_character_set() {
+        let font = Font {
+            charset: 128,
+            face_name: "MS Gothic".to_owned(),
+            ..Font::default()
+        };
+        let decoded = decode_text(
+            &[0x82, 0xa0, b'a'],
+            0,
+            3,
+            false,
+            &font,
+            EmrType::ExtTextOutA,
+        )
+        .expect("shift-jis text");
+        assert_eq!(decoded.text, "あa");
+        assert!(decoded.exact);
+
+        let broken = decode_text(&[0x82], 0, 1, false, &font, EmrType::ExtTextOutA).unwrap();
+        assert!(!broken.exact);
+    }
+
+    #[test]
+    fn unicode_text_in_the_symbol_face_becomes_real_characters() {
+        let font = Font {
+            charset: 2,
+            face_name: "Symbol".to_owned(),
+            ..Font::default()
+        };
+        let bytes: Vec<u8> = [0xf070_u16, 0xf065]
+            .iter()
+            .flat_map(|u| u.to_le_bytes())
+            .collect();
+        let decoded = decode_text(&bytes, 0, 2, true, &font, EmrType::ExtTextOutW).unwrap();
+        assert_eq!(decoded.text, "πε");
+        assert!(decoded.unicode_face);
+    }
+
+    #[test]
+    fn an_empty_clip_rectangle_hides_later_drawing() {
+        let (svg, codes) = convert_codes(vec![
+            clip_rect(5, 5, 5, 20),
+            record(EmrType::MoveToEx, &point(0, 0)),
+            line_to(30, 30),
+        ]);
+        assert!(codes.is_empty(), "{codes:?}");
+        assert!(svg.contains("clip-path"), "{svg}");
     }
 }

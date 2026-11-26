@@ -299,6 +299,49 @@ pub struct EmfRecordRef<'a> {
     pub data: &'a [u8],
 }
 
+/// Outcome of reading one record header and its payload.
+enum EmfRecordScan<'a> {
+    /// A complete record and its size in bytes.
+    Complete {
+        /// The record that was read.
+        record: EmfRecordRef<'a>,
+        /// Size of the record in bytes.
+        consumed: usize,
+    },
+    /// The bytes at the offset cannot form a complete record.
+    Incomplete(EmfIncompleteRecord),
+}
+
+/// Why the bytes at a record offset do not form a complete record.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum EmfIncompleteRecord {
+    /// Fewer than eight bytes remain for the record header.
+    Header,
+    /// The record size is below the header size or not a multiple of four.
+    Size(u32),
+    /// The record size extends beyond the remaining bytes.
+    Payload {
+        /// Declared record size in bytes.
+        size: usize,
+        /// Bytes available for this record.
+        available: usize,
+    },
+}
+
+impl EmfIncompleteRecord {
+    /// Strict-parser message for this condition.
+    fn message(self, offset: usize) -> String {
+        match self {
+            Self::Header => "Insufficient data for EMF record".to_owned(),
+            Self::Size(size) => format!("Invalid EMF record size: {size} at offset {offset}"),
+            Self::Payload { size, available } => format!(
+                "EMF record extends beyond data: size {size} at offset {offset}, data length {}",
+                offset + available
+            ),
+        }
+    }
+}
+
 /// A safely recoverable format deviation accepted by a compatible parser.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EmfParserWarning {
@@ -308,6 +351,50 @@ pub enum EmfParserWarning {
         expected: u32,
         /// The nonconforming value found in `SizeLast`.
         found: u32,
+    },
+    /// The EOF record is shorter than the 20 bytes MS-EMF requires; playback
+    /// ends at its record type alone.
+    ShortEof {
+        /// Size of the EOF record in bytes.
+        size: u32,
+    },
+    /// The header's `nBytes` disagrees with the bytes present.
+    DeclaredSize {
+        /// Size declared by the header.
+        declared: usize,
+        /// Bytes actually present.
+        actual: usize,
+    },
+    /// The header's `nRecords` disagrees with the number of records.
+    RecordCount {
+        /// Record count declared by the header.
+        declared: u32,
+        /// Records found, counting the header and the EOF record.
+        found: u32,
+    },
+    /// An `EMR_HEADER` record appears after the first record; playback
+    /// ignores it.
+    RepeatedHeader {
+        /// Offset of the repeated header record.
+        offset: usize,
+    },
+    /// Bytes follow the `EMR_EOF` record.
+    TrailingData {
+        /// Number of bytes after the EOF record.
+        bytes: usize,
+    },
+    /// Playback stops where the remaining bytes cannot form a record.
+    TruncatedRecord {
+        /// Offset of the bytes that do not form a record.
+        offset: usize,
+        /// Bytes remaining at that offset.
+        available: usize,
+    },
+    /// The record stream ends without an `EMR_EOF` record.
+    MissingEof {
+        /// Whether the last record ends exactly where `nBytes` says the
+        /// metafile ends, so nothing indicates that records were lost.
+        at_declared_end: bool,
     },
 }
 
@@ -367,11 +454,22 @@ impl<'a> EmfRecordRef<'a> {
                 offset
             )));
         }
+        match Self::scan(data, offset)? {
+            EmfRecordScan::Complete { record, consumed } => Ok((record, consumed)),
+            EmfRecordScan::Incomplete(reason) => Err(Error::ParseError(reason.message(offset))),
+        }
+    }
+
+    /// Reads one record header and payload.
+    ///
+    /// Structural problems are reported as [`EmfRecordScan::Incomplete`] so
+    /// that playback can stop there.
+    fn scan(data: &'a [u8], offset: usize) -> Result<EmfRecordScan<'a>> {
         let header_end = offset
             .checked_add(8)
             .ok_or_else(|| Error::ParseError("EMF record offset overflow".into()))?;
         if header_end > data.len() {
-            return Err(Error::ParseError("Insufficient data for EMF record".into()));
+            return Ok(EmfRecordScan::Incomplete(EmfIncompleteRecord::Header));
         }
 
         // Parse record header using zerocopy - highly optimized, no allocations
@@ -383,46 +481,34 @@ impl<'a> EmfRecordRef<'a> {
 
         // Validate size with early return for better branch prediction
         if size < 8 || size % 4 != 0 {
-            return Err(Error::ParseError(format!(
-                "Invalid EMF record size: {} at offset {}",
-                size, offset
-            )));
+            return Ok(EmfRecordScan::Incomplete(EmfIncompleteRecord::Size(size)));
         }
 
         let size = usize::try_from(size)
             .map_err(|_| Error::ParseError("EMF record size does not fit in memory".into()))?;
-        if size > limits.max_uncompressed_bytes {
-            return Err(Error::ParseError(format!(
-                "EMF record size {} exceeds limit {}",
-                size, limits.max_uncompressed_bytes
-            )));
-        }
-
         let end_offset = offset
             .checked_add(size)
             .ok_or_else(|| Error::ParseError("EMF record size overflow".into()))?;
 
         if end_offset > data.len() {
-            return Err(Error::ParseError(format!(
-                "EMF record extends beyond data: size {} at offset {}, data length {}",
+            return Ok(EmfRecordScan::Incomplete(EmfIncompleteRecord::Payload {
                 size,
-                offset,
-                data.len()
-            )));
+                available: data.len() - offset,
+            }));
         }
 
         // Zero-copy: just borrow the slice
         let record_data = &data[offset + 8..end_offset];
 
-        Ok((
-            Self {
+        Ok(EmfRecordScan::Complete {
+            record: Self {
                 record_type,
                 size: u32::try_from(size)
                     .map_err(|_| Error::ParseError("EMF record size overflow".into()))?,
                 data: record_data,
             },
-            size,
-        ))
+            consumed: size,
+        })
     }
 
     /// Convert to owned record (requires allocation)
@@ -474,17 +560,32 @@ pub struct EmfParser {
     first_record_offset: usize,
 }
 
+/// Result of walking an EMF record stream.
+struct ValidatedStream {
+    /// Offset of the first record after the header.
+    first_record_offset: usize,
+    /// Offset just past the last record playback reaches.
+    end_of_records: usize,
+    /// Deviations accepted by a compatible walk.
+    warnings: Vec<EmfParserWarning>,
+}
+
 impl EmfParser {
     const MAX_PREALLOCATED_RECORDS: usize = 16_384;
 
-    /// Validate the complete record stream and return its first record offset
-    /// plus any narrowly scoped compatibility diagnostic.
+    /// Validate the record stream.
+    ///
+    /// A strict parse rejects every deviation from [MS-EMF]. A compatible
+    /// parse walks the records the way playback does, from the first record
+    /// to the first `EMR_EOF`, and records each deviation that leaves the
+    /// picture unchanged as a warning; a stream that stops at a corrupt record
+    /// is accepted up to that record.
     fn validate(
         data: &[u8],
         header: &EmfHeader,
-        allow_legacy_size_last: bool,
+        compatible: bool,
         limits: &crate::Limits,
-    ) -> Result<(usize, Vec<EmfParserWarning>)> {
+    ) -> Result<ValidatedStream> {
         if limits.max_uncompressed_bytes == 0 || limits.max_records == 0 {
             return Err(Error::ParseError(
                 "EMF parser limits must be greater than zero".into(),
@@ -496,9 +597,10 @@ impl EmfParser {
                 limits.max_uncompressed_bytes
             )));
         }
+        let mut warnings = Vec::new();
         let declared_records = usize::try_from(header.num_records)
             .map_err(|_| Error::ParseError("EMF record count does not fit in memory".into()))?;
-        if declared_records > limits.max_records {
+        if !compatible && declared_records > limits.max_records {
             return Err(Error::ParseError(format!(
                 "EMF record count {} exceeds limit {}",
                 declared_records, limits.max_records
@@ -507,35 +609,67 @@ impl EmfParser {
         let declared_size = usize::try_from(header.size)
             .map_err(|_| Error::ParseError("EMF declared size does not fit in memory".into()))?;
         if declared_size != data.len() {
-            return Err(Error::ParseError(format!(
-                "EMF declared byte size {} does not match input length {}",
-                declared_size,
-                data.len()
-            )));
+            if !compatible {
+                return Err(Error::ParseError(format!(
+                    "EMF declared byte size {} does not match input length {}",
+                    declared_size,
+                    data.len()
+                )));
+            }
+            warnings.push(EmfParserWarning::DeclaredSize {
+                declared: declared_size,
+                actual: data.len(),
+            });
         }
 
         let first_record_offset =
             usize::try_from(u32::from_le_bytes([data[4], data[5], data[6], data[7]]))
                 .map_err(|_| Error::ParseError("EMF header size does not fit in memory".into()))?;
-        let remaining = declared_size
-            .checked_sub(first_record_offset)
-            .ok_or_else(|| Error::ParseError("EMF header exceeds declared size".into()))?;
-        let declared_after_header = header
-            .num_records
-            .checked_sub(1)
-            .ok_or_else(|| Error::ParseError("Invalid EMF record count".into()))?;
-        if u64::from(declared_after_header) > (remaining / 8) as u64 {
-            return Err(Error::ParseError(
-                "EMF record count cannot fit in the declared byte size".into(),
-            ));
+        if !compatible {
+            let remaining = declared_size
+                .checked_sub(first_record_offset)
+                .ok_or_else(|| Error::ParseError("EMF header exceeds declared size".into()))?;
+            let declared_after_header = header
+                .num_records
+                .checked_sub(1)
+                .ok_or_else(|| Error::ParseError("Invalid EMF record count".into()))?;
+            if u64::from(declared_after_header) > (remaining / 8) as u64 {
+                return Err(Error::ParseError(
+                    "EMF record count cannot fit in the declared byte size".into(),
+                ));
+            }
         }
 
+        // Playback follows the records themselves; the declared size only
+        // bounds the walk in a strict parse.
+        let stream_end = if compatible {
+            data.len()
+        } else {
+            declared_size
+        };
         let mut offset = first_record_offset;
         let mut records_seen = 1u32; // EMR_HEADER
         let mut saw_eof = false;
-        let mut warnings = Vec::new();
-        while offset < declared_size {
-            let (record, consumed) = EmfRecordRef::parse_ref(data, offset, limits)?;
+        let mut incomplete = None;
+        let mut trailing = 0usize;
+        let mut end_of_records = offset;
+        while offset < stream_end {
+            if records_seen as usize >= limits.max_records {
+                return Err(Error::ParseError(format!(
+                    "EMF record count exceeds limit {}",
+                    limits.max_records
+                )));
+            }
+            let (record, consumed) = match EmfRecordRef::scan(data, offset)? {
+                EmfRecordScan::Complete { record, consumed } => (record, consumed),
+                EmfRecordScan::Incomplete(reason) => {
+                    if !compatible {
+                        return Err(Error::ParseError(reason.message(offset)));
+                    }
+                    incomplete = Some(reason);
+                    break;
+                },
+            };
             records_seen = records_seen
                 .checked_add(1)
                 .ok_or_else(|| Error::ParseError("EMF record count overflow".into()))?;
@@ -544,91 +678,131 @@ impl EmfParser {
                 .ok_or_else(|| Error::ParseError("EMF record offset overflow".into()))?;
 
             if record.record_type == EmfRecordType::Header as u32 {
-                return Err(Error::ParseError(
-                    "EMF header record appears after the beginning".into(),
-                ));
+                if !compatible {
+                    return Err(Error::ParseError(
+                        "EMF header record appears after the beginning".into(),
+                    ));
+                }
+                warnings.push(EmfParserWarning::RepeatedHeader { offset });
             }
             if record.record_type == EmfRecordType::Eof as u32 {
-                if saw_eof {
-                    return Err(Error::ParseError("Multiple EMF EOF records".into()));
-                }
                 if record.size < 20 {
-                    return Err(Error::ParseError("EMF EOF record is too short".into()));
-                }
-                let palette_entries = u32::from_le_bytes([
-                    record.data[0],
-                    record.data[1],
-                    record.data[2],
-                    record.data[3],
-                ]);
-                let palette_offset = u32::from_le_bytes([
-                    record.data[4],
-                    record.data[5],
-                    record.data[6],
-                    record.data[7],
-                ]);
-                let last = record.data.len() - 4;
-                let last_size = u32::from_le_bytes([
-                    record.data[last],
-                    record.data[last + 1],
-                    record.data[last + 2],
-                    record.data[last + 3],
-                ]);
-                let palette_bytes = palette_entries
-                    .checked_mul(4)
-                    .ok_or_else(|| Error::ParseError("EMF EOF palette size overflow".into()))?;
-                let palette_end = palette_offset
-                    .checked_add(palette_bytes)
-                    .ok_or_else(|| Error::ParseError("EMF EOF palette range overflow".into()))?;
-                let palette_limit = record
-                    .size
-                    .checked_sub(4)
-                    .ok_or_else(|| Error::ParseError("EMF EOF palette limit underflow".into()))?;
-                let invalid_palette_range = palette_entries != 0
-                    && (palette_offset < 16
-                        || palette_offset % 4 != 0
-                        || palette_end > palette_limit);
-                if palette_entries != header.num_palette || invalid_palette_range {
-                    return Err(Error::ParseError(format!(
-                        "Malformed EMF EOF record: palette {}/{}, offset {}, size {}, last {}",
-                        palette_entries, header.num_palette, palette_offset, record.size, last_size
-                    )));
-                }
-                if last_size != record.size {
-                    if !allow_legacy_size_last {
-                        return Err(Error::ParseError(format!(
-                            "Malformed EMF EOF record: SizeLast {}, expected {}",
-                            last_size, record.size
-                        )));
+                    if !compatible {
+                        return Err(Error::ParseError("EMF EOF record is too short".into()));
                     }
-                    warnings.push(EmfParserWarning::EofSizeLastMismatch {
-                        expected: record.size,
-                        found: last_size,
-                    });
+                    warnings.push(EmfParserWarning::ShortEof { size: record.size });
+                } else {
+                    Self::check_eof_record(&record, header, compatible, &mut warnings)?;
                 }
-                if end != declared_size {
+                if !compatible && end != declared_size {
                     return Err(Error::ParseError(
                         "Trailing data after EMF EOF record".into(),
                     ));
                 }
                 saw_eof = true;
-            } else if saw_eof {
-                return Err(Error::ParseError("Record found after EMF EOF".into()));
+                trailing = stream_end - end;
+                end_of_records = end;
+                break;
             }
-
             offset = end;
+            end_of_records = end;
         }
 
-        if !saw_eof {
-            return Err(Error::ParseError("Missing EMF EOF record".into()));
+        if incomplete.is_some() {
+            warnings.push(EmfParserWarning::TruncatedRecord {
+                offset,
+                available: data.len().saturating_sub(offset),
+            });
         }
-        if records_seen != header.num_records {
+        if !saw_eof {
+            if !compatible {
+                return Err(Error::ParseError("Missing EMF EOF record".into()));
+            }
+            warnings.push(EmfParserWarning::MissingEof {
+                at_declared_end: incomplete.is_none() && declared_size == data.len(),
+            });
+        } else {
+            if trailing > 0 {
+                warnings.push(EmfParserWarning::TrailingData { bytes: trailing });
+            }
+            if records_seen != header.num_records {
+                if !compatible {
+                    return Err(Error::ParseError(format!(
+                        "EMF record count {} does not match declared count {}",
+                        records_seen, header.num_records
+                    )));
+                }
+                warnings.push(EmfParserWarning::RecordCount {
+                    declared: header.num_records,
+                    found: records_seen,
+                });
+            }
+        }
+        Ok(ValidatedStream {
+            first_record_offset,
+            end_of_records,
+            warnings,
+        })
+    }
+
+    /// Checks the fixed fields of an `EMR_EOF` record that is at least 20
+    /// bytes long.
+    fn check_eof_record(
+        record: &EmfRecordRef<'_>,
+        header: &EmfHeader,
+        compatible: bool,
+        warnings: &mut Vec<EmfParserWarning>,
+    ) -> Result<()> {
+        let palette_entries = u32::from_le_bytes([
+            record.data[0],
+            record.data[1],
+            record.data[2],
+            record.data[3],
+        ]);
+        let palette_offset = u32::from_le_bytes([
+            record.data[4],
+            record.data[5],
+            record.data[6],
+            record.data[7],
+        ]);
+        let last = record.data.len() - 4;
+        let last_size = u32::from_le_bytes([
+            record.data[last],
+            record.data[last + 1],
+            record.data[last + 2],
+            record.data[last + 3],
+        ]);
+        let palette_bytes = palette_entries
+            .checked_mul(4)
+            .ok_or_else(|| Error::ParseError("EMF EOF palette size overflow".into()))?;
+        let palette_end = palette_offset
+            .checked_add(palette_bytes)
+            .ok_or_else(|| Error::ParseError("EMF EOF palette range overflow".into()))?;
+        let palette_limit = record
+            .size
+            .checked_sub(4)
+            .ok_or_else(|| Error::ParseError("EMF EOF palette limit underflow".into()))?;
+        let invalid_palette_range = palette_entries != 0
+            && (palette_offset < 16 || palette_offset % 4 != 0 || palette_end > palette_limit);
+        if palette_entries != header.num_palette || invalid_palette_range {
             return Err(Error::ParseError(format!(
-                "EMF record count {} does not match declared count {}",
-                records_seen, header.num_records
+                "Malformed EMF EOF record: palette {}/{}, offset {}, size {}, last {}",
+                palette_entries, header.num_palette, palette_offset, record.size, last_size
             )));
         }
-        Ok((first_record_offset, warnings))
+        if last_size != record.size {
+            if !compatible {
+                return Err(Error::ParseError(format!(
+                    "Malformed EMF EOF record: SizeLast {}, expected {}",
+                    last_size, record.size
+                )));
+            }
+            warnings.push(EmfParserWarning::EofSizeLastMismatch {
+                expected: record.size,
+                found: last_size,
+            });
+        }
+        Ok(())
     }
 
     /// Create a new EMF parser from raw data
@@ -677,7 +851,7 @@ impl EmfParser {
     fn parse_internal(
         data: Bytes,
         eager: bool,
-        allow_legacy_size_last: bool,
+        compatible: bool,
         limits: crate::Limits,
     ) -> Result<Self> {
         if data.len() < 88 {
@@ -685,8 +859,11 @@ impl EmfParser {
         }
 
         let header = EmfHeader::parse(&data)?;
-        let (header_record_size, warnings) =
-            Self::validate(&data, &header, allow_legacy_size_last, &limits)?;
+        let ValidatedStream {
+            first_record_offset: header_record_size,
+            end_of_records,
+            warnings,
+        } = Self::validate(&data, &header, compatible, &limits)?;
 
         if !eager {
             return Ok(Self {
@@ -716,7 +893,7 @@ impl EmfParser {
         let mut offset = header_record_size;
 
         // Parse remaining records with optimized loop
-        while offset < data.len() {
+        while offset < end_of_records {
             let (record_ref, consumed) = EmfRecordRef::parse_ref(&data, offset, &limits)?;
             let is_eof = record_ref.record_type == EmfRecordType::Eof as u32;
             let end = offset
@@ -1104,7 +1281,7 @@ mod tests {
     }
 
     #[test]
-    fn compatible_mode_relaxes_only_eof_size_last() {
+    fn compatible_mode_accepts_legacy_eof_size_last_and_keeps_palette_checks() {
         let eof = 88 + 16;
         let mut legacy = valid_emf();
         let file_size = legacy.len() as u32;
@@ -1120,23 +1297,142 @@ mod tests {
             }]
         );
 
-        let mut missing_eof = legacy.clone();
-        put_u32(&mut missing_eof, eof, 15);
-        assert!(EmfParser::new_compatible(&missing_eof, &crate::Limits::default()).is_err());
-
-        let mut wrong_count = legacy.clone();
-        put_u32(&mut wrong_count, 52, 4);
-        assert!(EmfParser::new_compatible(&wrong_count, &crate::Limits::default()).is_err());
-
-        let mut palette_mismatch = legacy.clone();
+        let mut palette_mismatch = legacy;
         put_u32(&mut palette_mismatch, 68, 1);
         assert!(EmfParser::new_compatible(&palette_mismatch, &crate::Limits::default()).is_err());
+    }
 
-        let mut trailing = legacy;
-        trailing.extend_from_slice(&[15, 0, 0, 0, 8, 0, 0, 0]);
-        let length = trailing.len() as u32;
-        put_u32(&mut trailing, 48, length);
-        put_u32(&mut trailing, 52, 4);
-        assert!(EmfParser::new_compatible(&trailing, &crate::Limits::default()).is_err());
+    fn compatible_warnings(data: &[u8]) -> Vec<EmfParserWarning> {
+        EmfParser::new_compatible(data, &crate::Limits::default())
+            .unwrap()
+            .warnings()
+            .to_vec()
+    }
+
+    #[test]
+    fn compatible_mode_walks_to_the_terminator_despite_wrong_declared_counts() {
+        let mut wrong_count = valid_emf();
+        put_u32(&mut wrong_count, 52, 4);
+        assert!(EmfParser::new(&wrong_count, &crate::Limits::default()).is_err());
+        assert_eq!(
+            compatible_warnings(&wrong_count),
+            [EmfParserWarning::RecordCount {
+                declared: 4,
+                found: 3,
+            }]
+        );
+
+        let mut wrong_size = valid_emf();
+        put_u32(&mut wrong_size, 48, 4000);
+        assert!(EmfParser::new(&wrong_size, &crate::Limits::default()).is_err());
+        assert_eq!(
+            compatible_warnings(&wrong_size),
+            [EmfParserWarning::DeclaredSize {
+                declared: 4000,
+                actual: 124,
+            }]
+        );
+
+        let mut trailing = valid_emf();
+        trailing.extend_from_slice(&[0; 8]);
+        assert!(EmfParser::new(&trailing, &crate::Limits::default()).is_err());
+        let warnings = compatible_warnings(&trailing);
+        assert!(warnings.contains(&EmfParserWarning::TrailingData { bytes: 8 }));
+        assert!(warnings.contains(&EmfParserWarning::DeclaredSize {
+            declared: 124,
+            actual: 132,
+        }));
+    }
+
+    #[test]
+    fn compatible_mode_ignores_repeated_headers_and_short_terminators() {
+        let mut repeated = valid_emf();
+        let mut header_record = vec![0u8; 16];
+        put_u32(&mut header_record, 0, EmfRecordType::Header as u32);
+        put_u32(&mut header_record, 4, 16);
+        repeated.splice(88..88, header_record);
+        let len = repeated.len() as u32;
+        put_u32(&mut repeated, 48, len);
+        put_u32(&mut repeated, 52, 4);
+        assert!(EmfParser::new(&repeated, &crate::Limits::default()).is_err());
+        assert_eq!(
+            compatible_warnings(&repeated),
+            [EmfParserWarning::RepeatedHeader { offset: 88 }]
+        );
+
+        let mut short_eof = valid_emf();
+        short_eof.truncate(88 + 16 + 8);
+        let len = short_eof.len() as u32;
+        put_u32(&mut short_eof, 48, len);
+        put_u32(&mut short_eof, 88 + 16 + 4, 8);
+        assert!(EmfParser::new(&short_eof, &crate::Limits::default()).is_err());
+        assert_eq!(
+            compatible_warnings(&short_eof),
+            [EmfParserWarning::ShortEof { size: 8 }]
+        );
+    }
+
+    #[test]
+    fn compatible_mode_stops_at_a_corrupt_record_and_reports_missing_terminators() {
+        // The record after the header claims more bytes than the input has.
+        let mut corrupt = valid_emf();
+        put_u32(&mut corrupt, 88 + 4, 0x1000);
+        assert!(EmfParser::new(&corrupt, &crate::Limits::default()).is_err());
+        let parsed = EmfParser::new_compatible(&corrupt, &crate::Limits::default()).unwrap();
+        assert!(parsed.records.is_empty());
+        assert_eq!(
+            parsed.warnings(),
+            &[
+                EmfParserWarning::TruncatedRecord {
+                    offset: 88,
+                    available: 36,
+                },
+                EmfParserWarning::MissingEof {
+                    at_declared_end: false,
+                },
+            ]
+        );
+
+        // A size that is not a multiple of four is corrupt as well.
+        let mut unaligned = valid_emf();
+        put_u32(&mut unaligned, 88 + 4, 18);
+        assert!(
+            EmfParser::new_compatible(&unaligned, &crate::Limits::default())
+                .unwrap()
+                .records
+                .is_empty()
+        );
+
+        // A stream that ends exactly at the declared size without EMR_EOF.
+        let mut missing_eof = valid_emf();
+        put_u32(&mut missing_eof, 88 + 16, 15);
+        assert!(EmfParser::new(&missing_eof, &crate::Limits::default()).is_err());
+        let parsed = EmfParser::new_compatible(&missing_eof, &crate::Limits::default()).unwrap();
+        assert_eq!(parsed.records.len(), 2);
+        assert_eq!(
+            parsed.warnings(),
+            &[EmfParserWarning::MissingEof {
+                at_declared_end: true,
+            }]
+        );
+    }
+
+    #[test]
+    fn compatible_mode_bounds_the_records_it_walks() {
+        let limits = crate::Limits {
+            max_records: 2,
+            ..crate::Limits::default()
+        };
+        let mut data = valid_emf();
+        let extra: Vec<u8> = [EmfRecordType::SetWindowOrgEx as u32, 16, 0, 0]
+            .iter()
+            .flat_map(|value| value.to_le_bytes())
+            .collect();
+        data.splice(88..88, extra.clone());
+        data.splice(88..88, extra);
+        let len = data.len() as u32;
+        put_u32(&mut data, 48, len);
+        put_u32(&mut data, 52, 5);
+        assert!(EmfParser::new_compatible(&data, &limits).is_err());
     }
 }

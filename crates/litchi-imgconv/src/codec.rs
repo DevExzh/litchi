@@ -149,11 +149,11 @@ impl Default for Limits {
             max_height: 8192,
             max_pixels: 32 * 1024 * 1024,
             max_output_bytes: 256 * 1024 * 1024,
-            max_records: 100_000,
+            max_records: 1_000_000,
             max_objects: 16_384,
             max_state_depth: 256,
             max_path_points: 1_000_000,
-            max_svg_elements: 100_000,
+            max_svg_elements: 500_000,
         }
     }
 }
@@ -385,17 +385,7 @@ fn raw_metafile_svg(
             let mut diagnostics: Vec<_> = parser
                 .warnings()
                 .iter()
-                .map(|warning| match *warning {
-                    crate::emf::parser::EmfParserWarning::EofSizeLastMismatch {
-                        expected,
-                        found,
-                    } => ConversionDiagnostic {
-                        code: "noncanonical-emf-eof-size-last",
-                        message: format!(
-                            "accepted legacy EMF EOF SizeLast {found}; the specification requires {expected}"
-                        ),
-                    },
-                })
+                .map(emf_parser_diagnostic)
                 .collect();
             diagnostics.extend(emfplus_diagnostics.into_iter().map(|diagnostic| {
                 ConversionDiagnostic {
@@ -410,7 +400,7 @@ fn raw_metafile_svg(
         },
         InputFormat::Wmf => {
             preflight_wmf_records(data, limits)?;
-            let parser = crate::wmf::WmfParser::new(data, limits)?;
+            let parser = crate::wmf::WmfParser::new_compatible(data, limits)?;
             check_record_count(parser.records.len(), limits)?;
             check_wmf_playback_limits(&parser, limits)?;
             let width = positive(parser.width());
@@ -422,12 +412,18 @@ fn raw_metafile_svg(
                 && parser.records.iter().all(|record| {
                     is_wmf_bitmap_paint(record.function) || is_wmf_non_drawing(record.function)
                 });
+            let mut diagnostics: Vec<_> = parser
+                .warnings()
+                .iter()
+                .map(wmf_parser_diagnostic)
+                .collect();
             let (svg, warnings) =
                 crate::wmf::WmfSvgConverter::with_limits(parser, *limits).to_svg_reported()?;
-            let diagnostics = warnings
-                .into_iter()
-                .map(|(code, message)| ConversionDiagnostic { code, message })
-                .collect();
+            diagnostics.extend(
+                warnings
+                    .into_iter()
+                    .map(|(code, message)| ConversionDiagnostic { code, message }),
+            );
             Ok((svg, width, height, bitmap_only, diagnostics))
         },
     }
@@ -452,14 +448,10 @@ fn validate_limits(limits: &Limits) -> Result<()> {
 }
 
 fn preflight_emf_header(data: &[u8], limits: &Limits) -> Result<()> {
-    let records = read_u32_at(data, 52)
-        .ok_or_else(|| parse("EMF header is too short for its record count"))?;
-    let records = usize::try_from(records).map_err(|_| parse("EMF record count overflow"))?;
-    if records > limits.max_records {
-        return Err(parse(format!(
-            "EMF declares {records} records; limit is {}",
-            limits.max_records
-        )));
+    // The declared record count is not trusted: playback follows the records
+    // themselves, and the parser bounds the records it walks.
+    if data.len() < 56 {
+        return Err(parse("EMF header is too short for its record count"));
     }
     let handles = data
         .get(56..58)
@@ -474,6 +466,116 @@ fn preflight_emf_header(data: &[u8], limits: &Limits) -> Result<()> {
     Ok(())
 }
 
+/// Maps an EMF framing deviation to the diagnostic reported with the picture.
+///
+/// Deviations that leave the picture unchanged use `noncanonical-` codes; a
+/// stream that stops before its terminator reports an approximation.
+fn emf_parser_diagnostic(warning: &crate::emf::parser::EmfParserWarning) -> ConversionDiagnostic {
+    use crate::emf::parser::EmfParserWarning;
+    let (code, message) = match *warning {
+        EmfParserWarning::EofSizeLastMismatch { expected, found } => (
+            "noncanonical-emf-eof-size-last",
+            format!(
+                "accepted legacy EMF EOF SizeLast {found}; the specification requires {expected}"
+            ),
+        ),
+        EmfParserWarning::ShortEof { size } => (
+            "noncanonical-emf-short-eof",
+            format!("EMR_EOF has {size} bytes; playback ends at the record type"),
+        ),
+        EmfParserWarning::DeclaredSize { declared, actual } => (
+            "noncanonical-emf-declared-size",
+            format!("the header declares {declared} bytes; the input has {actual} bytes"),
+        ),
+        EmfParserWarning::RecordCount { declared, found } => (
+            "noncanonical-emf-record-count",
+            format!("the header declares {declared} records; the stream has {found}"),
+        ),
+        EmfParserWarning::RepeatedHeader { offset } => (
+            "noncanonical-emf-repeated-header",
+            format!("ignored an EMR_HEADER record at offset {offset}"),
+        ),
+        EmfParserWarning::TrailingData { bytes } => (
+            "noncanonical-emf-trailing-data",
+            format!("{bytes} bytes follow the EMR_EOF record"),
+        ),
+        EmfParserWarning::TruncatedRecord { offset, available } => (
+            "emf-truncated-record",
+            format!(
+                "playback stops at offset {offset}: {available} bytes do not form a complete record"
+            ),
+        ),
+        EmfParserWarning::MissingEof { at_declared_end } => (
+            // Playback ends with the last record; only a stream that stops
+            // exactly where the header says it ends is known to be complete.
+            if at_declared_end {
+                "noncanonical-emf-missing-eof"
+            } else {
+                "emf-missing-eof"
+            },
+            "the record stream ends without an EMR_EOF record".to_owned(),
+        ),
+    };
+    ConversionDiagnostic { code, message }
+}
+
+/// Maps a WMF framing deviation to the diagnostic reported with the picture.
+///
+/// Framing deviations that leave the picture unchanged use `noncanonical-`
+/// codes; a stream that stops before its terminator reports an approximation.
+fn wmf_parser_diagnostic(warning: &crate::wmf::parser::WmfParserWarning) -> ConversionDiagnostic {
+    use crate::wmf::parser::WmfParserWarning;
+    let (code, message) = match *warning {
+        WmfParserWarning::PlaceableHeader { field } => (
+            "noncanonical-wmf-placeable-header",
+            format!("accepted placeable header field that playback ignores: {field}"),
+        ),
+        WmfParserWarning::Header(deviation) => (
+            match deviation {
+                crate::wmf::parser::WmfHeaderDeviation::ObjectCount(_) => {
+                    "noncanonical-wmf-object-count"
+                },
+                _ => "noncanonical-wmf-max-record",
+            },
+            deviation.message(),
+        ),
+        WmfParserWarning::DeclaredSize { declared, actual } => (
+            "noncanonical-wmf-declared-size",
+            format!("mtSize declares {declared} bytes; the record stream occupies {actual} bytes"),
+        ),
+        WmfParserWarning::MaxRecord { declared, found } => (
+            "noncanonical-wmf-max-record",
+            format!("mtMaxRecord declares {declared} words; the largest record has {found}"),
+        ),
+        WmfParserWarning::TrailingData { bytes } => (
+            "noncanonical-wmf-trailing-data",
+            format!("{bytes} bytes follow the META_EOF record"),
+        ),
+        WmfParserWarning::TruncatedRecord { offset, available } => (
+            "wmf-truncated-record",
+            format!(
+                "playback stops at offset {offset}: {available} bytes do not form a complete record"
+            ),
+        ),
+        WmfParserWarning::MissingEof { at_declared_end } => (
+            // Playback ends with the last record; only a stream that stops
+            // exactly where mtSize says it ends is known to be complete.
+            if at_declared_end {
+                "noncanonical-wmf-missing-eof"
+            } else {
+                "wmf-missing-eof"
+            },
+            "the record stream ends without a META_EOF record".to_owned(),
+        ),
+    };
+    ConversionDiagnostic { code, message }
+}
+
+/// Rejects a WMF that plays more records than the caller allows.
+///
+/// The walk stops where the bytes stop forming records, exactly as playback
+/// does, so a declared `mtSize` or object-slot count cannot reject the stream
+/// before it is walked; playback bounds the objects it retains itself.
 fn preflight_wmf_records(data: &[u8], limits: &Limits) -> Result<()> {
     const PLACEABLE_KEY: u32 = 0x9ac6_cdd7;
     let header_offset = if read_u32_at(data, 0) == Some(PLACEABLE_KEY) {
@@ -481,48 +583,30 @@ fn preflight_wmf_records(data: &[u8], limits: &Limits) -> Result<()> {
     } else {
         0usize
     };
-    let object_offset = header_offset
-        .checked_add(10)
-        .ok_or_else(|| parse("WMF header offset overflow"))?;
-    let objects = usize::from(
-        read_u16_at(data, object_offset)
-            .ok_or_else(|| parse("WMF header is too short for its object count"))?,
-    );
-    if objects > limits.max_objects {
-        return Err(parse(format!(
-            "WMF declares {objects} object slots; limit is {}",
-            limits.max_objects
-        )));
-    }
     let mut offset = header_offset
         .checked_add(18)
         .ok_or_else(|| parse("WMF record offset overflow"))?;
     let mut records = 0usize;
-    loop {
-        let words = read_u32_at(data, offset)
-            .ok_or_else(|| parse("WMF record header is truncated during limit preflight"))?;
+    while offset < data.len() {
+        let Some(words) = read_u32_at(data, offset) else {
+            break;
+        };
+        let bytes = usize::try_from(words)
+            .map_err(|_| parse("WMF record size overflow"))?
+            .checked_mul(2)
+            .ok_or_else(|| parse("WMF record byte size overflow"))?;
         let function = read_u16_at(
             data,
             offset
                 .checked_add(4)
                 .ok_or_else(|| parse("WMF function offset overflow"))?,
-        )
-        .ok_or_else(|| parse("WMF record function is truncated during limit preflight"))?;
-        let bytes = usize::try_from(words)
-            .map_err(|_| parse("WMF record size overflow"))?
-            .checked_mul(2)
-            .ok_or_else(|| parse("WMF record byte size overflow"))?;
+        );
         if bytes < 6 {
-            return Err(parse("WMF record is smaller than its header"));
+            break;
         }
-        offset = offset
-            .checked_add(bytes)
-            .ok_or_else(|| parse("WMF record range overflow"))?;
-        if offset > data.len() {
-            return Err(parse(
-                "WMF record extends beyond input during limit preflight",
-            ));
-        }
+        let Some(next) = offset.checked_add(bytes).filter(|&next| next <= data.len()) else {
+            break;
+        };
         records = records
             .checked_add(1)
             .ok_or_else(|| parse("WMF record count overflow"))?;
@@ -532,7 +616,8 @@ fn preflight_wmf_records(data: &[u8], limits: &Limits) -> Result<()> {
                 limits.max_records
             )));
         }
-        if function == crate::wmf::record::EOF {
+        offset = next;
+        if function == Some(crate::wmf::record::EOF) {
             break;
         }
     }
@@ -599,12 +684,6 @@ fn emf_record_point_count(record: &crate::emf::parser::EmfRecord) -> Option<usiz
 }
 
 fn check_wmf_playback_limits(parser: &crate::wmf::WmfParser, limits: &Limits) -> Result<()> {
-    if usize::from(parser.header.num_objects) > limits.max_objects {
-        return Err(parse(format!(
-            "WMF object table exceeds limit {}",
-            limits.max_objects
-        )));
-    }
     let mut saved_depth = 0usize;
     for record in &parser.records {
         match crate::wmf::record::canonical(record.function) {
@@ -1712,6 +1791,74 @@ mod tests {
             ..Limits::default()
         };
         assert!(to_png(&blip, Options::default().limits(limits)).is_err());
+    }
+
+    fn minimal_wmf() -> Vec<u8> {
+        let mut data = vec![0_u8; 18];
+        data[0..2].copy_from_slice(&1_u16.to_le_bytes());
+        data[2..4].copy_from_slice(&9_u16.to_le_bytes());
+        data[4..6].copy_from_slice(&0x0300_u16.to_le_bytes());
+        data[6..10].copy_from_slice(&12_u32.to_le_bytes());
+        data[12..16].copy_from_slice(&3_u32.to_le_bytes());
+        data.extend_from_slice(&3_u32.to_le_bytes());
+        data.extend_from_slice(&0_u16.to_le_bytes());
+        data
+    }
+
+    #[test]
+    fn wmf_framing_deviations_render_with_noncanonical_diagnostics() {
+        // mtSize understates the stream and two bytes follow META_EOF.
+        let mut data = minimal_wmf();
+        data[6..10].copy_from_slice(&11_u32.to_le_bytes());
+        data.extend_from_slice(&[0, 0]);
+        let converted = convert_metafile(
+            &data,
+            InputFormat::Wmf,
+            OutputFormat::Svg,
+            Options::default(),
+        )
+        .unwrap();
+        let codes: Vec<_> = converted
+            .report
+            .diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.code)
+            .collect();
+        assert_eq!(
+            codes,
+            [
+                "noncanonical-wmf-declared-size",
+                "noncanonical-wmf-trailing-data"
+            ]
+        );
+        assert!(crate::wmf::convert_wmf_to_svg(&data).is_ok());
+
+        // A stream that stops before its terminator stays an approximation.
+        let mut truncated = minimal_wmf();
+        truncated.truncate(20);
+        truncated[6..10].copy_from_slice(&10_u32.to_le_bytes());
+        let converted = convert_metafile(
+            &truncated,
+            InputFormat::Wmf,
+            OutputFormat::Svg,
+            Options::default(),
+        )
+        .unwrap();
+        let codes: Vec<_> = converted
+            .report
+            .diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.code)
+            .collect();
+        assert_eq!(
+            codes,
+            [
+                "wmf-truncated-record",
+                "wmf-missing-eof",
+                "noncanonical-wmf-max-record"
+            ]
+        );
+        assert!(crate::wmf::convert_wmf_to_svg(&truncated).is_err());
     }
 
     #[test]

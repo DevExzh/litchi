@@ -129,7 +129,8 @@ fn auto_selects_png_for_bitmap_only_emf() {
 }
 
 #[test]
-fn malformed_emf_lengths_and_missing_eof_are_rejected() {
+fn emf_framing_defects_render_with_diagnostics_or_stay_rejected() {
+    // An unusable header size is not a header.
     let mut malformed_header = emf_vector(10, 10);
     malformed_header[48..52].copy_from_slice(&u32::MAX.to_le_bytes());
     assert_err(
@@ -139,57 +140,124 @@ fn malformed_emf_lengths_and_missing_eof_are_rejected() {
         Options::default(),
     );
 
-    let malformed_record = emf_file(10, 10, &[emr(EMR_RECTANGLE, &rectl(0, 0, 10, 10))]);
-    assert_err(
-        &malformed_record,
+    // Playback ends with the last record when no terminator follows it.
+    let without_eof = emf_file(10, 10, &[emr(EMR_RECTANGLE, &rectl(0, 0, 10, 10))]);
+    let converted = convert(
+        &without_eof,
         InputFormat::Emf,
         OutputFormat::Svg,
         Options::default(),
     );
+    assert!(
+        converted
+            .report
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "noncanonical-emf-missing-eof")
+    );
 
+    // A record length that runs past the input stops playback: the picture
+    // is an approximation, so the strict helper refuses it.
     let mut overlong_record = emf_vector(10, 10);
     overlong_record[EMF_HEADER_SIZE + 4..EMF_HEADER_SIZE + 8]
         .copy_from_slice(&u32::MAX.to_le_bytes());
-    assert_err(
+    let converted = convert(
         &overlong_record,
         InputFormat::Emf,
         OutputFormat::Svg,
         Options::default(),
     );
+    assert!(
+        converted
+            .report
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "emf-truncated-record")
+    );
+    assert!(litchi_imgconv::emf::convert_emf_to_svg(&overlong_record).is_err());
 }
 
 #[test]
-fn malformed_wmf_lengths_missing_eof_and_checksum_are_rejected() {
+fn emf_declared_counts_and_sizes_do_not_have_to_match_the_records() {
+    // Neither nRecords nor nBytes changes what playback draws.
+    let mut emf = emf_vector(10, 10);
+    emf[52..56].copy_from_slice(&40_u32.to_le_bytes());
+    let declared = u32::try_from(emf.len()).unwrap() + 64;
+    emf[48..52].copy_from_slice(&declared.to_le_bytes());
+    let converted = convert(
+        &emf,
+        InputFormat::Emf,
+        OutputFormat::Svg,
+        Options::default(),
+    );
+    let codes: Vec<_> = converted
+        .report
+        .diagnostics
+        .iter()
+        .map(|diagnostic| diagnostic.code)
+        .collect();
+    assert_eq!(
+        codes,
+        [
+            "noncanonical-emf-declared-size",
+            "noncanonical-emf-record-count"
+        ]
+    );
+    assert!(litchi_imgconv::emf::convert_emf_to_svg(&emf).is_ok());
+}
+
+#[test]
+fn wmf_framing_defects_render_with_diagnostics_or_stay_rejected() {
+    // GDI never reads the placeable checksum.
     let mut bad_checksum = wmf_vector(10, 10);
     bad_checksum[20..22].copy_from_slice(&0_u16.to_le_bytes());
-    assert_err(
+    let converted = convert(
         &bad_checksum,
         InputFormat::Wmf,
         OutputFormat::Svg,
         Options::default(),
     );
+    assert_eq!(
+        converted.report.diagnostics[0].code,
+        "noncanonical-wmf-placeable-header"
+    );
 
+    // Playback ends with the last record when no terminator follows it.
     let wmf_without_eof = wmf_file(
         10,
         10,
         &[wmf_record(WMF_RECTANGLE, &wmf_rect(0, 0, 10, 10))],
     );
-    assert_err(
+    let converted = convert(
         &wmf_without_eof,
         InputFormat::Wmf,
         OutputFormat::Svg,
         Options::default(),
     );
+    assert_eq!(
+        converted.report.diagnostics[0].code,
+        "noncanonical-wmf-missing-eof"
+    );
 
+    // A record length that runs past the input stops playback: the picture
+    // is an approximation, so the strict helper refuses it.
     let mut overlong_record = wmf_vector(10, 10);
     let record_offset = WMF_PLACEABLE_SIZE + WMF_HEADER_SIZE;
     overlong_record[record_offset..record_offset + 4].copy_from_slice(&u32::MAX.to_le_bytes());
-    assert_err(
+    let converted = convert(
         &overlong_record,
         InputFormat::Wmf,
         OutputFormat::Svg,
         Options::default(),
     );
+    assert!(
+        converted
+            .report
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "wmf-truncated-record")
+    );
+    assert!(litchi_imgconv::wmf::convert_wmf_to_svg(&overlong_record).is_err());
 }
 
 #[test]
