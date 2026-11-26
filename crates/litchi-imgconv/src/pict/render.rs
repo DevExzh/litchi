@@ -2151,30 +2151,15 @@ fn frame_region(region: &Region, pen: (i32, i32)) -> Option<Region> {
             mask[y * width + (x0 - left) as usize..y * width + (x1 - left) as usize].fill(true);
         }
     }
-    let inside = |x: isize, y: isize, mask: &[bool]| {
-        x >= 0
-            && y >= 0
-            && (x as usize) < width
-            && (y as usize) < height
-            && mask[y as usize * width + x as usize]
-    };
-    let (dx, dy) = (pen_width as isize, pen_height as isize);
-    let mut horizontal = vec![false; width * height];
-    for y in 0..height as isize {
-        for x in 0..width as isize {
-            horizontal[y as usize * width + x as usize] =
-                (-dx..=dx).all(|offset| inside(x + offset, y, &mask));
-        }
-    }
+    // A pixel survives the inset when every pixel within the pen width on its
+    // row and then within the pen height in its column is inside the region.
+    let horizontal = erode_axis(&mask, width, height, pen_width as usize, true);
+    let inset = erode_axis(&horizontal, width, height, pen_height as usize, false);
     let mut rects = Vec::new();
     for y in 0..height {
         let mut x = 0usize;
         while x < width {
-            let edge = |x: usize| {
-                mask[y * width + x]
-                    && !(-dy..=dy)
-                        .all(|offset| inside(x as isize, y as isize + offset, &horizontal))
-            };
+            let edge = |x: usize| mask[y * width + x] && !inset[y * width + x];
             if !edge(x) {
                 x += 1;
                 continue;
@@ -2191,6 +2176,47 @@ fn frame_region(region: &Region, pen: (i32, i32)) -> Option<Region> {
         bounds: region.bounds,
         rects,
     })
+}
+
+/// Keeps the cells of `source` that have `radius` set cells on both sides along
+/// one axis, rows when `along_rows` and columns otherwise.
+///
+/// Each run of set cells is cut by `radius` at both ends, so the cost is
+/// linear in the number of cells whatever the radius.
+fn erode_axis(
+    source: &[bool],
+    width: usize,
+    height: usize,
+    radius: usize,
+    along_rows: bool,
+) -> Vec<bool> {
+    let (lines, length, line_step, step) = if along_rows {
+        (height, width, width, 1)
+    } else {
+        (width, height, 1, width)
+    };
+    let mut eroded = vec![false; source.len()];
+    for line in 0..lines {
+        let base = line * line_step;
+        let mut start = 0;
+        while start < length {
+            if !source[base + start * step] {
+                start += 1;
+                continue;
+            }
+            let mut end = start;
+            while end < length && source[base + end * step] {
+                end += 1;
+            }
+            if end - start > radius.saturating_mul(2) {
+                for cell in start + radius..end - radius {
+                    eroded[base + cell * step] = true;
+                }
+            }
+            start = end;
+        }
+    }
+    eroded
 }
 
 fn encode_png(width: u32, height: u32, rgba: Vec<u8>, limits: &crate::Limits) -> Option<Vec<u8>> {
@@ -2592,5 +2618,86 @@ mod tests {
         let rendered = render(&parser, &limits).unwrap();
         assert_eq!(rendered.svg.matches("<path").count(), 3);
         assert_eq!(codes(&rendered), ["pict-svg-element-limit"]);
+    }
+
+    /// The definition of `FrameRgn` on a pixel mask, checked pixel by pixel.
+    fn frame_region_by_definition(region: &Region, pen: (i32, i32)) -> Vec<(i32, i32)> {
+        let inside = |x: i32, y: i32| {
+            region
+                .rects
+                .iter()
+                .any(|rect| x >= rect[0] && x < rect[2] && y >= rect[1] && y < rect[3])
+        };
+        let mut pixels = Vec::new();
+        for y in -2..30 {
+            for x in -2..30 {
+                let inset =
+                    (-pen.0..=pen.0).all(|dx| (-pen.1..=pen.1).all(|dy| inside(x + dx, y + dy)));
+                if inside(x, y) && !inset {
+                    pixels.push((x, y));
+                }
+            }
+        }
+        pixels
+    }
+
+    fn region_pixels(region: &Region) -> Vec<(i32, i32)> {
+        let mut pixels = Vec::new();
+        for rect in &region.rects {
+            for y in rect[1]..rect[3] {
+                for x in rect[0]..rect[2] {
+                    pixels.push((x, y));
+                }
+            }
+        }
+        pixels.sort_unstable();
+        pixels.dedup();
+        pixels
+    }
+
+    #[test]
+    fn region_frame_matches_its_definition_on_small_regions() {
+        let region = Region {
+            bounds: PictRect {
+                top: 0,
+                left: 0,
+                bottom: 28,
+                right: 28,
+            },
+            rects: vec![
+                [2, 2, 20, 9],
+                [5, 9, 12, 25],
+                [12, 14, 27, 20],
+                [3, 21, 10, 24],
+            ],
+        };
+        for pen in [(1, 1), (2, 1), (1, 3), (3, 2), (6, 6), (40, 1), (1, 40)] {
+            let frame = frame_region(&region, pen).unwrap();
+            let mut expected = frame_region_by_definition(&region, pen);
+            expected.sort_unstable();
+            assert_eq!(region_pixels(&frame), expected, "pen {pen:?}");
+        }
+    }
+
+    #[test]
+    fn region_frame_with_an_enormous_pen_stays_fast() {
+        let region = Region {
+            bounds: PictRect {
+                top: 0,
+                left: 0,
+                bottom: 2000,
+                right: 2000,
+            },
+            rects: vec![[0, 0, 2000, 2000]],
+        };
+        let frame = frame_region(&region, (i32::MAX, i32::MAX)).unwrap();
+        assert_eq!(
+            frame
+                .rects
+                .iter()
+                .map(|r| (r[2] - r[0]) * (r[3] - r[1]))
+                .sum::<i32>(),
+            2000 * 2000
+        );
     }
 }
