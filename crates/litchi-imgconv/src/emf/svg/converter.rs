@@ -3,7 +3,9 @@
 use super::{
     buffer::ElementBuffer,
     path::PathBuilder,
-    state::{Brush, Canvas, ClipRule, DeviceContext, Font, GdiObject, Pen, RenderState},
+    state::{
+        Brush, Canvas, ClipRule, DashPattern, DeviceContext, Font, GdiObject, Pen, RenderState,
+    },
 };
 use crate::emf::{
     parser::{EmfParser, EmfRecord},
@@ -18,6 +20,7 @@ use crate::{
         Rop2Paint, Rop3, StretchPolicy, convex_outlines_overlap, is_convex, parse_emf_object_dib,
         xor_bracket_paint,
     },
+    text_charset::DecodedText,
 };
 use bytes::Bytes;
 use litchi_core::error::{Error, Result};
@@ -620,7 +623,7 @@ impl<'a> EmfSvgConverter<'a> {
                         "bitmap-backed extended pen requires DIB integration",
                     );
                 }
-                let mut pen = Pen::from_create_pen(value.pen_style, value.width, value.color);
+                let mut pen = Pen::from_ext_create_pen(value.pen_style, value.width, value.color);
                 if value.num_style_entries > 0 {
                     let count = bounded_count(value.num_style_entries, kind)?;
                     if count > self.limits.max_path_points
@@ -634,14 +637,13 @@ impl<'a> EmfSvgConverter<'a> {
                     let offset = size_of::<EmrExtCreatePenHeader>();
                     let entries = read_u32_array(data, offset, count, kind)?;
                     if value.pen_style & 0xff == pen_style::USERSTYLE {
-                        pen.dash_pattern = Some(
+                        pen.dash_pattern = Some(DashPattern::Units(
                             entries
                                 .iter()
-                                .map(u32::to_string)
+                                .map(|value| f64::from(*value))
                                 .collect::<Vec<_>>()
-                                .join(" ")
                                 .into(),
-                        );
+                        ));
                     }
                 }
                 insert_object(state, value.object_index, GdiObject::Pen(pen), kind)?;
@@ -1099,7 +1101,7 @@ impl<'a> EmfSvgConverter<'a> {
         if let Some(shape) = bracket_paint(state, rop2, fill, stroke) {
             // The bracket decides the fill once its second pass is complete.
             let saved = (state.dc.pen.clone(), state.dc.brush.clone());
-            state.dc.pen = Pen::from_create_pen(pen_style::NULL, 1, ColorRef::from_rgb(0, 0, 0));
+            state.dc.pen = Pen::from_create_pen(pen_style::NULL, 0, ColorRef::from_rgb(0, 0, 0));
             state.dc.brush = xor_fill_brush();
             let result = render(state);
             (state.dc.pen, state.dc.brush) = saved;
@@ -2142,11 +2144,12 @@ impl<'a> EmfSvgConverter<'a> {
             y: header.y,
         };
         render_text_element(
-            &decoded,
+            decoded,
             reference,
             header.fu_options,
             None,
             None,
+            self.canvas(),
             state,
             kind,
         )
@@ -2193,11 +2196,12 @@ impl<'a> EmfSvgConverter<'a> {
             Some(read_i32_array(data, offset, values, kind)?)
         };
         render_text_element(
-            &decoded,
+            decoded,
             info.reference,
             info.options,
             Some(info.rectangle),
             dx.as_deref(),
+            self.canvas(),
             state,
             kind,
         )
@@ -3100,16 +3104,16 @@ fn region_path(
 }
 
 fn render_text_element(
-    decoded: &DecodedEmfText,
+    mut decoded: DecodedText,
     reference: PointL,
     options: u32,
     rectangle: Option<RectL>,
     dx: Option<&[i32]>,
+    canvas: Canvas,
     state: &mut RenderState,
     kind: EmrType,
 ) -> Result<Vec<String>> {
-    let text = decoded.text.as_str();
-    if state.dc.text_break_extra != 0 && dx.is_none() && text.contains(' ') {
+    if state.dc.text_break_extra != 0 && dx.is_none() && decoded.text.contains(' ') {
         state.note(
             "emf-text-justification-ignored",
             format!(
@@ -3190,27 +3194,56 @@ fn render_text_element(
         )
         .ok();
     }
-    let mut x_values = vec![origin.0];
-    let mut y_values = vec![origin.1];
-    let mut advance = (0.0, 0.0);
-    if let Some(values) = dx {
-        let pdy = options & text_options::PDY != 0;
-        let stride = if pdy { 2 } else { 1 };
-        for chunk in values
-            .chunks_exact(stride)
-            .take(text.chars().count().saturating_sub(1))
-        {
-            advance.0 += f64::from(chunk[0]);
-            if pdy {
-                advance.1 += f64::from(chunk[1]);
-            }
-            let p = state
-                .dc
-                .transform_point(logical.0 + advance.0, logical.1 + advance.1);
-            x_values.push(p.0);
-            y_values.push(p.1);
+    // A dx array holds the distance between the origins of adjacent
+    // character cells ([MS-EMF] 2.2.5 EmrText), one value (or an x and a y
+    // value with ETO_PDY) per code unit of the string. The characters are
+    // placed at those absolute origins.
+    let advances: Vec<(f64, f64)> = match dx {
+        Some(values) if options & text_options::PDY != 0 => values
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|pair| (f64::from(pair[0]), f64::from(pair[1])))
+            .collect(),
+        Some(values) => values.iter().map(|&x| (f64::from(x), 0.0)).collect(),
+        None => Vec::new(),
+    };
+    let mut origins = if advances.is_empty() {
+        vec![origin]
+    } else {
+        decoded
+            .origin_offsets(&advances)
+            .into_iter()
+            .map(|(x, y)| state.dc.transform_point(logical.0 + x, logical.1 + y))
+            .collect()
+    };
+    let extent = advances
+        .iter()
+        .fold((0.0, 0.0), |sum, (x, y)| (sum.0 + x, sum.1 + y));
+    // GDI aligns the whole string on the reference point, while SVG applies
+    // text-anchor to every absolutely positioned character; with recorded
+    // advances the string extent is known, so the origins move instead.
+    let mut anchor = anchor;
+    if origins.len() > 1 && anchor != "start" {
+        let (width, height) = state.dc.transform_vector(extent.0, extent.1);
+        let shift = if anchor == "middle" { 0.5 } else { 1.0 };
+        for (x, y) in &mut origins {
+            *x -= width * shift;
+            *y -= height * shift;
         }
+        anchor = "start";
     }
+    let font_size = state.dc.font_device_size();
+    let origins = decoded.retain_visible(&origins, |position| {
+        crate::text_charset::origin_reaches_canvas(
+            position,
+            origin,
+            (canvas.left, canvas.top, canvas.right, canvas.bottom),
+            4.0 * font_size,
+        )
+    });
+    let text = decoded.text.as_str();
+    let (x_values, y_values): (Vec<f64>, Vec<f64>) = origins.into_iter().unzip();
     let x = x_values
         .iter()
         .map(|v| fmt(*v))
@@ -3223,35 +3256,37 @@ fn render_text_element(
         .join(" ");
     let mut escaped_text = String::with_capacity(text.len());
     write_xml_escaped(&mut escaped_text, text);
+    // GDI draws and advances over every space; XML would collapse runs of them
+    // and shift the characters after them onto earlier positions.
     let element = format!(
-        "<text x=\"{}\" y=\"{}\" fill=\"{}\" {} text-anchor=\"{}\" dominant-baseline=\"{}\" direction=\"{}\"{}>{}</text>",
+        "<text x=\"{}\" y=\"{}\" fill=\"{}\" {} text-anchor=\"{}\" dominant-baseline=\"{}\" direction=\"{}\" xml:space=\"preserve\"{}>{}</text>",
         x,
         y,
         state.dc.text_color.to_svg_color(),
-        state.dc.font.to_svg_attrs_for_face(!decoded.unicode_face),
+        state.dc.font.svg_attrs(font_size, !decoded.unicode_face),
         anchor,
         baseline,
         direction,
         attrs,
         escaped_text
     );
-    output.push(if rotated && !clip.is_empty() {
-        device_clipped(&clip, &element)
-    } else {
-        element
-    });
-    if update {
-        let estimated = if let Some(values) = dx {
-            let stride = if options & text_options::PDY != 0 {
-                2
-            } else {
-                1
-            };
-            values.iter().step_by(stride).map(|v| f64::from(*v)).sum()
+    if !text.is_empty() {
+        output.push(if rotated && !clip.is_empty() {
+            device_clipped(&clip, &element)
         } else {
-            state.dc.font.height.abs() * 0.6 * text.chars().count() as f64
+            element
+        });
+    }
+    if update {
+        let advanced = if advances.is_empty() {
+            (
+                state.dc.font.height.abs() * 0.6 * text.chars().count() as f64,
+                0.0,
+            )
+        } else {
+            extent
         };
-        state.dc.current_pos = (logical.0 + estimated, logical.1);
+        state.dc.current_pos = (logical.0 + advanced.0, logical.1 + advanced.1);
     }
     Ok(output)
 }
@@ -3263,7 +3298,7 @@ fn decode_text(
     unicode: bool,
     font: &Font,
     kind: EmrType,
-) -> Result<DecodedEmfText> {
+) -> Result<DecodedText> {
     let bytes = count
         .checked_mul(if unicode { 2 } else { 1 })
         .ok_or_else(|| Error::ParseError("text byte length overflow".into()))?;
@@ -3280,29 +3315,21 @@ fn decode_text(
             .iter()
             .map(|v| u16::from_le_bytes([v[0], v[1]]))
             .collect::<Vec<_>>();
-        let decoded = crate::text_charset::decode_unicode_logfont_text(
-            String::from_utf16_lossy(&units)
-                .trim_end_matches('\0')
-                .to_string(),
+        Ok(crate::text_charset::decode_utf16_logfont_text(
+            &units,
             &font.face_name,
-        );
-        Ok(DecodedEmfText {
-            text: decoded.text,
-            exact: decoded.exact,
-            unicode_face: decoded.unicode_face,
-        })
+        ))
     } else {
-        let decoded = crate::text_charset::decode_logfont_text(raw, font.charset, &font.face_name);
-        Ok(DecodedEmfText {
-            text: decoded.text,
-            exact: decoded.exact,
-            unicode_face: decoded.unicode_face,
-        })
+        Ok(crate::text_charset::decode_logfont_text(
+            raw,
+            font.charset,
+            &font.face_name,
+        ))
     }
 }
 
 /// Reports text whose character set could not be resolved exactly.
-fn note_inexact_text(state: &mut RenderState, decoded: &DecodedEmfText) {
+fn note_inexact_text(state: &mut RenderState, decoded: &DecodedText) {
     if !decoded.exact {
         let charset = state.dc.font.charset;
         state.note(
@@ -3312,16 +3339,6 @@ fn note_inexact_text(state: &mut RenderState, decoded: &DecodedEmfText) {
             ),
         );
     }
-}
-
-/// Text decoded from one EMF text record.
-struct DecodedEmfText {
-    text: String,
-    /// Whether the conversion reproduces what Windows draws for this font.
-    exact: bool,
-    /// Whether the text needs a Unicode-capable face instead of the recorded
-    /// symbol face.
-    unicode_face: bool,
 }
 
 fn parse_font(data: &[u8], kind: EmrType) -> Result<(u32, Font)> {
@@ -3349,6 +3366,7 @@ fn parse_font(data: &[u8], kind: EmrType) -> Result<(u32, Font)> {
             underline: log.underline != 0,
             strike_out: log.strike_out != 0,
             charset: log.char_set,
+            pitch_and_family: log.pitch_and_family,
             face_name,
         },
     ))
@@ -4233,7 +4251,7 @@ mod tests {
         assert!(decoded.unicode_face);
         assert!(
             !font
-                .to_svg_attrs_for_face(!decoded.unicode_face)
+                .svg_attrs(12.0, !decoded.unicode_face)
                 .contains("Symbol")
         );
     }
@@ -4393,6 +4411,94 @@ mod tests {
                 "noncanonical-emf-close-figure",
             ]
         );
+    }
+
+    fn set_world_transform(m11: f32, m12: f32, m21: f32, m22: f32, dx: f32, dy: f32) -> Vec<u8> {
+        let mut out = Vec::new();
+        for value in [m11, m12, m21, m22, dx, dy] {
+            out.extend_from_slice(&value.to_le_bytes());
+        }
+        dword(&mut out, 4);
+        record(EmrType::ModifyWorldTransform, &out)
+    }
+
+    fn log_font(height: i32, face: &str, charset: u8, pitch_and_family: u8) -> Vec<u8> {
+        let mut out = Vec::new();
+        for value in [height, 0, 0, 0, 400] {
+            sdword(&mut out, value);
+        }
+        out.extend_from_slice(&[0, 0, 0, charset, 0, 0, 0, pitch_and_family]);
+        let mut name: Vec<u8> = face.encode_utf16().flat_map(u16::to_le_bytes).collect();
+        name.resize(64, 0);
+        out.extend_from_slice(&name);
+        out
+    }
+
+    fn font_record(handle: u32, height: i32, face: &str) -> Vec<u8> {
+        font_record_with(handle, height, face, 0, 0)
+    }
+
+    fn font_record_with(
+        handle: u32,
+        height: i32,
+        face: &str,
+        charset: u8,
+        pitch_and_family: u8,
+    ) -> Vec<u8> {
+        let mut out = Vec::new();
+        dword(&mut out, handle);
+        out.extend_from_slice(&log_font(height, face, charset, pitch_and_family));
+        record(EmrType::ExtCreateFontIndirectW, &out)
+    }
+
+    fn extended_pen_record(handle: u32, style: u32, width: u32) -> Vec<u8> {
+        let mut out = Vec::new();
+        for value in [handle, 0, 0, 0, 0, style, width, 0, 0, 0, 0] {
+            dword(&mut out, value);
+        }
+        record(EmrType::ExtCreatePen, &out)
+    }
+
+    fn text_out_w(x: i32, y: i32, text: &str, dx: Option<&[i32]>) -> Vec<u8> {
+        let units: Vec<u16> = text.encode_utf16().collect();
+        let string: Vec<u8> = units.iter().flat_map(|unit| unit.to_le_bytes()).collect();
+        text_out(EmrType::ExtTextOutW, (x, y), &string, units.len(), 0, dx)
+    }
+
+    /// An ExtTextOutA or ExtTextOutW record: its header, the string at offset
+    /// 76 padded to four bytes, then the advances.
+    fn text_out(
+        kind: EmrType,
+        (x, y): (i32, i32),
+        string: &[u8],
+        count: usize,
+        options: u32,
+        dx: Option<&[i32]>,
+    ) -> Vec<u8> {
+        let mut string = string.to_vec();
+        while (76 + string.len()) % 4 != 0 {
+            string.push(0);
+        }
+        let mut out = Vec::new();
+        out.extend_from_slice(&[0u8; 16]); // bounds
+        dword(&mut out, 1); // GM_COMPATIBLE
+        out.extend_from_slice(&1.0_f32.to_le_bytes());
+        out.extend_from_slice(&1.0_f32.to_le_bytes());
+        sdword(&mut out, x);
+        sdword(&mut out, y);
+        dword(&mut out, u32::try_from(count).unwrap());
+        dword(&mut out, 76); // string follows the 68-byte header
+        dword(&mut out, options);
+        out.extend_from_slice(&[0u8; 16]); // rectangle
+        let dx_offset = 76 + u32::try_from(string.len()).unwrap();
+        dword(&mut out, if dx.is_some() { dx_offset } else { 0 });
+        out.extend_from_slice(&string);
+        if let Some(values) = dx {
+            for value in values {
+                sdword(&mut out, *value);
+            }
+        }
+        record(kind, &out)
     }
 
     fn modify_world_transform(dx: f32, mode: u32) -> Vec<u8> {
@@ -4712,5 +4818,203 @@ mod tests {
         ]);
         assert!(!svg.contains("stroke-width=\"4294967295\""), "{svg}");
         assert!(!svg.contains("e9"), "{svg}");
+    }
+
+    #[test]
+    fn classic_text_height_follows_the_world_transform() {
+        let (svg, codes) = convert_codes(vec![
+            set_world_transform(0.25, 0.0, 0.0, 0.25, 0.0, 0.0),
+            font_record(1, -100, "Arial"),
+            handle_record(EmrType::SelectObject, 1),
+            text_out_w(0, 0, "A", None),
+        ]);
+        assert!(codes.is_empty(), "{codes:?}");
+        assert!(svg.contains("font-size=\"25\""), "{svg}");
+    }
+
+    #[test]
+    fn symbol_face_text_keeps_the_face_and_maps_its_positions() {
+        let (svg, codes) = convert_codes(vec![
+            font_record(1, -100, "MT Extra"),
+            handle_record(EmrType::SelectObject, 1),
+            text_out_w(0, 0, "h", None),
+        ]);
+        assert!(codes.is_empty(), "{codes:?}");
+        // MT Extra position 0x68 is Planck's constant over two pi, and the
+        // face stays selectable for positions without a Unicode equivalent.
+        assert!(svg.contains('\u{210f}'), "{svg}");
+        assert!(svg.contains(r#"font-family="MT Extra""#), "{svg}");
+    }
+
+    #[test]
+    fn a_zero_text_height_uses_the_default_font_size() {
+        let (svg, codes) = convert_codes(vec![
+            font_record(1, 0, "Arial"),
+            handle_record(EmrType::SelectObject, 1),
+            text_out_w(0, 0, "A", None),
+        ]);
+        assert!(codes.is_empty(), "{codes:?}");
+        assert!(svg.contains("font-size=\"12\""), "{svg}");
+    }
+
+    #[test]
+    fn geometric_pen_width_follows_the_world_transform() {
+        let (svg, codes) = convert_codes(vec![
+            set_world_transform(0.25, 0.0, 0.0, 0.25, 0.0, 0.0),
+            extended_pen_record(1, pen_style::GEOMETRIC | pen_style::SOLID, 6),
+            handle_record(EmrType::SelectObject, 1),
+            record(EmrType::MoveToEx, &point(0, 0)),
+            line_to(200, 200),
+        ]);
+        assert!(codes.is_empty(), "{codes:?}");
+        assert!(svg.contains("stroke-width=\"1.5\""), "{svg}");
+    }
+
+    #[test]
+    fn cosmetic_pen_width_is_a_device_width() {
+        let (svg, codes) = convert_codes(vec![
+            set_world_transform(0.25, 0.0, 0.0, 0.25, 0.0, 0.0),
+            extended_pen_record(1, pen_style::COSMETIC | pen_style::SOLID, 3),
+            handle_record(EmrType::SelectObject, 1),
+            record(EmrType::MoveToEx, &point(0, 0)),
+            line_to(200, 200),
+        ]);
+        assert!(codes.is_empty(), "{codes:?}");
+        assert!(svg.contains("stroke-width=\"3\""), "{svg}");
+    }
+
+    fn create_pen_record(handle: u32, style: u32, width: i32) -> Vec<u8> {
+        let mut out = Vec::new();
+        dword(&mut out, handle);
+        dword(&mut out, style);
+        sdword(&mut out, width);
+        sdword(&mut out, 0);
+        dword(&mut out, 0);
+        record(EmrType::CreatePen, &out)
+    }
+
+    #[test]
+    fn logpen_width_follows_the_world_transform() {
+        // GDI creates a LogPen with its width in logical units even though
+        // the style carries no PS_GEOMETRIC bit.
+        let (svg, codes) = convert_codes(vec![
+            set_world_transform(0.25, 0.0, 0.0, 0.25, 0.0, 0.0),
+            create_pen_record(1, pen_style::SOLID, 8),
+            handle_record(EmrType::SelectObject, 1),
+            record(EmrType::MoveToEx, &point(0, 0)),
+            line_to(200, 200),
+        ]);
+        assert!(codes.is_empty(), "{codes:?}");
+        assert!(svg.contains("stroke-width=\"2\""), "{svg}");
+        // Dashes are multiples of the drawn width.
+        let (svg, _) = convert_codes(vec![
+            set_world_transform(0.25, 0.0, 0.0, 0.25, 0.0, 0.0),
+            create_pen_record(1, pen_style::DASH, 8),
+            handle_record(EmrType::SelectObject, 1),
+            record(EmrType::MoveToEx, &point(0, 0)),
+            line_to(200, 200),
+        ]);
+        assert!(svg.contains("stroke-dasharray=\"6 2\""), "{svg}");
+    }
+
+    #[test]
+    fn zero_width_pens_stay_one_device_pixel_wide() {
+        for pen in [
+            create_pen_record(1, pen_style::SOLID, 0),
+            extended_pen_record(1, pen_style::GEOMETRIC | pen_style::SOLID, 0),
+        ] {
+            let (svg, codes) = convert_codes(vec![
+                set_world_transform(16.0, 0.0, 0.0, 16.0, 0.0, 0.0),
+                pen,
+                handle_record(EmrType::SelectObject, 1),
+                record(EmrType::MoveToEx, &point(0, 0)),
+                line_to(20, 20),
+            ]);
+            assert!(codes.is_empty(), "{codes:?}");
+            assert!(svg.contains("<line"), "{svg}");
+            assert!(!svg.contains("stroke-width"), "{svg}");
+        }
+        // So does the stock black pen.
+        let (svg, _) = convert_codes(vec![
+            set_world_transform(16.0, 0.0, 0.0, 16.0, 0.0, 0.0),
+            record(EmrType::MoveToEx, &point(0, 0)),
+            line_to(20, 20),
+        ]);
+        assert!(!svg.contains("stroke-width"), "{svg}");
+    }
+
+    #[test]
+    fn text_anchoring_uses_the_recorded_glyph_positions() {
+        let (svg, codes) = convert_codes(vec![
+            record(EmrType::SetTextAlign, &6_u32.to_le_bytes()),
+            font_record(1, -10, "Arial"),
+            handle_record(EmrType::SelectObject, 1),
+            text_out_w(50, 20, "ab", Some(&[10, 10])),
+        ]);
+        assert!(codes.is_empty(), "{codes:?}");
+        // The 20 unit string is centered on 50, so the glyphs start at 40 and
+        // 50; SVG's own text-anchor would center each glyph on its position.
+        assert!(svg.contains("<text x=\"40 50\""), "{svg}");
+        assert!(!svg.contains("text-anchor=\"middle\""), "{svg}");
+    }
+
+    #[test]
+    fn advances_place_characters_after_every_code_unit_they_cover() {
+        // A Shift_JIS character takes two bytes and two advances.
+        let (svg, codes) = convert_codes(vec![
+            font_record_with(1, -10, "MS Mincho", 128, 0),
+            handle_record(EmrType::SelectObject, 1),
+            text_out(
+                EmrType::ExtTextOutA,
+                (0, 0),
+                b"a\x82\xa0b",
+                4,
+                0,
+                Some(&[10, 6, 6, 8]),
+            ),
+        ]);
+        assert!(codes.is_empty(), "{codes:?}");
+        assert!(svg.contains("<text x=\"0 10 22\" y=\"0 0 0\""), "{svg}");
+        // So does a surrogate pair in UTF-16, and every space of a run keeps
+        // its own position.
+        let (svg, _) = convert_codes(vec![text_out_w(
+            0,
+            0,
+            "a\u{1d400}  b",
+            Some(&[10, 6, 6, 5, 5, 8]),
+        )]);
+        assert!(svg.contains("<text x=\"0 10 22 27 32\""), "{svg}");
+        assert!(
+            svg.contains("xml:space=\"preserve\">a\u{1d400}  b<"),
+            "{svg}"
+        );
+    }
+
+    #[test]
+    fn vertical_advances_move_the_characters_down_the_page() {
+        let (svg, codes) = convert_codes(vec![text_out(
+            EmrType::ExtTextOutW,
+            (5, 5),
+            &[b'a', 0, b'b', 0],
+            2,
+            text_options::PDY,
+            Some(&[10, 3, 10, 3]),
+        )]);
+        assert!(codes.is_empty(), "{codes:?}");
+        assert!(svg.contains("<text x=\"5 15\" y=\"5 8\""), "{svg}");
+    }
+
+    #[test]
+    fn the_font_family_names_the_recorded_face_then_its_class() {
+        let (svg, codes) = convert_codes(vec![
+            font_record_with(1, -10, "Garamond Premier", 0, 0x12),
+            handle_record(EmrType::SelectObject, 1),
+            text_out_w(0, 0, "a", None),
+        ]);
+        assert!(codes.is_empty(), "{codes:?}");
+        assert!(
+            svg.contains("font-family=\"Garamond Premier, serif\""),
+            "{svg}"
+        );
     }
 }

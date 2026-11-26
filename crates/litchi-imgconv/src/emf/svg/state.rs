@@ -450,6 +450,30 @@ impl DeviceContext {
         (end.0 - origin.0, end.1 - origin.1)
     }
 
+    /// Length in device units of the transformed logical x and y axes.
+    ///
+    /// GDI measures font heights and the widths of most pens in logical
+    /// units, so the world transform and page mapping scale them.
+    pub fn device_scale(&self) -> (f64, f64) {
+        let (xx, xy) = self.transform_vector(1.0, 0.0);
+        let (yx, yy) = self.transform_vector(0.0, 1.0);
+        (xx.hypot(xy), yx.hypot(yy))
+    }
+
+    /// SVG `font-size` of the selected font in device units.
+    ///
+    /// A LOGFONT height is in logical units, so the world transform and page
+    /// mapping scale the glyphs ([MS-EMF] 2.2.13 LogFont). A zero height asks
+    /// GDI for its default size, which the crate models with the 12 device
+    /// units of [`Font::default`].
+    pub fn font_device_size(&self) -> f64 {
+        let height = self.font.height.abs();
+        if height == 0.0 {
+            return Font::default().height;
+        }
+        (height * self.device_scale().1).max(0.01)
+    }
+
     fn page_scale(&self) -> (f64, f64) {
         let ratio = || {
             let x = if self.window_ext.0 == 0 {
@@ -492,14 +516,24 @@ impl DeviceContext {
 
     /// Appends width, dash, cap, join and miter attributes of the pen.
     fn push_pen_shape_attrs(&self, attrs: &mut String) {
-        if self.pen.width > 1.0 {
+        let width = self.pen_device_width();
+        if width > 1.0 {
             attrs.push_str(" stroke-width=\"");
-            write_num(attrs, self.pen.width);
+            write_num(attrs, width);
             attrs.push('"');
         }
         if let Some(dash) = &self.pen.dash_pattern {
+            let (lengths, scale) = match dash {
+                DashPattern::Width(multiples) => (multiples, width),
+                DashPattern::Units(lengths) => (lengths, self.pen_unit_scale()),
+            };
             attrs.push_str(" stroke-dasharray=\"");
-            attrs.push_str(dash);
+            for (index, length) in lengths.iter().enumerate() {
+                if index != 0 {
+                    attrs.push(' ');
+                }
+                write_num(attrs, length * scale);
+            }
             attrs.push('"');
         }
         let cap = match self.pen.end_cap {
@@ -516,6 +550,25 @@ impl DeviceContext {
             " stroke-linecap=\"{cap}\" stroke-linejoin=\"{join}\" stroke-miterlimit=\"{}\"",
             self.miter_limit
         ));
+    }
+
+    /// Device units per unit of the selected pen's width and style lengths.
+    ///
+    /// A non-uniform mapping turns the round nib of a logical width into an
+    /// ellipse; the scale returned here gives the circle of the same area.
+    fn pen_unit_scale(&self) -> f64 {
+        if self.pen.logical_width {
+            let (x, y) = self.device_scale();
+            (x * y).sqrt()
+        } else {
+            1.0
+        }
+    }
+
+    /// Width of the selected pen in device units; GDI draws every line at
+    /// least one device pixel wide, and a zero-width pen exactly that wide.
+    fn pen_device_width(&self) -> f64 {
+        (self.pen.width * self.pen_unit_scale()).max(1.0)
     }
 
     pub fn get_fill_attr(&self) -> String {
@@ -544,54 +597,70 @@ impl DeviceContext {
 #[derive(Debug, Clone)]
 pub struct Pen {
     pub style: u32,
+    /// Width as recorded; zero draws lines one device pixel wide.
     pub width: f64,
     pub color: ColorRef,
     pub end_cap: u32,
     pub line_join: u32,
-    pub dash_pattern: Option<Arc<str>>,
+    /// Dash lengths, in the units the pen style measures them in.
+    pub dash_pattern: Option<DashPattern>,
+    /// Whether the width and style lengths are logical units, which the world
+    /// transform and page mapping scale, rather than device units.
+    pub logical_width: bool,
+}
+
+/// Dash lengths of a pen.
+#[derive(Debug, Clone)]
+pub enum DashPattern {
+    /// Multiples of the pen width, as the fixed pen styles define them.
+    Width(Arc<[f64]>),
+    /// Lengths in the units of the pen width, as an extended pen's style
+    /// array records them ([MS-EMF] 2.2.20 LogPenEx).
+    Units(Arc<[f64]>),
 }
 
 impl Default for Pen {
+    /// The stock black pen: solid and zero width.
     fn default() -> Self {
-        Self::from_create_pen(pen_style::SOLID, 1, ColorRef::from_rgb(0, 0, 0))
+        Self::from_create_pen(pen_style::SOLID, 0, ColorRef::from_rgb(0, 0, 0))
     }
 }
 
 impl Pen {
+    /// A pen created from an [MS-EMF] 2.2.19 LogPen.
+    ///
+    /// GDI creates such a pen with its width in logical units whatever pen
+    /// type bits the style carries, so the world transform and page mapping
+    /// scale it; a zero width draws one device pixel wide.
     pub fn from_create_pen(style: u32, width: u32, color: ColorRef) -> Self {
         let base = style & 0xff;
-        let unit = f64::from(width.max(1));
         let dash_pattern = match base {
-            pen_style::DASH => Some(Arc::from(format!("{} {}", unit * 3.0, unit))),
-            pen_style::DOT => Some(Arc::from(format!("{} {}", unit, unit))),
-            pen_style::DASHDOT => Some(Arc::from(format!(
-                "{} {} {} {}",
-                unit * 3.0,
-                unit,
-                unit,
-                unit
-            ))),
-            pen_style::DASHDOTDOT => Some(
-                format!(
-                    "{} {} {} {} {} {}",
-                    unit * 3.0,
-                    unit,
-                    unit,
-                    unit,
-                    unit,
-                    unit
-                )
-                .into(),
-            ),
+            pen_style::DASH => Some(DashPattern::Width(Arc::from([3.0, 1.0]))),
+            pen_style::DOT => Some(DashPattern::Width(Arc::from([1.0, 1.0]))),
+            pen_style::DASHDOT => Some(DashPattern::Width(Arc::from([3.0, 1.0, 1.0, 1.0]))),
+            pen_style::DASHDOTDOT => Some(DashPattern::Width(Arc::from([
+                3.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+            ]))),
             _ => None,
         };
         Self {
             style: base,
-            width: unit,
+            width: f64::from(width),
             color,
             end_cap: style & 0x0f00,
             line_join: style & 0xf000,
             dash_pattern,
+            logical_width: true,
+        }
+    }
+
+    /// A pen created from an [MS-EMF] 2.2.20 LogPenEx, whose width is in
+    /// logical units for a geometric pen and in device units for a cosmetic
+    /// one.
+    pub fn from_ext_create_pen(style: u32, width: u32, color: ColorRef) -> Self {
+        Self {
+            logical_width: style & pen_style::GEOMETRIC != 0,
+            ..Self::from_create_pen(style, width, color)
         }
     }
 }
@@ -694,6 +763,9 @@ pub struct Font {
     pub underline: bool,
     pub strike_out: bool,
     pub charset: u8,
+    /// `lfPitchAndFamily` byte, whose family class names the generic SVG
+    /// family to fall back to.
+    pub pitch_and_family: u8,
     pub face_name: String,
 }
 
@@ -709,29 +781,29 @@ impl Default for Font {
             underline: false,
             strike_out: false,
             charset: 1,
+            pitch_and_family: 0,
             face_name: "Arial".to_string(),
         }
     }
 }
 
 impl Font {
-    pub fn to_svg_attrs(&self) -> String {
-        self.to_svg_attrs_for_face(true)
-    }
-
-    /// Returns the SVG font attributes, naming the recorded face only when the
-    /// text is drawn with it.
+    /// Returns the SVG font attributes for the font drawn at `font_size`
+    /// device units, naming the recorded face only when the text is drawn
+    /// with it.
     ///
     /// Text that a symbol face draws through a glyph order — the Adobe Symbol
     /// encoding in particular — is emitted as the Unicode characters those
     /// glyphs represent, which the recorded symbol face does not contain.
-    pub fn to_svg_attrs_for_face(&self, use_face: bool) -> String {
-        let mut attrs = format!("font-size=\"{}\"", self.height.abs().max(1.0));
+    pub fn svg_attrs(&self, font_size: f64, use_face: bool) -> String {
+        let mut attrs = String::from("font-size=\"");
+        write_num(&mut attrs, font_size);
+        attrs.push('"');
         if use_face {
-            let mut family = String::with_capacity(self.face_name.len());
-            write_xml_escaped(&mut family, &self.face_name);
+            let family =
+                crate::text_charset::svg_font_family(&self.face_name, self.pitch_and_family);
             attrs.push_str(" font-family=\"");
-            attrs.push_str(&family);
+            write_xml_escaped(&mut attrs, &family);
             attrs.push('"');
         }
         if self.weight != font_weight::NORMAL {
@@ -775,13 +847,13 @@ fn stock_object(handle: u32) -> Option<GdiObject> {
         ))),
         stock_objects::WHITE_PEN => Some(GdiObject::Pen(Pen::from_create_pen(
             pen_style::SOLID,
-            1,
+            0,
             ColorRef::from_rgb(255, 255, 255),
         ))),
         stock_objects::BLACK_PEN | stock_objects::DC_PEN => Some(GdiObject::Pen(Pen::default())),
         stock_objects::NULL_PEN => Some(GdiObject::Pen(Pen::from_create_pen(
             pen_style::NULL,
-            1,
+            0,
             ColorRef::from_rgb(0, 0, 0),
         ))),
         stock_objects::OEM_FIXED_FONT
