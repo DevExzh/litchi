@@ -3,6 +3,7 @@
 use std::{mem::size_of, sync::Arc};
 
 use super::super::constants::{bk_mode, brush, fill_mode, layout, map_mode, pen, stock};
+use crate::metafile_bitmap::BrushPattern;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(super) struct DeviceRect {
@@ -80,7 +81,7 @@ impl ClipRegion {
 }
 
 /// Logical-to-device mapping in the playback DC.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub(super) struct MappingState {
     pub mode: u16,
     pub window_origin: (f64, f64),
@@ -196,9 +197,9 @@ pub(super) struct Brush {
     pub style: u16,
     pub color: u32,
     pub hatch: u16,
-    /// Opaque bitmap payload for pattern brushes. It is never interpreted by
-    /// the SVG player itself.
-    pub pattern: Option<Arc<[u8]>>,
+    /// Pattern bitmap of a pattern brush, or why its record carries no
+    /// usable bitmap.
+    pub pattern: Option<Result<Arc<BrushPattern>, Arc<str>>>,
 }
 
 impl Default for Brush {
@@ -308,8 +309,10 @@ impl ObjectTable {
                     region.rects.len().saturating_mul(size_of::<DeviceRect>())
                 },
                 Some(GdiObject::Font(font)) => font.name.len(),
-                Some(GdiObject::Brush(brush)) => {
-                    brush.pattern.as_ref().map_or(0, |pattern| pattern.len())
+                Some(GdiObject::Brush(brush)) => match &brush.pattern {
+                    Some(Ok(pattern)) => pattern.retained_bytes(),
+                    Some(Err(reason)) => reason.len(),
+                    None => 0,
                 },
                 _ => 0,
             };

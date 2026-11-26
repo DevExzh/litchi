@@ -12,9 +12,14 @@ use crate::emf::{
 };
 use crate::svg_utils::{write_num, write_xml_escaped};
 use crate::{
-    dib::DibLimits,
-    metafile_bitmap::{BitmapOp, StretchPolicy},
+    dib::{ColorUsage, Dib, DibLimits},
+    metafile_bitmap::{
+        BitmapOp, BitmapPaint, BitmapSource, BlitGrid, BrushPattern, RasterComposite, Rop2,
+        Rop2Paint, Rop3, StretchPolicy, convex_outlines_overlap, is_convex, parse_emf_object_dib,
+        xor_bracket_paint,
+    },
 };
+use bytes::Bytes;
 use litchi_core::error::{Error, Result};
 use std::{f64::consts::PI, fmt::Write, mem::size_of};
 use zerocopy::FromBytes;
@@ -67,8 +72,15 @@ impl<'a> EmfSvgConverter<'a> {
         let mut generated_bytes = 0usize;
         let mut generated_elements = 0usize;
         let mut counted_definitions = 0usize;
-        for record in &self.parser.records {
-            let record_elements = self.process_record(record, &mut state)?;
+        let mut records = self.parser.records.iter();
+        loop {
+            let record_elements = match records.next() {
+                Some(record) => self.play_record(record, &mut state)?,
+                None if state.xor_bracket.is_some() => return Err(xor_bracket_failure()),
+                // Deferred bitmap records paint at the end of playback.
+                None if state.deferred_blits.is_some() => self.flush_blits(&mut state)?,
+                None => break,
+            };
             if state
                 .path_builder
                 .as_ref()
@@ -194,6 +206,38 @@ impl<'a> EmfSvgConverter<'a> {
         Ok(Some(output))
     }
 
+    /// Plays one record, painting deferred bitmap records before anything
+    /// another record draws.
+    fn play_record(&self, record: &EmfRecord, state: &mut RenderState) -> Result<Vec<String>> {
+        state.bracket_shape = None;
+        let mut elements = self.process_record(record, state)?;
+        if let Some((shape, shape_elements)) = state.bracket_shape.take() {
+            let outline = logical_outline(record);
+            elements = self.capture_bracket_shape(state, shape, shape_elements, outline)?;
+        } else if state.xor_bracket.is_some() && !elements.is_empty() {
+            return Err(xor_bracket_failure());
+        }
+        let bitmap = matches!(
+            EmrType::from_u32(record.record_type),
+            Some(
+                EmrType::BitBlt
+                    | EmrType::StretchBlt
+                    | EmrType::MaskBlt
+                    | EmrType::PlgBlt
+                    | EmrType::SetDIBitsToDevice
+                    | EmrType::StretchDIBits
+                    | EmrType::AlphaBlend
+                    | EmrType::TransparentBlt
+            )
+        );
+        if !bitmap && !elements.is_empty() && state.deferred_blits.is_some() {
+            let mut output = self.flush_blits(state)?;
+            output.append(&mut elements);
+            elements = output;
+        }
+        Ok(elements)
+    }
+
     fn process_record(&self, record: &EmfRecord, state: &mut RenderState) -> Result<Vec<String>> {
         let Some(kind) = EmrType::from_u32(record.record_type) else {
             return Err(Error::Unsupported(format!(
@@ -291,6 +335,17 @@ impl<'a> EmfSvgConverter<'a> {
                 let color = read_record::<ColorRef>(data, kind)?;
                 if kind == EmrType::SetTextColor {
                     state.dc.text_color = color;
+                    // A monochrome pattern definition captures its old text
+                    // colour.
+                    if state
+                        .dc
+                        .brush
+                        .pattern
+                        .as_ref()
+                        .is_some_and(|pattern| pattern.as_ref().is_ok_and(|p| p.is_monochrome()))
+                    {
+                        state.dc.brush.pattern_id = None;
+                    }
                 } else {
                     state.dc.bg_color = color;
                     // A selected hatch definition captures its old background.
@@ -320,14 +375,19 @@ impl<'a> EmfSvgConverter<'a> {
                 Ok(Vec::new())
             },
             EmrType::SetRop2 => {
+                // The mix mode only matters to records that paint with it,
+                // so it is resolved per drawing.
                 let mode = read_u32(data, 0, kind)?;
-                if !matches!(mode, 11 | 13) {
-                    return unsupported(
-                        kind,
-                        "binary ROP2 composition has no faithful SVG equivalent",
+                if Rop2::from_mode(mode).is_some() {
+                    state.dc.rop2 = mode;
+                } else {
+                    // SetROP2 fails for an undefined mode and keeps the
+                    // current one.
+                    state.note(
+                        "noncanonical-emf-invalid-rop2",
+                        format!("EMR_SETROP2 ignores undefined mix mode {mode}"),
                     );
                 }
-                state.dc.rop2 = mode;
                 Ok(Vec::new())
             },
             EmrType::SetStretchBltMode => {
@@ -455,7 +515,6 @@ impl<'a> EmfSvgConverter<'a> {
                 if !state.select_object(handle) {
                     return malformed(kind, "unknown object handle");
                 }
-                state.prepare_brush_pattern();
                 Ok(Vec::new())
             },
             EmrType::DeleteObject => {
@@ -495,10 +554,10 @@ impl<'a> EmfSvgConverter<'a> {
                     }
                     builder.line_to(end.0, end.1);
                     Ok(Vec::new())
-                } else if state.dc.rop2 == 11 {
-                    Ok(Vec::new())
                 } else {
-                    Ok(vec![render_line(start, end, &state.dc)])
+                    self.paint_shape(kind, state, false, true, |state| {
+                        Ok(vec![render_line(start, end, &state.dc)])
+                    })
                 }
             },
             EmrType::BeginPath => {
@@ -534,9 +593,11 @@ impl<'a> EmfSvgConverter<'a> {
                 })?;
                 let fill = matches!(kind, EmrType::FillPath | EmrType::StrokeAndFillPath);
                 let stroke = matches!(kind, EmrType::StrokePath | EmrType::StrokeAndFillPath);
-                Ok(path_element(builder, &state.dc, fill, stroke)
-                    .into_iter()
-                    .collect())
+                self.paint_shape(kind, state, fill, stroke, |state| {
+                    Ok(path_element(builder, &state.dc, fill, stroke)
+                        .into_iter()
+                        .collect())
+                })
             },
             EmrType::FlattenPath => {
                 require_len_exact(data, 0, kind)?;
@@ -586,12 +647,12 @@ impl<'a> EmfSvgConverter<'a> {
                 } else {
                     ellipse_path(rect, &state.dc)
                 }?;
-                self.record_or_render(builder, state, true, true)
+                self.record_or_render(builder, kind, state, true, true)
             },
             EmrType::RoundRect => {
                 let shape = read_record::<EmrRoundRect>(data, kind)?;
                 let builder = round_rect_path(shape.rect, shape.corner, &state.dc)?;
-                self.record_or_render(builder, state, true, true)
+                self.record_or_render(builder, kind, state, true, true)
             },
             EmrType::Arc | EmrType::ArcTo | EmrType::Chord | EmrType::Pie => {
                 let arc = read_record::<EmrArc>(data, kind)?;
@@ -600,13 +661,13 @@ impl<'a> EmfSvgConverter<'a> {
                     state.dc.current_pos = end;
                 }
                 let fill = matches!(kind, EmrType::Chord | EmrType::Pie);
-                self.record_or_render(builder, state, fill, true)
+                self.record_or_render(builder, kind, state, fill, true)
             },
             EmrType::AngleArc => {
                 let arc = read_record::<EmrAngleArc>(data, kind)?;
                 let (builder, end) = angle_arc_path(arc, &state.dc)?;
                 state.dc.current_pos = end;
-                self.record_or_render(builder, state, false, true)
+                self.record_or_render(builder, kind, state, false, true)
             },
             EmrType::SetPixelV => {
                 let pixel = read_record::<EmrSetPixelV>(data, kind)?;
@@ -709,11 +770,41 @@ impl<'a> EmfSvgConverter<'a> {
             | EmrType::SetDIBitsToDevice
             | EmrType::StretchDIBits
             | EmrType::AlphaBlend
-            | EmrType::TransparentBlt => self.bitmap_record(data, kind, state),
-            EmrType::CreateMonoBrush | EmrType::CreateDIBPatternBrushPt => unsupported(
-                kind,
-                "bitmap brush playback is not supported by the shared DIB renderer",
-            ),
+            | EmrType::TransparentBlt => self.bitmap_record(&record.data, kind, state),
+            EmrType::CreateMonoBrush | EmrType::CreateDIBPatternBrushPt => {
+                // Both records share one header: object index, colour usage,
+                // then the bitmap-info and bitmap-bits ranges.
+                let value = read_record::<EmrCreateDIBPatternBrushPtHeader>(data, kind)?;
+                let dib = ColorUsage::from_raw(value.usage).and_then(|usage| {
+                    parse_emf_object_dib(
+                        data,
+                        [value.off_bmi, value.cb_bmi, value.off_bits, value.cb_bits],
+                        usage,
+                        dib_limits(self.limits),
+                    )
+                });
+                // A monochrome brush takes its colours from the device
+                // context; a DIB pattern brush from its own color table.
+                let pattern = dib.and_then(|dib| {
+                    note_dib_tolerances(state, &dib);
+                    if kind == EmrType::CreateMonoBrush {
+                        BrushPattern::from_monochrome_dib(&dib)
+                    } else {
+                        BrushPattern::from_dib(&dib)
+                    }
+                });
+                // The object keeps its table slot; painting with it fails.
+                let pattern = pattern
+                    .map(std::sync::Arc::new)
+                    .map_err(|error| std::sync::Arc::from(error.to_string().as_str()));
+                insert_object(
+                    state,
+                    value.object_index,
+                    GdiObject::Brush(Brush::from_pattern(brush_style::PATTERN, pattern)),
+                    kind,
+                )?;
+                Ok(Vec::new())
+            },
 
             // Validated non-visual records.
             EmrType::SetMapperFlags => {
@@ -792,28 +883,110 @@ impl<'a> EmfSvgConverter<'a> {
     fn record_or_render(
         &self,
         builder: PathBuilder,
+        kind: EmrType,
         state: &mut RenderState,
         fill: bool,
         stroke: bool,
     ) -> Result<Vec<String>> {
         if state.in_path {
             append_path(active_path(state)?, builder);
-            Ok(Vec::new())
-        } else if state.dc.rop2 == 11 {
-            Ok(Vec::new())
-        } else {
-            state.prepare_brush_pattern();
+            return Ok(Vec::new());
+        }
+        self.paint_shape(kind, state, fill, stroke, |state| {
             Ok(path_element(builder, &state.dc, fill, stroke)
                 .into_iter()
                 .collect())
+        })
+    }
+
+    /// Renders a shape with the pen and brush as the active mix mode paints
+    /// them. Nothing is emitted when the mode leaves every pixel the shape
+    /// would paint unchanged.
+    fn paint_shape(
+        &self,
+        kind: EmrType,
+        state: &mut RenderState,
+        fill: bool,
+        stroke: bool,
+        render: impl FnOnce(&mut RenderState) -> Result<Vec<String>>,
+    ) -> Result<Vec<String>> {
+        let rop2 = Rop2::from_mode(state.dc.rop2).unwrap_or(Rop2::COPY_PEN);
+        if let Some(shape) = bracket_paint(state, rop2, fill, stroke) {
+            // The bracket decides the fill once its second pass is complete.
+            let saved = (state.dc.pen.clone(), state.dc.brush.clone());
+            state.dc.pen = Pen::from_create_pen(pen_style::NULL, 1, ColorRef::from_rgb(0, 0, 0));
+            state.dc.brush = xor_fill_brush();
+            let result = render(state);
+            (state.dc.pen, state.dc.brush) = saved;
+            state.bracket_shape = Some((shape, result?));
+            return Ok(Vec::new());
         }
+        if rop2 == Rop2::COPY_PEN {
+            if fill {
+                state.prepare_brush_pattern(self.limits.max_output_bytes)?;
+            }
+            return render(state);
+        }
+        let dependent = || {
+            Error::Unsupported(format!(
+                "{}: ROP2 mode {} depends on destination pixels and has no faithful SVG equivalent",
+                kind.name(),
+                rop2.mode()
+            ))
+        };
+        let pen = if stroke {
+            Some(mixed_pen(rop2, &state.dc.pen).ok_or_else(dependent)?)
+        } else {
+            None
+        };
+        let brush = if fill {
+            Some(mixed_brush(rop2, &state.dc).ok_or_else(dependent)?)
+        } else {
+            None
+        };
+        let paints_stroke = pen.as_ref().is_some_and(|pen| pen.style != pen_style::NULL);
+        let paints_fill = brush
+            .as_ref()
+            .is_some_and(|(brush, _)| brush.style != brush_style::NULL);
+        if !paints_stroke && !paints_fill {
+            return Ok(Vec::new());
+        }
+        let saved = (
+            state.dc.pen.clone(),
+            state.dc.brush.clone(),
+            state.dc.bg_mode,
+            state.dc.bg_color,
+        );
+        if let Some(pen) = pen {
+            state.dc.pen = pen;
+        }
+        if let Some((brush, background)) = brush {
+            state.dc.brush = brush;
+            match background {
+                Some(color) => state.dc.bg_color = color,
+                None => state.dc.bg_mode = 1,
+            }
+        }
+        let result = if fill {
+            state.prepare_brush_pattern(self.limits.max_output_bytes)
+        } else {
+            Ok(())
+        }
+        .and_then(|()| render(state));
+        (
+            state.dc.pen,
+            state.dc.brush,
+            state.dc.bg_mode,
+            state.dc.bg_color,
+        ) = saved;
+        result
     }
 
     fn bitmap_record(
         &self,
-        data: &[u8],
+        data: &Bytes,
         kind: EmrType,
-        state: &RenderState,
+        state: &mut RenderState,
     ) -> Result<Vec<String>> {
         let stretch = match state.dc.stretch_mode {
             1 => StretchPolicy::BlackOnWhite,
@@ -823,30 +996,427 @@ impl<'a> EmfSvgConverter<'a> {
             _ => return malformed(kind, "invalid active stretch mode"),
         };
         let operation = BitmapOp::parse_emf(kind as u32, data, stretch, dib_limits(self.limits))?;
-        let image = operation.to_svg_image()?;
-
-        // The shared helper emits logical destination coordinates. Applying
-        // the complete DC affine matrix as a wrapper preserves rectangular
-        // mirroring and the three-point PlgBlt parallelogram under the active
-        // world, page, and device transforms.
+        if let Some(BitmapSource::Dib(dib)) = operation.source {
+            note_dib_tolerances(state, &dib);
+        }
+        let paint = operation.paint()?;
         let matrix = logical_to_device_matrix(&state.dc);
-        let interpolation = match stretch {
-            StretchPolicy::Halftone => "optimizeQuality",
-            StretchPolicy::BlackOnWhite
-            | StretchPolicy::WhiteOnBlack
-            | StretchPolicy::ColorOnColor => "optimizeSpeed",
+        if !operation.rop3.depends_on_source() && paint != BitmapPaint::Nothing {
+            let destination = operation.destination_rect()?;
+            if let Some(output) = self.bracket_blit(state, operation.rop3, &matrix, destination)? {
+                return Ok(output);
+            }
+        }
+        if state.xor_bracket.is_some() {
+            return Err(xor_bracket_failure());
+        }
+        match paint {
+            BitmapPaint::Nothing => {
+                state.note(
+                    "noncanonical-emf-empty-bitmap-record",
+                    format!("{} paints no pixels", kind.name()),
+                );
+                Ok(Vec::new())
+            },
+            BitmapPaint::Solid(color) => {
+                // The ROP3 ignores source and destination and paints the whole
+                // destination rectangle with one colour.
+                let element = format!(
+                    "<path d=\"{}\" fill=\"{}\" {}/>",
+                    device_rect_path(&matrix, operation.destination_rect()?),
+                    ColorRef { value: color }.to_svg_color(),
+                    state.dc.clip_attr()
+                );
+                self.paint_after_blits(state, element)
+            },
+            BitmapPaint::Brush => {
+                if state.dc.brush.style == brush_style::NULL {
+                    return Ok(Vec::new());
+                }
+                // GDI aligns brush patterns to device pixels, so the
+                // rectangle is emitted in device coordinates.
+                state.prepare_brush_pattern(self.limits.max_output_bytes)?;
+                let element = format!(
+                    "<path d=\"{}\" {} {}/>",
+                    device_rect_path(&matrix, operation.destination_rect()?),
+                    state.dc.get_fill_attr(),
+                    state.dc.clip_attr()
+                );
+                self.paint_after_blits(state, element)
+            },
+            BitmapPaint::Image | BitmapPaint::Composite => {
+                let transform = matrix_attr(&matrix);
+                let interpolation = interpolation(stretch);
+                if !operation.is_plain_blit() {
+                    // Alpha, colour-key and parallelogram blits paint their
+                    // source directly.
+                    let Some(image) = operation.to_svg_image()? else {
+                        return Ok(Vec::new());
+                    };
+                    let element = bitmap_group(
+                        &state.dc.clip_attr(),
+                        &transform,
+                        interpolation,
+                        &image.element,
+                    );
+                    return self.paint_after_blits(state, element);
+                }
+                let destination = operation.destination_rect()?;
+                let destination = [
+                    f64::from(destination.x),
+                    f64::from(destination.y),
+                    f64::from(destination.width),
+                    f64::from(destination.height),
+                ];
+                let (painted, pixels) = if operation.rop3.depends_on_source() {
+                    let Some(window) = operation.blit_window()? else {
+                        state.note(
+                            "noncanonical-emf-blit-outside-bitmap",
+                            format!("{} reads no pixel inside its bitmap", kind.name()),
+                        );
+                        return Ok(Vec::new());
+                    };
+                    (window.painted(destination), Some(window.pixels()))
+                } else {
+                    (destination, None)
+                };
+                let blit = DeferredBlit {
+                    kind,
+                    data: data.clone(),
+                    stretch,
+                    rop3: operation.rop3,
+                    destination,
+                    brush: (state.dc.brush.style == brush_style::SOLID
+                        && state.dc.brush.pattern.is_none())
+                    .then_some(state.dc.brush.color.value),
+                };
+                let context = BlitContext {
+                    clip: state.dc.clip_attr(),
+                    transform,
+                    interpolation,
+                };
+                self.defer_blit(state, context, blit, painted, pixels)
+            },
+        }
+    }
+
+    /// Adds a blit without a source to an XOR bracket: a PATINVERT with a
+    /// solid brush is an XOR fill, and another brush raster operation right
+    /// after a first XOR pass is the middle fill. Returns the bracket's
+    /// output, or `None` when the blit is not part of a bracket.
+    fn bracket_blit(
+        &self,
+        state: &mut RenderState,
+        rop3: Rop3,
+        matrix: &[f64; 6],
+        destination: crate::metafile_bitmap::SignedRect,
+    ) -> Result<Option<Vec<String>>> {
+        let shape = if rop3.table() == 0x5a {
+            let brush = &state.dc.brush;
+            if brush.style != brush_style::SOLID || brush.pattern.is_some() {
+                return Ok(None);
+            }
+            let color = brush.color.value & 0x00ff_ffff;
+            if color == 0 {
+                // XOR with black keeps every pixel.
+                return Ok(Some(Vec::new()));
+            }
+            BracketShape::Xor(color)
+        } else {
+            let Some(bracket) = &state.xor_bracket else {
+                return Ok(None);
+            };
+            if bracket.middle.is_some() || bracket.matched != 0 {
+                return Ok(None);
+            }
+            let rop2 = rop3_as_rop2(rop3);
+            if rop2.ignores_color() && rop2.paint(0) == Rop2Paint::Unchanged {
+                return Ok(Some(Vec::new()));
+            }
+            match bracket_middle(state, rop2) {
+                Some(middle) => BracketShape::Middle(middle),
+                None => return Ok(None),
+            }
         };
-        Ok(vec![format!(
-            "<g transform=\"matrix({} {} {} {} {} {})\" image-rendering=\"{}\" {}>{}</g>",
-            fmt(matrix[0]),
-            fmt(matrix[1]),
-            fmt(matrix[2]),
-            fmt(matrix[3]),
-            fmt(matrix[4]),
-            fmt(matrix[5]),
-            interpolation,
-            state.dc.clip_attr(),
-            image.element
+        let element = format!(
+            "<path d=\"{}\" fill=\"url(#{XOR_FILL})\" {}/>",
+            device_rect_path(matrix, destination),
+            state.dc.clip_attr()
+        );
+        let (x, y) = (i64::from(destination.x), i64::from(destination.y));
+        let (right, bottom) = (
+            x + i64::from(destination.width),
+            y + i64::from(destination.height),
+        );
+        let outline = vec![(x, y), (right, y), (right, bottom), (x, bottom)];
+        self.capture_bracket_shape(state, shape, vec![element], Some(outline))
+            .map(Some)
+    }
+
+    /// Adds a shape to the XOR bracket, returning the bracket's output once
+    /// its second pass is complete.
+    fn capture_bracket_shape(
+        &self,
+        state: &mut RenderState,
+        shape: BracketShape,
+        elements: Vec<String>,
+        outline: Option<Vec<(i64, i64)>>,
+    ) -> Result<Vec<String>> {
+        let matrix = logical_to_device_matrix(&state.dc);
+        let element = elements.concat();
+        match shape {
+            BracketShape::Xor(color) => {
+                let shape = XorShape {
+                    element,
+                    color,
+                    outline,
+                };
+                let Some(bracket) = &mut state.xor_bracket else {
+                    state.xor_bracket = Some(XorBracket {
+                        matrix,
+                        first: vec![shape],
+                        middle: None,
+                        matched: 0,
+                    });
+                    return Ok(Vec::new());
+                };
+                if bracket.matrix != matrix {
+                    state.xor_bracket = None;
+                    return Err(xor_bracket_failure());
+                }
+                if bracket.middle.is_none() {
+                    bracket.first.push(shape);
+                    return Ok(Vec::new());
+                }
+                let expected = &bracket.first[bracket.matched];
+                if expected.element != shape.element || expected.color != shape.color {
+                    state.xor_bracket = None;
+                    return Err(xor_bracket_failure());
+                }
+                bracket.matched += 1;
+                if bracket.matched < bracket.first.len() {
+                    return Ok(Vec::new());
+                }
+                let Some(bracket) = state.xor_bracket.take() else {
+                    return Ok(Vec::new());
+                };
+                let output = self.resolve_xor_bracket(state, bracket)?;
+                let mut elements = self.flush_blits(state)?;
+                elements.extend(output);
+                Ok(elements)
+            },
+            BracketShape::Middle(middle) => {
+                if let Some(bracket) = &mut state.xor_bracket {
+                    bracket.middle = Some((element, middle, outline));
+                }
+                Ok(Vec::new())
+            },
+        }
+    }
+
+    /// Paints a complete XOR bracket: the middle fill where no XOR fill
+    /// covers it, then every XOR fill clipped to the middle fill.
+    fn resolve_xor_bracket(
+        &self,
+        state: &mut RenderState,
+        bracket: XorBracket,
+    ) -> Result<Vec<String>> {
+        let Some((middle_element, middle, middle_outline)) = bracket.middle else {
+            return Err(xor_bracket_failure());
+        };
+        // Each pixel takes the colour of the one XOR fill covering it only
+        // when no two fills overlap.
+        if bracket.first.len() > 1 {
+            let outlines = bracket
+                .first
+                .iter()
+                .map(|shape| shape.outline.as_deref())
+                .collect::<Option<Vec<_>>>()
+                .ok_or_else(xor_bracket_failure)?;
+            if outlines.len() > 4096 || convex_outlines_overlap(&outlines) {
+                return Err(xor_bracket_failure());
+            }
+        }
+        let token = format!("url(#{XOR_FILL})");
+        let mut output = Vec::new();
+        // The middle fill outside every XOR fill. When the XOR fills tile a
+        // rectangle that holds the middle fill nothing is left of it;
+        // otherwise a mask keeps it from painting under the XOR fills, which
+        // paint those pixels themselves.
+        if !xor_fills_cover(&bracket.first, middle_outline.as_deref())
+            && let Some(paint) = self.bracket_region_paint(state, &middle, 0)?
+        {
+            let id = state.fresh_id("xor-mask");
+            let mut hidden = String::new();
+            for shape in &bracket.first {
+                hidden.push_str(&shape.element.replace(&token, "black"));
+            }
+            state.add_definition(format!(
+                "<mask id=\"{id}\" maskUnits=\"userSpaceOnUse\" x=\"-1000000000\" y=\"-1000000000\" width=\"2000000000\" height=\"2000000000\"><rect x=\"-1000000000\" y=\"-1000000000\" width=\"2000000000\" height=\"2000000000\" fill=\"white\"/>{hidden}</mask>"
+            ));
+            output.push(format!(
+                "<g mask=\"url(#{id})\">{}</g>",
+                middle_element.replace(&token, &paint)
+            ));
+        }
+        let mut strips = String::new();
+        for shape in &bracket.first {
+            if let Some(paint) = self.bracket_region_paint(state, &middle, shape.color)? {
+                strips.push_str(&shape.element.replace(&token, &paint));
+            }
+        }
+        if !strips.is_empty() {
+            let id = state.fresh_id("xor-clip");
+            let geometry = middle_element
+                .replace(&token, "black")
+                .replace(" fill-rule=", " clip-rule=");
+            state.add_definition(format!(
+                "<clipPath id=\"{id}\" clipPathUnits=\"userSpaceOnUse\">{geometry}</clipPath>"
+            ));
+            // The XOR fills tile without overlap; edges without antialiasing
+            // keep the seams between them closed, as GDI draws them.
+            output.push(format!(
+                "<g clip-path=\"url(#{id})\"><g shape-rendering=\"crispEdges\">{strips}</g></g>"
+            ));
+        }
+        Ok(output)
+    }
+
+    /// The SVG paint of the middle region whose XOR fills total `xor`, or
+    /// `None` when the region keeps the destination.
+    fn bracket_region_paint(
+        &self,
+        state: &mut RenderState,
+        middle: &XorMiddle,
+        xor: u32,
+    ) -> Result<Option<String>> {
+        match middle {
+            XorMiddle::Solid { rop2, color } => Ok(xor_bracket_paint(*rop2, *color, xor)
+                .ok_or_else(xor_bracket_failure)?
+                .map(|value| ColorRef { value }.to_svg_color())),
+            XorMiddle::Pattern {
+                rop2,
+                pattern,
+                text_color,
+                background_color,
+                origin,
+            } => {
+                let png = pattern
+                    .mapped(*text_color, *background_color, |color| {
+                        xor_bracket_paint(*rop2, color, xor)
+                    })
+                    .ok_or_else(xor_bracket_failure)?
+                    .tile_png(0, 0, self.limits.max_output_bytes)?;
+                let size = (f64::from(pattern.width()), f64::from(pattern.height()));
+                let id = state.pattern_definition(png, size, *origin)?;
+                Ok(Some(format!("url(#{id})")))
+            },
+        }
+    }
+
+    /// Paints the deferred bitmap records, then `element`.
+    fn paint_after_blits(&self, state: &mut RenderState, element: String) -> Result<Vec<String>> {
+        let mut output = self.flush_blits(state)?;
+        output.push(element);
+        Ok(output)
+    }
+
+    /// Defers a bitmap record that may combine with the records after it,
+    /// returning the output of the deferred records it cannot join.
+    fn defer_blit(
+        &self,
+        state: &mut RenderState,
+        context: BlitContext,
+        blit: DeferredBlit,
+        painted: [f64; 4],
+        pixels: Option<(u32, u32)>,
+    ) -> Result<Vec<String>> {
+        let composite =
+            blit.rop3.depends_on_destination() || !matches!(blit.rop3.table(), 0xcc | 0x33);
+        let max_cells = usize::try_from(self.limits.max_pixels).unwrap_or(usize::MAX);
+        if let Some(group) = &mut state.deferred_blits
+            && group.context == context
+            && group.grid.extend(painted, pixels, max_cells)
+        {
+            group.composite |= composite;
+            group.blits.push(blit);
+            return Ok(Vec::new());
+        }
+        let flushed = self.flush_blits(state)?;
+        let grid = match pixels {
+            Some((columns, rows)) => BlitGrid::for_pixels(painted, columns, rows),
+            None => BlitGrid::for_area(painted),
+        };
+        if let Some(grid) = grid {
+            state.deferred_blits = Some(DeferredBlits {
+                context,
+                grid,
+                blits: vec![blit],
+                composite,
+            });
+        }
+        Ok(flushed)
+    }
+
+    /// Paints the deferred bitmap records.
+    fn flush_blits(&self, state: &mut RenderState) -> Result<Vec<String>> {
+        let Some(group) = state.deferred_blits.take() else {
+            return Ok(Vec::new());
+        };
+        let limits = dib_limits(self.limits);
+        fn parse(blit: &DeferredBlit, limits: DibLimits) -> Result<BitmapOp<'_>> {
+            BitmapOp::parse_emf(blit.kind as u32, &blit.data, blit.stretch, limits)
+        }
+        let context = &group.context;
+        if !group.composite {
+            // Plain source copies paint exactly as they would one by one.
+            let mut output = Vec::new();
+            for blit in &group.blits {
+                if let Some(image) = parse(blit, limits)?.to_svg_image()? {
+                    output.push(bitmap_group(
+                        &context.clip,
+                        &context.transform,
+                        context.interpolation,
+                        &image.element,
+                    ));
+                }
+            }
+            return Ok(output);
+        }
+        let mut composite = RasterComposite::new(group.grid)?;
+        let mut brush_approximated = false;
+        for blit in &group.blits {
+            let pattern = blit.brush.unwrap_or_else(|| {
+                brush_approximated |= blit.rop3.depends_on_pattern();
+                0
+            });
+            if blit.rop3.depends_on_source() {
+                let Some(pixels) = parse(blit, limits)?.blit_pixels()? else {
+                    continue;
+                };
+                composite.apply(
+                    blit.rop3,
+                    pixels.window.painted(blit.destination),
+                    Some(&pixels.image),
+                    pattern,
+                )?;
+            } else {
+                composite.apply(blit.rop3, blit.destination, None, pattern)?;
+            }
+        }
+        let image = composite.to_svg_image(self.limits.max_output_bytes)?;
+        if image.approximated || brush_approximated {
+            state.note(
+                "emf-raster-operation-approximated",
+                "raster operations that combine with destination pixels were painted as on a white destination"
+                    .to_owned(),
+            );
+        }
+        Ok(vec![bitmap_group(
+            &context.clip,
+            &context.transform,
+            context.interpolation,
+            &image.image.element,
         )])
     }
 
@@ -929,7 +1499,7 @@ impl<'a> EmfSvgConverter<'a> {
                 state.dc.current_pos = (f64::from(last.0), f64::from(last.1));
             }
         }
-        self.record_or_render(builder, state, polygon, true)
+        self.record_or_render(builder, kind, state, polygon, true)
     }
 
     fn poly_poly_record(
@@ -1000,7 +1570,7 @@ impl<'a> EmfSvgConverter<'a> {
             }
             offset += count;
         }
-        self.record_or_render(builder, state, filled, true)
+        self.record_or_render(builder, kind, state, filled, true)
     }
 
     fn poly_draw(
@@ -1082,7 +1652,7 @@ impl<'a> EmfSvgConverter<'a> {
         if let Some(last) = points.last() {
             state.dc.current_pos = (f64::from(last.0), f64::from(last.1));
         }
-        self.record_or_render(builder, state, false, true)
+        self.record_or_render(builder, kind, state, false, true)
     }
 
     fn render_region(
@@ -1121,29 +1691,37 @@ impl<'a> EmfSvgConverter<'a> {
         if matches!(kind, EmrType::FillRgn | EmrType::FrameRgn) {
             let brush_handle = read_u32(data, 20, kind)?;
             if !state.select_brush(brush_handle) {
-                return malformed(kind, "unknown region brush handle");
+                // GDI fails the record for an invalid brush handle and keeps
+                // painting the rest of the picture.
+                state.note(
+                    "noncanonical-emf-region-brush-missing",
+                    format!("{} references missing brush {brush_handle}", kind.name()),
+                );
+                return Ok(Vec::new());
             }
-            state.prepare_brush_pattern();
         }
-        let attrs = match kind {
-            EmrType::FrameRgn => {
-                let width = read_i32(data, 24, kind)?.unsigned_abs().max(1);
-                format!(
-                    "fill=\"none\" stroke=\"{}\" stroke-width=\"{}\" {}",
-                    state.dc.brush.color.to_svg_color(),
-                    width,
-                    state.dc.clip_attr()
-                )
-            },
-            EmrType::InvertRgn => unreachable!(),
-            _ => format!("{} {}", state.dc.get_fill_attr(), state.dc.clip_attr()),
+        let frame_width = if kind == EmrType::FrameRgn {
+            Some(read_i32(data, 24, kind)?.unsigned_abs().max(1))
+        } else {
+            None
         };
+        let result = self.paint_shape(kind, state, true, false, |state| {
+            let attrs = match frame_width {
+                // FrameRgn strokes the region outline with the brush.
+                Some(width) => format!(
+                    "fill=\"none\" stroke=\"{}\" stroke-width=\"{width}\"",
+                    state.dc.get_fill_attr()["fill=\"".len()..].trim_end_matches('"')
+                ),
+                None => state.dc.get_fill_attr(),
+            };
+            Ok(vec![format!(
+                "<path d=\"{path}\" {attrs} {} fill-rule=\"evenodd\"/>",
+                state.dc.clip_attr()
+            )])
+        });
         state.dc.brush = saved_brush;
         state.dc.brush_handle = saved_brush_handle;
-        Ok(vec![format!(
-            "<path d=\"{}\" {} fill-rule=\"evenodd\"/>",
-            path, attrs
-        )])
+        result
     }
 
     fn gradient_fill(
@@ -1559,6 +2137,420 @@ fn path_element(
         rule,
         dc.clip_attr()
     ))
+}
+
+/// Stands in for the fill of a shape whose paint is known only once its XOR
+/// bracket is complete.
+const XOR_FILL: &str = "@xor-fill@";
+
+/// A fill painted in an XOR mix mode, waiting for the pass that undoes it.
+#[derive(Debug, Clone)]
+pub(super) struct XorShape {
+    /// The elements, with [`XOR_FILL`] as their fill.
+    element: String,
+    /// The colour the fill XORs into the destination.
+    color: u32,
+    /// Convex outline in logical coordinates, when the record has one.
+    outline: Option<Vec<(i64, i64)>>,
+}
+
+/// How the fill between the two XOR passes paints.
+#[derive(Debug, Clone)]
+pub(super) enum XorMiddle {
+    Solid {
+        rop2: Rop2,
+        color: u32,
+    },
+    Pattern {
+        rop2: Rop2,
+        pattern: std::sync::Arc<BrushPattern>,
+        text_color: u32,
+        background_color: u32,
+        origin: (i32, i32),
+    },
+}
+
+/// Fills XORed into the destination, the one fill drawn after them, and the
+/// pass that XORs the same fills again.
+///
+/// The second pass cancels the first wherever the middle fill did not
+/// paint. Inside the middle fill every pixel becomes `m(D ^ a) ^ a`, where
+/// `a` is the colour of the XOR fill covering it and `m` the paint of the
+/// middle fill. Producers use this to clip gradients and patterns to a
+/// shape.
+#[derive(Debug, Clone)]
+pub(super) struct XorBracket {
+    matrix: [f64; 6],
+    first: Vec<XorShape>,
+    /// The middle elements, with [`XOR_FILL`] as their fill, their paint and
+    /// their logical outline, when the record has one.
+    middle: Option<(String, XorMiddle, Option<Vec<(i64, i64)>>)>,
+    /// Shapes of the second pass matched so far.
+    matched: usize,
+}
+
+/// What the current record's shape contributes to an XOR bracket.
+#[derive(Debug, Clone)]
+pub(super) enum BracketShape {
+    Xor(u32),
+    Middle(XorMiddle),
+}
+
+/// Whether the XOR fills tile the rectangle that bounds them and that
+/// rectangle holds the middle fill's outline.
+fn xor_fills_cover(fills: &[XorShape], middle: Option<&[(i64, i64)]>) -> bool {
+    let bounds = |outline: &[(i64, i64)]| {
+        outline.iter().fold(
+            [i64::MAX, i64::MAX, i64::MIN, i64::MIN],
+            |[left, top, right, bottom], &(x, y)| {
+                [left.min(x), top.min(y), right.max(x), bottom.max(y)]
+            },
+        )
+    };
+    let doubled_area = |outline: &[(i64, i64)]| {
+        let mut sum = 0i64;
+        for index in 0..outline.len() {
+            let (x0, y0) = outline[index];
+            let (x1, y1) = outline[(index + 1) % outline.len()];
+            sum = sum.saturating_add(x0.saturating_mul(y1).saturating_sub(x1.saturating_mul(y0)));
+        }
+        sum.saturating_abs()
+    };
+    let (Some(middle), Some(outlines)) = (
+        middle,
+        fills
+            .iter()
+            .map(|fill| fill.outline.as_deref())
+            .collect::<Option<Vec<_>>>(),
+    ) else {
+        return false;
+    };
+    let Some(cover) = outlines
+        .iter()
+        .map(|outline| bounds(outline))
+        .reduce(|a, b| {
+            [
+                a[0].min(b[0]),
+                a[1].min(b[1]),
+                a[2].max(b[2]),
+                a[3].max(b[3]),
+            ]
+        })
+    else {
+        return false;
+    };
+    // Disjoint fills tile their bounds exactly when their areas add up to
+    // its area; both sides are doubled to stay in integers.
+    let area = outlines.iter().try_fold(0i64, |total, outline| {
+        total.checked_add(doubled_area(outline))
+    });
+    let cover_area = (cover[2] - cover[0])
+        .checked_mul(cover[3] - cover[1])
+        .and_then(|value| value.checked_mul(2));
+    let inner = bounds(middle);
+    area.is_some()
+        && area == cover_area
+        && inner[0] >= cover[0]
+        && inner[1] >= cover[1]
+        && inner[2] <= cover[2]
+        && inner[3] <= cover[3]
+}
+
+fn xor_bracket_failure() -> Error {
+    Error::Unsupported(
+        "ROP2 mode 7 depends on destination pixels and has no faithful SVG equivalent".into(),
+    )
+}
+
+/// A solid brush whose fill attribute is the [`XOR_FILL`] placeholder.
+fn xor_fill_brush() -> Brush {
+    let mut brush = Brush::from_create_brush(brush_style::SOLID, ColorRef::from_rgb(0, 0, 0), 0);
+    brush.pattern_id = Some(XOR_FILL.to_owned());
+    brush
+}
+
+/// Identifies a fill that belongs to an XOR bracket: an XOR fill, or the
+/// one fill after a first XOR pass.
+fn bracket_paint(
+    state: &RenderState,
+    rop2: Rop2,
+    fill: bool,
+    stroke: bool,
+) -> Option<BracketShape> {
+    if !fill || state.in_path {
+        return None;
+    }
+    if stroke && mixed_pen(rop2, &state.dc.pen).is_none_or(|pen| pen.style != pen_style::NULL) {
+        return None;
+    }
+    if matches!(rop2.mode(), 7 | 10) {
+        let brush = &state.dc.brush;
+        if brush.style != brush_style::SOLID || brush.pattern.is_some() {
+            return None;
+        }
+        // R2_NOTXORPEN XORs the inverse colour.
+        let color = if rop2.mode() == 7 {
+            brush.color.value
+        } else {
+            !brush.color.value
+        } & 0x00ff_ffff;
+        return (color != 0).then_some(BracketShape::Xor(color));
+    }
+    let bracket = state.xor_bracket.as_ref()?;
+    if bracket.middle.is_some() || bracket.matched != 0 {
+        return None;
+    }
+    if rop2.ignores_color() && rop2.paint(0) == Rop2Paint::Unchanged {
+        return None;
+    }
+    bracket_middle(state, rop2).map(BracketShape::Middle)
+}
+
+/// The middle-fill paint of the selected brush under `rop2`.
+fn bracket_middle(state: &RenderState, rop2: Rop2) -> Option<XorMiddle> {
+    let brush = &state.dc.brush;
+    match &brush.pattern {
+        None if brush.style == brush_style::SOLID => Some(XorMiddle::Solid {
+            rop2,
+            color: brush.color.value & 0x00ff_ffff,
+        }),
+        Some(Ok(pattern)) => Some(XorMiddle::Pattern {
+            rop2,
+            pattern: std::sync::Arc::clone(pattern),
+            text_color: state.dc.text_color.value & 0x00ff_ffff,
+            background_color: state.dc.bg_color.value & 0x00ff_ffff,
+            origin: state.dc.brush_org,
+        }),
+        _ => None,
+    }
+}
+
+/// The mix mode that a ROP3 without a source applies to its brush.
+fn rop3_as_rop2(rop3: Rop3) -> Rop2 {
+    // The ROP2 truth table is indexed by (P, D); the ROP3 one by (P, S, D).
+    let table = rop3.table();
+    let mode = (table & 0b11) | ((table >> 2) & 0b1100);
+    Rop2::from_mode(u32::from(mode) + 1).unwrap_or(Rop2::COPY_PEN)
+}
+
+/// The convex outline of a rectangle or polygon record in logical
+/// coordinates, or `None` for other records and non-convex polygons.
+fn logical_outline(record: &EmfRecord) -> Option<Vec<(i64, i64)>> {
+    let data: &[u8] = &record.data;
+    let int = |offset: usize| -> Option<i64> {
+        Some(i64::from(i32::from_le_bytes(
+            data.get(offset..offset + 4)?.try_into().ok()?,
+        )))
+    };
+    let short = |offset: usize| -> Option<i64> {
+        Some(i64::from(i16::from_le_bytes(
+            data.get(offset..offset + 2)?.try_into().ok()?,
+        )))
+    };
+    let outline = match EmrType::from_u32(record.record_type)? {
+        EmrType::Rectangle => {
+            let (left, top, right, bottom) = (int(0)?, int(4)?, int(8)?, int(12)?);
+            vec![(left, top), (right, top), (right, bottom), (left, bottom)]
+        },
+        EmrType::Polygon => {
+            let count = usize::try_from(int(16)?).ok()?;
+            (0..count.min(MAX_RECORD_ITEMS))
+                .map(|index| Some((int(20 + index * 8)?, int(24 + index * 8)?)))
+                .collect::<Option<Vec<_>>>()?
+        },
+        EmrType::Polygon16 => {
+            let count = usize::try_from(int(16)?).ok()?;
+            (0..count.min(MAX_RECORD_ITEMS))
+                .map(|index| Some((short(20 + index * 4)?, short(22 + index * 4)?)))
+                .collect::<Option<Vec<_>>>()?
+        },
+        _ => return None,
+    };
+    is_convex(&outline).then_some(outline)
+}
+
+/// A deferred bitmap record of classic EMF playback.
+#[derive(Debug, Clone)]
+pub(super) struct DeferredBlit {
+    kind: EmrType,
+    data: Bytes,
+    stretch: StretchPolicy,
+    rop3: Rop3,
+    /// Normalized logical destination rectangle `[x, y, width, height]`.
+    destination: [f64; 4],
+    /// Solid brush `COLORREF`, or `None` for other brushes.
+    brush: Option<u32>,
+}
+
+/// SVG context that every deferred record of one group shares.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct BlitContext {
+    clip: String,
+    transform: String,
+    interpolation: &'static str,
+}
+
+/// Consecutive deferred bitmap records that share one context and pixel
+/// grid, so that raster operations combining with each other's pixels are
+/// composed into one image.
+#[derive(Debug, Clone)]
+pub(super) struct DeferredBlits {
+    context: BlitContext,
+    grid: BlitGrid,
+    blits: Vec<DeferredBlit>,
+    /// At least one record combines with destination pixels.
+    composite: bool,
+}
+
+/// Groups a logical-coordinate bitmap element under the DC transform and the
+/// device-space clip.
+///
+/// The clip sits on an outer group: a clip path on the transformed group
+/// would be transformed with it.
+fn bitmap_group(clip: &str, transform: &str, interpolation: &str, element: &str) -> String {
+    let inner = format!("<g {transform} image-rendering=\"{interpolation}\">{element}</g>");
+    if clip.is_empty() {
+        inner
+    } else {
+        format!("<g {clip}>{inner}</g>")
+    }
+}
+
+fn matrix_attr(matrix: &[f64; 6]) -> String {
+    format!(
+        "transform=\"matrix({} {} {} {} {} {})\"",
+        fmt(matrix[0]),
+        fmt(matrix[1]),
+        fmt(matrix[2]),
+        fmt(matrix[3]),
+        fmt(matrix[4]),
+        fmt(matrix[5])
+    )
+}
+
+fn interpolation(stretch: StretchPolicy) -> &'static str {
+    match stretch {
+        StretchPolicy::Halftone => "optimizeQuality",
+        StretchPolicy::BlackOnWhite | StretchPolicy::WhiteOnBlack | StretchPolicy::ColorOnColor => {
+            "optimizeSpeed"
+        },
+    }
+}
+
+/// Path data of a logical rectangle mapped to device coordinates.
+fn device_rect_path(matrix: &[f64; 6], rect: crate::metafile_bitmap::SignedRect) -> String {
+    let x0 = f64::from(rect.x);
+    let y0 = f64::from(rect.y);
+    let x1 = x0 + f64::from(rect.width);
+    let y1 = y0 + f64::from(rect.height);
+    let map = |x: f64, y: f64| {
+        (
+            matrix[0] * x + matrix[2] * y + matrix[4],
+            matrix[1] * x + matrix[3] * y + matrix[5],
+        )
+    };
+    let mut path = String::with_capacity(96);
+    for (index, (x, y)) in [map(x0, y0), map(x1, y0), map(x1, y1), map(x0, y1)]
+        .into_iter()
+        .enumerate()
+    {
+        path.push(if index == 0 { 'M' } else { 'L' });
+        write_num(&mut path, x);
+        path.push(' ');
+        write_num(&mut path, y);
+    }
+    path.push('Z');
+    path
+}
+
+/// Reports DIB header fields that GDI ignores.
+fn note_dib_tolerances(state: &mut RenderState, dib: &Dib<'_>) {
+    for (code, message) in dib.info().tolerances.diagnostics() {
+        state.note(code, message.to_owned());
+    }
+}
+
+/// The pen that paints like `pen` under `rop2`, or `None` when the result
+/// depends on destination pixels.
+fn mixed_pen(rop2: Rop2, pen: &Pen) -> Option<Pen> {
+    if pen.style == pen_style::NULL {
+        return Some(pen.clone());
+    }
+    match rop2.paint(pen.color.value) {
+        Rop2Paint::Unchanged => Some(Pen {
+            style: pen_style::NULL,
+            ..pen.clone()
+        }),
+        Rop2Paint::Color(value) => Some(Pen {
+            color: ColorRef { value },
+            ..pen.clone()
+        }),
+        Rop2Paint::DestinationDependent => None,
+    }
+}
+
+/// The brush and hatch background (`None` when transparent) that paint like
+/// the selected brush under `rop2`, or `None` when the result depends on
+/// destination pixels.
+fn mixed_brush(rop2: Rop2, dc: &DeviceContext) -> Option<(Brush, Option<ColorRef>)> {
+    let brush = &dc.brush;
+    let background = (dc.bg_mode == 2).then_some(dc.bg_color);
+    if brush.style == brush_style::NULL {
+        return Some((brush.clone(), background));
+    }
+    let null = || Brush::from_create_brush(brush_style::NULL, ColorRef::from_rgb(0, 0, 0), 0);
+    let solid = |value| Brush::from_create_brush(brush_style::SOLID, ColorRef { value }, 0);
+    if let Some(Ok(pattern)) = &brush.pattern {
+        // Every pixel of the pattern goes through the mix mode on its own.
+        let pattern = pattern.under_rop2(
+            rop2,
+            dc.text_color.value & 0x00ff_ffff,
+            dc.bg_color.value & 0x00ff_ffff,
+        )?;
+        return Some((
+            Brush {
+                pattern: Some(Ok(std::sync::Arc::new(pattern))),
+                pattern_id: None,
+                ..brush.clone()
+            },
+            None,
+        ));
+    }
+    if brush.pattern.is_some() || !matches!(brush.style, brush_style::SOLID | brush_style::HATCHED)
+    {
+        // A brush without its pattern bitmap fails when it paints.
+        return Some((brush.clone(), background));
+    }
+    let mix = |color: ColorRef| match rop2.paint(color.value) {
+        Rop2Paint::Unchanged => Some(None),
+        Rop2Paint::Color(value) => Some(Some(ColorRef { value })),
+        Rop2Paint::DestinationDependent => None,
+    };
+    let foreground = mix(brush.color)?;
+    if brush.style == brush_style::SOLID {
+        return Some((
+            foreground.map_or_else(null, |color| solid(color.value)),
+            None,
+        ));
+    }
+    let background = match background {
+        Some(color) => mix(color)?,
+        None => None,
+    };
+    match (foreground, background) {
+        (Some(color), background) => Some((
+            Brush {
+                color,
+                pattern_id: None,
+                ..brush.clone()
+            },
+            background,
+        )),
+        (None, None) => Some((null(), None)),
+        // A hatch whose lines keep the destination needs a pattern with
+        // transparent lines, which the hatch definitions do not draw.
+        (None, Some(_)) => None,
+    }
 }
 
 fn append_path(target: &mut PathBuilder, source: PathBuilder) {
@@ -2334,6 +3326,14 @@ mod tests {
         payload
     }
 
+    fn rect_payload(left: i32, top: i32, right: i32, bottom: i32) -> Vec<u8> {
+        let mut out = Vec::new();
+        for value in [left, top, right, bottom] {
+            sdword(&mut out, value);
+        }
+        out
+    }
+
     fn point(x: i32, y: i32) -> Vec<u8> {
         let mut out = Vec::new();
         sdword(&mut out, x);
@@ -2489,6 +3489,253 @@ mod tests {
         assert!(svg.contains("stroke=\"red\""));
         assert!(svg.contains("stroke-width=\"2\""));
         assert!(svg.contains("x1=\"10\" y1=\"20\""));
+    }
+
+    fn set_rop2(mode: u32) -> Vec<u8> {
+        let mut out = Vec::new();
+        dword(&mut out, mode);
+        record(EmrType::SetRop2, &out)
+    }
+
+    /// A BitBlt record with no embedded bitmap, as producers write for fills.
+    fn brush_bitblt(rop3: u32, left: i32, top: i32, width: i32, height: i32) -> Vec<u8> {
+        let mut payload = vec![0u8; 92];
+        for (offset, value) in [(16, left), (20, top), (24, width), (28, height)] {
+            put_i32(&mut payload, offset, value);
+        }
+        put_u32(&mut payload, 32, rop3);
+        put_f32(&mut payload, 44, 1.0);
+        put_f32(&mut payload, 56, 1.0);
+        record(EmrType::BitBlt, &payload)
+    }
+
+    fn create_solid_brush(handle: u32, color: u32) -> Vec<u8> {
+        let mut brush = Vec::new();
+        dword(&mut brush, handle);
+        dword(&mut brush, brush_style::SOLID);
+        dword(&mut brush, color);
+        dword(&mut brush, 0);
+        record(EmrType::CreateBrushIndirect, &brush)
+    }
+
+    fn select_object(handle: u32) -> Vec<u8> {
+        let mut out = Vec::new();
+        dword(&mut out, handle);
+        record(EmrType::SelectObject, &out)
+    }
+
+    fn convert_with_report(
+        records: Vec<Vec<u8>>,
+    ) -> (String, Vec<crate::emfplus::renderer::RendererDiagnostic>) {
+        let bytes = classic_emf(records);
+        let parser = EmfParser::new(&bytes, &crate::Limits::default()).unwrap();
+        EmfSvgConverter::new(&parser)
+            .convert_with_diagnostics()
+            .unwrap()
+    }
+
+    /// A StretchDIBits record copying a 1x`colors.len()` 24-bpp DIB to the
+    /// logical rectangle (10, 20, 20, 30) with `rop3`.
+    fn stretch_dib_record(colors: &[u32], rop3: u32) -> Vec<u8> {
+        const FIXED: usize = 72;
+        let mut info = vec![0u8; 40];
+        put_u32(&mut info, 0, 40);
+        put_i32(&mut info, 4, i32::try_from(colors.len()).unwrap());
+        put_i32(&mut info, 8, 1);
+        info[12..14].copy_from_slice(&1u16.to_le_bytes());
+        info[14..16].copy_from_slice(&24u16.to_le_bytes());
+        let mut bits = Vec::new();
+        for color in colors {
+            let [red, green, blue, _] = color.to_le_bytes();
+            bits.extend_from_slice(&[blue, green, red]);
+        }
+        bits.resize(bits.len().div_ceil(4) * 4, 0);
+        let mut payload = vec![0u8; FIXED];
+        put_i32(&mut payload, 16, 10);
+        put_i32(&mut payload, 20, 20);
+        put_i32(&mut payload, 32, i32::try_from(colors.len()).unwrap());
+        put_i32(&mut payload, 36, 1);
+        put_u32(&mut payload, 40, (8 + FIXED) as u32);
+        put_u32(&mut payload, 44, info.len() as u32);
+        put_u32(&mut payload, 48, (8 + FIXED + info.len()) as u32);
+        put_u32(&mut payload, 52, bits.len() as u32);
+        put_u32(&mut payload, 60, rop3);
+        put_i32(&mut payload, 64, 20);
+        put_i32(&mut payload, 68, 30);
+        payload.extend_from_slice(&info);
+        payload.extend_from_slice(&bits);
+        record(EmrType::StretchDIBits, &payload)
+    }
+
+    fn rectangle(left: i32, top: i32, right: i32, bottom: i32) -> Vec<u8> {
+        record(EmrType::Rectangle, &rect_payload(left, top, right, bottom))
+    }
+
+    #[test]
+    fn set_rop2_only_fails_when_a_record_paints_with_it() {
+        // Setting and resetting a mix mode does not matter while nothing is
+        // painted under it.
+        let (svg, _) = convert_with_report(vec![set_rop2(6), set_rop2(13), rectangle(1, 2, 3, 4)]);
+        assert!(svg.contains("<path "));
+
+        // R2_NOT inverts the destination under any pen.
+        let bytes = classic_emf(vec![set_rop2(6), rectangle(1, 2, 3, 4)]);
+        let parser = EmfParser::new(&bytes, &crate::Limits::default()).unwrap();
+        assert!(matches!(
+            EmfSvgConverter::new(&parser).convert(),
+            Err(Error::Unsupported(_))
+        ));
+    }
+
+    #[test]
+    fn rop2_nop_and_xor_with_black_paint_nothing() {
+        for mode in [11, 7] {
+            let (svg, diagnostics) = convert_with_report(vec![
+                set_rop2(mode),
+                create_solid_brush(1, 0),
+                select_object(1),
+                record(EmrType::MoveToEx, &point(10, 20)),
+                line_to(30, 40),
+                rectangle(1, 2, 3, 4),
+            ]);
+            assert!(!svg.contains("<line ") && !svg.contains("<path "), "{svg}");
+            assert!(diagnostics.is_empty());
+        }
+    }
+
+    #[test]
+    fn rop2_constant_modes_paint_without_destination_pixels() {
+        let (svg, diagnostics) = convert_with_report(vec![set_rop2(16), rectangle(10, 20, 30, 40)]);
+        assert!(svg.contains("fill=\"white\" stroke=\"white\""));
+        assert!(diagnostics.is_empty());
+        // R2_NOTCOPYPEN inverts the default white brush and black pen.
+        let (svg, _) = convert_with_report(vec![set_rop2(4), rectangle(10, 20, 30, 40)]);
+        assert!(svg.contains("fill=\"black\" stroke=\"white\""));
+    }
+
+    #[test]
+    fn undefined_rop2_mode_keeps_the_current_mode() {
+        let (svg, diagnostics) = convert_with_report(vec![set_rop2(0), rectangle(10, 20, 30, 40)]);
+        assert!(svg.contains("fill=\"white\" stroke=\"black\""));
+        assert!(
+            diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.code == "noncanonical-emf-invalid-rop2")
+        );
+    }
+
+    #[test]
+    fn patcopy_blit_fills_the_device_rectangle_with_the_brush() {
+        let (svg, diagnostics) = convert_with_report(vec![
+            create_solid_brush(1, 0x0000_00ff),
+            select_object(1),
+            brush_bitblt(0x00f0_0021, 10, 20, 30, 40),
+        ]);
+        assert!(svg.contains("<path d=\"M10 20L40 20L40 60L10 60Z\" fill=\"red\""));
+        assert!(diagnostics.is_empty());
+    }
+
+    #[test]
+    fn zero_size_blit_rectangles_draw_nothing() {
+        let (svg, diagnostics) =
+            convert_with_report(vec![brush_bitblt(0x00f0_0021, 10, 20, 0, 40)]);
+        assert!(!svg.contains("<path "));
+        assert!(
+            diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.code == "noncanonical-emf-empty-bitmap-record")
+        );
+    }
+
+    #[test]
+    fn mask_and_image_blits_compose_one_exact_image() {
+        // SRCAND with a black and white mask, then SRCPAINT with an image
+        // that is black where the mask is white.
+        let (svg, diagnostics) = convert_with_report(vec![
+            stretch_dib_record(&[0, 0x00ff_ffff], 0x0088_00c6),
+            stretch_dib_record(&[0x0000_00ff, 0], 0x00ee_0086),
+            rectangle(0, 0, 5, 5),
+        ]);
+        assert_eq!(svg.matches("<image").count(), 1);
+        assert!(svg.find("<image").unwrap() < svg.find("<path").unwrap());
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+
+        // A lone SRCPAINT of a coloured image depends on the destination.
+        let (svg, diagnostics) =
+            convert_with_report(vec![stretch_dib_record(&[0x0000_00ff], 0x00ee_0086)]);
+        assert!(svg.contains("<image"));
+        assert!(
+            diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.code == "emf-raster-operation-approximated")
+        );
+    }
+
+    #[test]
+    fn clipped_bitmaps_keep_the_clip_outside_the_transform() {
+        let (svg, _) = convert_with_report(vec![
+            record(EmrType::IntersectClipRect, &rect_payload(0, 0, 15, 25)),
+            stretch_dib_record(&[0x0000_00ff], 0x00cc_0020),
+        ]);
+        assert!(svg.contains("<g clip-path=\"url(#"));
+        assert!(svg.contains("><g transform=\"matrix(1 0 0 1 0 0)\""));
+    }
+
+    #[test]
+    fn dib_pattern_brush_tiles_its_dib_in_device_pixels() {
+        let (info, bits) = one_pixel_dib_parts();
+        let mut payload = Vec::new();
+        for value in [1u32, 0, 32, u32::try_from(info.len()).unwrap()] {
+            dword(&mut payload, value);
+        }
+        dword(&mut payload, u32::try_from(32 + info.len()).unwrap());
+        dword(&mut payload, u32::try_from(bits.len()).unwrap());
+        payload.extend_from_slice(&info);
+        payload.extend_from_slice(&bits);
+        let (svg, diagnostics) = convert_with_report(vec![
+            record(EmrType::CreateDIBPatternBrushPt, &payload),
+            select_object(1),
+            rectangle(10, 20, 30, 40),
+        ]);
+        assert!(svg.contains("<pattern id=\"emf-brush-"));
+        assert!(svg.contains("fill=\"url(#emf-brush-"));
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    }
+
+    #[test]
+    fn patinvert_bracket_paints_the_middle_fill_in_the_brush_colour() {
+        let patinvert = || brush_bitblt(0x005a_0049, 0, 0, 40, 40);
+        let (svg, diagnostics) = convert_with_report(vec![
+            create_solid_brush(1, 0x0000_00ff),
+            create_solid_brush(2, 0),
+            select_object(stock_objects::NULL_PEN),
+            select_object(1),
+            patinvert(),
+            // The middle fill: a black rectangle, painted with R2_COPYPEN.
+            select_object(2),
+            rectangle(10, 10, 30, 30),
+            select_object(1),
+            patinvert(),
+        ]);
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+        // The XOR rectangle holds the middle rectangle, so only the XOR
+        // rectangle paints, in red, clipped to the middle rectangle.
+        assert!(!svg.contains("mask="));
+        assert!(svg.contains("<g clip-path=\"url(#emf-xor-clip-"));
+        assert!(svg.contains("<path d=\"M0 0L40 0L40 40L0 40Z\" fill=\"red\""));
+        assert!(!svg.contains(XOR_FILL));
+
+        // Without the second pass the XOR fill depends on the destination.
+        let bytes = classic_emf(vec![
+            create_solid_brush(1, 0x0000_00ff),
+            select_object(1),
+            patinvert(),
+        ]);
+        let parser = EmfParser::new(&bytes, &crate::Limits::default()).unwrap();
+        assert!(matches!(
+            EmfSvgConverter::new(&parser).convert(),
+            Err(Error::Unsupported(_))
+        ));
     }
 
     #[test]

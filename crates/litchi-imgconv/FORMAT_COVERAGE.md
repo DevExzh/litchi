@@ -24,13 +24,12 @@ The output policy is deliberately stricter than best-effort metafile viewers:
 
 | Family | Specification identifiers | Classification |
 |---|---:|---|
-| Classic EMF | 119 | All explicitly matched: 87 semantic/state/drawing routes, 25 validated non-rendering routes, 7 unconditional `Unsupported` routes |
+| Classic EMF | 119 | All explicitly matched: 89 semantic/state/drawing routes, 25 validated non-rendering routes, 5 unconditional `Unsupported` routes |
 | WMF | 70 | All explicitly matched: 65 state/drawing/error routes and 5 validated control/no-render routes |
 | EMF+ | 58 | All explicitly matched; the three reserved MultiFormat records are rejected/diagnosed |
 
-The seven classic EMF records that are unconditionally rejected are
-`EMR_WIDENPATH`, `EMR_EXTFLOODFILL`, `EMR_CREATEMONOBRUSH`,
-`EMR_CREATEDIBPATTERNBRUSHPT`, `EMR_DRAWESCAPE`, `EMR_EXTESCAPE`, and
+The five classic EMF records that are unconditionally rejected are
+`EMR_WIDENPATH`, `EMR_EXTFLOODFILL`, `EMR_DRAWESCAPE`, `EMR_EXTESCAPE`, and
 `EMR_NAMEDESCAPE`. Additional records can be rejected conditionally when their
 specific flags or payload require semantics SVG cannot reproduce—for example,
 destination-dependent raster operations, unsupported bitmap masks, glyph-index
@@ -50,8 +49,20 @@ The shared DIB decoder handles CORE, INFO, V4, and V5 headers; indexed palettes;
 top-down images where allowed; alpha policy; crop/mirror/stretch operations;
 `AlphaBlend`; and `TransparentBlt`. Every EMF and WMF bitmap record family is
 routed through the shared typed normalization layer. Unsupported masks,
-device-dependent `Bitmap16` sources, CMYK decode, or destination/pattern-
-dependent ROPs fail explicitly.
+device-dependent `Bitmap16` sources, and CMYK decode fail explicitly.
+
+## Raster operations and brushes
+
+- Solid, hatch, monochrome pattern and DIB pattern brushes, tiled in device
+  pixels.
+- ROP2 mix modes whose result for the pen or brush colour does not read the
+  destination; other mix modes fail when a record paints with them.
+- XOR brackets (a pass of XOR fills, one fill, and the same XOR pass again),
+  painted as the fills clipped to the middle fill.
+- ROP3 blits: constants, brush fills and source copies directly; consecutive
+  blits on one pixel grid, such as mask and image pairs, composed into one
+  image. Pixels that still depend on the destination are painted as on a white
+  destination and reported as an approximation.
 
 ## Resource and safety model
 
