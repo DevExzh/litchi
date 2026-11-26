@@ -17,6 +17,7 @@ finding rather than an accident:
 | `odraw_scan` | `image::scan`/`store`/`get`/`all`/`delay`/`record` | 20 000 records, 1 MiB record body |
 | `emfplus_stream` | `EmfPlusRecordIter`, `validate_complete_stream`, `try_extract_emfplus_comment_body` | 1 MiB, 20 000 records |
 | `emfplus_render` | `EmfPlusSvgRenderer::push_payload` + `finish`, and the same payload as one `EMR_COMMENT_EMFPLUS` inside a synthetic EMF | 1 MiB, 20 000 records |
+| `bitmap_op` | `metafile_bitmap::BitmapOp::parse_emf`/`parse_wmf` and the blit, composite and brush-pattern helpers behind them | 256x256, 1 MiB |
 | `dib_decode` | `dib::Dib::parse_with_usage` + `to_bmp`/`to_dynamic_image*`/`to_png`, and `parse_parts` | 256x256, 1 MiB |
 
 The first input byte of `dib_decode` selects the color usage and alpha
@@ -24,8 +25,23 @@ interpretation; `emfplus_render` wraps arbitrary bytes as the payload of a
 single `EMR_COMMENT_EMFPLUS` (MS-EMF 2.3.2.7) so EMF+ playback receives
 mutation-shaped record streams from a valid outer metafile.
 
-The targets also assert the one invariant that is cheap to check per
-execution: encoded output never exceeds the requested `max_output_bytes`.
+The targets also assert invariants that are cheap to check per execution:
+encoded output never exceeds the requested `max_output_bytes`, SVG output is
+well-formed XML with an `svg` root, PNG output decodes within the render
+budget, a repeated SVG conversion (a quarter of the inputs) gives the same
+output, and a parsed BLIP copies and parses again unchanged (`odraw_scan`).
+
+`emf_*`, `wmf_*`, `emfplus_render` and `emfplus_stream` register a custom
+mutator (`fuzz_targets/common/mutate.rs`) that edits whole records and single
+fields and rewrites the size fields, so mutants keep their framing instead of
+dying in the first size check; inputs that are not framed fall back to byte
+mutation.
+
+`bitmap_op` takes eight bytes of selector, stretch policy and colors, then the
+record payload: a selector with `% 4 == 0` parses an EMF bitmap record
+(`selector / 4` picks the type), `% 4 == 1` a WMF bitmap function, and any
+other value reads a DIB brush through `parse_emf_object_dib` after four
+little-endian offset/size words.
 
 ## Building
 
