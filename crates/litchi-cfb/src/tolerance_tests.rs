@@ -718,6 +718,30 @@ fn names_with_forbidden_characters_stay_readable_and_are_recorded() {
     assert_eq!(file.list_streams(), [vec!["D:ta".to_owned()]]);
 }
 
+#[test]
+fn unterminated_root_name_is_read_as_the_root_and_recorded() {
+    let data = pattern(300, 18);
+    let mut bytes = build(&[(&["Data"], &data)]);
+    let root = directory_offsets(&bytes)[0];
+    // Classic Mac writers store the root name as an unterminated "R".
+    bytes[root..root + 64].fill(0);
+    bytes[root] = b'R';
+    bytes[root + 64..root + 66].copy_from_slice(&2u16.to_le_bytes());
+    assert_eq!(
+        recorded(&open_report(&bytes)),
+        [(crate::DirectoryDefect::RootEntryFields.into(), 0)]
+    );
+    assert_eq!(read_both(&bytes, &["Data"]), data);
+
+    // Any other entry still needs a terminated name.
+    let (_, offset) = entry(&bytes, "Data");
+    bytes[offset + 64..offset + 66].copy_from_slice(&8u16.to_le_bytes());
+    assert!(matches!(
+        OleFile::open(Cursor::new(bytes), OleFileLimits::default()),
+        Err(OleError::CorruptedFile(message)) if message.contains("NUL-terminated")
+    ));
+}
+
 /// The bundle never relaxes entry framing.
 #[test]
 fn directory_entry_framing_stays_fatal() {
@@ -735,4 +759,35 @@ fn directory_entry_framing_stays_fatal() {
             "field {field} = {value}"
         );
     }
+}
+
+#[test]
+fn freesect_after_the_declared_difat_chain_is_ignored_and_recorded() {
+    use crate::consts::{ENDOFCHAIN, FREESECT};
+    // More than the 109 FAT sectors the header lists, so a DIFAT is needed.
+    let data = pattern(109 * 128 * SECTOR + 4 * SECTOR, 19);
+    let mut bytes = build(&[(&["Data"], &data)]);
+    let count = read_u32(&bytes, 0x48);
+    assert!(count >= 1);
+    let mut last = read_u32(&bytes, 0x44);
+    for _ in 1..count {
+        last = read_u32(&bytes, sector_offset(last) + SECTOR - 4);
+    }
+    let link = sector_offset(last) + SECTOR - 4;
+    assert_eq!(read_u32(&bytes, link), ENDOFCHAIN);
+    assert!(open_report(&bytes).is_clean());
+
+    write_u32(&mut bytes, link, FREESECT);
+    assert_eq!(
+        recorded(&open_report(&bytes)),
+        [(AllocationDefect::DifatChainEnd.into(), last)]
+    );
+    assert_eq!(read_both(&bytes, &["Data"]), data);
+
+    // A link to a real sector would continue the chain past its count.
+    write_u32(&mut bytes, link, 0);
+    assert!(matches!(
+        OleFile::open(Cursor::new(bytes), OleFileLimits::default()),
+        Err(OleError::CorruptedFile(message)) if message.contains("DIFAT chain exceeds")
+    ));
 }

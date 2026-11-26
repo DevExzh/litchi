@@ -157,6 +157,13 @@ pub enum AllocationDefect {
     /// as empty and never follows the stale start sector. The context is the
     /// stream's directory SID.
     EmptyStreamStartSector,
+    /// The last DIFAT sector's next-sector field was `FREESECT` instead of
+    /// `ENDOFCHAIN`.
+    ///
+    /// The header's DIFAT sector count already ends the chain, so the link is
+    /// never followed; olefile accepts both terminators. Any other value
+    /// stays fatal. The context is the last DIFAT sector's index.
+    DifatChainEnd,
 }
 
 impl AllocationDefect {
@@ -172,6 +179,9 @@ impl AllocationDefect {
             },
             Self::EmptyStreamStartSector => {
                 "read the zero-length stream as empty; the stale start sector was not followed"
+            },
+            Self::DifatChainEnd => {
+                "ended the DIFAT chain at its declared sector count; the FREESECT link was not followed"
             },
         }
     }
@@ -214,11 +224,11 @@ pub enum DirectoryDefect {
     /// Streams have no children; the link is cleared in memory and never
     /// followed, as LibreOffice never checks it.
     StreamChildLink,
-    /// The root entry's name or sibling links deviated from MS-CFB 2.6.2
     /// The root entry's name or sibling links deviated from MS-CFB 2.6.2.
     ///
     /// SID 0 is the root by position, as LibreOffice takes it; the root has
     /// no siblings, so its links are cleared in memory and never followed.
+    /// A root name that is not NUL-terminated is read as "Root Entry".
     /// The context is zero.
     RootEntryFields,
     /// An unused (`STGTY_EMPTY`) entry carried leftover name bytes.

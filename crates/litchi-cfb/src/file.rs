@@ -1404,7 +1404,12 @@ impl<R: Read + Seek> OleFile<R> {
                 "DIFAT continuation entry",
             )?;
             if difat_index + 1 == expected_difat_sectors {
-                if next != ENDOFCHAIN {
+                // The declared count already ends the chain; a FREESECT link
+                // there is never followed (olefile accepts it too).
+                if next == FREESECT {
+                    self.tolerance
+                        .record(AllocationDefect::DifatChainEnd, difat_sector);
+                } else if next != ENDOFCHAIN {
                     return Err(OleError::CorruptedFile(
                         "DIFAT chain exceeds its declared length".to_string(),
                     ));
@@ -2143,9 +2148,17 @@ impl<R: Read + Seek> OleFile<R> {
             name_utf16.clear();
             name_utf16.extend("Root Entry".encode_utf16());
         } else if name_utf16.pop() != Some(0) || name_utf16.contains(&0) {
-            return Err(OleError::CorruptedFile(format!(
-                "CFB directory name at SID {sid} is not correctly NUL-terminated"
-            )));
+            // SID 0 is the root by position and its name is never looked up
+            // (LibreOffice `StgDirStrm::SetupEntry`); classic Mac writers
+            // also store it as an unterminated "R".
+            if sid != 0 || raw.entry_type != STGTY_ROOT {
+                return Err(OleError::CorruptedFile(format!(
+                    "CFB directory name at SID {sid} is not correctly NUL-terminated"
+                )));
+            }
+            tolerance.record(DirectoryDefect::RootEntryFields, 0);
+            name_utf16.clear();
+            name_utf16.extend("Root Entry".encode_utf16());
         }
         let name = String::from_utf16(&name_utf16).map_err(|_err| {
             OleError::CorruptedFile(format!("invalid UTF-16 CFB directory name at SID {sid}"))
