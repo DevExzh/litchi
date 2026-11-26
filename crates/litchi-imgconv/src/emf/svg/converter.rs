@@ -1356,12 +1356,21 @@ impl<'a> EmfSvgConverter<'a> {
         }
         let unicode = header.fu_options & 0x0200 == 0;
         let offset = size_of::<EmrSmallTextOutHeader>();
-        let text = decode_text(data, offset, count, unicode, state.dc.font.charset, kind)?;
+        let decoded = decode_text(data, offset, count, unicode, &state.dc.font, kind)?;
+        note_inexact_text(state, &decoded);
         let reference = PointL {
             x: header.x,
             y: header.y,
         };
-        render_text_element(&text, reference, header.fu_options, None, None, state, kind)
+        render_text_element(
+            &decoded,
+            reference,
+            header.fu_options,
+            None,
+            None,
+            state,
+            kind,
+        )
     }
 
     fn render_emr_text(
@@ -1383,14 +1392,8 @@ impl<'a> EmfSvgConverter<'a> {
             return malformed(kind, "text character count exceeds configured limit");
         }
         let string_offset = payload_offset(info.off_string, kind)?;
-        let text = decode_text(
-            data,
-            string_offset,
-            count,
-            unicode,
-            state.dc.font.charset,
-            kind,
-        )?;
+        let decoded = decode_text(data, string_offset, count, unicode, &state.dc.font, kind)?;
+        note_inexact_text(state, &decoded);
         let dx = if info.off_dx == 0 {
             None
         } else {
@@ -1405,7 +1408,7 @@ impl<'a> EmfSvgConverter<'a> {
             Some(read_i32_array(data, offset, values, kind)?)
         };
         render_text_element(
-            &text,
+            &decoded,
             info.reference,
             info.options,
             Some(info.rectangle),
@@ -1834,7 +1837,7 @@ fn region_path(
 }
 
 fn render_text_element(
-    text: &str,
+    decoded: &DecodedEmfText,
     reference: PointL,
     options: u32,
     rectangle: Option<RectL>,
@@ -1842,6 +1845,7 @@ fn render_text_element(
     state: &mut RenderState,
     kind: EmrType,
 ) -> Result<Vec<String>> {
+    let text = decoded.text.as_str();
     let update = state.dc.text_align & text_align::UPDATECP != 0;
     let logical = if update {
         state.dc.current_pos
@@ -1939,7 +1943,7 @@ fn render_text_element(
         .join(" ");
     let mut escaped_text = String::with_capacity(text.len());
     write_xml_escaped(&mut escaped_text, text);
-    output.push(format!("<text x=\"{}\" y=\"{}\" fill=\"{}\" {} text-anchor=\"{}\" dominant-baseline=\"{}\" direction=\"{}\"{}>{}</text>",x,y,state.dc.text_color.to_svg_color(),state.dc.font.to_svg_attrs(),anchor,baseline,direction,attrs,escaped_text));
+    output.push(format!("<text x=\"{}\" y=\"{}\" fill=\"{}\" {} text-anchor=\"{}\" dominant-baseline=\"{}\" direction=\"{}\"{}>{}</text>",x,y,state.dc.text_color.to_svg_color(),state.dc.font.to_svg_attrs_for_face(!decoded.unicode_face),anchor,baseline,direction,attrs,escaped_text));
     if update {
         let estimated = if let Some(values) = dx {
             let stride = if options & text_options::PDY != 0 {
@@ -1961,9 +1965,9 @@ fn decode_text(
     offset: usize,
     count: usize,
     unicode: bool,
-    charset: u8,
+    font: &Font,
     kind: EmrType,
-) -> Result<String> {
+) -> Result<DecodedEmfText> {
     let bytes = count
         .checked_mul(if unicode { 2 } else { 1 })
         .ok_or_else(|| Error::ParseError("text byte length overflow".into()))?;
@@ -1980,44 +1984,44 @@ fn decode_text(
             .iter()
             .map(|v| u16::from_le_bytes([v[0], v[1]]))
             .collect::<Vec<_>>();
-        Ok(String::from_utf16_lossy(&units)
-            .trim_end_matches('\0')
-            .to_string())
+        Ok(DecodedEmfText {
+            text: String::from_utf16_lossy(&units)
+                .trim_end_matches('\0')
+                .to_string(),
+            exact: true,
+            unicode_face: false,
+        })
     } else {
-        decode_ansi(raw, charset, kind)
+        let decoded = crate::text_charset::decode_logfont_text(raw, font.charset, &font.face_name);
+        Ok(DecodedEmfText {
+            text: decoded.text,
+            exact: decoded.exact,
+            unicode_face: decoded.unicode_face,
+        })
     }
 }
 
-fn decode_ansi(raw: &[u8], charset: u8, kind: EmrType) -> Result<String> {
-    match charset {
-        0 | 1 | 255 => Ok(raw
-            .iter()
-            .filter(|&&b| b != 0)
-            .map(|&b| cp1252(b))
-            .collect()),
-        2 => Ok(raw
-            .iter()
-            .filter(|&&b| b != 0)
-            .map(|&b| char::from_u32(0xf000 + u32::from(b)).unwrap_or('\u{fffd}'))
-            .collect()),
-        128 | 129 | 134 | 136 => unsupported(
-            kind,
-            "multibyte ANSI charset needs litchi-codepage integration",
-        ),
-        _ => unsupported(kind, "unsupported LOGFONT character set"),
+/// Reports text whose character set could not be resolved exactly.
+fn note_inexact_text(state: &mut RenderState, decoded: &DecodedEmfText) {
+    if !decoded.exact {
+        let charset = state.dc.font.charset;
+        state.note(
+            "emf-text-charset-fallback",
+            format!(
+                "font charset {charset} selects a code page the metafile does not record; decoded as Windows-1252"
+            ),
+        );
     }
 }
-fn cp1252(byte: u8) -> char {
-    const SPECIAL: [char; 32] = [
-        '€', '\u{0081}', '‚', 'ƒ', '„', '…', '†', '‡', 'ˆ', '‰', 'Š', '‹', 'Œ', '\u{008d}', 'Ž',
-        '\u{008f}', '\u{0090}', '‘', '’', '“', '”', '•', '–', '—', '˜', '™', 'š', '›', 'œ',
-        '\u{009d}', 'ž', 'Ÿ',
-    ];
-    if (0x80..=0x9f).contains(&byte) {
-        SPECIAL[usize::from(byte - 0x80)]
-    } else {
-        char::from(byte)
-    }
+
+/// Text decoded from one EMF text record.
+struct DecodedEmfText {
+    text: String,
+    /// Whether the conversion reproduces what Windows draws for this font.
+    exact: bool,
+    /// Whether the text needs a Unicode-capable face instead of the recorded
+    /// symbol face.
+    unicode_face: bool,
 }
 
 fn parse_font(data: &[u8], kind: EmrType) -> Result<(u32, Font)> {
@@ -2539,9 +2543,40 @@ mod tests {
     }
     #[test]
     fn ansi_is_not_decoded_as_utf8() {
-        assert_eq!(
-            decode_ansi(&[0x80, 0x93, 0x94], 0, EmrType::ExtTextOutA).unwrap(),
-            "€“”"
+        let font = Font {
+            charset: 0,
+            face_name: "Arial".to_owned(),
+            ..Font::default()
+        };
+        let decoded = decode_text(
+            &[0x80, 0x93, 0x94],
+            0,
+            3,
+            false,
+            &font,
+            EmrType::ExtTextOutA,
+        )
+        .expect("single-byte text");
+        assert_eq!(decoded.text, "€“”");
+        assert!(decoded.exact);
+    }
+
+    #[test]
+    fn symbol_face_text_decodes_to_greek_without_the_symbol_face() {
+        let font = Font {
+            charset: 2,
+            face_name: "Symbol".to_owned(),
+            ..Font::default()
+        };
+        let decoded =
+            decode_text(b"ab", 0, 2, false, &font, EmrType::ExtTextOutA).expect("symbol text");
+        assert_eq!(decoded.text, "αβ");
+        assert!(decoded.exact);
+        assert!(decoded.unicode_face);
+        assert!(
+            !font
+                .to_svg_attrs_for_face(!decoded.unicode_face)
+                .contains("Symbol")
         );
     }
 

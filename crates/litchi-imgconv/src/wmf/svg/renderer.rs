@@ -1380,13 +1380,19 @@ impl<'hook> SvgRenderer<'hook> {
         if bytes.is_empty() {
             return None;
         }
-        let (text, exact_charset) = decode_text(bytes, self.state.font.charset);
-        if !exact_charset {
+        let decoded = crate::text_charset::decode_logfont_text(
+            bytes,
+            self.state.font.charset,
+            &self.state.font.name,
+        );
+        if !decoded.exact {
             self.warn(format!(
-                "font charset {} decoded with a safe Windows-1252 fallback",
+                "font charset {} selects a code page the metafile does not record; decoded as Windows-1252",
                 self.state.font.charset
             ));
         }
+        let use_face = !decoded.unicode_face;
+        let text = decoded.text;
         let update_position = self.state.text_align & text_align::TA_UPDATECP != 0;
         let (logical_x, logical_y) = if update_position {
             self.state.position
@@ -1434,7 +1440,7 @@ impl<'hook> SvgRenderer<'hook> {
             text_align::TA_BASELINE => {},
             _ => text_element.push_str(r#" dominant-baseline="text-before-edge""#),
         }
-        if self.state.font.name != "serif" {
+        if use_face && self.state.font.name != "serif" {
             text_element.push_str(r#" font-family=""#);
             escape_xml_attr_into(&mut text_element, &self.state.font.name);
             text_element.push('"');
@@ -2039,54 +2045,6 @@ fn parse_region(data: &[u8], max_rects: usize) -> Option<Region> {
     Some(Region { rects })
 }
 
-fn decode_text(bytes: &[u8], charset: u8) -> (String, bool) {
-    if charset == 2 {
-        return (
-            bytes
-                .iter()
-                .map(|&byte| char::from_u32(0xf000 + u32::from(byte)).unwrap_or('\u{fffd}'))
-                .collect(),
-            true,
-        );
-    }
-    let exact = matches!(charset, 0 | 1);
-    let text = bytes
-        .iter()
-        .map(|&byte| match byte {
-            0x80 => '€',
-            0x82 => '‚',
-            0x83 => 'ƒ',
-            0x84 => '„',
-            0x85 => '…',
-            0x86 => '†',
-            0x87 => '‡',
-            0x88 => 'ˆ',
-            0x89 => '‰',
-            0x8a => 'Š',
-            0x8b => '‹',
-            0x8c => 'Œ',
-            0x8e => 'Ž',
-            0x91 => '‘',
-            0x92 => '’',
-            0x93 => '“',
-            0x94 => '”',
-            0x95 => '•',
-            0x96 => '–',
-            0x97 => '—',
-            0x98 => '˜',
-            0x99 => '™',
-            0x9a => 'š',
-            0x9b => '›',
-            0x9c => 'œ',
-            0x9e => 'ž',
-            0x9f => 'Ÿ',
-            0x81 | 0x8d | 0x8f | 0x90 | 0x9d => '\u{fffd}',
-            _ => char::from(byte),
-        })
-        .collect();
-    (text, exact)
-}
-
 fn bitmap_destination(
     function: u16,
     data: &[u8],
@@ -2121,6 +2079,16 @@ mod tests {
             function,
             params: Bytes::copy_from_slice(params),
         }
+    }
+
+    fn font_params(charset: u8, face: &str) -> Vec<u8> {
+        let mut params = vec![0u8; 18];
+        params[0..2].copy_from_slice(&(-12_i16).to_le_bytes());
+        params[13] = charset;
+        let mut name = [0u8; 32];
+        name[..face.len()].copy_from_slice(face.as_bytes());
+        params.extend_from_slice(&name);
+        params
     }
 
     fn renderer() -> SvgRenderer<'static> {
@@ -2259,10 +2227,37 @@ mod tests {
 
     #[test]
     fn windows_1252_text_and_xml_metacharacters_are_safe() {
-        let (text, exact) = decode_text(&[0x80, b'<', b'&'], 0);
-        assert!(exact);
+        let decoded = crate::text_charset::decode_logfont_text(&[0x80, b'<', b'&'], 0, "");
+        assert!(decoded.exact);
         let mut escaped = String::new();
-        escape_xml_text_into(&mut escaped, &text);
+        escape_xml_text_into(&mut escaped, &decoded.text);
         assert_eq!(escaped, "€&lt;&amp;");
+    }
+
+    #[test]
+    fn symbol_font_text_uses_a_unicode_face_and_private_use_keeps_the_face() {
+        let mut greek = renderer();
+        greek.render_record(&rec(
+            record::CREATE_FONT_INDIRECT,
+            &font_params(2, "Symbol"),
+        ));
+        greek.render_record(&rec(record::SELECT_OBJECT, &[0, 0]));
+        let output = greek
+            .render_record(&rec(record::TEXT_OUT, &[1, 0, b'a', 0, 0, 0, 0, 0]))
+            .unwrap();
+        assert!(output.contains("α"));
+        assert!(!output.contains("Symbol"));
+
+        let mut dingbat = renderer();
+        dingbat.render_record(&rec(
+            record::CREATE_FONT_INDIRECT,
+            &font_params(2, "Wingdings"),
+        ));
+        dingbat.render_record(&rec(record::SELECT_OBJECT, &[0, 0]));
+        let output = dingbat
+            .render_record(&rec(record::TEXT_OUT, &[1, 0, b'a', 0, 0, 0, 0, 0]))
+            .unwrap();
+        assert!(output.contains("\u{f061}"));
+        assert!(output.contains("Wingdings"));
     }
 }

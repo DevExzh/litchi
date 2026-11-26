@@ -567,13 +567,24 @@ impl Default for Font {
 
 impl Font {
     pub fn to_svg_attrs(&self) -> String {
-        let mut family = String::with_capacity(self.face_name.len());
-        write_xml_escaped(&mut family, &self.face_name);
-        let mut attrs = format!(
-            "font-size=\"{}\" font-family=\"{}\"",
-            self.height.abs().max(1.0),
-            family
-        );
+        self.to_svg_attrs_for_face(true)
+    }
+
+    /// Returns the SVG font attributes, naming the recorded face only when the
+    /// text is drawn with it.
+    ///
+    /// Text that a symbol face draws through a glyph order — the Adobe Symbol
+    /// encoding in particular — is emitted as the Unicode characters those
+    /// glyphs represent, which the recorded symbol face does not contain.
+    pub fn to_svg_attrs_for_face(&self, use_face: bool) -> String {
+        let mut attrs = format!("font-size=\"{}\"", self.height.abs().max(1.0));
+        if use_face {
+            let mut family = String::with_capacity(self.face_name.len());
+            write_xml_escaped(&mut family, &self.face_name);
+            attrs.push_str(" font-family=\"");
+            attrs.push_str(&family);
+            attrs.push('"');
+        }
         if self.weight != font_weight::NORMAL {
             attrs.push_str(&format!(" font-weight=\"{}\"", self.weight.clamp(1, 1000)));
         }
