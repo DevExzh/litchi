@@ -144,11 +144,11 @@ impl Default for Limits {
             max_height: 8192,
             max_pixels: 32 * 1024 * 1024,
             max_output_bytes: 256 * 1024 * 1024,
-            max_records: 100_000,
+            max_records: 1_000_000,
             max_objects: 16_384,
             max_state_depth: 256,
             max_path_points: 1_000_000,
-            max_svg_elements: 100_000,
+            max_svg_elements: 500_000,
         }
     }
 }

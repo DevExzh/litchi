@@ -1445,10 +1445,13 @@ impl<'hook> SvgRenderer<'hook> {
             &self.state.font.name,
         );
         if !decoded.exact {
-            self.warn(format!(
-                "font charset {} selects a code page the metafile does not record; decoded as Windows-1252",
-                self.state.font.charset
-            ));
+            self.note(
+                "wmf-text-charset-inexact",
+                format!(
+                    "text in font charset {} could not be decoded exactly; Windows-1252 or replacement characters were used",
+                    self.state.font.charset
+                ),
+            );
         }
         let use_face = !decoded.unicode_face;
         let text = decoded.text;

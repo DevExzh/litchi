@@ -1948,7 +1948,8 @@ fn render_text_element(
     let mut output = Vec::new();
     if options & text_options::OPAQUE != 0 || (state.dc.bg_mode == 2 && rectangle.is_some()) {
         // A rectangle without area paints no background.
-        if let Some(rect) = rectangle.filter(|rect| rect.left != rect.right && rect.top != rect.bottom)
+        if let Some(rect) =
+            rectangle.filter(|rect| rect.left != rect.right && rect.top != rect.bottom)
         {
             let p = rectangle_path(rect, &state.dc)?;
             output.push(format!(
@@ -2078,12 +2079,16 @@ fn decode_text(
             .iter()
             .map(|v| u16::from_le_bytes([v[0], v[1]]))
             .collect::<Vec<_>>();
-        Ok(DecodedEmfText {
-            text: String::from_utf16_lossy(&units)
+        let decoded = crate::text_charset::decode_unicode_logfont_text(
+            String::from_utf16_lossy(&units)
                 .trim_end_matches('\0')
                 .to_string(),
-            exact: true,
-            unicode_face: false,
+            &font.face_name,
+        );
+        Ok(DecodedEmfText {
+            text: decoded.text,
+            exact: decoded.exact,
+            unicode_face: decoded.unicode_face,
         })
     } else {
         let decoded = crate::text_charset::decode_logfont_text(raw, font.charset, &font.face_name);
@@ -2100,9 +2105,9 @@ fn note_inexact_text(state: &mut RenderState, decoded: &DecodedEmfText) {
     if !decoded.exact {
         let charset = state.dc.font.charset;
         state.note(
-            "emf-text-charset-fallback",
+            "emf-text-charset-inexact",
             format!(
-                "font charset {charset} selects a code page the metafile does not record; decoded as Windows-1252"
+                "text in font charset {charset} could not be decoded exactly; Windows-1252 or replacement characters were used"
             ),
         );
     }
@@ -2915,5 +2920,55 @@ mod tests {
                 "noncanonical-emf-empty-poly-record"
             ]
         );
+    }
+
+    #[test]
+    fn multibyte_ansi_text_uses_the_font_character_set() {
+        let font = Font {
+            charset: 128,
+            face_name: "MS Gothic".to_owned(),
+            ..Font::default()
+        };
+        let decoded = decode_text(
+            &[0x82, 0xa0, b'a'],
+            0,
+            3,
+            false,
+            &font,
+            EmrType::ExtTextOutA,
+        )
+        .expect("shift-jis text");
+        assert_eq!(decoded.text, "あa");
+        assert!(decoded.exact);
+
+        let broken = decode_text(&[0x82], 0, 1, false, &font, EmrType::ExtTextOutA).unwrap();
+        assert!(!broken.exact);
+    }
+
+    #[test]
+    fn unicode_text_in_the_symbol_face_becomes_real_characters() {
+        let font = Font {
+            charset: 2,
+            face_name: "Symbol".to_owned(),
+            ..Font::default()
+        };
+        let bytes: Vec<u8> = [0xf070_u16, 0xf065]
+            .iter()
+            .flat_map(|u| u.to_le_bytes())
+            .collect();
+        let decoded = decode_text(&bytes, 0, 2, true, &font, EmrType::ExtTextOutW).unwrap();
+        assert_eq!(decoded.text, "πε");
+        assert!(decoded.unicode_face);
+    }
+
+    #[test]
+    fn an_empty_clip_rectangle_hides_later_drawing() {
+        let (svg, codes) = convert_codes(vec![
+            clip_rect(5, 5, 5, 20),
+            record(EmrType::MoveToEx, &point(0, 0)),
+            line_to(30, 30),
+        ]);
+        assert!(codes.is_empty(), "{codes:?}");
+        assert!(svg.contains("clip-path"), "{svg}");
     }
 }

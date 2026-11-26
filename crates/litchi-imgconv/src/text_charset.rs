@@ -193,6 +193,35 @@ fn decode_single_byte(page: Page, bytes: &[u8]) -> String {
     text
 }
 
+/// Reinterprets UTF-16 text drawn with a symbol face.
+///
+/// Windows reaches the glyphs of a symbol face through the U+F000 private-use
+/// range, and it also accepts the plain 0x20 through 0xFF positions there, so
+/// a record that draws with the Adobe Symbol face names its characters as
+/// U+F0xx (or U+00xx). They are mapped to the characters those glyphs draw;
+/// any other character, and any other face, keeps its text.
+pub(crate) fn decode_unicode_logfont_text(text: String, face_name: &str) -> DecodedText {
+    if symbol_face(face_name) != Some(SymbolFace::Adobe) {
+        return DecodedText {
+            text,
+            exact: true,
+            unicode_face: false,
+        };
+    }
+    let mapped = text
+        .chars()
+        .map(|character| match u32::from(character) {
+            position @ (0x20..=0xff | 0xf020..=0xf0ff) => adobe_symbol((position & 0xff) as u8),
+            _ => character,
+        })
+        .collect();
+    DecodedText {
+        text: mapped,
+        exact: true,
+        unicode_face: true,
+    }
+}
+
 /// Decodes symbol-font text.
 ///
 /// A symbol face draws glyph *n* for byte *n*, so the text is not a code-page
@@ -391,6 +420,17 @@ mod tests {
         let math = decode(b"\x61", 160, "MT Extra");
         assert_eq!(math.text, "\u{f061}");
         assert!(!math.unicode_face);
+    }
+
+    #[test]
+    fn unicode_text_in_the_symbol_face_maps_private_use_positions() {
+        let mapped = decode_unicode_logfont_text("\u{f070}\u{f065}a\u{3b1}".to_owned(), "Symbol");
+        assert_eq!(mapped.text, "πεαα");
+        assert!(mapped.unicode_face);
+
+        let other = decode_unicode_logfont_text("\u{f070}".to_owned(), "Wingdings");
+        assert_eq!(other.text, "\u{f070}");
+        assert!(!other.unicode_face);
     }
 
     #[test]
