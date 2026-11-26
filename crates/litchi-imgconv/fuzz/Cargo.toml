@@ -58,6 +58,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "pict_svg"
+path = "fuzz_targets/pict_svg.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "blip_convert"
 path = "fuzz_targets/blip_convert.rs"
 test = false

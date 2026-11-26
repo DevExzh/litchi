@@ -6,12 +6,13 @@ finding rather than an accident:
 
 | Target | Entry point | Budget |
 | --- | --- | --- |
-| `emf_svg` | `convert_metafile(Emf, Svg)` | `Limits::default()` |
+| `emf_svg` | `convert_metafile(Emf, Svg)` | 256x256 render, 1 MiB output, 20 000 records |
 | `emf_png` | `convert_metafile(Emf, Png)` and `(Emf, Auto)` | 256x256 render, 1 MiB output, 20 000 records |
-| `wmf_svg` | `convert_metafile(Wmf, Svg)` | `Limits::default()` |
+| `wmf_svg` | `convert_metafile(Wmf, Svg)` | 256x256 render, 1 MiB output, 20 000 records |
 | `wmf_png` | `convert_metafile(Wmf, Png)` and `(Wmf, Auto)` | 256x256 render, 1 MiB output, 20 000 records |
 | `pict_png` | `pict::PictParser` + `PictConverter` | 256x256 bitmap, 1 MiB output |
-| `pict_convert` | `pict::convert_pict` | the function's default budgets |
+| `pict_convert` | `pict::convert_pict_with_options` | 256x256 render, 1 MiB output, 20 000 records |
+| `pict_svg` | `convert_metafile(Pict, Svg)`/`(Pict, Auto)` and `pict::convert_pict_to_svg_with_options` | 256x256 render, 1 MiB output, 20 000 records |
 | `blip_convert` | `image::Blip::parse` + `decode_data` + `to_png`/`to_svg` | 1 MiB BLIP, 256x256 render |
 | `odraw_scan` | `image::scan`/`store`/`get`/`all`/`delay`/`record` | 20 000 records, 1 MiB record body |
 | `emfplus_stream` | `EmfPlusRecordIter`, `validate_complete_stream`, `try_extract_emfplus_comment_body` | 1 MiB, 20 000 records |
@@ -64,6 +65,14 @@ produce. Copy them into the corpus directory of `emf_svg`/`emf_png`
 (`*.emf`) or `wmf_svg`/`wmf_png` (`*.wmf`); the `find` command above does this
 for one target. Further seeds come from the metafiles an Office document
 carries: extract them from your own documents and keep them below 64 KiB.
+
+A seed set drawn only from small vector pictures never mutates into the
+records that carry bitmaps, brushes, clipping or the EMF+ track selection. Add
+seeds that already contain those records: dual-mode EMF+ metafiles with and
+without `EmfPlusGetDC`, bitmap and pattern-brush records, and WMF files whose
+bitmap functions use raster operations other than `SRCCOPY`. Select them by
+record coverage, not by size alone, and keep both the small pictures and the
+larger feature-bearing ones.
 
 Targets with a structured input take these seeds:
 
