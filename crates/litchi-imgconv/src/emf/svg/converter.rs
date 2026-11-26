@@ -1436,8 +1436,16 @@ impl<'a> EmfSvgConverter<'a> {
             for shape in &bracket.first {
                 hidden.push_str(&shape.element.replace(&token, "black"));
             }
+            // Nothing outside the canvas is visible, so the canvas bounds the
+            // mask exactly.
+            let canvas = self.canvas();
+            let (x, y) = (fmt(canvas.left), fmt(canvas.top));
+            let (width, height) = (
+                fmt(canvas.right - canvas.left),
+                fmt(canvas.bottom - canvas.top),
+            );
             state.add_definition(format!(
-                "<mask id=\"{id}\" maskUnits=\"userSpaceOnUse\" x=\"-1000000000\" y=\"-1000000000\" width=\"2000000000\" height=\"2000000000\"><rect x=\"-1000000000\" y=\"-1000000000\" width=\"2000000000\" height=\"2000000000\" fill=\"white\"/>{hidden}</mask>"
+                "<mask id=\"{id}\" maskUnits=\"userSpaceOnUse\" x=\"{x}\" y=\"{y}\" width=\"{width}\" height=\"{height}\"><rect x=\"{x}\" y=\"{y}\" width=\"{width}\" height=\"{height}\" fill=\"white\"/>{hidden}</mask>"
             ));
             output.push(format!(
                 "<g mask=\"url(#{id})\">{}</g>",
