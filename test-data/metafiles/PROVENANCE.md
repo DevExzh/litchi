@@ -11,6 +11,10 @@ document, the container inside that document, the byte offset in that
 container, the extraction route, and how many corpus documents contain the
 identical bytes.
 
+`fuzz/` holds inputs that libFuzzer minimized from seeds drawn from these
+metafiles; each one once panicked, exhausted memory or crashed the
+rasterizer, and must now convert or fail with an error.
+
 ## Sources
 
 - **GovDocs1** (`govdocs1`): the Digital Corpora "GovDocs1" corpus of
