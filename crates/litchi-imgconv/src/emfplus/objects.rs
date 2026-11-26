@@ -689,10 +689,12 @@ fn decode_metafile(c: &mut Cursor<'_>) -> Result<ImageKind> {
     if size > c.limits.max_bytes {
         return Err(error("metafile image exceeds configured byte limit"));
     }
-    Ok(ImageKind::Metafile {
-        type_code,
-        data: c.take(size)?.to_vec(),
-    })
+    let data = c.take(size)?.to_vec();
+    // GDI+ reads exactly MetafileDataSize bytes; producers that pad the object
+    // without updating the size leave bytes that are not part of the metafile.
+    let trailing = c.remaining();
+    c.skip(trailing)?;
+    Ok(ImageKind::Metafile { type_code, data })
 }
 
 fn decode_bitmap(c: &mut Cursor<'_>) -> Result<ImageKind> {

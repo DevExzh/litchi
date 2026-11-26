@@ -348,6 +348,8 @@ pub struct SvgStroke {
     pub dashes: Vec<f64>,
     /// Dash phase.
     pub dash_offset: f64,
+    /// Miter length limit, as a multiple of the stroke width.
+    pub miter_limit: f64,
 }
 
 /// Paint and common element attributes.
@@ -361,6 +363,8 @@ pub struct SvgStyle {
     pub opacity: f64,
     /// EMF+ compositing request.
     pub compositing: SvgCompositingMode,
+    /// Even-odd filling, as selected by GDI+ `FillModeAlternate`.
+    pub even_odd_fill: bool,
 }
 
 impl Default for SvgStyle {
@@ -370,6 +374,8 @@ impl Default for SvgStyle {
             stroke: None,
             opacity: 1.0,
             compositing: SvgCompositingMode::SourceOver,
+            // SVG's default fill rule is nonzero, which is GDI+ winding mode.
+            even_odd_fill: false,
         }
     }
 }
@@ -403,6 +409,20 @@ pub struct SvgLinearGradient {
     pub stops: Vec<SvgGradientStop>,
     /// Optional gradient transform.
     pub transform: Option<SvgTransform>,
+    /// How the gradient continues beyond its end points.
+    pub spread: SvgSpread,
+}
+
+/// SVG `spreadMethod` of a gradient.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum SvgSpread {
+    /// Extend the end colors.
+    #[default]
+    Pad,
+    /// Mirror the gradient in every other repetition.
+    Reflect,
+    /// Repeat the gradient.
+    Repeat,
 }
 
 /// Safe pattern content.  There is intentionally no raw XML variant.
@@ -483,6 +503,17 @@ pub struct SvgText {
     pub value: String,
     /// Text baseline position.
     pub origin: SvgPoint,
+    /// Baseline position of each character; when not empty it replaces
+    /// `origin` and holds one point per `char` of `value`.
+    pub positions: Vec<SvgPoint>,
+    /// Bold weight.
+    pub bold: bool,
+    /// Italic style.
+    pub italic: bool,
+    /// Underline decoration.
+    pub underline: bool,
+    /// Strikeout decoration.
+    pub strikeout: bool,
     /// Font family name, emitted as an escaped attribute.
     pub font_family: String,
     /// Font size.
@@ -499,6 +530,8 @@ pub struct SvgBuilder {
     limits: SvgLimits,
     width: f64,
     height: f64,
+    view_x: f64,
+    view_y: f64,
     fragment: SvgFragment,
     elements: usize,
     definitions: usize,
@@ -515,6 +548,8 @@ impl SvgBuilder {
             limits,
             width,
             height,
+            view_x: 0.0,
+            view_y: 0.0,
             fragment: SvgFragment::default(),
             elements: 0,
             definitions: 0,
@@ -543,9 +578,8 @@ impl SvgBuilder {
             self.limits,
         )?;
         write_transform(&mut element, transform)?;
-        write_clip(&mut element, clip);
         element.push_str("/>");
-        self.push_body(element)
+        self.push_clipped_body(element, clip)
     }
 
     /// Emit a rectangle.
@@ -565,9 +599,8 @@ impl SvgBuilder {
             self.limits,
         )?;
         write_transform(&mut element, transform)?;
-        write_clip(&mut element, clip);
         element.push_str("/>");
-        self.push_body(element)
+        self.push_clipped_body(element, clip)
     }
 
     /// Emit an ellipse bounded by `rect`.
@@ -595,25 +628,75 @@ impl SvgBuilder {
             self.limits,
         )?;
         write_transform(&mut element, transform)?;
-        write_clip(&mut element, clip);
         element.push_str("/>");
-        self.push_body(element)
+        self.push_clipped_body(element, clip)
+    }
+
+    /// Move the top-left corner of the document's view box.
+    #[must_use]
+    pub fn with_view_origin(mut self, x: f64, y: f64) -> Self {
+        self.view_x = x;
+        self.view_y = y;
+        self
     }
 
     /// Emit text as escaped character data.
     pub fn text(&mut self, text: &SvgText, clip: Option<&SvgId>) -> Result<()> {
         validate_point(text.origin)?;
         validate_non_negative(text.font_size, "font size")?;
-        self.ensure_space(estimated_escaped_bytes(&text.value, &text.font_family)?)?;
+        if !text.positions.is_empty() && text.positions.len() != text.value.chars().count() {
+            return Err(Error::ParseError(
+                "SVG text positions do not match its characters".into(),
+            ));
+        }
+        let position_bytes = text
+            .positions
+            .len()
+            .checked_mul(48)
+            .ok_or_else(|| limit("text position count"))?;
+        self.ensure_space(
+            estimated_escaped_bytes(&text.value, &text.font_family)?
+                .checked_add(position_bytes)
+                .ok_or_else(|| limit("text size"))?,
+        )?;
         let mut element = String::from("<text x=\"");
-        write_number(&mut element, text.origin.x)?;
-        element.push_str("\" y=\"");
-        write_number(&mut element, text.origin.y)?;
-        element.push_str("\" font-family=\"");
+        if text.positions.is_empty() {
+            write_number(&mut element, text.origin.x)?;
+            element.push_str("\" y=\"");
+            write_number(&mut element, text.origin.y)?;
+        } else {
+            for (index, point) in text.positions.iter().enumerate() {
+                validate_point(*point)?;
+                if index != 0 {
+                    element.push(' ');
+                }
+                write_number(&mut element, point.x)?;
+            }
+            element.push_str("\" y=\"");
+            for (index, point) in text.positions.iter().enumerate() {
+                if index != 0 {
+                    element.push(' ');
+                }
+                write_number(&mut element, point.y)?;
+            }
+        }
+        element.push_str("\" xml:space=\"preserve\" font-family=\"");
         write_xml_escaped(&mut element, &text.font_family);
         element.push_str("\" font-size=\"");
         write_number(&mut element, text.font_size)?;
         element.push('"');
+        if text.bold {
+            element.push_str(" font-weight=\"bold\"");
+        }
+        if text.italic {
+            element.push_str(" font-style=\"italic\"");
+        }
+        match (text.underline, text.strikeout) {
+            (true, true) => element.push_str(" text-decoration=\"underline line-through\""),
+            (true, false) => element.push_str(" text-decoration=\"underline\""),
+            (false, true) => element.push_str(" text-decoration=\"line-through\""),
+            (false, false) => {},
+        }
         write_style(
             &mut element,
             &text.style,
@@ -621,11 +704,10 @@ impl SvgBuilder {
             self.limits,
         )?;
         write_transform(&mut element, text.transform)?;
-        write_clip(&mut element, clip);
         element.push('>');
         write_xml_escaped(&mut element, &text.value);
         element.push_str("</text>");
-        self.push_body(element)
+        self.push_clipped_body(element, clip)
     }
 
     /// Emit a base64-embedded raster image.  External image sources are skipped.
@@ -648,16 +730,17 @@ impl SvgBuilder {
         let mut element = String::new();
         element.push_str("<image");
         write_rect_attributes(&mut element, image.rect)?;
-        element.push_str(" href=\"data:");
+        // The destination frame stretches the image; SVG's default would keep
+        // the image aspect ratio and letterbox it inside the frame.
+        element.push_str(" preserveAspectRatio=\"none\" href=\"data:");
         element.push_str(mime.as_str());
         element.push_str(";base64,");
         base64::engine::general_purpose::STANDARD.encode_string(bytes, &mut element);
         element.push('"');
         write_opacity(&mut element, image.opacity)?;
         write_transform(&mut element, image.transform)?;
-        write_clip(&mut element, clip);
         element.push_str("/>");
-        self.push_body(element)
+        self.push_clipped_body(element, clip)
     }
 
     /// Define a linear gradient and return an ID usable as `SvgPaint::Reference`.
@@ -688,7 +771,12 @@ impl SvgBuilder {
         write_number(&mut definition, gradient.end.x)?;
         definition.push_str("\" y2=\"");
         write_number(&mut definition, gradient.end.y)?;
-        definition.push('"');
+        definition.push_str("\" gradientUnits=\"userSpaceOnUse\"");
+        match gradient.spread {
+            SvgSpread::Pad => {},
+            SvgSpread::Reflect => definition.push_str(" spreadMethod=\"reflect\""),
+            SvgSpread::Repeat => definition.push_str(" spreadMethod=\"repeat\""),
+        }
         write_transform_attribute(&mut definition, "gradientTransform", gradient.transform)?;
         definition.push('>');
         for stop in &gradient.stops {
@@ -711,11 +799,14 @@ impl SvgBuilder {
         &mut self,
         rect: SvgRect,
         transform: Option<SvgTransform>,
+        outer: Option<&SvgId>,
     ) -> Result<SvgId> {
         let id = self.next_definition_id("clip")?;
         let mut definition = String::from("<clipPath id=\"");
         definition.push_str(id.as_str());
-        definition.push_str("\"><rect");
+        definition.push('"');
+        write_clip(&mut definition, outer);
+        definition.push_str("><rect");
         write_rect_attributes(&mut definition, rect)?;
         write_transform(&mut definition, transform)?;
         definition.push_str("/></clipPath>");
@@ -724,19 +815,29 @@ impl SvgBuilder {
     }
 
     /// Define a path clip region and return its generated ID.
+    ///
+    /// `outer` intersects the new clip with an earlier one, and `even_odd`
+    /// selects the alternate fill rule for the path interior.
     pub fn define_clip_path(
         &mut self,
         path: &SvgPath,
         transform: Option<SvgTransform>,
+        outer: Option<&SvgId>,
+        even_odd: bool,
     ) -> Result<SvgId> {
         validate_path(path, self.limits)?;
         self.ensure_space(estimated_path_bytes(path.commands.len())?)?;
         let id = self.next_definition_id("clip")?;
         let mut definition = String::from("<clipPath id=\"");
         definition.push_str(id.as_str());
-        definition.push_str("\"><path d=\"");
+        definition.push('"');
+        write_clip(&mut definition, outer);
+        definition.push_str("><path d=\"");
         write_path_data(&mut definition, path)?;
         definition.push('"');
+        if even_odd {
+            definition.push_str(" clip-rule=\"evenodd\"");
+        }
         write_transform(&mut definition, transform)?;
         definition.push_str("/></clipPath>");
         self.push_definition(definition)?;
@@ -787,7 +888,11 @@ impl SvgBuilder {
         write_number(&mut svg, self.width)?;
         checked_push(&mut svg, "\" height=\"", self.limits.max_output_bytes)?;
         write_number(&mut svg, self.height)?;
-        checked_push(&mut svg, "\" viewBox=\"0 0 ", self.limits.max_output_bytes)?;
+        checked_push(&mut svg, "\" viewBox=\"", self.limits.max_output_bytes)?;
+        write_number(&mut svg, self.view_x)?;
+        svg.push(' ');
+        write_number(&mut svg, self.view_y)?;
+        svg.push(' ');
         write_number(&mut svg, self.width)?;
         svg.push(' ');
         write_number(&mut svg, self.height)?;
@@ -814,6 +919,24 @@ impl SvgBuilder {
             .checked_add(1)
             .ok_or_else(|| limit("definition ID"))?;
         Ok(SvgId(format!("emfplus-{kind}-{}", self.next_id)))
+    }
+
+    /// Emit an element whose clip, if any, is in document coordinates.
+    ///
+    /// SVG resolves a `userSpaceOnUse` clip in the coordinate system of the
+    /// clipped element, including the element's own `transform`; a group
+    /// carries the clip so that the element transform does not apply to it.
+    fn push_clipped_body(&mut self, element: String, clip: Option<&SvgId>) -> Result<()> {
+        let Some(clip) = clip else {
+            return self.push_body(element);
+        };
+        let mut group = String::with_capacity(element.len() + 48);
+        group.push_str("<g");
+        write_clip(&mut group, Some(clip));
+        group.push('>');
+        group.push_str(&element);
+        group.push_str("</g>");
+        self.push_body(group)
     }
 
     fn push_body(&mut self, element: String) -> Result<()> {
@@ -980,6 +1103,9 @@ fn write_style(
     }
     validate_opacity(style.opacity)?;
     write_opacity(output, style.opacity)?;
+    if style.even_odd_fill {
+        output.push_str(" fill-rule=\"evenodd\"");
+    }
     if let Some(stroke) = &style.stroke {
         if stroke.dashes.len() > limits.max_path_commands {
             return Err(limit("dash count"));
@@ -997,6 +1123,13 @@ fn write_style(
         output.push_str("\" stroke-linejoin=\"");
         output.push_str(line_join_name(stroke.line_join));
         output.push('"');
+        if stroke.line_join == SvgLineJoin::Miter {
+            validate_non_negative(stroke.miter_limit, "miter limit")?;
+            output.push_str(" stroke-miterlimit=\"");
+            // SVG rejects a limit below one.
+            write_number(output, stroke.miter_limit.max(1.0))?;
+            output.push('"');
+        }
         if !stroke.dashes.is_empty() {
             output.push_str(" stroke-dasharray=\"");
             for (index, dash) in stroke.dashes.iter().enumerate() {
@@ -1296,6 +1429,11 @@ mod tests {
             &SvgText {
                 value: "<script>&'\"\u{1}".to_owned(),
                 origin: SvgPoint { x: 1.0, y: 2.0 },
+                positions: Vec::new(),
+                bold: false,
+                italic: false,
+                underline: false,
+                strikeout: false,
                 font_family: "a\" onclick=\"evil".to_owned(),
                 font_size: 12.0,
                 style: SvgStyle::default(),
@@ -1391,6 +1529,7 @@ mod tests {
                     height: 10.0,
                 },
                 Some(SvgTransform::identity()),
+                None,
             )
             .unwrap();
         let second = svg
@@ -1402,6 +1541,7 @@ mod tests {
                     height: 8.0,
                 },
                 None,
+                Some(&first),
             )
             .unwrap();
         assert_eq!(first.as_str(), "emfplus-clip-1");
@@ -1539,6 +1679,7 @@ mod tests {
                 height: 1.0,
             },
             None,
+            None,
         )
         .unwrap();
         assert!(
@@ -1549,6 +1690,7 @@ mod tests {
                     width: 1.0,
                     height: 1.0
                 },
+                None,
                 None
             )
             .is_err()
