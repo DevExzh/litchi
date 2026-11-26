@@ -53,6 +53,39 @@ routed through the shared typed normalization layer. Unsupported masks,
 device-dependent `Bitmap16` sources, CMYK decode, or destination/pattern-
 dependent ROPs fail explicitly.
 
+## Macintosh PICT
+
+PICT version 1, version 2 and extended version 2 pictures are read with or
+without the 512-byte file header, following *Inside Macintosh: Imaging With
+QuickDraw*, Appendix A. Every opcode is framed by its defined length, so
+reserved opcodes are skipped as QuickDraw skips them. Playback emits SVG:
+
+- lines, rectangles, rounded rectangles, ovals, arcs, polygons and regions in
+  their frame, paint, erase and fill forms, drawn with the pen size, the
+  pen, fill and background patterns, and the port colours;
+- one-bit, dither and colour pixel patterns;
+- text with font, face, size, ratio and spacing, decoded from Mac OS Roman
+  (and from the Symbol font encoding);
+- clipping regions and origin changes;
+- `BitsRect`, `BitsRgn`, `PackBitsRect`, `PackBitsRgn`, `DirectBitsRect` and
+  `DirectBitsRgn` with 1/2/4/8-bit indexed and 16/32-bit direct pixels, every
+  packing type, source cropping, scaling, mask regions and the copy, or,
+  bit-clear and transparent transfer modes;
+- QuickTime compressed images whose codec is JPEG, PNG, GIF, TIFF, BMP,
+  uncompressed (`raw `), a Windows DIB or a Windows metafile, placed through
+  their matrix and mask region; the drawing QuickTime pictures carry for
+  readers without QuickTime is skipped as QuickTime skips it.
+
+The native resolution of an extended version 2 picture sets its size, and
+pens keep the one-pixel minimum `DrawPicture` gives them. Video codecs,
+mattes, exclusive-or and inverting drawing, and the remaining arithmetic
+transfer modes are drawn approximately and reported through
+`ConversionReport::diagnostics`; the strict helpers (`pict::convert_pict*`,
+and `to_png`, `to_svg` and `convert` for PICT BLIPs) reject such pictures
+instead of returning a placeholder image. Input QuickDraw tolerates, such as
+a missing end-of-picture opcode or trailing bytes, is reported with
+`noncanonical-*` diagnostics.
+
 ## Resource and safety model
 
 Strict framing checks run before playback. Caller limits cover encoded and
